@@ -51,7 +51,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TReplicaPreference;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
-import org.apache.impala.thrift.TScanRangeLocations;
+import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.util.MembershipSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -353,7 +353,7 @@ public class HdfsScanNode extends ScanNode {
                 fileDesc.getFileName(), currentOffset, currentLength, partition.getId(),
                 fileDesc.getFileLength(), fileDesc.getFileCompression(),
                 fileDesc.getModificationTime()));
-            TScanRangeLocations scanRangeLocations = new TScanRangeLocations();
+            TScanRangeLocationList scanRangeLocations = new TScanRangeLocationList();
             scanRangeLocations.scan_range = scanRange;
             scanRangeLocations.locations = locations;
             scanRanges_.add(scanRangeLocations);
@@ -456,7 +456,7 @@ public class HdfsScanNode extends ScanNode {
     int totalNodes = 0;
     int numLocalRanges = 0;
     int numRemoteRanges = 0;
-    for (TScanRangeLocations range: scanRanges_) {
+    for (TScanRangeLocationList range: scanRanges_) {
       boolean anyLocal = false;
       for (TScanRangeLocation loc: range.locations) {
         TNetworkAddress dataNode = analyzer.getHostIndex().getEntry(loc.getHost_idx());

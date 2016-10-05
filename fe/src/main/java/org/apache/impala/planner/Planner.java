@@ -302,9 +302,7 @@ public class Planner {
       for (int i = 0; i < fragments.size(); ++i) {
         PlanFragment fragment = fragments.get(i);
         str.append(fragment.getExplainString(explainLevel));
-        if (explainLevel == TExplainLevel.VERBOSE && i + 1 != fragments.size()) {
-          str.append("\n");
-        }
+        if (i < fragments.size() - 1) str.append("\n");
       }
     }
     return str.toString();

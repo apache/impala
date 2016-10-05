@@ -100,10 +100,6 @@ struct DebugOptions;
 ///
 /// TODO: move into separate subdirectory and move nested classes into separate files
 /// and unnest them
-///
-/// TODO: remove all data structures and functions that are superceded by their
-/// multi-threaded counterpart and remove the "Mt" prefix with which the latter
-/// is currently marked
 class Coordinator {
  public:
   Coordinator(const QuerySchedule& schedule, ExecEnv* exec_env,
@@ -216,7 +212,8 @@ class Coordinator {
 
  private:
   class FragmentInstanceState;
-  struct FilterState;
+  struct FilterTarget;
+  class FilterState;
 
   /// Typedef for boost utility to compute averaged stats
   /// TODO: including the median doesn't compile, looks like some includes are missing
@@ -253,7 +250,7 @@ class Coordinator {
 
   /// FragmentInstanceStates for all fragment instances, including that of the coordinator
   /// fragment. All elements are non-nullptr. Owned by obj_pool(). Filled in
-  /// PrepareCoordFragment() and StartRemoteFragments()/MtStartRemoteFInstances().
+  /// StartFInstances().
   std::vector<FragmentInstanceState*> fragment_instance_states_;
 
   /// True if the query needs a post-execution step to tidy up
@@ -412,22 +409,6 @@ class Coordinator {
   /// returned, successfully or not. Initialised during Exec().
   boost::scoped_ptr<CountingBarrier> exec_complete_barrier_;
 
-  /// Represents a runtime filter target.
-  struct FilterTarget {
-    TPlanNodeId node_id;
-    bool is_local;
-    bool is_bound_by_partition_columns;
-
-    // indices into fragment_instance_states_
-    boost::unordered_set<int> fragment_instance_state_idxs;
-
-    FilterTarget(const TRuntimeFilterTargetDesc& tFilterTarget) {
-      node_id = tFilterTarget.node_id;
-      is_bound_by_partition_columns = tFilterTarget.is_bound_by_partition_columns;
-      is_local = tFilterTarget.is_local_target;
-    }
-  };
-
   /// Protects filter_routing_table_.
   SpinLock filter_lock_;
 
@@ -444,7 +425,7 @@ class Coordinator {
   RuntimeProfile::Counter* filter_updates_received_;
 
   /// The filtering mode for this query. Set in constructor.
-  const TRuntimeFilterMode::type filter_mode_;
+  TRuntimeFilterMode::type filter_mode_;
 
   /// Tracks the memory consumed by runtime filters during aggregation. Child of
   /// query_mem_tracker_.
@@ -459,22 +440,13 @@ class Coordinator {
   /// Sets 'filter_routing_table_complete_' and prints the table to the profile and log.
   void MarkFilterRoutingTableComplete();
 
-  /// Fill in rpc_params based on parameters.
-  /// 'per_fragment_instance_idx' is the 0-based ordinal of this particular fragment
-  /// instance within its fragment.
-  void SetExecPlanFragmentParams(const TPlanFragment& fragment,
-      const FragmentExecParams& params, int per_fragment_instance_idx,
-      TExecPlanFragmentParams* rpc_params);
-  void MtSetExecPlanFragmentParams(
+  /// Fill in rpc_params based on params.
+  void SetExecPlanFragmentParams(
       const FInstanceExecParams& params, TExecPlanFragmentParams* rpc_params);
 
   /// Wrapper for ExecPlanFragment() RPC. This function will be called in parallel from
-  /// multiple threads. Creates a new FragmentInstanceState and registers it in
-  /// fragment_instance_states_, then calls RPC to issue fragment on remote impalad.
-  void ExecRemoteFragment(const FragmentExecParams& fragment_exec_params,
-      const TPlanFragment& plan_fragment, DebugOptions* debug_options,
-      int fragment_instance_idx);
-  void MtExecRemoteFInstance(
+  /// multiple threads.
+  void ExecRemoteFInstance(
       const FInstanceExecParams& exec_params, const DebugOptions* debug_options);
 
   /// Determine fragment number, given fragment id.
@@ -518,14 +490,13 @@ class Coordinator {
   /// Moves all temporary staging files to their final destinations.
   Status FinalizeSuccessfulInsert();
 
-  /// Initializes the structures in runtime profile and exec_summary_. Must be
-  /// called before RPCs to start remote fragments.
-  void InitExecProfile(const TQueryExecRequest& request);
-  void MtInitExecProfiles();
+  /// Initializes the structures in fragment_profiles_. Must be called before RPCs to
+  /// start remote fragments.
+  void InitExecProfiles();
 
   /// Initialize the structures to collect execution summary of every plan node
   /// (exec_summary_ and plan_node_id_to_summary_map_)
-  void MtInitExecSummary();
+  void InitExecSummary();
 
   /// Update fragment profile information from a fragment instance state.
   void UpdateAverageProfile(FragmentInstanceState* fragment_instance_state);
@@ -556,13 +527,10 @@ class Coordinator {
   void PopulatePathPermissionCache(hdfsFS fs, const std::string& path_str,
       PermissionCache* permissions_cache);
 
-  /// Starts all fragment instances contained in the schedule by issuing RPCs in parallel,
-  /// and then waiting for all of the RPCs to complete.
-  void StartFragments();
-
-  /// Starts all fragment instances contained in the schedule by issuing RPCs in parallel
-  /// and then waiting for all of the RPCs to complete.
-  void MtStartFInstances();
+  /// Starts all fragment instances contained in the schedule by issuing RPCs in
+  /// parallel and then waiting for all of the RPCs to complete. Also sets up and
+  /// registers the state for all fragment instances.
+  void StartFInstances();
 
   /// Calls CancelInternal() and returns an error if there was any error starting the
   /// fragments.
@@ -570,11 +538,8 @@ class Coordinator {
   Status FinishInstanceStartup();
 
   /// Build the filter routing table by iterating over all plan nodes and collecting the
-  /// filters that they either produce or consume. The source and target fragment
-  /// instance indexes for filters are numbered in the range
-  /// [start_fragment_instance_idx .. start_fragment_instance_idx + num_hosts]
-  void UpdateFilterRoutingTable(const std::vector<TPlanNode>& plan_nodes, int num_hosts,
-      int start_fragment_instance_idx);
+  /// filters that they either produce or consume.
+  void UpdateFilterRoutingTable(const FragmentExecParams& fragment_params);
 };
 
 }

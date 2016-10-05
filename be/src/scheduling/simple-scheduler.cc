@@ -31,7 +31,6 @@
 #include "common/logging.h"
 #include "util/metrics.h"
 #include "runtime/exec-env.h"
-#include "runtime/coordinator.h"
 #include "service/impala-server.h"
 
 #include "statestore/statestore-subscriber.h"
@@ -290,55 +289,17 @@ SimpleScheduler::BackendConfigPtr SimpleScheduler::GetBackendConfig() const {
   return backend_config;
 }
 
-void SimpleScheduler::SetBackendConfig(const BackendConfigPtr& backend_config)
-{
+void SimpleScheduler::SetBackendConfig(const BackendConfigPtr& backend_config) {
   lock_guard<mutex> l(backend_config_lock_);
   backend_config_ = backend_config;
 }
 
-Status SimpleScheduler::ComputeScanRangeAssignment(const TQueryExecRequest& exec_request,
-    QuerySchedule* schedule) {
-  map<TPlanNodeId, vector<TScanRangeLocations>>::const_iterator entry;
-  RuntimeProfile::Counter* total_assignment_timer =
-      ADD_TIMER(schedule->summary_profile(), "ComputeScanRangeAssignmentTimer");
-
-  BackendConfigPtr backend_config = GetBackendConfig();
-
-  for (entry = exec_request.per_node_scan_ranges.begin();
-      entry != exec_request.per_node_scan_ranges.end(); ++entry) {
-    const TPlanNodeId node_id = entry->first;
-    FragmentIdx fragment_idx = schedule->GetFragmentIdx(node_id);
-    const TPlanFragment& fragment = exec_request.fragments[fragment_idx];
-    bool exec_at_coord = (fragment.partition.type == TPartitionType::UNPARTITIONED);
-
-    const TPlanNode& node = fragment.plan.nodes[schedule->GetNodeIdx(node_id)];
-    DCHECK_EQ(node.node_id, node_id);
-
-    const TReplicaPreference::type* node_replica_preference = node.__isset.hdfs_scan_node
-        && node.hdfs_scan_node.__isset.replica_preference
-        ? &node.hdfs_scan_node.replica_preference : NULL;
-
-    bool node_random_replica = node.__isset.hdfs_scan_node
-        && node.hdfs_scan_node.__isset.random_replica
-        && node.hdfs_scan_node.random_replica;
-
-    FragmentScanRangeAssignment* assignment =
-        &(*schedule->exec_params())[fragment_idx].scan_range_assignment;
-    RETURN_IF_ERROR(ComputeScanRangeAssignment(*backend_config,
-        node_id, node_replica_preference, node_random_replica, entry->second,
-        exec_request.host_list, exec_at_coord, schedule->query_options(),
-        total_assignment_timer, assignment));
-    schedule->IncNumScanRanges(entry->second.size());
-  }
-  return Status::OK();
-}
-
-Status SimpleScheduler::MtComputeScanRangeAssignment(QuerySchedule* schedule) {
+Status SimpleScheduler::ComputeScanRangeAssignment(QuerySchedule* schedule) {
   RuntimeProfile::Counter* total_assignment_timer =
       ADD_TIMER(schedule->summary_profile(), "ComputeScanRangeAssignmentTimer");
   BackendConfigPtr backend_config = GetBackendConfig();
   const TQueryExecRequest& exec_request = schedule->request();
-  for (const TPlanExecInfo& plan_exec_info: exec_request.mt_plan_exec_info) {
+  for (const TPlanExecInfo& plan_exec_info: exec_request.plan_exec_info) {
     for (const auto& entry: plan_exec_info.per_node_scan_ranges) {
       const TPlanNodeId node_id = entry.first;
       const TPlanFragment& fragment = schedule->GetContainingFragment(node_id);
@@ -366,38 +327,34 @@ Status SimpleScheduler::MtComputeScanRangeAssignment(QuerySchedule* schedule) {
   return Status::OK();
 }
 
-void SimpleScheduler::MtComputeFragmentExecParams(QuerySchedule* schedule) {
+void SimpleScheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
   const TQueryExecRequest& exec_request = schedule->request();
 
   // for each plan, compute the FInstanceExecParams for the tree of fragments
-  for (const TPlanExecInfo& plan_exec_info: exec_request.mt_plan_exec_info) {
+  for (const TPlanExecInfo& plan_exec_info: exec_request.plan_exec_info) {
     // set instance_id, host, per_node_scan_ranges
-    MtComputeFragmentExecParams(
-        plan_exec_info,
+    ComputeFragmentExecParams(plan_exec_info,
         schedule->GetFragmentExecParams(plan_exec_info.fragments[0].idx),
         schedule);
 
     // Set destinations, per_exch_num_senders, sender_id.
-    // fragments[f] sends its output to fragments[dest_fragment_idx[f-1]];
-    // fragments[0] is an endpoint.
-    for (int i = 0; i < plan_exec_info.dest_fragment_idx.size(); ++i) {
-      int dest_idx = plan_exec_info.dest_fragment_idx[i];
+    for (const TPlanFragment& src_fragment: plan_exec_info.fragments) {
+      if (!src_fragment.output_sink.__isset.stream_sink) continue;
+      FragmentIdx dest_idx =
+          schedule->GetFragmentIdx(src_fragment.output_sink.stream_sink.dest_node_id);
       DCHECK_LT(dest_idx, plan_exec_info.fragments.size());
       const TPlanFragment& dest_fragment = plan_exec_info.fragments[dest_idx];
-      DCHECK_LT(i + 1, plan_exec_info.fragments.size());
-      const TPlanFragment& src_fragment = plan_exec_info.fragments[i + 1];
-      DCHECK(src_fragment.output_sink.__isset.stream_sink);
-      MtFragmentExecParams* dest_params =
+      FragmentExecParams* dest_params =
           schedule->GetFragmentExecParams(dest_fragment.idx);
-      MtFragmentExecParams* src_params =
+      FragmentExecParams* src_params =
           schedule->GetFragmentExecParams(src_fragment.idx);
 
       // populate src_params->destinations
       src_params->destinations.resize(dest_params->instance_exec_params.size());
-      for (int j = 0; j < dest_params->instance_exec_params.size(); ++j) {
-        TPlanFragmentDestination& dest = src_params->destinations[j];
-        dest.__set_fragment_instance_id(dest_params->instance_exec_params[j].instance_id);
-        dest.__set_server(dest_params->instance_exec_params[j].host);
+      for (int i = 0; i < dest_params->instance_exec_params.size(); ++i) {
+        TPlanFragmentDestination& dest = src_params->destinations[i];
+        dest.__set_fragment_instance_id(dest_params->instance_exec_params[i].instance_id);
+        dest.__set_server(dest_params->instance_exec_params[i].host);
       }
 
       // enumerate senders consecutively;
@@ -411,26 +368,24 @@ void SimpleScheduler::MtComputeFragmentExecParams(QuerySchedule* schedule) {
       int sender_id_base = dest_params->per_exch_num_senders[exch_id];
       dest_params->per_exch_num_senders[exch_id] +=
           src_params->instance_exec_params.size();
-      for (int j = 0; j < src_params->instance_exec_params.size(); ++j) {
-        FInstanceExecParams& src_instance_params = src_params->instance_exec_params[j];
-        src_instance_params.sender_id = sender_id_base + j;
+      for (int i = 0; i < src_params->instance_exec_params.size(); ++i) {
+        FInstanceExecParams& src_instance_params = src_params->instance_exec_params[i];
+        src_instance_params.sender_id = sender_id_base + i;
       }
     }
   }
 }
 
-void SimpleScheduler::MtComputeFragmentExecParams(
-    const TPlanExecInfo& plan_exec_info, MtFragmentExecParams* fragment_params,
+void SimpleScheduler::ComputeFragmentExecParams(
+    const TPlanExecInfo& plan_exec_info, FragmentExecParams* fragment_params,
     QuerySchedule* schedule) {
   // traverse input fragments
   for (FragmentIdx input_fragment_idx: fragment_params->input_fragments) {
-    MtComputeFragmentExecParams(
+    ComputeFragmentExecParams(
         plan_exec_info, schedule->GetFragmentExecParams(input_fragment_idx), schedule);
   }
 
   const TPlanFragment& fragment = fragment_params->fragment;
-  // TODO: deal with Union nodes
-  DCHECK(!ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE));
   // case 1: single instance executed at coordinator
   if (fragment.partition.type == TPartitionType::UNPARTITIONED) {
     const TNetworkAddress& coord = local_backend_descriptor_.address;
@@ -439,7 +394,7 @@ void SimpleScheduler::MtComputeFragmentExecParams(
         ? schedule->query_id()
         : schedule->GetNextInstanceId();
     fragment_params->instance_exec_params.emplace_back(
-      instance_id, coord, 0, *fragment_params);
+        instance_id, coord, 0, *fragment_params);
     FInstanceExecParams& instance_params = fragment_params->instance_exec_params.back();
 
     // That instance gets all of the scan ranges, if there are any.
@@ -448,25 +403,81 @@ void SimpleScheduler::MtComputeFragmentExecParams(
       auto first_entry = fragment_params->scan_range_assignment.begin();
       instance_params.per_node_scan_ranges = first_entry->second;
     }
+
+    return;
+  }
+
+  if (ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE)) {
+    CreateUnionInstances(fragment_params, schedule);
+    return;
+  }
+
+  PlanNodeId leftmost_scan_id = FindLeftmostScan(fragment.plan);
+  if (leftmost_scan_id != g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
+    // case 2: leaf fragment with leftmost scan
+    // TODO: check that there's only one scan in this fragment
+    CreateScanInstances(leftmost_scan_id, fragment_params, schedule);
   } else {
-    PlanNodeId leftmost_scan_id = FindLeftmostScan(fragment.plan);
-    if (leftmost_scan_id != g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
-      // case 2: leaf fragment with leftmost scan
-      // TODO: check that there's only one scan in this fragment
-      MtCreateScanInstances(leftmost_scan_id, fragment_params, schedule);
-    } else {
-      // case 3: interior fragment without leftmost scan
-      // we assign the same hosts as those of our leftmost input fragment (so that a
-      // merge aggregation fragment runs on the hosts that provide the input data)
-      MtCreateMirrorInstances(fragment_params, schedule);
+    // case 3: interior fragment without leftmost scan
+    // we assign the same hosts as those of our leftmost input fragment (so that a
+    // merge aggregation fragment runs on the hosts that provide the input data)
+    CreateCollocatedInstances(fragment_params, schedule);
+  }
+}
+
+void SimpleScheduler::CreateUnionInstances(
+    FragmentExecParams* fragment_params, QuerySchedule* schedule) {
+  const TPlanFragment& fragment = fragment_params->fragment;
+  DCHECK(ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE));
+
+  // Add hosts of scan nodes.
+  vector<TPlanNodeType::type> scan_node_types {
+    TPlanNodeType::HDFS_SCAN_NODE, TPlanNodeType::HBASE_SCAN_NODE,
+    TPlanNodeType::DATA_SOURCE_NODE, TPlanNodeType::KUDU_SCAN_NODE};
+  vector<TPlanNodeId> scan_node_ids;
+  FindNodes(fragment.plan, scan_node_types, &scan_node_ids);
+  vector<TNetworkAddress> scan_hosts;
+  for (TPlanNodeId id: scan_node_ids) GetScanHosts(id, *fragment_params, &scan_hosts);
+
+  unordered_set<TNetworkAddress> hosts(scan_hosts.begin(), scan_hosts.end());
+
+  // Add hosts of input fragments.
+  for (FragmentIdx idx: fragment_params->input_fragments) {
+    const FragmentExecParams& input_params = *schedule->GetFragmentExecParams(idx);
+    for (const FInstanceExecParams& instance_params: input_params.instance_exec_params) {
+      hosts.insert(instance_params.host);
+    }
+  }
+  DCHECK(!hosts.empty())
+      << "no hosts for fragment " << fragment.idx << " with a UnionNode";
+
+  // create a single instance per host
+  // TODO-MT: figure out how to parallelize Union
+  int per_fragment_idx = 0;
+  for (const TNetworkAddress& host: hosts) {
+    fragment_params->instance_exec_params.emplace_back(
+        schedule->GetNextInstanceId(), host, per_fragment_idx++, *fragment_params);
+    // assign all scan ranges
+    FInstanceExecParams& instance_params = fragment_params->instance_exec_params.back();
+    if (fragment_params->scan_range_assignment.count(host) > 0) {
+      instance_params.per_node_scan_ranges = fragment_params->scan_range_assignment[host];
     }
   }
 }
 
-void SimpleScheduler::MtCreateScanInstances(
-    PlanNodeId leftmost_scan_id, MtFragmentExecParams* fragment_params,
+void SimpleScheduler::CreateScanInstances(
+    PlanNodeId leftmost_scan_id, FragmentExecParams* fragment_params,
     QuerySchedule* schedule) {
   int max_num_instances = schedule->request().query_ctx.request.query_options.mt_dop;
+  if (max_num_instances == 0) max_num_instances = 1;
+
+  if (fragment_params->scan_range_assignment.empty()) {
+    // this scan doesn't have any scan ranges: run a single instance on the coordinator
+    fragment_params->instance_exec_params.emplace_back(
+        schedule->GetNextInstanceId(), local_backend_descriptor_.address, 0, *fragment_params);
+    return;
+  }
+
   for (const auto& assignment_entry: fragment_params->scan_range_assignment) {
     // evenly divide up the scan ranges of the leftmost scan between at most
     // <dop> instances
@@ -477,9 +488,13 @@ void SimpleScheduler::MtCreateScanInstances(
 
     int64 total_size = 0;
     for (const TScanRangeParams& params: params_list) {
-      // TODO: implement logic for hbase and kudu
-      DCHECK(params.scan_range.__isset.hdfs_file_split);
-      total_size += params.scan_range.hdfs_file_split.length;
+      if (params.scan_range.__isset.hdfs_file_split) {
+        total_size += params.scan_range.hdfs_file_split.length;
+      } else {
+        // fake load-balancing for Kudu and Hbase: every split has length 1
+        // TODO: implement more accurate logic for Kudu and Hbase
+        ++total_size;
+      }
     }
 
     // try to load-balance scan ranges by assigning just beyond the average number of
@@ -507,7 +522,12 @@ void SimpleScheduler::MtCreateScanInstances(
         const TScanRangeParams& scan_range_params = params_list[params_idx];
         instance_params.per_node_scan_ranges[leftmost_scan_id].push_back(
             scan_range_params);
-        total_assigned_bytes += scan_range_params.scan_range.hdfs_file_split.length;
+        if (scan_range_params.scan_range.__isset.hdfs_file_split) {
+          total_assigned_bytes += scan_range_params.scan_range.hdfs_file_split.length;
+        } else {
+          // for Kudu and Hbase every split has length 1
+          ++total_assigned_bytes;
+        }
         ++params_idx;
       }
       if (params_idx >= params_list.size()) break;  // nothing left to assign
@@ -516,10 +536,10 @@ void SimpleScheduler::MtCreateScanInstances(
   }
 }
 
-void SimpleScheduler::MtCreateMirrorInstances(
-    MtFragmentExecParams* fragment_params, QuerySchedule* schedule) {
+void SimpleScheduler::CreateCollocatedInstances(
+    FragmentExecParams* fragment_params, QuerySchedule* schedule) {
   DCHECK_GE(fragment_params->input_fragments.size(), 1);
-  const MtFragmentExecParams* input_fragment_params =
+  const FragmentExecParams* input_fragment_params =
       schedule->GetFragmentExecParams(fragment_params->input_fragments[0]);
   int per_fragment_instance_idx = 0;
   for (const FInstanceExecParams& input_instance_params:
@@ -533,7 +553,7 @@ void SimpleScheduler::MtCreateMirrorInstances(
 Status SimpleScheduler::ComputeScanRangeAssignment(
     const BackendConfig& backend_config, PlanNodeId node_id,
     const TReplicaPreference::type* node_replica_preference, bool node_random_replica,
-    const vector<TScanRangeLocations>& locations,
+    const vector<TScanRangeLocationList>& locations,
     const vector<TNetworkAddress>& host_list, bool exec_at_coord,
     const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
     FragmentScanRangeAssignment* assignment) {
@@ -564,11 +584,11 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
   AssignmentCtx assignment_ctx(backend_config, total_assignments_,
       total_local_assignments_);
 
-  vector<const TScanRangeLocations*> remote_scan_range_locations;
+  vector<const TScanRangeLocationList*> remote_scan_range_locations;
 
   // Loop over all scan ranges, select a backend for those with local impalads and collect
   // all others for later processing.
-  for (const TScanRangeLocations& scan_range_locations: locations) {
+  for (const TScanRangeLocationList& scan_range_locations: locations) {
     TReplicaPreference::type min_distance = TReplicaPreference::REMOTE;
 
     // Select backend host for the current scan range.
@@ -643,7 +663,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
   }  // End of for loop over scan ranges.
 
   // Assign remote scans to backends.
-  for (const TScanRangeLocations* scan_range_locations: remote_scan_range_locations) {
+  for (const TScanRangeLocationList* scan_range_locations: remote_scan_range_locations) {
     const IpAddr* backend_ip = assignment_ctx.SelectRemoteBackendHost();
     TBackendDescriptor backend;
     assignment_ctx.SelectBackendOnHost(*backend_ip, &backend);
@@ -654,132 +674,6 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
   if (VLOG_FILE_IS_ON) assignment_ctx.PrintAssignment(*assignment);
 
   return Status::OK();
-}
-
-void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_request,
-    QuerySchedule* schedule) {
-  vector<FragmentExecParams>* fragment_exec_params = schedule->exec_params();
-  // assign instance ids
-  int64_t num_fragment_instances = 0;
-  for (FragmentExecParams& params: *fragment_exec_params) {
-    for (int j = 0; j < params.hosts.size(); ++j, ++num_fragment_instances) {
-      params.instance_ids.push_back(
-          CreateInstanceId(schedule->query_id(), num_fragment_instances));
-    }
-  }
-
-  // compute destinations and # senders per exchange node
-  // (the root fragment doesn't have a destination)
-  for (int i = 1; i < fragment_exec_params->size(); ++i) {
-    FragmentExecParams& params = (*fragment_exec_params)[i];
-    int dest_fragment_idx = exec_request.dest_fragment_idx[i - 1];
-    DCHECK_LT(dest_fragment_idx, fragment_exec_params->size());
-    FragmentExecParams& dest_params = (*fragment_exec_params)[dest_fragment_idx];
-
-    // set # of senders
-    DCHECK(exec_request.fragments[i].output_sink.__isset.stream_sink);
-    const TDataStreamSink& sink = exec_request.fragments[i].output_sink.stream_sink;
-    // we can only handle unpartitioned (= broadcast), random-partitioned or
-    // hash-partitioned output at the moment
-    DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
-           || sink.output_partition.type == TPartitionType::HASH_PARTITIONED
-           || sink.output_partition.type == TPartitionType::RANDOM);
-    PlanNodeId exch_id = sink.dest_node_id;
-    // we might have multiple fragments sending to this exchange node
-    // (distributed MERGE), which is why we need to add up the #senders
-    params.sender_id_base = dest_params.per_exch_num_senders[exch_id];
-    dest_params.per_exch_num_senders[exch_id] += params.hosts.size();
-
-    // create one TPlanFragmentDestination per destination host
-    params.destinations.resize(dest_params.hosts.size());
-    for (int j = 0; j < dest_params.hosts.size(); ++j) {
-      TPlanFragmentDestination& dest = params.destinations[j];
-      dest.fragment_instance_id = dest_params.instance_ids[j];
-      dest.server = dest_params.hosts[j];
-      VLOG_RPC  << "dest for fragment " << i << ":"
-                << " instance_id=" << dest.fragment_instance_id
-                << " server=" << dest.server;
-    }
-  }
-}
-
-void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request,
-    QuerySchedule* schedule) {
-  vector<FragmentExecParams>* fragment_exec_params = schedule->exec_params();
-  DCHECK_EQ(fragment_exec_params->size(), exec_request.fragments.size());
-
-  // compute hosts of producer fragment before those of consumer fragment(s),
-  // the latter might inherit the set of hosts from the former
-  for (int i = exec_request.fragments.size() - 1; i >= 0; --i) {
-    const TPlanFragment& fragment = exec_request.fragments[i];
-    FragmentExecParams& params = (*fragment_exec_params)[i];
-    if (fragment.partition.type == TPartitionType::UNPARTITIONED) {
-      // all single-node fragments run on the coordinator host
-      params.hosts.push_back(local_backend_descriptor_.address);
-      continue;
-    }
-
-    // UnionNodes are special because they can consume multiple partitioned inputs,
-    // as well as execute multiple scans in the same fragment.
-    // Fragments containing a UnionNode are executed on the union of hosts of all
-    // scans in the fragment as well as the hosts of all its input fragments (s.t.
-    // a UnionNode with partitioned joins or grouping aggregates as children runs on
-    // at least as many hosts as the input to those children).
-    if (ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE)) {
-      vector<TPlanNodeType::type> scan_node_types {
-        TPlanNodeType::HDFS_SCAN_NODE, TPlanNodeType::HBASE_SCAN_NODE,
-        TPlanNodeType::DATA_SOURCE_NODE, TPlanNodeType::KUDU_SCAN_NODE};
-      vector<TPlanNodeId> scan_nodes;
-      FindNodes(fragment.plan, scan_node_types, &scan_nodes);
-      vector<TPlanNodeId> exch_nodes;
-      FindNodes(fragment.plan,
-          vector<TPlanNodeType::type>(1, TPlanNodeType::EXCHANGE_NODE),
-          &exch_nodes);
-
-      // Add hosts of scan nodes.
-      vector<TNetworkAddress> scan_hosts;
-      for (int j = 0; j < scan_nodes.size(); ++j) {
-        GetScanHosts(scan_nodes[j], exec_request, params, &scan_hosts);
-      }
-      unordered_set<TNetworkAddress> hosts(scan_hosts.begin(), scan_hosts.end());
-
-      // Add hosts of input fragments.
-      for (int j = 0; j < exch_nodes.size(); ++j) {
-        int input_fragment_idx = FindSenderFragment(exch_nodes[j], i, exec_request);
-        const vector<TNetworkAddress>& input_fragment_hosts =
-            (*fragment_exec_params)[input_fragment_idx].hosts;
-        hosts.insert(input_fragment_hosts.begin(), input_fragment_hosts.end());
-      }
-      DCHECK(!hosts.empty()) << "no hosts for fragment " << i << " with a UnionNode";
-
-      params.hosts.assign(hosts.begin(), hosts.end());
-      continue;
-    }
-
-    PlanNodeId leftmost_scan_id = FindLeftmostScan(fragment.plan);
-    if (leftmost_scan_id == g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
-      // there is no leftmost scan; we assign the same hosts as those of our
-      // leftmost input fragment (so that a partitioned aggregation fragment
-      // runs on the hosts that provide the input data)
-      int input_fragment_idx = FindLeftmostInputFragment(i, exec_request);
-      DCHECK_GE(input_fragment_idx, 0);
-      DCHECK_LT(input_fragment_idx, fragment_exec_params->size());
-      params.hosts = (*fragment_exec_params)[input_fragment_idx].hosts;
-      // TODO: switch to unpartitioned/coord execution if our input fragment
-      // is executed that way (could have been downgraded from distributed)
-      continue;
-    }
-
-    // This fragment is executed on those hosts that have scan ranges
-    // for the leftmost scan.
-    GetScanHosts(leftmost_scan_id, exec_request, params, &params.hosts);
-  }
-
-  unordered_set<TNetworkAddress> unique_hosts;
-  for (const FragmentExecParams& exec_params: *fragment_exec_params) {
-    unique_hosts.insert(exec_params.hosts.begin(), exec_params.hosts.end());
-  }
-  schedule->SetUniqueHosts(unique_hosts);
 }
 
 PlanNodeId SimpleScheduler::FindLeftmostNode(
@@ -827,11 +721,17 @@ void SimpleScheduler::FindNodes(const TPlan& plan,
 }
 
 void SimpleScheduler::GetScanHosts(TPlanNodeId scan_id,
-    const TQueryExecRequest& exec_request, const FragmentExecParams& params,
-    vector<TNetworkAddress>* scan_hosts) {
-  map<TPlanNodeId, vector<TScanRangeLocations>>::const_iterator entry =
-      exec_request.per_node_scan_ranges.find(scan_id);
-  if (entry == exec_request.per_node_scan_ranges.end() || entry->second.empty()) {
+    const FragmentExecParams& params, vector<TNetworkAddress>* scan_hosts) {
+  // Get the list of impalad host from scan_range_assignment_
+  for (const FragmentScanRangeAssignment::value_type& scan_range_assignment:
+      params.scan_range_assignment) {
+    const PerNodeScanRanges& per_node_scan_ranges = scan_range_assignment.second;
+    if (per_node_scan_ranges.find(scan_id) != per_node_scan_ranges.end()) {
+      scan_hosts->push_back(scan_range_assignment.first);
+    }
+  }
+
+  if (scan_hosts->empty()) {
     // this scan node doesn't have any scan ranges; run it on the coordinator
     // TODO: we'll need to revisit this strategy once we can partition joins
     // (in which case this fragment might be executing a right outer join
@@ -839,40 +739,6 @@ void SimpleScheduler::GetScanHosts(TPlanNodeId scan_id,
     scan_hosts->push_back(local_backend_descriptor_.address);
     return;
   }
-
-  // Get the list of impalad host from scan_range_assignment_
-  for (const FragmentScanRangeAssignment::value_type& scan_range_assignment:
-      params.scan_range_assignment) {
-    scan_hosts->push_back(scan_range_assignment.first);
-  }
-}
-
-int SimpleScheduler::FindLeftmostInputFragment(
-    int fragment_idx, const TQueryExecRequest& exec_request) {
-  // find the leftmost node, which we expect to be an exchage node
-  vector<TPlanNodeType::type> exch_node_type;
-  exch_node_type.push_back(TPlanNodeType::EXCHANGE_NODE);
-  PlanNodeId exch_id =
-      FindLeftmostNode(exec_request.fragments[fragment_idx].plan, exch_node_type);
-  if (exch_id == g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
-    return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
-  }
-  // find the fragment that sends to this exchange node
-  return FindSenderFragment(exch_id, fragment_idx, exec_request);
-}
-
-int SimpleScheduler::FindSenderFragment(TPlanNodeId exch_id, int fragment_idx,
-    const TQueryExecRequest& exec_request) {
-  for (int i = 0; i < exec_request.dest_fragment_idx.size(); ++i) {
-    if (exec_request.dest_fragment_idx[i] != fragment_idx) continue;
-    const TPlanFragment& input_fragment = exec_request.fragments[i + 1];
-    DCHECK(input_fragment.__isset.output_sink);
-    DCHECK(input_fragment.output_sink.__isset.stream_sink);
-    if (input_fragment.output_sink.stream_sink.dest_node_id == exch_id) return i + 1;
-  }
-  // this shouldn't happen
-  DCHECK(false) << "no fragment sends to exch id " << exch_id;
-  return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
 }
 
 Status SimpleScheduler::Schedule(QuerySchedule* schedule) {
@@ -882,28 +748,25 @@ Status SimpleScheduler::Schedule(QuerySchedule* schedule) {
   schedule->set_request_pool(resolved_pool);
   schedule->summary_profile()->AddInfoString("Request Pool", resolved_pool);
 
+  RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule));
+  ComputeFragmentExecParams(schedule);
+#ifndef NDEBUG
+  schedule->Validate();
+#endif
+
+  // compute unique hosts
+  unordered_set<TNetworkAddress> unique_hosts;
+  for (const FragmentExecParams& f: schedule->fragment_exec_params()) {
+    for (const FInstanceExecParams& i: f.instance_exec_params) {
+      unique_hosts.insert(i.host);
+    }
+  }
+  schedule->SetUniqueHosts(unique_hosts);
+
+  // TODO-MT: call AdmitQuery()
   bool is_mt_execution = schedule->request().query_ctx.request.query_options.mt_dop > 0;
-  if (is_mt_execution) {
-    RETURN_IF_ERROR(MtComputeScanRangeAssignment(schedule));
-    MtComputeFragmentExecParams(schedule);
-
-    // compute unique hosts
-    unordered_set<TNetworkAddress> unique_hosts;
-    for (const MtFragmentExecParams& f: schedule->mt_fragment_exec_params()) {
-      for (const FInstanceExecParams& i: f.instance_exec_params) {
-        unique_hosts.insert(i.host);
-      }
-    }
-    schedule->SetUniqueHosts(unique_hosts);
-
-    // TODO-MT: call AdmitQuery()
-  } else {
-    RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule->request(), schedule));
-    ComputeFragmentHosts(schedule->request(), schedule);
-    ComputeFragmentExecParams(schedule->request(), schedule);
-    if (!FLAGS_disable_admission_control) {
-      RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
-    }
+  if (!is_mt_execution && !FLAGS_disable_admission_control) {
+    RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
   }
   return Status::OK();
 }
@@ -1020,7 +883,7 @@ void SimpleScheduler::AssignmentCtx::SelectBackendOnHost(const IpAddr& backend_i
 void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
     const TBackendDescriptor& backend, PlanNodeId node_id,
     const vector<TNetworkAddress>& host_list,
-    const TScanRangeLocations& scan_range_locations,
+    const TScanRangeLocationList& scan_range_locations,
     FragmentScanRangeAssignment* assignment) {
   int64_t scan_range_length = 0;
   if (scan_range_locations.scan_range.__isset.hdfs_file_split) {

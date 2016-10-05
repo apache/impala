@@ -713,7 +713,12 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
         summary = exec_state->coord()->exec_summary();
       }
       if (include_json_plan) {
-        fragments = exec_state->exec_request().query_exec_request.fragments;
+        for (const TPlanExecInfo& plan_exec_info:
+            exec_state->exec_request().query_exec_request.plan_exec_info) {
+          for (const TPlanFragment& fragment: plan_exec_info.fragments) {
+            fragments.push_back(fragment);
+          }
+        }
       }
     }
   }

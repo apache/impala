@@ -111,7 +111,7 @@ MemTracker tracker;
 // constant query
 static Status PrepareSelectList(const TExecRequest& request, ExprContext** ctx) {
   const TQueryExecRequest& query_request = request.query_exec_request;
-  vector<TExpr> texprs = query_request.fragments[0].output_exprs;
+  vector<TExpr> texprs = query_request.plan_exec_info[0].fragments[0].output_exprs;
   DCHECK_EQ(texprs.size(), 1);
   RETURN_IF_ERROR(Expr::CreateExprTree(&pool, texprs[0], ctx));
   RETURN_IF_ERROR((*ctx)->Prepare(NULL, RowDescriptor(), &tracker));

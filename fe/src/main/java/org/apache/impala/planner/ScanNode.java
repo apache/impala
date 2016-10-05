@@ -26,7 +26,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TNetworkAddress;
-import org.apache.impala.thrift.TScanRangeLocations;
+import org.apache.impala.thrift.TScanRangeLocationList;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -45,7 +45,7 @@ abstract public class ScanNode extends PlanNode {
   protected int numPartitionsMissingStats_ = 0;
 
   // List of scan-range locations. Populated in init().
-  protected List<TScanRangeLocations> scanRanges_;
+  protected List<TScanRangeLocationList> scanRanges_;
 
   public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
     super(id, desc.getId().asList(), displayName);
@@ -82,7 +82,7 @@ abstract public class ScanNode extends PlanNode {
   /**
    * Returns all scan ranges plus their locations.
    */
-  public List<TScanRangeLocations> getScanRangeLocations() {
+  public List<TScanRangeLocationList> getScanRangeLocations() {
     Preconditions.checkNotNull(scanRanges_, "Need to call init() first.");
     return scanRanges_;
   }

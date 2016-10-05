@@ -1599,7 +1599,11 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   }
 
   // Save the query fragments so that the plan can be visualised.
-  fragments = exec_state.exec_request().query_exec_request.fragments;
+  for (const TPlanExecInfo& plan_exec_info:
+      exec_state.exec_request().query_exec_request.plan_exec_info) {
+    fragments.insert(fragments.end(),
+        plan_exec_info.fragments.begin(), plan_exec_info.fragments.end());
+  }
   all_rows_returned = exec_state.eos();
   last_active_time = exec_state.last_active();
 }

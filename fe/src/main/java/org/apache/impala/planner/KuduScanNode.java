@@ -43,7 +43,7 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
-import org.apache.impala.thrift.TScanRangeLocations;
+import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
@@ -183,7 +183,7 @@ public class KuduScanNode extends ScanNode {
             token.toString(), e);
       }
 
-      TScanRangeLocations locs = new TScanRangeLocations();
+      TScanRangeLocationList locs = new TScanRangeLocationList();
       locs.setScan_range(scanRange);
       locs.locations = locations;
       scanRanges_.add(locs);

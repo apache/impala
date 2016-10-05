@@ -379,8 +379,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
 Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     const TQueryExecRequest& query_exec_request) {
   // we always need at least one plan fragment
-  DCHECK(query_exec_request.fragments.size() > 0
-      || query_exec_request.mt_plan_exec_info.size() > 0);
+  DCHECK(query_exec_request.plan_exec_info.size() > 0);
 
   if (query_exec_request.__isset.query_plan) {
     stringstream plan_ss;
@@ -426,11 +425,6 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     }
     summary_profile_.AddInfoString(TABLES_WITH_CORRUPT_STATS_KEY, ss.str());
   }
-
-  bool is_mt_exec = query_exec_request.query_ctx.request.query_options.mt_dop > 0;
-  const TPlanFragment& fragment = is_mt_exec
-      ? query_exec_request.mt_plan_exec_info[0].fragments[0]
-      : query_exec_request.fragments[0];
 
   {
     lock_guard<mutex> l(lock_);

@@ -59,7 +59,7 @@ import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
-import org.apache.impala.thrift.TScanRangeLocations;
+import org.apache.impala.thrift.TScanRangeLocationList;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -337,13 +337,13 @@ public class HBaseScanNode extends ScanNode {
           // extend the key range
           setKeyRangeEnd(keyRange, curRegEndKey);
         } else {
-          // create a new HBaseKeyRange (and TScanRange2/TScanRangeLocations to go
+          // create a new HBaseKeyRange (and TScanRange2/TScanRangeLocationList to go
           // with it).
           keyRange = new THBaseKeyRange();
           setKeyRangeStart(keyRange, curRegStartKey);
           setKeyRangeEnd(keyRange, curRegEndKey);
 
-          TScanRangeLocations scanRangeLocation = new TScanRangeLocations();
+          TScanRangeLocationList scanRangeLocation = new TScanRangeLocationList();
           TNetworkAddress networkAddress = addressToTNetworkAddress(locEntry.getKey());
           scanRangeLocation.addToLocations(
               new TScanRangeLocation(analyzer.getHostIndex().getIndex(networkAddress)));
