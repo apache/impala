@@ -24,6 +24,8 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
+#include "gen-cpp/CatalogService.h"
+#include "gen-cpp/ImpalaInternalService.h"
 #include "runtime/backend-client.h"
 #include "runtime/client-cache.h"
 #include "runtime/coordinator.h"
@@ -36,25 +38,24 @@
 #include "runtime/thread-resource-mgr.h"
 #include "runtime/tmp-file-mgr.h"
 #include "scheduling/request-pool-service.h"
-#include "service/frontend.h"
 #include "scheduling/simple-scheduler.h"
+#include "service/fragment-mgr.h"
+#include "service/frontend.h"
 #include "statestore/statestore-subscriber.h"
+#include "util/debug-util.h"
 #include "util/debug-util.h"
 #include "util/default-path-handlers.h"
 #include "util/hdfs-bulk-ops.h"
 #include "util/mem-info.h"
+#include "util/mem-info.h"
+#include "util/memory-metrics.h"
+#include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/parse-util.h"
-#include "util/memory-metrics.h"
-#include "util/webserver.h"
-#include "util/mem-info.h"
-#include "util/debug-util.h"
-#include "util/memory-metrics.h"
 #include "util/pretty-printer.h"
 #include "util/thread-pool.h"
-#include "gen-cpp/ImpalaInternalService.h"
-#include "gen-cpp/CatalogService.h"
+#include "util/webserver.h"
 
 #include "common/names.h"
 
@@ -145,6 +146,7 @@ ExecEnv::ExecEnv()
     fragment_exec_thread_pool_(new CallableThreadPool("coordinator-fragment-rpc",
         "worker", FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
+    fragment_mgr_(new FragmentMgr()),
     enable_webserver_(FLAGS_enable_webserver),
     is_fe_tests_(false),
     backend_address_(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port)) {
@@ -197,6 +199,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     fragment_exec_thread_pool_(new CallableThreadPool("coordinator-fragment-rpc",
         "worker", FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
+    fragment_mgr_(new FragmentMgr()),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     is_fe_tests_(false),
     backend_address_(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port)) {

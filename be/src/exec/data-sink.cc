@@ -26,6 +26,7 @@
 #include "exec/hdfs-table-sink.h"
 #include "exec/kudu-table-sink.h"
 #include "exec/kudu-util.h"
+#include "exec/plan-root-sink.h"
 #include "exprs/expr.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -93,6 +94,9 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
           return Status(error_msg.str());
       }
 
+      break;
+    case TDataSinkType::PLAN_ROOT_SINK:
+      sink->reset(new PlanRootSink(row_desc, output_exprs, thrift_sink));
       break;
     default:
       stringstream error_msg;

@@ -91,9 +91,10 @@ def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None):
   """
   result = run_impala_shell_cmd_no_expect(shell_args, stdin_input)
   if expect_success:
-    assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (cmd, result.stderr)
+    assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (shell_args,
+                                                                   result.stderr)
   else:
-    assert result.rc != 0, "Cmd %s was expected to fail" % cmd
+    assert result.rc != 0, "Cmd %s was expected to fail" % shell_args
   return result
 
 def run_impala_shell_cmd_no_expect(shell_args, stdin_input=None):

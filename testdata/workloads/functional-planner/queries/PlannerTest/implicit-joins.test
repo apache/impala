@@ -5,6 +5,8 @@ from (select * from functional.alltypestiny) t1
   join (select * from functional.alltypestiny) t2 on (t1.id = t2.id)
   join functional.alltypestiny t3 on (coalesce(t1.id, t3.id) = t3.id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: (coalesce(functional.alltypestiny.id, t3.id) = t3.id)
 |
@@ -30,6 +32,8 @@ from
 where
   v.x < v.y
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: t1.id < t2.id
 |
@@ -47,6 +51,8 @@ from
 where
   t1.id = t2.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--02:SCAN HDFS [functional.alltypes t3]
@@ -71,6 +77,8 @@ from
 where
   t1.id = t3.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--01:SCAN HDFS [functional.alltypes t2]
@@ -98,6 +106,8 @@ from
 where
   t2.id = t3.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |  runtime filters: RF000 <- t3.id
@@ -121,6 +131,8 @@ from
   functional.alltypes t3 on t3.id = t2.id,
   functional.alltypes t4
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--03:SCAN HDFS [functional.alltypes t4]
@@ -147,6 +159,8 @@ select a.* from
   functional.alltypessmall b full outer join
   functional.alltypes c on a.id = c.id and a.id < b.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = c.id
 |  other join predicates: a.id < b.id
@@ -169,6 +183,8 @@ functional.alltypestiny c,
 functional.alltypes d
 where a.id = d.id and b.id = c.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: d.id = a.id
 |  runtime filters: RF000 <- a.id
@@ -201,6 +217,8 @@ from
     on t1.id < t2.id,
   functional.alltypes t3
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -232,6 +250,8 @@ from
 where
   t1.id = t2.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -267,6 +287,8 @@ from
 where
   t1.id = t2.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -298,6 +320,8 @@ from
   functional.alltypes t0 left semi join
   functional.alltypes t1 on ( t0.id < t1.id )
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -320,6 +344,8 @@ where
   b.id in (select avg(id) from functional.alltypes group by month) and
   a.id < b.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -348,6 +374,8 @@ from functional.alltypes t1,
 functional.alltypes t2 join functional.alltypes t3 on (t1.id = t2.id),
 functional.alltypes t4
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--03:SCAN HDFS [functional.alltypes t4]

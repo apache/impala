@@ -68,6 +68,10 @@ class TestJsonEndpoints(HS2TestSuite):
     fetch_results_req.maxRows = 100
     fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
     TestJsonEndpoints.check_response(fetch_results_resp)
+    # Fetch one more time to ensure that query is at EOS (first fetch might return 0-size
+    # row batch)
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    TestJsonEndpoints.check_response(fetch_results_resp)
     queries_json = self._get_json_queries(http_addr)
     assert len(queries_json["in_flight_queries"]) == 1
     assert queries_json["num_in_flight_queries"] == 1

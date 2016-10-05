@@ -248,7 +248,7 @@ class ImpalaServer::QueryExecState {
   /// Resource assignment determined by scheduler. Owned by obj_pool_.
   boost::scoped_ptr<QuerySchedule> schedule_;
 
-  /// not set for ddl queries, or queries with "limit 0"
+  /// Not set for ddl queries.
   boost::scoped_ptr<Coordinator> coord_;
 
   /// Runs statements that query or modify the catalog via the CatalogService.
@@ -293,7 +293,7 @@ class ImpalaServer::QueryExecState {
   MonotonicStopWatch client_wait_sw_;
 
   RuntimeProfile::EventSequence* query_events_;
-  std::vector<ExprContext*> output_expr_ctxs_;
+
   bool is_cancelled_; // if true, Cancel() was called.
   bool eos_;  // if true, there are no more rows to return
   // We enforce the invariant that query_status_ is not OK iff query_state_
@@ -355,13 +355,6 @@ class ImpalaServer::QueryExecState {
   /// Core logic of FetchRows(). Does not update query_state_/status_.
   /// Caller needs to hold fetch_rows_lock_ and lock_.
   Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows);
-
-  /// Fetch the next row batch and store the results in current_batch_. Only called for
-  /// non-DDL / DML queries. current_batch_ is set to NULL if execution is complete or the
-  /// query was cancelled.
-  /// Caller needs to hold fetch_rows_lock_ and lock_. Blocks, during which time lock_ is
-  /// released.
-  Status FetchNextBatch();
 
   /// Evaluates 'output_expr_ctxs_' against 'row' and output the evaluated row in
   /// 'result'. The values' scales (# of digits after decimal) are stored in 'scales'.

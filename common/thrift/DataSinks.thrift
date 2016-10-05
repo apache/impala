@@ -26,7 +26,8 @@ include "Partitions.thrift"
 enum TDataSinkType {
   DATA_STREAM_SINK,
   TABLE_SINK,
-  JOIN_BUILD_SINK
+  JOIN_BUILD_SINK,
+  PLAN_ROOT_SINK
 }
 
 enum TSinkAction {
@@ -87,10 +88,10 @@ struct TJoinBuildSink {
 
 // Union type of all table sinks.
 struct TTableSink {
-  1: required Types.TTableId  target_table_id
+  1: required Types.TTableId target_table_id
   2: required TTableSinkType type
   3: required TSinkAction action
-  4: optional THdfsTableSink  hdfs_table_sink
+  4: optional THdfsTableSink hdfs_table_sink
   5: optional TKuduTableSink kudu_table_sink
 }
 

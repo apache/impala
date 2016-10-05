@@ -6,6 +6,8 @@ right outer join functional.alltypesagg c
   on a.smallint_col >= c.smallint_col
 where a.id < 10 and c.bigint_col = 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
 |  join predicates: a.smallint_col >= c.smallint_col
 |  predicates: a.id < 10
@@ -34,6 +36,8 @@ right semi join functional.alltypesagg d
   on c.tinyint_col < d.bigint_col
 where d.bigint_col < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
 |  join predicates: c.tinyint_col < d.bigint_col
 |
@@ -62,6 +66,8 @@ full outer join functional.alltypes d
   on c.int_col > d.int_col
 where a.bigint_col != c.bigint_col and a.id < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:NESTED LOOP JOIN [FULL OUTER JOIN]
 |  join predicates: c.int_col > d.int_col
 |  predicates: a.bigint_col != c.bigint_col, a.id < 10
@@ -93,6 +99,8 @@ from functional.alltypestiny a right anti join functional.alltypessmall b
   on a.id < b.id
 where b.int_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -116,6 +124,8 @@ right semi join functional.alltypes d on c.tinyint_col < d.tinyint_col
 right anti join functional.alltypesnopart e on d.tinyint_col > e.tinyint_col
 where e.id < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 09:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -158,6 +168,8 @@ right semi join functional.alltypes d on c.tinyint_col < d.tinyint_col
 right anti join functional.alltypesnopart e on d.tinyint_col > e.tinyint_col
 where e.id < 10
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 15:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |

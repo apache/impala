@@ -54,8 +54,10 @@ Status FragmentMgr::FragmentExecState::Prepare() {
 }
 
 void FragmentMgr::FragmentExecState::Exec() {
-  // Open() does the full execution, because all plan fragments have sinks
-  executor_.Open();
+  if (Prepare().ok()) {
+    executor_.Open();
+    executor_.Exec();
+  }
   executor_.Close();
 }
 

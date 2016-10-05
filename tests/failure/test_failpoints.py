@@ -122,7 +122,7 @@ class TestFailpoints(ImpalaTestSuite):
 
     for node_id in node_ids:
       debug_action = '%d:%s:%s' % (node_id, location, FAILPOINT_ACTION_MAP[action])
-      LOG.info('Current dubug action: SET DEBUG_ACTION=%s' % debug_action)
+      LOG.info('Current debug action: SET DEBUG_ACTION=%s' % debug_action)
       vector.get_value('exec_option')['debug_action'] = debug_action
 
       if action == 'CANCEL':

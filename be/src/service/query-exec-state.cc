@@ -19,14 +19,15 @@
 #include <limits>
 #include <gutil/strings/substitute.h>
 
-#include "exprs/expr.h"
 #include "exprs/expr-context.h"
+#include "exprs/expr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "service/impala-server.h"
 #include "service/frontend.h"
+#include "service/impala-server.h"
 #include "service/query-options.h"
+#include "service/query-result-set.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/runtime-profile-counters.h"
@@ -191,6 +192,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
             exec_request_.set_query_option_request.value,
             &session_->default_query_options,
             &session_->set_query_options_mask));
+        SetResultSet({}, {});
       } else {
         // "SET" returns a table of all query options.
         map<string, string> config;
@@ -421,17 +423,10 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     summary_profile_.AddInfoString(TABLES_WITH_CORRUPT_STATS_KEY, ss.str());
   }
 
-  // If desc_tbl is not set, query has SELECT with no FROM. In that
-  // case, the query can only have a single fragment, and that fragment needs to be
-  // executed by the coordinator. This check confirms that.
-  // If desc_tbl is set, the query may or may not have a coordinator fragment.
   bool is_mt_exec = query_exec_request.query_ctx.request.query_options.mt_dop > 0;
   const TPlanFragment& fragment = is_mt_exec
       ? query_exec_request.mt_plan_exec_info[0].fragments[0]
       : query_exec_request.fragments[0];
-  bool has_coordinator_fragment =
-      fragment.partition.type == TPartitionType::UNPARTITIONED;
-  DCHECK(has_coordinator_fragment || query_exec_request.__isset.desc_tbl);
 
   {
     lock_guard<mutex> l(lock_);
@@ -449,7 +444,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
   }
 
   coord_.reset(new Coordinator(*schedule_, exec_env_, query_events_));
-  status = coord_->Exec(&output_expr_ctxs_);
+  status = coord_->Exec();
   {
     lock_guard<mutex> l(lock_);
     RETURN_IF_ERROR(UpdateQueryStatus(status));
@@ -538,12 +533,11 @@ void ImpalaServer::QueryExecState::Done() {
   query_events_->MarkEvent("Unregister query");
 
   if (coord_.get() != NULL) {
-    Expr::Close(output_expr_ctxs_, coord_->runtime_state());
     // Release any reserved resources.
     Status status = exec_env_->scheduler()->Release(schedule_.get());
     if (!status.ok()) {
       LOG(WARNING) << "Failed to release resources of query " << schedule_->query_id()
-            << " because of error: " << status.GetDetail();
+                   << " because of error: " << status.GetDetail();
     }
     coord_->TearDown();
   }
@@ -626,7 +620,6 @@ Status ImpalaServer::QueryExecState::WaitInternal() {
 
   if (coord_.get() != NULL) {
     RETURN_IF_ERROR(coord_->Wait());
-    RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, coord_->runtime_state()));
     RETURN_IF_ERROR(UpdateCatalog());
   }
 
@@ -719,6 +712,10 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
     return Status::OK();
   }
 
+  if (coord_.get() == nullptr) {
+    return Status("Client tried to fetch rows on a query that produces no results.");
+  }
+
   int32_t num_rows_fetched_from_cache = 0;
   if (result_cache_max_size_ > 0 && result_cache_ != NULL) {
     // Satisfy the fetch from the result cache if possible.
@@ -729,27 +726,7 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
     if (num_rows_fetched_from_cache >= max_rows) return Status::OK();
   }
 
-  // List of expr values to hold evaluated rows from the query
-  vector<void*> result_row;
-  result_row.resize(output_expr_ctxs_.size());
-
-  // List of scales for floating point values in result_row
-  vector<int> scales;
-  scales.resize(result_row.size());
-
-  if (coord_ == NULL) {
-    // Query with LIMIT 0.
-    query_state_ = QueryState::FINISHED;
-    eos_ = true;
-    return Status::OK();
-  }
-
   query_state_ = QueryState::FINISHED;  // results will be ready after this call
-  // Fetch the next batch if we've returned the current batch entirely
-  if (current_batch_ == NULL || current_batch_row_ >= current_batch_->num_rows()) {
-    RETURN_IF_ERROR(FetchNextBatch());
-  }
-  if (current_batch_ == NULL) return Status::OK();
 
   // Maximum number of rows to be fetched from the coord.
   int32_t max_coord_rows = max_rows;
@@ -759,22 +736,26 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
   }
   {
     SCOPED_TIMER(row_materialization_timer_);
-    // Convert the available rows, limited by max_coord_rows
-    int available = current_batch_->num_rows() - current_batch_row_;
-    int fetched_count = available;
-    // max_coord_rows <= 0 means no limit
-    if (max_coord_rows > 0 && max_coord_rows < available) fetched_count = max_coord_rows;
-    for (int i = 0; i < fetched_count; ++i) {
-      TupleRow* row = current_batch_->GetRow(current_batch_row_);
-      RETURN_IF_ERROR(GetRowValue(row, &result_row, &scales));
-      RETURN_IF_ERROR(fetched_rows->AddOneRow(result_row, scales));
-      ++num_rows_fetched_;
-      ++current_batch_row_;
+    size_t before = fetched_rows->size();
+    // Temporarily release lock so calls to Cancel() are not blocked. fetch_rows_lock_
+    // (already held) ensures that we do not call coord_->GetNext() multiple times
+    // concurrently.
+    // TODO: Simplify this.
+    lock_.unlock();
+    Status status = coord_->GetNext(fetched_rows, max_coord_rows, &eos_);
+    lock_.lock();
+    int num_fetched = fetched_rows->size() - before;
+    DCHECK(max_coord_rows <= 0 || num_fetched <= max_coord_rows) << Substitute(
+        "Fetched more rows ($0) than asked for ($1)", num_fetched, max_coord_rows);
+    num_rows_fetched_ += num_fetched;
+
+    RETURN_IF_ERROR(status);
+    // Check if query status has changed during GetNext() call
+    if (!query_status_.ok()) {
+      eos_ = true;
+      return query_status_;
     }
   }
-  ExprContext::FreeLocalAllocations(output_expr_ctxs_);
-  // Check if there was an error evaluating a row value.
-  RETURN_IF_ERROR(coord_->runtime_state()->CheckQueryState());
 
   // Update the result cache if necessary.
   if (result_cache_max_size_ > 0 && result_cache_.get() != NULL) {
@@ -830,16 +811,6 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
     ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES->Increment(delta_bytes);
   }
 
-  return Status::OK();
-}
-
-Status ImpalaServer::QueryExecState::GetRowValue(TupleRow* row, vector<void*>* result,
-                                                 vector<int>* scales) {
-  DCHECK(result->size() >= output_expr_ctxs_.size());
-  for (int i = 0; i < output_expr_ctxs_.size(); ++i) {
-    (*result)[i] = output_expr_ctxs_[i]->GetValue(row);
-    (*scales)[i] = output_expr_ctxs_[i]->root()->output_scale();
-  }
   return Status::OK();
 }
 
@@ -928,28 +899,6 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
     }
   }
   query_events_->MarkEvent("DML Metastore update finished");
-  return Status::OK();
-}
-
-Status ImpalaServer::QueryExecState::FetchNextBatch() {
-  DCHECK(!eos_);
-  DCHECK(coord_.get() != NULL);
-
-  // Temporarily release lock so calls to Cancel() are not blocked.  fetch_rows_lock_
-  // ensures that we do not call coord_->GetNext() multiple times concurrently.
-  lock_.unlock();
-  Status status = coord_->GetNext(&current_batch_, coord_->runtime_state());
-  lock_.lock();
-  if (!status.ok()) return status;
-
-  // Check if query status has changed during GetNext() call
-  if (!query_status_.ok()) {
-    current_batch_ = NULL;
-    return query_status_;
-  }
-
-  current_batch_row_ = 0;
-  eos_ = current_batch_ == NULL;
   return Status::OK();
 }
 

@@ -4,6 +4,8 @@ from functional.alltypes
 where id in
   (select id from functional.alltypesagg)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = id
 |  runtime filters: RF000 <- id
@@ -21,6 +23,8 @@ from functional.alltypes
 where id not in
   (select id from functional.alltypesagg)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  hash predicates: id = id
 |
@@ -39,6 +43,8 @@ where a.int_col not in
    where g.id = a.id and g.bigint_col < a.bigint_col)
 and a.int_col < 100
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  hash predicates: a.int_col = int_col
 |  other join predicates: a.id = g.id, g.bigint_col < a.bigint_col
@@ -56,6 +62,8 @@ select *
 from functional.alltypes a
 where a.id not in (select id from functional.alltypes b where a.id = b.id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  hash predicates: a.id = id
 |  other join predicates: a.id = b.id
@@ -73,6 +81,8 @@ where int_col in
   (select int_col from functional.alltypesagg g where a.id = g.id and g.bigint_col < 10)
 and bool_col = false
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -95,6 +105,8 @@ from functional.alltypes t
 where t.int_col + 1 in
   (select int_col + bigint_col from functional.alltypesagg)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t.int_col + 1 = int_col + bigint_col
 |  runtime filters: RF000 <- int_col + bigint_col
@@ -114,6 +126,8 @@ where t.id in
 and t.tinyint_col not in (select tinyint_col from functional.alltypestiny)
 and t.bigint_col < 1000
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  hash predicates: t.tinyint_col = tinyint_col
 |
@@ -139,6 +153,8 @@ from functional.alltypesagg a, functional.alltypes t
 where a.id = t.id and a.int_col in
   (select int_col from functional.alltypestiny where bool_col = false)
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -170,6 +186,8 @@ where a.id in
    where s.int_col = t.int_col and a.bool_col = s.bool_col)
 and a.int_col < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -201,6 +219,8 @@ where a.id in
   (select id from functional.alltypestiny)
 and t.bool_col = false
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -231,6 +251,8 @@ from functional.alltypes a left outer join
 on a.int_col = t.int_col
 where a.bool_col = false and t.bigint_col < 100
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -262,6 +284,8 @@ where a.int_col in
    from functional.alltypes t, functional.alltypessmall s, functional.alltypestiny n
    where t.id = s.id and s.bigint_col = n.bigint_col and n.bool_col = false)
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:AGGREGATE [FINALIZE]
 |  output: count(id)
 |
@@ -304,6 +328,8 @@ where t.id in
    (select id, count(*) as cnt from functional.alltypessmall group by id) s
    where s.id = a.id and s.cnt = 10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t.id = a.id
 |  runtime filters: RF000 <- a.id
@@ -332,6 +358,8 @@ with t as (select a.* from functional.alltypes a where id in
   (select id from functional.alltypestiny))
 select * from t where t.bool_col = false and t.int_col = 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = id
 |  runtime filters: RF000 <- id
@@ -354,6 +382,8 @@ where s.string_col = t.string_col and t.int_col in
   (select int_col from functional.alltypessmall)
 and s.bool_col = false
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: a.int_col = int_col
 |  runtime filters: RF000 <- int_col
@@ -395,6 +425,8 @@ where id in
   (select id from functional.alltypesagg a where t.int_col = a.int_col)
 and t.bool_col = false
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = id, t.int_col = a.int_col
 |  runtime filters: RF000 <- id, RF001 <- a.int_col
@@ -416,6 +448,8 @@ where id in
    and bool_col = false)
 and bigint_col < 1000
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = id
 |  runtime filters: RF000 <- id
@@ -446,6 +480,8 @@ where id in
     (select tinyint_col from functional.alltypestiny s
      where s.bigint_col = a.bigint_col))
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = id, t.int_col = a.int_col
 |  runtime filters: RF000 <- id, RF001 <- a.int_col
@@ -472,6 +508,8 @@ where id in
   (select id from functional.alltypesagg a where a.int_col in
     (select int_col from functional.alltypestiny s where a.bigint_col = s.bigint_col))
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = id
 |  runtime filters: RF000 <- id
@@ -497,6 +535,8 @@ from functional.alltypes
 where id in
   (select id from functional.alltypes where id < 10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = id
 |  runtime filters: RF000 <- id
@@ -516,6 +556,8 @@ from functional.alltypesagg a inner join functional.alltypes t on t.id = a.id
 where t.int_col < 10 and t.int_col in
   (select int_col from functional.alltypessmall s where s.id = t.id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t.id = s.id, t.int_col = int_col
 |  runtime filters: RF000 <- s.id, RF001 <- int_col
@@ -543,6 +585,8 @@ from functional.alltypes t
 where exists
   (select * from functional.alltypesagg a where a.id = t.id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -567,6 +611,8 @@ where exists
    group by id, int_col, bool_col)
 and tinyint_col < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: a.tinyint_col = b.tinyint_col
 |  runtime filters: RF000 <- b.tinyint_col
@@ -588,6 +634,8 @@ from functional.alltypes t
 where not exists
   (select id from functional.alltypesagg a where t.int_col = a.int_col)
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -610,6 +658,8 @@ where not exists
    group by b.id, b.int_col, b.bigint_col)
 and bool_col = false
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -640,6 +690,8 @@ select *
 from functional.alltypestiny t
 where exists (select * from functional.alltypessmall s where s.id < 5)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:NESTED LOOP JOIN [LEFT SEMI JOIN]
 |
 |--01:SCAN HDFS [functional.alltypessmall s]
@@ -658,6 +710,8 @@ where exists
    from functional.alltypesagg where tinyint_col = 10
    group by id, int_col, bigint_col)
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:NESTED LOOP JOIN [RIGHT SEMI JOIN]
 |
 |--00:SCAN HDFS [functional.alltypestiny t]
@@ -676,6 +730,8 @@ select 1
 from functional.alltypestiny t
 where exists (select * from functional.alltypessmall limit 0)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # Uncorrelated NOT EXISTS
@@ -683,6 +739,8 @@ select *
 from functional.alltypestiny t
 where not exists (select * from functional.alltypessmall s where s.id < 5)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:NESTED LOOP JOIN [LEFT ANTI JOIN]
 |
 |--01:SCAN HDFS [functional.alltypessmall s]
@@ -701,6 +759,8 @@ select *
 from w1 t
 where not exists (select 1 from w2)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:NESTED LOOP JOIN [LEFT ANTI JOIN]
 |
 |--01:SCAN HDFS [functional.alltypessmall s]
@@ -719,6 +779,8 @@ where not exists
    from functional.alltypesagg where tinyint_col = 10
    group by id, int_col, bigint_col)
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:NESTED LOOP JOIN [RIGHT ANTI JOIN]
 |
 |--00:SCAN HDFS [functional.alltypestiny t]
@@ -737,6 +799,8 @@ select 1
 from functional.alltypestiny t
 where not exists (select * from functional.alltypessmall limit 0)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypestiny t]
    partitions=4/4 files=4 size=460B
 ====
@@ -748,6 +812,8 @@ where exists
     (select * from functional.alltypesagg g where g.int_col = t.int_col
      and g.bool_col = false))
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -790,6 +856,8 @@ and g.tinyint_col <
 group by g.int_col
 having count(*) < 100
 ---- PLAN
+PLAN-ROOT SINK
+|
 10:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: g.int_col
@@ -847,6 +915,8 @@ where a.int_col in
   group by int_col)
 and a.bigint_col < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: a.int_col = count(int_col)
 |  runtime filters: RF000 <- count(int_col)
@@ -871,6 +941,8 @@ where a.int_col <
   (select max(int_col) from functional.alltypesagg g where g.bool_col = true)
 and a.bigint_col > 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: a.int_col < max(int_col)
 |
@@ -891,6 +963,8 @@ from functional.alltypesagg a
 where (select max(id) from functional.alltypes t where t.bool_col = false) > 10
 and a.int_col < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--02:AGGREGATE [FINALIZE]
@@ -915,6 +989,8 @@ where a.id =
 and a.bool_col = false
 group by a.int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: a.int_col
@@ -947,6 +1023,8 @@ where t.int_col <
 and a.bool_col = false
 group by t.tinyint_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: t.tinyint_col
@@ -993,6 +1071,8 @@ and a.tinyint_col >
   (select max(tinyint_col) from functional.alltypessmall s where s.id < 10)
 and t.bool_col = false
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: a.tinyint_col > max(tinyint_col)
 |
@@ -1041,6 +1121,8 @@ where t.int_col <
       where a.id = g.id
       and a.bool_col = false))
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t.id = g.id
 |  other join predicates: t.int_col < avg(g.int_col) * 2
@@ -1079,6 +1161,8 @@ where a.int_col <
    where s.id = a.id and s.tinyint_col >
      (select count(*) from functional.alltypestiny where bool_col = false))
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.id = s.id
 |  other predicates: a.int_col < zeroifnull(count(*))
@@ -1115,6 +1199,8 @@ from functional.alltypesagg g
 where 100 < (select count(*) from functional.alltypes where bool_col = false and id < 5)
 and bool_col = false
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:AGGREGATE [FINALIZE]
 |  group by: id, bool_col
 |
@@ -1138,6 +1224,8 @@ from functional.alltypesagg g
 where 100 > (select count(distinct id) from functional.alltypestiny where int_col < 5)
 and g.bigint_col < 1000 and g.bigint_col = true
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:AGGREGATE [FINALIZE]
 |  group by: g.id, g.bool_col, g.tinyint_col, g.smallint_col, g.int_col, g.bigint_col, g.float_col, g.double_col, g.date_string_col, g.string_col, g.timestamp_col, g.year, g.month, g.day
 |
@@ -1163,6 +1251,8 @@ select *
 from functional.alltypestiny t
 where (select max(int_col) from functional.alltypesagg where int_col is null) is null
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--02:AGGREGATE [FINALIZE]
@@ -1183,6 +1273,8 @@ where (select count(*) from functional.alltypesagg g where t.id = g.id) is null
 and bool_col = false
 group by int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: int_col
@@ -1214,6 +1306,8 @@ where
    where g.id = t.id and g.int_col is null) is null
 and t.bool_col = false
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: g.id = t.id
 |  runtime filters: RF000 <- t.id
@@ -1239,6 +1333,8 @@ where 1 +
   (select count(*) from functional.alltypesagg where bool_col = false) = t.int_col + 2
 and t.bigint_col < 100
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t.int_col + 2 = 1 + count(*)
 |  runtime filters: RF000 <- 1 + count(*)
@@ -1262,6 +1358,8 @@ where nullifzero((select min(id) from functional.alltypessmall s where s.bool_co
   is null
 and t.id < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--02:AGGREGATE [FINALIZE]
@@ -1286,6 +1384,8 @@ where t.int_col <
    limit 1)
 group by t.bool_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:AGGREGATE [FINALIZE]
 |  output: min(t.id)
 |  group by: t.bool_col
@@ -1313,6 +1413,8 @@ where int_col between
   (select min(int_col) from functional.alltypessmall where bool_col = false) and
   (select max(int_col) from functional.alltypessmall where bool_col = true)
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: int_col <= max(int_col)
 |
@@ -1344,6 +1446,8 @@ where
    from functional.alltypestiny tt1
    where t1.id = tt1.month) < t1.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: tt1.month = t1.id
 |  other predicates: zeroifnull(count(tt1.smallint_col)) < t1.id
@@ -1369,6 +1473,8 @@ where
   < 10
 group by int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: int_col
@@ -1398,6 +1504,8 @@ where
 and bool_col = false
 group by int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: int_col
@@ -1425,6 +1533,8 @@ select 1
 from functional.alltypestiny t1
 where (select count(*) from functional.alltypessmall) + t1.int_col = t1.bigint_col - 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: count(*) + t1.int_col = t1.bigint_col - 1
 |
@@ -1443,6 +1553,8 @@ select 1
 from functional.alltypestiny t1 join functional.alltypessmall t2 on t1.id = t2.id
 where (select count(*) from functional.alltypes) + 1 = t1.int_col + t2.int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.int_col + t2.int_col = count(*) + 1
 |
@@ -1470,6 +1582,8 @@ from functional.alltypestiny t1 join functional.alltypessmall t2 on t1.id = t2.i
 where
   (select count(*) from functional.alltypes) + t2.bigint_col = t1.int_col + t2.int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: count(*) + t2.bigint_col = t1.int_col + t2.int_col
 |
@@ -1498,6 +1612,8 @@ where
    from functional.alltypesagg t1 inner join functional.alltypes t2 on t1.id = t2.id
    where t1.id + t2.id = t.int_col) = t.int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: sum(t1.id) = t.int_col
 |
@@ -1528,6 +1644,8 @@ where
    from functional.alltypesagg t1 inner join functional.alltypes t2 on t1.id = t2.id
    where t1.id + t2.id = t.bigint_col) = t.int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: t1.id + t2.id = t.bigint_col, sum(t1.id) = t.int_col
 |
@@ -1560,6 +1678,8 @@ where
    on tt1.int_col = tt2.int_col
    where tt1.id + tt2.id = t1.int_col - t2.int_col) = t1.bigint_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: sum(tt1.id) = t1.bigint_col, tt1.id + tt2.id = t1.int_col - t2.int_col
 |
@@ -1602,6 +1722,8 @@ and not exists
    from functional.alltypesagg t3
    where t1.id = t3.id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # Correlated EXISTS and NOT EXISTS subqueries with limit 0 and
@@ -1625,6 +1747,8 @@ and not exists
    from functional.alltypestiny t5
    where t1.id = t5.id and false)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypestiny t1]
    partitions=4/4 files=4 size=460B
 ====
@@ -1647,6 +1771,8 @@ and not exists
    where t4.int_col = t1.tinyint_col
    having count(id) > 200)
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: t1.tinyint_col = t4.int_col
 |
@@ -1680,6 +1806,8 @@ where t1.id is not distinct from
 (select min(id) from functional.alltypes t2
 where t1.int_col is not distinct from t2.int_col);
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.id IS NOT DISTINCT FROM min(id), t1.int_col IS NOT DISTINCT FROM t2.int_col
 |  runtime filters: RF000 <- min(id), RF001 <- t2.int_col
@@ -1700,6 +1828,8 @@ where t1.id is distinct from
 (select min(id) from functional.alltypes t2
 where t1.int_col is not distinct from t2.int_col);
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.int_col IS NOT DISTINCT FROM t2.int_col
 |  other join predicates: t1.id IS DISTINCT FROM min(id)
@@ -1721,6 +1851,8 @@ where t1.id =
 (select min(id) from functional.alltypes t2
 where t1.int_col is not distinct from t2.int_col);
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.id = min(id), t1.int_col IS NOT DISTINCT FROM t2.int_col
 |  runtime filters: RF000 <- min(id), RF001 <- t2.int_col
@@ -1741,6 +1873,8 @@ where t1.id !=
 (select min(id) from functional.alltypes t2
 where t1.int_col is not distinct from t2.int_col);
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.int_col IS NOT DISTINCT FROM t2.int_col
 |  other join predicates: t1.id != min(id)
@@ -1762,6 +1896,8 @@ where t1.id is not distinct from
 (select min(id) from functional.alltypes t2
 where t1.int_col = t2.int_col);
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.id IS NOT DISTINCT FROM min(id), t1.int_col = t2.int_col
 |  runtime filters: RF000 <- min(id), RF001 <- t2.int_col
@@ -1782,6 +1918,8 @@ where t1.id is distinct from
 (select min(id) from functional.alltypes t2
 where t1.int_col = t2.int_col);
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.int_col = t2.int_col
 |  other join predicates: t1.id IS DISTINCT FROM min(id)
@@ -1803,6 +1941,8 @@ where t1.id =
 (select min(id) from functional.alltypes t2
 where t1.int_col = t2.int_col);
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.id = min(id), t1.int_col = t2.int_col
 |  runtime filters: RF000 <- min(id), RF001 <- t2.int_col
@@ -1823,6 +1963,8 @@ where t1.id !=
 (select min(id) from functional.alltypes t2
 where t1.int_col = t2.int_col);
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.int_col = t2.int_col
 |  other join predicates: t1.id != min(id)
@@ -1850,6 +1992,8 @@ select 1 from functional.alltypes t where id in
    a.double_col between round(acos(t.float_col), 2)
                 and cast(t.string_col as int))
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = id
 |  other join predicates: a.tinyint_col >= t.tinyint_col, t.float_col >= a.float_col, a.smallint_col <= t.int_col, a.tinyint_col <= t.smallint_col, t.float_col <= a.double_col, a.double_col <= CAST(t.string_col AS INT), t.string_col >= a.string_col, a.double_col >= round(acos(t.float_col), 2)

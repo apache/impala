@@ -1,6 +1,8 @@
 # Scanning an unpartitioned Parquet table with complex types plans ok.
 select s.f1 from functional_parquet.complextypes_fileformat t, t.a
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:SUBPLAN
 |
 |--04:NESTED LOOP JOIN [CROSS JOIN]
@@ -47,6 +49,8 @@ Complex types are supported for these file formats: PARQUET.
 # only scalar type columns are allowed.
 select id from functional_rc_snap.complextypes_fileformat
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional_rc_snap.complextypes_fileformat]
    partitions=1/1 files=1 size=56B
 ====
@@ -54,6 +58,8 @@ select id from functional_rc_snap.complextypes_fileformat
 # queries should work.
 select count(*) from functional_rc_snap.complextypes_fileformat
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -70,6 +76,8 @@ Complex types are supported for these file formats: PARQUET.
 # are allowed.
 select id from functional_seq_snap.complextypes_fileformat
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional_seq_snap.complextypes_fileformat]
    partitions=1/1 files=1 size=87B
 ====
@@ -85,6 +93,8 @@ not implemented: Scan of partition
 # columns are selected.
 select id from functional_hbase.allcomplextypes
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.allcomplextypes]
 ====
 # Scanning an HBase table with complex-types columns fails if a complex-typed
@@ -115,6 +125,8 @@ Complex types are supported for these file formats: PARQUET.
 # Scanning a Parquet partition of a multi-format table with complex types plans ok.
 select s.f1 from functional.complextypes_multifileformat t, t.a where p = 2
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:SUBPLAN
 |
 |--04:NESTED LOOP JOIN [CROSS JOIN]
@@ -143,6 +155,8 @@ Complex types are supported for these file formats: PARQUET.
 # queries should work.
 select count(*) from functional.complextypes_multifileformat where p = 4
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |

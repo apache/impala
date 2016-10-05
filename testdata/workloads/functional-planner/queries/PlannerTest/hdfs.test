@@ -2,9 +2,13 @@
 select * FROM functional.alltypes
 where cast(year as string) = to_date( from_unixtime(unix_timestamp()) )
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=0/24 files=0 size=0B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
@@ -16,6 +20,8 @@ from functional.testtbl
 where name like 'm%'
 group by 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: zip
@@ -24,6 +30,8 @@ group by 1
    partitions=1/1 files=0 size=0B
    predicates: name LIKE 'm%'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [FINALIZE]
@@ -43,6 +51,8 @@ group by 1
 # all partitions are selected
 select * from functional.alltypes
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- SCANRANGELOCATIONS
@@ -72,6 +82,8 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt 0:20179
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
@@ -80,6 +92,8 @@ NODE 0:
 # predicate on first partition key
 select id, month from functional.alltypes where year = 2009
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=238.68KB
 ---- SCANRANGELOCATIONS
@@ -97,6 +111,8 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
@@ -105,141 +121,191 @@ NODE 0:
 # same predicate, phrased differently
 select * from functional.alltypes where year = 2009.0
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=238.68KB
 ====
 select * from functional.alltypes where 2009 = year
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=238.68KB
 ====
 select * from functional.alltypes where 2009 <=> year
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=238.68KB
 ====
 # compound predicate on the second partition key
 select * from functional.alltypes where !(month > 2)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=4/24 files=4 size=76.83KB
 ====
 # nested compound predicates on the second partition key
 select * from functional.alltypes where !(!(month=1))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=40.32KB
 ====
 select * from functional.alltypes where !(!(month<=>1))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=40.32KB
 ====
 # predicates on both partition keys one of which is a compound predicate with NOT
 select * from functional.alltypes where year=2009 and !(month < 6)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=7/24 files=7 size=140.58KB
 ====
 # compound predicates on both partition keys
 select * from functional.alltypes where !(year < 2009) and !(month < 6)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=14/24 files=14 size=281.15KB
 ====
 # compound predicate on a conjunct
 select * from functional.alltypes where !(year = 2009 and month > 6)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=18/24 files=18 size=357.58KB
 ====
 select * from functional.alltypes where !(year <=> 2009 and month > 6)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=18/24 files=18 size=357.58KB
 ====
 select * from functional.alltypes where !(year <=> 2009) or !(month > 6)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=18/24 files=18 size=357.58KB
 ====
 # compound predicate on a disjunct
 select * from functional.alltypes where !(month = 6 or month = 8)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=20/24 files=20 size=398.31KB
 ====
 select * from functional.alltypes where !(month <=> 6 or month <=> 8)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=20/24 files=20 size=398.31KB
 ====
 # not predicate with is null
 select * from functional.alltypes where not (year = 2009 or month is null)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=239.77KB
 ====
 # not predicate with "<=> null" as a synonym of "is null"
 select * from functional.alltypes where not (year = 2009 or month <=> null)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=239.77KB
 ====
 # nested not predicates with is null
 select * from functional.alltypes where not (not (month is null))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=0/24 files=0 size=0B
 ====
 # nested not predicates with "<=> null" as a synonym of "is null"
 select * from functional.alltypes where not (not (month <=> null))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=0/24 files=0 size=0B
 ====
 # nested not predicates with disjunct
 select * from functional.alltypes where not (not (month is null or year = 2009))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=238.68KB
 ====
 # nested not predicates with disjunct and "<=> null" as a synonym of "is null"
 select * from functional.alltypes where not (not (month <=> null or year = 2009))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=238.68KB
 ====
 # predicate on second partition key
 select * from functional.alltypes where month=1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=40.32KB
 ====
 # predicate on both partition keys
 select * from functional.alltypes where year=2009 and month=1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=1/24 files=1 size=19.95KB
 ====
 # single-sided range on 2nd key
 select * from functional.alltypes where year=2009 and month > 6
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=6/24 files=6 size=120.87KB
 ====
 select * from functional.alltypes where year=2009 and month < 6
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=5/24 files=5 size=98.11KB
 ====
 select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=4/24 files=4 size=80.74KB
 ====
 select * from functional.alltypes where year<=>2009 and month in (1, 3, 5, 7)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=4/24 files=4 size=80.74KB
 ====
@@ -247,6 +313,8 @@ select * from functional.alltypes where year<=>2009 and month in (1, 3, 5, 7)
 select * from functional.alltypes
 where year=2009 and month in (1, 3, 5, 7) and month is not null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=4/24 files=4 size=80.74KB
 ====
@@ -254,29 +322,39 @@ where year=2009 and month in (1, 3, 5, 7) and month is not null
 select * from functional.alltypes
 where year=2009 and month in (1, 3, 5, 7) and month is null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=0/24 files=0 size=0B
 ====
 select * from functional.alltypes where year=2009 and (month in (1, 3, 5) or month = 7)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=4/24 files=4 size=80.74KB
 ====
 # single-sided ranges on both keys
 select * from functional.alltypes where year<=2009 and month < 6
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=5/24 files=5 size=98.11KB
 ====
 # range on 2nd key
 select * from functional.alltypes where month < 9 and month > 6
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=4/24 files=4 size=81.46KB
 ====
 # multiple predicates on first key; 2nd one applied as predicate
 select * from functional.alltypes where year < 2010 and year < 2009 and month > 6
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=0/24 files=0 size=0B
 ====
@@ -284,6 +362,8 @@ select * from functional.alltypes where year < 2010 and year < 2009 and month > 
 select * from functional.alltypes
 where year < 2010 and (month > 6 or month = 1 or month in (3, 4))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=9/24 files=9 size=180.49KB
 ====
@@ -291,18 +371,24 @@ where year < 2010 and (month > 6 or month = 1 or month in (3, 4))
 select * from functional.alltypes
 where year < 2010 and (month > 6 or month <=> 1 or month in (3, 4))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=9/24 files=9 size=180.49KB
 ====
 # between predicate on second key
 select * from functional.alltypes where year = 2009 and month between 6 and 8
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=3/24 files=3 size=60.43KB
 ====
 # between predicate on second key
 select * from functional.alltypes where year <=> 2009 and month between 6 and 8
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=3/24 files=3 size=60.43KB
 ====
@@ -310,6 +396,8 @@ select * from functional.alltypes where year <=> 2009 and month between 6 and 8
 select * from functional.alltypes
 where year between 2009 and 2009 and month between 6 and 8
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=3/24 files=3 size=60.43KB
 ====
@@ -317,6 +405,8 @@ where year between 2009 and 2009 and month between 6 and 8
 select * from functional.alltypes
 where year = 2009 and (month between 6 and 7 or month between 7 and 8)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=3/24 files=3 size=60.43KB
 ---- SCANRANGELOCATIONS
@@ -329,6 +419,8 @@ NODE 0:
 select * from functional.alltypes
 where year = 2009 and (month between 5+1 and 8-1 or month between 9-2 and 1+7)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=3/24 files=3 size=60.43KB
 ---- SCANRANGELOCATIONS
@@ -340,11 +432,15 @@ NODE 0:
 # slot binding still determined
 select * from functional.alltypes where year - 1 = 2009
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=239.77KB
 ====
 select * from functional.alltypes where year - 1 <=> 2009
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=239.77KB
 ====
@@ -352,82 +448,110 @@ select * from functional.alltypes where year - 1 <=> 2009
 # IS NULL predicate on a partition key with nulls
 select * from functional.alltypesagg where day is null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # <=> null predicate on a partition key with nulls
 select * from functional.alltypesagg where day <=> null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # IS NOT NULL predicate on a partition key with nulls
 select * from functional.alltypesagg where day is not null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/11 files=10 size=743.67KB
 ====
 # IS DISTINCT FROM NULL predicate on a partition key with nulls
 select * from functional.alltypesagg where day is distinct from null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/11 files=10 size=743.67KB
 ====
 select * from functional.alltypesagg where day = day
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/11 files=10 size=743.67KB
 ====
 select * from functional.alltypesagg where day <=> day
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ====
 # partition key predicates which are in conjunctive normal form (case 1)
 select * from functional.alltypesagg where day is null and day = 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=0/11 files=0 size=0B
 ====
 # partition key predicates which are in conjunctive normal form (case 1)
 select * from functional.alltypesagg where day <=> null and day = 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=0/11 files=0 size=0B
 ====
 # partition key predicates which are in conjunctive normal form (case 2)
 select * from functional.alltypesagg where day is null and month = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # partition key predicates which are in conjunctive normal form (case 2)
 select * from functional.alltypesagg where day <=> null and month = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # partition key predicates which are in conjunctive normal form (case 3)
 select * from functional.alltypesagg where month = 1 and (day is null or day = 10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=2/11 files=2 size=145.53KB
 ====
 # partition key predicates which are in conjunctive normal form (case 3)
 select * from functional.alltypesagg where month = 1 and (day <=> null or day = 10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=2/11 files=2 size=145.53KB
 ====
 # partition key predicates which are in conjunctive normal form (case 4)
 select * from functional.alltypesagg where month = 1 and (day is null or year = 2010)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ====
 # partition key predicates which are in conjunctive normal form (case 4)
 select * from functional.alltypesagg where month = 1 and (day <=> null or year = 2010)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ====
@@ -435,6 +559,8 @@ select * from functional.alltypesagg where month = 1 and (day <=> null or year =
 select * from functional.alltypesagg
 where (year = 2010 or month = 1) and (day is not null or day = 10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/11 files=10 size=743.67KB
 ====
@@ -442,42 +568,56 @@ where (year = 2010 or month = 1) and (day is not null or day = 10)
 select * from functional.alltypesagg
 where (year = 2010 or month = 1) and (day is distinct from null or day = 10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/11 files=10 size=743.67KB
 ====
 # partition key predicates which are in disjunctive normal form (case 1)
 select * from functional.alltypesagg where day is null or month = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ====
 # partition key predicates which are in disjunctive normal form (case 1)
 select * from functional.alltypesagg where day <=> null or month = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ====
 # partition key predicates which are in disjunctive normal form (case 2)
 select * from functional.alltypesagg where day is null or day = 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=2/11 files=2 size=145.53KB
 ====
 # partition key predicates which are in disjunctive normal form (case 2)
 select * from functional.alltypesagg where day <=> null or day = 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=2/11 files=2 size=145.53KB
 ====
 # partition key predicates which are in disjunctive normal form (case 3)
 select * from functional.alltypesagg where day = 10 or (day is null and year = 2010)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=2/11 files=2 size=145.53KB
 ====
 # partition key predicates which are in disjunctive normal form (case 3)
 select * from functional.alltypesagg where day = 10 or (day <=> null and year = 2010)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=2/11 files=2 size=145.53KB
 ====
@@ -485,6 +625,8 @@ select * from functional.alltypesagg where day = 10 or (day <=> null and year = 
 select * from functional.alltypesagg
 where (month = 1 and day = 1) or (day is null and year = 2010)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=2/11 files=2 size=144.45KB
 ====
@@ -492,54 +634,72 @@ where (month = 1 and day = 1) or (day is null and year = 2010)
 select * from functional.alltypesagg
 where (month = 1 and day = 1) or (day <=> null and year = 2010)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=2/11 files=2 size=144.45KB
 ====
 # partition key predicates with negation (case 1)
 select * from functional.alltypesagg where not (day is not null)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # partition key predicates with negation (case 1)
 select * from functional.alltypesagg where not (day is distinct from null)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # partition key predicates with negation (case 2)
 select * from functional.alltypesagg where not (not (day is null))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # partition key predicates with negation (case 2)
 select * from functional.alltypesagg where not (not (day <=> null))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # partition key predicates with negation (case 3)
 select * from functional.alltypesagg where not (day is not null and month = 1)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # partition key predicates with negation (case 3)
 select * from functional.alltypesagg where not (day is distinct from null and month = 1)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # partition key predicates with negation (case 3)
 select * from functional.alltypesagg where not (day is not null or day < 9)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=0/11 files=0 size=0B
 ====
 # partition key predicates with negation (case 3)
 select * from functional.alltypesagg where not (day is distinct from null or day < 9)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=0/11 files=0 size=0B
 ====
@@ -547,6 +707,8 @@ select * from functional.alltypesagg where not (day is distinct from null or day
 select * from functional.alltypesagg
 where not (day is not null and (not (day < 9 and month = 1)))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=9/11 files=9 size=665.77KB
 ====
@@ -554,6 +716,8 @@ where not (day is not null and (not (day < 9 and month = 1)))
 select * from functional.alltypesagg
 where not (day is distinct from null and (not (day < 9 and month = 1)))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=9/11 files=9 size=665.77KB
 ====
@@ -561,6 +725,8 @@ where not (day is distinct from null and (not (day < 9 and month = 1)))
 select * from functional.alltypesagg
 where not (day is not null or (day = 1 and (not (month = 1 or year = 2010))))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
@@ -568,6 +734,8 @@ where not (day is not null or (day = 1 and (not (month = 1 or year = 2010))))
 select * from functional.alltypesagg
 where not (day is distinct from null or (day = 1 and (not (month = 1 or year = 2010))))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
@@ -575,6 +743,8 @@ where not (day is distinct from null or (day = 1 and (not (month = 1 or year = 2
 select * from functional.alltypesagg
 where year + 1 = 2011 and month + 1 <= 3 and day is null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
@@ -582,6 +752,8 @@ where year + 1 = 2011 and month + 1 <= 3 and day is null
 select * from functional.alltypesagg
 where year + 1 = 2011 and month + 1 <= 3 and day <=> null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
@@ -591,6 +763,8 @@ where day = 5 or (day >= 1 and day <= 2) or (day > 6 and day < 8)
 or day is null or day in (4) or not(day is not null)
 or not (day not in (10)) or not (day != 8)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=8/11 files=8 size=591.30KB
 ---- SCANRANGELOCATIONS
@@ -610,6 +784,8 @@ where day = 5 or (day >= 1 and day <= 2) or (day > 6 and day < 8)
 or day <=> null or day in (4) or not(day is distinct from null)
 or not (day not in (10)) or not (day != 8)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg]
    partitions=8/11 files=8 size=591.30KB
 ---- SCANRANGELOCATIONS
@@ -626,47 +802,65 @@ NODE 0:
 # Predicates on a partition key with no values (see IMPALA-4128).
 select * from functional.emptytable where f2 = 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.emptytable]
    partitions=0/0 files=0 size=0B
 ====
 select * from functional.emptytable where f2 != 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.emptytable]
    partitions=0/0 files=0 size=0B
 ====
 select * from functional.emptytable where f2 > 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.emptytable]
    partitions=0/0 files=0 size=0B
 ====
 select * from functional.emptytable where f2 < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.emptytable]
    partitions=0/0 files=0 size=0B
 ====
 select * from functional.emptytable where f2 in (10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.emptytable]
    partitions=0/0 files=0 size=0B
 ====
 select * from functional.emptytable where f2 not in (10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.emptytable]
    partitions=0/0 files=0 size=0B
 ====
 select * from functional.emptytable where f2 is null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.emptytable]
    partitions=0/0 files=0 size=0B
 ====
 select * from functional.emptytable where f2 is not null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.emptytable]
    partitions=0/0 files=0 size=0B
 ====
 # multi-file non-partitioned table
 select * from functional.alltypesaggmultifilesNoPart
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesaggmultifilesnopart]
    partitions=1/1 files=4 size=805.23KB
 ---- SCANRANGELOCATIONS
@@ -679,6 +873,8 @@ NODE 0:
 # multi-file partitioned table
 select * from functional.alltypesaggmultifiles where day <= 2
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesaggmultifiles]
    partitions=2/11 files=8 size=145.97KB
 ====
@@ -688,39 +884,53 @@ select * from functional.alltypesaggmultifiles where day <= 2
 # Test single binary predicate on a partition column
 select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [scale_db.num_partitions_1234_blocks_per_partition_1]
    partitions=1/1234 files=1 size=2B
 ====
 select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j <=> 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [scale_db.num_partitions_1234_blocks_per_partition_1]
    partitions=1/1234 files=1 size=2B
 ====
 # Test disjunctive predicate on a partition column
 select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j = 1 or j = 2
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [scale_db.num_partitions_1234_blocks_per_partition_1]
    partitions=2/1234 files=2 size=4B
 ====
 select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j <=> 1 or j <=> 2
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [scale_db.num_partitions_1234_blocks_per_partition_1]
    partitions=2/1234 files=2 size=4B
 ====
 # Test conjunctive predicate on a partition column
 select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j = 1 and j = 2
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [scale_db.num_partitions_1234_blocks_per_partition_1]
    partitions=0/1234 files=0 size=0B
 ====
 select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j <=> 1 and j <=> 2
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [scale_db.num_partitions_1234_blocks_per_partition_1]
    partitions=0/1234 files=0 size=0B
 ====
 # Partition pruning when a binary predicate contains a NullLiteral (IMPALA-1535)
 select * from functional.alltypestiny t1 where t1.year != null or t1.year = null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypestiny t1]
    partitions=0/4 files=0 size=0B
 ====
@@ -728,6 +938,8 @@ select * from functional.alltypestiny t1 where t1.year != null or t1.year = null
 select * from functional.alltypestiny t1
 where t1.year IS DISTINCT FROM null or t1.year = null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypestiny t1]
    partitions=4/4 files=4 size=460B
 ====
@@ -735,6 +947,8 @@ where t1.year IS DISTINCT FROM null or t1.year = null
 # expression
 select * from functional.alltypesagg t1 where t1.year + null != t1.day
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=0/11 files=0 size=0B
 ====
@@ -742,6 +956,8 @@ select * from functional.alltypesagg t1 where t1.year + null != t1.day
 # expression and IS DISTINCT FROM
 select * from functional.alltypesagg t1 where t1.year + null IS DISTINCT FROM t1.day
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=10/11 files=10 size=743.67KB
 ====
@@ -749,6 +965,8 @@ select * from functional.alltypesagg t1 where t1.year + null IS DISTINCT FROM t1
 # (a single partition is scanned)
 select * from functional.alltypesagg t1 where day in (10, null)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=1/11 files=1 size=74.48KB
 ====
@@ -756,6 +974,8 @@ select * from functional.alltypesagg t1 where day in (10, null)
 # (all partitions are pruned)
 select * from functional.alltypesagg t1 where day not in (10, null)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=0/11 files=0 size=0B
 ====
@@ -763,6 +983,8 @@ select * from functional.alltypesagg t1 where day not in (10, null)
 select * from functional.alltypesagg t1
 where t1.day = instr("this is a test", "this") or t1.year = year(now()) + 100
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=1/11 files=1 size=73.39KB
 ====
@@ -771,6 +993,8 @@ where t1.day = instr("this is a test", "this") or t1.year = year(now()) + 100
 select * from functional.alltypesagg t1
 where t1.day in (1, cast(2.0 as INT), year(now()) + 100)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=2/11 files=2 size=147.87KB
 ====
@@ -779,6 +1003,8 @@ where t1.day in (1, cast(2.0 as INT), year(now()) + 100)
 select * from functional.alltypesagg t1
 where -t1.day in(-1 - 1) or cast(t1.day as string) like '%1%'
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=3/11 files=3 size=222.34KB
 ====

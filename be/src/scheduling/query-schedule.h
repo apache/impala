@@ -140,33 +140,8 @@ class QuerySchedule {
   /// Helper methods used by scheduler to populate this QuerySchedule.
   void IncNumScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
 
-  /// The following 4 functions need to be replaced once we stop special-casing
-  /// the coordinator instance in the coordinator.
-  /// The replacement is a single function int GetNumFInstances() (which includes
-  /// the coordinator instance).
-
-  /// TODO-MT: remove; this is actually only the number of remote instances
-  /// (from the coordinator's perspective)
-  void set_num_fragment_instances(int64_t num_fragment_instances) {
-    num_fragment_instances_ = num_fragment_instances;
-  }
-
-  /// Returns the number of fragment instances registered with this schedule.
-  /// MT: total number of fragment instances
-  /// ST: value set with set_num_fragment_instances(); excludes coord instance
-  /// (in effect the number of remote instances)
-  /// TODO-MT: get rid of special-casing of coordinator instance and always return the
-  /// total
+  /// Returns the total number of fragment instances.
   int GetNumFragmentInstances() const;
-
-  /// Returns the total number of fragment instances, incl. coordinator fragment.
-  /// TODO-MT: remove
-  int GetTotalFInstances() const;
-
-  /// Returns the number of remote fragment instances (excludes coordinator).
-  /// Works for both MT and ST.
-  /// TODO-MT: remove
-  int GetNumRemoteFInstances() const;
 
   /// Return the coordinator fragment, or nullptr if there isn't one.
   const TPlanFragment* GetCoordFragment() const;

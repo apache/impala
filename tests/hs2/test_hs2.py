@@ -291,12 +291,16 @@ class TestHS2(HS2TestSuite):
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     TestHS2.check_response(execute_statement_resp)
 
-    # Fetch results to make sure errors are generated
-    fetch_results_req = TCLIService.TFetchResultsReq()
-    fetch_results_req.operationHandle = execute_statement_resp.operationHandle
-    fetch_results_req.maxRows = 100
-    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
-    TestHS2.check_response(fetch_results_resp)
+    # Fetch results to make sure errors are generated. Errors are only guaranteed to be
+    # seen by the coordinator after FetchResults() returns eos.
+    has_more_results = True
+    while has_more_results:
+      fetch_results_req = TCLIService.TFetchResultsReq()
+      fetch_results_req.operationHandle = execute_statement_resp.operationHandle
+      fetch_results_req.maxRows = 100
+      fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+      TestHS2.check_response(fetch_results_resp)
+      has_more_results = fetch_results_resp.hasMoreRows
 
     get_log_req = TCLIService.TGetLogReq()
     get_log_req.operationHandle = execute_statement_resp.operationHandle

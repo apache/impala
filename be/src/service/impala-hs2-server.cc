@@ -36,13 +36,14 @@
 #include "exprs/expr.h"
 #include "rpc/thrift-util.h"
 #include "runtime/raw-value.h"
+#include "service/hs2-util.h"
 #include "service/query-exec-state.h"
 #include "service/query-options.h"
+#include "service/query-result-set.h"
 #include "util/debug-util.h"
-#include "util/runtime-profile-counters.h"
 #include "util/impalad-metrics.h"
+#include "util/runtime-profile-counters.h"
 #include "util/string-parser.h"
-#include "service/hs2-util.h"
 
 #include "common/names.h"
 
@@ -129,7 +130,7 @@ static TOperationState::type QueryStateToTOperationState(
 
 // Result set container for Hive protocol versions >= V6, where results are returned in
 // column-orientation.
-class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
+class HS2ColumnarResultSet : public QueryResultSet {
  public:
   HS2ColumnarResultSet(const TResultSetMetadata& metadata, TRowSet* rowset = NULL)
       : metadata_(metadata), result_set_(rowset), num_rows_(0) {
@@ -317,7 +318,7 @@ class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
 };
 
 // TRow result set for HiveServer2
-class ImpalaServer::HS2RowOrientedResultSet : public ImpalaServer::QueryResultSet {
+class HS2RowOrientedResultSet : public QueryResultSet {
  public:
   // Rows are added into rowset.
   HS2RowOrientedResultSet(const TResultSetMetadata& metadata, TRowSet* rowset = NULL)
@@ -392,16 +393,6 @@ class ImpalaServer::HS2RowOrientedResultSet : public ImpalaServer::QueryResultSe
   // Set to result_set_ if result_set_ is owned.
   scoped_ptr<TRowSet> owned_result_set_;
 };
-
-ImpalaServer::QueryResultSet* ImpalaServer::CreateHS2ResultSet(
-    TProtocolVersion::type version, const TResultSetMetadata& metadata,
-    TRowSet* rowset) {
-  if (version < TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V6) {
-    return new HS2RowOrientedResultSet(metadata, rowset);
-  } else {
-    return new HS2ColumnarResultSet(metadata, rowset);
-  }
-}
 
 void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     TMetadataOpRequest* request, TOperationHandle* handle, thrift::TStatus* status) {
@@ -480,6 +471,18 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   TUniqueId operation_id = exec_state->query_id();
   TUniqueIdToTHandleIdentifier(operation_id, operation_id, &(handle->operationId));
   status->__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
+}
+
+namespace {
+
+QueryResultSet* CreateHS2ResultSet(
+    TProtocolVersion::type version, const TResultSetMetadata& metadata, TRowSet* rowset) {
+  if (version < TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V6) {
+    return new HS2RowOrientedResultSet(metadata, rowset);
+  } else {
+    return new HS2ColumnarResultSet(metadata, rowset);
+  }
+}
 }
 
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size,
@@ -759,8 +762,9 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
 
   // Optionally enable result caching on the QueryExecState.
   if (cache_num_rows > 0) {
-    status = exec_state->SetResultCache(CreateHS2ResultSet(session->hs2_version,
-            *exec_state->result_metadata()), cache_num_rows);
+    status = exec_state->SetResultCache(
+        CreateHS2ResultSet(session->hs2_version, *exec_state->result_metadata(), nullptr),
+        cache_num_rows);
     if (!status.ok()) {
       UnregisterQuery(exec_state->query_id(), false, &status);
       HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);

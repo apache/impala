@@ -25,6 +25,8 @@ import java.util.Set;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.TreeNode;
+import org.apache.impala.planner.DataSink;
+import org.apache.impala.planner.PlanRootSink;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
@@ -407,6 +409,10 @@ public abstract class QueryStmt extends StatementBase {
    */
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
     resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
+  }
+
+  public DataSink createDataSink() {
+    return new PlanRootSink();
   }
 
   public ArrayList<OrderByElement> cloneOrderByElements() {

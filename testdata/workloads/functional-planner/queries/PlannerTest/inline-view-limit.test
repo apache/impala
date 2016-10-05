@@ -1,10 +1,14 @@
 # predicate pushdown
 select * from (select * from functional.alltypessmall) a where id < 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
    predicates: functional.alltypessmall.id < 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypessmall]
@@ -14,6 +18,8 @@ select * from (select * from functional.alltypessmall) a where id < 5
 # predicate pushdown is prevented in presence of limit clause
 select * from (select * from functional.alltypessmall limit 10) a where id < 5 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:SELECT
 |  predicates: functional.alltypessmall.id < 5
 |  limit: 5
@@ -22,6 +28,8 @@ select * from (select * from functional.alltypessmall limit 10) a where id < 5 l
    partitions=4/4 files=4 size=6.32KB
    limit: 10
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:SELECT
 |  predicates: functional.alltypessmall.id < 5
 |  limit: 5
@@ -39,6 +47,8 @@ select *
 from (select * from functional.alltypessmall order by id limit 10) a
 where id < 5 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:SELECT
 |  predicates: id < 5
 |  limit: 5
@@ -49,6 +59,8 @@ where id < 5 limit 5
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 02:SELECT
 |  predicates: id < 5
 |  limit: 5
@@ -72,6 +84,8 @@ from functional.alltypes
     group by 1 order by 2 limit 5) a using (id)
 where a.id < 5 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = id
 |  runtime filters: RF000 <- id
@@ -92,6 +106,8 @@ where a.id < 5 limit 5
    predicates: functional.alltypes.id < 5
    runtime filters: RF000 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 09:EXCHANGE [UNPARTITIONED]
 |  limit: 5
 |
@@ -135,6 +151,8 @@ from (
   limit 10) a
 where id < 5 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:SELECT
 |  predicates: a.id < 5
 |  limit: 5
@@ -151,6 +169,8 @@ where id < 5 limit 5
    partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> a.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 03:SELECT
 |  predicates: a.id < 5
 |  limit: 5
@@ -179,6 +199,8 @@ where id < 5
 order by id
 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:TOP-N [LIMIT=5]
 |  order by: id ASC
 |
@@ -189,6 +211,8 @@ limit 5
    partitions=4/4 files=4 size=6.32KB
    limit: 10
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 02:TOP-N [LIMIT=5]
 |  order by: id ASC
 |
@@ -213,6 +237,8 @@ where id < 5
 order by id
 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:TOP-N [LIMIT=5]
 |  order by: id ASC
 |
@@ -231,6 +257,8 @@ limit 5
    partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> a.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:TOP-N [LIMIT=5]
 |  order by: id ASC
 |
@@ -259,6 +287,8 @@ select *
 from functional.alltypes
   join (select id from functional.alltypessmall limit 10) a using (id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = id
 |  runtime filters: RF000 <- id
@@ -271,6 +301,8 @@ from functional.alltypes
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
@@ -296,6 +328,8 @@ select *
 from functional.alltypes
   join (select id from functional.alltypessmall order by id limit 10) a using (id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = id
 |  runtime filters: RF000 <- id
@@ -310,6 +344,8 @@ from functional.alltypes
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
@@ -344,6 +380,8 @@ where a.id < 5
 order by a.id
 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:TOP-N [LIMIT=5]
 |  order by: id ASC
 |
@@ -368,6 +406,8 @@ limit 5
    predicates: functional.alltypes.id < 5
    runtime filters: RF000 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |  limit: 5
@@ -416,6 +456,8 @@ where a.id < 5
 order by a.id
 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:TOP-N [LIMIT=5]
 |  order by: id ASC
 |
@@ -442,6 +484,8 @@ limit 5
    predicates: functional.alltypes.id < 5
    runtime filters: RF000 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 10:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |  limit: 5
@@ -486,6 +530,8 @@ select x.id from (
 order by x.id
 limit 100 offset 4
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:TOP-N [LIMIT=100 OFFSET=4]
 |  order by: id ASC
 |
@@ -495,6 +541,8 @@ limit 100 offset 4
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 02:TOP-N [LIMIT=100 OFFSET=4]
 |  order by: id ASC
 |
@@ -519,6 +567,8 @@ left outer join
 on (a.id = b.id)
 where a.id > 10 and b.id > 20
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: id = id
 |  other predicates: id > 20
@@ -542,6 +592,8 @@ left outer join
 on (a.id = b.id)
 where a.id > 10 and b.id > 20
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id = id
 |  other predicates: id > 20
@@ -570,6 +622,8 @@ right outer join
 on (a.id = b.id)
 where a.id > 10 and b.id > 20
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id = id
 |  other predicates: id > 10
@@ -595,6 +649,8 @@ right outer join
 on (a.id = b.id)
 where a.id > 10 and b.id > 20
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id = id
 |  other predicates: id > 10
@@ -618,6 +674,8 @@ where a.id > 10 and b.id > 20
 # have explain_level=1
 select * from (select * from functional.alltypes limit 100) v where id < 10 limit 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:SELECT
 |  predicates: functional.alltypes.id < 10
 |  limit: 1

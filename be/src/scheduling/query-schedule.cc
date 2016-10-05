@@ -198,36 +198,28 @@ const TPlanFragment& FInstanceExecParams::fragment() const {
 }
 
 int QuerySchedule::GetNumFragmentInstances() const {
-  if (mt_fragment_exec_params_.empty()) return num_fragment_instances_;
   int result = 0;
-  for (const MtFragmentExecParams& fragment_exec_params: mt_fragment_exec_params_) {
-    result += fragment_exec_params.instance_exec_params.size();
+  if (mt_fragment_exec_params_.empty()) {
+    DCHECK(!fragment_exec_params_.empty());
+    for (const FragmentExecParams& fragment_exec_params : fragment_exec_params_) {
+      result += fragment_exec_params.hosts.size();
+    }
+  } else {
+    for (const MtFragmentExecParams& fragment_exec_params : mt_fragment_exec_params_) {
+      result += fragment_exec_params.instance_exec_params.size();
+    }
   }
   return result;
-}
-
-int QuerySchedule::GetNumRemoteFInstances() const {
-  bool has_coordinator_fragment = GetCoordFragment() != nullptr;
-  int result = GetNumFragmentInstances();
-  bool is_mt_execution = request_.query_ctx.request.query_options.mt_dop > 0;
-  if (is_mt_execution && has_coordinator_fragment) --result;
-  return result;
-}
-
-int QuerySchedule::GetTotalFInstances() const {
-  int result = GetNumRemoteFInstances();
-  return GetCoordFragment() != nullptr ? result + 1 : result;
 }
 
 const TPlanFragment* QuerySchedule::GetCoordFragment() const {
+  // Only have coordinator fragment for statements that return rows.
+  if (request_.stmt_type != TStmtType::QUERY) return nullptr;
   bool is_mt_exec = request_.query_ctx.request.query_options.mt_dop > 0;
   const TPlanFragment* fragment = is_mt_exec
       ? &request_.mt_plan_exec_info[0].fragments[0] : &request_.fragments[0];
-  if (fragment->partition.type == TPartitionType::UNPARTITIONED) {
+
     return fragment;
-  } else {
-    return nullptr;
-  }
 }
 
 void QuerySchedule::GetTPlanFragments(vector<const TPlanFragment*>* fragments) const {

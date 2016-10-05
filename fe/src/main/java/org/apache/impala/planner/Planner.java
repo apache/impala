@@ -149,6 +149,8 @@ public class Planner {
       } else if (ctx_.isDelete()) {
         // Set up delete sink for root fragment
         rootFragment.setSink(ctx_.getAnalysisResult().getDeleteStmt().createDataSink());
+      } else if (ctx_.isQuery()) {
+        rootFragment.setSink(ctx_.getAnalysisResult().getQueryStmt().createDataSink());
       }
       QueryStmt queryStmt = ctx_.getQueryStmt();
       queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());

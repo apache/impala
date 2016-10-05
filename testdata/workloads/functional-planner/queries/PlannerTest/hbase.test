@@ -1,6 +1,8 @@
 # full scan of string typed row-key
 select * from functional_hbase.stringids
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
 ====
 # predicate on row key doesn't get transformed into scan parameter, because
@@ -8,6 +10,8 @@ select * from functional_hbase.stringids
 select * from functional_hbase.alltypessmall
 where id < 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: id < 5
 ---- SCANRANGELOCATIONS
@@ -16,6 +20,8 @@ NODE 0:
   HBASE KEYRANGE port=16202 3:7
   HBASE KEYRANGE port=16203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
@@ -26,6 +32,8 @@ select * from functional_hbase.stringids
 where id = '5'
 and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 5
    stop key: 5\0
@@ -34,6 +42,8 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=16202 5:5\0
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -45,6 +55,8 @@ select * from functional_hbase.stringids
 where id > '5'
 and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 5\0
    predicates: tinyint_col = 5
@@ -53,6 +65,8 @@ NODE 0:
   HBASE KEYRANGE port=16202 5\0:7
   HBASE KEYRANGE port=16203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -63,6 +77,8 @@ select * from functional_hbase.stringids
 where id >= '5'
 and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 5
    predicates: tinyint_col = 5
@@ -71,6 +87,8 @@ NODE 0:
   HBASE KEYRANGE port=16202 5:7
   HBASE KEYRANGE port=16203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -81,6 +99,8 @@ select * from functional_hbase.stringids
 where id < '5'
 and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    stop key: 5
    predicates: tinyint_col = 5
@@ -89,6 +109,8 @@ NODE 0:
   HBASE KEYRANGE port=16201 <unbounded>:3
   HBASE KEYRANGE port=16202 3:5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -99,6 +121,8 @@ select * from functional_hbase.stringids
 where id <= '5'
 and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    stop key: 5\0
    predicates: tinyint_col = 5
@@ -107,6 +131,8 @@ select * from functional_hbase.stringids
 where id > '4' and id < '5'
 and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4\0
    stop key: 5
@@ -115,6 +141,8 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=16202 4\0:5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -126,6 +154,8 @@ select * from functional_hbase.stringids
 where id >= '4' and id < '5'
 and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4
    stop key: 5
@@ -134,6 +164,8 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=16202 4:5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -145,6 +177,8 @@ select * from functional_hbase.stringids
 where id > '4' and id <= '5'
 and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4\0
    stop key: 5\0
@@ -153,6 +187,8 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=16202 4\0:5\0
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -164,6 +200,8 @@ select * from functional_hbase.stringids
 where id >= '4' and id <= '5'
 and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4
    stop key: 5\0
@@ -172,6 +210,8 @@ and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=16202 4:5\0
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -185,6 +225,8 @@ from functional_hbase.alltypessmall
 where id < 5
 group by 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: int_col
@@ -192,6 +234,8 @@ group by 1
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: id < 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [FINALIZE]
@@ -210,10 +254,14 @@ group by 1
 # predicates on string columns against a constant string are converted to HBase filters
 select * from functional_hbase.alltypessmall where string_col = '4'
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col EQUAL '4'
    predicates: string_col = '4'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
@@ -223,10 +271,14 @@ select * from functional_hbase.alltypessmall where string_col = '4'
 # test all comparison ops
 select * from functional_hbase.alltypessmall where string_col != '4'
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col NOT_EQUAL '4'
    predicates: string_col != '4'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
@@ -235,10 +287,14 @@ select * from functional_hbase.alltypessmall where string_col != '4'
 ====
 select * from functional_hbase.alltypessmall where string_col < '4'
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col LESS '4'
    predicates: string_col < '4'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
@@ -247,10 +303,14 @@ select * from functional_hbase.alltypessmall where string_col < '4'
 ====
 select * from functional_hbase.alltypessmall where string_col > '4'
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col GREATER '4'
    predicates: string_col > '4'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
@@ -259,10 +319,14 @@ select * from functional_hbase.alltypessmall where string_col > '4'
 ====
 select * from functional_hbase.alltypessmall where string_col <= '4'
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col LESS_OR_EQUAL '4'
    predicates: string_col <= '4'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
@@ -271,10 +335,14 @@ select * from functional_hbase.alltypessmall where string_col <= '4'
 ====
 select * from functional_hbase.alltypessmall where string_col >= '4'
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col GREATER_OR_EQUAL '4'
    predicates: string_col >= '4'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
@@ -285,6 +353,8 @@ select * from functional_hbase.alltypessmall where string_col >= '4'
 select * from functional_hbase.alltypessmall
 where string_col >= '4' and string_col != '2' and date_string_col = '04/03/09'
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters:
   d:string_col NOT_EQUAL '2'
@@ -292,6 +362,8 @@ where string_col >= '4' and string_col != '2' and date_string_col = '04/03/09'
   d:date_string_col EQUAL '04/03/09'
    predicates: string_col != '2', string_col >= '4', date_string_col = '04/03/09'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
@@ -304,6 +376,8 @@ where string_col >= '4' and string_col != '2' and date_string_col = '04/03/09'
 # mix of predicates and functional_hbase. filters
 select * from functional_hbase.alltypessmall where string_col = '4' and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters: d:string_col EQUAL '4'
    predicates: tinyint_col = 5, string_col = '4'
@@ -312,6 +386,8 @@ select * from functional_hbase.alltypessmall where string_col = '4' and tinyint_
 select * from functional_hbase.stringids
 where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4
    stop key: 5\0
@@ -321,6 +397,8 @@ where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
 NODE 0:
   HBASE KEYRANGE port=16202 4:5\0
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -332,12 +410,16 @@ NODE 0:
 # predicates involving casts (ie, non-string comparisons) cannot be turned into filters
 select * from functional_hbase.alltypessmall where cast(string_col as int) >= 4
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: CAST(string_col AS INT) >= 4
 ====
 # non-const comparisons cannot be turned into filters
 select * from functional_hbase.alltypessmall where string_col >= date_string_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: string_col >= date_string_col
 ====
@@ -346,6 +428,8 @@ select * from functional_hbase.stringids
 where id = concat('', '5')
 and tinyint_col = 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 5
    stop key: 5\0
@@ -356,6 +440,8 @@ select * from functional_hbase.stringids
 where string_col = '4' and tinyint_col = 5
   and id >= concat('', '4') and id <= concat('5', '')
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 4
    stop key: 5\0
@@ -365,6 +451,8 @@ where string_col = '4' and tinyint_col = 5
 NODE 0:
   HBASE KEYRANGE port=16202 4:5\0
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -376,8 +464,12 @@ NODE 0:
 # IMP-1188 - row key predicate is null.
 select * from functional_hbase.stringids where id = null
 ---- PLAN
+PLAN-ROOT SINK
+|
 empty scan node
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 empty scan node
@@ -385,8 +477,12 @@ empty scan node
 # IMP-1188 - row key lower bound is bigger than upper bound.
 select * from functional_hbase.stringids where id > 'b' and id < 'a'
 ---- PLAN
+PLAN-ROOT SINK
+|
 empty scan node
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 empty scan node
@@ -396,6 +492,8 @@ empty scan node
 select * from functional_hbase.stringids
 where cast(id as int) < 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.stringids]
    predicates: CAST(id AS INT) < 5
 ====
@@ -407,6 +505,8 @@ where cast(id as int) < 5
 select * from functional_hbase.alltypesagg
 where bigint_col is null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NULL
 ====
@@ -415,6 +515,8 @@ where bigint_col is null
 select bigint_col, day from functional_hbase.alltypesagg
 where bigint_col is null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NULL
 ====
@@ -422,6 +524,8 @@ where bigint_col is null
 select * from functional_hbase.alltypesagg
 where bigint_col is not null
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NOT NULL
 ====
@@ -429,6 +533,8 @@ where bigint_col is not null
 select * from functional_hbase.alltypesagg
 where bigint_col is null and day = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NULL, day = 1
 ====
@@ -436,6 +542,8 @@ where bigint_col is null and day = 1
 select * from functional_hbase.alltypesagg
 where bigint_col is not null and bool_col = true
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NOT NULL, bool_col = TRUE
 ---- SCANRANGELOCATIONS
@@ -444,6 +552,8 @@ NODE 0:
   HBASE KEYRANGE port=16202 3:7
   HBASE KEYRANGE port=16203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
@@ -453,12 +563,16 @@ NODE 0:
 select count(*) from functional_hbase.alltypesagg
 where bigint_col = 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col = 10
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |
@@ -474,6 +588,8 @@ where bigint_col = 10
 select count(*) from functional_hbase.alltypesagg
 where bigint_col = 10 and day = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -492,6 +608,8 @@ where
   a.int_col = b.int_col and
   c.int_col = b.int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: b.int_col = a.int_col
 |

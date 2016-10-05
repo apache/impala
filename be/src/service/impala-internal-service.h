@@ -18,8 +18,6 @@
 #ifndef IMPALA_SERVICE_IMPALA_INTERNAL_SERVICE_H
 #define IMPALA_SERVICE_IMPALA_INTERNAL_SERVICE_H
 
-#include <boost/shared_ptr.hpp>
-
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "service/impala-server.h"
@@ -32,9 +30,12 @@ namespace impala {
 /// ImpalaInternalService service.
 class ImpalaInternalService : public ImpalaInternalServiceIf {
  public:
-  ImpalaInternalService(const boost::shared_ptr<ImpalaServer>& impala_server,
-      const boost::shared_ptr<FragmentMgr>& fragment_mgr)
-      : impala_server_(impala_server), fragment_mgr_(fragment_mgr) { }
+  ImpalaInternalService() {
+    impala_server_ = ExecEnv::GetInstance()->impala_server();
+    DCHECK(impala_server_ != nullptr);
+    fragment_mgr_ = ExecEnv::GetInstance()->fragment_mgr();
+    DCHECK(fragment_mgr_ != nullptr);
+  }
 
   virtual void ExecPlanFragment(TExecPlanFragmentResult& return_val,
       const TExecPlanFragmentParams& params) {
@@ -74,10 +75,10 @@ class ImpalaInternalService : public ImpalaInternalServiceIf {
 
  private:
   /// Manages fragment reporting and data transmission
-  boost::shared_ptr<ImpalaServer> impala_server_;
+  ImpalaServer* impala_server_;
 
   /// Manages fragment execution
-  boost::shared_ptr<FragmentMgr> fragment_mgr_;
+  FragmentMgr* fragment_mgr_;
 };
 
 }

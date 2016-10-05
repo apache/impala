@@ -17,55 +17,19 @@
 
 #include "service/impala-server.h"
 
-#include <algorithm>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/date_time/posix_time/posix_time_types.hpp>
-#include <boost/unordered_set.hpp>
-#include <jni.h>
-#include <thrift/protocol/TDebugProtocol.h>
-#include <gtest/gtest.h>
-#include <boost/bind.hpp>
-#include <boost/algorithm/string.hpp>
-#include <gperftools/heap-profiler.h>
-#include <gperftools/malloc_extension.h>
 
-#include "codegen/llvm-codegen.h"
 #include "common/logging.h"
-#include "common/version.h"
-#include "exec/exec-node.h"
-#include "exec/hdfs-table-sink.h"
-#include "exec/scan-node.h"
-#include "exprs/expr.h"
-#include "runtime/data-stream-mgr.h"
-#include "runtime/client-cache.h"
-#include "runtime/descriptors.h"
-#include "runtime/data-stream-sender.h"
-#include "runtime/row-batch.h"
-#include "runtime/plan-fragment-executor.h"
-#include "runtime/hdfs-fs-cache.h"
+#include "gen-cpp/Frontend_types.h"
+#include "rpc/thrift-util.h"
 #include "runtime/exec-env.h"
-#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/timestamp-value.h"
-#include "scheduling/simple-scheduler.h"
 #include "service/query-exec-state.h"
 #include "service/query-options.h"
-#include "util/container-util.h"
-#include "util/debug-util.h"
+#include "service/query-result-set.h"
 #include "util/impalad-metrics.h"
-#include "util/string-parser.h"
-#include "rpc/thrift-util.h"
-#include "rpc/thrift-server.h"
-#include "util/jni-util.h"
 #include "util/webserver.h"
-#include "gen-cpp/Types_types.h"
-#include "gen-cpp/ImpalaService.h"
-#include "gen-cpp/DataSinks_types.h"
-#include "gen-cpp/Types_types.h"
-#include "gen-cpp/ImpalaService.h"
-#include "gen-cpp/ImpalaService_types.h"
-#include "gen-cpp/ImpalaInternalService.h"
-#include "gen-cpp/Frontend_types.h"
 
 #include "common/names.h"
 
@@ -83,11 +47,17 @@ using namespace beeswax;
     }                                                           \
   } while (false)
 
+namespace {
+
+/// Ascii output precision for double/float
+constexpr int ASCII_PRECISION = 16;
+}
+
 namespace impala {
 
 // Ascii result set for Beeswax.
 // Beeswax returns rows in ascii, using "\t" as column delimiter.
-class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
+class AsciiQueryResultSet : public QueryResultSet {
  public:
   // Rows are added into rowset.
   AsciiQueryResultSet(const TResultSetMetadata& metadata, vector<string>* rowset)

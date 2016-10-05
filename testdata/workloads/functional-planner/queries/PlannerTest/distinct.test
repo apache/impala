@@ -2,12 +2,16 @@
 select distinct *
 from functional.testtbl
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 files=0 size=0B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [FINALIZE]
@@ -25,12 +29,16 @@ from functional.testtbl
 select distinct id, zip
 from functional.testtbl
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  group by: id, zip
 |
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 files=0 size=0B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [FINALIZE]
@@ -48,6 +56,8 @@ from functional.testtbl
 select count(distinct id, zip)
 from functional.testtbl
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: count(if(id IS NULL, NULL, zip))
 |
@@ -57,6 +67,8 @@ from functional.testtbl
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 files=0 size=0B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(if(id IS NULL, NULL, zip))
 |
@@ -81,6 +93,8 @@ select tinyint_col, count(distinct int_col, bigint_col)
 from functional.alltypesagg
 group by 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: count(if(int_col IS NULL, NULL, bigint_col))
 |  group by: tinyint_col
@@ -91,6 +105,8 @@ group by 1
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [FINALIZE]
@@ -113,6 +129,8 @@ select tinyint_col, count(distinct int_col), sum(distinct int_col)
 from functional.alltypesagg
 group by 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: count(int_col), sum(int_col)
 |  group by: tinyint_col
@@ -123,6 +141,8 @@ group by 1
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [FINALIZE]
@@ -144,6 +164,8 @@ group by 1
 select sum(distinct int_col)
 from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: sum(int_col)
 |
@@ -153,6 +175,8 @@ from functional.alltypesagg
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: sum:merge(int_col)
 |
@@ -178,6 +202,8 @@ select tinyint_col, count(distinct int_col),
 min(distinct smallint_col), max(distinct string_col)
 from functional.alltypesagg group by 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: count(int_col), min:merge(smallint_col), max:merge(string_col)
 |  group by: tinyint_col
@@ -189,6 +215,8 @@ from functional.alltypesagg group by 1
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [FINALIZE]
@@ -213,6 +241,8 @@ select tinyint_col, count(distinct int_col), count(*), sum(distinct int_col),
 sum(int_col), min(smallint_col), max(bigint_col)
 from functional.alltypesagg group by 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: count(int_col), sum(int_col), count:merge(*), sum:merge(int_col), min:merge(smallint_col), max:merge(bigint_col)
 |  group by: tinyint_col
@@ -224,6 +254,8 @@ from functional.alltypesagg group by 1
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [FINALIZE]
@@ -250,6 +282,8 @@ select t1.c, t2.c from
 (select count(distinct int_col) as c from functional.alltypestiny) t1 inner join
 (select count(distinct bigint_col) as c from functional.alltypestiny) t2 on (t1.c = t2.c)
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: count(int_col) = count(bigint_col)
 |
@@ -271,6 +305,8 @@ select t1.c, t2.c from
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: count(int_col) = count(bigint_col)
 |
@@ -323,6 +359,8 @@ select t1.c, t2.c from
 select count(distinct tinyint_col) from functional.alltypes
 having count(bigint_col) > 0
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: count(tinyint_col), count:merge(bigint_col)
 |  having: zeroifnull(count(bigint_col)) > 0
@@ -334,6 +372,8 @@ having count(bigint_col) > 0
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(tinyint_col), count:merge(bigint_col)
 |  having: zeroifnull(count(bigint_col)) > 0
@@ -362,6 +402,8 @@ select 1 from
   (select count(distinct 1) x from functional.alltypes) t
 where t.x is not null
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: count(1)
 |  having: count(1) IS NOT NULL
@@ -372,6 +414,8 @@ where t.x is not null
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(1)
 |  having: count(1) IS NOT NULL
@@ -398,6 +442,8 @@ select 1 from
   (select count(distinct 1) x, count(1) y from functional.alltypes) t
 where t.x + t.y > 10 and t.x > 0 and t.y > 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: count(1), count:merge(1)
 |  having: count(1) > 0, zeroifnull(count(1)) > 1, count(1) + zeroifnull(count(1)) > 10
@@ -409,6 +455,8 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(1), count:merge(1)
 |  having: count(1) > 0, zeroifnull(count(1)) > 1, count(1) + zeroifnull(count(1)) > 10
@@ -434,6 +482,8 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 # IMPALA-2266: Test non-grouping distinct aggregation inside an inline view.
 select * from (select count(distinct int_col) cd from functional.alltypes) v
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(int_col)
 |
@@ -456,6 +506,8 @@ select * from (select count(distinct int_col) cd from functional.alltypes) v
 # IMPALA-2266: Test grouping distinct aggregation inside an inline view.
 select * from (select count(distinct int_col) cd from functional.alltypes group by bool_col) v
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE [FINALIZE]
@@ -476,6 +528,8 @@ select * from (select count(distinct int_col) cd from functional.alltypes group 
 # IMPALA-4042: count(distinct NULL) fails on a view
 select count(distinct null) from functional.alltypes_view
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(NULL)
 |

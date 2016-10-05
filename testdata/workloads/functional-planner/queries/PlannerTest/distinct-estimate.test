@@ -1,12 +1,16 @@
 # Distinct estimate
 select distinctpc(l_orderkey) from tpch.lineitem
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: distinctpc(l_orderkey)
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: distinctpc:merge(l_orderkey)
 |
@@ -21,6 +25,8 @@ select distinctpc(l_orderkey) from tpch.lineitem
 # Distinct estimate with distinct
 select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: count(l_orderkey), distinctpc:merge(l_orderkey)
 |
@@ -31,6 +37,8 @@ select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(l_orderkey), distinctpc:merge(l_orderkey)
 |

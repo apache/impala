@@ -22,6 +22,8 @@ order by
   l_returnflag,
   l_linestatus
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:SORT
 |  order by: l_returnflag ASC, l_linestatus ASC
 |
@@ -33,6 +35,8 @@ order by
    partitions=1/1 files=4 size=577.87MB
    predicates: l_shipdate <= '1998-09-02'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: l_returnflag ASC, l_linestatus ASC
 |
@@ -96,6 +100,8 @@ order by
   p_partkey
 limit 100
 ---- PLAN
+PLAN-ROOT SINK
+|
 26:TOP-N [LIMIT=100]
 |  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
 |
@@ -173,6 +179,8 @@ limit 100
    predicates: !empty(s.s_partsupps)
    runtime filters: RF002 -> s_nationkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 33:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
 |  limit: 100
@@ -292,6 +300,8 @@ order by
   o_orderdate
 limit 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 10:TOP-N [LIMIT=10]
 |  order by: sum(l_extendedprice * (1 - l_discount)) DESC, o_orderdate ASC
 |
@@ -321,6 +331,8 @@ limit 10
    predicates on o: !empty(o.o_lineitems), o_orderdate < '1995-03-15'
    predicates on l: l_shipdate > '1995-03-15'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 13:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(l_extendedprice * (1 - l_discount)) DESC, o_orderdate ASC
 |  limit: 10
@@ -384,6 +396,8 @@ group by
 order by
   o_orderpriority
 ---- PLAN
+PLAN-ROOT SINK
+|
 10:SORT
 |  order by: o_orderpriority ASC
 |
@@ -413,6 +427,8 @@ order by
    predicates on o: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
    predicates on o_lineitems: l_commitdate < l_receiptdate
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 13:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: o_orderpriority ASC
 |
@@ -475,6 +491,8 @@ group by
 order by
   revenue desc
 ---- PLAN
+PLAN-ROOT SINK
+|
 18:SORT
 |  order by: sum(l_extendedprice * (1 - l_discount)) DESC
 |
@@ -528,6 +546,8 @@ order by
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
    runtime filters: RF000 -> c.c_nationkey, RF001 -> c_nationkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 23:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(l_extendedprice * (1 - l_discount)) DESC
 |
@@ -606,6 +626,8 @@ where
   and l_discount between 0.05 and 0.07
   and l_quantity < 24
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice * l_discount)
 |
@@ -613,6 +635,8 @@ where
    partitions=1/1 files=4 size=292.35MB
    predicates: l_discount <= 0.07, l_discount >= 0.05, l_quantity < 24, l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_extendedprice * l_discount)
 |
@@ -664,6 +688,8 @@ order by
   cust_nation,
   l_year
 ---- PLAN
+PLAN-ROOT SINK
+|
 16:SORT
 |  order by: supp_nation ASC, cust_nation ASC, l_year ASC
 |
@@ -716,6 +742,8 @@ order by
    predicates on l: l_shipdate >= '1995-01-01', l_shipdate <= '1996-12-31'
    runtime filters: RF000 -> c_nationkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 22:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: supp_nation ASC, cust_nation ASC, l_year ASC
 |
@@ -820,6 +848,8 @@ group by
 order by
   o_year
 ---- PLAN
+PLAN-ROOT SINK
+|
 22:SORT
 |  order by: o_year ASC
 |
@@ -886,6 +916,8 @@ order by
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
    runtime filters: RF001 -> c_nationkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 29:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: o_year ASC
 |
@@ -1001,6 +1033,8 @@ order by
   nation,
   o_year desc
 ---- PLAN
+PLAN-ROOT SINK
+|
 16:SORT
 |  order by: nation ASC, o_year DESC
 |
@@ -1050,6 +1084,8 @@ order by
    partitions=1/1 files=4 size=577.87MB
    predicates: !empty(o.o_lineitems)
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 22:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: nation ASC, o_year DESC
 |
@@ -1148,6 +1184,8 @@ order by
   revenue desc
 limit 20
 ---- PLAN
+PLAN-ROOT SINK
+|
 12:TOP-N [LIMIT=20]
 |  order by: sum(l_extendedprice * (1 - l_discount)) DESC
 |
@@ -1185,6 +1223,8 @@ limit 20
    predicates on l: l_returnflag = 'R'
    runtime filters: RF000 -> c_nationkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 16:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(l_extendedprice * (1 - l_discount)) DESC
 |  limit: 20
@@ -1268,6 +1308,8 @@ where
 order by
   value desc
 ---- PLAN
+PLAN-ROOT SINK
+|
 17:SORT
 |  order by: value DESC
 |
@@ -1323,6 +1365,8 @@ order by
    predicates: !empty(s.s_partsupps)
    runtime filters: RF000 -> s_nationkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 25:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: value DESC
 |
@@ -1428,6 +1472,8 @@ group by
 order by
   l_shipmode
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:SORT
 |  order by: l_shipmode ASC
 |
@@ -1448,6 +1494,8 @@ order by
    predicates: !empty(o.o_lineitems)
    predicates on l: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate, l_receiptdate >= '1994-01-01', l_receiptdate < '1995-01-01'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: l_shipmode ASC
 |
@@ -1499,6 +1547,8 @@ order by
   custdist desc,
   c_count desc
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:SORT
 |  order by: count(*) DESC, c_count DESC
 |
@@ -1522,6 +1572,8 @@ order by
    partitions=1/1 files=4 size=577.87MB
    predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 12:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(*) DESC, c_count DESC
 |
@@ -1576,6 +1628,8 @@ where
   and l_shipdate >= '1995-09-01'
   and l_shipdate < '1995-10-01'
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
 |
@@ -1591,6 +1645,8 @@ where
    predicates: l_shipdate < '1995-10-01', l_shipdate >= '1995-09-01'
    runtime filters: RF000 -> l_partkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: sum:merge(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum:merge(l_extendedprice * (1 - l_discount))
 |
@@ -1646,6 +1702,8 @@ where
 order by
   s_suppkey
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:SORT
 |  order by: s_suppkey ASC
 |
@@ -1679,6 +1737,8 @@ order by
    predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
    runtime filters: RF000 -> l.l_suppkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_suppkey ASC
 |
@@ -1763,6 +1823,8 @@ order by
   p_type,
   p_size
 ---- PLAN
+PLAN-ROOT SINK
+|
 09:SORT
 |  order by: count(s_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
 |
@@ -1792,6 +1854,8 @@ order by
    partitions=1/1 files=1 size=111.08MB
    predicates: NOT s_comment LIKE '%Customer%Complaints%', !empty(s.s_partsupps)
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 13:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(s_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
 |
@@ -1851,6 +1915,8 @@ where
       l_partkey = p_partkey
   )
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice)
 |
@@ -1879,6 +1945,8 @@ where
    partitions=1/1 files=4 size=577.87MB
    runtime filters: RF000 -> l.l_partkey, RF001 -> l_partkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 12:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_extendedprice)
 |
@@ -1942,6 +2010,8 @@ order by
   o_orderdate
 limit 100
 ---- PLAN
+PLAN-ROOT SINK
+|
 10:TOP-N [LIMIT=100]
 |  order by: o_totalprice DESC, o_orderdate ASC
 |
@@ -1969,6 +2039,8 @@ limit 100
    partitions=1/1 files=4 size=577.87MB
    predicates: !empty(c.c_orders)
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: o_totalprice DESC, o_orderdate ASC
 |  limit: 100
@@ -2038,6 +2110,8 @@ where
     )
   )
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |
@@ -2053,6 +2127,8 @@ where
    partitions=1/1 files=4 size=577.87MB
    runtime filters: RF000 -> l_partkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_extendedprice * (1 - l_discount))
 |
@@ -2110,6 +2186,8 @@ where
 order by
   s_name
 ---- PLAN
+PLAN-ROOT SINK
+|
 13:SORT
 |  order by: s_name ASC
 |
@@ -2158,6 +2236,8 @@ order by
    predicates: l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    runtime filters: RF000 -> l.l_partkey, RF001 -> l.l_suppkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 21:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_name ASC
 |
@@ -2267,6 +2347,8 @@ order by
   s_name
 limit 100
 ---- PLAN
+PLAN-ROOT SINK
+|
 20:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, s_name ASC
 |
@@ -2326,6 +2408,8 @@ limit 100
    predicates on l1: l1.l_receiptdate > l1.l_commitdate
    predicates on l3: l3.l_receiptdate > l3.l_commitdate
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 25:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(*) DESC, s_name ASC
 |  limit: 100
@@ -2434,6 +2518,8 @@ group by
 order by
   cntrycode
 ---- PLAN
+PLAN-ROOT SINK
+|
 09:SORT
 |  order by: cntrycode ASC
 |
@@ -2463,6 +2549,8 @@ order by
    partitions=1/1 files=4 size=577.87MB
    predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 15:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: cntrycode ASC
 |

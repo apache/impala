@@ -2,6 +2,8 @@ select * from tpch.nation n1
 join[broadcast]
 tpch.nation n2 on n1.n_regionkey=n2.n_regionkey
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]

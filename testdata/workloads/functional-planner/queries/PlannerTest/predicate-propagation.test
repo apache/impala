@@ -3,6 +3,8 @@ select straight_join count(*)
 from functional.alltypes a join functional.alltypes b on (a.double_col = b.bigint_col)
 where b.bigint_col div 2 = 0
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -26,6 +28,8 @@ from
    inner join functional.alltypessmall b on (a.cnt = b.id)
 where b.id < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: count(id) = b.id
 |
@@ -45,6 +49,8 @@ where b.id < 10
 select count(*) from functional.alltypes
 where month = id and id = int_col and tinyint_col = int_col and int_col < 2
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -60,6 +66,8 @@ from
    left outer join (select id, string_col from functional.alltypes) b
    on (a.id = b.id and a.string_col = 'a' and b.string_col = 'b')
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: id = id
 |  other join predicates: string_col = 'a'
@@ -80,6 +88,8 @@ from
    on (a.id = b.id)
 where a.string_col = 'a' and b.string_col = 'b'
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: id = id
 |  other predicates: string_col = 'b'
@@ -99,6 +109,8 @@ from
    cross join (select id, string_col from functional.alltypes) b
 where a.string_col = 'a' and b.string_col = 'b'
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--01:SCAN HDFS [functional.alltypes]
@@ -109,6 +121,8 @@ where a.string_col = 'a' and b.string_col = 'b'
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.string_col = 'a'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |
 02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -135,6 +149,8 @@ where c1 > 0
 order by 2, 1 desc
 limit 3
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:TOP-N [LIMIT=3]
 |  order by: c2 ASC, c1 DESC
 |
@@ -163,6 +179,8 @@ where c1 > 0
 order by 2, 1 desc
 limit 3
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:TOP-N [LIMIT=3]
 |  order by: c2 ASC, c1 DESC
 |
@@ -189,6 +207,8 @@ from functional.alltypes a
 where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
   and cast(sin(c.int_col) as boolean) = true
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: b.id = c.id, b.month = c.month, b.year = c.year, b.smallint_col = c.int_col
 |  runtime filters: RF000 <- c.id, RF001 <- c.month, RF002 <- c.year, RF003 <- c.int_col
@@ -221,6 +241,8 @@ NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -262,6 +284,8 @@ from (select * from functional.alltypes) a
 where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
   and cast(sin(c.int_col) as boolean) = true
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.month = functional.alltypestiny.month, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.smallint_col = functional.alltypestiny.int_col
 |  runtime filters: RF000 <- functional.alltypestiny.id, RF001 <- functional.alltypestiny.month, RF002 <- functional.alltypestiny.year, RF003 <- functional.alltypestiny.int_col
@@ -294,6 +318,8 @@ NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -340,6 +366,8 @@ from functional.alltypes a
    and a.month = b.month and b.month + 1 = 2)
 where a.year = 2009 and a.tinyint_col = 7 and a.id is null and b.id = 17 and b.int_col is null
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.id = b.id, a.month = b.month, a.tinyint_col = b.tinyint_col, a.year = b.year
 |  other predicates: b.int_col IS NULL, b.id = 17
@@ -368,6 +396,8 @@ NODE 0:
 NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -400,6 +430,8 @@ from functional.alltypessmall a
    and a.month = b.month and a.month + 1 = 2)
 where b.year = 2009 and b.tinyint_col = 7 and b.id is null and a.id = 17 and a.int_col is null
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: a.id = b.id, a.month = b.month, a.tinyint_col = b.tinyint_col, a.year = b.year
 |  other predicates: a.int_col IS NULL, a.id = 17
@@ -414,6 +446,8 @@ where b.year = 2009 and b.tinyint_col = 7 and b.id is null and a.id = 17 and a.i
    predicates: a.id = 17, a.tinyint_col = 7
    runtime filters: RF000 -> a.id, RF001 -> a.month, RF002 -> a.tinyint_col, RF003 -> a.year
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
@@ -448,6 +482,8 @@ from functional.alltypes a
   on (a.id = b.id and a.tinyint_col = b.int_col and a.year = b.year and a.month = b.month)
 where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col != 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = id, a.month = month, a.year = year, a.tinyint_col = int_col
 |  runtime filters: RF000 <- id, RF001 <- month, RF002 <- year, RF003 <- int_col
@@ -473,6 +509,8 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 07:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
@@ -518,6 +556,8 @@ where a.id = b.id and
       b.count_col + 1 = 17 and
       a.tinyint_col != 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = id, a.month = month, a.year = year, a.tinyint_col = int_col
 |  runtime filters: RF000 <- id, RF001 <- month, RF002 <- year, RF003 <- int_col
@@ -536,6 +576,8 @@ where a.id = b.id and
    predicates: a.id > 11, a.tinyint_col != 5
    runtime filters: RF000 -> a.id, RF001 -> a.month, RF002 -> a.year, RF003 -> a.tinyint_col
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 07:EXCHANGE [UNPARTITIONED]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
@@ -579,6 +621,8 @@ from functional.alltypes a
   on (a.id = b.id and a.tinyint_col = b.int_col and a.year = b.year and a.month = b.month)
 where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col != 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = id, a.month = month, a.year = year, a.tinyint_col = int_col
 |  runtime filters: RF000 <- id, RF001 <- month, RF002 <- year, RF003 <- int_col
@@ -609,6 +653,8 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 09:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -661,6 +707,8 @@ where a.year = 2009 and
       a.year = b.year and
       a.month = b.month
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = id, a.month = month, a.year = year, a.tinyint_col = int_col
 |  runtime filters: RF000 <- id, RF001 <- month, RF002 <- year, RF003 <- int_col
@@ -682,6 +730,8 @@ where a.year = 2009 and
    predicates: a.id > 11, a.tinyint_col != 5
    runtime filters: RF000 -> a.id, RF001 -> a.month, RF002 -> a.year, RF003 -> a.tinyint_col
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 09:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -724,6 +774,8 @@ on (x.id = z.id)
 where x.year = 2009
 and z.month = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypesagg.id
 |  runtime filters: RF000 <- functional.alltypesagg.id
@@ -756,6 +808,8 @@ where x.year = 2009
 and z.month = 1
 and x.id + x.b_id = 17
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = functional.alltypesagg.id
 |  runtime filters: RF000 <- functional.alltypesagg.id
@@ -785,6 +839,8 @@ from functional.alltypes a left outer join
 (select id, int_col from functional.alltypes group by 1, 2) b on (a.id = b.id)
 where a.id is null and isnull(b.id, 0) = 0 and b.int_col = 17
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.id = id
 |  other predicates: int_col = 17, isnull(id, 0) = 0
@@ -807,6 +863,8 @@ from functional.alltypes a left outer join
 on (a.id = b.id)
 where isnull(a.id, 0) = 0 and b.id is null  and b.int_col = 17
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.id = id
 |  other predicates: id IS NULL, int_col = 17
@@ -837,6 +895,8 @@ from
 right outer join functional.alltypes a on (a.id = b.id)
 where a.id is null and isnull(b.id, 0) = 0 and b.int_col = 17
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id = a.id
 |  other predicates: int_col = 17, isnull(id, 0) = 0
@@ -861,6 +921,8 @@ from
 right outer join functional.alltypes a on (a.id = b.id)
 where isnull(a.id, 0) = 0 and b.id is null  and b.int_col = 17
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: id = a.id
 |  other predicates: id IS NULL, int_col = 17
@@ -893,6 +955,8 @@ select straight_join a.string_col from functional.alltypes a
 full outer join (select * from functional.alltypessmall where id > 0) b
 ON a.id=b.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = functional.alltypessmall.id
 |
@@ -916,6 +980,8 @@ left outer join
    where x.id is null) b
 on a.id=b.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.id = x.id
 |
@@ -942,6 +1008,8 @@ from functional.alltypes
 group by bool_col, int_col
 having bool_col = false and int_col > 0 and count(bigint_col) > 0
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: count(bigint_col)
 |  group by: bool_col, int_col
@@ -968,6 +1036,8 @@ and t2.id + t2.smallint_col + t2.bigint_col > 30
 # assigned in join, TODO: propagate multi-tuple predicates
 and t2.id + t3.int_col > 40
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.bigint_col = functional.alltypestiny.bigint_col, t2.id = functional.alltypestiny.id, t2.smallint_col = functional.alltypestiny.int_col
 |  other predicates: t2.id + functional.alltypestiny.int_col > 40
@@ -1009,6 +1079,8 @@ t1.id + t1.tinyint_col > 20
 # assigned in agg nodes in t2 and t3
 and t2.y + t2.z > 30
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: max(smallint_col) = max(smallint_col), min(int_col) = min(int_col)
 |  runtime filters: RF000 <- max(smallint_col)
@@ -1056,6 +1128,8 @@ and ifnull(t3.tinyint_col + t3.bigint_col, true) = true
 # assigned in scan of t1, t2 and t3
 and t1.id * t1.int_col < 100
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t2.id = functional.alltypestiny.id, t2.int_col = functional.alltypestiny.int_col
 |  other predicates: functional.alltypestiny.tinyint_col + functional.alltypestiny.smallint_col + functional.alltypestiny.int_col > 10, ifnull(functional.alltypestiny.tinyint_col + functional.alltypestiny.bigint_col, TRUE) = TRUE
@@ -1084,6 +1158,8 @@ functional.alltypes t1 inner join functional.alltypessmall t2
 on (t1.id = t2.month and t1.year = t2.year and t1.month = t2.month)
 where t2.year + t2.month > 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.month, t1.year = t2.year
 |  runtime filters: RF000 <- t2.month, RF001 <- t2.year
@@ -1107,6 +1183,8 @@ on (t1.id = t2.id
     and t1.tinyint_col = t2.int_col)
 where t1.id + t1.tinyint_col > 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id, t1.tinyint_col = t2.tinyint_col
 |  runtime filters: RF000 <- t2.id, RF001 <- t2.tinyint_col
@@ -1132,6 +1210,8 @@ inner join (select bigint_col, min(int_col) x, max(int_col) y
 on (t1.id = t2.bigint_col and t1.int_col = t2.x)
 where t1.id + t1.int_col > 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.int_col = min(int_col), t1.id = bigint_col
 |  runtime filters: RF000 <- min(int_col), RF001 <- bigint_col
@@ -1157,6 +1237,8 @@ left anti join
 on (a.id = b.id)
 where a.id < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: a.id = id
 |
@@ -1176,6 +1258,8 @@ right anti join functional.alltypestiny b
 on (a.id = b.id)
 where b.id < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: id = b.id
 |
@@ -1197,6 +1281,8 @@ select * from
    group by j.int_col) v
 where v.int_col = 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:AGGREGATE [FINALIZE]
 |  output: sum(a.tinyint_col)
 |  group by: b.int_col
@@ -1223,6 +1309,8 @@ select * from
     on a.id = b.id) j) v
 where v.int_col = 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: b.id = a.id
 |  other predicates: b.int_col = 10
@@ -1245,6 +1333,8 @@ SELECT count(*) FROM
   WHERE n_name = 'BRAZIL' AND n_regionkey = 1 AND c_custkey % 2 = 0) cn
  LEFT OUTER JOIN tpch_parquet.region r ON n_regionkey = r_regionkey
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
 |

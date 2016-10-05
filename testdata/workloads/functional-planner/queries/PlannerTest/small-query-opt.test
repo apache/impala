@@ -1,9 +1,13 @@
 select * from functional_seq.alltypes t1 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional_seq.alltypes t1]
    partitions=24/24 files=24 size=562.59KB
    limit: 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional_seq.alltypes t1]
    partitions=24/24 files=24 size=562.59KB
    limit: 5
@@ -11,10 +15,14 @@ select * from functional_seq.alltypes t1 limit 5
 # Query is over the limit of 8 rows to be optimized, will distribute the query
 select * from functional.alltypes t1 limit 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    limit: 10
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
@@ -25,10 +33,14 @@ select * from functional.alltypes t1 limit 10
 # Query is optimized, run on coordinator only
 select * from functional.alltypes t1 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    limit: 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    limit: 5
@@ -36,11 +48,15 @@ select * from functional.alltypes t1 limit 5
 # If a predicate is applied the optimization is disabled
 select * from functional.alltypes t1 where t1.id < 99 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
    predicates: t1.id < 99
    limit: 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |  limit: 5
 |
@@ -52,10 +68,14 @@ select * from functional.alltypes t1 where t1.id < 99 limit 5
 # No optimization for hbase tables
 select * from functional_hbase.alltypes t1 where t1.id < 99 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypes t1]
    predicates: t1.id < 99
    limit: 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |  limit: 5
 |
@@ -66,9 +86,13 @@ select * from functional_hbase.alltypes t1 where t1.id < 99 limit 5
 # Applies optimization for small queries in hbase
 select * from functional_hbase.alltypes t1 limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypes t1]
    limit: 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 00:SCAN HBASE [functional_hbase.alltypes t1]
    limit: 5
 ====
@@ -122,6 +146,8 @@ select * from functional_hbase.alltypes limit 5
 union all
 select * from functional_hbase.alltypes limit 2
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:UNION
 |
 |--02:SCAN HBASE [functional_hbase.alltypes]
@@ -130,6 +156,8 @@ select * from functional_hbase.alltypes limit 2
 01:SCAN HBASE [functional_hbase.alltypes]
    limit: 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 00:UNION
 |
 |--02:SCAN HBASE [functional_hbase.alltypes]
@@ -142,6 +170,8 @@ select * from functional_hbase.alltypes limit 5
 union all
 select * from functional_hbase.alltypes limit 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:UNION
 |
 |--02:SCAN HBASE [functional_hbase.alltypes]
@@ -150,6 +180,8 @@ select * from functional_hbase.alltypes limit 5
 01:SCAN HBASE [functional_hbase.alltypes]
    limit: 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 00:UNION
 |
 |--04:EXCHANGE [UNPARTITIONED]
@@ -168,6 +200,8 @@ select * from functional_hbase.alltypes limit 5
 select * from
   functional.testtbl a join functional.testtbl b on a.id = b.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
@@ -186,6 +220,8 @@ select * from
 select * from
   functional.testtbl a, functional.testtbl b
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |
 02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -202,6 +238,8 @@ select * from
   functional.alltypestiny a
 where a.id in (select id from functional.alltypestiny limit 5) limit 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:EXCHANGE [UNPARTITIONED]
 |  limit: 5
 |
@@ -237,6 +275,8 @@ select id, bool_col
 from functional.alltypestiny c
 where year=2009 and month=2
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:UNION
 |
 |--03:AGGREGATE [FINALIZE]
@@ -256,6 +296,8 @@ where year=2009 and month=2
 # IMPALA-2527: Tests that the small query optimization is disabled for colleciton types
 select key from functional.allcomplextypes.map_map_col.value limit 5;
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |  limit: 5
 |

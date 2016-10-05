@@ -5,6 +5,8 @@ max(tinyint_col) over(partition by int_col)
 from functional.alltypes
 group by int_col, tinyint_col
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:EXCHANGE [UNPARTITIONED]
 |
 03:ANALYTIC
@@ -32,6 +34,8 @@ max(int_col) over(partition by int_col, bool_col),
 max(int_col) over(partition by int_col, tinyint_col)
 from functional.alltypes
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:EXCHANGE [UNPARTITIONED]
 |
 04:ANALYTIC
@@ -60,6 +64,8 @@ max(int_col) over(partition by int_col),
 min(int_col) over(order by int_col)
 from functional.alltypes
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:ANALYTIC
 |  functions: min(int_col)
 |  order by: int_col ASC
@@ -78,6 +84,8 @@ from functional.alltypes
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:ANALYTIC
 |  functions: min(int_col)
 |  order by: int_col ASC
@@ -115,6 +123,8 @@ max(int_col) over(partition by int_col order by bigint_col),
 max(int_col) over(partition by int_col order by bigint_col desc)
 from functional.alltypes
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:ANALYTIC
 |  functions: max(int_col)
 |  partition by: bool_col
@@ -155,6 +165,8 @@ from functional.alltypes
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 11:EXCHANGE [UNPARTITIONED]
 |
 08:ANALYTIC
@@ -226,6 +238,8 @@ min(int_col) over(partition by int_col, smallint_col order by bigint_col),
 max(int_col) over(partition by int_col, smallint_col order by int_col)
 from functional.alltypes
 ---- PLAN
+PLAN-ROOT SINK
+|
 11:ANALYTIC
 |  functions: min(int_col), max(int_col)
 |  order by: bigint_col ASC
@@ -276,6 +290,8 @@ from functional.alltypes
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 11:ANALYTIC
 |  functions: min(int_col), max(int_col)
 |  order by: bigint_col ASC
@@ -336,12 +352,16 @@ from functional.alltypes
 # basic analytic with default window and no partition/ordering
 select count(*) over() from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:ANALYTIC
 |  functions: count(*)
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:ANALYTIC
 |  functions: count(*)
 |
@@ -354,6 +374,8 @@ select count(*) over() from functional.alltypesagg
 select tinyint_col, sum(bigint_col) over(partition by tinyint_col) sum_of_bigints
 from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:ANALYTIC
 |  functions: sum(bigint_col)
 |  partition by: tinyint_col
@@ -364,6 +386,8 @@ from functional.alltypesagg
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |
 02:ANALYTIC
@@ -381,6 +405,8 @@ from functional.alltypesagg
 # basic analytic with default window and ordering
 select int_col, rank() over(order by int_col) from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:ANALYTIC
 |  functions: rank()
 |  order by: int_col ASC
@@ -392,6 +418,8 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 02:ANALYTIC
 |  functions: rank()
 |  order by: int_col ASC
@@ -413,6 +441,8 @@ select bigint_col, count(double_col)
 from functional.alltypesagg
 limit 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:ANALYTIC
 |  functions: count(double_col)
 |  partition by: tinyint_col + 1, double_col / 2
@@ -426,6 +456,8 @@ limit 10
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
@@ -463,6 +495,8 @@ avg(double_col)
 from functional.alltypes
 limit 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:ANALYTIC
 |  functions: avg(double_col)
 |  order by: int_col DESC
@@ -490,6 +524,8 @@ limit 10
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:ANALYTIC
 |  functions: avg(double_col)
 |  order by: int_col DESC
@@ -528,6 +564,8 @@ select a.tinyint_col, a.int_col, count(a.double_col)
 from functional.alltypes a inner join functional.alltypessmall b on a.id = b.id
 order by a.tinyint_col, a.int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:SORT
 |  order by: tinyint_col ASC, int_col ASC
 |
@@ -551,6 +589,8 @@ order by a.tinyint_col, a.int_col
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> a.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: tinyint_col ASC, int_col ASC
 |
@@ -596,6 +636,8 @@ from functional.alltypes
 group by 1
 order by 1, 2, 3
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:SORT
 |  order by: bool_col ASC, sum(min(int_col)) ASC, max(sum(bigint_col)) ASC
 |
@@ -624,6 +666,8 @@ order by 1, 2, 3
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 10:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: bool_col ASC, sum(min(int_col)) ASC, max(sum(bigint_col)) ASC
 |
@@ -700,6 +744,8 @@ min(int_col)
   rows between unbounded preceding and 2 following)
 from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 10:ANALYTIC
 |  functions: count(double_col), last_value(double_col)
 |  partition by: tinyint_col, double_col
@@ -754,6 +800,8 @@ from functional.alltypesagg
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 12:EXCHANGE [UNPARTITIONED]
 |
 10:ANALYTIC
@@ -829,6 +877,8 @@ sum(smallint_col)
   rows between 2 preceding and 2 following)
 from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:ANALYTIC
 |  functions: sum(tinyint_col)
 |  order by: int_col DESC
@@ -862,6 +912,8 @@ from functional.alltypesagg
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 07:ANALYTIC
 |  functions: sum(tinyint_col)
 |  order by: int_col DESC
@@ -912,6 +964,8 @@ select double_col, a, b, a + b, double_col + a from
      (select * from functional.alltypes) v1) v2
 order by 2, 3, 4
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:SORT
 |  order by: a ASC, b ASC, a + b ASC
 |
@@ -928,6 +982,8 @@ order by 2, 3, 4
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:SORT
 |  order by: a ASC, b ASC, a + b ASC
 |
@@ -959,6 +1015,8 @@ with v2 as
 select double_col, a, b, a + b, double_col + a from v2
 order by 2, 3, 4
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:SORT
 |  order by: a ASC, b ASC, a + b ASC
 |
@@ -975,6 +1033,8 @@ order by 2, 3, 4
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:SORT
 |  order by: a ASC, b ASC, a + b ASC
 |
@@ -1007,6 +1067,8 @@ select b from
    from functional.alltypes) v
 where e < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:SELECT
 |  predicates: count(1) < 10
 |
@@ -1029,6 +1091,8 @@ where e < 10
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 08:EXCHANGE [UNPARTITIONED]
 |
 05:SELECT
@@ -1068,6 +1132,8 @@ union all
  from functional.alltypestiny)
 order by 1 desc nulls first
 ---- PLAN
+PLAN-ROOT SINK
+|
 12:SORT
 |  order by: min(id) OVER(...) DESC NULLS FIRST
 |
@@ -1110,6 +1176,8 @@ order by 1 desc nulls first
 09:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: min(id) OVER(...) DESC NULLS FIRST
 |
@@ -1172,6 +1240,8 @@ where int_col in
   (select min(bigint_col) over(partition by bool_col)
    from functional.alltypestiny t2 where t2.id < 10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: int_col = min(bigint_col)
 |  runtime filters: RF000 <- min(bigint_col)
@@ -1191,6 +1261,8 @@ where int_col in
    partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> int_col
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 07:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
@@ -1247,6 +1319,8 @@ where
   v.a != v.e and
   v.b != v.c
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:SELECT
 |  predicates: min(int_col) < 1, max(int_col) < 2, bigint_col > 10, count(int_col) < 3, sum(int_col) < 4, avg(int_col) < 5, min(int_col) != count(int_col), min(int_col) != avg(int_col), max(int_col) != count(int_col), count(int_col) < bigint_col + 3, sum(int_col) < bigint_col + 4, min(int_col) < bigint_col + 1, max(int_col) < bigint_col + 2, avg(int_col) < bigint_col + 5
 |
@@ -1279,6 +1353,8 @@ where
    partitions=24/24 files=24 size=478.45KB
    predicates: int_col <= 10, int_col >= 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 07:SELECT
 |  predicates: min(int_col) < 1, max(int_col) < 2, bigint_col > 10, count(int_col) < 3, sum(int_col) < 4, avg(int_col) < 5, min(int_col) != count(int_col), min(int_col) != avg(int_col), max(int_col) != count(int_col), count(int_col) < bigint_col + 3, sum(int_col) < bigint_col + 4, min(int_col) < bigint_col + 1, max(int_col) < bigint_col + 2, avg(int_col) < bigint_col + 5
 |
@@ -1330,6 +1406,8 @@ inner join functional.alltypes t2
 on (t1.id = t2.id and t1.a = t2.int_col)
 where t2.id < 10 and t2.int_col < 20
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: id = t2.id, sum(int_col) = t2.int_col
 |
@@ -1362,6 +1440,8 @@ left outer join functional.alltypes t2
 on (t1.id = t2.id and t1.a = t2.int_col)
 where t2.id < 10 and t2.int_col < 20
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: id = t2.id, sum(int_col) = t2.int_col
 |  other predicates: t2.id < 10, t2.int_col < 20
@@ -1387,6 +1467,8 @@ select
 row_number() over(partition by tinyint_col order by id)
 from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:ANALYTIC
 |  functions: row_number()
 |  partition by: tinyint_col
@@ -1410,6 +1492,8 @@ lead(int_col, 8, 20) over(partition by int_col order by id),
 lag(int_col, 8, 20) over(partition by int_col order by id)
 from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 09:ANALYTIC
 |  functions: lag(int_col, 8, 20)
 |  partition by: int_col
@@ -1478,6 +1562,8 @@ count(bigint_col) over(partition by tinyint_col order by id
 #                       range between unbounded preceding and 10 following)
 from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:ANALYTIC
 |  functions: count(bigint_col)
 |  partition by: tinyint_col
@@ -1544,6 +1630,8 @@ first_value(tinyint_col ignore nulls) over (order by id
                                             rows between 1 following and 2 following)
 from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 09:ANALYTIC
 |  functions: last_value_ignore_nulls(tinyint_col)
 |  order by: id DESC
@@ -1607,6 +1695,8 @@ last_value(bigint_col) over(partition by tinyint_col order by id
                             range between unbounded preceding and unbounded following)
 from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:ANALYTIC
 |  functions: last_value(bigint_col)
 |  partition by: tinyint_col
@@ -1654,6 +1744,8 @@ select DENSE_RANK() OVER (ORDER BY t1.day ASC)
 FROM functional.alltypesagg t1
 WHERE EXISTS (SELECT t1.year AS int_col_1 FROM functional.alltypesagg t1)
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:ANALYTIC
 |  functions: dense_rank()
 |  order by: day ASC
@@ -1682,6 +1774,8 @@ FROM (
   FROM functional.alltypes t1 ) t1
 WHERE id IS NULL and tinyint_col != 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -1705,6 +1799,8 @@ WHERE id IS NULL and tinyint_col != 5
    partitions=4/4 files=4 size=460B
    predicates: t1.id IS NULL, t1.tinyint_col != 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 10:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |
@@ -1747,6 +1843,8 @@ select * from
    from functional.alltypes) v
 where year = 2009 and id = 1 and int_col < 10 and s = 4
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:SELECT
 |  predicates: id = 1, int_col < 10, sum(int_col) = 4
 |
@@ -1775,6 +1873,8 @@ select * from
    from functional.alltypes) v
 where year = 2009 and tinyint_col + 1 = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 09:SELECT
 |  predicates: tinyint_col + 1 = 1
 |
@@ -1826,6 +1926,8 @@ select * from
    from functional.alltypes) v
 where year = 2009 and tinyint_col = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:SELECT
 |  predicates: tinyint_col = 1, year = 2009
 |
@@ -1866,6 +1968,8 @@ select * from
    from functional.alltypestiny where id = tinyint_col) v
 where month = int_col and int_col = 1 and tinyint_col = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:SELECT
 |  predicates: month = int_col
 |
@@ -1894,6 +1998,8 @@ select * from
    on t1.id = t2.id) v
 where v.x + v.y < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:SELECT
 |  predicates: tinyint_col + int_col < 10
 |
@@ -1928,6 +2034,8 @@ select * from
    from functional.alltypestiny) v
 where x = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:SELECT
 |  predicates: int_col + 1 = 1
 |
@@ -1964,6 +2072,8 @@ left outer join
    from functional.alltypestiny) t2
 on (t1.id = t2.a + 100)
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:ANALYTIC
 |  functions: avg(if(TupleIsNull(), NULL, coalesce(id + bigint_col, 40)))
 |  order by: if(TupleIsNull(), NULL, coalesce(bigint_col, 30)) ASC
@@ -2023,6 +2133,8 @@ from
   on (t1.id = t2.a + 100)) t3
 group by d
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:AGGREGATE [FINALIZE]
 |  output: avg(sum(t1.id)), sum(avg(g)), count(id)
 |  group by: if(TupleIsNull(), NULL, coalesce(int_col, 20))
@@ -2090,6 +2202,8 @@ full outer join
    on (c.id = v3.id)) v4
 on (v2.id = v4.id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 14:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: id = id
 |
@@ -2152,6 +2266,8 @@ left outer join
    on (t1.id = t2.id)) b
 on (a.id = b.id and b.int_col < 10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.id = t1.id
 |
@@ -2198,6 +2314,8 @@ first_value(int_col) over (order by bigint_col
                            rows between unbounded preceding and current row)
 from functional.alltypes
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:ANALYTIC
 |  functions: last_value(int_col), first_value(int_col)
 |  order by: bigint_col ASC

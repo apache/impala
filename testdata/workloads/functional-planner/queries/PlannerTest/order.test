@@ -2,12 +2,16 @@ select name, zip
 from functional.testtbl
 order by name offset 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:SORT
 |  order by: name ASC
 |
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 files=0 size=0B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: name ASC
@@ -22,12 +26,16 @@ select name, zip
 from functional.testtbl
 order by name
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:SORT
 |  order by: name ASC
 |
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 files=0 size=0B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: name ASC
 |
@@ -43,6 +51,8 @@ where name like 'm%'
 group by 1
 order by 2 desc
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:SORT
 |  order by: count(*) DESC
 |
@@ -54,6 +64,8 @@ order by 2 desc
    partitions=1/1 files=0 size=0B
    predicates: name LIKE 'm%'
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(*) DESC
 |
@@ -80,6 +92,8 @@ where id < 5
 group by 1
 order by 2
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:SORT
 |  order by: sum(float_col) ASC
 |
@@ -90,6 +104,8 @@ order by 2
 00:SCAN HBASE [functional_hbase.alltypessmall]
    predicates: id < 5
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(float_col) ASC
 |
@@ -114,6 +130,8 @@ from functional_hbase.alltypessmall
 group by 1
 order by 2,3 desc
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:SORT
 |  order by: sum(float_col) ASC, min(float_col) DESC
 |
@@ -123,6 +141,8 @@ order by 2,3 desc
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(float_col) ASC, min(float_col) DESC
 |
@@ -144,12 +164,16 @@ order by 2,3 desc
 # Test that the sort is on int_col and not on the id column
 select int_col as id from functional.alltypessmall order by id
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:SORT
 |  order by: int_col ASC
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC
 |
@@ -162,12 +186,16 @@ select int_col as id from functional.alltypessmall order by id
 # Test that the sort is on id and not on int_col
 select int_col as id from functional.alltypessmall order by functional.alltypessmall.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:SORT
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |
@@ -184,6 +212,8 @@ select int_col, bigint_col from
    select * from functional.alltypessmall) t
 order by int_col desc offset 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:SORT
 |  order by: int_col DESC
 |
@@ -195,6 +225,8 @@ order by int_col desc offset 5
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: int_col DESC
@@ -217,6 +249,8 @@ select int_col, bigint_col from
    select * from functional.alltypessmall) t
 order by int_col desc offset 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:SORT
 |  order by: int_col DESC
 |
@@ -231,6 +265,8 @@ order by int_col desc offset 5
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 07:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: int_col DESC
@@ -259,6 +295,8 @@ select j.*, d.* from functional.JoinTbl j full outer join functional.DimTbl d
 on (j.test_id = d.id)
 order by j.test_id, j.test_name, j.test_zip, j.alltypes_id, d.name
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:SORT
 |  order by: test_id ASC, test_name ASC, test_zip ASC, alltypes_id ASC, name ASC
 |
@@ -271,6 +309,8 @@ order by j.test_id, j.test_name, j.test_zip, j.alltypes_id, d.name
 00:SCAN HDFS [functional.jointbl j]
    partitions=1/1 files=1 size=433B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 06:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: test_id ASC, test_name ASC, test_zip ASC, alltypes_id ASC, name ASC
 |
@@ -303,6 +343,8 @@ and c.string_col < '7'
 and a.int_col + b.float_col + cast(c.string_col as float) < 1000
 order by c.string_col desc, a.smallint_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 05:SORT
 |  order by: string_col DESC, smallint_col ASC
 |
@@ -329,6 +371,8 @@ order by c.string_col desc, a.smallint_col
    predicates: c.string_col < '7'
    runtime filters: RF000 -> c.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: string_col DESC, smallint_col ASC
 |
@@ -370,6 +414,8 @@ from functional.alltypesagg
 group by 1
 order by avg(tinyint_col)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:SORT
 |  order by: avg(tinyint_col) ASC
 |
@@ -380,6 +426,8 @@ order by avg(tinyint_col)
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: avg(tinyint_col) ASC
 |
@@ -406,6 +454,8 @@ left outer join functional.alltypessmall t2
   on (t1.int_col = t2.int_col)
 order by t1.id,t2.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:SORT
 |  order by: id ASC, id ASC
 |
@@ -418,6 +468,8 @@ order by t1.id,t2.id
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC, id ASC
 |
@@ -440,6 +492,8 @@ select t1.id, t2.id from functional.alltypestiny t1 cross join functional.alltyp
 where (t1.id < 3 and t2.id < 3)
 order by t1.id, t2.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:SORT
 |  order by: id ASC, id ASC
 |
@@ -453,6 +507,8 @@ order by t1.id, t2.id
    partitions=4/4 files=4 size=460B
    predicates: t1.id < 3
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC, id ASC
 |
@@ -481,6 +537,8 @@ union distinct
 (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from functional.alltypestiny where year=2009 and month=2)
 order by 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 06:SORT
 |  order by: id ASC
 |
@@ -501,6 +559,8 @@ order by 1
 01:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 files=1 size=115B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |
@@ -538,6 +598,8 @@ union all
 (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from functional.alltypestiny where year=2009 and month=2)
 order by 1,2
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:SORT
 |  order by: id ASC, bool_col ASC
 |
@@ -560,6 +622,8 @@ order by 1,2
 05:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 files=1 size=115B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 10:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC, bool_col ASC
 |
@@ -611,6 +675,8 @@ union all
    order by 1 limit 3)
 order by 12, 13, 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 16:SORT
 |  order by: year ASC, month ASC, id ASC
 |
@@ -658,6 +724,8 @@ order by 12, 13, 1
 10:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 files=1 size=115B
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 23:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: year ASC, month ASC, id ASC
 |
@@ -729,6 +797,8 @@ order by 12, 13, 1
 select * from (select * from functional.alltypes order by bigint_col limit 10) t
 order by int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:SORT
 |  order by: int_col ASC
 |
@@ -738,6 +808,8 @@ order by int_col
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 02:SORT
 |  order by: int_col ASC
 |
@@ -758,6 +830,8 @@ select * from
    (select * from functional.alltypessmall) order by bigint_col limit 10) t
 order by int_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:SORT
 |  order by: int_col ASC
 |
@@ -772,6 +846,8 @@ order by int_col
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:SORT
 |  order by: int_col ASC
 |
@@ -796,6 +872,8 @@ select * from
 (select * from functional.alltypes order by bigint_col) A
 join B on (A.string_col = B.string_col)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.string_col = functional.alltypes.string_col
 |  runtime filters: RF000 <- functional.alltypes.string_col
@@ -807,6 +885,8 @@ join B on (A.string_col = B.string_col)
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.string_col
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 05:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -863,6 +943,8 @@ select * from functional.alltypes
    union all
 select * from functional.alltypessmall order by bigint_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
@@ -871,6 +953,8 @@ select * from functional.alltypessmall order by bigint_col
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 03:EXCHANGE [UNPARTITIONED]
 |
 00:UNION
@@ -886,6 +970,8 @@ select * from functional.alltypes
    union all
 (select * from functional.alltypessmall) order by bigint_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:SORT
 |  order by: bigint_col ASC
 |
@@ -897,6 +983,8 @@ select * from functional.alltypes
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: bigint_col ASC
 |
@@ -917,6 +1005,8 @@ select int_col from functional.alltypes order by int_col
  union (select int_col from functional.alltypes order by int_col limit 10 offset 5)
 order by int_col offset 5
 ---- PLAN
+PLAN-ROOT SINK
+|
 07:SORT
 |  order by: int_col ASC
 |
@@ -940,6 +1030,8 @@ order by int_col offset 5
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 14:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: int_col ASC
@@ -1003,6 +1095,8 @@ select * from
   having sum(float_col) > 10) t3
 order by x
 ---- PLAN
+PLAN-ROOT SINK
+|
 11:SORT
 |  order by: x ASC
 |
@@ -1040,6 +1134,8 @@ order by x
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 11:SORT
 |  order by: x ASC
 |
@@ -1098,6 +1194,8 @@ select int_col from
   (select int_col, bigint_col from functional.alltypesagg)
 order by bigint_col limit 10) A
 ---- PLAN
+PLAN-ROOT SINK
+|
 03:TOP-N [LIMIT=10]
 |  order by: bigint_col ASC
 |
@@ -1109,6 +1207,8 @@ order by bigint_col limit 10) A
 01:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 04:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: bigint_col ASC
 |  limit: 10
@@ -1127,6 +1227,8 @@ order by bigint_col limit 10) A
 # Sort node is unnecessary (IMPALA-1148).
 select 1 from functional.alltypes order by 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
@@ -1135,6 +1237,8 @@ select a from
   (select 1 as a, int_col, bigint_col
    from functional.alltypes order by 1 limit 1) v
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    limit: 1

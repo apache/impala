@@ -1,9 +1,13 @@
 # Basic test with a view.
 select int_col, string_col from functional.alltypes_view
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
@@ -12,6 +16,8 @@ select int_col, string_col from functional.alltypes_view
 # Basic test with a complex view.
 select * from functional.complex_view
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:TOP-N [LIMIT=100]
 |  order by: b.string_col ASC
 |
@@ -32,6 +38,8 @@ select * from functional.complex_view
    predicates: a.bigint_col < 50
    runtime filters: RF000 -> a.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: b.string_col ASC
 |  limit: 100
@@ -67,9 +75,13 @@ select * from functional.complex_view
 # Basic test with a view on a view
 select int_col, string_col from functional.view_view
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
@@ -79,6 +91,8 @@ select int_col, string_col from functional.view_view
 select * from functional.alltypes_view union all
 select * from functional.alltypes_view where id < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypes]
@@ -88,6 +102,8 @@ select * from functional.alltypes_view where id < 10
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 03:EXCHANGE [UNPARTITIONED]
 |
 00:UNION
@@ -103,10 +119,14 @@ select * from functional.alltypes_view where id < 10
 select t.id from (select id from functional.alltypes_view) t
 where t.id < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 10
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
@@ -117,6 +137,8 @@ where t.id < 10
 select * from functional.alltypes_view t1, functional.alltypes_view_sub t2,
 functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 ---- PLAN
+PLAN-ROOT SINK
+|
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = count(a.bigint_col)
 |  runtime filters: RF000 <- count(a.bigint_col)
@@ -155,6 +177,8 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
    predicates: functional.alltypes.id > 1
    runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 16:EXCHANGE [UNPARTITIONED]
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -219,6 +243,8 @@ select * from functional.alltypes_view t1
 inner join functional.alltypes_view t2 on (t1.id = t2.id)
 inner join functional.alltypes_view t3 on (t2.id = t3.id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |  runtime filters: RF000 <- functional.alltypes.id
@@ -238,6 +264,8 @@ inner join functional.alltypes_view t3 on (t2.id = t3.id)
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -271,6 +299,8 @@ select * from functional.alltypes_view t1
 inner join functional.alltypes_view t2 using(id)
 inner join functional.alltypes_view t3 using(id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |  runtime filters: RF000 <- functional.alltypes.id
@@ -290,6 +320,8 @@ inner join functional.alltypes_view t3 using(id)
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -323,6 +355,8 @@ select * from functional.alltypes_view t1
 left outer join functional.alltypes_view t2 using(id)
 full outer join functional.alltypes_view t3 using(id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |
@@ -338,6 +372,8 @@ full outer join functional.alltypes_view t3 using(id)
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
@@ -369,6 +405,8 @@ select * from functional.alltypes_view t1
 inner join [broadcast] functional.alltypes_view t2 using(id)
 inner join [shuffle] functional.alltypes_view t3 using(id)
 ---- PLAN
+PLAN-ROOT SINK
+|
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |  runtime filters: RF000 <- functional.alltypes.id
@@ -388,6 +426,8 @@ inner join [shuffle] functional.alltypes_view t3 using(id)
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 08:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -419,10 +459,14 @@ inner join [shuffle] functional.alltypes_view t3 using(id)
 # enabling proper partition pruning for this particular view.
 select * from functional.alltypes_parens
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes]
    partitions=1/24 files=1 size=19.95KB
    predicates: (int_col < 100 OR bool_col = FALSE)
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
@@ -433,10 +477,14 @@ select * from functional.alltypes_parens
 # possible (see IMPALA-923)
 select bool_col FROM ( SELECT bool_col FROM functional.alltypes t ) t WHERE t.bool_col
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
    predicates: bool_col
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes t]

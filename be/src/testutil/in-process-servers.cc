@@ -34,6 +34,7 @@
 
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
+DECLARE_int32(be_port);
 
 using namespace apache::thrift;
 using namespace impala;
@@ -43,6 +44,9 @@ InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
   for (int tries = 0; tries < 10; ++tries) {
     int backend_port = FindUnusedEphemeralPort();
     if (backend_port == -1) continue;
+    // This flag is read directly in several places to find the address of the local
+    // backend interface.
+    FLAGS_be_port = backend_port;
 
     int subscriber_port = FindUnusedEphemeralPort();
     if (subscriber_port == -1) continue;

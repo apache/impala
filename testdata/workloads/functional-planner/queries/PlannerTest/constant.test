@@ -1,8 +1,12 @@
 select 1 + 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:UNION
    constant-operands=1
 ---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
 00:UNION
    constant-operands=1
 ====

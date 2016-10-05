@@ -26,22 +26,23 @@
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "exec/data-sink.h"
-#include "exec/exec-node.h"
 #include "exec/exchange-node.h"
-#include "exec/scan-node.h"
-#include "exec/hdfs-scan-node.h"
+#include "exec/exec-node.h"
 #include "exec/hbase-table-scanner.h"
+#include "exec/hdfs-scan-node.h"
+#include "exec/plan-root-sink.h"
+#include "exec/scan-node.h"
 #include "exprs/expr.h"
-#include "runtime/descriptors.h"
 #include "runtime/data-stream-mgr.h"
+#include "runtime/descriptors.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter-bank.h"
-#include "runtime/mem-tracker.h"
+#include "util/container-util.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
-#include "util/container-util.h"
-#include "util/parse-util.h"
 #include "util/mem-info.h"
+#include "util/parse-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/pretty-printer.h"
 
@@ -60,28 +61,45 @@ namespace impala {
 
 const string PlanFragmentExecutor::PER_HOST_PEAK_MEM_COUNTER = "PerHostPeakMemUsage";
 
-PlanFragmentExecutor::PlanFragmentExecutor(ExecEnv* exec_env,
-    const ReportStatusCallback& report_status_cb) :
-    exec_env_(exec_env), plan_(NULL), report_status_cb_(report_status_cb),
-    report_thread_active_(false), done_(false), closed_(false),
-    has_thread_token_(false), is_prepared_(false), is_cancelled_(false),
-    average_thread_tokens_(NULL), mem_usage_sampled_counter_(NULL),
-    thread_usage_sampled_counter_(NULL) {
-}
+PlanFragmentExecutor::PlanFragmentExecutor(
+    ExecEnv* exec_env, const ReportStatusCallback& report_status_cb)
+  : exec_env_(exec_env),
+    exec_tree_(NULL),
+    report_status_cb_(report_status_cb),
+    report_thread_active_(false),
+    closed_(false),
+    has_thread_token_(false),
+    is_prepared_(false),
+    is_cancelled_(false),
+    average_thread_tokens_(NULL),
+    mem_usage_sampled_counter_(NULL),
+    thread_usage_sampled_counter_(NULL) {}
 
 PlanFragmentExecutor::~PlanFragmentExecutor() {
-  Close();
+  DCHECK(!is_prepared_ || closed_);
   // at this point, the report thread should have been stopped
   DCHECK(!report_thread_active_);
 }
 
 Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
+  Status status = PrepareInternal(request);
+  prepared_promise_.Set(status);
+  return status;
+}
+
+Status PlanFragmentExecutor::WaitForOpen() {
+  DCHECK(prepared_promise_.IsSet()) << "Prepare() must complete before WaitForOpen()";
+  RETURN_IF_ERROR(prepared_promise_.Get());
+  return opened_promise_.Get();
+}
+
+Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& request) {
   lock_guard<mutex> l(prepare_lock_);
   DCHECK(!is_prepared_);
 
   if (is_cancelled_) return Status::CANCELLED;
-
   is_prepared_ = true;
+
   // TODO: Break this method up.
   fragment_sw_.Start();
   const TPlanFragmentInstanceCtx& fragment_instance_ctx = request.fragment_instance_ctx;
@@ -100,6 +118,10 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   // total_time_counter() is in the runtime_state_ so start it up now.
   SCOPED_TIMER(profile()->total_time_counter());
+  timings_profile_ =
+      obj_pool()->Add(new RuntimeProfile(obj_pool(), "PlanFragmentExecutor"));
+  profile()->AddChild(timings_profile_);
+  SCOPED_TIMER(ADD_TIMER(timings_profile_, "PrepareTime"));
 
   // reservation or a query option.
   int64_t bytes_limit = -1;
@@ -145,22 +167,22 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   // set up plan
   DCHECK(request.__isset.fragment_ctx);
-  RETURN_IF_ERROR(ExecNode::CreateTree(runtime_state_.get(),
-      request.fragment_ctx.fragment.plan, *desc_tbl, &plan_));
-  runtime_state_->set_fragment_root_id(plan_->id());
+  RETURN_IF_ERROR(ExecNode::CreateTree(
+      runtime_state_.get(), request.fragment_ctx.fragment.plan, *desc_tbl, &exec_tree_));
+  runtime_state_->set_fragment_root_id(exec_tree_->id());
 
   if (fragment_instance_ctx.__isset.debug_node_id) {
     DCHECK(fragment_instance_ctx.__isset.debug_action);
     DCHECK(fragment_instance_ctx.__isset.debug_phase);
     ExecNode::SetDebugOptions(fragment_instance_ctx.debug_node_id,
-        fragment_instance_ctx.debug_phase, fragment_instance_ctx.debug_action, plan_);
+        fragment_instance_ctx.debug_phase, fragment_instance_ctx.debug_action,
+        exec_tree_);
   }
 
   // set #senders of exchange nodes before calling Prepare()
   vector<ExecNode*> exch_nodes;
-  plan_->CollectNodes(TPlanNodeType::EXCHANGE_NODE, &exch_nodes);
-  for (ExecNode* exch_node: exch_nodes)
-  {
+  exec_tree_->CollectNodes(TPlanNodeType::EXCHANGE_NODE, &exch_nodes);
+  for (ExecNode* exch_node : exch_nodes) {
     DCHECK_EQ(exch_node->type(), TPlanNodeType::EXCHANGE_NODE);
     int num_senders = FindWithDefault(fragment_instance_ctx.per_exch_num_senders,
         exch_node->id(), 0);
@@ -171,7 +193,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   // set scan ranges
   vector<ExecNode*> scan_nodes;
   vector<TScanRangeParams> no_scan_ranges;
-  plan_->CollectScanNodes(&scan_nodes);
+  exec_tree_->CollectScanNodes(&scan_nodes);
   for (int i = 0; i < scan_nodes.size(); ++i) {
     ScanNode* scan_node = static_cast<ScanNode*>(scan_nodes[i]);
     const vector<TScanRangeParams>& scan_ranges = FindWithDefault(
@@ -179,42 +201,47 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     scan_node->SetScanRanges(scan_ranges);
   }
 
-  RuntimeProfile::Counter* prepare_timer = ADD_TIMER(profile(), "PrepareTime");
+  RuntimeProfile::Counter* prepare_timer = ADD_TIMER(profile(), "ExecTreePrepareTime");
   {
     SCOPED_TIMER(prepare_timer);
-    RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
+    RETURN_IF_ERROR(exec_tree_->Prepare(runtime_state_.get()));
   }
 
   PrintVolumeIds(fragment_instance_ctx.per_node_scan_ranges);
 
-  // set up sink, if required
-  if (request.fragment_ctx.fragment.__isset.output_sink) {
-    RETURN_IF_ERROR(DataSink::CreateDataSink(
-        obj_pool(), request.fragment_ctx.fragment.output_sink,
-        request.fragment_ctx.fragment.output_exprs,
-        fragment_instance_ctx, row_desc(), &sink_));
-    sink_mem_tracker_.reset(new MemTracker(
-        -1, sink_->GetName(), runtime_state_->instance_mem_tracker(), true));
-    RETURN_IF_ERROR(sink_->Prepare(runtime_state(), sink_mem_tracker_.get()));
+  DCHECK(request.fragment_ctx.fragment.__isset.output_sink);
+  RETURN_IF_ERROR(
+      DataSink::CreateDataSink(obj_pool(), request.fragment_ctx.fragment.output_sink,
+          request.fragment_ctx.fragment.output_exprs, fragment_instance_ctx,
+          exec_tree_->row_desc(), &sink_));
+  sink_mem_tracker_.reset(
+      new MemTracker(-1, sink_->GetName(), runtime_state_->instance_mem_tracker(), true));
+  RETURN_IF_ERROR(sink_->Prepare(runtime_state(), sink_mem_tracker_.get()));
 
-    RuntimeProfile* sink_profile = sink_->profile();
-    if (sink_profile != NULL) {
-      profile()->AddChild(sink_profile);
-    }
-  } else {
-    sink_.reset(NULL);
+  RuntimeProfile* sink_profile = sink_->profile();
+  if (sink_profile != NULL) {
+    profile()->AddChild(sink_profile);
+  }
+
+  if (request.fragment_ctx.fragment.output_sink.type == TDataSinkType::PLAN_ROOT_SINK) {
+    root_sink_ = reinterpret_cast<PlanRootSink*>(sink_.get());
+    // Release the thread token on the root fragment instance. This fragment spends most
+    // of the time waiting and doing very little work. Holding on to the token causes
+    // underutilization of the machine. If there are 12 queries on this node, that's 12
+    // tokens reserved for no reason.
+    ReleaseThreadToken();
   }
 
   // set up profile counters
-  profile()->AddChild(plan_->runtime_profile());
+  profile()->AddChild(exec_tree_->runtime_profile());
   rows_produced_counter_ =
       ADD_COUNTER(profile(), "RowsProduced", TUnit::UNIT);
   per_host_mem_usage_ =
       ADD_COUNTER(profile(), PER_HOST_PEAK_MEM_COUNTER, TUnit::BYTES);
 
-  row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size(),
-        runtime_state_->instance_mem_tracker()));
-  VLOG(2) << "plan_root=\n" << plan_->DebugString();
+  row_batch_.reset(new RowBatch(exec_tree_->row_desc(), runtime_state_->batch_size(),
+      runtime_state_->instance_mem_tracker()));
+  VLOG(2) << "plan_root=\n" << exec_tree_->DebugString();
   return Status::OK();
 }
 
@@ -251,12 +278,21 @@ void PlanFragmentExecutor::PrintVolumeIds(
 }
 
 Status PlanFragmentExecutor::Open() {
-  VLOG_QUERY << "Open(): instance_id="
-      << runtime_state_->fragment_instance_id();
+  SCOPED_TIMER(profile()->total_time_counter());
+  SCOPED_TIMER(ADD_TIMER(timings_profile_, "OpenTime"));
+  VLOG_QUERY << "Open(): instance_id=" << runtime_state_->fragment_instance_id();
+  Status status = OpenInternal();
+  UpdateStatus(status);
+  opened_promise_.Set(status);
+  return status;
+}
 
-  RETURN_IF_ERROR(runtime_state_->desc_tbl().PrepareAndOpenPartitionExprs(runtime_state_.get()));
+Status PlanFragmentExecutor::OpenInternal() {
+  RETURN_IF_ERROR(
+      runtime_state_->desc_tbl().PrepareAndOpenPartitionExprs(runtime_state_.get()));
 
-  // we need to start the profile-reporting thread before calling Open(), since it
+  // we need to start the profile-reporting thread before calling exec_tree_->Open(),
+  // since it
   // may block
   if (!report_status_cb_.empty() && FLAGS_status_report_interval > 0) {
     unique_lock<mutex> l(report_thread_lock_);
@@ -271,22 +307,25 @@ Status PlanFragmentExecutor::Open() {
 
   OptimizeLlvmModule();
 
-  Status status = OpenInternal();
-  if (sink_.get() != NULL) {
-    // We call Close() here rather than in OpenInternal() because we want to make sure
-    // that Close() gets called even if there was an error in OpenInternal().
-    // We also want to call sink_->Close() here rather than in PlanFragmentExecutor::Close
-    // because we do not want the sink_ to hold on to all its resources as we will never
-    // use it after this.
-    sink_->Close(runtime_state());
-    // If there's a sink and no error, OpenInternal() completed the fragment execution.
-    if (status.ok()) {
-      done_ = true;
-      FragmentComplete();
-    }
+  {
+    SCOPED_TIMER(ADD_TIMER(timings_profile_, "ExecTreeOpenTime"));
+    RETURN_IF_ERROR(exec_tree_->Open(runtime_state_.get()));
   }
+  return sink_->Open(runtime_state_.get());
+}
 
-  if (!status.ok() && !status.IsCancelled() && !status.IsMemLimitExceeded()) {
+Status PlanFragmentExecutor::Exec() {
+  SCOPED_TIMER(ADD_TIMER(timings_profile_, "ExecTime"));
+  {
+    lock_guard<mutex> l(status_lock_);
+    RETURN_IF_ERROR(status_);
+  }
+  Status status = ExecInternal();
+
+  // If there's no error, ExecInternal() completed the fragment instance's execution.
+  if (status.ok()) {
+    FragmentComplete();
+  } else if (!status.IsCancelled() && !status.IsMemLimitExceeded()) {
     // Log error message in addition to returning in Status. Queries that do not
     // fetch results (e.g. insert) may not receive the message directly and can
     // only retrieve the log.
@@ -296,21 +335,23 @@ Status PlanFragmentExecutor::Open() {
   return status;
 }
 
-Status PlanFragmentExecutor::OpenInternal() {
-  SCOPED_TIMER(profile()->total_time_counter());
-  RETURN_IF_ERROR(plan_->Open(runtime_state_.get()));
-  if (sink_.get() == NULL) return Status::OK();
-
-  // If there is a sink, do all the work of driving it here, so that
-  // when this returns the query has actually finished
-  RETURN_IF_ERROR(sink_->Open(runtime_state_.get()));
-  while (!done_) {
+Status PlanFragmentExecutor::ExecInternal() {
+  RuntimeProfile::Counter* plan_exec_timer =
+      ADD_TIMER(timings_profile_, "ExecTreeExecTime");
+  bool exec_tree_complete = false;
+  do {
+    Status status;
     row_batch_->Reset();
-    RETURN_IF_ERROR(plan_->GetNext(runtime_state_.get(), row_batch_.get(), &done_));
-    if (VLOG_ROW_IS_ON) row_batch_->VLogRows("PlanFragmentExecutor::OpenInternal()");
+    {
+      SCOPED_TIMER(plan_exec_timer);
+      status = exec_tree_->GetNext(
+          runtime_state_.get(), row_batch_.get(), &exec_tree_complete);
+    }
+    if (VLOG_ROW_IS_ON) row_batch_->VLogRows("PlanFragmentExecutor::ExecInternal()");
     COUNTER_ADD(rows_produced_counter_, row_batch_->num_rows());
+    RETURN_IF_ERROR(status);
     RETURN_IF_ERROR(sink_->Send(runtime_state(), row_batch_.get()));
-  }
+  } while (!exec_tree_complete);
 
   // Flush the sink *before* stopping the report thread. Flush may need to add some
   // important information to the last report that gets sent. (e.g. table sinks record the
@@ -376,13 +417,20 @@ void PlanFragmentExecutor::SendReport(bool done) {
     status = status_;
   }
 
+  // If status is not OK, we need to make sure that only one sender sends a 'done'
+  // response.
+  // TODO: Clean all this up - move 'done' reporting to Close()?
+  if (!done && !status.ok()) {
+    done = completed_report_sent_.CompareAndSwap(0, 1);
+  }
+
   // Update the counter for the peak per host mem usage.
   per_host_mem_usage_->Set(runtime_state()->query_mem_tracker()->peak_consumption());
 
   // This will send a report even if we are cancelled.  If the query completed correctly
   // but fragments still need to be cancelled (e.g. limit reached), the coordinator will
   // be waiting for a final report and profile.
-  report_status_cb_(status, profile(), done || !status.ok());
+  report_status_cb_(status, profile(), done);
 }
 
 void PlanFragmentExecutor::StopReportThread() {
@@ -393,36 +441,6 @@ void PlanFragmentExecutor::StopReportThread() {
   }
   stop_report_thread_cv_.notify_one();
   report_thread_->Join();
-}
-
-Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
-  SCOPED_TIMER(profile()->total_time_counter());
-  VLOG_FILE << "GetNext(): instance_id=" << runtime_state_->fragment_instance_id();
-
-  Status status = Status::OK();
-  row_batch_->Reset();
-  // Loop until we've got a non-empty batch, hit an error or exhausted the input.
-  while (!done_) {
-    status = plan_->GetNext(runtime_state_.get(), row_batch_.get(), &done_);
-    if (VLOG_ROW_IS_ON) row_batch_->VLogRows("PlanFragmentExecutor::GetNext()");
-    if (!status.ok()) break;
-    if (row_batch_->num_rows() > 0) break;
-    row_batch_->Reset();
-  }
-  UpdateStatus(status);
-  COUNTER_ADD(rows_produced_counter_, row_batch_->num_rows());
-
-  if (done_) {
-    VLOG_QUERY << "Finished executing fragment query_id=" << PrintId(query_id_)
-        << " instance_id=" << PrintId(runtime_state_->fragment_instance_id());
-    FragmentComplete();
-    // Once all rows are returned, signal that we're done with an empty batch.
-    *batch = row_batch_->num_rows() == 0 ? NULL : row_batch_.get();
-    return status;
-  }
-
-  *batch = row_batch_.get();
-  return status;
 }
 
 void PlanFragmentExecutor::FragmentComplete() {
@@ -463,7 +481,7 @@ void PlanFragmentExecutor::UpdateStatus(const Status& status) {
 }
 
 void PlanFragmentExecutor::Cancel() {
-  VLOG_QUERY << "Cancelling plan fragment...";
+  VLOG_QUERY << "Cancelling fragment instance...";
   lock_guard<mutex> l(prepare_lock_);
   is_cancelled_ = true;
   if (!is_prepared_) {
@@ -476,16 +494,8 @@ void PlanFragmentExecutor::Cancel() {
   runtime_state_->stream_mgr()->Cancel(runtime_state_->fragment_instance_id());
 }
 
-const RowDescriptor& PlanFragmentExecutor::row_desc() {
-  return plan_->row_desc();
-}
-
 RuntimeProfile* PlanFragmentExecutor::profile() {
   return runtime_state_->runtime_profile();
-}
-
-bool PlanFragmentExecutor::ReachedLimit() {
-  return plan_->ReachedLimit();
 }
 
 void PlanFragmentExecutor::ReleaseThreadToken() {
@@ -500,19 +510,23 @@ void PlanFragmentExecutor::ReleaseThreadToken() {
 
 void PlanFragmentExecutor::Close() {
   if (closed_) return;
+  if (!is_prepared_) return;
+  if (sink_.get() != nullptr) sink_->Close(runtime_state());
+
   row_batch_.reset();
   if (sink_mem_tracker_ != NULL) {
     sink_mem_tracker_->UnregisterFromParent();
     sink_mem_tracker_.reset();
   }
-  // Prepare may not have been called, which sets runtime_state_
-  if (runtime_state_.get() != NULL) {
-    if (plan_ != NULL) plan_->Close(runtime_state_.get());
-    runtime_state_->UnregisterReaderContexts();
-    exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
-    runtime_state_->desc_tbl().ClosePartitionExprs(runtime_state_.get());
-    runtime_state_->filter_bank()->Close();
-  }
+
+  // Prepare should always have been called, and so runtime_state_ should be set
+  DCHECK(prepared_promise_.IsSet());
+  if (exec_tree_ != NULL) exec_tree_->Close(runtime_state_.get());
+  runtime_state_->UnregisterReaderContexts();
+  exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
+  runtime_state_->desc_tbl().ClosePartitionExprs(runtime_state_.get());
+  runtime_state_->filter_bank()->Close();
+
   if (mem_usage_sampled_counter_ != NULL) {
     PeriodicCounterUpdater::StopTimeSeriesCounter(mem_usage_sampled_counter_);
     mem_usage_sampled_counter_ = NULL;

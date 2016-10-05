@@ -206,7 +206,6 @@ const string HS2_SERVER_NAME = "hiveserver2-frontend";
 const char* ImpalaServer::SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION = "42000";
 const char* ImpalaServer::SQLSTATE_GENERAL_ERROR = "HY000";
 const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
-const int ImpalaServer::ASCII_PRECISION = 16; // print 16 digits for double/float
 
 const int MAX_NM_MISSED_HEARTBEATS = 5;
 
@@ -1866,9 +1865,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
   }
 
   if (be_port != 0 && be_server != NULL) {
-    boost::shared_ptr<FragmentMgr> fragment_mgr(new FragmentMgr());
-    boost::shared_ptr<ImpalaInternalService> thrift_if(
-        new ImpalaInternalService(handler, fragment_mgr));
+    boost::shared_ptr<ImpalaInternalService> thrift_if(new ImpalaInternalService());
     boost::shared_ptr<TProcessor> be_processor(
         new ImpalaInternalServiceProcessor(thrift_if));
     boost::shared_ptr<TProcessorEventHandler> event_handler(

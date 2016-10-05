@@ -249,45 +249,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   boost::scoped_ptr<ImpalaHttpHandler> http_handler_;
 
-  /// Query result set stores converted rows returned by QueryExecState.fetchRows(). It
-  /// provides an interface to convert Impala rows to external API rows.
-  /// It is an abstract class. Subclass must implement AddOneRow().
-  class QueryResultSet {
-   public:
-    QueryResultSet() {}
-    virtual ~QueryResultSet() {}
-
-    /// Add the row (list of expr value) from a select query to this result set. When a row
-    /// comes from a select query, the row is in the form of expr values (void*). 'scales'
-    /// contains the values' scales (# of digits after decimal), with -1 indicating no
-    /// scale specified.
-    virtual Status AddOneRow(
-        const std::vector<void*>& row, const std::vector<int>& scales) = 0;
-
-    /// Add the TResultRow to this result set. When a row comes from a DDL/metadata
-    /// operation, the row in the form of TResultRow.
-    virtual Status AddOneRow(const TResultRow& row) = 0;
-
-    /// Copies rows in the range [start_idx, start_idx + num_rows) from the other result
-    /// set into this result set. Returns the number of rows added to this result set.
-    /// Returns 0 if the given range is out of bounds of the other result set.
-    virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) = 0;
-
-    /// Returns the approximate size of this result set in bytes.
-    int64_t ByteSize() { return ByteSize(0, size()); }
-
-    /// Returns the approximate size of the given range of rows in bytes.
-    virtual int64_t ByteSize(int start_idx, int num_rows) = 0;
-
-    /// Returns the size of this result set in number of rows.
-    virtual size_t size() = 0;
-  };
-
-  /// Result set implementations for Beeswax and HS2
-  class AsciiQueryResultSet;
-  class HS2RowOrientedResultSet;
-  class HS2ColumnarResultSet;
-
   struct SessionState;
 
   /// Execution state of a query.
@@ -298,14 +259,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   static const char* SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION;
   static const char* SQLSTATE_GENERAL_ERROR;
   static const char* SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED;
-
-  /// Ascii output precision for double/float
-  static const int ASCII_PRECISION;
-
-  QueryResultSet* CreateHS2ResultSet(
-      apache::hive::service::cli::thrift::TProtocolVersion::type version,
-      const TResultSetMetadata& metadata,
-      apache::hive::service::cli::thrift::TRowSet* rowset = NULL);
 
   /// Return exec state for given query_id, or NULL if not found.
   /// If 'lock' is true, the returned exec state's lock() will be acquired before

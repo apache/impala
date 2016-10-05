@@ -47,9 +47,6 @@ class FragmentMgr::FragmentExecState {
   /// the fragment and returns OK.
   Status Cancel();
 
-  /// Call Prepare() and create and initialize data sink.
-  Status Prepare();
-
   /// Main loop of plan fragment execution. Blocks until execution finishes.
   void Exec();
 
@@ -66,6 +63,8 @@ class FragmentMgr::FragmentExecState {
 
   /// Publishes filter with ID 'filter_id' to this fragment's filter bank.
   void PublishFilter(int32_t filter_id, const TBloomFilter& thrift_bloom_filter);
+
+  PlanFragmentExecutor* executor() { return &executor_; }
 
  private:
   TQueryCtx query_ctx_;
@@ -98,6 +97,9 @@ class FragmentMgr::FragmentExecState {
   /// the reporting RPC. `profile` may be NULL if a runtime profile has not been created
   /// for this fragment (e.g. when the fragment has failed during preparation).
   void ReportStatusCb(const Status& status, RuntimeProfile* profile, bool done);
+
+  /// Call Prepare() and create and initialize data sink.
+  Status Prepare();
 };
 
 }

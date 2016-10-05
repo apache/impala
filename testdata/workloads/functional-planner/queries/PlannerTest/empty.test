@@ -5,11 +5,15 @@ left outer join functional.alltypes t2
 on t1.id = t2.id
 where false
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # HBase scan turns into empty-set node due to a constant conjunct.
 select * from functional_hbase.alltypessmall where false
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # Data source scan turns into empty-set node due to a constant conjunct.
@@ -19,6 +23,8 @@ inner join functional.alltypestiny b
 on a.id = b.id
 where length("a") > 7
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # Constant conjunct in ON clause turns query block into an empty-set node.
@@ -27,6 +33,8 @@ from functional.alltypestiny t1
 inner join functional.alltypes t2
 on (t1.id = t2.id and (false or false))
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # Constant conjunct in WHERE clause turns query block into an aggregation
@@ -35,6 +43,8 @@ select count(int_col), avg(double_col), count(*)
 from functional.alltypes
 where null
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: count(int_col), avg(double_col), count(*)
 |
@@ -47,6 +57,8 @@ from functional.alltypestiny t1
 inner join functional.alltypes t2
 on (t1.id = t2.id and (false or false))
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
@@ -61,6 +73,8 @@ on t1.id = t2.id
 group by t1.int_col
 having ifnull(null, false)
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # Constant conjunct causes empty-set inline view.
@@ -74,6 +88,8 @@ inner join
    where 1 + 3 > 10) e
 on e.id = f.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: f.id = t1.id
 |  runtime filters: RF000 <- t1.id
@@ -91,6 +107,8 @@ select * from functional.alltypes where "abc" = "cde"
 union all
 select * from functional.alltypestiny
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypestiny]
@@ -110,6 +128,8 @@ full outer join
    where null) t2
 on a.id = t2.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = id
 |
@@ -125,6 +145,8 @@ from functional.alltypessmall a
 left outer join functional.alltypestiny b
 on (a.id = b.id and 1 + 1 > 10)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.id = b.id
 |  other join predicates: 1 + 1 > 10
@@ -142,6 +164,8 @@ from functional.alltypessmall a
 right outer join functional.alltypestiny b
 on (a.id = b.id and !true)
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: a.id = b.id
 |  other join predicates: NOT TRUE
@@ -161,6 +185,8 @@ from functional.alltypessmall a
 full outer join functional.alltypestiny b
 on (a.id = b.id and null = "abc")
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = b.id
 |  other join predicates: NULL = 'abc'
@@ -178,6 +204,8 @@ left outer join functional.alltypes t2
 on t1.id = t2.id
 limit 0
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # Limit 0 turns query block into an empty-set node.
@@ -185,6 +213,8 @@ select count(int_col), avg(double_col), count(*)
 from functional.alltypes
 limit 0
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # Limit 0 causes empty-set inline view.
@@ -198,6 +228,8 @@ inner join
    limit 0) e
 on e.id = f.id
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: f.id = t1.id
 |  runtime filters: RF000 <- t1.id
@@ -215,6 +247,8 @@ select * from functional.alltypes limit 0
 union all
 select * from functional.alltypestiny
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypestiny]
@@ -231,6 +265,8 @@ union all
 (select * from functional.alltypestiny)
 limit 0
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # Inline view with a constant select stmt that is guaranteed to be empty.
@@ -241,6 +277,8 @@ w1 where w1.c1 is null
 union all
 select int_col from functional.alltypesagg
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:UNION
 |
 |--03:SCAN HDFS [functional.alltypesagg]
@@ -254,6 +292,8 @@ select int_col from functional.alltypesagg
 # IMPALA-1234: Analytic with constant empty result set failed precondition check in FE
 select MIN(int_col) OVER () FROM functional.alltypes limit 0
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # IMPALA-1860: INSERT/CTAS should evaluate and apply constant predicates.
@@ -291,6 +331,8 @@ from
   (select id, int_col, bigint_col from functional.alltypestiny) T
 where false
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: sum(id), count(int_col)
 |
@@ -304,6 +346,8 @@ from
   (select id, int_col from functional.alltypestiny) T2 on (T1.id = T2.id)
 where T1.bigint_col < 10 and 1 > 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:AGGREGATE [FINALIZE]
 |  output: sum(id + int_col)
 |
@@ -317,6 +361,8 @@ from
   functional.alltypessmall T2 on T1.id = T2.id
 where T2.bigint_col < 10 and false
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:AGGREGATE [FINALIZE]
 |  output: count(T1.int_col)
 |
@@ -338,6 +384,8 @@ union all
 select coalesce(10.4, int_col)
 from functional.alltypes where false
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:UNION
 |
 01:AGGREGATE [FINALIZE]
@@ -359,6 +407,8 @@ select 1
 union all select bigint_col
 from functional.alltypestiny
 ---- PLAN
+PLAN-ROOT SINK
+|
 02:UNION
 |  constant-operands=1
 |
@@ -375,6 +425,8 @@ from functional.alltypestiny
 select * from (select 10 as i, 2 as j, '2013' as s) as t
 where t.i < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
 # IMPALA-2216: Make sure the final output exprs are substituted, even
@@ -406,6 +458,8 @@ left outer join
       where null) nv) v4
 where c_custkey < 10
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:SUBPLAN
 |
 |--16:NESTED LOOP JOIN [LEFT OUTER JOIN]
@@ -457,6 +511,8 @@ from tpch_nested_parquet.customer c,
  ) v1
 where c_custkey = 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 01:SUBPLAN
 |
 |--07:NESTED LOOP JOIN [CROSS JOIN]
@@ -479,5 +535,7 @@ where c_custkey = 1
 # IMPALA-2215: Having clause without aggregation.
 select 1 from (select 1) v having 1 > 1
 ---- PLAN
+PLAN-ROOT SINK
+|
 00:EMPTYSET
 ====
