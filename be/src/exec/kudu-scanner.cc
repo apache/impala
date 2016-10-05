@@ -147,7 +147,7 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
       "Could not set scanner timeout");
 
   {
-    SCOPED_TIMER(scan_node_->kudu_read_timer());
+    SCOPED_TIMER(state_->total_storage_wait_timer());
     KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");
   }
   return Status::OK();
@@ -335,7 +335,7 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduScanBatch::RowPtr& row,
 
 
 Status KuduScanner::GetNextScannerBatch() {
-  SCOPED_TIMER(scan_node_->kudu_read_timer());
+  SCOPED_TIMER(state_->total_storage_wait_timer());
   int64_t now = MonotonicMicros();
   KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_kudu_batch_), "Unable to advance iterator");
   COUNTER_ADD(scan_node_->kudu_round_trips(), 1);

@@ -99,10 +99,8 @@ class KuduScanNode : public ScanNode {
   /// Thread group for all scanner worker threads
   ThreadGroup scanner_threads_;
 
-  RuntimeProfile::Counter* kudu_read_timer_;
   RuntimeProfile::Counter* kudu_round_trips_;
   RuntimeProfile::Counter* kudu_remote_tokens_;
-  static const std::string KUDU_READ_TIMER;
   static const std::string KUDU_ROUND_TRIPS;
   static const std::string KUDU_REMOTE_TOKENS;
 
@@ -136,7 +134,6 @@ class KuduScanNode : public ScanNode {
   // have been open previously.
   Status GetConjunctCtxs(vector<ExprContext*>* ctxs);
 
-  RuntimeProfile::Counter* kudu_read_timer() const { return kudu_read_timer_; }
   RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
 };
 
