@@ -332,6 +332,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
         node->hdfs_table()->null_column_value().data(),
         node->hdfs_table()->null_column_value().size(), true, state->strict_mode());
     if (fn == NULL) return Status("CodegenWriteSlot failed.");
+    if (i >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) codegen->SetNoInline(fn);
     slot_fns.push_back(fn);
   }
 
@@ -487,6 +488,10 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
         fn->eraseFromParent();
         return status;
       }
+      if (node->materialized_slots().size() + conjunct_idx
+          >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) {
+        codegen->SetNoInline(conjunct_fn);
+      }
 
       Function* get_ctx_fn =
           codegen->GetFunction(IRFunction::HDFS_SCANNER_GET_CONJUNCT_CTX, false);
@@ -505,6 +510,10 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   builder.SetInsertPoint(eval_fail_block);
   builder.CreateRet(codegen->false_value());
 
+  if (node->materialized_slots().size() + conjunct_ctxs.size()
+      > LlvmCodeGen::CODEGEN_INLINE_EXPR_BATCH_THRESHOLD) {
+    codegen->SetNoInline(fn);
+  }
   *write_complete_tuple_fn = codegen->FinalizeFunction(fn);
   if (*write_complete_tuple_fn == NULL) {
     return Status("Failed to finalize write_complete_tuple_fn.");

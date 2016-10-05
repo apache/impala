@@ -251,7 +251,8 @@ TEST_F(ExprCodegenTest, TestInlineConstants) {
   stringstream test_udf_file;
   test_udf_file << getenv("IMPALA_HOME") << "/be/build/latest/exprs/expr-codegen-test.ll";
   scoped_ptr<LlvmCodeGen> codegen;
-  ASSERT_OK(LlvmCodeGen::CreateFromFile(&pool, test_udf_file.str(), "test", &codegen));
+  ASSERT_OK(
+      LlvmCodeGen::CreateFromFile(&pool, NULL, test_udf_file.str(), "test", &codegen));
   Function* fn = codegen->GetFunction(TEST_GET_CONSTANT_SYMBOL, false);
   ASSERT_TRUE(fn != NULL);
 

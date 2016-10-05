@@ -72,6 +72,7 @@ namespace llvm {
 namespace impala {
 
 class CodegenSymbolEmitter;
+class ImpalaMCJITMemoryManager;
 class SubExprElimination;
 class TupleDescriptor;
 
@@ -124,6 +125,14 @@ class LlvmBuilder : public llvm::IRBuilder<> {
 /// instructions attached to the function object. Functions reachable by the function
 /// are also materialized recursively.
 //
+/// Memory used for codegen is tracked via the MemTracker hierarchy. Codegen can use
+/// significant memory for the IR module and for the optimization and compilation
+/// algorithms. LLVM provides no way to directly track this transient memory - instead
+/// the memory consumption is estimated based on the size of the IR module and released
+/// once compilation finishes. Once compilation finishes, the size of the compiled
+/// machine code is obtained from LLVM and and is tracked until the LlvmCodeGen object
+/// is torn down and the compiled code is freed.
+//
 class LlvmCodeGen {
  public:
   /// This function must be called once per process before any llvm API calls are
@@ -138,13 +147,15 @@ class LlvmCodeGen {
 
   /// Creates a codegen instance for Impala initialized with the cross-compiled Impala IR.
   /// 'codegen' will contain the created object on success.
+  /// 'parent_mem_tracker' - if non-NULL, the CodeGen MemTracker is created under this.
   /// 'id' is used for outputting the IR module for debugging.
-  static Status CreateImpalaCodegen(
-      ObjectPool*, const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
+  static Status CreateImpalaCodegen(ObjectPool*, MemTracker* parent_mem_tracker,
+      const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   /// Creates a LlvmCodeGen instance initialized with the module bitcode from 'file'.
   /// 'codegen' will contain the created object on success.
-  static Status CreateFromFile(ObjectPool*, const std::string& file, const std::string& id,
+  static Status CreateFromFile(ObjectPool*, MemTracker* parent_mem_tracker,
+      const std::string& file, const std::string& id,
       boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   /// Removes all jit compiled dynamically linked functions from the process.
@@ -202,8 +213,8 @@ class LlvmCodeGen {
     /// If 'print_ir' is true, the generated llvm::Function's IR will be printed when
     /// GetIR() is called. Avoid doing so for IR function prototypes generated for
     /// externally defined native function.
-    llvm::Function* GeneratePrototype(LlvmBuilder* builder = NULL,
-        llvm::Value** params = NULL, bool print_ir = true);
+    llvm::Function* GeneratePrototype(
+        LlvmBuilder* builder = NULL, llvm::Value** params = NULL, bool print_ir = true);
 
    private:
     friend class LlvmCodeGen;
@@ -266,7 +277,9 @@ class LlvmCodeGen {
 
   /// Optimize and compile the module. This should be called after all functions to JIT
   /// have been added to the module via AddFunctionToJit(). If optimizations_enabled_ is
-  /// false, the module will not be optimized before compilation.
+  /// false, the module will not be optimized before compilation. After FinalizeModule()
+  /// is called, the LLVM module is destroyed and it is invalid to call any LlvmCodegen
+  /// functions.
   Status FinalizeModule();
 
   /// Replaces all instructions in 'caller' that call 'target_name' with a call
@@ -356,6 +369,10 @@ class LlvmCodeGen {
   llvm::Function* GetHashFunction(int num_bytes = -1);
   llvm::Function* GetFnvHashFunction(int num_bytes = -1);
   llvm::Function* GetMurmurHashFunction(int num_bytes = -1);
+
+  /// Set the NoInline attribute on 'function' and remove the AlwaysInline attribute if
+  /// present.
+  void SetNoInline(llvm::Function* function) const;
 
   /// Allocate stack storage for local variables.  This is similar to traditional c, where
   /// all the variables must be declared at the top of the function.  This helper can be
@@ -454,6 +471,15 @@ class LlvmCodeGen {
   /// this LlvmCodeGen object. The module must be on the local filesystem.
   Status LinkModule(const std::string& file);
 
+  /// If there are more than this number of expr trees (or functions that evaluate
+  /// expressions), avoid inlining avoid inlining for the exprs exceeding this threshold.
+  static const int CODEGEN_INLINE_EXPRS_THRESHOLD = 100;
+
+  /// If there are more than this number of expr trees (or functions that evaluate
+  /// expressions), avoid inlining the function that evaluates the expression batch
+  /// into the calling function.
+  static const int CODEGEN_INLINE_EXPR_BATCH_THRESHOLD = 25;
+
  private:
   friend class ExprCodegenTest;
   friend class LlvmCodeGenTest;
@@ -471,11 +497,12 @@ class LlvmCodeGen {
   /// Parses all the global variables in 'module' and adds any functions referenced by
   /// them to the set 'ref_fns' if they are not defined in the Impalad native code.
   /// These functions need to be materialized to avoid linking error.
-  static void ParseGVForFunctions(llvm::Module* module,
-      boost::unordered_set<string>* ref_fns);
+  static void ParseGVForFunctions(
+      llvm::Module* module, boost::unordered_set<string>* ref_fns);
 
   /// Top level codegen object.  'module_id' is used for debugging when outputting the IR.
-  LlvmCodeGen(ObjectPool* pool, const std::string& module_id);
+  LlvmCodeGen(
+      ObjectPool* pool, MemTracker* parent_mem_tracker, const std::string& module_id);
 
   /// Initializes the jitter and execution engine with the given module.
   Status Init(std::unique_ptr<llvm::Module> module);
@@ -484,8 +511,8 @@ class LlvmCodeGen {
   /// 'codegen' will contain the created object on success. Note that the functions
   /// are not materialized. Getting a reference to the function via GetFunction()
   /// will materialize the function and its callees recursively.
-  static Status CreateFromMemory(ObjectPool* pool, const std::string& id,
-      boost::scoped_ptr<LlvmCodeGen>* codegen);
+  static Status CreateFromMemory(ObjectPool* pool, MemTracker* parent_mem_tracker,
+      const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   /// Loads an LLVM module from 'file' which is the local path to the LLVM bitcode file.
   /// The functions in the module are not materialized. Getting a reference to the
@@ -524,7 +551,7 @@ class LlvmCodeGen {
   void ResetVerification() { is_corrupt_ = false; }
 
   /// Optimizes the module. This includes pruning the module of any unused functions.
-  void OptimizeModule();
+  Status OptimizeModule();
 
   /// Clears generated hash fns.  This is only used for testing.
   void ClearHashFns();
@@ -570,6 +597,10 @@ class LlvmCodeGen {
   /// there is error in materializing the module.
   Status FinalizeLazyMaterialization();
 
+  /// Destroy the IR module, freeing memory used by the IR. Any machine code that was
+  /// generated is retained by the execution engine.
+  void DestroyModule();
+
   /// Whether InitializeLlvm() has been called.
   static bool llvm_initialized_;
 
@@ -588,6 +619,10 @@ class LlvmCodeGen {
 
   /// Codegen counters
   RuntimeProfile profile_;
+
+  /// MemTracker used for tracking memory consumed by codegen. Connected to a parent
+  /// MemTracker if one was provided during initialization.
+  boost::scoped_ptr<MemTracker> mem_tracker_;
 
   /// Time spent reading the .ir file from the file system.
   RuntimeProfile::Counter* load_module_timer_;
@@ -639,6 +674,9 @@ class LlvmCodeGen {
   /// Execution/Jitting engine.
   std::unique_ptr<llvm::ExecutionEngine> execution_engine_;
 
+  /// The memory manager used by 'execution_engine_'. Owned by 'execution_engine_'.
+  ImpalaMCJITMemoryManager* memory_manager_;
+
   /// Functions parsed from pre-compiled module.  Indexed by ImpalaIR::Function enum
   std::vector<llvm::Function*> loaded_functions_;
 
@@ -686,8 +724,28 @@ class LlvmCodeGen {
   /// 'symbol_emitter_' are called by 'execution_engine_' when code is emitted or freed.
   /// The lifetime of the symbol emitter must be longer than 'execution_engine_'.
   boost::scoped_ptr<CodegenSymbolEmitter> symbol_emitter_;
-};
 
+  /// Very rough estimate of memory in bytes that the IR and the intermediate data
+  /// structures used by the optimizer may consume per LLVM IR instruction to be
+  /// optimized (after dead code is removed). The number is chosen to avoid pathological
+  /// behaviour at either extreme: failing queries unnecessarily because the memory
+  /// estimate is too high versus having large amounts of untracked memory because the
+  /// estimate is too low.
+  ///
+  /// This was chosen by looking at the behaviour of TPC-H queries. Using the heap growth
+  /// profile from gperftools reveal that LLVM allocated ~9mb of memory for fragments with
+  /// ~17k total instructions in TPC-H Q2. Inspection of other TPC-H queries revealed
+  /// that a typical fragment from a TPC-H query is < 5,000 instructions, which translates
+  /// to 2.5MB, which is almost always lower than the runtime memory requirement of the
+  /// fragment - so we are unlikely to fail queries unnecessarily.
+  ///
+  /// This assumes optimizer memory usage scales linearly with instruction count. This is
+  /// true only if the size of functions is bounded, because some optimization passes
+  /// (e.g. global value numbering) use time and memory that is super-linear in relation
+  /// to the # of instructions in a function. So codegen should avoid generating
+  /// arbitrarily large function.
+  static constexpr int64_t ESTIMATED_OPTIMIZER_BYTES_PER_INST = 512;
+};
 }
 
 #endif

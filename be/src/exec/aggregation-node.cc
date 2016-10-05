@@ -164,6 +164,9 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 
 void AggregationNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+
   bool codegen_enabled = false;
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
@@ -178,7 +181,6 @@ void AggregationNode::Codegen(RuntimeState* state) {
     }
   }
   runtime_profile()->AddCodegenMsg(codegen_enabled);
-  ExecNode::Codegen(state);
 }
 
 Status AggregationNode::Open(RuntimeState* state) {

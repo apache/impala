@@ -403,8 +403,8 @@ Status LibCache::GetCacheEntryInternal(const string& hdfs_lib_file, LibType type
     ObjectPool pool;
     scoped_ptr<LlvmCodeGen> codegen;
     string module_id = filesystem::path((*entry)->local_path).stem().string();
-    RETURN_IF_ERROR(
-        LlvmCodeGen::CreateFromFile(&pool, (*entry)->local_path, module_id, &codegen));
+    RETURN_IF_ERROR(LlvmCodeGen::CreateFromFile(
+        &pool, NULL, (*entry)->local_path, module_id, &codegen));
     codegen->GetSymbols(&(*entry)->symbols);
   } else {
     DCHECK_EQ(type, TYPE_JAR);

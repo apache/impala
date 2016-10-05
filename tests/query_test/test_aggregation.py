@@ -19,13 +19,19 @@
 #
 import pytest
 
+from testdata.common import widetable
 from tests.common.environ import USING_OLD_AGGS_JOINS
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfOldAggsJoins
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_uncompressed_text_dimension)
-from tests.common.test_result_verifier import assert_codegen_enabled
+from tests.common.test_result_verifier import (
+    assert_codegen_enabled,
+    parse_column_types,
+    parse_column_labels,
+    QueryTestResult,
+    parse_result_rows)
 from tests.common.test_vector import TestDimension
 
 # Test dimensions for TestAggregation.
@@ -128,8 +134,9 @@ class TestAggregation(ImpalaTestSuite):
     self.verify_agg_result(agg_func, data_type, False, result.data[0]);
 
     if check_codegen_enabled:
-      # Verify codegen was enabled for both stages of the aggregation.
-      assert_codegen_enabled(result.runtime_profile, [1, 3])
+      # Verify codegen was enabled for the preaggregation.
+      # It is deliberately disabled for the merge aggregation.
+      assert_codegen_enabled(result.runtime_profile, [1])
 
     query = 'select %s(DISTINCT(%s_col)) from alltypesagg where day is not null' % (
         agg_func, data_type)
@@ -207,7 +214,7 @@ class TestAggregationQueries(ImpalaTestSuite):
        Required to run directly in python because the order in which results will be
        merged at the final, single-node aggregation step is non-deterministic (if the
        first phase is running on multiple nodes). Need to pull the result apart and
-       compare the actual items)"""
+   compare the actual items)"""
     exec_option = vector.get_value('exec_option')
     disable_codegen = exec_option['disable_codegen']
     table_format = vector.get_value('table_format')
@@ -262,6 +269,42 @@ class TestAggregationQueries(ImpalaTestSuite):
     if check_codegen_enabled:
       # Verify codegen was enabled for all four stages of the aggregation.
       assert_codegen_enabled(result.runtime_profile, [1, 2, 4, 6])
+
+class TestWideAggregationQueries(ImpalaTestSuite):
+  """Test that aggregations with many grouping columns work"""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestWideAggregationQueries, cls).add_test_dimensions()
+
+    cls.TestMatrix.add_dimension(
+      create_exec_option_dimension(disable_codegen_options=[False, True]))
+
+    # File format doesn't matter for this test.
+    cls.TestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_many_grouping_columns(self, vector):
+    """Test that an aggregate with many grouping columns works"""
+    table_format = vector.get_value('table_format')
+    exec_option = vector.get_value('exec_option')
+    query = "select distinct * from widetable_1000_cols"
+
+    # Ensure codegen is enabled.
+    result = self.execute_query(query, exec_option, table_format=table_format)
+
+    # All rows should be distinct.
+    expected_result = widetable.get_data(1000, 10, quote_strings=True)
+
+    types = parse_column_types(result.schema)
+    labels = parse_column_labels(result.schema)
+    expected = QueryTestResult(expected_result, types, labels, order_matters=False)
+    actual = QueryTestResult(parse_result_rows(result), types, labels,
+        order_matters=False)
+    assert expected == actual
 
 
 class TestTPCHAggregationQueries(ImpalaTestSuite):

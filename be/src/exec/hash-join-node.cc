@@ -134,14 +134,13 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   AddExprCtxsToFree(other_join_conjunct_ctxs_);
 
   // TODO: default buckets
-  const bool stores_nulls = join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
-      join_op_ == TJoinOp::FULL_OUTER_JOIN ||
-      std::accumulate(is_not_distinct_from_.begin(), is_not_distinct_from_.end(), false,
-                      std::logical_or<bool>());
+  const bool stores_nulls = join_op_ == TJoinOp::RIGHT_OUTER_JOIN
+      || join_op_ == TJoinOp::FULL_OUTER_JOIN
+      || std::accumulate(is_not_distinct_from_.begin(), is_not_distinct_from_.end(),
+                                false, std::logical_or<bool>());
   hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_,
-          filter_expr_ctxs_,
-          child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
-          is_not_distinct_from_, state->fragment_hash_seed(), mem_tracker(), filters_));
+      filter_expr_ctxs_, child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
+      is_not_distinct_from_, state->fragment_hash_seed(), mem_tracker(), filters_));
   build_pool_.reset(new MemPool(mem_tracker()));
   AddCodegenDisabledMessage(state);
   return Status::OK();
@@ -149,6 +148,9 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 
 void HashJoinNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
   bool build_codegen_enabled = false;
@@ -178,7 +180,6 @@ void HashJoinNode::Codegen(RuntimeState* state) {
   }
   runtime_profile()->AddCodegenMsg(build_codegen_enabled, "", "Build Side");
   runtime_profile()->AddCodegenMsg(probe_codegen_enabled, "", "Probe Side");
-  ExecNode::Codegen(state);
 }
 
 Status HashJoinNode::Reset(RuntimeState* state) {

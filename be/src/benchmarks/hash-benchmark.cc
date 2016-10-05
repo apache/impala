@@ -429,7 +429,7 @@ int main(int argc, char **argv) {
 
   Status status;
   scoped_ptr<LlvmCodeGen> codegen;
-  status = LlvmCodeGen::CreateImpalaCodegen(&obj_pool, "test", &codegen);
+  status = LlvmCodeGen::CreateImpalaCodegen(&obj_pool, NULL, "test", &codegen);
   if (!status.ok()) {
     cout << "Could not start codegen.";
     return -1;

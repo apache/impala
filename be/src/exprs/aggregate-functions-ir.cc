@@ -1190,8 +1190,26 @@ void AggregateFunctions::HllUpdate(FunctionContext* ctx, const T& src, StringVal
   }
 }
 
-void AggregateFunctions::HllMerge(FunctionContext* ctx, const StringVal& src,
-    StringVal* dst) {
+// Specialize for DecimalVal to allow substituting decimal size.
+template <>
+void AggregateFunctions::HllUpdate(
+    FunctionContext* ctx, const DecimalVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, HLL_LEN);
+  uint64_t hash_value = AnyValUtil::HashDecimal64(
+      src, Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_SIZE, 0), HashUtil::FNV64_SEED);
+  if (hash_value != 0) {
+    // Use the lower bits to index into the number of streams and then
+    // find the first 1 bit after the index bits.
+    int idx = hash_value & (HLL_LEN - 1);
+    uint8_t first_one_bit = __builtin_ctzl(hash_value >> HLL_PRECISION) + 1;
+    dst->ptr[idx] = ::max(dst->ptr[idx], first_one_bit);
+  }
+}
+
+void AggregateFunctions::HllMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
   DCHECK(!dst->is_null);
   DCHECK(!src.is_null);
   DCHECK_EQ(dst->len, HLL_LEN);

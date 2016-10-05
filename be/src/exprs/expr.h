@@ -361,6 +361,7 @@ class Expr {
 
   /// recognize if this node is a slotref in order to speed up GetValue()
   const bool is_slotref_;
+
   /// analysis is done, types are fixed at this point
   const ColumnType type_;
   std::vector<Expr*> children_;

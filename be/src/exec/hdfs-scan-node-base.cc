@@ -297,6 +297,10 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
 }
 
 void HdfsScanNodeBase::Codegen(RuntimeState* state) {
+  DCHECK(state->ShouldCodegen());
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+
   // Create codegen'd functions
   for (int format = THdfsFileFormat::TEXT; format <= THdfsFileFormat::PARQUET; ++format) {
     vector<HdfsFileDesc*>& file_descs =
@@ -343,7 +347,6 @@ void HdfsScanNodeBase::Codegen(RuntimeState* state) {
     }
     runtime_profile()->AddCodegenMsg(status.ok(), status, format_name);
   }
-  ExecNode::Codegen(state);
 }
 
 Status HdfsScanNodeBase::Open(RuntimeState* state) {

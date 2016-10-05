@@ -92,11 +92,13 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
 
 void ExchangeNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+
   if (is_merging_) {
     Status codegen_status = less_than_->Codegen(state);
     runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
   }
-  ExecNode::Codegen(state);
 }
 
 Status ExchangeNode::Open(RuntimeState* state) {

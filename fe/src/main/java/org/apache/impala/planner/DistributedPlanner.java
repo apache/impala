@@ -818,6 +818,12 @@ public class DistributedPlanner {
         mergeFragment.getPlanRoot(), node.getAggInfo().getMergeAggInfo());
     mergeAggNode.init(ctx_.getRootAnalyzer());
     mergeAggNode.setLimit(limit);
+    // Merge of non-grouping agg only processes one tuple per Impala daemon - codegen
+    // will cost more than benefit.
+    if (!hasGrouping) {
+      mergeFragment.getPlanRoot().setDisableCodegen(true);
+      mergeAggNode.setDisableCodegen(true);
+    }
 
     // HAVING predicates can only be evaluated after the merge agg step
     node.transferConjuncts(mergeAggNode);

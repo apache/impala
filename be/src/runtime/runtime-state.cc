@@ -96,16 +96,16 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
 RuntimeState::~RuntimeState() {
   block_mgr_.reset();
 
+  // Release codegen memory before tearing down trackers.
+  codegen_.reset();
+
   // query_mem_tracker_ must be valid as long as instance_mem_tracker_ is so
   // delete instance_mem_tracker_ first.
   // LogUsage() walks the MemTracker tree top-down when the memory limit is exceeded.
   // Break the link between the instance_mem_tracker and its parent (query_mem_tracker_)
   // before the instance_mem_tracker_ and its children are destroyed.
-  if (instance_mem_tracker_.get() != NULL) {
-    // May be NULL if InitMemTrackers() is not called, for example from tests.
-    instance_mem_tracker_->UnregisterFromParent();
-  }
-
+  // May be NULL if InitMemTrackers() is not called, for example from tests.
+  if (instance_mem_tracker_ != NULL) instance_mem_tracker_->UnregisterFromParent();
   instance_mem_tracker_.reset();
   query_mem_tracker_.reset();
 }
@@ -184,8 +184,8 @@ Status RuntimeState::CreateBlockMgr() {
 Status RuntimeState::CreateCodegen() {
   if (codegen_.get() != NULL) return Status::OK();
   // TODO: add the fragment ID to the codegen ID as well
-  RETURN_IF_ERROR(LlvmCodeGen::CreateImpalaCodegen(
-      obj_pool_.get(), PrintId(fragment_instance_id()), &codegen_));
+  RETURN_IF_ERROR(LlvmCodeGen::CreateImpalaCodegen(obj_pool_.get(),
+      instance_mem_tracker_.get(), PrintId(fragment_instance_id()), &codegen_));
   codegen_->EnableOptimizations(true);
   profile_.AddChild(codegen_->runtime_profile());
   return Status::OK();

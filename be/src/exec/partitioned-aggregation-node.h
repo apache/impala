@@ -643,7 +643,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// Codegen UpdateSlot(). Returns non-OK status if codegen is unsuccessful.
   /// Assumes is_merge = false;
   Status CodegenUpdateSlot(LlvmCodeGen* codegen, AggFnEvaluator* evaluator,
-      SlotDescriptor* slot_desc, llvm::Function** fn);
+      int evaluator_idx, SlotDescriptor* slot_desc, llvm::Function** fn);
 
   /// Codegen a call to a function implementing the UDA interface with input values
   /// from 'input_vals'. 'dst_val' should contain the previous value of the aggregate

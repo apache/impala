@@ -84,6 +84,9 @@ Status TopNNode::Prepare(RuntimeState* state) {
 
 void TopNNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
 
@@ -126,7 +129,6 @@ void TopNNode::Codegen(RuntimeState* state) {
     }
   }
   runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
-  ExecNode::Codegen(state);
 }
 
 Status TopNNode::Open(RuntimeState* state) {

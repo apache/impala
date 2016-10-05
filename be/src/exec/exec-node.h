@@ -184,6 +184,10 @@ class ExecNode {
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
   MemTracker* expr_mem_tracker() { return expr_mem_tracker_.get(); }
 
+  /// Return true if codegen was disabled by the planner for this ExecNode. Does not
+  /// check to see if codegen was enabled for the enclosing fragment.
+  bool IsNodeCodegenDisabled() const;
+
   /// Add codegen disabled message if codegen is disabled for this ExecNode.
   void AddCodegenDisabledMessage(RuntimeState* state);
 
@@ -275,6 +279,9 @@ class ExecNode {
   /// Returns true if this node is inside the right-hand side plan tree of a SubplanNode.
   /// Valid to call in or after Prepare().
   bool IsInSubplan() const { return containing_subplan_ != NULL; }
+
+  /// If true, codegen should be disabled for this exec node.
+  const bool disable_codegen_;
 
   /// Create a single exec node derived from thrift node; place exec node in 'pool'.
   static Status CreateNode(ObjectPool* pool, const TPlanNode& tnode,

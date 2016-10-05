@@ -51,8 +51,9 @@ Status SortNode::Prepare(RuntimeState* state) {
       state, child(0)->row_desc(), row_descriptor_, expr_mem_tracker()));
   AddExprCtxsToFree(sort_exec_exprs_);
   less_than_.reset(new TupleRowComparator(sort_exec_exprs_, is_asc_order_, nulls_first_));
-  sorter_.reset(new Sorter(*less_than_.get(), sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
-      &row_descriptor_, mem_tracker(), runtime_profile(), state));
+  sorter_.reset(
+      new Sorter(*less_than_.get(), sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
+          &row_descriptor_, mem_tracker(), runtime_profile(), state));
   RETURN_IF_ERROR(sorter_->Init());
   AddCodegenDisabledMessage(state);
   return Status::OK();
@@ -60,9 +61,11 @@ Status SortNode::Prepare(RuntimeState* state) {
 
 void SortNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+
   Status codegen_status = less_than_->Codegen(state);
   runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
-  ExecNode::Codegen(state);
 }
 
 Status SortNode::Open(RuntimeState* state) {
