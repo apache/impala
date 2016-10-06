@@ -436,13 +436,21 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
     return Status::OK();
   }
 
-  // Cached read succeeded.
+  // Cached read returned a buffer, verify we read the correct amount of data.
   void* buffer = const_cast<void*>(hadoopRzBufferGet(cached_buffer_));
   int32_t bytes_read = hadoopRzBufferLength(cached_buffer_);
-  // For now, entire the entire block is cached or none of it.
-  // TODO: if HDFS ever changes this, we'll have to handle the case where half
-  // the block is cached.
-  DCHECK_EQ(bytes_read, len());
+  // A partial read can happen when files are truncated.
+  // TODO: If HDFS ever supports partially cached blocks, we'll have to distinguish
+  // between errors and partially cached blocks here.
+  if (bytes_read < len()) {
+    stringstream ss;
+    VLOG_QUERY << "Error reading file from HDFS cache: " << file_ << ". Expected "
+      << len() << " bytes, but read " << bytes_read << ". Switching to disk read path.";
+    // Close the scan range. 'read_succeeded' is still false, so the caller will fall back
+    // to non-cached read of this scan range.
+    Close();
+    return Status::OK();
+  }
 
   // Create a single buffer desc for the entire scan range and enqueue that.
   // 'mem_tracker' is NULL because the memory is owned by the HDFS java client,
