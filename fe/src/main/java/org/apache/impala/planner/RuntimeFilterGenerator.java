@@ -334,7 +334,9 @@ public final class RuntimeFilterGenerator {
      * child.
      */
     public double getSelectivity() {
-      if (src_.getCardinality() == -1 || src_.getChild(0).getCardinality() == -1) {
+      if (src_.getCardinality() == -1
+          || src_.getChild(0).getCardinality() == -1
+          || src_.getChild(0).getCardinality() == 0) {
         return -1;
       }
       return src_.getCardinality() / (double) src_.getChild(0).getCardinality();
@@ -415,8 +417,7 @@ public final class RuntimeFilterGenerator {
                 a.getSelectivity() == -1 ? Double.MAX_VALUE : a.getSelectivity();
             double bSelectivity =
                 b.getSelectivity() == -1 ? Double.MAX_VALUE : b.getSelectivity();
-            double diff = aSelectivity - bSelectivity;
-            return (diff < 0.0 ? -1 : (diff > 0.0 ? 1 : 0));
+            return Double.compare(aSelectivity, bSelectivity);
           }
         }
       );

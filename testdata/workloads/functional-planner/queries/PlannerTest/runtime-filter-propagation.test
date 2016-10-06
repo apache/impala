@@ -1118,3 +1118,201 @@ where t1.month is not null
    partitions=11/11 files=11 size=814.73KB
    runtime filters: RF000 -> coalesce(int_col, 384), RF001 -> int_col
 ====
+# IMPALA-4076: Test pruning the least selective runtime filters to obey
+# MAX_NUM_RUNTIME_FILTERS in the presence of zero-cardinality plan nodes. This query was
+# constructed by hand to trigger the issue with the sort compare method violating the
+# comparison contract. In order to trigger the issue, the number of runtime filters has to
+# be greater than 32 and they have to be in a certain initial order.
+with big_six as (
+  select straight_join a.id
+  from functional.alltypes a
+    inner join functional.alltypes b on a.id = b.id
+      and a.bigint_col = b.bigint_col
+      and a.bool_col = b.bool_col
+      and a.int_col = b.int_col
+      and a.smallint_col = b.smallint_col
+      and a.tinyint_col = b.tinyint_col
+), small_two as (
+  select straight_join a.bool_col
+  from functional.alltypes a
+    inner join functional.alltypestiny b on a.id = b.id
+      and a.bool_col = b.bool_col
+), big_eight as (
+  select straight_join a.id
+  from functional.alltypes a
+    inner join functional.alltypes b on a.id = b.id
+      and a.bool_col = b.bool_col
+      and a.date_string_col = b.date_string_col
+      and a.double_col = b.double_col
+      and a.smallint_col = b.smallint_col
+      and a.string_col = b.string_col
+      and a.timestamp_col = b.timestamp_col
+      and a.tinyint_col = b.tinyint_col
+), small_four as (
+  select straight_join a.bool_col
+  from functional.alltypes a
+    inner join functional.alltypestiny b on a.id = b.id
+      and a.bigint_col = b.bigint_col
+      and a.bool_col = b.bool_col
+      and a.double_col = b.double_col
+      and a.float_col = b.float_col
+      and a.int_col = b.int_col
+      and a.smallint_col = b.smallint_col
+      and a.tinyint_col = b.tinyint_col
+), big_one as (
+  select straight_join a.id
+  from functional.alltypes a
+    inner join functional.alltypes b on a.id = b.id
+), nan as (
+  with zero_card as (
+   select straight_join b.id, b.int_col
+   from (values(1 id) limit 0) a
+     inner join functional.alltypes b on a.id = b.id
+  )
+  select straight_join 1
+  from zero_card z
+    inner join functional.alltypestiny x on x.id = z.id
+), small_six as (
+  select straight_join a.bool_col
+  from functional.alltypes a
+    inner join functional.alltypestiny b on a.id = b.id
+      and a.bigint_col = b.bigint_col
+      and a.bool_col = b.bool_col
+      and a.int_col = b.int_col
+      and a.smallint_col = b.smallint_col
+      and a.tinyint_col = b.tinyint_col
+), big_three as (
+  select straight_join a.id
+  from functional.alltypes a
+    inner join functional.alltypes b on a.id = b.id
+      and a.bool_col = b.bool_col
+      and a.tinyint_col = b.tinyint_col
+), small_four_2 as (
+  select straight_join a.bool_col
+  from functional.alltypes a
+    inner join functional.alltypestiny b on a.id = b.id
+      and a.bigint_col = b.bigint_col
+      and a.bool_col = b.bool_col
+      and a.double_col = b.double_col
+      and a.float_col = b.float_col
+      and a.int_col = b.int_col
+      and a.smallint_col = b.smallint_col
+      and a.tinyint_col = b.tinyint_col
+)
+select straight_join 1
+from big_six
+  inner join small_two
+  inner join big_eight
+  inner join small_four
+  inner join big_one
+  inner join nan
+  inner join small_six
+  inner join big_three
+  inner join small_four_2
+---- PLAN
+36:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--28:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.id, a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.double_col = b.double_col, a.float_col = b.float_col, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
+|  |
+|  |--27:SCAN HDFS [functional.alltypestiny b]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  26:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|
+35:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--25:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.id, a.bool_col = b.bool_col, a.tinyint_col = b.tinyint_col
+|  |
+|  |--24:SCAN HDFS [functional.alltypes b]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  23:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|
+34:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--22:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.id, a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
+|  |
+|  |--21:SCAN HDFS [functional.alltypestiny b]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  20:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|
+33:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--19:HASH JOIN [INNER JOIN]
+|  |  hash predicates: b.id = x.id
+|  |
+|  |--18:SCAN HDFS [functional.alltypestiny x]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  17:HASH JOIN [INNER JOIN]
+|  |  hash predicates: id = b.id
+|  |
+|  |--16:SCAN HDFS [functional.alltypes b]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  15:EMPTYSET
+|
+32:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--14:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.id
+|  |
+|  |--13:SCAN HDFS [functional.alltypes b]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  12:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|
+31:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--11:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.id, a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.double_col = b.double_col, a.float_col = b.float_col, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
+|  |  runtime filters: RF017 <- b.bigint_col, RF016 <- b.id, RF019 <- b.double_col, RF018 <- b.bool_col, RF021 <- b.int_col, RF020 <- b.float_col, RF023 <- b.tinyint_col, RF022 <- b.smallint_col
+|  |
+|  |--10:SCAN HDFS [functional.alltypestiny b]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  09:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF017 -> a.bigint_col, RF016 -> a.id, RF019 -> a.double_col, RF018 -> a.bool_col, RF021 -> a.int_col, RF020 -> a.float_col, RF023 -> a.tinyint_col, RF022 -> a.smallint_col
+|
+30:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--08:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.id, a.bool_col = b.bool_col, a.double_col = b.double_col, a.smallint_col = b.smallint_col, a.timestamp_col = b.timestamp_col, a.tinyint_col = b.tinyint_col, a.string_col = b.string_col, a.date_string_col = b.date_string_col
+|  |
+|  |--07:SCAN HDFS [functional.alltypes b]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  06:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|
+29:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.id, a.bool_col = b.bool_col
+|  |  runtime filters: RF006 <- b.id, RF007 <- b.bool_col
+|  |
+|  |--04:SCAN HDFS [functional.alltypestiny b]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  03:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF006 -> a.id, RF007 -> a.bool_col
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id, a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+====
