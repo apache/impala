@@ -73,7 +73,7 @@ class IsNullExpr : public Expr {
   virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow* row);
   virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow* row);
 
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
   virtual std::string DebugString() const { return Expr::DebugString("IsNullExpr"); }
 
  protected:
@@ -94,7 +94,7 @@ class NullIfExpr : public Expr {
   virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow* row);
   virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow* row);
 
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
   virtual std::string DebugString() const { return Expr::DebugString("NullIfExpr"); }
 
  protected:
@@ -115,7 +115,7 @@ class IfExpr : public Expr {
   virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow* row);
   virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow* row);
 
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
   virtual std::string DebugString() const { return Expr::DebugString("IfExpr"); }
 
  protected:
@@ -141,7 +141,7 @@ class CoalesceExpr : public Expr {
  protected:
   friend class Expr;
   CoalesceExpr(const TExprNode& node) : Expr(node) { }
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
 };
 
 }

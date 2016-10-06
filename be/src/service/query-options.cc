@@ -304,6 +304,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_schedule_random_replica(
             iequals(value, "true") || iequals(value, "1"));
         break;
+      // TODO: remove this query option (IMPALA-4319).
       case TImpalaQueryOptions::SCAN_NODE_CODEGEN_THRESHOLD:
         query_options->__set_scan_node_codegen_threshold(atol(value.c_str()));
         break;

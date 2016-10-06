@@ -155,7 +155,7 @@ string SlotRef::DebugString() const {
 //
 // TODO: We could generate a typed struct (and not a char*) for Tuple for llvm.  We know
 // the types from the TupleDesc.  It will likey make this code simpler to reason about.
-Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
+Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
   if (type_.type == TYPE_CHAR) {
     *fn = NULL;
     return Status("Codegen for Char not supported.");
@@ -166,9 +166,6 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
-
   // SlotRefs are based on the slot_id and tuple_idx.  Combine them to make a
   // query-wide unique id. We also need to combine whether the tuple is nullable. For
   // example, in an outer join the scan node could have the same tuple id and slot id

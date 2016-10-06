@@ -255,16 +255,13 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
 // Both the null and not null branch into the continue block.  The continue block
 // becomes the start of the next block for codegen (either the next expr or just the
 // end of the function).
-Function* OldHashTable::CodegenEvalTupleRow(RuntimeState* state, bool build) {
+Function* OldHashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
   // TODO: CodegenAssignNullValue() can't handle TYPE_TIMESTAMP or TYPE_DECIMAL yet
   const vector<ExprContext*>& ctxs = build ? build_expr_ctxs_ : probe_expr_ctxs_;
   for (int i = 0; i < ctxs.size(); ++i) {
     PrimitiveType type = ctxs[i]->root()->type().type;
     if (type == TYPE_TIMESTAMP || type == TYPE_DECIMAL || type == TYPE_CHAR) return NULL;
   }
-
-  LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
 
   // Get types to generate function prototype
   Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
@@ -307,12 +304,10 @@ Function* OldHashTable::CodegenEvalTupleRow(RuntimeState* state, bool build) {
 
       // Call expr
       Function* expr_fn;
-      Status status = ctxs[i]->root()->GetCodegendComputeFn(state, &expr_fn);
+      Status status = ctxs[i]->root()->GetCodegendComputeFn(codegen, &expr_fn);
       if (!status.ok()) {
-        stringstream ss;
-        ss << "Problem with codegen: " << status.GetDetail();
-        state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
         fn->eraseFromParent(); // deletes function
+        VLOG_QUERY << "Failed to codegen EvalTupleRow(): " << status.GetDetail();
         return NULL;
       }
 
@@ -352,10 +347,8 @@ Function* OldHashTable::CodegenEvalTupleRow(RuntimeState* state, bool build) {
     }
   }
   builder.CreateRet(has_null);
-
   return codegen->FinalizeFunction(fn);
 }
-
 
 uint32_t OldHashTable::HashVariableLenRow() {
   uint32_t hash = initial_seed_;
@@ -410,14 +403,11 @@ uint32_t OldHashTable::HashVariableLenRow() {
 //   ret i32 %7
 // }
 // TODO: can this be cross-compiled?
-Function* OldHashTable::CodegenHashCurrentRow(RuntimeState* state) {
+Function* OldHashTable::CodegenHashCurrentRow(LlvmCodeGen* codegen) {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     // Disable codegen for CHAR
     if (build_expr_ctxs_[i]->root()->type().type == TYPE_CHAR) return NULL;
   }
-
-  LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
 
   // Get types to generate function prototype
   Type* this_type = codegen->GetType(OldHashTable::LLVM_CLASS_NAME);
@@ -592,14 +582,12 @@ bool OldHashTable::Equals(TupleRow* build_row) {
 // continue3:                                        ; preds = %not_null2, %null1
 //   ret i1 true
 // }
-Function* OldHashTable::CodegenEquals(RuntimeState* state) {
+Function* OldHashTable::CodegenEquals(LlvmCodeGen* codegen) {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     // Disable codegen for CHAR
     if (build_expr_ctxs_[i]->root()->type().type == TYPE_CHAR) return NULL;
   }
 
-  LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
   // Get types to generate function prototype
   Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
   DCHECK(tuple_row_type != NULL);
@@ -629,12 +617,11 @@ Function* OldHashTable::CodegenEquals(RuntimeState* state) {
 
       // call GetValue on build_exprs[i]
       Function* expr_fn;
-      Status status = build_expr_ctxs_[i]->root()->GetCodegendComputeFn(state, &expr_fn);
+      Status status =
+          build_expr_ctxs_[i]->root()->GetCodegendComputeFn(codegen, &expr_fn);
       if (!status.ok()) {
-        stringstream ss;
-        ss << "Problem with codegen: " << status.GetDetail();
-        state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
         fn->eraseFromParent(); // deletes function
+        VLOG_QUERY << "Failed to codegen Equals(): " << status.GetDetail();
         return NULL;
       }
 
@@ -690,7 +677,6 @@ Function* OldHashTable::CodegenEquals(RuntimeState* state) {
   } else {
     builder.CreateRet(codegen->true_value());
   }
-
   return codegen->FinalizeFunction(fn);
 }
 

@@ -91,15 +91,13 @@ CollectionVal NullLiteral::GetCollectionVal(ExprContext* context, const TupleRow
 // entry:
 //   ret { i8, i64 } { i8 1, i64 0 }
 // }
-Status NullLiteral::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
+Status NullLiteral::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK();
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   Value* args[2];
   *fn = CreateIrFunctionPrototype(codegen, "NullLiteral", &args);
   BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);

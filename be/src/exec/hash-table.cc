@@ -684,7 +684,7 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
 // Both the null and not null branch into the continue block.  The continue block
 // becomes the start of the next block for codegen (either the next expr or just the
 // end of the function).
-Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** fn) {
+Status HashTableCtx::CodegenEvalRow(LlvmCodeGen* codegen, bool build, Function** fn) {
   // TODO: CodegenAssignNullValue() can't handle TYPE_TIMESTAMP or TYPE_DECIMAL yet
   const vector<ExprContext*>& ctxs = build ? build_expr_ctxs_ : probe_expr_ctxs_;
   for (int i = 0; i < ctxs.size(); ++i) {
@@ -694,9 +694,6 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
           TypeToString(type)));
     }
   }
-
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
 
   // Get types to generate function prototype
   Type* this_type = codegen->GetType(HashTableCtx::LLVM_CLASS_NAME);
@@ -746,7 +743,7 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
 
     // Call expr
     Function* expr_fn;
-    Status status = ctxs[i]->root()->GetCodegendComputeFn(state, &expr_fn);
+    Status status = ctxs[i]->root()->GetCodegendComputeFn(codegen, &expr_fn);
     if (!status.ok()) {
       (*fn)->eraseFromParent(); // deletes function
       *fn = NULL;
@@ -837,16 +834,13 @@ Status HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build, Function** 
 //   %hash_phi = phi i32 [ %string_hash, %not_null ], [ %str_null, %null ]
 //   ret i32 %hash_phi
 // }
-Status HashTableCtx::CodegenHashRow(RuntimeState* state, bool use_murmur, Function** fn) {
+Status HashTableCtx::CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur, Function** fn) {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     // Disable codegen for CHAR
     if (build_expr_ctxs_[i]->root()->type().type == TYPE_CHAR) {
       return Status("HashTableCtx::CodegenHashRow(): CHAR NYI");
     }
   }
-
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
 
   // Get types to generate function prototype
   Type* this_type = codegen->GetType(HashTableCtx::LLVM_CLASS_NAME);
@@ -1044,7 +1038,7 @@ Status HashTableCtx::CodegenHashRow(RuntimeState* state, bool use_murmur, Functi
 //        %"struct.impala_udf::StringVal"* %8, %"struct.impala::StringValue"* %row_val8)
 //   br i1 %cmp_raw10, label %continue3, label %false_block
 // }
-Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality,
+Status HashTableCtx::CodegenEquals(LlvmCodeGen* codegen, bool force_null_equality,
     Function** fn) {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     // Disable codegen for CHAR
@@ -1053,8 +1047,6 @@ Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality
     }
   }
 
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   // Get types to generate function prototype
   Type* this_type = codegen->GetType(HashTableCtx::LLVM_CLASS_NAME);
   DCHECK(this_type != NULL);
@@ -1091,7 +1083,7 @@ Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality
 
     // call GetValue on build_exprs[i]
     Function* expr_fn;
-    Status status = build_expr_ctxs_[i]->root()->GetCodegendComputeFn(state, &expr_fn);
+    Status status = build_expr_ctxs_[i]->root()->GetCodegendComputeFn(codegen, &expr_fn);
     if (!status.ok()) {
       (*fn)->eraseFromParent(); // deletes function
       *fn = NULL;
@@ -1164,11 +1156,9 @@ Status HashTableCtx::CodegenEquals(RuntimeState* state, bool force_null_equality
   return Status::OK();
 }
 
-Status HashTableCtx::ReplaceHashTableConstants(RuntimeState* state,
+Status HashTableCtx::ReplaceHashTableConstants(LlvmCodeGen* codegen,
     bool stores_duplicates, int num_build_tuples, Function* fn,
     HashTableReplacedConstants* replacement_counts) {
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
 
   replacement_counts->stores_nulls = codegen->ReplaceCallSitesWithBoolConst(
       fn, stores_nulls(), "stores_nulls");

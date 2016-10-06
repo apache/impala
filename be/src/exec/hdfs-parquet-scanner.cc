@@ -620,13 +620,9 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
 
 Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ExprContext*>& conjunct_ctxs, Function** process_scratch_batch_fn) {
+  DCHECK(node->runtime_state()->codegen_enabled());
   *process_scratch_batch_fn = NULL;
-  if (!node->runtime_state()->codegen_enabled()) {
-    return Status("Disabled by query option.");
-  }
-
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(node->runtime_state()->GetCodegen(&codegen));
+  LlvmCodeGen* codegen = node->runtime_state()->codegen();
   DCHECK(codegen != NULL);
   SCOPED_TIMER(codegen->codegen_timer());
 
@@ -634,7 +630,7 @@ Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
   DCHECK(fn != NULL);
 
   Function* eval_conjuncts_fn;
-  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(node->runtime_state(), conjunct_ctxs,
+  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, conjunct_ctxs,
       &eval_conjuncts_fn));
   DCHECK(eval_conjuncts_fn != NULL);
 

@@ -60,7 +60,7 @@ class ScalarFnCall: public Expr {
                          ExprContext* context);
   virtual Status Open(RuntimeState* state, ExprContext* context,
       FunctionContext::FunctionStateScope scope = FunctionContext::FRAGMENT_LOCAL);
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
   virtual void Close(RuntimeState* state, ExprContext* context,
       FunctionContext::FunctionStateScope scope = FunctionContext::FRAGMENT_LOCAL);
 
@@ -107,7 +107,7 @@ class ScalarFnCall: public Expr {
   }
 
   /// Loads the native or IR function from HDFS and puts the result in *udf.
-  Status GetUdf(RuntimeState* state, llvm::Function** udf);
+  Status GetUdf(LlvmCodeGen* codegen, llvm::Function** udf);
 
   /// Loads the native or IR function 'symbol' from HDFS and puts the result in *fn.
   /// If the function is loaded from an IR module, it cannot be called until the module

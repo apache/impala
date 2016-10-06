@@ -42,9 +42,9 @@ Status IsNotEmptyPredicate::Prepare(RuntimeState* state,
   return Status::OK();
 }
 
-Status IsNotEmptyPredicate::GetCodegendComputeFn(RuntimeState* state,
+Status IsNotEmptyPredicate::GetCodegendComputeFn(LlvmCodeGen* codegen,
     llvm::Function** fn) {
-  return GetCodegendComputeFnWrapper(state, fn);
+  return GetCodegendComputeFnWrapper(codegen, fn);
 }
 
 string IsNotEmptyPredicate::DebugString() const {

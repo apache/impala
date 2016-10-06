@@ -177,20 +177,20 @@ class HashTableCtx {
   /// Codegen for evaluating a tuple row. Codegen'd function matches the signature
   /// for EvalBuildRow and EvalTupleRow.
   /// If build_row is true, the codegen uses the build_exprs, otherwise the probe_exprs.
-  Status CodegenEvalRow(RuntimeState* state, bool build_row, llvm::Function** fn);
+  Status CodegenEvalRow(LlvmCodeGen* codegen, bool build_row, llvm::Function** fn);
 
   /// Codegen for evaluating a TupleRow and comparing equality. Function signature
   /// matches HashTable::Equals(). 'force_null_equality' is true if the generated
   /// equality function should treat all NULLs as equal. See the template parameter
   /// to HashTable::Equals().
-  Status CodegenEquals(RuntimeState* state, bool force_null_equality,
+  Status CodegenEquals(LlvmCodeGen* codegen, bool force_null_equality,
       llvm::Function** fn);
 
   /// Codegen for hashing expr values. Function prototype matches HashRow identically.
   /// Unlike HashRow(), the returned function only uses a single hash function, rather
   /// than switching based on level_. If 'use_murmur' is true, murmur hash is used,
   /// otherwise CRC is used if the hardware supports it (see hash-util.h).
-  Status CodegenHashRow(RuntimeState* state, bool use_murmur, llvm::Function** fn);
+  Status CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur, llvm::Function** fn);
 
   /// Struct that returns the number of constants replaced by ReplaceConstants().
   struct HashTableReplacedConstants {
@@ -204,7 +204,7 @@ class HashTableCtx {
   /// Replace hash table parameters with constants in 'fn'. Updates 'replacement_counts'
   /// with the number of replacements made. 'num_build_tuples' and 'stores_duplicates'
   /// correspond to HashTable parameters with the same name.
-  Status ReplaceHashTableConstants(RuntimeState* state, bool stores_duplicates,
+  Status ReplaceHashTableConstants(LlvmCodeGen* codegen, bool stores_duplicates,
       int num_build_tuples, llvm::Function* fn,
       HashTableReplacedConstants* replacement_counts);
 

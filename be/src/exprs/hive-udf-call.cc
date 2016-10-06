@@ -277,8 +277,8 @@ void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
   Expr::Close(state, ctx, scope);
 }
 
-Status HiveUdfCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
-  return GetCodegendComputeFnWrapper(state, fn);
+Status HiveUdfCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
+  return GetCodegendComputeFnWrapper(codegen, fn);
 }
 
 string HiveUdfCall::DebugString() const {

@@ -54,6 +54,7 @@ class HashJoinNode : public BlockingJoinNode {
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
+  virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Reset(RuntimeState* state);
@@ -63,7 +64,6 @@ class HashJoinNode : public BlockingJoinNode {
 
  protected:
   virtual void AddToDebugString(int indentation_level, std::stringstream* out) const;
-
   virtual Status ProcessBuildInput(RuntimeState* state);
 
  private:
@@ -144,13 +144,13 @@ class HashJoinNode : public BlockingJoinNode {
   /// hash_fn is the codegen'd function for computing hashes over tuple rows in the
   /// hash table.
   /// Returns NULL if codegen was not possible.
-  llvm::Function* CodegenProcessBuildBatch(RuntimeState* state, llvm::Function* hash_fn);
+  llvm::Function* CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn);
 
   /// Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
   /// hash_fn is the codegen'd function for computing hashes over tuple rows in the
   /// hash table.
   /// Returns NULL if codegen was not possible.
-  llvm::Function* CodegenProcessProbeBatch(RuntimeState* state, llvm::Function* hash_fn);
+  llvm::Function* CodegenProcessProbeBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn);
 };
 
 }

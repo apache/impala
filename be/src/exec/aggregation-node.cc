@@ -165,25 +165,29 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     hash_tbl_->Insert(singleton_intermediate_tuple_);
     output_iterator_ = hash_tbl_->Begin();
   }
+  if (!state->codegen_enabled()) {
+    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
+  }
+  return Status::OK();
+}
 
+void AggregationNode::Codegen(RuntimeState* state) {
+  DCHECK(state->codegen_enabled());
   bool codegen_enabled = false;
-  if (state->codegen_enabled()) {
-    LlvmCodeGen* codegen;
-    RETURN_IF_ERROR(state->GetCodegen(&codegen));
-    Function* update_tuple_fn = CodegenUpdateTuple(state);
-    if (update_tuple_fn != NULL) {
-      codegen_process_row_batch_fn_ =
-          CodegenProcessRowBatch(state, update_tuple_fn);
-      if (codegen_process_row_batch_fn_ != NULL) {
-        // Update to using codegen'd process row batch.
-        codegen->AddFunctionToJit(codegen_process_row_batch_fn_,
-            reinterpret_cast<void**>(&process_row_batch_fn_));
-        codegen_enabled = true;
-      }
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != NULL);
+  Function* update_tuple_fn = CodegenUpdateTuple(codegen);
+  if (update_tuple_fn != NULL) {
+    codegen_process_row_batch_fn_ = CodegenProcessRowBatch(codegen, update_tuple_fn);
+    if (codegen_process_row_batch_fn_ != NULL) {
+      // Update to using codegen'd process row batch.
+      codegen->AddFunctionToJit(codegen_process_row_batch_fn_,
+          reinterpret_cast<void**>(&process_row_batch_fn_));
+      codegen_enabled = true;
     }
   }
   runtime_profile()->AddCodegenMsg(codegen_enabled);
-  return Status::OK();
+  ExecNode::Codegen(state);
 }
 
 Status AggregationNode::Open(RuntimeState* state) {
@@ -525,11 +529,8 @@ IRFunction::Type GetHllUpdateFunction2(const ColumnType& type) {
 // ret:                                              ; preds = %src_not_null, %entry
 //   ret void
 // }
-llvm::Function* AggregationNode::CodegenUpdateSlot(
-    RuntimeState* state, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc) {
-  LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
-
+llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
+    AggFnEvaluator* evaluator, SlotDescriptor* slot_desc) {
   // TODO: Fix this DCHECK and Init() once CodegenUpdateSlot() can handle AggFnEvaluator
   // with multiple input expressions (e.g. group_concat).
   DCHECK_EQ(evaluator->input_expr_ctxs().size(), 1);
@@ -538,7 +539,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
   // TODO: implement timestamp
   if (input_expr->type().type == TYPE_TIMESTAMP) return NULL;
   Function* agg_expr_fn;
-  Status status = input_expr->GetCodegendComputeFn(state, &agg_expr_fn);
+  Status status = input_expr->GetCodegendComputeFn(codegen, &agg_expr_fn);
   if (!status.ok()) {
     VLOG_QUERY << "Could not codegen UpdateSlot(): " << status.GetDetail();
     return NULL;
@@ -715,9 +716,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
 //                           %"class.impala::TupleRow"* %tuple_row)
 //   ret void
 // }
-Function* AggregationNode::CodegenUpdateTuple(RuntimeState* state) {
-  LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
+Function* AggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen) {
   SCOPED_TIMER(codegen->codegen_timer());
 
   int j = probe_expr_ctxs_.size();
@@ -805,7 +804,7 @@ Function* AggregationNode::CodegenUpdateTuple(RuntimeState* state) {
       Value* count_inc = builder.CreateAdd(slot_loaded, const_one, "count_star_inc");
       builder.CreateStore(count_inc, slot_ptr);
     } else {
-      Function* update_slot_fn = CodegenUpdateSlot(state, evaluator, slot_desc);
+      Function* update_slot_fn = CodegenUpdateSlot(codegen, evaluator, slot_desc);
       if (update_slot_fn == NULL) return NULL;
       // Call GetAggFnCtx() to get the function context.
       Value* get_fn_ctx_args[] = { this_arg, codegen->GetIntConstant(TYPE_INT, i) };
@@ -824,10 +823,8 @@ Function* AggregationNode::CodegenUpdateTuple(RuntimeState* state) {
   return codegen->FinalizeFunction(fn);
 }
 
-Function* AggregationNode::CodegenProcessRowBatch(
-    RuntimeState* state, Function* update_tuple_fn) {
-  LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
+Function* AggregationNode::CodegenProcessRowBatch(LlvmCodeGen* codegen,
+    Function* update_tuple_fn) {
   SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(update_tuple_fn != NULL);
 
@@ -847,19 +844,19 @@ Function* AggregationNode::CodegenProcessRowBatch(
     // Aggregation w/o grouping does not use a hash table.
 
     // Codegen for hash
-    Function* hash_fn = hash_tbl_->CodegenHashCurrentRow(state);
+    Function* hash_fn = hash_tbl_->CodegenHashCurrentRow(codegen);
     if (hash_fn == NULL) return NULL;
 
     // Codegen HashTable::Equals
-    Function* equals_fn = hash_tbl_->CodegenEquals(state);
+    Function* equals_fn = hash_tbl_->CodegenEquals(codegen);
     if (equals_fn == NULL) return NULL;
 
     // Codegen for evaluating build rows
-    Function* eval_build_row_fn = hash_tbl_->CodegenEvalTupleRow(state, true);
+    Function* eval_build_row_fn = hash_tbl_->CodegenEvalTupleRow(codegen, true);
     if (eval_build_row_fn == NULL) return NULL;
 
     // Codegen for evaluating probe rows
-    Function* eval_probe_row_fn = hash_tbl_->CodegenEvalTupleRow(state, false);
+    Function* eval_probe_row_fn = hash_tbl_->CodegenEvalTupleRow(codegen, false);
     if (eval_probe_row_fn == NULL) return NULL;
 
     // Replace call sites

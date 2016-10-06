@@ -167,7 +167,7 @@ class Tuple {
   /// separate functions for the non-NULL and NULL cases, i.e., the 'pool' argument of the
   /// generated function is ignored. There are two different MaterializeExprs symbols to
   /// differentiate these cases when we replace the function calls during codegen.
-  static Status CodegenMaterializeExprs(RuntimeState* state, bool collect_string_vals,
+  static Status CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_vals,
       const TupleDescriptor& desc, const vector<ExprContext*>& materialize_expr_ctxs,
       MemPool* pool, llvm::Function** fn);
 

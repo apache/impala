@@ -34,7 +34,7 @@ class CompoundPredicate: public Predicate {
  protected:
   CompoundPredicate(const TExprNode& node) : Predicate(node) { }
 
-  Status CodegenComputeFn(bool and_fn, RuntimeState* state, llvm::Function** fn);
+  Status CodegenComputeFn(bool and_fn, LlvmCodeGen* codegen, llvm::Function** fn);
 };
 
 /// Expr for evaluating and (&&) operators
@@ -42,8 +42,8 @@ class AndPredicate: public CompoundPredicate {
  public:
   virtual impala_udf::BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
 
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
-    return CompoundPredicate::CodegenComputeFn(true, state, fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
+    return CompoundPredicate::CodegenComputeFn(true, codegen, fn);
   }
 
  protected:
@@ -61,8 +61,8 @@ class OrPredicate: public CompoundPredicate {
  public:
   virtual impala_udf::BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
 
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
-    return CompoundPredicate::CodegenComputeFn(false, state, fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
+    return CompoundPredicate::CodegenComputeFn(false, codegen, fn);
   }
 
  protected:

@@ -138,8 +138,9 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
   partition_build_rows_timer_ = ADD_TIMER(profile(), "BuildRowsPartitionTime");
   build_hash_table_timer_ = ADD_TIMER(profile(), "HashTablesBuildTime");
   repartition_timer_ = ADD_TIMER(profile(), "RepartitionTime");
-
-  Codegen(state);
+  if (!state->codegen_enabled()) {
+    profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
+  }
   return Status::OK();
 }
 
@@ -704,39 +705,34 @@ not_built:
   return Status::OK();
 }
 
-void PhjBuilder::Codegen(RuntimeState* state) {
-  bool build_codegen_enabled = false;
-  bool insert_codegen_enabled = false;
-  Status build_codegen_status, insert_codegen_status;
-  if (state->codegen_enabled()) {
-    Status codegen_status;
-    // Codegen for hashing rows with the builder's hash table context.
-    Function* hash_fn;
-    codegen_status = ht_ctx_->CodegenHashRow(runtime_state_, false, &hash_fn);
-    Function* murmur_hash_fn;
-    codegen_status.MergeStatus(
-        ht_ctx_->CodegenHashRow(runtime_state_, true, &murmur_hash_fn));
+void PhjBuilder::Codegen(LlvmCodeGen* codegen) {
+  Status build_codegen_status;
+  Status insert_codegen_status;
+  Status codegen_status;
 
-    // Codegen for evaluating build rows
-    Function* eval_build_row_fn;
-    codegen_status.MergeStatus(
-        ht_ctx_->CodegenEvalRow(runtime_state_, true, &eval_build_row_fn));
+  // Codegen for hashing rows with the builder's hash table context.
+  Function* hash_fn;
+  codegen_status = ht_ctx_->CodegenHashRow(codegen, false, &hash_fn);
+  Function* murmur_hash_fn;
+  codegen_status.MergeStatus(ht_ctx_->CodegenHashRow(codegen, true, &murmur_hash_fn));
 
-    if (codegen_status.ok()) {
-      build_codegen_status =
-          CodegenProcessBuildBatch(hash_fn, murmur_hash_fn, eval_build_row_fn);
-      insert_codegen_status =
-          CodegenInsertBatch(hash_fn, murmur_hash_fn, eval_build_row_fn);
-    } else {
-      build_codegen_status = codegen_status;
-      insert_codegen_status = codegen_status;
-    }
-    build_codegen_enabled = build_codegen_status.ok();
-    insert_codegen_enabled = insert_codegen_status.ok();
+  // Codegen for evaluating build rows
+  Function* eval_build_row_fn;
+  codegen_status.MergeStatus(ht_ctx_->CodegenEvalRow(codegen, true, &eval_build_row_fn));
+
+  if (codegen_status.ok()) {
+    TPrefetchMode::type prefetch_mode = runtime_state_->query_options().prefetch_mode;
+    build_codegen_status =
+        CodegenProcessBuildBatch(codegen, hash_fn, murmur_hash_fn, eval_build_row_fn);
+    insert_codegen_status = CodegenInsertBatch(codegen, hash_fn, murmur_hash_fn,
+        eval_build_row_fn, prefetch_mode);
+  } else {
+    build_codegen_status = codegen_status;
+    insert_codegen_status = codegen_status;
   }
-  profile()->AddCodegenMsg(build_codegen_enabled, build_codegen_status, "Build Side");
-  profile()->AddCodegenMsg(
-      insert_codegen_enabled, insert_codegen_status, "Hash Table Construction");
+  profile()->AddCodegenMsg(build_codegen_status.ok(), build_codegen_status, "Build Side");
+  profile()->AddCodegenMsg(insert_codegen_status.ok(), insert_codegen_status,
+      "Hash Table Construction");
 }
 
 string PhjBuilder::DebugString() const {
@@ -763,11 +759,8 @@ string PhjBuilder::DebugString() const {
   return ss.str();
 }
 
-Status PhjBuilder::CodegenProcessBuildBatch(
+Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
     Function* hash_fn, Function* murmur_hash_fn, Function* eval_row_fn) {
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(runtime_state_->GetCodegen(&codegen));
-
   Function* process_build_batch_fn =
       codegen->GetFunction(IRFunction::PHJ_PROCESS_BUILD_BATCH, true);
   DCHECK(process_build_batch_fn != NULL);
@@ -781,7 +774,7 @@ Status PhjBuilder::CodegenProcessBuildBatch(
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = true;
   const int num_build_tuples = row_desc_.tuple_descriptors().size();
-  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(runtime_state_, stores_duplicates,
+  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(codegen, stores_duplicates,
       num_build_tuples, process_build_batch_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
   DCHECK_EQ(replaced_constants.finds_some_nulls, 0);
@@ -838,18 +831,14 @@ Status PhjBuilder::CodegenProcessBuildBatch(
   return Status::OK();
 }
 
-Status PhjBuilder::CodegenInsertBatch(
-    Function* hash_fn, Function* murmur_hash_fn, Function* eval_row_fn) {
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(runtime_state_->GetCodegen(&codegen));
-
+Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, Function* hash_fn,
+    Function* murmur_hash_fn, Function* eval_row_fn, TPrefetchMode::type prefetch_mode) {
   Function* insert_batch_fn = codegen->GetFunction(IRFunction::PHJ_INSERT_BATCH, true);
   Function* build_equals_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEquals(runtime_state_, true, &build_equals_fn));
+  RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, true, &build_equals_fn));
 
   // Replace the parameter 'prefetch_mode' with constant.
   Value* prefetch_mode_arg = codegen->GetArgument(insert_batch_fn, 1);
-  TPrefetchMode::type prefetch_mode = runtime_state_->query_options().prefetch_mode;
   DCHECK_GE(prefetch_mode, TPrefetchMode::NONE);
   DCHECK_LE(prefetch_mode, TPrefetchMode::HT_BUCKET);
   prefetch_mode_arg->replaceAllUsesWith(
@@ -867,7 +856,7 @@ Status PhjBuilder::CodegenInsertBatch(
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = true;
   const int num_build_tuples = row_desc_.tuple_descriptors().size();
-  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(runtime_state_, stores_duplicates,
+  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(codegen, stores_duplicates,
       num_build_tuples, insert_batch_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
   DCHECK_EQ(replaced_constants.finds_some_nulls, 0);

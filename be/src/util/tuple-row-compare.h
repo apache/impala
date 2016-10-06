@@ -127,7 +127,7 @@ class TupleRowComparator {
   /// Codegen Compare(). Returns a non-OK status if codegen is unsuccessful.
   /// TODO: inline this at codegen'd callsites instead of indirectly calling via function
   /// pointer.
-  Status CodegenCompare(RuntimeState* state, llvm::Function** fn);
+  Status CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn);
 
   /// References to ExprContexts managed by SortExecExprs. The lhs ExprContexts must
   /// be created and prepared before the TupleRowCompator is constructed, but the rhs

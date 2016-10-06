@@ -24,12 +24,60 @@ symbol='FnDoesNotExist';
 Could not load binary: $FILESYSTEM_PREFIX/test-warehouse/not-a-real-file.so
 ====
 ---- QUERY
+# This test is run with codegen disabled. Interpretation only handles up to 20 arguments.
+create function if not exists udf_test_errors.twenty_args(int, int, int, int, int, int,
+    int, int, int, int, int, int, int, int, int, int, int, int, int, int) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so'
+symbol='TwentyArgs';
+---- RESULTS
+====
+---- QUERY
+# Verifies that interpretation can support up to 20 arguments
+select udf_test_errors.twenty_args(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20);
+---- TYPES
+INT
+---- RESULTS
+210
+====
+---- QUERY
+# This test is run with codegen disabled. Interpretation only handles up to 20 arguments.
+create function if not exists udf_test_errors.twenty_one_args(int, int, int, int, int, int,
+    int, int, int, int, int, int, int, int, int, int, int, int, int, int, int) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so'
+symbol='TwentyOneArgs';
+---- RESULTS
+====
+---- QUERY
+# Verifies that interpretation fails with more than 20 arguments.
+select udf_test_errors.twenty_one_args(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21);
+---- CATCH
+Cannot interpret native UDF 'twenty_one_args': number of arguments is more than 20. Codegen is needed. Please set DISABLE_CODEGEN to false.
+====
+---- QUERY
+# This test is run with codegen disabled. IR UDF will fail.
+create function if not exists udf_test_errors.nine_args_ir(int, int, int, int, int, int,
+    int, int, int) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/test-udfs.ll'
+symbol='NineArgs';
+---- RESULTS
+====
+---- QUERY
+select udf_test_errors.nine_args_ir(1,2,3,4,5,6,7,8,9);
+---- CATCH
+Cannot interpret LLVM IR UDF 'nine_args_ir': Codegen is needed. Please set DISABLE_CODEGEN to false.
+====
+---- QUERY
 drop database udf_test_errors;
 ---- CATCH
 Cannot drop non-empty database: udf_test_errors
 ====
 ---- QUERY
 drop function udf_test_errors.hive_pi();
+drop function udf_test_errors.twenty_args(int, int, int, int, int, int, int, int,
+    int, int, int, int, int, int, int, int, int, int, int, int);
+drop function udf_test_errors.twenty_one_args(int, int, int, int, int, int, int, int,
+    int, int, int, int, int, int, int, int, int, int, int, int, int);
+drop function udf_test_errors.nine_args_ir(int, int, int, int, int, int, int, int, int);
 drop database udf_test_errors;
 ---- RESULTS
 ====

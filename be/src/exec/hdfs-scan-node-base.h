@@ -119,6 +119,7 @@ class HdfsScanNodeBase : public ScanNode {
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
+  virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);

@@ -158,9 +158,8 @@ class RuntimeState {
   /// Returns true if codegen is enabled for this query.
   bool codegen_enabled() const { return !query_options().disable_codegen; }
 
-  /// Returns true if the codegen object has been created. Note that this may return false
-  /// even when codegen is enabled if nothing has been codegen'd.
-  bool codegen_created() const { return codegen_.get() != NULL; }
+  /// Returns the LlvmCodeGen object for this fragment instance.
+  LlvmCodeGen* codegen() { return codegen_.get(); }
 
   /// Takes ownership of a scan node's reader context and plan fragment executor will call
   /// UnregisterReaderContexts() to unregister it when the fragment is closed. The IO
@@ -169,18 +168,6 @@ class RuntimeState {
 
   /// Unregisters all reader contexts acquired through AcquireReaderContext().
   void UnregisterReaderContexts();
-
-  /// Returns codegen_ in 'codegen'. If 'initialize' is true, codegen_ will be created if
-  /// it has not been initialized by a previous call already. If 'initialize' is false,
-  /// 'codegen' will be set to NULL if codegen_ has not been initialized.
-  Status GetCodegen(LlvmCodeGen** codegen, bool initialize = true);
-
-  /// Returns true if codegen should be used for expr evaluation in this plan fragment.
-  bool ShouldCodegenExpr() { return codegen_expr_; }
-
-  /// Records that this fragment should use codegen for expr evaluation whenever
-  /// applicable if codegen is not disabled.
-  void SetCodegenExpr() { codegen_expr_ = codegen_enabled(); }
 
   BufferedBlockMgr* block_mgr() {
     DCHECK(block_mgr_.get() != NULL);
@@ -267,16 +254,15 @@ class RuntimeState {
   /// execution doesn't continue if the query terminates abnormally.
   Status CheckQueryState();
 
+  /// Create a codegen object accessible via codegen() if it doesn't exist already.
+  Status CreateCodegen();
+
  private:
   /// Allow TestEnv to set block_mgr manually for testing.
   friend class TestEnv;
 
   /// Set per-fragment state.
   Status Init(ExecEnv* exec_env);
-
-  /// Create a codegen object in codegen_. No-op if it has already been called. This is
-  /// created on first use.
-  Status CreateCodegen();
 
   /// Use a custom block manager for the query for testing purposes.
   void set_block_mgr(const std::shared_ptr<BufferedBlockMgr>& block_mgr) {
@@ -305,9 +291,6 @@ class RuntimeState {
 
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
-
-  /// True if this fragment should force codegen for expr evaluation.
-  bool codegen_expr_;
 
   /// Thread resource management object for this fragment's execution.  The runtime
   /// state is responsible for returning this pool to the thread mgr.

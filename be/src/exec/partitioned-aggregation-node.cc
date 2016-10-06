@@ -172,14 +172,6 @@ Status PartitionedAggregationNode::Init(const TPlanNode& tnode, RuntimeState* st
 Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
-  // Create the codegen object before preparing conjunct_ctxs_ and children_, so that any
-  // ScalarFnCalls will use codegen.
-  // TODO: this is brittle and hard to reason about, revisit
-  if (state->codegen_enabled()) {
-    LlvmCodeGen* codegen;
-    RETURN_IF_ERROR(state->GetCodegen(&codegen));
-  }
-
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   state_ = state;
 
@@ -292,16 +284,22 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     }
     DCHECK(serialize_stream_->has_write_block());
   }
-
-  bool codegen_enabled = false;
-  Status codegen_status;
-  if (state->codegen_enabled()) {
-    codegen_status =
-        is_streaming_preagg_ ? CodegenProcessBatchStreaming() : CodegenProcessBatch();
-    codegen_enabled = codegen_status.ok();
+  if (!state->codegen_enabled()) {
+    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
   }
-  runtime_profile()->AddCodegenMsg(codegen_enabled, codegen_status);
   return Status::OK();
+}
+
+void PartitionedAggregationNode::Codegen(RuntimeState* state) {
+  DCHECK(state->codegen_enabled());
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != NULL);
+  TPrefetchMode::type prefetch_mode = state_->query_options().prefetch_mode;
+  Status codegen_status =
+     is_streaming_preagg_ ? CodegenProcessBatchStreaming(codegen, prefetch_mode) :
+          CodegenProcessBatch(codegen, prefetch_mode);
+  runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  ExecNode::Codegen(state);
 }
 
 Status PartitionedAggregationNode::Open(RuntimeState* state) {
@@ -1531,11 +1529,8 @@ Status PartitionedAggregationNode::QueryMaintenance(RuntimeState* state) {
 // ret:                                              ; preds = %src_not_null, %entry
 //   ret void
 // }
-Status PartitionedAggregationNode::CodegenUpdateSlot(
+Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
     AggFnEvaluator* evaluator, SlotDescriptor* slot_desc, Function** fn) {
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state_->GetCodegen(&codegen));
-
   // TODO: Fix this DCHECK and Init() once CodegenUpdateSlot() can handle AggFnEvaluator
   // with multiple input expressions (e.g. group_concat).
   DCHECK_EQ(evaluator->input_expr_ctxs().size(), 1);
@@ -1550,7 +1545,7 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(
   }
 
   Function* agg_expr_fn;
-  RETURN_IF_ERROR(agg_expr->GetCodegendComputeFn(state_, &agg_expr_fn));
+  RETURN_IF_ERROR(agg_expr->GetCodegendComputeFn(codegen, &agg_expr_fn));
 
   PointerType* fn_ctx_type =
       codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME);
@@ -1746,9 +1741,8 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(
 //                          %"class.impala::TupleRow"* %row)
 //   ret void
 // }
-Status PartitionedAggregationNode::CodegenUpdateTuple(Function** fn) {
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state_->GetCodegen(&codegen));
+Status PartitionedAggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen,
+    Function** fn) {
   SCOPED_TIMER(codegen->codegen_timer());
 
   int j = grouping_expr_ctxs_.size();
@@ -1838,7 +1832,7 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(Function** fn) {
       builder.CreateStore(count_inc, slot_ptr);
     } else {
       Function* update_slot_fn;
-      RETURN_IF_ERROR(CodegenUpdateSlot(evaluator, slot_desc, &update_slot_fn));
+      RETURN_IF_ERROR(CodegenUpdateSlot(codegen, evaluator, slot_desc, &update_slot_fn));
       Value* agg_fn_ctx_ptr = builder.CreateConstGEP1_32(agg_fn_ctxs_arg, i);
       Value* agg_fn_ctx = builder.CreateLoad(agg_fn_ctx_ptr, "agg_fn_ctx");
       // Call GetExprCtx() to get the expression context.
@@ -1860,13 +1854,12 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(Function** fn) {
   return Status::OK();
 }
 
-Status PartitionedAggregationNode::CodegenProcessBatch() {
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state_->GetCodegen(&codegen));
+Status PartitionedAggregationNode::CodegenProcessBatch(LlvmCodeGen* codegen,
+    TPrefetchMode::type prefetch_mode) {
   SCOPED_TIMER(codegen->codegen_timer());
 
   Function* update_tuple_fn;
-  RETURN_IF_ERROR(CodegenUpdateTuple(&update_tuple_fn));
+  RETURN_IF_ERROR(CodegenUpdateTuple(codegen, &update_tuple_fn));
 
   // Get the cross compiled update row batch function
   IRFunction::Type ir_fn = (!grouping_expr_ctxs_.empty() ?
@@ -1880,7 +1873,6 @@ Status PartitionedAggregationNode::CodegenProcessBatch() {
     // Codegen for grouping using hash table
 
     // Replace prefetch_mode with constant so branches can be optimised out.
-    TPrefetchMode::type prefetch_mode = state_->query_options().prefetch_mode;
     Value* prefetch_mode_arg = codegen->GetArgument(process_batch_fn, 3);
     prefetch_mode_arg->replaceAllUsesWith(
         ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
@@ -1888,15 +1880,15 @@ Status PartitionedAggregationNode::CodegenProcessBatch() {
     // The codegen'd ProcessBatch function is only used in Open() with level_ = 0,
     // so don't use murmur hash
     Function* hash_fn;
-    RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(state_, /* use murmur */ false, &hash_fn));
+    RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, /* use murmur */ false, &hash_fn));
 
     // Codegen HashTable::Equals<true>
     Function* build_equals_fn;
-    RETURN_IF_ERROR(ht_ctx_->CodegenEquals(state_, true, &build_equals_fn));
+    RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, true, &build_equals_fn));
 
     // Codegen for evaluating input rows
     Function* eval_grouping_expr_fn;
-    RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(state_, false, &eval_grouping_expr_fn));
+    RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(codegen, false, &eval_grouping_expr_fn));
 
     // Replace call sites
     replaced = codegen->ReplaceCallSites(process_batch_fn, eval_grouping_expr_fn,
@@ -1911,7 +1903,7 @@ Status PartitionedAggregationNode::CodegenProcessBatch() {
 
     HashTableCtx::HashTableReplacedConstants replaced_constants;
     const bool stores_duplicates = false;
-    RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(state_, stores_duplicates, 1,
+    RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(codegen, stores_duplicates, 1,
         process_batch_fn, &replaced_constants));
     DCHECK_GE(replaced_constants.stores_nulls, 1);
     DCHECK_GE(replaced_constants.finds_some_nulls, 1);
@@ -1935,10 +1927,9 @@ Status PartitionedAggregationNode::CodegenProcessBatch() {
   return Status::OK();
 }
 
-Status PartitionedAggregationNode::CodegenProcessBatchStreaming() {
+Status PartitionedAggregationNode::CodegenProcessBatchStreaming(
+    LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) {
   DCHECK(is_streaming_preagg_);
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state_->GetCodegen(&codegen));
   SCOPED_TIMER(codegen->codegen_timer());
 
   IRFunction::Type ir_fn = IRFunction::PART_AGG_NODE_PROCESS_BATCH_STREAMING;
@@ -1951,25 +1942,24 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming() {
       ConstantInt::get(Type::getInt1Ty(codegen->context()), needs_serialize_));
 
   // Replace prefetch_mode with constant so branches can be optimised out.
-  TPrefetchMode::type prefetch_mode = state_->query_options().prefetch_mode;
   Value* prefetch_mode_arg = codegen->GetArgument(process_batch_streaming_fn, 3);
   prefetch_mode_arg->replaceAllUsesWith(
       ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
 
   Function* update_tuple_fn;
-  RETURN_IF_ERROR(CodegenUpdateTuple(&update_tuple_fn));
+  RETURN_IF_ERROR(CodegenUpdateTuple(codegen, &update_tuple_fn));
 
   // We only use the top-level hash function for streaming aggregations.
   Function* hash_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(state_, false, &hash_fn));
+  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, false, &hash_fn));
 
   // Codegen HashTable::Equals
   Function* equals_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEquals(state_, true, &equals_fn));
+  RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, true, &equals_fn));
 
   // Codegen for evaluating input rows
   Function* eval_grouping_expr_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(state_, false, &eval_grouping_expr_fn));
+  RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(codegen, false, &eval_grouping_expr_fn));
 
   // Replace call sites
   int replaced = codegen->ReplaceCallSites(process_batch_streaming_fn, update_tuple_fn,
@@ -1988,7 +1978,7 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming() {
 
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = false;
-  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(state_, stores_duplicates, 1,
+  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(codegen, stores_duplicates, 1,
       process_batch_streaming_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
   DCHECK_GE(replaced_constants.finds_some_nulls, 1);

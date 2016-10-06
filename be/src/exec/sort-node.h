@@ -41,6 +41,7 @@ class SortNode : public ExecNode {
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
+  virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Reset(RuntimeState* state);
@@ -55,6 +56,9 @@ class SortNode : public ExecNode {
 
   /// Number of rows to skip.
   int64_t offset_;
+
+  /// The tuple row comparator derived based on 'sort_exec_exprs_'.
+  boost::scoped_ptr<TupleRowComparator> less_than_;
 
   /// Expressions and parameters used for tuple materialization and tuple comparison.
   SortExecExprs sort_exec_exprs_;

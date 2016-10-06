@@ -31,7 +31,7 @@ class IsNotEmptyPredicate: public Predicate {
  public:
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
                          ExprContext* ctx);
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
   virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow* row);
   virtual std::string DebugString() const;
 

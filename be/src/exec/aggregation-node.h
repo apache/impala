@@ -55,6 +55,7 @@ class AggregationNode : public ExecNode {
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
+  virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Reset(RuntimeState* state);
@@ -159,16 +160,16 @@ class AggregationNode : public ExecNode {
   /// IR and loaded into the codegen object.  UpdateAggTuple has also been
   /// codegen'd to IR.  This function will modify the loop subsituting the
   /// UpdateAggTuple function call with the (inlined) codegen'd 'update_tuple_fn'.
-  llvm::Function* CodegenProcessRowBatch(
-      RuntimeState* state, llvm::Function* update_tuple_fn);
+  llvm::Function* CodegenProcessRowBatch(LlvmCodeGen* codegen,
+      llvm::Function* update_tuple_fn);
 
   /// Codegen for updating aggregate_exprs at slot_idx. Returns NULL if unsuccessful.
   /// slot_idx is the idx into aggregate_exprs_ (does not include grouping exprs).
-  llvm::Function* CodegenUpdateSlot(
-      RuntimeState* state, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc);
+  llvm::Function* CodegenUpdateSlot(LlvmCodeGen* codegen,
+      AggFnEvaluator* evaluator, SlotDescriptor* slot_desc);
 
   /// Codegen UpdateTuple(). Returns NULL if codegen is unsuccessful.
-  llvm::Function* CodegenUpdateTuple(RuntimeState* state);
+  llvm::Function* CodegenUpdateTuple(LlvmCodeGen* codegen);
 };
 
 }

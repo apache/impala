@@ -30,7 +30,7 @@ class TExprNode;
 
 class CaseExpr: public Expr {
  public:
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
 
   virtual BooleanVal GetBooleanVal(ExprContext* ctx, const TupleRow* row);
   virtual TinyIntVal GetTinyIntVal(ExprContext* ctx, const TupleRow* row);

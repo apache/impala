@@ -201,10 +201,14 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
     scan_node->SetScanRanges(scan_ranges);
   }
 
+  RuntimeState* state = runtime_state_.get();
   RuntimeProfile::Counter* prepare_timer = ADD_TIMER(profile(), "ExecTreePrepareTime");
   {
     SCOPED_TIMER(prepare_timer);
-    RETURN_IF_ERROR(exec_tree_->Prepare(runtime_state_.get()));
+    // Until IMPALA-4233 is fixed, we still need to create the codegen object before
+    // Prepare() as ScalarFnCall::Prepare() may codegen.
+    if (state->codegen_enabled()) RETURN_IF_ERROR(state->CreateCodegen());
+    RETURN_IF_ERROR(exec_tree_->Prepare(state));
   }
 
   PrintVolumeIds(fragment_instance_ctx.per_node_scan_ranges);
@@ -232,6 +236,8 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
     ReleaseThreadToken();
   }
 
+  if (state->codegen_enabled()) exec_tree_->Codegen(state);
+
   // set up profile counters
   profile()->AddChild(exec_tree_->runtime_profile());
   rows_produced_counter_ =
@@ -246,12 +252,10 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
 }
 
 void PlanFragmentExecutor::OptimizeLlvmModule() {
-  if (!runtime_state_->codegen_created()) return;
-  LlvmCodeGen* codegen;
-  Status status = runtime_state_->GetCodegen(&codegen, /* initalize */ false);
-  DCHECK(status.ok());
+  if (!runtime_state_->codegen_enabled()) return;
+  LlvmCodeGen* codegen = runtime_state_->codegen();
   DCHECK(codegen != NULL);
-  status = codegen->FinalizeModule();
+  Status status = codegen->FinalizeModule();
   if (!status.ok()) {
     stringstream ss;
     ss << "Error with codegen for this query: " << status.GetDetail();

@@ -84,31 +84,45 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
 
   DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch);
   DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx);
-  query_ctx.request.query_options.disable_codegen = true;
+  vector<TExpr>& texprs = expr_batch.exprs;
+
+  // Codegen is almost always disabled in this path. The only exception is when the
+  // expression contains IR UDF which cannot be interpreted. Enable codegen in this
+  // case if codegen is not disabled in the query option. Otherwise, we will let it
+  // fail in ScalarFnCall::Prepare().
+  bool need_codegen = false;
+  for (const TExpr& texpr : texprs) {
+    if (Expr::NeedCodegen(texpr)) {
+      need_codegen = true;
+      break;
+    }
+  }
+  query_ctx.request.query_options.disable_codegen |= !need_codegen;
   RuntimeState state(query_ctx);
+  if (!query_ctx.request.query_options.disable_codegen) {
+    THROW_IF_ERROR_RET(
+        state.CreateCodegen(), env, JniUtil::internal_exc_class(), result_bytes);
+  }
 
   THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
-                     result_bytes);
+      result_bytes);
   // Exprs can allocate memory so we need to set up the mem trackers before
   // preparing/running the exprs.
   state.InitMemTrackers(TUniqueId(), NULL, -1);
 
-  vector<TExpr>& texprs = expr_batch.exprs;
   // Prepare the exprs
   vector<ExprContext*> expr_ctxs;
-  for (vector<TExpr>::iterator it = texprs.begin(); it != texprs.end(); it++) {
+  for (const TExpr& texpr : texprs) {
     ExprContext* ctx;
-    THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, *it, &ctx), env,
-                       JniUtil::internal_exc_class(), result_bytes);
+    THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, texpr, &ctx), env,
+        JniUtil::internal_exc_class(), result_bytes);
     THROW_IF_ERROR_RET(ctx->Prepare(&state, RowDescriptor(), state.query_mem_tracker()),
-                       env, JniUtil::internal_exc_class(), result_bytes);
+        env, JniUtil::internal_exc_class(), result_bytes);
     expr_ctxs.push_back(ctx);
   }
 
-  if (state.codegen_created()) {
-    // Finalize the module so any UDF functions are jit'd
-    LlvmCodeGen* codegen = NULL;
-    state.GetCodegen(&codegen, /* initialize */ false);
+  if (!query_ctx.request.query_options.disable_codegen) {
+    LlvmCodeGen* codegen = state.codegen();
     DCHECK(codegen != NULL);
     codegen->EnableOptimizations(false);
     codegen->FinalizeModule();

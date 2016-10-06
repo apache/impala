@@ -696,11 +696,9 @@ Status HdfsTextScanner::CheckForSplitDelimiter(bool* split_delimiter) {
 Status HdfsTextScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ExprContext*>& conjunct_ctxs, Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = NULL;
-  if (!node->runtime_state()->codegen_enabled()) {
-    return Status("Disabled by query option.");
-  }
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(node->runtime_state()->GetCodegen(&codegen));
+  DCHECK(node->runtime_state()->codegen_enabled());
+  LlvmCodeGen* codegen = node->runtime_state()->codegen();
+  DCHECK(codegen != NULL);
   Function* write_complete_tuple_fn;
   RETURN_IF_ERROR(CodegenWriteCompleteTuple(node, codegen, conjunct_ctxs,
       &write_complete_tuple_fn));

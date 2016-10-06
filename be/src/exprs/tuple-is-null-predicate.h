@@ -38,7 +38,7 @@ class TupleIsNullPredicate: public Predicate {
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
                          ExprContext* ctx);
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
   virtual std::string DebugString() const;
 
   virtual bool IsConstant() const { return false; }

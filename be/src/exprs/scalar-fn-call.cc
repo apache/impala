@@ -22,6 +22,11 @@
 #include <llvm/IR/Attributes.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 
+#include <boost/preprocessor/punctuation/comma_if.hpp>
+#include <boost/preprocessor/repetition/repeat.hpp>
+#include <boost/preprocessor/repetition/enum_params.hpp>
+#include <boost/preprocessor/repetition/repeat_from_to.hpp>
+
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "exprs/anyval-util.h"
@@ -40,6 +45,9 @@
 using namespace impala;
 using namespace impala_udf;
 using namespace strings;
+
+// Maximum number of arguments the interpretation path supports.
+#define MAX_INTERP_ARGS 20
 
 ScalarFnCall::ScalarFnCall(const TExprNode& node)
   : Expr(node),
@@ -89,33 +97,30 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
       varargs_buffer_size);
 
   // Use the interpreted path and call the builtin without codegen if:
-  // 1. there are char arguments (as they aren't supported yet)
-  // OR
-  // if all of the following conditions are satisfied:
-  // 2. the codegen object hasn't been created yet.
-  // 3. the planner doesn't insist on using codegen.
-  // 4. we're calling a builtin or native UDF with <= 8 non-variadic arguments.
-  //    The templates for UDFs used in the interpretation path support up to 8
-  //    arguments only.
-  //
-  // This saves us the overhead of creating the codegen object when it's not necessary
-  // (i.e., in plan fragments with no codegen-enabled operators).
+  // 1. codegen is disabled or
+  // 2. there are char arguments (as they aren't supported yet)
   //
   // TODO: codegen for char arguments
-  // TODO: remove condition 2 above and put a flag in the RuntimeState to indicate
-  // if codegen should be enabled for the entire fragment.
-  bool skip_codegen = false;
-  if (has_char_arg_or_result) {
-    skip_codegen = true;
-  } else if (!state->codegen_created() && !state->ShouldCodegenExpr()) {
-    skip_codegen = fn_.binary_type != TFunctionBinaryType::IR && NumFixedArgs() <= 8;
-  }
-  if (skip_codegen) {
-    // Builtins with char arguments must still have <= 8 arguments.
-    // TODO: delete when we have codegen for char arguments
-    if (has_char_arg_or_result) {
-      DCHECK(NumFixedArgs() <= 8 && fn_.binary_type == TFunctionBinaryType::BUILTIN);
+  bool codegen_enabled = state->codegen_enabled();
+  if (!codegen_enabled || has_char_arg_or_result) {
+    if (fn_.binary_type == TFunctionBinaryType::IR) {
+      // CHAR or VARCHAR are not supported as input arguments or return values for UDFs.
+      DCHECK(!has_char_arg_or_result && !codegen_enabled);
+      return Status(Substitute("Cannot interpret LLVM IR UDF '$0': Codegen is needed. "
+          "Please set DISABLE_CODEGEN to false.", fn_.name.function_name));
     }
+
+    // The templates for builtin or native UDFs used in the interpretation path
+    // support up to 20 arguments only.
+    if (NumFixedArgs() > MAX_INTERP_ARGS) {
+      DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::NATIVE);
+      // CHAR or VARCHAR are not supported as input arguments or return values for UDFs.
+      DCHECK(!has_char_arg_or_result && !codegen_enabled);
+      return Status(Substitute("Cannot interpret native UDF '$0': number of arguments is "
+          "more than $1. Codegen is needed. Please set DISABLE_CODEGEN to false.",
+          fn_.name.function_name, MAX_INTERP_ARGS));
+    }
+
     Status status = LibCache::instance()->GetSoFunctionPtr(
         fn_.hdfs_location, fn_.scalar_fn.symbol, &scalar_fn_, &cache_entry_);
     if (!status.ok()) {
@@ -127,13 +132,12 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
         DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::NATIVE);
         return Status(Substitute("Problem loading UDF '$0':\n$1",
             fn_.name.function_name, status.GetDetail()));
-        return status;
       }
     }
   } else {
     // If we got here, either codegen is enabled or we need codegen to run this function.
-    LlvmCodeGen* codegen;
-    RETURN_IF_ERROR(state->GetCodegen(&codegen));
+    LlvmCodeGen* codegen = state->codegen();
+    DCHECK(codegen != NULL);
 
     if (fn_.binary_type == TFunctionBinaryType::IR) {
       string local_path;
@@ -146,7 +150,7 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
     }
 
     llvm::Function* ir_udf_wrapper;
-    RETURN_IF_ERROR(GetCodegendComputeFn(state, &ir_udf_wrapper));
+    RETURN_IF_ERROR(GetCodegendComputeFn(codegen, &ir_udf_wrapper));
     // TODO: don't do this for child exprs
     codegen->AddFunctionToJit(ir_udf_wrapper, &scalar_fn_wrapper_);
   }
@@ -260,7 +264,7 @@ bool ScalarFnCall::IsConstant() const {
 //        i32 4,
 //        i64* inttoptr (i64 89111072 to i64*))
 //   ret { i8, double } %result
-Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
+Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK();
@@ -275,11 +279,8 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
     }
   }
 
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
-
   llvm::Function* udf;
-  RETURN_IF_ERROR(GetUdf(state, &udf));
+  RETURN_IF_ERROR(GetUdf(codegen, &udf));
 
   // Create wrapper that computes args and calls UDF
   stringstream fn_name;
@@ -326,10 +327,9 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
   for (int i = 0; i < GetNumChildren(); ++i) {
     llvm::Function* child_fn = NULL;
     vector<llvm::Value*> child_fn_args;
-    if (state->codegen_enabled()) {
-      // Set 'child_fn' to the codegen'd function, sets child_fn = NULL if codegen fails
-      children_[i]->GetCodegendComputeFn(state, &child_fn);
-    }
+    // Set 'child_fn' to the codegen'd function, sets child_fn = NULL if codegen fails
+    children_[i]->GetCodegendComputeFn(codegen, &child_fn);
+
     if (child_fn == NULL) {
       // Set 'child_fn' to the interpreted function
       child_fn = GetStaticGetValWrapper(children_[i]->type(), codegen);
@@ -401,21 +401,16 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
   return Status::OK();
 }
 
-Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
-
-  // from_utc_timestamp and to_utc_timestamp have inline ASM that cannot be JIT'd.
+Status ScalarFnCall::GetUdf(LlvmCodeGen* codegen, llvm::Function** udf) {
+  // from_utc_timestamp() and to_utc_timestamp() have inline ASM that cannot be JIT'd.
   // TimestampFunctions::AddSub() contains a try/catch which doesn't work in JIT'd
-  // code.  Always use the statically compiled versions of these functions so the
-  // xcompiled versions are not included in the final module to be JIT'd.
-  // TODO: fix this
+  // code. Always use the interpreted version of these functions.
+  // TODO: fix these built-in functions so we don't need 'broken_builtin' below.
   bool broken_builtin = fn_.name.function_name == "from_utc_timestamp" ||
                         fn_.name.function_name == "to_utc_timestamp" ||
                         fn_.scalar_fn.symbol.find("AddSub") != string::npos;
   if (fn_.binary_type == TFunctionBinaryType::NATIVE ||
-      (fn_.binary_type == TFunctionBinaryType::BUILTIN &&
-       (!state->codegen_enabled() || broken_builtin))) {
+      (fn_.binary_type == TFunctionBinaryType::BUILTIN && broken_builtin)) {
     // In this path, we are code that has been statically compiled to assembly.
     // This can either be a UDF implemented in a .so or a builtin using the UDF
     // interface with the code in impalad.
@@ -478,7 +473,6 @@ Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
   } else if (fn_.binary_type == TFunctionBinaryType::BUILTIN) {
     // In this path, we're running a builtin with the UDF interface. The IR is
     // in the llvm module.
-    DCHECK(state->codegen_enabled());
     *udf = codegen->GetFunction(fn_.scalar_fn.symbol);
     if (*udf == NULL) {
       // Builtins symbols should exist unless there is a version mismatch.
@@ -522,8 +516,8 @@ Status ScalarFnCall::GetFunction(RuntimeState* state, const string& symbol, void
                                                   &cache_entry_);
   } else {
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
-    LlvmCodeGen* codegen;
-    RETURN_IF_ERROR(state->GetCodegen(&codegen));
+    LlvmCodeGen* codegen = state->codegen();
+    DCHECK(codegen != NULL);
     llvm::Function* ir_fn = codegen->GetFunction(symbol);
     if (ir_fn == NULL) {
       stringstream ss;
@@ -563,122 +557,56 @@ RETURN_TYPE ScalarFnCall::InterpretEval(ExprContext* context, const TupleRow* ro
 
   if (vararg_start_idx_ == -1) {
     switch (children_.size()) {
-      case 0:
-        typedef RETURN_TYPE (*ScalarFn0)(FunctionContext*);
-        return reinterpret_cast<ScalarFn0>(scalar_fn_)(fn_ctx);
-      case 1:
-        typedef RETURN_TYPE (*ScalarFn1)(FunctionContext*, const AnyVal& a1);
-        return reinterpret_cast<ScalarFn1>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0]);
-      case 2:
-        typedef RETURN_TYPE (*ScalarFn2)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2);
-        return reinterpret_cast<ScalarFn2>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1]);
-      case 3:
-        typedef RETURN_TYPE (*ScalarFn3)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3);
-        return reinterpret_cast<ScalarFn3>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2]);
-      case 4:
-        typedef RETURN_TYPE (*ScalarFn4)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4);
-        return reinterpret_cast<ScalarFn4>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3]);
-      case 5:
-        typedef RETURN_TYPE (*ScalarFn5)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5);
-        return reinterpret_cast<ScalarFn5>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
-            *(*input_vals)[4]);
-      case 6:
-        typedef RETURN_TYPE (*ScalarFn6)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
-            const AnyVal& a6);
-        return reinterpret_cast<ScalarFn6>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
-            *(*input_vals)[4], *(*input_vals)[5]);
-      case 7:
-        typedef RETURN_TYPE (*ScalarFn7)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
-            const AnyVal& a6, const AnyVal& a7);
-        return reinterpret_cast<ScalarFn7>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
-            *(*input_vals)[4], *(*input_vals)[5], *(*input_vals)[6]);
-      case 8:
-        typedef RETURN_TYPE (*ScalarFn8)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
-            const AnyVal& a6, const AnyVal& a7, const AnyVal& a8);
-        return reinterpret_cast<ScalarFn8>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
-            *(*input_vals)[4], *(*input_vals)[5], *(*input_vals)[6], *(*input_vals)[7]);
+
+#define ARG_DECL_ONE(z, n, data) BOOST_PP_COMMA_IF(n) const AnyVal&
+#define ARG_DECL_LIST(n) \
+    FunctionContext* BOOST_PP_COMMA_IF(n) BOOST_PP_REPEAT(n, ARG_DECL_ONE, unused)
+#define ARG_ONE(z, n, data) BOOST_PP_COMMA_IF(n) *(*input_vals)[n]
+#define ARG_LIST(n) fn_ctx BOOST_PP_COMMA_IF(n) BOOST_PP_REPEAT(n, ARG_ONE, unused)
+
+   // Expands to code snippet like the following for X from 0 to 20:
+   // case X:
+   //     typedef RETURN_TYPE (*ScalarFnX)(FunctionContext*, const AnyVal& a1, ...,
+   //         const AnyVal& aX);
+   //     return reinterpret_cast<ScalarFnn>(scalar_fn_)(fn_ctx, *(*input_vals)[0], ...,
+   //         *(*input_vals)[X-1]);
+#define SCALAR_FN_TYPE(n) BOOST_PP_CAT(ScalarFn, n)
+#define INTERP_SCALAR_FN(z, n, unused)                                       \
+      case n:                                                                \
+        typedef RETURN_TYPE (*SCALAR_FN_TYPE(n))(ARG_DECL_LIST(n));          \
+        return reinterpret_cast<SCALAR_FN_TYPE(n)>(scalar_fn_)(ARG_LIST(n));
+
+      // Support up to MAX_INTERP_ARGS arguments in the interpretation path
+      BOOST_PP_REPEAT_FROM_TO(0, BOOST_PP_ADD(MAX_INTERP_ARGS, 1),
+          INTERP_SCALAR_FN, unused)
+
       default:
-        DCHECK(false) << "Interpreted path not implemented. We should have "
-                      << "codegen'd the wrapper";
+        DCHECK(false) << "Interpreted path not implemented.";
     }
-   } else {
+  } else {
     int num_varargs = children_.size() - NumFixedArgs();
     const AnyVal* varargs = reinterpret_cast<AnyVal*>(fn_ctx->impl()->varargs_buffer());
     switch (NumFixedArgs()) {
-      case 0:
-        typedef RETURN_TYPE (*VarargFn0)(FunctionContext*, int num_varargs,
-            const AnyVal* varargs);
-        return reinterpret_cast<VarargFn0>(scalar_fn_)(fn_ctx, num_varargs, varargs);
-      case 1:
-        typedef RETURN_TYPE (*VarargFn1)(FunctionContext*, const AnyVal& a1,
-            int num_varargs, const AnyVal* varargs);
-        return reinterpret_cast<VarargFn1>(scalar_fn_)(fn_ctx, *(*input_vals)[0],
+
+   // Expands to code snippet like the following for X from 0 to 20:
+   // case X:
+   //     typedef RETURN_TYPE (*VarargFnX)(FunctionContext*, const AnyVal& a1, ...,
+   //         const AnyVal& aX, int num_varargs, const AnyVal* varargs);
+   //     return reinterpret_cast<VarargFnX>(scalar_fn_)(fn_ctx, *(*input_vals)[0], ...,
+   //         *(*input_vals)[X-1], num_varargs, varargs);
+#define SCALAR_VARARG_FN_TYPE(n) BOOST_PP_CAT(VarargFn, n)
+#define INTERP_SCALAR_VARARG_FN(z, n, text)                                        \
+      case n:                                                                      \
+        typedef RETURN_TYPE (*SCALAR_VARARG_FN_TYPE(n))(ARG_DECL_LIST(n), int,     \
+            const AnyVal*);                                                        \
+        return reinterpret_cast<SCALAR_VARARG_FN_TYPE(n)>(scalar_fn_)(ARG_LIST(n), \
             num_varargs, varargs);
-      case 2:
-        typedef RETURN_TYPE (*VarargFn2)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, int num_varargs, const AnyVal* varargs);
-        return reinterpret_cast<VarargFn2>(scalar_fn_)(fn_ctx, *(*input_vals)[0],
-            *(*input_vals)[1], num_varargs, varargs);
-      case 3:
-        typedef RETURN_TYPE (*VarargFn3)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, int num_varargs, const AnyVal* varargs);
-        return reinterpret_cast<VarargFn3>(scalar_fn_)(fn_ctx, *(*input_vals)[0],
-            *(*input_vals)[1], *(*input_vals)[2], num_varargs, varargs);
-      case 4:
-        typedef RETURN_TYPE (*VarargFn4)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, int num_varargs,
-            const AnyVal* varargs);
-        return reinterpret_cast<VarargFn4>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
-            num_varargs, varargs);
-      case 5:
-        typedef RETURN_TYPE (*VarargFn5)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
-            int num_varargs, const AnyVal* varargs);
-        return reinterpret_cast<VarargFn5>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
-            *(*input_vals)[4], num_varargs, varargs);
-      case 6:
-        typedef RETURN_TYPE (*VarargFn6)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
-            const AnyVal& a6, int num_varargs, const AnyVal* varargs);
-        return reinterpret_cast<VarargFn6>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
-            *(*input_vals)[4], *(*input_vals)[5], num_varargs, varargs);
-      case 7:
-        typedef RETURN_TYPE (*VarargFn7)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
-            const AnyVal& a6, const AnyVal& a7, int num_varargs, const AnyVal* varargs);
-        return reinterpret_cast<VarargFn7>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
-            *(*input_vals)[4], *(*input_vals)[5], *(*input_vals)[6], num_varargs, varargs);
-      case 8:
-        typedef RETURN_TYPE (*VarargFn8)(FunctionContext*, const AnyVal& a1,
-            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
-            const AnyVal& a6, const AnyVal& a7, const AnyVal& a8, int num_varargs,
-            const AnyVal* varargs);
-        return reinterpret_cast<VarargFn8>(scalar_fn_)(fn_ctx,
-            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
-            *(*input_vals)[4], *(*input_vals)[5], *(*input_vals)[6], *(*input_vals)[7],
-            num_varargs, varargs);
+
+      BOOST_PP_REPEAT_FROM_TO(0, BOOST_PP_ADD(MAX_INTERP_ARGS, 1),
+         INTERP_SCALAR_VARARG_FN, unused)
+
       default:
-        DCHECK(false) << "Interpreted path not implemented. We should have "
-                      << "codegen'd the wrapper";
+        DCHECK(false) << "Interpreted path not implemented.";
     }
   }
   return RETURN_TYPE::null();

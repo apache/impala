@@ -92,7 +92,7 @@ class SortedRunMerger {
   std::vector<SortedRunWrapper*> min_heap_;
 
   /// Row comparator. Returns true if lhs < rhs.
-  TupleRowComparator comparator_;
+  const TupleRowComparator& comparator_;
 
   /// Descriptor for the rows provided by the input runs. Owned by the exec-node through
   /// which this merger was created.

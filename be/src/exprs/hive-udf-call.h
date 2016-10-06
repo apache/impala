@@ -82,7 +82,7 @@ class HiveUdfCall : public Expr {
   virtual TimestampVal GetTimestampVal(ExprContext* ctx, const TupleRow*);
   virtual DecimalVal GetDecimalVal(ExprContext* ctx, const TupleRow*);
 
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
 
  protected:
   friend class Expr;

@@ -98,14 +98,6 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state
 Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
-  // Create the codegen object before preparing conjunct_ctxs_ and children_, so that any
-  // ScalarFnCalls will use codegen.
-  // TODO: this is brittle and hard to reason about, revisit
-  if (state->codegen_enabled()) {
-    LlvmCodeGen* codegen;
-    RETURN_IF_ERROR(state->GetCodegen(&codegen));
-  }
-
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
   runtime_state_ = state;
 
@@ -143,16 +135,28 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
 
   num_probe_rows_partitioned_ =
       ADD_COUNTER(runtime_profile(), "ProbeRowsPartitioned", TUnit::UNIT);
-
-  bool probe_codegen_enabled = false;
-  Status probe_codegen_status;
-  if (state->codegen_enabled()) {
-    probe_codegen_status = CodegenProcessProbeBatch(state);
-    probe_codegen_enabled = probe_codegen_status.ok();
+  if (!state->codegen_enabled()) {
+    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
   }
-  runtime_profile()->AddCodegenMsg(
-      probe_codegen_enabled, probe_codegen_status, "Probe Side");
   return Status::OK();
+}
+
+void PartitionedHashJoinNode::Codegen(RuntimeState* state) {
+  DCHECK(state->codegen_enabled());
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != NULL);
+
+  // Codegen the build side.
+  builder_->Codegen(codegen);
+
+  // Codegen the probe side.
+  TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
+  Status probe_codegen_status = CodegenProcessProbeBatch(codegen, prefetch_mode);
+  runtime_profile()->AddCodegenMsg(probe_codegen_status.ok(), probe_codegen_status,
+      "Probe Side");
+
+  // Codegen the children node;
+  ExecNode::Codegen(state);
 }
 
 Status PartitionedHashJoinNode::Open(RuntimeState* state) {
@@ -1190,14 +1194,13 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen,
   return Status::OK();
 }
 
-Status PartitionedHashJoinNode::CodegenProcessProbeBatch(RuntimeState* state) {
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
+Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
+    LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) {
   // Codegen for hashing rows
   Function* hash_fn;
   Function* murmur_hash_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(state, false, &hash_fn));
-  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(state, true, &murmur_hash_fn));
+  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, false, &hash_fn));
+  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, true, &murmur_hash_fn));
 
   // Get cross compiled function
   IRFunction::Type ir_fn = IRFunction::FN_END;
@@ -1243,7 +1246,6 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(RuntimeState* state) {
 
   // Replace the parameter 'prefetch_mode' with constant.
   Value* prefetch_mode_arg = codegen->GetArgument(process_probe_batch_fn, 1);
-  TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
   DCHECK_GE(prefetch_mode, TPrefetchMode::NONE);
   DCHECK_LE(prefetch_mode, TPrefetchMode::HT_BUCKET);
   prefetch_mode_arg->replaceAllUsesWith(
@@ -1251,11 +1253,11 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(RuntimeState* state) {
 
   // Codegen HashTable::Equals
   Function* probe_equals_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEquals(state, false, &probe_equals_fn));
+  RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, false, &probe_equals_fn));
 
   // Codegen for evaluating probe rows
   Function* eval_row_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(state, false, &eval_row_fn));
+  RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(codegen, false, &eval_row_fn));
 
   // Codegen CreateOutputRow
   Function* create_output_row_fn;
@@ -1263,12 +1265,12 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(RuntimeState* state) {
 
   // Codegen evaluating other join conjuncts
   Function* eval_other_conjuncts_fn;
-  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(state, other_join_conjunct_ctxs_,
+  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, other_join_conjunct_ctxs_,
       &eval_other_conjuncts_fn, "EvalOtherConjuncts"));
 
   // Codegen evaluating conjuncts
   Function* eval_conjuncts_fn;
-  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs_,
+  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, conjunct_ctxs_,
       &eval_conjuncts_fn));
 
   // Replace all call sites with codegen version
@@ -1317,7 +1319,7 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(RuntimeState* state) {
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = true;
   const int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
-  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(state, stores_duplicates,
+  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(codegen, stores_duplicates,
       num_build_tuples, process_probe_batch_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
   DCHECK_GE(replaced_constants.finds_some_nulls, 1);

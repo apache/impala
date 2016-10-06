@@ -27,6 +27,7 @@ namespace impala {
 
 class RowBatch;
 class DataStreamRecvr;
+class TupleRowComparator;
 
 /// Receiver node for data streams. The data stream receiver is created in Prepare()
 /// and closed in Close().
@@ -93,6 +94,9 @@ class ExchangeNode : public ExecNode {
   /// True if this is a merging exchange node. If true, GetNext() is delegated to the
   /// underlying stream_recvr_, and input_batch_ is not used/valid.
   bool is_merging_;
+
+  /// The TupleRowComparator based on 'sort_exec_exprs_' for merging exchange.
+  boost::scoped_ptr<TupleRowComparator> less_than_;
 
   /// Sort expressions and parameters passed to the merging receiver..
   SortExecExprs sort_exec_exprs_;

@@ -530,7 +530,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
       parse_block = BasicBlock::Create(context, "parse", fn, eval_fail_block);
       Function* conjunct_fn;
       Status status =
-          conjunct_ctxs[conjunct_idx]->root()->GetCodegendComputeFn(state, &conjunct_fn);
+          conjunct_ctxs[conjunct_idx]->root()->GetCodegendComputeFn(codegen, &conjunct_fn);
       if (!status.ok()) {
         stringstream ss;
         ss << "Failed to codegen conjunct: " << status.GetDetail();

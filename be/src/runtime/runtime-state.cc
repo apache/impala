@@ -73,7 +73,6 @@ RuntimeState::RuntimeState(
     fragment_params_(fragment_params),
     now_(new TimestampValue(
         query_ctx().now_string.c_str(), query_ctx().now_string.size())),
-    codegen_expr_(false),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_ctx().fragment_instance_id)),
     is_cancelled_(false),
     root_node_id_(-1) {
@@ -86,7 +85,6 @@ RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
     now_(new TimestampValue(query_ctx.now_string.c_str(),
         query_ctx.now_string.size())),
     exec_env_(ExecEnv::GetInstance()),
-    codegen_expr_(false),
     profile_(obj_pool_.get(), "<unnamed>"),
     is_cancelled_(false),
     root_node_id_(-1) {
@@ -284,12 +282,6 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
 Status RuntimeState::CheckQueryState() {
   if (UNLIKELY(instance_mem_tracker_->AnyLimitExceeded())) return SetMemLimitExceeded();
   return GetQueryStatus();
-}
-
-Status RuntimeState::GetCodegen(LlvmCodeGen** codegen, bool initialize) {
-  if (codegen_.get() == NULL && initialize) RETURN_IF_ERROR(CreateCodegen());
-  *codegen = codegen_.get();
-  return Status::OK();
 }
 
 void RuntimeState::AcquireReaderContext(DiskIoRequestContext* reader_context) {

@@ -197,7 +197,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// Produces a version of DecodeAvroData that uses codegen'd instead of interpreted
   /// functions. Stores the resulting function in 'decode_avro_data_fn' if codegen was
   /// successful or returns an error.
-  static Status CodegenDecodeAvroData(RuntimeState* state,
+  static Status CodegenDecodeAvroData(LlvmCodeGen* codegen,
       llvm::Function* materialize_tuple_fn,
       const std::vector<ExprContext*>& conjunct_ctxs,
       llvm::Function** decode_avro_data_fn);
