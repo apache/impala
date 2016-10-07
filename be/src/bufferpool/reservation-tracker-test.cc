@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <gtest/gtest.h>
 #include <limits>
 #include <string>
 #include <vector>
@@ -24,7 +23,7 @@
 #include "common/init.h"
 #include "common/object-pool.h"
 #include "runtime/mem-tracker.h"
-#include "testutil/test-macros.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
@@ -376,8 +375,4 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
 }
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

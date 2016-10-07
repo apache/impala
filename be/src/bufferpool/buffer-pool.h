@@ -24,6 +24,7 @@
 #include <string>
 
 #include "bufferpool/buffer-allocator.h"
+#include "bufferpool/buffer-pool-counters.h"
 #include "common/atomic.h"
 #include "common/status.h"
 #include "gutil/macros.h"
@@ -167,10 +168,11 @@ class BufferPool {
 
   /// Register a client. Returns an error status and does not register the client if the
   /// arguments are invalid. 'name' is an arbitrary name used to identify the client in
-  /// any errors messages or logging. 'client' is the client to register. 'client' should
-  /// not already be registered.
+  /// any errors messages or logging. Counters for this client are added to the (non-NULL)
+  /// 'profile'. 'client' is the client to register. 'client' should not already be
+  /// registered.
   Status RegisterClient(const std::string& name, ReservationTracker* reservation,
-      Client* client);
+      RuntimeProfile* profile, Client* client);
 
   /// Deregister 'client' if it is registered. Idempotent.
   void DeregisterClient(Client* client);
@@ -305,12 +307,19 @@ class BufferPool::Client {
   friend class BufferPool;
   DISALLOW_COPY_AND_ASSIGN(Client);
 
+  /// Initialize 'counters_' and add the counters to 'profile'.
+  void InitCounters(RuntimeProfile* profile);
+
   /// A name identifying the client.
   std::string name_;
 
   /// The reservation tracker for the client. NULL means the client isn't registered.
   /// All pages pinned by the client count as usage against 'reservation_'.
   ReservationTracker* reservation_;
+
+  /// The RuntimeProfile counters for this client. All non-NULL if is_registered()
+  /// is true.
+  BufferPoolClientCounters counters_;
 };
 
 /// A handle to a buffer allocated from the buffer pool. Each BufferHandle should only

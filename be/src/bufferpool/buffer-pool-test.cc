@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <gtest/gtest.h>
 #include <boost/bind.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
@@ -29,7 +28,7 @@
 #include "common/init.h"
 #include "common/object-pool.h"
 #include "testutil/death-test-util.h"
-#include "testutil/test-macros.h"
+#include "testutil/gtest-util.h"
 
 #include "common/names.h"
 
@@ -125,7 +124,8 @@ void BufferPoolTest::RegisterQueriesAndClients(BufferPool* pool, int query_id_hi
       EXPECT_TRUE(
           client_reservations[i][j].IncreaseReservationToFit(initial_client_reservation));
       string name = Substitute("Client $0 for query $1", j, query_id);
-      EXPECT_OK(pool->RegisterClient(name, &client_reservations[i][j], &clients[i][j]));
+      EXPECT_OK(pool->RegisterClient(
+          name, &client_reservations[i][j], NewProfile(), &clients[i][j]));
     }
 
     for (int j = 0; j < clients_per_query; ++j) {
@@ -209,7 +209,7 @@ TEST_F(BufferPoolTest, PageCreation) {
   client_tracker->InitChildTracker(NewProfile(), &global_reservations_, NULL, total_mem);
   ASSERT_TRUE(client_tracker->IncreaseReservation(total_mem));
   BufferPool::Client client;
-  ASSERT_OK(pool.RegisterClient("test client", client_tracker, &client));
+  ASSERT_OK(pool.RegisterClient("test client", client_tracker, NewProfile(), &client));
 
   vector<BufferPool::PageHandle> handles(num_pages);
 
@@ -256,7 +256,7 @@ TEST_F(BufferPoolTest, BufferAllocation) {
   client_tracker->InitChildTracker(NewProfile(), &global_reservations_, NULL, total_mem);
   ASSERT_TRUE(client_tracker->IncreaseReservationToFit(total_mem));
   BufferPool::Client client;
-  ASSERT_OK(pool.RegisterClient("test client", client_tracker, &client));
+  ASSERT_OK(pool.RegisterClient("test client", client_tracker, NewProfile(), &client));
 
   vector<BufferPool::BufferHandle> handles(num_buffers);
 
@@ -302,7 +302,8 @@ TEST_F(BufferPoolTest, BufferTransfer) {
     client_trackers[i].InitChildTracker(
         NewProfile(), &global_reservations_, NULL, TEST_BUFFER_LEN);
     ASSERT_TRUE(client_trackers[i].IncreaseReservationToFit(TEST_BUFFER_LEN));
-    ASSERT_OK(pool.RegisterClient("test client", &client_trackers[i], &clients[i]));
+    ASSERT_OK(pool.RegisterClient(
+        "test client", &client_trackers[i], NewProfile(), &clients[i]));
   }
 
   // Transfer the page around between the clients repeatedly in a circle.
@@ -344,7 +345,7 @@ TEST_F(BufferPoolTest, Pin) {
       NewProfile(), &global_reservations_, NULL, child_reservation);
   ASSERT_TRUE(client_tracker->IncreaseReservationToFit(child_reservation));
   BufferPool::Client client;
-  ASSERT_OK(pool.RegisterClient("test client", client_tracker, &client));
+  ASSERT_OK(pool.RegisterClient("test client", client_tracker, NewProfile(), &client));
 
   BufferPool::PageHandle handle1, handle2;
 
@@ -395,7 +396,7 @@ TEST_F(BufferPoolTest, PinWithoutReservation) {
   client_tracker->InitChildTracker(
       NewProfile(), &global_reservations_, NULL, TEST_BUFFER_LEN);
   BufferPool::Client client;
-  ASSERT_OK(pool.RegisterClient("test client", client_tracker, &client));
+  ASSERT_OK(pool.RegisterClient("test client", client_tracker, NewProfile(), &client));
 
   BufferPool::PageHandle handle;
   IMPALA_ASSERT_DEBUG_DEATH(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle), "");
@@ -423,7 +424,7 @@ TEST_F(BufferPoolTest, ExtractBuffer) {
       NewProfile(), &global_reservations_, NULL, child_reservation);
   ASSERT_TRUE(client_tracker->IncreaseReservationToFit(child_reservation));
   BufferPool::Client client;
-  ASSERT_OK(pool.RegisterClient("test client", client_tracker, &client));
+  ASSERT_OK(pool.RegisterClient("test client", client_tracker, NewProfile(), &client));
 
   BufferPool::PageHandle page;
   BufferPool::BufferHandle buffer;
@@ -499,7 +500,7 @@ void BufferPoolTest::CreatePageLoop(
   ReservationTracker client_tracker;
   client_tracker.InitChildTracker(NewProfile(), parent_tracker, NULL, TEST_BUFFER_LEN);
   BufferPool::Client client;
-  ASSERT_OK(pool->RegisterClient("test client", &client_tracker, &client));
+  ASSERT_OK(pool->RegisterClient("test client", &client_tracker, NewProfile(), &client));
   for (int i = 0; i < num_ops; ++i) {
     BufferPool::PageHandle handle;
     ASSERT_TRUE(client_tracker.IncreaseReservation(TEST_BUFFER_LEN));
@@ -525,7 +526,8 @@ TEST_F(BufferPoolTest, CapacityExhausted) {
   BufferPool::PageHandle handle1, handle2, handle3;
 
   BufferPool::Client client;
-  ASSERT_OK(pool.RegisterClient("test client", &global_reservations_, &client));
+  ASSERT_OK(
+      pool.RegisterClient("test client", &global_reservations_, NewProfile(), &client));
   ASSERT_TRUE(global_reservations_.IncreaseReservation(TEST_BUFFER_LEN));
   ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle1));
 
@@ -549,8 +551,4 @@ TEST_F(BufferPoolTest, CapacityExhausted) {
 }
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

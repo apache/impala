@@ -25,6 +25,7 @@
 #include "common/names.h"
 #include "gutil/strings/substitute.h"
 #include "util/bit-util.h"
+#include "util/runtime-profile-counters.h"
 #include "util/uid-util.h"
 
 namespace impala {
@@ -176,12 +177,24 @@ BufferPool::~BufferPool() {
 }
 
 Status BufferPool::RegisterClient(
-    const string& name, ReservationTracker* reservation, Client* client) {
+    const string& name, ReservationTracker* reservation, RuntimeProfile* profile,
+    Client* client) {
   DCHECK(!client->is_registered());
   DCHECK(reservation != NULL);
+  client->InitCounters(profile);
   client->reservation_ = reservation;
   client->name_ = name;
   return Status::OK();
+}
+
+void BufferPool::Client::InitCounters(RuntimeProfile* profile) {
+  counters_.get_buffer_time = ADD_TIMER(profile, "BufferPoolGetBufferTime");
+  counters_.read_wait_time = ADD_TIMER(profile, "BufferPoolReadWaitTime");
+  counters_.write_wait_time = ADD_TIMER(profile, "BufferPoolWriteWaitTime");
+  counters_.peak_unpinned_bytes =
+      profile->AddHighWaterMarkCounter("BufferPoolPeakUnpinnedBytes", TUnit::BYTES);
+  counters_.total_unpinned_bytes =
+      ADD_COUNTER(profile, "BufferPoolTotalUnpinnedBytes", TUnit::BYTES);
 }
 
 void BufferPool::DeregisterClient(Client* client) {
@@ -256,13 +269,16 @@ Status BufferPool::Pin(Client* client, PageHandle* handle) {
   Page* page = handle->page_;
   {
     lock_guard<SpinLock> pl(page->lock); // Lock page while we work on its state.
-    if (!page->buffer.is_open()) {
-      // No changes have been made to state yet, so we can cleanly return on error.
-      RETURN_IF_ERROR(AllocateBufferInternal(client, page->len, &page->buffer));
+    if (page->pin_count == 0)  {
+      if (!page->buffer.is_open()) {
+        // No changes have been made to state yet, so we can cleanly return on error.
+        RETURN_IF_ERROR(AllocateBufferInternal(client, page->len, &page->buffer));
+
+        // TODO: will need to initiate/wait for read if the page is not in-memory.
+      }
+      COUNTER_ADD(client->counters_.peak_unpinned_bytes, -handle->len());
     }
     page->IncrementPinCount(handle);
-
-    // TODO: will need to initiate/wait for read if the page is not in-memory.
   }
 
   client->reservation_->AllocateFrom(page->len);
@@ -286,12 +302,16 @@ void BufferPool::UnpinLocked(Client* client, PageHandle* handle) {
   page->DecrementPinCount(handle);
   client->reservation_->ReleaseTo(page->len);
 
+  COUNTER_ADD(client->counters_.total_unpinned_bytes, handle->len());
+  COUNTER_ADD(client->counters_.peak_unpinned_bytes, handle->len());
+
   // TODO: can evict now. Only need to preserve contents if 'page->dirty' is true.
 }
 
 void BufferPool::ExtractBuffer(
     Client* client, PageHandle* page_handle, BufferHandle* buffer_handle) {
   DCHECK(page_handle->is_pinned());
+
   DCHECK_EQ(page_handle->client_, client);
 
   Page* page = page_handle->page_;
@@ -316,6 +336,7 @@ Status BufferPool::AllocateBufferInternal(
   DCHECK(!buffer->is_open());
   DCHECK_GE(len, min_buffer_len_);
   DCHECK_EQ(len, BitUtil::RoundUpToPowerOfTwo(len));
+  SCOPED_TIMER(client->counters_.get_buffer_time);
 
   // If there is headroom in 'buffer_bytes_remaining_', we can just allocate a new buffer.
   if (TryDecreaseBufferBytesRemaining(len)) {
