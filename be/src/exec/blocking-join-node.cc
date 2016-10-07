@@ -145,9 +145,9 @@ void BlockingJoinNode::Close(RuntimeState* state) {
 
 void BlockingJoinNode::ProcessBuildInputAsync(RuntimeState* state, DataSink* build_sink,
     Promise<Status>* status) {
+  SCOPED_THREAD_COUNTER_MEASUREMENT(state->total_thread_statistics());
   Status s;
   {
-    SCOPED_TIMER(state->total_cpu_timer());
     if  (build_sink == NULL){
       s = ProcessBuildInput(state);
     } else {

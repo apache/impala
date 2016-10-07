@@ -39,6 +39,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter-bank.h"
 #include "util/container-util.h"
+#include "runtime/runtime-state.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/mem-info.h"
@@ -107,7 +108,6 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
   is_prepared_ = true;
 
   // TODO: Break this method up.
-  fragment_sw_.Start();
   const TPlanFragmentInstanceCtx& fragment_instance_ctx = request.fragment_instance_ctx;
   query_id_ = request.query_ctx.query_id;
 
@@ -302,6 +302,7 @@ Status PlanFragmentExecutor::Open() {
 }
 
 Status PlanFragmentExecutor::OpenInternal() {
+  SCOPED_THREAD_COUNTER_MEASUREMENT(runtime_state_->total_thread_statistics());
   RETURN_IF_ERROR(
       runtime_state_->desc_tbl().PrepareAndOpenPartitionExprs(runtime_state_.get()));
 
@@ -357,6 +358,7 @@ Status PlanFragmentExecutor::Exec() {
 Status PlanFragmentExecutor::ExecInternal() {
   RuntimeProfile::Counter* plan_exec_timer =
       ADD_CHILD_TIMER(timings_profile_, "ExecTreeExecTime", EXEC_TIMER_NAME);
+  SCOPED_THREAD_COUNTER_MEASUREMENT(runtime_state_->total_thread_statistics());
   bool exec_tree_complete = false;
   do {
     Status status;
@@ -467,18 +469,6 @@ void PlanFragmentExecutor::FragmentComplete() {
   // Check the atomic flag. If it is set, then a fragment complete report has already
   // been sent.
   bool send_report = completed_report_sent_.CompareAndSwap(0, 1);
-
-  fragment_sw_.Stop();
-  int64_t cpu_and_wait_time = fragment_sw_.ElapsedTime();
-  fragment_sw_ = MonotonicStopWatch();
-  int64_t cpu_time = cpu_and_wait_time
-      - runtime_state_->total_storage_wait_timer()->value()
-      - runtime_state_->total_network_send_timer()->value()
-      - runtime_state_->total_network_receive_timer()->value();
-  // Timing is not perfect.
-  if (cpu_time < 0) cpu_time = 0;
-  runtime_state_->total_cpu_timer()->Add(cpu_time);
-
   ReleaseThreadToken();
   StopReportThread();
   if (send_report) SendReport(true);

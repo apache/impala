@@ -273,8 +273,7 @@ Status KuduScanNode::ProcessScanToken(KuduScanner* scanner, const string& scan_t
 void KuduScanNode::RunScannerThread(const string& name, const string* initial_token) {
   DCHECK(initial_token != NULL);
   SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
-  SCOPED_TIMER(runtime_state_->total_cpu_timer());
-
+  SCOPED_THREAD_COUNTER_MEASUREMENT(runtime_state_->total_thread_statistics());
   // Set to true if this thread observes that the number of optional threads has been
   // exceeded and is exiting early.
   bool optional_thread_exiting = false;

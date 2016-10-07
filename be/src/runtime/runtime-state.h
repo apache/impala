@@ -251,15 +251,20 @@ class RuntimeState {
   bool is_cancelled() const { return is_cancelled_; }
   void set_is_cancelled(bool v) { is_cancelled_ = v; }
 
-  RuntimeProfile::Counter* total_cpu_timer() { return total_cpu_timer_; }
   RuntimeProfile::Counter* total_storage_wait_timer() {
     return total_storage_wait_timer_;
   }
+
   RuntimeProfile::Counter* total_network_send_timer() {
     return total_network_send_timer_;
   }
+
   RuntimeProfile::Counter* total_network_receive_timer() {
     return total_network_receive_timer_;
+  }
+
+  RuntimeProfile::ThreadCounters* total_thread_statistics() const {
+   return total_thread_statistics_;
   }
 
   /// Sets query_status_ with err_msg if no error has been set yet.
@@ -351,9 +356,6 @@ class RuntimeState {
 
   RuntimeProfile profile_;
 
-  /// Total CPU time (across all threads), including all wait times.
-  RuntimeProfile::Counter* total_cpu_timer_;
-
   /// Total time waiting in storage (across all threads)
   RuntimeProfile::Counter* total_storage_wait_timer_;
 
@@ -362,6 +364,9 @@ class RuntimeState {
 
   /// Total time spent receiving over the network (across all threads)
   RuntimeProfile::Counter* total_network_receive_timer_;
+
+  /// Total CPU utilization for all threads in this plan fragment.
+  RuntimeProfile::ThreadCounters* total_thread_statistics_;
 
   /// MemTracker that is shared by all fragment instances running on this host.
   /// The query mem tracker must be released after the instance_mem_tracker_.
@@ -405,6 +410,7 @@ class RuntimeState {
 
   /// prohibit copies
   RuntimeState(const RuntimeState&);
+
 };
 
 #define RETURN_IF_CANCELLED(state) \
