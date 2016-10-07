@@ -86,12 +86,16 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
   // clean up internal buffers it reopens. To work around this issue, create a new client
   // instead.
   ClientKey old_client_key = *client_key;
-  if (metrics_enabled_) total_clients_metric_->Increment(-1);
   Status status = CreateClient(client_impl->address(), factory_method, client_key);
   // Only erase the existing client from the map if creation of the new one succeeded.
   // This helps to ensure the proper accounting of metrics in the presence of
   // re-connection failures (the original client should be released as usual).
   if (status.ok()) {
+    // CreateClient() will increment total_clients_metric_ if succeed.
+    if (metrics_enabled_) {
+      total_clients_metric_->Increment(-1);
+      DCHECK_GE(total_clients_metric_->value(), 0);
+    }
     lock_guard<mutex> lock(client_map_lock_);
     client_map_.erase(client);
   } else {
