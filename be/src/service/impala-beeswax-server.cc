@@ -441,7 +441,8 @@ inline void ImpalaServer::QueryHandleToTUniqueId(const QueryHandle& handle,
   ParseId(handle.id, query_id);
 }
 
-void ImpalaServer::RaiseBeeswaxException(const string& msg, const char* sql_state) {
+[[noreturn]] void ImpalaServer::RaiseBeeswaxException(
+    const string& msg, const char* sql_state) {
   BeeswaxException exc;
   exc.__set_message(msg);
   exc.__set_SQLState(sql_state);

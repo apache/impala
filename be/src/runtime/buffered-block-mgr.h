@@ -384,7 +384,7 @@ class BufferedBlockMgr {
 
   int num_pinned_buffers(Client* client) const;
   int num_reserved_buffers_remaining(Client* client) const;
-  MemTracker* mem_tracker() const { return mem_tracker_.get(); };
+  MemTracker* mem_tracker() const { return mem_tracker_.get(); }
   MemTracker* get_tracker(Client* client) const;
   int64_t max_block_size() const { return max_block_size_; }
   int64_t bytes_allocated() const;

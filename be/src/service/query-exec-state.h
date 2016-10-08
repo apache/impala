@@ -170,7 +170,7 @@ class ImpalaServer::QueryExecState {
   }
   boost::mutex* lock() { return &lock_; }
   boost::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
-  const beeswax::QueryState::type query_state() const { return query_state_; }
+  beeswax::QueryState::type query_state() const { return query_state_; }
   const Status& query_status() const { return query_status_; }
   void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
   const RuntimeProfile& profile() const { return profile_; }

@@ -31,7 +31,7 @@
 // on libhdfs.
 #include "udf/udf-internal.h"
 
-#if IMPALA_UDF_SDK_BUILD
+#if defined(IMPALA_UDF_SDK_BUILD) && IMPALA_UDF_SDK_BUILD
 // For the SDK build, we are building the .lib that the developers would use to
 // write UDFs. They want to link against this to run their UDFs in a test environment.
 // Pulling in free-pool is very undesirable since it pulls in many other libraries.
@@ -252,7 +252,7 @@ const char* FunctionContext::effective_user() const {
 
 FunctionContext::UniqueId FunctionContext::query_id() const {
   UniqueId id;
-#if IMPALA_UDF_SDK_BUILD
+#if defined(IMPALA_UDF_SDK_BUILD) && IMPALA_UDF_SDK_BUILD
   id.hi = id.lo = 0;
 #else
   id.hi = impl_->state_->query_id().hi;

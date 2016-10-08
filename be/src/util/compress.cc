@@ -158,7 +158,7 @@ Status BzipCompressor::ProcessBlock(bool output_preallocated, int64_t input_leng
     out_buffer_ = temp_memory_pool_->Allocate(buffer_length_);
   }
 
-  unsigned int outlen;
+  unsigned int outlen = static_cast<unsigned int>(buffer_length_);
   int ret = BZ_OUTBUFF_FULL;
   while (ret == BZ_OUTBUFF_FULL) {
     if (out_buffer_ == NULL) {

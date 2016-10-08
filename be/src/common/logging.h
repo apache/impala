@@ -42,11 +42,6 @@
   #define VLOG(level) while(false) std::cout
   #define VLOG_IS_ON(level) (false)
 #else
-  /// GLOG defines this based on the system but doesn't check if it's already
-  /// been defined.  undef it first to avoid warnings.
-  /// glog MUST be included before gflags.  Instead of including them,
-  /// our files should include this file instead.
-  #undef _XOPEN_SOURCE
   #include <glog/logging.h>
   #include <gflags/gflags.h>
 #endif

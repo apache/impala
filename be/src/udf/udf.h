@@ -565,7 +565,7 @@ struct StringVal : public AnyVal {
   StringVal(uint8_t* ptr = NULL, int len = 0) : len(len), ptr(ptr) {
     assert(len >= 0);
     if (ptr == NULL) assert(len == 0);
-  };
+  }
 
   /// Construct a StringVal from NULL-terminated c-string. Note: this does not make a
   /// copy of ptr so the underlying string must exist as long as this StringVal does.

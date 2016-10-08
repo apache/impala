@@ -18,8 +18,8 @@
  * under the License.
  */
 
-#ifndef _THRIFT_TRANSPORT_TSSLTRANSPORT_H_
-#define _THRIFT_TRANSPORT_TSSLTRANSPORT_H_ 1
+#ifndef IMPALA_TRANSPORT_TSSLTRANSPORT_H
+#define IMPALA_TRANSPORT_TSSLTRANSPORT_H
 
 #include <string>
 
@@ -220,4 +220,4 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
 
 }}} // apache::thrift::transport
 
-#endif // #ifndef _THRIFT_TRANSPORT_TSSLTRANSPORT_H_
+#endif // #ifndef IMPALA_TRANSPORT_TSSLTRANSPORT_H

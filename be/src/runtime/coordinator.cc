@@ -368,7 +368,7 @@ Coordinator::Coordinator(const QuerySchedule& schedule, ExecEnv* exec_env,
     obj_pool_(new ObjectPool()),
     query_events_(events),
     filter_routing_table_complete_(false),
-    filter_mode_(schedule_.query_options().runtime_filter_mode),
+    filter_mode_(schedule.query_options().runtime_filter_mode),
     torn_down_(false) {}
 
 Coordinator::~Coordinator() {
@@ -1215,7 +1215,6 @@ void Coordinator::InitExecSummary() {
 }
 
 void Coordinator::InitExecProfiles() {
-  const TQueryExecRequest& request = schedule_.request();
   vector<const TPlanFragment*> fragments;
   schedule_.GetTPlanFragments(&fragments);
   fragment_profiles_.resize(fragments.size());

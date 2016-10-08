@@ -104,7 +104,6 @@ class DataStreamSender : public DataSink {
   /// Sender instance id, unique within a fragment.
   int sender_id_;
   RuntimeState* state_;
-  ObjectPool* pool_;
   bool broadcast_;  // if true, send all rows on all channels
   bool random_; // if true, round-robins row batches among channels
   int current_channel_idx_; // index of current channel to send to if random_ == true

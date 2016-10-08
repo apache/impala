@@ -34,7 +34,7 @@ class MetricGroup;
 /// that the initialization can return an error status if an error occurs.
 class ExternalDataSourceExecutor {
  public:
-  ExternalDataSourceExecutor() : is_initialized_(false), executor_(NULL) { };
+  ExternalDataSourceExecutor() : is_initialized_(false), executor_(NULL) { }
 
   /// Initialize static JNI state. Called on process startup.
   static Status InitJNI(MetricGroup* metrics);

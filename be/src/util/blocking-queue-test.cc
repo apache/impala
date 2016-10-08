@@ -67,7 +67,7 @@ TEST(BlockingQueueTest, TestPutWithTimeout) {
   ASSERT_TRUE(test_queue.BlockingPutWithTimeout(3, timeout_micros));
 }
 
-class MultiThreadTest {
+class MultiThreadTest { // NOLINT: members are not arranged for minimal padding
  public:
   MultiThreadTest()
     : iterations_(10000),

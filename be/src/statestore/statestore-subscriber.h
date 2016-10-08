@@ -263,7 +263,7 @@ class StatestoreSubscriber {
   /// During recovery mode, any public methods that are started will block on lock_, which
   /// is only released when recovery finishes. In practice, all registrations are made
   /// early in the life of an impalad before the statestore could be detected as failed.
-  void RecoveryModeChecker();
+  [[noreturn]] void RecoveryModeChecker();
 
   /// Creates a client of the remote statestore and sends a list of
   /// topics to register for. Returns OK unless there is some problem

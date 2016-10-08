@@ -23,6 +23,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/bind/mem_fn.hpp>
 
+#include "util/aligned-new.h"
 #include "util/thread.h"
 
 namespace impala {
@@ -30,7 +31,7 @@ namespace impala {
 /// Simple threadpool which processes items (of type T) in parallel which were placed on a
 /// blocking queue by Offer(). Each item is processed by a single user-supplied method.
 template <typename T>
-class ThreadPool {
+class ThreadPool : public CacheLineAligned {
  public:
   /// Signature of a work-processing function. Takes the integer id of the thread which is
   /// calling it (ids run from 0 to num_threads - 1) and a reference to the item to

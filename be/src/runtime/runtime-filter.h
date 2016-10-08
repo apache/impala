@@ -49,7 +49,7 @@ class RuntimeFilter {
   bool HasBloomFilter() const { return arrival_time_ != 0; }
 
   const TRuntimeFilterDesc& filter_desc() const { return filter_desc_; }
-  const int32_t id() const { return filter_desc().filter_id; }
+  int32_t id() const { return filter_desc().filter_id; }
   int64_t filter_size() const { return filter_size_; }
 
   /// Sets the internal filter bloom_filter to 'bloom_filter'. Can only legally be called

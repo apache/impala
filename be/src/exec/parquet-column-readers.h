@@ -156,7 +156,7 @@ class ParquetColumnReader {
   /// Returns true if this reader materializes collections (i.e. CollectionValues).
   virtual bool IsCollectionReader() const { return false; }
 
-  const char* filename() const { return parent_->filename(); };
+  const char* filename() const { return parent_->filename(); }
 
   /// Read the current value (or null) into 'tuple' for this column. This should only be
   /// called when a value is defined, i.e., def_level() >=

@@ -83,6 +83,8 @@ class ThriftServer {
     /// After this callback returns, the memory connection_context references is no longer
     /// valid and clients must not refer to it again.
     virtual void ConnectionEnd(const ConnectionContext& connection_context) = 0;
+
+    virtual ~ConnectionHandlerIf() = default;
   };
 
   static const int DEFAULT_WORKER_THREADS = 2;

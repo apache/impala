@@ -100,7 +100,7 @@ struct DebugOptions;
 ///
 /// TODO: move into separate subdirectory and move nested classes into separate files
 /// and unnest them
-class Coordinator {
+class Coordinator { // NOLINT: The member variables could be re-ordered to save space
  public:
   Coordinator(const QuerySchedule& schedule, ExecEnv* exec_env,
       RuntimeProfile::EventSequence* events);

@@ -321,7 +321,7 @@ class BoolColumnReader;
 class HdfsParquetScanner : public HdfsScanner {
  public:
   HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
-  virtual ~HdfsParquetScanner() {};
+  virtual ~HdfsParquetScanner() {}
 
   /// Issue just the footer range for each file.  We'll then parse the footer and pick
   /// out the columns we want.
@@ -557,7 +557,7 @@ class HdfsParquetScanner : public HdfsScanner {
       int row_group_idx, int64_t rows_read);
 
   /// Part of the HdfsScanner interface, not used in Parquet.
-  Status InitNewRange() { return Status::OK(); };
+  Status InitNewRange() { return Status::OK(); }
 
   /// Transfers the remaining resources backing tuples such as IO buffers and memory
   /// from mem pools to the given row batch. Closes all column readers.

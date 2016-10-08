@@ -52,7 +52,7 @@ class HBaseScanNode : public ScanNode {
   /// Close the hbase_scanner_, and report errors.
   virtual void Close(RuntimeState* state);
 
-  const int suggested_max_caching() const { return suggested_max_caching_; }
+  int suggested_max_caching() const { return suggested_max_caching_; }
 
  protected:
   /// Write debug string of this into out.

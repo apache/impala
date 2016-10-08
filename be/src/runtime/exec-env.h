@@ -93,7 +93,7 @@ class ExecEnv {
     return fragment_exec_thread_pool_.get();
   }
   ImpalaServer* impala_server() { return impala_server_; }
-  Frontend* frontend() { return frontend_.get(); };
+  Frontend* frontend() { return frontend_.get(); }
   RequestPoolService* request_pool_service() { return request_pool_service_.get(); }
   CallableThreadPool* rpc_pool() { return async_rpc_pool_.get(); }
   FragmentMgr* fragment_mgr() { return fragment_mgr_.get(); }

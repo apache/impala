@@ -77,7 +77,7 @@ class TimeoutFailureDetector : public FailureDetector {
   TimeoutFailureDetector(boost::posix_time::time_duration failure_timeout,
       boost::posix_time::time_duration suspect_timeout)
       : failure_timeout_(failure_timeout),
-        suspect_timeout_(suspect_timeout) { };
+        suspect_timeout_(suspect_timeout) { }
 
   virtual PeerState UpdateHeartbeat(const std::string& peer, bool seen);
 

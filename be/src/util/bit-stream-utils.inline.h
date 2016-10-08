@@ -93,6 +93,8 @@ inline bool BitReader::GetValue(int num_bits, T* v) {
 
   if (UNLIKELY(byte_offset_ * 8 + bit_offset_ + num_bits > max_bytes_ * 8)) return false;
 
+  DCHECK_GE(bit_offset_, 0);
+  DCHECK_LE(bit_offset_, 64);
   *v = BitUtil::TrailingBits(buffered_values_, bit_offset_ + num_bits) >> bit_offset_;
 
   bit_offset_ += num_bits;

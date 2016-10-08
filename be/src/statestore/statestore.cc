@@ -199,7 +199,7 @@ void Statestore::Subscriber::AddTransientUpdate(const TopicId& topic_id,
   }
 }
 
-const Statestore::TopicEntry::Version Statestore::Subscriber::LastTopicVersionProcessed(
+Statestore::TopicEntry::Version Statestore::Subscriber::LastTopicVersionProcessed(
     const TopicId& topic_id) const {
   Topics::const_iterator itr = subscribed_topics_.find(topic_id);
   return itr == subscribed_topics_.end() ?
@@ -561,7 +561,7 @@ void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
   }
 }
 
-const Statestore::TopicEntry::Version Statestore::GetMinSubscriberTopicVersion(
+Statestore::TopicEntry::Version Statestore::GetMinSubscriberTopicVersion(
     const TopicId& topic_id, SubscriberId* subscriber_id) {
   TopicEntry::Version min_topic_version = numeric_limits<int64_t>::max();
   bool found = false;

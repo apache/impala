@@ -84,7 +84,7 @@ void MemTestMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst
   dst->val += src.val;
 }
 
-const BigIntVal MemTestSerialize(FunctionContext* context, const BigIntVal& total) {
+BigIntVal MemTestSerialize(FunctionContext* context, const BigIntVal& total) {
   if (total.is_null) return BigIntVal(0);
   context->Free(total.val);
   return total;

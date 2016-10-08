@@ -161,8 +161,9 @@
 #include <gutil/strings/substitute.h>
 
 #include "exprs/in-predicate.h"
-#include "exprs/in-predicate-ir.cc"
 
+#include "runtime/decimal-value.h"
+#include "runtime/string-value.h"
 #include "udf/udf-test-harness.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"

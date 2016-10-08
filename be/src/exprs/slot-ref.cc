@@ -17,6 +17,7 @@
 
 #include "exprs/slot-ref.h"
 
+#include <limits>
 #include <sstream>
 
 #include "codegen/codegen-anyval.h"
@@ -172,7 +173,7 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   // as the join node. When the slot is being used in the scan-node, the tuple is
   // non-nullable. Used in the join node (and above in the plan tree), it is nullable.
   // TODO: can we do something better.
-  const int64_t TUPLE_NULLABLE_MASK = 1L << 63;
+  constexpr int64_t TUPLE_NULLABLE_MASK = numeric_limits<int64_t>::min();
   int64_t unique_slot_id = slot_id_ | ((int64_t)tuple_idx_) << 32;
   DCHECK_EQ(unique_slot_id & TUPLE_NULLABLE_MASK, 0);
   if (tuple_is_nullable_) unique_slot_id |= TUPLE_NULLABLE_MASK;

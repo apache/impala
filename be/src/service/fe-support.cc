@@ -178,6 +178,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
     type = LibCache::TYPE_JAR;
   } else {
     DCHECK(false) << params.fn_binary_type;
+    type = LibCache::TYPE_JAR; // Set type to something for the case where DCHECK is off.
   }
 
   // Builtin functions are loaded directly from the running process

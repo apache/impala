@@ -26,6 +26,7 @@
 #include <boost/random/uniform_int.hpp>
 #include <boost/filesystem.hpp>
 #include <gutil/strings/substitute.h>
+#include <random>
 #include <string>
 #include <vector>
 #include <thrift/Thrift.h>

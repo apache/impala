@@ -19,15 +19,15 @@
 #ifndef IMPALA_EXEC_EXEC_NODE_H
 #define IMPALA_EXEC_EXEC_NODE_H
 
-#include <vector>
 #include <sstream>
+#include <vector>
 
 #include "common/status.h"
 #include "exprs/expr-context.h"
-#include "runtime/descriptors.h"  // for RowDescriptor
-#include "util/runtime-profile.h"
-#include "util/blocking-queue.h"
 #include "gen-cpp/PlanNodes_types.h"
+#include "runtime/descriptors.h" // for RowDescriptor
+#include "util/blocking-queue.h"
+#include "util/runtime-profile.h"
 
 namespace impala {
 

@@ -32,7 +32,7 @@ namespace impala {
 class WriteStream {
  public:
 
-  WriteStream() : len_(0) { };
+  WriteStream() : len_(0) { }
 
   /// Writes bytes to the buffer, returns the number of bytes written
   inline int WriteBytes(int length, const uint8_t* buf);

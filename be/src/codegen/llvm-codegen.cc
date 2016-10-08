@@ -102,8 +102,8 @@ string LlvmCodeGen::cpu_name_;
 vector<string> LlvmCodeGen::cpu_attrs_;
 unordered_set<string> LlvmCodeGen::gv_ref_ir_fns_;
 
-static void LlvmCodegenHandleError(void* user_data, const std::string& reason,
-    bool gen_crash_diag) {
+[[noreturn]] static void LlvmCodegenHandleError(
+    void* user_data, const std::string& reason, bool gen_crash_diag) {
   LOG(FATAL) << "LLVM hit fatal error: " << reason.c_str();
 }
 
@@ -1416,7 +1416,7 @@ namespace boost {
 /// Handler for exceptions in cross-compiled functions.
 /// When boost is configured with BOOST_NO_EXCEPTIONS, it calls this handler instead of
 /// throwing the exception.
-void throw_exception(std::exception const &e) {
+[[noreturn]] void throw_exception(std::exception const& e) {
   LOG(FATAL) << "Cannot handle exceptions in codegen'd code " << e.what();
 }
 

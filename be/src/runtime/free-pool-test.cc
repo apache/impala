@@ -48,7 +48,7 @@ TEST(FreePoolTest, Basic) {
   for (int i = 0; i < 10; ++i) {
     uint8_t* p2 = pool.Allocate(1);
     *p2 = 111;
-    ASSERT_EQ(p1, p2);
+    EXPECT_EQ(p1, p2);
     EXPECT_EQ(mem_pool.total_allocated_bytes(), 16);
     pool.Free(p2);
   }
@@ -191,6 +191,7 @@ TEST(FreePoolTest, ReAlloc) {
   uint8_t* ptr5 = pool.Reallocate(ptr4, 1024);
   EXPECT_TRUE(ptr4 == ptr5);
   EXPECT_EQ(mem_pool.total_allocated_bytes(), 1024 + 8 + 2048 + 8 + (1LL << 32) + 8);
+  pool.Free(ptr5);
 
   mem_pool.FreeAll();
 }

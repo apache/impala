@@ -41,7 +41,8 @@ class ObjectPool;
 /// corresponding rate based counter.  This thread wakes up at fixed intervals and updates
 /// all of the rate counters.
 /// Thread-safe.
-class RuntimeProfile {
+class RuntimeProfile { // NOLINT: This struct is not packed, but there are not so many
+                       // of them that it makes a performance difference
  public:
   class Counter {
    public:

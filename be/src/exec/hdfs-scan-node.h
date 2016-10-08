@@ -153,11 +153,6 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// -1 if no callback is registered.
   int thread_avail_cb_id_;
 
-  /// The id of the callback added to the query resource manager when RM is enabled.
-  /// Used to remove the callback before this scan node is destroyed.
-  /// -1 if no callback is registered.
-  int32_t rm_callback_id_;
-
   /// Maximum number of scanner threads. Set to 'NUM_SCANNER_THREADS' if that query
   /// option is set. Otherwise, it's set to the number of cpu cores. Scanner threads
   /// are generally cpu bound so there is no benefit in spinning up more threads than

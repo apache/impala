@@ -409,13 +409,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void LogQueryEvents(const QueryExecState& exec_state);
 
   /// Runs once every 5s to flush the profile log file to disk.
-  void LogFileFlushThread();
+  [[noreturn]] void LogFileFlushThread();
 
   /// Runs once every 5s to flush the audit log file to disk.
-  void AuditEventLoggerFlushThread();
+  [[noreturn]] void AuditEventLoggerFlushThread();
 
   /// Runs once every 5s to flush the lineage log file to disk.
-  void LineageLoggerFlushThread();
+  [[noreturn]] void LineageLoggerFlushThread();
 
   /// Copies a query's state into the query log. Called immediately prior to a
   /// QueryExecState's deletion. Also writes the query profile to the profile log on disk.
@@ -516,7 +516,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void QueryHandleToTUniqueId(const beeswax::QueryHandle& handle, TUniqueId* query_id);
 
   /// Helper function to raise BeeswaxException
-  void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
+  [[noreturn]] void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
 
   /// Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
   Status FetchInternal(const TUniqueId& query_id, bool start_over,
@@ -598,12 +598,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// sessions for their last-idle times. Those that have been idle for longer than
   /// their configured timeout values are 'expired': they will no longer accept queries
   /// and any running queries associated with those sessions are unregistered.
-  void ExpireSessions();
+  [[noreturn]] void ExpireSessions();
 
   /// Runs forever, walking queries_by_timestamp_ and expiring any queries that have been
   /// idle (i.e. no client input and no time spent processing locally) for
   /// FLAGS_idle_query_timeout seconds.
-  void ExpireQueries();
+  [[noreturn]] void ExpireQueries();
 
   /// Guards query_log_ and query_log_index_
   boost::mutex query_log_lock_;

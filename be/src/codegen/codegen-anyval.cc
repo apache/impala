@@ -305,7 +305,6 @@ Value* CodegenAnyVal::GetVal(const char* name) {
       uint32_t idxs[] = {2, 0};
       Value* val = builder_->CreateExtractValue(value_, idxs, name);
       return builder_->CreateTrunc(val, codegen_->GetType(type_), name);
-      break;
     }
     default:
       DCHECK(false) << "Unsupported type: " << type_;

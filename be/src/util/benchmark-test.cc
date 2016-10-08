@@ -40,7 +40,7 @@ class BenchmarkTest {
  public:
   static double Measure(Benchmark::BenchmarkFunction fn, void* data) {
     return Benchmark::Measure(fn, data);
-  };
+  }
 };
 
 void TestFunction(int batch_size, void* d) {

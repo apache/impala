@@ -151,7 +151,7 @@ class CatalogServer {
   /// to get the latest set of catalog objects that exist, along with some metadata on
   /// each object. The results are stored in the shared catalog_objects_ data structure.
   /// Also, explicitly releases free memory back to the OS after each complete iteration.
-  void GatherCatalogUpdatesThread();
+  [[noreturn]] void GatherCatalogUpdatesThread();
 
   /// This function determines what items have been added/removed from the catalog
   /// since the last heartbeat and builds the next topic update to send. To do this, it

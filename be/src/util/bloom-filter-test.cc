@@ -180,7 +180,8 @@ TEST(BloomFilter, FindInvalid) {
 
 // Test that MaxNdv() and MinLogSpace() are dual
 TEST(BloomFilter, MinSpaceMaxNdv) {
-  for (double fpp = 0.25; fpp >= 1.0 / (1ull << 63); fpp /= 2) {
+  for (int log2fpp = -2; log2fpp >= -63; --log2fpp) {
+    const double fpp = pow(2, log2fpp);
     for (int given_log_space = 8; given_log_space < 30; ++given_log_space) {
       const size_t derived_ndv = BloomFilter::MaxNdv(given_log_space, fpp);
       int derived_log_space = BloomFilter::MinLogSpace(derived_ndv, fpp);
@@ -225,7 +226,7 @@ TEST(BloomFilter, MinSpaceEdgeCase) {
 // Check that MinLogSpace() and FalsePositiveProb() are dual
 TEST(BloomFilter, MinSpaceForFpp) {
   for (size_t ndv = 10000; ndv < 100 * 1000 * 1000; ndv *= 1.01) {
-    for (double fpp = 0.1; fpp > pow(2, -20); fpp *= 0.99) {
+    for (double fpp = 0.1; fpp > pow(2, -20); fpp *= 0.99) { // NOLINT: loop on double
       // When contructing a Bloom filter, we can request a particular fpp by calling
       // MinLogSpace().
       const int min_log_space = BloomFilter::MinLogSpace(ndv, fpp);

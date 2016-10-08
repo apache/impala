@@ -339,7 +339,7 @@ bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContex
         *d = date(dt_result.year, dt_result.month, dt_result.day);
         *d += date_duration(day_offset);
       }
-    } catch (boost::exception& e) {
+    } catch (boost::exception&) {
       is_valid_date = false;
     }
     if (!is_valid_date) {

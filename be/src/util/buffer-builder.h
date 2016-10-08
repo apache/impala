@@ -27,35 +27,31 @@ namespace impala {
 /// Utility class to build an in-memory buffer.
 class BufferBuilder {
  public:
-  BufferBuilder(uint8_t* dst_buffer, int dst_len) 
-    : buffer_(dst_buffer), capacity_(dst_len), size_(0) {
-  }
-  
-  BufferBuilder(char* dst_buffer, int dst_len) 
-    : buffer_(reinterpret_cast<uint8_t*>(dst_buffer)), 
-      capacity_(dst_len), size_(0) {
-  }
+  BufferBuilder(uint8_t* dst_buffer, int dst_len)
+    : buffer_(dst_buffer), capacity_(dst_len), size_(0) {}
 
-  inline void Append(const void* buffer, int len) {
+  BufferBuilder(char* dst_buffer, int dst_len)
+    : buffer_(reinterpret_cast<uint8_t*>(dst_buffer)), capacity_(dst_len), size_(0) {}
+
+  inline void Append(const void* buffer, int len) __attribute__((nonnull)) {
     DCHECK_LE(size_ + len, capacity_);
     memcpy(buffer_ + size_, buffer, len);
     size_ += len;
   }
 
-  template<typename T>
+  template <typename T>
   inline void Append(const T& v) {
     Append(&v, sizeof(T));
   }
 
   int capacity() const { return capacity_; }
   int size() const { return size_; }
- 
- private: 
+
+ private:
   uint8_t* buffer_;
   int capacity_;
   int size_;
 };
-
 }
 
 #endif

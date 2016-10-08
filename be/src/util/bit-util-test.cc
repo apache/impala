@@ -90,9 +90,9 @@ TEST(BitUtil, TrailingBits) {
             BOOST_BINARY(1 1 1 1 1 1 1 1));
   EXPECT_EQ(BitUtil::TrailingBits(0, 1), 0);
   EXPECT_EQ(BitUtil::TrailingBits(0, 64), 0);
-  EXPECT_EQ(BitUtil::TrailingBits(1LL << 63, 0), 0);
-  EXPECT_EQ(BitUtil::TrailingBits(1LL << 63, 63), 0);
-  EXPECT_EQ(BitUtil::TrailingBits(1LL << 63, 64), 1LL << 63);
+  EXPECT_EQ(BitUtil::TrailingBits(1ULL << 63, 0), 0);
+  EXPECT_EQ(BitUtil::TrailingBits(1ULL << 63, 63), 0);
+  EXPECT_EQ(BitUtil::TrailingBits(1ULL << 63, 64), 1ULL << 63);
 }
 
 // Test different SIMD functionality units with an input/output buffer.
@@ -141,6 +141,7 @@ void TestByteSwapSimd_Unit(const int64_t CpuFlag) {
 //   CpuFlag == 0 for BitUtil::ByteSwap;
 // buf_size parameter indicates the size of input/output buffer.
 void TestByteSwapSimd(const int64_t CpuFlag, const int buf_size) {
+  if (buf_size <= 0) return;
   uint8_t src_buf[buf_size];
   uint8_t dst_buf[buf_size];
   std::iota(src_buf, src_buf + buf_size, 0);

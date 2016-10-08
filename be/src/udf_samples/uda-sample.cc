@@ -50,7 +50,7 @@ struct AvgStruct {
 };
 
 void AvgInit(FunctionContext* context, BufferVal* val) {
-  assert(sizeof(AvgStruct) == 16);
+  static_assert(sizeof(AvgStruct) == 16, "AvgStruct is an unexpected size");
   memset(*val, 0, sizeof(AvgStruct));
 }
 

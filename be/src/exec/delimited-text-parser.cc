@@ -27,8 +27,13 @@ using namespace impala;
 DelimitedTextParser::DelimitedTextParser(
     int num_cols, int num_partition_keys, const bool* is_materialized_col,
     char tuple_delim, char field_delim, char collection_item_delim, char escape_char)
-    : num_tuple_delims_(0),
+    : is_materialized_col_(is_materialized_col),
+      num_tuple_delims_(0),
       num_delims_(0),
+      num_cols_(num_cols),
+      num_partition_keys_(num_partition_keys),
+      column_idx_(0),
+      last_row_delim_offset_(-1),
       field_delim_(field_delim),
       process_escapes_(escape_char != '\0'),
       escape_char_(escape_char),
@@ -36,11 +41,6 @@ DelimitedTextParser::DelimitedTextParser(
       tuple_delim_(tuple_delim),
       current_column_has_escape_(false),
       last_char_is_escape_(false),
-      last_row_delim_offset_(-1),
-      num_cols_(num_cols),
-      num_partition_keys_(num_partition_keys),
-      is_materialized_col_(is_materialized_col),
-      column_idx_(0),
       unfinished_tuple_(false){
   // Escape character should not be the same as tuple or col delim unless it is the
   // empty delimiter.

@@ -83,7 +83,7 @@ Status HdfsAvroScanner::Codegen(HdfsScanNodeBase* node,
   DCHECK(node->runtime_state()->codegen_enabled());
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
   DCHECK(codegen != NULL);
-  Function* materialize_tuple_fn;
+  Function* materialize_tuple_fn = NULL;
   RETURN_IF_ERROR(CodegenMaterializeTuple(node, codegen, &materialize_tuple_fn));
   DCHECK(materialize_tuple_fn != NULL);
   RETURN_IF_ERROR(CodegenDecodeAvroData(codegen, materialize_tuple_fn,
@@ -641,6 +641,7 @@ bool HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
         success = MaterializeTuple(element, pool, data, data_end, tuple);
         break;
       default:
+        success = false;
         DCHECK(false) << "Unsupported SchemaElement: " << type;
     }
     if (UNLIKELY(!success)) {
@@ -923,7 +924,7 @@ Status HdfsAvroScanner::CodegenReadRecord(
 
     // Write read_field_block IR
     builder->SetInsertPoint(read_field_block);
-    Value* ret_val;
+    Value *ret_val = nullptr;
     if (field->schema->type == AVRO_RECORD) {
       BasicBlock* insert_before_block =
           (null_block != NULL) ? null_block : end_field_block;

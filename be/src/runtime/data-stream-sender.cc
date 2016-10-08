@@ -32,6 +32,7 @@
 #include "runtime/client-cache.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/backend-client.h"
+#include "util/aligned-new.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
 #include "util/thread-pool.h"
@@ -59,7 +60,7 @@ namespace impala {
 // at any one time (ie, sending will block if the most recent rpc hasn't finished,
 // which allows the receiver node to throttle the sender by withholding acks).
 // *Not* thread-safe.
-class DataStreamSender::Channel {
+class DataStreamSender::Channel : public CacheLineAligned {
  public:
   // Create channel to send data to particular ipaddress/port/query/node
   // combination. buffer_size is specified in bytes and a soft limit on
@@ -330,7 +331,6 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
     int per_channel_buffer_size)
   : DataSink(row_desc),
     sender_id_(sender_id),
-    pool_(pool),
     current_channel_idx_(0),
     flushed_(false),
     closed_(false),

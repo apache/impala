@@ -250,7 +250,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
   catalog_update_cv_.notify_one();
 }
 
-void CatalogServer::GatherCatalogUpdatesThread() {
+[[noreturn]] void CatalogServer::GatherCatalogUpdatesThread() {
   while (1) {
     unique_lock<mutex> unique_lock(catalog_lock_);
     // Protect against spurious wakups by checking the value of topic_updates_ready_.

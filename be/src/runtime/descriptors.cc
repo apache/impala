@@ -90,7 +90,6 @@ SlotDescriptor::SlotDescriptor(
     slot_idx_(tdesc.slotIdx),
     slot_size_(type_.GetSlotSize()),
     llvm_field_idx_(-1),
-    is_null_fn_(NULL),
     set_not_null_fn_(NULL),
     set_null_fn_(NULL) {
   DCHECK_NE(type_.type, TYPE_STRUCT);

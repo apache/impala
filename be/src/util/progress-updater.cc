@@ -52,7 +52,7 @@ void ProgressUpdater::Update(int64_t delta) {
 
   if (num_complete >= total_) {
     // Always print the final 100% complete
-    VLOG(logging_level_) << label_ << " 100\% Complete ("
+    VLOG(logging_level_) << label_ << " 100% Complete ("
                          << num_complete << " out of " << total_ << ")";
     return;
   }
@@ -62,7 +62,7 @@ void ProgressUpdater::Update(int64_t delta) {
   if (new_percentage - old_percentage > update_period_) {
     // Only update shared variable if this guy was the latest.
     last_output_percentage_.CompareAndSwap(old_percentage, new_percentage);
-    VLOG(logging_level_) << label_ << ": " << new_percentage << "\% Complete ("
+    VLOG(logging_level_) << label_ << ": " << new_percentage << "% Complete ("
                          << num_complete << " out of " << total_ << ")";
   }
 }
@@ -72,11 +72,11 @@ string ProgressUpdater::ToString() const {
   int64_t num_complete = num_complete_.Load();
   if (num_complete >= total_) {
     // Always print the final 100% complete
-    ss << label_ << " 100\% Complete (" << num_complete << " out of " << total_ << ")";
+    ss << label_ << " 100% Complete (" << num_complete << " out of " << total_ << ")";
     return ss.str();
   }
   int percentage = (static_cast<double>(num_complete) / total_) * 100;
-  ss << label_ << ": " << percentage << "\% Complete ("
+  ss << label_ << ": " << percentage << "% Complete ("
      << num_complete << " out of " << total_ << ")";
   return ss.str();
 }

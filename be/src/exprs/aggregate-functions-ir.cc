@@ -92,7 +92,7 @@ int64_t HllEstimateBias(int64_t estimate) {
   // Precision index into data arrays
   // We don't have data for precisions less than 4
   DCHECK(impala::AggregateFunctions::HLL_PRECISION >= 4);
-  const size_t idx = impala::AggregateFunctions::HLL_PRECISION - 4;
+  static constexpr size_t idx = impala::AggregateFunctions::HLL_PRECISION - 4;
 
   // Calculate the square of the difference of this estimate to all
   // precalculated estimates for a particular precision
@@ -170,10 +170,8 @@ StringVal ToStringVal(FunctionContext* context, T val) {
 // Delimiter to use if the separator is NULL.
 static const StringVal DEFAULT_STRING_CONCAT_DELIM((uint8_t*)", ", 2);
 
-// Hyperloglog precision. Default taken from paper. Doesn't seem to matter very
-// much when between [6,12]
-const int AggregateFunctions::HLL_PRECISION = 10;
-const int AggregateFunctions::HLL_LEN = 1024; // 2^HLL_PRECISION
+constexpr int AggregateFunctions::HLL_PRECISION;
+constexpr int AggregateFunctions::HLL_LEN;
 
 void AggregateFunctions::InitNull(FunctionContext*, AnyVal* dst) {
   dst->is_null = true;
@@ -983,7 +981,7 @@ void AggregateFunctions::ReservoirSampleUpdate(FunctionContext* ctx, const T& sr
 }
 
 template <typename T>
-const StringVal AggregateFunctions::ReservoirSampleSerialize(FunctionContext* ctx,
+StringVal AggregateFunctions::ReservoirSampleSerialize(FunctionContext* ctx,
     const StringVal& src) {
   if (UNLIKELY(src.is_null)) return src;
   StringVal result = StringVal::CopyFrom(ctx, src.ptr, src.len);
@@ -1779,25 +1777,25 @@ template void AggregateFunctions::ReservoirSampleUpdate(
 template void AggregateFunctions::ReservoirSampleUpdate(
     FunctionContext*, const DecimalVal&, StringVal*);
 
-template const StringVal AggregateFunctions::ReservoirSampleSerialize<BooleanVal>(
+template StringVal AggregateFunctions::ReservoirSampleSerialize<BooleanVal>(
     FunctionContext*, const StringVal&);
-template const StringVal AggregateFunctions::ReservoirSampleSerialize<TinyIntVal>(
+template StringVal AggregateFunctions::ReservoirSampleSerialize<TinyIntVal>(
     FunctionContext*, const StringVal&);
-template const StringVal AggregateFunctions::ReservoirSampleSerialize<SmallIntVal>(
+template StringVal AggregateFunctions::ReservoirSampleSerialize<SmallIntVal>(
     FunctionContext*, const StringVal&);
-template const StringVal AggregateFunctions::ReservoirSampleSerialize<IntVal>(
+template StringVal AggregateFunctions::ReservoirSampleSerialize<IntVal>(
     FunctionContext*, const StringVal&);
-template const StringVal AggregateFunctions::ReservoirSampleSerialize<BigIntVal>(
+template StringVal AggregateFunctions::ReservoirSampleSerialize<BigIntVal>(
     FunctionContext*, const StringVal&);
-template const StringVal AggregateFunctions::ReservoirSampleSerialize<FloatVal>(
+template StringVal AggregateFunctions::ReservoirSampleSerialize<FloatVal>(
     FunctionContext*, const StringVal&);
-template const StringVal AggregateFunctions::ReservoirSampleSerialize<DoubleVal>(
+template StringVal AggregateFunctions::ReservoirSampleSerialize<DoubleVal>(
     FunctionContext*, const StringVal&);
-template const StringVal AggregateFunctions::ReservoirSampleSerialize<StringVal>(
+template StringVal AggregateFunctions::ReservoirSampleSerialize<StringVal>(
     FunctionContext*, const StringVal&);
-template const StringVal AggregateFunctions::ReservoirSampleSerialize<TimestampVal>(
+template StringVal AggregateFunctions::ReservoirSampleSerialize<TimestampVal>(
     FunctionContext*, const StringVal&);
-template const StringVal AggregateFunctions::ReservoirSampleSerialize<DecimalVal>(
+template StringVal AggregateFunctions::ReservoirSampleSerialize<DecimalVal>(
     FunctionContext*, const StringVal&);
 
 template void AggregateFunctions::ReservoirSampleMerge<BooleanVal>(

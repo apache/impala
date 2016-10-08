@@ -24,8 +24,6 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 
-using namespace strings;
-
 namespace impala {
 
 /// Dynamic-sizable string (similar to std::string) but without as many
@@ -86,8 +84,9 @@ class StringBuffer {
       buffer_size_ = std::max<int64_t>(buffer_size_ * 2, new_size);
       char* new_buffer = reinterpret_cast<char*>(pool_->TryAllocate(buffer_size_));
       if (UNLIKELY(new_buffer == NULL)) {
-        string details = Substitute("StringBuffer failed to grow buffer from $0 "
-            "to $1 bytes.", old_size, buffer_size_);
+        string details =
+            strings::Substitute("StringBuffer failed to grow buffer from $0 to $1 bytes.",
+                old_size, buffer_size_);
         return pool_->mem_tracker()->MemLimitExceeded(NULL, details, buffer_size_);
       }
       if (LIKELY(len_ > 0)) memcpy(new_buffer, buffer_, len_);

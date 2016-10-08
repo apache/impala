@@ -94,7 +94,7 @@ void PprofCpuProfileHandler(const Webserver::ArgumentMap& args, stringstream* ou
   ProfilerStop();
   ifstream prof_file(tmp_prof_file_name.str().c_str(), ios::in);
   if (!prof_file.is_open()) {
-    (*output) << "Unable to open cpu profile: " << tmp_prof_file_name;
+    (*output) << "Unable to open cpu profile: " << tmp_prof_file_name.str();
     return;
   }
   (*output) << prof_file.rdbuf();

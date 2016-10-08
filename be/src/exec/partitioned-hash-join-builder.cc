@@ -17,6 +17,8 @@
 
 #include "exec/partitioned-hash-join-builder.h"
 
+#include <numeric>
+
 #include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"

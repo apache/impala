@@ -86,7 +86,7 @@ class HdfsTableWriter {
   virtual void Close() = 0;
 
   /// Returns the stats for this writer.
-  TInsertStats& stats() { return stats_; };
+  TInsertStats& stats() { return stats_; }
 
   /// Default block size to use for this file format.  If the file format doesn't
   /// care, it should return 0 and the hdfs config default will be used.

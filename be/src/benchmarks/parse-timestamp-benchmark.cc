@@ -58,21 +58,6 @@ using namespace impala;
 //                ImpalaTimeStamp               37.41              83.35X
 //              ImpalaTZTimeStamp               37.39               83.3X
 
-#define VALIDATE 0
-
-#if VALIDATE
-#define VALIDATE_RESULT(actual, expected, str) \
-  if (actual != expected) { \
-    cout << "Parse Error. " \
-         << "String: " << str \
-         << ". Parsed: " << actual << endl; \
-    exit(-1); \
-  }
-#else
-#define VALIDATE_RESULT(actual, expected, str)
-#endif
-
-
 struct TestData {
   vector<StringValue> data;
   vector<string> memory;

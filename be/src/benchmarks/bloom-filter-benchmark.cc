@@ -279,7 +279,8 @@ void RunBenchmarks() {
     Benchmark suite("insert");
     vector<unique_ptr<insert::TestData> > testdata;
     for (int ndv = 10000; ndv <= 100 * 1000 * 1000; ndv *= 100) {
-      for (double fpp = 0.1; fpp >= 0.001; fpp /= 10) {
+      for (int log10fpp = -1; log10fpp >= -3; --log10fpp) {
+        const double fpp = pow(10, log10fpp);
         testdata.emplace_back(new insert::TestData(BloomFilter::MinLogSpace(ndv, fpp)));
         snprintf(name, sizeof(name), "ndv %7dk fpp %6.1f%%", ndv/1000, fpp*100);
         suite.AddBenchmark(name, insert::Benchmark, testdata.back().get());
@@ -292,7 +293,8 @@ void RunBenchmarks() {
     Benchmark suite("find");
     vector<unique_ptr<find::TestData> > testdata;
     for (int ndv = 10000; ndv <= 100 * 1000 * 1000; ndv *= 100) {
-      for (double fpp = 0.1; fpp >= 0.001; fpp /= 10) {
+      for (int log10fpp = -1; log10fpp >= -3; --log10fpp) {
+        const double fpp = pow(10, log10fpp);
         testdata.emplace_back(
             new find::TestData(BloomFilter::MinLogSpace(ndv, fpp), ndv));
         snprintf(name, sizeof(name), "present ndv %7dk fpp %6.1f%%", ndv/1000, fpp*100);
@@ -309,7 +311,8 @@ void RunBenchmarks() {
     Benchmark suite("union");
     vector<unique_ptr<either::TestData> > testdata;
     for (int ndv = 10000; ndv <= 100 * 1000 * 1000; ndv *= 100) {
-      for (double fpp = 0.1; fpp >= 0.001; fpp /= 10) {
+      for (int log10fpp = -1; log10fpp >= -3; --log10fpp) {
+        const double fpp = pow(10, log10fpp);
         testdata.emplace_back(
             new either::TestData(BloomFilter::MinLogSpace(ndv, fpp)));
         snprintf(name, sizeof(name), "ndv %7dk fpp %6.1f%%", ndv/1000, fpp*100);
@@ -330,7 +333,8 @@ int main(int argc, char **argv) {
     Benchmark suite("initialize");
     vector<unique_ptr<int> > testdata;
     for (int ndv = 10000; ndv <= 100 * 1000 * 1000; ndv *= 100) {
-      for (double fpp = 0.1; fpp >= 0.001; fpp /= 10) {
+      for (int log10fpp = -1; log10fpp >= -3; --log10fpp) {
+        const double fpp = pow(10, log10fpp);
         testdata.emplace_back(new int(BloomFilter::MinLogSpace(ndv, fpp)));
         snprintf(name, sizeof(name), "ndv %7dk fpp %6.1f%%", ndv / 1000, fpp * 100);
         suite.AddBenchmark(name, initialize::Benchmark, testdata.back().get());
