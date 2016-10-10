@@ -1869,6 +1869,9 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           tbl.getMetaStoreTable().deepCopy();
       setStorageDescriptorFileFormat(msTbl.getSd(), fileFormat);
+      // The default partition must be updated if the file format is changed so that new
+      // partitions are created with the new file format.
+      if (tbl instanceof HdfsTable) ((HdfsTable) tbl).addDefaultPartition(msTbl.getSd());
       applyAlterTable(msTbl);
       reloadFileMetadata = true;
     } else {
