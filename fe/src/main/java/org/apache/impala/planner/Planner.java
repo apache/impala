@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.Analyzer;
@@ -29,11 +30,15 @@ import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.QueryStmt;
+import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.common.TreeNode;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
@@ -45,7 +50,9 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Creates an executable plan from an analyzed parse tree and query options.
@@ -140,6 +147,8 @@ public class Planner {
         rootFragment = distributedPlanner.createInsertFragment(
             rootFragment, insertStmt, ctx_.getRootAnalyzer(), fragments);
       }
+      // Add optional sort node to the plan, based on clustered/noclustered plan hint.
+      createClusteringSort(insertStmt, rootFragment, ctx_.getRootAnalyzer());
       // set up table sink for root fragment
       rootFragment.setSink(insertStmt.createDataSink());
       resultExprs = insertStmt.getResultExprs();
@@ -482,5 +491,44 @@ public class Planner {
     newJoinNode.setId(joinNode.getId());
     newJoinNode.init(analyzer);
     return newJoinNode;
+  }
+
+  /**
+   * Insert a sort node on top of the plan, depending on the clustered/noclustered plan
+   * hint. This will sort the data produced by 'inputFragment' by the clustering columns
+   * (key columns for Kudu tables), so that partitions can be written sequentially in the
+   * table sink.
+   */
+  public void createClusteringSort(InsertStmt insertStmt, PlanFragment inputFragment,
+       Analyzer analyzer) throws ImpalaException {
+    if (!insertStmt.hasClusteredHint()) return;
+
+    List<Expr> orderingExprs;
+    if (insertStmt.getTargetTable() instanceof KuduTable) {
+      orderingExprs = Lists.newArrayList(insertStmt.getPrimaryKeyExprs());
+    } else {
+      orderingExprs = Lists.newArrayList(insertStmt.getPartitionKeyExprs());
+    }
+    // Ignore constants for the sake of clustering.
+    Expr.removeConstants(orderingExprs);
+
+    if (orderingExprs.isEmpty()) return;
+
+    // Build sortinfo to sort by the ordering exprs.
+    List<Boolean> isAscOrder = Collections.nCopies(orderingExprs.size(), false);
+    List<Boolean> nullsFirstParams = Collections.nCopies(orderingExprs.size(), false);
+    SortInfo sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams);
+
+    ExprSubstitutionMap smap = sortInfo.createSortTupleInfo(
+        insertStmt.getResultExprs(), analyzer);
+    sortInfo.getSortTupleDescriptor().materializeSlots();
+
+    insertStmt.substituteResultExprs(smap, analyzer);
+
+    SortNode sortNode = new SortNode(ctx_.getNextNodeId(), inputFragment.getPlanRoot(),
+        sortInfo, false, 0);
+    sortNode.init(analyzer);
+
+    inputFragment.setPlanRoot(sortNode);
   }
 }

@@ -224,3 +224,61 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.alltypes]
    kudu predicates: id > 1475059865, id < 1475059775
 ====
+# IMPALA-2521: clustered insert into table adds sort node.
+insert into table functional_kudu.alltypes /*+ clustered */
+select * from functional_kudu.alltypes
+---- PLAN
+INSERT INTO KUDU [functional_kudu.alltypes]
+|  check unique keys: false
+|
+01:SORT
+|  order by: id DESC NULLS LAST
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+---- DISTRIBUTEDPLAN
+INSERT INTO KUDU [functional_kudu.alltypes]
+|  check unique keys: false
+|
+01:SORT
+|  order by: id DESC NULLS LAST
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+====
+# IMPALA-2521: clustered insert into table adds sort node, correctly substituting exprs.
+insert into table functional_kudu.testtbl /*+ clustered */
+select id, name, maxzip as zip
+from (
+select id, max(zip) as maxzip, name
+from functional_kudu.testtbl group by id, name
+) as sub;
+---- PLAN
+INSERT INTO KUDU [functional_kudu.testtbl]
+|  check unique keys: false
+|
+02:SORT
+|  order by: id DESC NULLS LAST
+|
+01:AGGREGATE [FINALIZE]
+|  output: max(zip)
+|  group by: id, name
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+---- DISTRIBUTEDPLAN
+INSERT INTO KUDU [functional_kudu.testtbl]
+|  check unique keys: false
+|
+04:SORT
+|  order by: id DESC NULLS LAST
+|
+03:AGGREGATE [FINALIZE]
+|  output: max:merge(zip)
+|  group by: id, name
+|
+02:EXCHANGE [HASH(id,name)]
+|
+01:AGGREGATE [STREAMING]
+|  output: max(zip)
+|  group by: id, name
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+====

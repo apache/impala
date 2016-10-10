@@ -858,3 +858,17 @@ DROP PARTITIONS alltypesinsert
 ---- CATCH
 Memory limit exceeded
 ====
+---- QUERY
+# IMPALA-2521: clustered insert into table
+insert into table alltypesinsert
+partition (year, month) /*+ clustered */
+select * from functional.alltypessmall;
+---- SETUP
+DROP PARTITIONS alltypesinsert
+RESET alltypesinsert
+---- RESULTS
+year=2009/month=1/: 25
+year=2009/month=2/: 25
+year=2009/month=3/: 25
+year=2009/month=4/: 25
+====

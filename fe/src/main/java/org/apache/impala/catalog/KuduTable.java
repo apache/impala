@@ -326,6 +326,10 @@ public class KuduTable extends Table {
     return tbl;
   }
 
+  public boolean isPrimaryKeyColumn(String name) {
+    return primaryKeyColumnNames_.contains(name);
+  }
+
   public TResultSet getTableStats() throws ImpalaRuntimeException {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();

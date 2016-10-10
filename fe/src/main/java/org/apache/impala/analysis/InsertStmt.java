@@ -41,6 +41,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.planner.DataSink;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -104,21 +105,31 @@ public class InsertStmt extends StatementBase {
   // Set in analyze(). Contains metadata of target table to determine type of sink.
   private Table table_;
 
-  // Set in analyze(). Exprs corresponding to the partitionKeyValues,
+  // Set in analyze(). Exprs corresponding to the partitionKeyValues.
   private List<Expr> partitionKeyExprs_ = Lists.newArrayList();
 
   // Indicates whether this insert stmt has a shuffle or noshuffle plan hint.
   // Both flags may be false. Only one of them may be true, not both.
-  // Shuffle forces data repartitioning before then data sink, and noshuffle
+  // Shuffle forces data repartitioning before the data sink, and noshuffle
   // prevents it. Set in analyze() based on planHints_.
   private boolean hasShuffleHint_ = false;
   private boolean hasNoShuffleHint_ = false;
+
+  // Indicates whether this insert stmt has a clustered or noclustered hint. If clustering
+  // is requested, we add a clustering phase before the data sink, so that partitions can
+  // be written sequentially. The default behavior is to not perform an additional
+  // clustering step.
+  private boolean hasClusteredHint_ = false;
 
   // Output expressions that produce the final results to write to the target table. May
   // include casts, and NullLiterals where an output column isn't explicitly mentioned.
   // Set in prepareExpressions(). The i'th expr produces the i'th column of the target
   // table.
   private ArrayList<Expr> resultExprs_ = Lists.newArrayList();
+
+  // Set in analyze(). Exprs corresponding to key columns of Kudu tables. Empty for
+  // non-Kudu tables.
+  private ArrayList<Expr> primaryKeyExprs_ = Lists.newArrayList();
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
@@ -170,7 +181,9 @@ public class InsertStmt extends StatementBase {
     partitionKeyExprs_.clear();
     hasShuffleHint_ = false;
     hasNoShuffleHint_ = false;
+    hasClusteredHint_ = false;
     resultExprs_.clear();
+    primaryKeyExprs_.clear();
   }
 
   @Override
@@ -493,7 +506,7 @@ public class InsertStmt extends StatementBase {
   }
 
   /**
-   * Performs three final parts of the analysis:
+   * Performs four final parts of the analysis:
    * 1. Checks type compatibility between all expressions and their targets
    *
    * 2. Populates partitionKeyExprs with type-compatible expressions, in Hive
@@ -502,6 +515,8 @@ public class InsertStmt extends StatementBase {
    * 3. Populates resultExprs_ with type-compatible expressions, in Hive column order,
    * for all expressions in the select-list. Unmentioned columns are assigned NULL literal
    * expressions.
+   *
+   * 4. Result exprs for key columns of Kudu tables are stored in primaryKeyExprs_.
    *
    * If necessary, adds casts to the expressions to make them compatible with the type of
    * the corresponding column.
@@ -585,7 +600,19 @@ public class InsertStmt extends StatementBase {
           resultExprs_.add(NullLiteral.create(tblColumn.getType()));
         }
       }
+      // Store exprs for Kudu key columns.
+      if (matchFound && table_ instanceof KuduTable) {
+        KuduTable kuduTable = (KuduTable) table_;
+        if (kuduTable.isPrimaryKeyColumn(tblColumn.getName())) {
+          primaryKeyExprs_.add(Iterables.getLast(resultExprs_));
+        }
+      }
     }
+
+    if (table_ instanceof KuduTable) {
+      Preconditions.checkState(!primaryKeyExprs_.isEmpty());
+    }
+
     // TODO: Check that HBase row-key columns are not NULL? See IMPALA-406
     if (needsGeneratedQueryStatement_) {
       // Build a query statement that returns NULL for every column
@@ -603,28 +630,33 @@ public class InsertStmt extends StatementBase {
     if (planHints_ == null) return;
     if (!planHints_.isEmpty() && table_ instanceof HBaseTable) {
       throw new AnalysisException("INSERT hints are only supported for inserting into " +
-          "Hdfs tables.");
+          "Hdfs and Kudu tables.");
     }
+    boolean hasNoClusteredHint = false;
     for (String hint: planHints_) {
       if (hint.equalsIgnoreCase("SHUFFLE")) {
-        if (hasNoShuffleHint_) {
-          throw new AnalysisException("Conflicting INSERT hint: " + hint);
-        }
         hasShuffleHint_ = true;
         analyzer.setHasPlanHints();
       } else if (hint.equalsIgnoreCase("NOSHUFFLE")) {
-        if (hasShuffleHint_) {
-          throw new AnalysisException("Conflicting INSERT hint: " + hint);
-        }
         hasNoShuffleHint_ = true;
+        analyzer.setHasPlanHints();
+      } else if (hint.equalsIgnoreCase("CLUSTERED")) {
+        hasClusteredHint_ = true;
+        analyzer.setHasPlanHints();
+      } else if (hint.equalsIgnoreCase("NOCLUSTERED")) {
+        hasNoClusteredHint = true;
         analyzer.setHasPlanHints();
       } else {
         analyzer.addWarning("INSERT hint not recognized: " + hint);
       }
     }
     // Both flags may be false or one of them may be true, but not both.
-    Preconditions.checkState((!hasShuffleHint_ && !hasNoShuffleHint_)
-        || (hasShuffleHint_ ^ hasNoShuffleHint_));
+    if (hasShuffleHint_ && hasNoShuffleHint_) {
+      throw new AnalysisException("Conflicting INSERT hints: shuffle and noshuffle");
+    }
+    if (hasClusteredHint_ && hasNoClusteredHint) {
+      throw new AnalysisException("Conflicting INSERT hints: clustered and noclustered");
+    }
   }
 
   public List<String> getPlanHints() { return planHints_; }
@@ -641,7 +673,9 @@ public class InsertStmt extends StatementBase {
   public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs_; }
   public boolean hasShuffleHint() { return hasShuffleHint_; }
   public boolean hasNoShuffleHint() { return hasNoShuffleHint_; }
+  public boolean hasClusteredHint() { return hasClusteredHint_; }
   public ArrayList<Expr> getResultExprs() { return resultExprs_; }
+  public ArrayList<Expr> getPrimaryKeyExprs() { return primaryKeyExprs_; }
 
   public DataSink createDataSink() {
     // analyze() must have been called before.
@@ -651,12 +685,14 @@ public class InsertStmt extends StatementBase {
   }
 
   /**
-   * Substitutes the result expressions and the partition key expressions with smap.
-   * Preserves the original types of those expressions during the substitution.
+   * Substitutes the result expressions, the partition key expressions, and the primary
+   * key expressions with smap. Preserves the original types of those expressions during
+   * the substitution.
    */
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
     resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
     partitionKeyExprs_ = Expr.substituteList(partitionKeyExprs_, smap, analyzer, true);
+    primaryKeyExprs_ = Expr.substituteList(primaryKeyExprs_, smap, analyzer, true);
   }
 
   @Override

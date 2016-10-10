@@ -1742,12 +1742,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalysisError(String.format(
           "insert into table functional_hbase.alltypes %sshuffle%s " +
           "select * from functional_hbase.alltypes", prefix, suffix),
-          "INSERT hints are only supported for inserting into Hdfs tables.");
+          "INSERT hints are only supported for inserting into Hdfs and Kudu tables.");
       // Conflicting plan hints.
       AnalysisError("insert into table functional.alltypessmall " +
           "partition (year, month) /* +shuffle,noshuffle */ " +
           "select * from functional.alltypes",
-          "Conflicting INSERT hint: noshuffle");
+          "Conflicting INSERT hints: shuffle and noshuffle");
     }
 
     // Multiple non-conflicting hints and case insensitivity of hints.
