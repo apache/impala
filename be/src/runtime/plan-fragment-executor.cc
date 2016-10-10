@@ -410,6 +410,7 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
     row_batch_->Reset();
   }
   UpdateStatus(status);
+  COUNTER_ADD(rows_produced_counter_, row_batch_->num_rows());
 
   if (done_) {
     VLOG_QUERY << "Finished executing fragment query_id=" << PrintId(query_id_)
@@ -421,7 +422,6 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
   }
 
   *batch = row_batch_.get();
-  COUNTER_ADD(rows_produced_counter_, row_batch_->num_rows());
   return status;
 }
 

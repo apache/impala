@@ -207,6 +207,7 @@ Status ExchangeNode::GetNextMerging(RuntimeState* state, RowBatch* output_batch,
   num_rows_returned_ += output_batch->num_rows();
   if (ReachedLimit()) {
     output_batch->set_num_rows(output_batch->num_rows() - (num_rows_returned_ - limit_));
+    num_rows_returned_ = limit_;
     *eos = true;
   }
 

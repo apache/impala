@@ -30,15 +30,15 @@ import shlex
 import getpass
 import re
 
-from impala._thrift_gen.beeswax import BeeswaxService
-from impala._thrift_gen.beeswax.BeeswaxService import QueryState
+from beeswaxd import BeeswaxService
+from beeswaxd.BeeswaxService import QueryState
 from datetime import datetime
 try:
   # If Exec Summary is not implemented in Impala, this cannot be imported
-  from impala._thrift_gen.ExecStats.ttypes import TExecStats
+  from ExecStats.ttypes import TExecStats
 except ImportError:
   pass
-from impala._thrift_gen.ImpalaService import ImpalaService
+from ImpalaService import ImpalaService
 from tests.util.thrift_util import create_transport
 from thrift.transport.TTransport import TTransportException
 from thrift.protocol import TBinaryProtocol
@@ -265,7 +265,7 @@ class ImpalaBeeswaxClient(object):
     # is the max over all instances (which should all have received the same number of
     # rows). Otherwise, the cardinality is the sum over all instances which process
     # disjoint partitions.
-    if node.is_broadcast and is_fragment_root:
+    if node.is_broadcast:
       cardinality = max_stats.cardinality
     else:
       cardinality = agg_stats.cardinality
