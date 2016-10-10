@@ -26,12 +26,7 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 
 # If the project was never build, no Makefile will exist and thus make clean will fail.
 # Combine the make command with the bash noop to always return true.
-make clean || :
-
-# Stop the minikdc if needed.
-if "${CLUSTER_DIR}/admin" is_kerberized; then
-    "${IMPALA_HOME}/testdata/bin/minikdc.sh" stop
-fi
+"${MAKE_CMD:-make}" clean || :
 
 # clean the external data source project
 pushd ${IMPALA_HOME}/ext-data-source

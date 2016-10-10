@@ -16,5 +16,5 @@
 # under the License.
 
 add_custom_target(fe DEPENDS thrift-deps function-registry ext-data-source
-  COMMAND mvn package -DskipTests
+  COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh install -DskipTests
 )
