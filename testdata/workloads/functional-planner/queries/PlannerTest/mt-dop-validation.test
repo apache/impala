@@ -1,0 +1,350 @@
+# Distributed nested-loop join not allowed.
+select count(*) from
+functional_parquet.alltypestiny a,
+functional_parquet.alltypestiny b
+---- PLAN
+not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+---- PARALLELPLANS
+not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+====
+# Distributed hash-join not allowed.
+select count(*) from
+functional_parquet.alltypestiny a,
+functional_parquet.alltypestiny b
+where a.id = b.id
+---- PLAN
+not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+---- PARALLELPLANS
+not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+====
+# Insert not allowed.
+insert into functional_parquet.alltypes partition(year,month)
+select * from functional_parquet.alltypessmall
+---- PLAN
+not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+---- PARALLELPLANS
+not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+====
+# CTAS not allowed.
+create table ctas_mt_dop_test as select * from functional_parquet.alltypes
+---- PLAN
+not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+---- PARALLELPLANS
+not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+====
+# Single-table scan/filter/agg/topn should work.
+select count(int_col) cnt from functional_parquet.alltypes
+where id < 10
+group by bigint_col
+order by cnt, bigint_col
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:TOP-N [LIMIT=10]
+|  order by: count(int_col) ASC, bigint_col ASC
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=2 row-size=16B cardinality=10
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(int_col)
+|  group by: bigint_col
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=1 row-size=16B cardinality=unavailable
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=156.57KB
+   predicates: id < 10
+   table stats: unavailable
+   column stats: unavailable
+   hosts=3 per-host-mem=unavailable
+   tuple-ids=0 row-size=16B cardinality=unavailable
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+05:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: count(int_col) ASC, bigint_col ASC
+|  limit: 10
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=2 row-size=16B cardinality=10
+|
+02:TOP-N [LIMIT=10]
+|  order by: count(int_col) ASC, bigint_col ASC
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=2 row-size=16B cardinality=10
+|
+04:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col)
+|  group by: bigint_col
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=1 row-size=16B cardinality=unavailable
+|
+03:EXCHANGE [HASH(bigint_col)]
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=1 row-size=16B cardinality=unavailable
+|
+01:AGGREGATE [STREAMING]
+|  output: count(int_col)
+|  group by: bigint_col
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=1 row-size=16B cardinality=unavailable
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   partitions=24/24 files=24 size=156.57KB
+   predicates: id < 10
+   table stats: unavailable
+   column stats: unavailable
+   hosts=3 per-host-mem=unavailable
+   tuple-ids=0 row-size=16B cardinality=unavailable
+====
+# Single-table scan/filter/analysic should work.
+select row_number() over(partition by int_col order by id)
+from functional_parquet.alltypes
+where id < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=3,2 row-size=16B cardinality=unavailable
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST, id ASC
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=3 row-size=8B cardinality=unavailable
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=156.57KB
+   predicates: id < 10
+   table stats: unavailable
+   column stats: unavailable
+   hosts=3 per-host-mem=unavailable
+   tuple-ids=0 row-size=8B cardinality=unavailable
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=3,2 row-size=16B cardinality=unavailable
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=3,2 row-size=16B cardinality=unavailable
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST, id ASC
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=3 row-size=8B cardinality=unavailable
+|
+03:EXCHANGE [HASH(int_col)]
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=0 row-size=8B cardinality=unavailable
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   partitions=24/24 files=24 size=156.57KB
+   predicates: id < 10
+   table stats: unavailable
+   column stats: unavailable
+   hosts=3 per-host-mem=unavailable
+   tuple-ids=0 row-size=8B cardinality=unavailable
+====
+# Nested-loop join in a subplan should work.
+select *
+from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
+where c_custkey < 10 and o_orderkey < 5 and l_linenumber < 3
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=2,1,0 row-size=562B cardinality=1500000
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |  hosts=3 per-host-mem=unavailable
+|  |  tuple-ids=2,1,0 row-size=562B cardinality=100
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     hosts=3 per-host-mem=unavailable
+|  |     tuple-ids=0 row-size=254B cardinality=1
+|  |
+|  04:SUBPLAN
+|  |  hosts=3 per-host-mem=unavailable
+|  |  tuple-ids=2,1 row-size=308B cardinality=100
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  hosts=3 per-host-mem=unavailable
+|  |  |  tuple-ids=2,1 row-size=308B cardinality=10
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |     parent-subplan=04
+|  |  |     hosts=3 per-host-mem=unavailable
+|  |  |     tuple-ids=1 row-size=124B cardinality=1
+|  |  |
+|  |  06:UNNEST [o.o_lineitems]
+|  |     parent-subplan=04
+|  |     hosts=3 per-host-mem=unavailable
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  03:UNNEST [c.c_orders o]
+|     parent-subplan=01
+|     hosts=3 per-host-mem=unavailable
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=292.36MB
+   predicates: c_custkey < 10, !empty(c.c_orders)
+   predicates on o: !empty(o.o_lineitems), o_orderkey < 5
+   predicates on o_lineitems: l_linenumber < 3
+   table stats: 150000 rows total
+   columns missing stats: c_orders
+   hosts=3 per-host-mem=unavailable
+   tuple-ids=0 row-size=254B cardinality=15000
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+09:EXCHANGE [UNPARTITIONED]
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=2,1,0 row-size=562B cardinality=1500000
+|
+01:SUBPLAN
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=2,1,0 row-size=562B cardinality=1500000
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |  hosts=3 per-host-mem=unavailable
+|  |  tuple-ids=2,1,0 row-size=562B cardinality=100
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     hosts=3 per-host-mem=unavailable
+|  |     tuple-ids=0 row-size=254B cardinality=1
+|  |
+|  04:SUBPLAN
+|  |  hosts=3 per-host-mem=unavailable
+|  |  tuple-ids=2,1 row-size=308B cardinality=100
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  hosts=3 per-host-mem=unavailable
+|  |  |  tuple-ids=2,1 row-size=308B cardinality=10
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |     parent-subplan=04
+|  |  |     hosts=3 per-host-mem=unavailable
+|  |  |     tuple-ids=1 row-size=124B cardinality=1
+|  |  |
+|  |  06:UNNEST [o.o_lineitems]
+|  |     parent-subplan=04
+|  |     hosts=3 per-host-mem=unavailable
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  03:UNNEST [c.c_orders o]
+|     parent-subplan=01
+|     hosts=3 per-host-mem=unavailable
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
+   partitions=1/1 files=4 size=292.36MB
+   predicates: c_custkey < 10, !empty(c.c_orders)
+   predicates on o: !empty(o.o_lineitems), o_orderkey < 5
+   predicates on o_lineitems: l_linenumber < 3
+   table stats: 150000 rows total
+   columns missing stats: c_orders
+   hosts=3 per-host-mem=unavailable
+   tuple-ids=0 row-size=254B cardinality=15000
+====
+# Hash-join in a subplan should work.
+select c.*
+from tpch_nested_parquet.customer c, c.c_orders o1, c.c_orders o2
+where o1.o_orderkey = o2.o_orderkey + 2 and o1.o_orderkey < 5
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=1,0,2 row-size=286B cardinality=1500000
+|
+|--06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: o1.o_orderkey = o2.o_orderkey + 2
+|  |  hosts=3 per-host-mem=unavailable
+|  |  tuple-ids=1,0,2 row-size=286B cardinality=10
+|  |
+|  |--04:UNNEST [c.c_orders o2]
+|  |     parent-subplan=01
+|  |     hosts=3 per-host-mem=unavailable
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  05:NESTED LOOP JOIN [CROSS JOIN]
+|  |  hosts=3 per-host-mem=unavailable
+|  |  tuple-ids=1,0 row-size=278B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     hosts=3 per-host-mem=unavailable
+|  |     tuple-ids=0 row-size=270B cardinality=1
+|  |
+|  03:UNNEST [c.c_orders o1]
+|     parent-subplan=01
+|     hosts=3 per-host-mem=unavailable
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=292.36MB
+   predicates: !empty(c.c_orders), !empty(c.c_orders)
+   predicates on o1: o1.o_orderkey < 5
+   table stats: 150000 rows total
+   columns missing stats: c_orders, c_orders
+   hosts=3 per-host-mem=unavailable
+   tuple-ids=0 row-size=270B cardinality=150000
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=1,0,2 row-size=286B cardinality=1500000
+|
+01:SUBPLAN
+|  hosts=3 per-host-mem=unavailable
+|  tuple-ids=1,0,2 row-size=286B cardinality=1500000
+|
+|--06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: o1.o_orderkey = o2.o_orderkey + 2
+|  |  hosts=3 per-host-mem=unavailable
+|  |  tuple-ids=1,0,2 row-size=286B cardinality=10
+|  |
+|  |--04:UNNEST [c.c_orders o2]
+|  |     parent-subplan=01
+|  |     hosts=3 per-host-mem=unavailable
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  05:NESTED LOOP JOIN [CROSS JOIN]
+|  |  hosts=3 per-host-mem=unavailable
+|  |  tuple-ids=1,0 row-size=278B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     hosts=3 per-host-mem=unavailable
+|  |     tuple-ids=0 row-size=270B cardinality=1
+|  |
+|  03:UNNEST [c.c_orders o1]
+|     parent-subplan=01
+|     hosts=3 per-host-mem=unavailable
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
+   partitions=1/1 files=4 size=292.36MB
+   predicates: !empty(c.c_orders), !empty(c.c_orders)
+   predicates on o1: o1.o_orderkey < 5
+   table stats: 150000 rows total
+   columns missing stats: c_orders, c_orders
+   hosts=3 per-host-mem=unavailable
+   tuple-ids=0 row-size=270B cardinality=150000
+====

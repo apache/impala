@@ -21,9 +21,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Set;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
@@ -55,6 +53,9 @@ import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocations;
 import org.apache.impala.util.MembershipSnapshot;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
@@ -106,6 +107,9 @@ public class HdfsScanNode extends ScanNode {
 
   // True if this scan node should use codegen for evaluting conjuncts.
   private boolean codegenConjuncts_;
+
+  // True if this scan node should use the MT implementation in the backend.
+  private boolean useMtScanNode_;
 
   // Conjuncts that can be evaluated while materializing the items (tuples) of
   // collection-typed slots. Maps from tuple descriptor to the conjuncts bound by that
@@ -168,7 +172,16 @@ public class HdfsScanNode extends ScanNode {
     computeMemLayout(analyzer);
 
     // compute scan range locations
-    computeScanRangeLocations(analyzer);
+    Set<HdfsFileFormat> fileFormats = computeScanRangeLocations(analyzer);
+
+    // Determine backend scan node implementation to use. The optimized MT implementation
+    // is currently only supported for Parquet.
+    if (analyzer.getQueryOptions().mt_dop > 0 &&
+        fileFormats.size() == 1 && fileFormats.contains(HdfsFileFormat.PARQUET)) {
+      useMtScanNode_ = true;
+    } else {
+      useMtScanNode_ = false;
+    }
 
     // do this at the end so it can take all conjuncts and scan ranges into account
     computeStats(analyzer);
@@ -298,12 +311,15 @@ public class HdfsScanNode extends ScanNode {
   /**
    * Computes scan ranges (hdfs splits) plus their storage locations, including volume
    * ids, based on the given maximum number of bytes each scan range should scan.
+   * Returns the set of file formats being scanned.
    */
-  private void computeScanRangeLocations(Analyzer analyzer) {
+  private Set<HdfsFileFormat> computeScanRangeLocations(Analyzer analyzer) {
     long maxScanRangeLength = analyzer.getQueryCtx().getRequest().getQuery_options()
         .getMax_scan_range_length();
     scanRanges_ = Lists.newArrayList();
+    Set<HdfsFileFormat> fileFormats = Sets.newHashSet();
     for (HdfsPartition partition: partitions_) {
+      fileFormats.add(partition.getFileFormat());
       Preconditions.checkState(partition.getId() >= 0);
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
         for (THdfsFileBlock thriftBlock: fileDesc.getFileBlocks()) {
@@ -353,6 +369,7 @@ public class HdfsScanNode extends ScanNode {
         }
       }
     }
+    return fileFormats;
   }
 
   /**
@@ -542,6 +559,7 @@ public class HdfsScanNode extends ScanNode {
     if (skipHeaderLineCount_ > 0) {
       msg.hdfs_scan_node.setSkip_header_line_count(skipHeaderLineCount_);
     }
+    msg.hdfs_scan_node.setUse_mt_scan_node(useMtScanNode_);
   }
 
   @Override

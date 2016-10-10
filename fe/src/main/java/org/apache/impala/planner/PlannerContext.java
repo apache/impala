@@ -25,6 +25,7 @@ import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
+
 import com.google.common.collect.Lists;
 
 /**
@@ -79,9 +80,7 @@ public class PlannerContext {
 
   public QueryStmt getQueryStmt() { return queryStmt_; }
   public TQueryCtx getQueryCtx() { return queryCtx_; }
-  public TQueryOptions getQueryOptions() {
-    return queryCtx_.getRequest().getQuery_options();
-  }
+  public TQueryOptions getQueryOptions() { return getRootAnalyzer().getQueryOptions(); }
   public AnalysisContext.AnalysisResult getAnalysisResult() { return analysisResult_; }
   public Analyzer getRootAnalyzer() { return analysisResult_.getAnalyzer(); }
   public boolean isSingleNodeExec() { return getQueryOptions().num_nodes == 1; }
@@ -91,7 +90,10 @@ public class PlannerContext {
     return analysisResult_.isInsertStmt() || analysisResult_.isCreateTableAsSelectStmt();
   }
   public boolean isQuery() { return analysisResult_.isQueryStmt(); }
-
+  public boolean hasTableSink() {
+    return isInsertOrCtas() || analysisResult_.isUpdateStmt()
+        || analysisResult_.isDeleteStmt();
+  }
   public boolean hasSubplan() { return !subplans_.isEmpty(); }
   public SubplanNode getSubplan() { return subplans_.getFirst(); }
   public boolean pushSubplan(SubplanNode n) { return subplans_.offerFirst(n); }

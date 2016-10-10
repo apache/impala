@@ -264,9 +264,12 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
   switch (tnode.node_type) {
     case TPlanNodeType::HDFS_SCAN_NODE:
       *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
-      if (state->query_options().mt_dop > 0) {
+      if (tnode.hdfs_scan_node.use_mt_scan_node) {
+        DCHECK_GT(state->query_options().mt_dop, 0);
         *node = pool->Add(new HdfsScanNodeMt(pool, tnode, descs));
       } else {
+        DCHECK(state->query_options().mt_dop == 0
+            || state->query_options().num_scanner_threads == 1);
         *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
       }
       // If true, this node requests codegen over interpretation for conjuncts

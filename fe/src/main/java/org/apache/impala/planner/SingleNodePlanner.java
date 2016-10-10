@@ -27,9 +27,6 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.AnalyticInfo;
 import org.apache.impala.analysis.Analyzer;
@@ -67,6 +64,10 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.RuntimeEnv;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
@@ -148,11 +149,22 @@ public class SingleNodePlanner {
   }
 
   /**
-   * Validates a single-node plan by checking that it does not contain right or
-   * full outer joins with no equi-join conjuncts that are not inside the right child
-   * of a SubplanNode. Throws a NotImplementedException if plan validation fails.
+   * Checks that the given single-node plan is executable:
+   * - It may not contain right or full outer joins with no equi-join conjuncts that
+   *   are not inside the right child of a SubplanNode.
+   * - MT_DOP > 0 is not supported for plans with base table joins or table sinks.
+   * Throws a NotImplementedException if plan validation fails.
    */
   public void validatePlan(PlanNode planNode) throws NotImplementedException {
+    if (ctx_.getQueryOptions().mt_dop > 0 && !RuntimeEnv.INSTANCE.isTestEnv()
+        && (planNode instanceof JoinNode || ctx_.hasTableSink())) {
+      throw new NotImplementedException(
+          "MT_DOP not supported for plans with base table joins or table sinks.");
+    }
+
+    // As long as MT_DOP == 0 any join can run in a single-node plan.
+    if (ctx_.isSingleNodeExec() && ctx_.getQueryOptions().mt_dop == 0) return;
+
     if (planNode instanceof NestedLoopJoinNode) {
       JoinNode joinNode = (JoinNode) planNode;
       JoinOperator joinOp = joinNode.getJoinOp();

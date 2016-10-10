@@ -33,13 +33,6 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.fs.Path;
-import org.apache.kudu.client.KuduClient;
-import org.apache.kudu.client.KuduScanToken;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.ColumnLineageGraph;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.common.FrontendTestBase;
@@ -72,6 +65,13 @@ import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTupleDescriptor;
 import org.apache.impala.thrift.TUpdateMembershipRequest;
 import org.apache.impala.util.MembershipSnapshot;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduScanToken;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -503,6 +503,7 @@ public class PlannerTestBase extends FrontendTestBase {
     // Query exec request may not be set for DDL, e.g., CTAS.
     String locationsStr = null;
     if (execRequest != null && execRequest.isSetQuery_exec_request()) {
+      if (execRequest.query_exec_request.fragments == null) return;
       buildMaps(execRequest.query_exec_request);
       // If we optimize the partition key scans, we may get all the partition key values
       // from the metadata and don't reference any table. Skip the check in this case.
@@ -563,7 +564,8 @@ public class PlannerTestBase extends FrontendTestBase {
       String query, TExecRequest execRequest, StringBuilder errorLog) {
     if (execRequest == null) return;
     if (!execRequest.isSetQuery_exec_request()
-        || execRequest.query_exec_request == null) {
+        || execRequest.query_exec_request == null
+        || execRequest.query_exec_request.fragments == null) {
       return;
     }
     for (TPlanFragment planFragment : execRequest.query_exec_request.fragments) {

@@ -17,14 +17,13 @@
 
 package org.apache.impala.planner;
 
-import org.junit.Assume;
-import org.junit.Test;
-
 import org.apache.impala.catalog.Db;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
+import org.junit.Assume;
+import org.junit.Test;
 
 // All planner tests, except for S3 specific tests should go here.
 public class PlannerTest extends PlannerTestBase {
@@ -278,5 +277,21 @@ public class PlannerTest extends PlannerTestBase {
   public void testKuduTpch() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     runPlannerTestFile("tpch-kudu");
+  }
+
+  @Test
+  public void testMtDopValidation() {
+    // Tests that queries supported with mt_dop > 0 produce a parallel plan, or
+    // throw a NotImplementedException otherwise (e.g. plan has a distributed join).
+    TQueryOptions options = defaultQueryOptions();
+    options.setMt_dop(3);
+    try {
+      // Temporarily unset the test env such that unsupported queries with mt_dop > 0
+      // throw an exception. Those are otherwise allowed for testing parallel plans.
+      RuntimeEnv.INSTANCE.setTestEnv(false);
+      runPlannerTestFile("mt-dop-validation", options);
+    } finally {
+      RuntimeEnv.INSTANCE.setTestEnv(true);
+    }
   }
 }

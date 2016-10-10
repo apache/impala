@@ -30,9 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.Privilege;
@@ -66,10 +63,14 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.DisjointSet;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TSessionStateUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -2246,6 +2247,9 @@ public class Analyzer {
   public String getDefaultDb() { return globalState_.queryCtx.session.database; }
   public User getUser() { return user_; }
   public TQueryCtx getQueryCtx() { return globalState_.queryCtx; }
+  public TQueryOptions getQueryOptions() {
+    return globalState_.queryCtx.getRequest().getQuery_options();
+  }
   public AuthorizationConfig getAuthzConfig() { return globalState_.authzConfig; }
   public ListMap<TNetworkAddress> getHostIndex() { return globalState_.hostIndex; }
   public ColumnLineageGraph getColumnLineageGraph() { return globalState_.lineageGraph; }

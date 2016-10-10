@@ -21,9 +21,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnLineageGraph;
@@ -43,6 +40,9 @@ import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.MaxRowsProcessedVisitor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -117,12 +117,13 @@ public class Planner {
           "Runtime filters computed");
     }
 
+    singleNodePlanner.validatePlan(singleNodePlan);
+
     if (ctx_.isSingleNodeExec()) {
       // create one fragment containing the entire single-node plan tree
       fragments = Lists.newArrayList(new PlanFragment(
           ctx_.getNextFragmentId(), singleNodePlan, DataPartition.UNPARTITIONED));
     } else {
-      singleNodePlanner.validatePlan(singleNodePlan);
       // create distributed plan
       fragments = distributedPlanner.createPlanFragments(singleNodePlan);
     }
@@ -200,10 +201,14 @@ public class Planner {
    * TODO: roll into createPlan()
    */
   public List<PlanFragment> createParallelPlans() throws ImpalaException {
+    Preconditions.checkState(ctx_.getQueryOptions().mt_dop > 0);
     ArrayList<PlanFragment> distrPlan = createPlan();
     Preconditions.checkNotNull(distrPlan);
     ParallelPlanner planner = new ParallelPlanner(ctx_);
     List<PlanFragment> parallelPlans = planner.createPlans(distrPlan.get(0));
+    // Only use one scanner thread per scan-node instance since intra-node
+    // parallelism is achieved via multiple fragment instances.
+    ctx_.getQueryOptions().setNum_scanner_threads(1);
     ctx_.getRootAnalyzer().getTimeline().markEvent("Parallel plans created");
     return parallelPlans;
   }
