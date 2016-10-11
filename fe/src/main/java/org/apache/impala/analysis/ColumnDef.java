@@ -79,7 +79,7 @@ public class ColumnDef {
 
   public void analyze() throws AnalysisException {
     // Check whether the column name meets the Metastore's requirements.
-    if (!MetaStoreUtils.validateName(colName_)) {
+    if (!MetaStoreUtils.validateName(colName_, null)) {
       throw new AnalysisException("Invalid column/field name: " + colName_);
     }
     if (typeDef_ != null) {

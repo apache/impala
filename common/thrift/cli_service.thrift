@@ -36,7 +36,7 @@
 // * Service names begin with the letter "T", use a capital letter for each
 //   new word (with no underscores), and end with the word "Service".
 
-namespace java org.apache.hive.service.cli.thrift
+namespace java org.apache.hive.service.rpc.thrift
 namespace cpp apache.hive.service.cli.thrift
 
 // List of protocol versions. A new token should be

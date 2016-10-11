@@ -2729,7 +2729,7 @@ public class ParserTest {
     // may have unquoted identifiers corresponding to keywords.
     for (String keyword: SqlScanner.keywordMap.keySet()) {
       // Skip keywords that are not valid field/column names in the Metastore.
-      if (!MetaStoreUtils.validateName(keyword)) continue;
+      if (!MetaStoreUtils.validateName(keyword, null)) continue;
       String structType = "STRUCT<" + keyword + ":INT>";
       TypeDefsParseOk(structType);
     }

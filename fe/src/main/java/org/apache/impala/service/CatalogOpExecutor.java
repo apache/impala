@@ -677,8 +677,7 @@ public class CatalogOpExecutor {
           partition.getValuesAsString(), numRows));
       PartitionStatsUtil.partStatsToParameters(partitionStats, partition);
       partition.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
-      partition.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
-          StatsSetupConst.TRUE);
+      partition.putToParameters(StatsSetupConst.STATS_GENERATED, StatsSetupConst.TASK);
       ++numTargetedPartitions;
       modifiedParts.add(partition);
     }
@@ -696,8 +695,7 @@ public class CatalogOpExecutor {
     // Update the table's ROW_COUNT parameter.
     msTbl.putToParameters(StatsSetupConst.ROW_COUNT,
         String.valueOf(params.getTable_stats().num_rows));
-    msTbl.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
-        StatsSetupConst.TRUE);
+    msTbl.putToParameters(StatsSetupConst.STATS_GENERATED, StatsSetupConst.TASK);
     return numTargetedPartitions;
   }
 
@@ -1687,7 +1685,7 @@ public class CatalogOpExecutor {
         cacheIds = Lists.<Long>newArrayList(id);
         // Update the partition metadata to include the cache directive id.
         msClient.getHiveClient().alter_partition(partition.getDbName(),
-            partition.getTableName(), partition);
+            partition.getTableName(), partition, null);
       }
       updateLastDdlTime(msTbl, msClient);
     } catch (AlreadyExistsException e) {
@@ -2212,7 +2210,7 @@ public class CatalogOpExecutor {
         }
         // Update the partition metadata to include the cache directive id.
         msClient.getHiveClient().alter_partitions(tableName.getDb(),
-            tableName.getTbl(), hmsPartitions);
+            tableName.getTbl(), hmsPartitions, null);
       }
       updateLastDdlTime(msTbl, msClient);
     } catch (AlreadyExistsException e) {
@@ -2355,7 +2353,7 @@ public class CatalogOpExecutor {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       TableName tableName = tbl.getTableName();
       msClient.getHiveClient().alter_partition(
-          tableName.getDb(), tableName.getTbl(), partition.toHmsPartition());
+          tableName.getDb(), tableName.getTbl(), partition.toHmsPartition(), null);
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           tbl.getMetaStoreTable().deepCopy();
       updateLastDdlTime(msTbl, msClient);
@@ -2511,7 +2509,7 @@ public class CatalogOpExecutor {
         try {
           // Alter partitions in bulk.
           msClient.getHiveClient().alter_partitions(dbName, tableName,
-              hmsPartitions.subList(i, numPartitionsToUpdate));
+              hmsPartitions.subList(i, numPartitionsToUpdate), null);
           // Mark the corresponding HdfsPartition objects as dirty
           for (org.apache.hadoop.hive.metastore.api.Partition msPartition:
                hmsPartitions.subList(i, numPartitionsToUpdate)) {
@@ -2850,7 +2848,7 @@ public class CatalogOpExecutor {
               partition.getSd().setSerdeInfo(msTbl.getSd().getSerdeInfo().deepCopy());
               partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" +
                   partName.substring(0, partName.length() - 1));
-              MetaStoreUtils.updatePartitionStatsFast(partition, warehouse);
+              MetaStoreUtils.updatePartitionStatsFast(partition, warehouse, null);
             }
 
             // First add_partitions and then alter_partitions the successful ones with
@@ -2881,7 +2879,7 @@ public class CatalogOpExecutor {
                 }
                 try {
                   msClient.getHiveClient().alter_partitions(tblName.getDb(),
-                      tblName.getTbl(), cachedHmsParts);
+                      tblName.getTbl(), cachedHmsParts, null);
                 } catch (Exception e) {
                   LOG.error("Failed in alter_partitions: ", e);
                   // Try to uncache the partitions when the alteration in the HMS failed.

@@ -67,7 +67,7 @@ public class MetaStoreUtil {
     // Get the value from the Hive configuration, if present.
     HiveConf hiveConf = new HiveConf(HdfsTable.class);
     String strValue = hiveConf.get(
-        HiveConf.ConfVars.METASTORE_BATCH_RETRIEVE_TABLE_PARTITION_MAX.toString());
+        HiveConf.ConfVars.METASTORE_BATCH_RETRIEVE_OBJECTS_MAX.toString());
     if (strValue != null) {
       try {
         maxPartitionsPerRpc_ = Short.parseShort(strValue);

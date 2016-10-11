@@ -54,12 +54,12 @@ public class TableName {
    */
   public void analyze() throws AnalysisException {
     if (db_ != null) {
-      if (!MetaStoreUtils.validateName(db_)) {
+      if (!MetaStoreUtils.validateName(db_, null)) {
         throw new AnalysisException("Invalid database name: " + db_);
       }
     }
     Preconditions.checkNotNull(tbl_);
-    if (!MetaStoreUtils.validateName(tbl_)) {
+    if (!MetaStoreUtils.validateName(tbl_, null)) {
       throw new AnalysisException("Invalid table/view name: " + tbl_);
     }
   }

@@ -82,7 +82,7 @@ public class CreateDbStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // Check whether the db name meets the Metastore's requirements.
-    if (!MetaStoreUtils.validateName(dbName_)) {
+    if (!MetaStoreUtils.validateName(dbName_, null)) {
       throw new AnalysisException("Invalid database name: " + dbName_);
     }
 

@@ -54,7 +54,7 @@ public class CreateDataSrcStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (!MetaStoreUtils.validateName(dataSrcName_)) {
+    if (!MetaStoreUtils.validateName(dataSrcName_, null)) {
       throw new AnalysisException("Invalid data source name: " + dataSrcName_);
     }
     if (!ifNotExists_ && analyzer.getCatalog().getDataSource(dataSrcName_) != null) {

@@ -39,7 +39,7 @@ public class DropDataSrcStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (!MetaStoreUtils.validateName(dataSrcName_) ||
+    if (!MetaStoreUtils.validateName(dataSrcName_, null) ||
         (!ifExists_ && analyzer.getCatalog().getDataSource(dataSrcName_) == null)) {
       throw new AnalysisException(Analyzer.DATA_SRC_DOES_NOT_EXIST_ERROR_MSG +
           dataSrcName_);

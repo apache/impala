@@ -132,7 +132,7 @@ public class Subquery extends Expr {
       Expr expr = stmtResultExprs.get(i);
       String fieldName = null;
       // Check if the label meets the Metastore's requirements.
-      if (MetaStoreUtils.validateName(labels.get(i))) {
+      if (MetaStoreUtils.validateName(labels.get(i), null)) {
         fieldName = labels.get(i);
         // Make sure the field names are unique.
         if (!hasUniqueLabels) {
