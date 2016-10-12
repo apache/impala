@@ -245,6 +245,31 @@ class TestParquet(ImpalaTestSuite):
     vector.get_value('exec_option')['abort_on_error'] = 1
     self.run_test_case('QueryTest/parquet-abort-on-error', vector)
 
+  def test_zero_rows(self, vector, unique_database):
+    """IMPALA-3943: Tests that scanning files with num_rows=0 in the file footer
+    succeeds without errors."""
+    # Create test table with a file that has 0 rows and 0 row groups.
+    self.client.execute("create table %s.zero_rows_zero_row_groups (c int) "
+        "stored as parquet" % unique_database)
+    zero_rows_zero_row_groups_loc = get_fs_path(
+        "/test-warehouse/%s.db/%s" % (unique_database, "zero_rows_zero_row_groups"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal',
+        os.environ['IMPALA_HOME'] + "/testdata/data/zero_rows_zero_row_groups.parquet",
+        zero_rows_zero_row_groups_loc])
+    # Create test table with a file that has 0 rows and 1 row group.
+    self.client.execute("create table %s.zero_rows_one_row_group (c int) "
+        "stored as parquet" % unique_database)
+    zero_rows_one_row_group_loc = get_fs_path(
+        "/test-warehouse/%s.db/%s" % (unique_database, "zero_rows_one_row_group"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal',
+        os.environ['IMPALA_HOME'] + "/testdata/data/zero_rows_one_row_group.parquet",
+        zero_rows_one_row_group_loc])
+
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/parquet-zero-rows', vector, unique_database)
+    vector.get_value('exec_option')['abort_on_error'] = 1
+    self.run_test_case('QueryTest/parquet-zero-rows', vector, unique_database)
+
   def test_corrupt_rle_counts(self, vector, unique_database):
     """IMPALA-3646: Tests that a certain type of file corruption for plain
     dictionary encoded values is gracefully handled. Cases tested:

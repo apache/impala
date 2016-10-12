@@ -410,7 +410,7 @@ Status HdfsParquetScanner::NextRowGroup() {
     ++row_group_idx_;
     if (row_group_idx_ >= file_metadata_.row_groups.size()) break;
     const parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
-    if (row_group.num_rows == 0) continue;
+    if (row_group.num_rows == 0 || file_metadata_.num_rows == 0) continue;
 
     const DiskIoMgr::ScanRange* split_range = static_cast<ScanRangeMetadata*>(
         metadata_range_->meta_data())->original_split;
@@ -895,6 +895,10 @@ Status HdfsParquetScanner::ProcessFooter() {
   }
 
   RETURN_IF_ERROR(ParquetMetadataUtils::ValidateFileVersion(file_metadata_, filename()));
+
+  // IMPALA-3943: Do not throw an error for empty files for backwards compatibility.
+  if (file_metadata_.num_rows == 0) return Status::OK();
+
   // Parse out the created by application version string
   if (file_metadata_.__isset.created_by) {
     file_version_ = ParquetFileVersion(file_metadata_.created_by);

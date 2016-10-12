@@ -1,0 +1,27 @@
+====
+---- QUERY
+select * from zero_rows_zero_row_groups
+---- TYPES
+int
+---- RESULTS
+====
+---- QUERY
+select count(*) from zero_rows_zero_row_groups
+---- TYPES
+bigint
+---- RESULTS
+0
+====
+---- QUERY
+select * from zero_rows_one_row_group
+---- TYPES
+int
+---- RESULTS
+====
+---- QUERY
+select count(*) from zero_rows_one_row_group
+---- TYPES
+bigint
+---- RESULTS
+0
+====
