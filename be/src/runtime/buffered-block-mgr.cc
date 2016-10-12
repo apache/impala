@@ -524,6 +524,7 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
 }
 
 BufferedBlockMgr::~BufferedBlockMgr() {
+  shared_ptr<BufferedBlockMgr> other_mgr_ptr;
   {
     lock_guard<SpinLock> lock(static_block_mgrs_lock_);
     BlockMgrsMap::iterator it = query_to_block_mgrs_.find(query_id_);
@@ -536,16 +537,19 @@ BufferedBlockMgr::~BufferedBlockMgr() {
     // distinguish between the two expired pointers), and when the other
     // ~BufferedBlockMgr() call occurs, it won't find an entry for this query_id_.
     if (it != query_to_block_mgrs_.end()) {
-      shared_ptr<BufferedBlockMgr> mgr = it->second.lock();
-      if (mgr.get() == NULL) {
+      other_mgr_ptr = it->second.lock();
+      if (other_mgr_ptr.get() == NULL) {
         // The BufferBlockMgr object referenced by this entry is being deconstructed.
         query_to_block_mgrs_.erase(it);
       } else {
         // The map references another (still valid) BufferedBlockMgr.
-        DCHECK_NE(mgr.get(), this);
+        DCHECK_NE(other_mgr_ptr.get(), this);
       }
     }
   }
+  // IMPALA-4274: releasing the reference count can recursively call ~BufferedBlockMgr().
+  // Do not do that with 'static_block_mgrs_lock_' held.
+  other_mgr_ptr.reset();
 
   if (io_request_context_ != NULL) io_mgr_->UnregisterContext(io_request_context_);
 
