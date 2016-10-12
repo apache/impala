@@ -147,10 +147,13 @@ public abstract class AggregateInfoBase {
           slotDesc.setSourceExpr(aggExpr);
         }
 
-        // count(*) is non-nullable.
-        if (aggExpr.getFnName().getFunction().equals("count")) {
+        // COUNT(), NDV() and NDV_NO_FINALIZE() are non-nullable. The latter two are used
+        // by compute stats and compute incremental stats, respectively.
+        if (aggExpr.getFnName().getFunction().equals("count")
+            || aggExpr.getFnName().getFunction().equals("ndv")
+            || aggExpr.getFnName().getFunction().equals("ndv_no_finalize")) {
           // TODO: Consider making nullability a property of types or of builtin agg fns.
-          // row_number, rank, and dense_rank are non-nullable as well.
+          // row_number(), rank(), and dense_rank() are non-nullable as well.
           slotDesc.setIsNullable(false);
         }
         if (!isOutputTuple) {
