@@ -410,7 +410,10 @@ Status HdfsParquetScanner::NextRowGroup() {
     ++row_group_idx_;
     if (row_group_idx_ >= file_metadata_.row_groups.size()) break;
     const parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
-    if (row_group.num_rows == 0 || file_metadata_.num_rows == 0) continue;
+    // Also check 'file_metadata_.num_rows' to make sure 'select count(*)' and 'select *'
+    // behave consistently for corrupt files that have 'file_metadata_.num_rows == 0'
+    // but some data in row groups.
+    if (row_group.num_rows == 0|| file_metadata_.num_rows == 0) continue;
 
     const DiskIoMgr::ScanRange* split_range = static_cast<ScanRangeMetadata*>(
         metadata_range_->meta_data())->original_split;
@@ -897,7 +900,24 @@ Status HdfsParquetScanner::ProcessFooter() {
   RETURN_IF_ERROR(ParquetMetadataUtils::ValidateFileVersion(file_metadata_, filename()));
 
   // IMPALA-3943: Do not throw an error for empty files for backwards compatibility.
-  if (file_metadata_.num_rows == 0) return Status::OK();
+  if (file_metadata_.num_rows == 0) {
+    // Warn if the num_rows is inconsistent with the row group metadata.
+    if (!file_metadata_.row_groups.empty()) {
+      bool has_non_empty_row_group = false;
+      for (const parquet::RowGroup& row_group : file_metadata_.row_groups) {
+        if (row_group.num_rows > 0) {
+          has_non_empty_row_group = true;
+          break;
+        }
+      }
+      // Warn if there is at least one non-empty row group.
+      if (has_non_empty_row_group) {
+        ErrorMsg msg(TErrorCode::PARQUET_ZERO_ROWS_IN_NON_EMPTY_FILE, filename());
+        state_->LogError(msg);
+      }
+    }
+    return Status::OK();
+  }
 
   // Parse out the created by application version string
   if (file_metadata_.__isset.created_by) {

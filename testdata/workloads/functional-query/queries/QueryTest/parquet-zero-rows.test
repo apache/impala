@@ -17,6 +17,8 @@ select * from zero_rows_one_row_group
 ---- TYPES
 int
 ---- RESULTS
+---- ERRORS
+File '__HDFS_FILENAME__' is corrupt: metadata indicates a zero row count but there is at least one non-empty row group.
 ====
 ---- QUERY
 select count(*) from zero_rows_one_row_group
@@ -24,4 +26,6 @@ select count(*) from zero_rows_one_row_group
 bigint
 ---- RESULTS
 0
+---- ERRORS
+File '__HDFS_FILENAME__' is corrupt: metadata indicates a zero row count but there is at least one non-empty row group.
 ====
