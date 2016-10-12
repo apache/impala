@@ -184,6 +184,10 @@ def load_table_info_dimension(workload_name, exploration_strategy, file_formats=
       vals = dict((key.strip(), value.strip()) for key, value in\
           (item.split(':') for item in line.split(',')))
 
+      # Skip Kudu if Kudu is not supported (IMPALA-4287).
+      if os.environ['KUDU_IS_SUPPORTED'] != 'true' and vals['file_format'] == 'kudu':
+        continue
+
       # If only loading specific file formats skip anything that doesn't match
       if file_formats is not None and vals['file_format'] not in file_formats:
         continue
