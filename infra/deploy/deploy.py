@@ -314,8 +314,6 @@ def create_new_service(api, cluster, new_name, deps, scratch_dirs, master_host):
                 new_role_name = "%s-%s-%s" % (new_name, rcg.roleType, md5.hexdigest())
                 new_service.create_role(new_role_name, rcg.roleType, h.hostId)
                 print "Created new role %s" % (new_role_name,)
-        elif rcg.roleType == "LLAMA":
-            continue
         else:
             md5 = hashlib.md5()
             md5.update(master_host.hostId)
@@ -367,19 +365,12 @@ def transform_rcg_config(rcg):
         new_config.update(transform_port(rcg.name, full, "beeswax_port"))
         new_config.update(transform_port(rcg.name, full, "hs2_port"))
         new_config.update(transform_port(rcg.name, full, "impalad_webserver_port"))
-        new_config.update(transform_port(rcg.name, full, "llama_callback_port"))
         new_config.update(transform_port(rcg.name, full, "state_store_subscriber_port"))
     elif rcg.roleType == "CATALOGSERVER":
         new_config.update(transform_path(rcg.name, full, "log_dir"))
 
         new_config.update(transform_port(rcg.name, full, "catalog_service_port"))
         new_config.update(transform_port(rcg.name, full, "catalogserver_webserver_port"))
-    elif rcg.roleType == "LLAMA":
-        new_config.update(transform_path(rcg.name, full, "llama_log_dir"))
-
-        new_config.update(transform_port(rcg.name, full, "llama_am_server_thrift_admin_address"))
-        new_config.update(transform_port(rcg.name, full, "llama_http_port"))
-        new_config.update(transform_port(rcg.name, full, "llama_port"))
     elif rcg.roleType == "STATESTORE":
         new_config.update(transform_path(rcg.name, full, "log_dir"))
 

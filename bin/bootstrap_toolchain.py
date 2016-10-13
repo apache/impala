@@ -351,5 +351,5 @@ if __name__ == "__main__":
 
   # Download the CDH components if necessary.
   if os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true":
-    cdh_components = ["hadoop", "hbase", "hive", "llama", "llama-minikdc", "sentry"]
+    cdh_components = ["hadoop", "hbase", "hive", "llama-minikdc", "sentry"]
     download_cdh_components(toolchain_root, cdh_components)

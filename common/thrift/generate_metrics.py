@@ -166,10 +166,6 @@ MDL_BASE = """
       "name" : "CATALOGSERVER",
       "nameForCrossEntityAggregateMetrics" : "catalogservers"
     },
-    {
-      "name" : "LLAMA",
-      "nameForCrossEntityAggregateMetrics" : "llamas"
-    }
   ],
   "metricEntityTypeDefinitions" : [
       {

@@ -134,21 +134,24 @@ enum TImpalaQueryOptions {
   REQUEST_POOL,
 
   // Per-host virtual CPU cores required for query (only relevant with RM).
+  // TODO: IMPALA-3271: retire at compatibility-breaking version
   V_CPU_CORES,
 
   // Max time in milliseconds the resource broker should wait for
   // a resource request to be granted by Llama/Yarn (only relevant with RM).
+  // TODO: IMPALA-3271: retire at compatibility-breaking version
   RESERVATION_REQUEST_TIMEOUT,
 
   // if true, disables cached reads. This option has no effect if REPLICA_PREFERENCE is
   // configured.
-  // TODO: Retire in C6
+  // TODO: IMPALA-4306: retire at compatibility-breaking version
   DISABLE_CACHED_READS,
 
   // Temporary testing flag
   DISABLE_OUTERMOST_TOPN,
 
   // Size of initial memory reservation when RM is enabled
+  // TODO: IMPALA-3271: retire at compatibility-breaking version
   RM_INITIAL_MEM,
 
   // Time, in s, before a query will be timed out if it is inactive. May not exceed

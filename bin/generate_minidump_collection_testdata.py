@@ -50,7 +50,6 @@ options, args = parser.parse_args()
 CONFIG_FILE = '''-beeswax_port=21000
 -fe_port=21000
 -be_port=22000
--llama_callback_port=28000
 -hs2_port=21050
 -enable_webserver=true
 -mem_limit=108232130560

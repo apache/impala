@@ -570,26 +570,6 @@
     "key": "impala-server.version"
   },
   {
-    "description": "The number of active connections to the Llama Callback Service.",
-    "contexts": [
-      "IMPALAD"
-    ],
-    "label": "Llama Callback Service Active Connections",
-    "units": "NONE",
-    "kind": "GAUGE",
-    "key": "impala.thrift-server.llama-callback.connections-in-use"
-  },
-  {
-    "description": "The total number of connections made to the Llama Callback Service over its lifetime.",
-    "contexts": [
-      "IMPALAD"
-    ],
-    "label": "Llama Callback Service Total Connections",
-    "units": "UNIT",
-    "kind": "COUNTER",
-    "key": "impala.thrift-server.llama-callback.total-connections"
-  },
-  {
     "description": "The number of active catalog service connections to this Catalog Server.",
     "contexts": [
       "CATALOGSERVER"
