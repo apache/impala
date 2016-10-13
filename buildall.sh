@@ -365,7 +365,7 @@ reconfigure_test_cluster() {
 
   # Copy Hadoop-lzo dependencies if available (required to generate Lzo data).
   if stat "$HADOOP_LZO"/build/native/Linux-*-*/lib/libgplcompression.* > /dev/null ; then
-    cp "$HADOOP_LZO"/build/native/Linux-*-*/lib/libgplcompression.* "$HADOOP_HOME/lib/native"
+    cp "$HADOOP_LZO"/build/native/Linux-*-*/lib/libgplcompression.* "$HADOOP_LIB_DIR/native"
   else
     echo "No hadoop-lzo found"
   fi

@@ -28,9 +28,9 @@
 exec_program(hadoop ARGS version OUTPUT_VARIABLE Hadoop_VERSION
              RETURN_VALUE Hadoop_RETURN)
 
-# currently only looking in HADOOP_HOME
+# Only look in HADOOP_INCLUDE_DIR
 find_path(HDFS_INCLUDE_DIR hdfs.h PATHS
-  $ENV{HADOOP_HOME}/include/
+  $ENV{HADOOP_INCLUDE_DIR}
   # make sure we don't accidentally pick up a different version
   NO_DEFAULT_PATH
 )
@@ -44,12 +44,7 @@ else ()
 endif()
 
 message(STATUS "Architecture: ${arch_hint}")
-
-if ("${arch_hint}" STREQUAL "x64")
-  set(HDFS_LIB_PATHS $ENV{HADOOP_HOME}/lib/native)
-else ()
-  set(HDFS_LIB_PATHS $ENV{HADOOP_HOME}/lib/native)
-endif ()
+set(HDFS_LIB_PATHS $ENV{HADOOP_LIB_DIR}/native)
 
 message(STATUS "HDFS_LIB_PATHS: ${HDFS_LIB_PATHS}")
 

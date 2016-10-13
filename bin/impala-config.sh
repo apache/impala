@@ -295,13 +295,13 @@ if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_THRIFT_JAVA_VERSION=0.9.2
 fi
 
-export IMPALA_HADOOP_VERSION=2.6.0-cdh5.10.0-SNAPSHOT
-export IMPALA_HBASE_VERSION=1.2.0-cdh5.10.0-SNAPSHOT
-export IMPALA_HIVE_VERSION=1.1.0-cdh5.10.0-SNAPSHOT
-export IMPALA_SENTRY_VERSION=1.5.1-cdh5.10.0-SNAPSHOT
-export IMPALA_LLAMA_VERSION=1.0.0-cdh5.10.0-SNAPSHOT
-export IMPALA_PARQUET_VERSION=1.5.0-cdh5.10.0-SNAPSHOT
-export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
+export IMPALA_HADOOP_VERSION=${IMPALA_HADOOP_VERSION:-2.6.0-cdh5.10.0-SNAPSHOT}
+export IMPALA_HBASE_VERSION=${IMPALA_HBASE_VERSION:-1.2.0-cdh5.10.0-SNAPSHOT}
+export IMPALA_HIVE_VERSION=${IMPALA_HIVE_VERSION:-1.1.0-cdh5.10.0-SNAPSHOT}
+export IMPALA_SENTRY_VERSION=${IMPALA_SENTRY_VERSION:-1.5.1-cdh5.10.0-SNAPSHOT}
+export IMPALA_LLAMA_VERSION=${IMPALA_LLAMA_VERSION:-1.0.0-cdh5.10.0-SNAPSHOT}
+export IMPALA_PARQUET_VERSION=${IMPALA_PARQUET_VERSION:-1.5.0-cdh5.10.0-SNAPSHOT}
+export IMPALA_LLAMA_MINIKDC_VERSION=${IMPALA_LLAMA_MINIKDC_VERSION:-1.0.0}
 
 export IMPALA_FE_DIR="$IMPALA_HOME/fe"
 export IMPALA_BE_DIR="$IMPALA_HOME/be"
@@ -319,12 +319,17 @@ else
   export CDH_COMPONENTS_HOME="$IMPALA_HOME/thirdparty"
 fi
 
-# Hadoop dependencies are snapshots in the Impala tree
+# Typically we build against a snapshot build of Hadoop that includes everything we need
+# for building Impala and running a minicluster.
 export HADOOP_HOME="$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
 export HADOOP_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
+# The include and lib paths are needed to pick up hdfs.h and libhdfs.*
+# Allow overriding in case we want to point to a package/install with a different layout.
+export HADOOP_INCLUDE_DIR=${HADOOP_INCLUDE_DIR:-"${HADOOP_HOME}/include"}
+export HADOOP_LIB_DIR=${HADOOP_LIB_DIR:-"${HADOOP_HOME}/lib"}
 
 : ${HADOOP_CLASSPATH=}
-# Please note that the * is inside quotes, thus it won't get exanded by bash but
+# Please note that the * is inside quotes, thus it won't get expanded by bash but
 # by java, see "Understanding class path wildcards" at http://goo.gl/f0cfft
 export HADOOP_CLASSPATH="$HADOOP_CLASSPATH:${HADOOP_HOME}/share/hadoop/tools/lib/*"
 # YARN is configured to use LZO so the LZO jar needs to be in the hadoop classpath.
@@ -341,6 +346,9 @@ export SENTRY_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 
 export HIVE_HOME="$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}/"
 export PATH="$HIVE_HOME/bin:$PATH"
+# Allow overriding of Hive source location in case we want to build Impala without
+# a complete Hive build.
+export HIVE_SRC_DIR=${HIVE_SRC_DIR:-"${HIVE_HOME}/src"}
 export HIVE_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 
 # Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
@@ -392,7 +400,7 @@ export USER="${USER-`id -un`}"
 #LIBHDFS_OPTS="-Xcheck:jni -Xcheck:nabounds"
 # - Points to the location of libbackend.so.
 LIBHDFS_OPTS="${LIBHDFS_OPTS:-}"
-LIBHDFS_OPTS="${LIBHDFS_OPTS} -Djava.library.path=${HADOOP_HOME}/lib/native/"
+LIBHDFS_OPTS="${LIBHDFS_OPTS} -Djava.library.path=${HADOOP_LIB_DIR}/native/"
 # READER BEWARE: This always points to the debug build.
 # TODO: Consider having cmake scripts change this value depending on
 # the build type.
@@ -412,7 +420,7 @@ LIB_JVM=` find "${JAVA_HOME}/"   -name libjvm.so  | head -1`
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`"
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${HADOOP_HOME}/lib/native"
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${HADOOP_LIB_DIR}/native"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_SNAPPY_PATH}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_LZO}/build"
@@ -443,9 +451,12 @@ export IMPALA_CONFIG_SOURCED=1
 echo "IMPALA_HOME             = $IMPALA_HOME"
 echo "HADOOP_HOME             = $HADOOP_HOME"
 echo "HADOOP_CONF_DIR         = $HADOOP_CONF_DIR"
+echo "HADOOP_INCLUDE_DIR      = $HADOOP_INCLUDE_DIR"
+echo "HADOOP_LIB_DIR          = $HADOOP_LIB_DIR"
 echo "MINI_DFS_BASE_DATA_DIR  = $MINI_DFS_BASE_DATA_DIR"
 echo "HIVE_HOME               = $HIVE_HOME"
 echo "HIVE_CONF_DIR           = $HIVE_CONF_DIR"
+echo "HIVE_SRC_DIR            = $HIVE_SRC_DIR"
 echo "HBASE_HOME              = $HBASE_HOME"
 echo "HBASE_CONF_DIR          = $HBASE_CONF_DIR"
 echo "MINIKDC_HOME            = $MINIKDC_HOME"
