@@ -56,9 +56,8 @@ fi
 # If it's 0, Impala will be built with the compiler in the toolchain directory.
 : ${USE_SYSTEM_GCC=0}
 
-# Gold is available on newer systems and a full build with static linking is ~1.5 mins
-# faster using gold. A shared object build using gold is a little faster than using ld.
-: ${USE_GOLD_LINKER=false}
+# Use ld.gold instead of ld by default to speed up builds.
+: ${USE_GOLD_LINKER=true}
 
 # Override the default compiler by setting a path to the new compiler. The default
 # compiler depends on USE_SYSTEM_GCC and IMPALA_GCC_VERSION. The intended use case
