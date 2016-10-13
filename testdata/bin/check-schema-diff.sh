@@ -31,11 +31,17 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 DATASET=${1-}
 hdfs dfs -test -e  ${WAREHOUSE_LOCATION_PREFIX}/test-warehouse/githash.txt || { exit 0; }
 GIT_HASH=$(echo $(hdfs dfs -cat ${WAREHOUSE_LOCATION_PREFIX}/test-warehouse/githash.txt))
-if ! git show $GIT_HASH &>/dev/null; then
+
+# To ensure this script works when executed from anywhere, even outside the Impala repo,
+# we specifiy the git-dir and work-tree for all git commands.
+if ! git --git-dir ${IMPALA_HOME}/.git --work-tree=${IMPALA_HOME} \
+  show $GIT_HASH &>/dev/null; then
   echo The git commit used to create the test warehouse snapshot is not available \
       locally. Fetching the latest commits from remotes.
-  git fetch --all &>/dev/null
+  git --git-dir ${IMPALA_HOME}/.git --work-tree=${IMPALA_HOME} fetch --all &>/dev/null
 fi
 # Check whether a non-empty diff exists.
-git diff --exit-code ${GIT_HASH}..HEAD ${IMPALA_HOME}/testdata/datasets/$DATASET
-git diff --exit-code ${GIT_HASH}..HEAD ${IMPALA_HOME}/testdata/avro_schema_resolution
+git --git-dir ${IMPALA_HOME}/.git --work-tree=${IMPALA_HOME} \
+  diff --exit-code ${GIT_HASH}..HEAD ${IMPALA_HOME}/testdata/datasets/$DATASET
+git --git-dir ${IMPALA_HOME}/.git --work-tree=${IMPALA_HOME} \
+  diff --exit-code ${GIT_HASH}..HEAD ${IMPALA_HOME}/testdata/avro_schema_resolution
