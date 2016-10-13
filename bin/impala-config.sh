@@ -246,13 +246,12 @@ else
 fi
 export NUM_CONCURRENT_TESTS="${NUM_CONCURRENT_TESTS-${CORES}}"
 
-# Versions of toolchain dependencies (or if toolchain is not used of dependencies in
-# thirdparty)
+# Versions of toolchain dependencies.
 export IMPALA_AVRO_VERSION=1.7.4-p4
 export IMPALA_BINUTILS_VERSION=2.26-p1
 export IMPALA_BOOST_VERSION=1.57.0
 export IMPALA_BREAKPAD_VERSION=20150612-p1
-export IMPALA_BZIP2_VERSION=1.0.6-p1
+export IMPALA_BZIP2_VERSION=1.0.6-p2
 export IMPALA_CMAKE_VERSION=3.2.3-p1
 export IMPALA_CYRUS_SASL_VERSION=2.1.23
 export IMPALA_GCC_VERSION=4.9.2
