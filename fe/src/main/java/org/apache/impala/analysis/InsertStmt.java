@@ -22,11 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.impala.planner.TableSink;
-import com.google.common.collect.ImmutableList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
@@ -39,8 +34,14 @@ import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.planner.DataSink;
+import org.apache.impala.planner.TableSink;
+import org.apache.impala.rewrite.ExprRewriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -657,6 +658,12 @@ public class InsertStmt extends StatementBase {
     if (hasClusteredHint_ && hasNoClusteredHint) {
       throw new AnalysisException("Conflicting INSERT hints: clustered and noclustered");
     }
+  }
+
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
+    Preconditions.checkState(isAnalyzed());
+    queryStmt_.rewriteExprs(rewriter);
   }
 
   public List<String> getPlanHints() { return planHints_; }

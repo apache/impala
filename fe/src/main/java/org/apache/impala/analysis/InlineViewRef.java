@@ -21,14 +21,15 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.rewrite.ExprRewriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -259,6 +260,13 @@ public class InlineViewRef extends TableRef {
     result.setIsMaterialized(false);
     result.setType(new StructType(fields));
     return result;
+  }
+
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter, Analyzer analyzer)
+      throws AnalysisException {
+    super.rewriteExprs(rewriter, analyzer);
+    queryStmt_.rewriteExprs(rewriter);
   }
 
   @Override

@@ -22,9 +22,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.StructField;
@@ -35,6 +32,10 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ColumnAliasGenerator;
 import org.apache.impala.common.TableAliasGenerator;
 import org.apache.impala.common.TreeNode;
+import org.apache.impala.rewrite.ExprRewriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
@@ -56,7 +57,7 @@ public class SelectStmt extends QueryStmt {
   protected final FromClause fromClause_;
   protected Expr whereClause_;
   protected ArrayList<Expr> groupingExprs_;
-  protected final Expr havingClause_;  // original having clause
+  protected Expr havingClause_;  // original having clause
 
   // havingClause with aliases and agg output resolved
   private Expr havingPred_;
@@ -860,6 +861,29 @@ public class SelectStmt extends QueryStmt {
       sortInfo_.substituteOrderingExprs(smap, analyzer);
       LOG.trace("post-analytic orderingExprs: " +
           Expr.debugString(sortInfo_.getOrderingExprs()));
+    }
+  }
+
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
+    Preconditions.checkState(isAnalyzed());
+    selectList_.rewriteExprs(rewriter, analyzer_);
+    for (TableRef ref: fromClause_.getTableRefs()) ref.rewriteExprs(rewriter, analyzer_);
+    if (whereClause_ != null) {
+      whereClause_ = rewriter.rewrite(whereClause_, analyzer_);
+      // Also rewrite exprs in the statements of subqueries.
+      List<Subquery> subqueryExprs = Lists.newArrayList();
+      whereClause_.collect(Subquery.class, subqueryExprs);
+      for (Subquery s: subqueryExprs) s.getStatement().rewriteExprs(rewriter);
+    }
+    if (havingClause_ != null) {
+      havingClause_ = rewriter.rewrite(havingClause_, analyzer_);
+    }
+    if (groupingExprs_ != null) rewriter.applyList(groupingExprs_, analyzer_);
+    if (orderByElements_ != null) {
+      for (OrderByElement orderByElem: orderByElements_) {
+        orderByElem.setExpr(rewriter.rewrite(orderByElem.getExpr(), analyzer_));
+      }
     }
   }
 

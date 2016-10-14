@@ -17,8 +17,8 @@
 
 package org.apache.impala.analysis;
 
-import java.util.List;
 import java.util.EnumSet;
+import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Db;
@@ -27,8 +27,10 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.THdfsFileFormat;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -206,6 +208,12 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
     // Finally, run analysis on the insert statement.
     insertStmt_.analyze(analyzer);
+  }
+
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
+    Preconditions.checkState(isAnalyzed());
+    insertStmt_.rewriteExprs(rewriter);
   }
 
   @Override

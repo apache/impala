@@ -21,12 +21,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCreateOrAlterViewParams;
 import org.apache.impala.thrift.TTableName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -156,7 +156,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   }
 
   /**
-   * Computes the column lineage graph for a create/alter view statetement.
+   * Computes the column lineage graph for a create/alter view statement.
    */
   protected void computeLineageGraph(Analyzer analyzer) {
     ColumnLineageGraph graph = analyzer.getColumnLineageGraph();

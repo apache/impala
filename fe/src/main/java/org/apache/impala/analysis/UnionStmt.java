@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.rewrite.ExprRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -198,6 +199,7 @@ public class UnionStmt extends QueryStmt {
   public boolean hasAllOps() { return !allOperands_.isEmpty(); }
   public AggregateInfo getDistinctAggInfo() { return distinctAggInfo_; }
   public boolean hasAnalyticExprs() { return hasAnalyticExprs_; }
+  public TupleId getTupleId() { return tupleId_; }
 
   public void removeAllOperands() {
     operands_.removeAll(allOperands_);
@@ -519,7 +521,15 @@ public class UnionStmt extends QueryStmt {
     baseTblResultExprs_ = resultExprs_;
   }
 
-  public TupleId getTupleId() { return tupleId_; }
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
+    for (UnionOperand op: operands_) op.getQueryStmt().rewriteExprs(rewriter);
+    if (orderByElements_ != null) {
+      for (OrderByElement orderByElem: orderByElements_) {
+        orderByElem.setExpr(rewriter.rewrite(orderByElem.getExpr(), analyzer_));
+      }
+    }
+  }
 
   @Override
   public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
@@ -533,9 +543,7 @@ public class UnionStmt extends QueryStmt {
 
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {
-    for (UnionOperand op: operands_) {
-      op.getQueryStmt().collectTableRefs(tblRefs);
-    }
+    for (UnionOperand op: operands_) op.getQueryStmt().collectTableRefs(tblRefs);
   }
 
   @Override

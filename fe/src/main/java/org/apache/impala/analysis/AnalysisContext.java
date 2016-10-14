@@ -22,9 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizeableColumn;
@@ -37,9 +34,15 @@ import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.ExprRewriteRule;
+import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TQueryCtx;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -52,6 +55,7 @@ public class AnalysisContext {
   private final ImpaladCatalog catalog_;
   private final TQueryCtx queryCtx_;
   private final AuthorizationConfig authzConfig_;
+  private final ExprRewriter rewriter_;
 
   // Set in analyze()
   private AnalysisResult analysisResult_;
@@ -61,12 +65,24 @@ public class AnalysisContext {
     catalog_ = catalog;
     queryCtx_ = queryCtx;
     authzConfig_ = authzConfig;
+    List<ExprRewriteRule> rules = Lists.newArrayList(BetweenToCompoundRule.INSTANCE);
+    rewriter_ = new ExprRewriter(rules);
+  }
+
+  /**
+   * C'tor with a custom ExprRewriter for testing.
+   */
+  protected AnalysisContext(ImpaladCatalog catalog, TQueryCtx queryCtx,
+      AuthorizationConfig authzConfig, ExprRewriter rewriter) {
+    catalog_ = catalog;
+    queryCtx_ = queryCtx;
+    authzConfig_ = authzConfig;
+    rewriter_ = rewriter;
   }
 
   static public class AnalysisResult {
     private StatementBase stmt_;
     private Analyzer analyzer_;
-    private CreateTableStmt tmpCreateTableStmt_;
 
     public boolean isAlterTableStmt() { return stmt_ instanceof AlterTableStmt; }
     public boolean isAlterViewStmt() { return stmt_ instanceof AlterViewStmt; }
@@ -190,10 +206,6 @@ public class AnalysisContext {
       return (CreateTableStmt) stmt_;
     }
 
-    public CreateTableStmt getTmpCreateTableStmt() {
-      return tmpCreateTableStmt_;
-    }
-
     public CreateDbStmt getCreateDbStmt() {
       Preconditions.checkState(isCreateDbStmt());
       return (CreateDbStmt) stmt_;
@@ -311,9 +323,13 @@ public class AnalysisContext {
     public StatementBase getStmt() { return stmt_; }
     public Analyzer getAnalyzer() { return analyzer_; }
     public Set<TAccessEvent> getAccessEvents() { return analyzer_.getAccessEvents(); }
-    public boolean requiresRewrite() {
+    public boolean requiresSubqueryRewrite() {
       return analyzer_.containsSubquery() && !(stmt_ instanceof CreateViewStmt)
           && !(stmt_ instanceof AlterViewStmt);
+    }
+    public boolean requiresExprRewrite() {
+      return isQueryStmt() ||isInsertStmt() || isCreateTableAsSelectStmt()
+          || isUpdateStmt() || isDeleteStmt();
     }
     public TLineageGraph getThriftLineageGraph() {
       return analyzer_.getThriftSerializedLineageGraph();
@@ -352,28 +368,27 @@ public class AnalysisContext {
       analysisResult_.stmt_ = (StatementBase) parser.parse().value;
       if (analysisResult_.stmt_ == null) return;
 
-      // For CTAS, we copy the create statement in case we have to create a new CTAS
-      // statement after a query rewrite.
-      if (analysisResult_.stmt_ instanceof CreateTableAsSelectStmt) {
-        analysisResult_.tmpCreateTableStmt_ =
-            ((CreateTableAsSelectStmt)analysisResult_.stmt_).getCreateStmt().clone();
-      }
-
       analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
       boolean isExplain = analysisResult_.isExplainStmt();
 
-      // Check if we need to rewrite the statement.
-      if (analysisResult_.requiresRewrite()) {
-        StatementBase rewrittenStmt = StmtRewriter.rewrite(analysisResult_);
-        // Re-analyze the rewritten statement.
-        Preconditions.checkNotNull(rewrittenStmt);
-        analysisResult_ = new AnalysisResult();
+      // Apply expr and subquery rewrites.
+      boolean reAnalyze = false;
+      if (analysisResult_.requiresExprRewrite()) {
+        rewriter_.reset();
+        analysisResult_.stmt_.rewriteExprs(rewriter_);
+        reAnalyze = rewriter_.changed();
+      }
+      if (analysisResult_.requiresSubqueryRewrite()) {
+        StmtRewriter.rewrite(analysisResult_);
+        reAnalyze = true;
+      }
+      if (reAnalyze) {
         analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_, authzConfig_);
-        analysisResult_.stmt_ = rewrittenStmt;
+        analysisResult_.stmt_.reset();
         analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
-        LOG.trace("rewrittenStmt: " + rewrittenStmt.toSql());
+        LOG.trace("rewrittenStmt: " + analysisResult_.stmt_.toSql());
         if (isExplain) analysisResult_.stmt_.setIsExplain();
-        Preconditions.checkState(!analysisResult_.requiresRewrite());
+        Preconditions.checkState(!analysisResult_.requiresSubqueryRewrite());
       }
     } catch (AnalysisException e) {
       // Don't wrap AnalysisExceptions in another AnalysisException

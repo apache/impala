@@ -23,7 +23,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
 class SelectListItem {
-  private final Expr expr_;
+  private Expr expr_;
   private String alias_;
 
   // for "[path.]*" (excludes trailing '*')
@@ -52,6 +52,7 @@ class SelectListItem {
   }
 
   public Expr getExpr() { return expr_; }
+  public void setExpr(Expr expr) { expr_ = expr; }
   public boolean isStar() { return isStar_; }
   public String getAlias() { return alias_; }
   public void setAlias(String alias) { alias_ = alias; }

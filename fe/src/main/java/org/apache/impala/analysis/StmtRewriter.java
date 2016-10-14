@@ -20,12 +20,12 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.UnionStmt.UnionOperand;
 import org.apache.impala.common.AnalysisException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
@@ -41,10 +41,10 @@ public class StmtRewriter {
   private final static Logger LOG = LoggerFactory.getLogger(StmtRewriter.class);
 
   /**
-   * Rewrite the statement of an analysis result. The unanalyzed rewritten
-   * statement is returned.
+   * Rewrite the statement of an analysis result in-place. Assumes that BetweenPredicates
+   * have already been rewritten.
    */
-  public static StatementBase rewrite(AnalysisResult analysisResult)
+  public static void rewrite(AnalysisResult analysisResult)
       throws AnalysisException {
     // Analyzed stmt that contains a query statement with subqueries to be rewritten.
     StatementBase stmt = analysisResult.getStmt();
@@ -66,8 +66,6 @@ public class StmtRewriter {
           stmt.toSql());
     }
     rewriteQueryStatement(queryStmt, queryStmt.getAnalyzer());
-    stmt.reset();
-    return stmt;
   }
 
   /**
@@ -204,8 +202,6 @@ public class StmtRewriter {
     int numTableRefs = stmt.fromClause_.size();
     ArrayList<Expr> exprsWithSubqueries = Lists.newArrayList();
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
-    // Replace all BetweenPredicates with their equivalent compound predicates.
-    stmt.whereClause_ = rewriteBetweenPredicates(stmt.whereClause_);
     // Check if all the conjuncts in the WHERE clause that contain subqueries
     // can currently be rewritten as a join.
     for (Expr conjunct: stmt.whereClause_.getConjuncts()) {
@@ -273,20 +269,6 @@ public class StmtRewriter {
       boolLiteral = new BoolLiteral(!predicate.isNotExists());
     }
     return boolLiteral;
-  }
-
-  /**
-   * Replace all BetweenPredicates with their equivalent compound predicates from the
-   * expr tree rooted at 'expr'. The modified expr tree is returned.
-   */
-  private static Expr rewriteBetweenPredicates(Expr expr) {
-    if (expr instanceof BetweenPredicate) {
-      return ((BetweenPredicate)expr).getRewrittenPredicate();
-    }
-    for (int i = 0; i < expr.getChildren().size(); ++i) {
-      expr.setChild(i, rewriteBetweenPredicates(expr.getChild(i)));
-    }
-    return expr;
   }
 
   /**

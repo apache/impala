@@ -26,7 +26,9 @@ import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
+import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TReplicaPreference;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -507,6 +509,12 @@ public class TableRef implements ParseNode {
       // Indicate that this table ref has an empty ON-clause.
       analyzer.registerOnClauseConjuncts(Collections.<Expr>emptyList(), this);
     }
+  }
+
+  public void rewriteExprs(ExprRewriter rewriter, Analyzer analyzer)
+      throws AnalysisException {
+    Preconditions.checkState(isAnalyzed_);
+    if (onClause_ != null) onClause_ = rewriter.rewrite(onClause_, analyzer);
   }
 
   protected String tableRefToSql() {

@@ -23,13 +23,13 @@ import static org.junit.Assert.fail;
 import java.lang.reflect.Field;
 import java.util.List;
 
-import org.junit.Assert;
-import org.junit.Test;
-
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.junit.Assert;
+import org.junit.Test;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -2769,7 +2769,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from with_1) select 1 as int_col_1 from with_4) as t1) select 1 as " +
         "int_col_1 from with_3) select 1 as int_col_1 from with_2");
 
-    // WITH clasue with a between predicate
+    // WITH clause with a between predicate
     AnalyzesOk("with with_1 as (select int_col from functional.alltypestiny " +
         "where int_col between 0 and 10) select * from with_1");
     // WITH clause with a between predicate in the select list

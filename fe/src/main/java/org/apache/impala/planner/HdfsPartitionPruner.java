@@ -26,9 +26,6 @@ import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BetweenPredicate;
 import org.apache.impala.analysis.BinaryPredicate;
@@ -47,6 +44,11 @@ import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.ExprRewriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
@@ -73,7 +75,12 @@ public class HdfsPartitionPruner {
 
   private final HdfsTable tbl_;
 
-  private List<SlotId> partitionSlots_ = Lists.newArrayList();
+  private final List<SlotId> partitionSlots_ = Lists.newArrayList();
+
+  // For converting BetweenPredicates to CompoundPredicates so they can be
+  // executed in the BE.
+  private final ExprRewriter exprRewriter_ =
+      new ExprRewriter(BetweenToCompoundRule.INSTANCE);
 
   public HdfsPartitionPruner(TupleDescriptor tupleDesc) {
     Preconditions.checkState(tupleDesc.getTable() instanceof HdfsTable);
@@ -90,10 +97,10 @@ public class HdfsPartitionPruner {
 
   /**
    * Return a list of partitions left after applying the conjuncts. Please note
-   * that conjunts used for filtering will be removed from the list 'conjuncts'.
+   * that conjuncts used for filtering will be removed from the list 'conjuncts'.
    */
   public List<HdfsPartition> prunePartitions(Analyzer analyzer, List<Expr> conjuncts)
-      throws InternalException {
+      throws InternalException, AnalysisException {
     // Start with creating a collection of partition filters for the applicable conjuncts.
     List<HdfsPartitionFilter> partitionFilters = Lists.newArrayList();
     // Conjuncts that can be evaluated from the partition key values.
@@ -109,15 +116,14 @@ public class HdfsPartitionPruner {
       Expr conjunct = it.next();
       if (conjunct.isBoundBySlotIds(partitionSlots_)) {
         // Check if the conjunct can be evaluated from the partition metadata.
-        // canEvalUsingPartitionMd() operates on a cloned conjunct which may get
-        // modified if it contains constant expressions. If the cloned conjunct
-        // cannot be evaluated from the partition metadata, the original unmodified
-        // conjuct is evaluated in the BE.
-        Expr clonedConjunct = conjunct.clone();
+        // Use a cloned conjunct to rewrite BetweenPredicates and allow
+        // canEvalUsingPartitionMd() to fold constant expressions without modifying
+        // the original expr.
+        Expr clonedConjunct = exprRewriter_.rewrite(conjunct.clone(), analyzer);
         if (canEvalUsingPartitionMd(clonedConjunct, analyzer)) {
           simpleFilterConjuncts.add(Expr.pushNegationToOperands(clonedConjunct));
         } else {
-          partitionFilters.add(new HdfsPartitionFilter(conjunct, tbl_, analyzer));
+          partitionFilters.add(new HdfsPartitionFilter(clonedConjunct, tbl_, analyzer));
         }
         it.remove();
       }
@@ -169,6 +175,7 @@ public class HdfsPartitionPruner {
    */
   private boolean canEvalUsingPartitionMd(Expr expr, Analyzer analyzer) {
     Preconditions.checkNotNull(expr);
+    Preconditions.checkState(!(expr instanceof BetweenPredicate));
     if (expr instanceof BinaryPredicate) {
       // Evaluate any constant expression in the BE
       try {
@@ -208,9 +215,6 @@ public class HdfsPartitionPruner {
         if (!(expr.getChild(i).isLiteral())) return false;
       }
       return true;
-    } else if (expr instanceof BetweenPredicate) {
-      return canEvalUsingPartitionMd(((BetweenPredicate) expr).getRewrittenPredicate(),
-          analyzer);
     }
     return false;
   }
@@ -407,10 +411,11 @@ public class HdfsPartitionPruner {
    * key values; return the matching partition ids. An empty set is returned
    * if there are no matching partitions. This function can evaluate the following
    * types of predicates: BinaryPredicate, CompoundPredicate, IsNullPredicate,
-   * InPredicate, and BetweenPredicate.
+   * InPredicate.
    */
   private HashSet<Long> evalSlotBindingFilter(Expr expr) {
     Preconditions.checkNotNull(expr);
+    Preconditions.checkState(!(expr instanceof BetweenPredicate));
     if (expr instanceof BinaryPredicate) {
       return evalBinaryPredicate(expr);
     } else if (expr instanceof CompoundPredicate) {
@@ -430,8 +435,6 @@ public class HdfsPartitionPruner {
       return evalInPredicate(expr);
     } else if (expr instanceof IsNullPredicate) {
       return evalIsNullPredicate(expr);
-    } else if (expr instanceof BetweenPredicate) {
-      return evalSlotBindingFilter(((BetweenPredicate) expr).getRewrittenPredicate());
     }
     return null;
   }

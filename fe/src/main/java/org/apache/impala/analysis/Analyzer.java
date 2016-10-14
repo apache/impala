@@ -58,6 +58,8 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.planner.PlanNode;
+import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -1039,6 +1041,13 @@ public class Analyzer {
     if ((!fromHavingClause && !hasEmptySpjResultSet_)
         || (fromHavingClause && !hasEmptyResultSet_)) {
       try {
+        if (conjunct instanceof BetweenPredicate) {
+          // Rewrite the BetweenPredicate into a CompoundPredicate so we can evaluate it
+          // below (BetweenPredicates are not executable). We might be in the first
+          // analysis pass, so the conjunct may not have been rewritten yet.
+          ExprRewriter rewriter = new ExprRewriter(BetweenToCompoundRule.INSTANCE);
+          conjunct = rewriter.rewrite(conjunct, this);
+        }
         if (!FeSupport.EvalPredicate(conjunct, globalState_.queryCtx)) {
           if (fromHavingClause) {
             hasEmptyResultSet_ = true;

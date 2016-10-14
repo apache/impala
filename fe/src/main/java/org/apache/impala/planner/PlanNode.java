@@ -23,9 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
@@ -41,6 +38,9 @@ import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlan;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -669,7 +669,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     int numWithoutSel = 0;
     List<T> remaining = Lists.newArrayListWithCapacity(conjuncts.size());
     for (T e : conjuncts) {
-      Preconditions.checkState(e.hasCost());
+      Preconditions.checkState(e.hasCost(), e.toSql());
       totalCost += e.getCost();
       remaining.add(e);
       if (!e.hasSelectivity()) {

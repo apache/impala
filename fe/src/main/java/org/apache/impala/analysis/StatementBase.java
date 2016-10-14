@@ -18,10 +18,10 @@
 package org.apache.impala.analysis;
 
 import org.apache.commons.lang.NotImplementedException;
-
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.rewrite.ExprRewriter;
 
 /**
  * Base class for all Impala SQL statements.
@@ -61,6 +61,17 @@ abstract class StatementBase implements ParseNode {
     if (isAnalyzed()) return;
     if (isExplain_) analyzer.setIsExplain();
     analyzer_ = analyzer;
+  }
+
+  /**
+   * Uses the given 'rewriter' to transform all Exprs in this statement according
+   * to the rules specified in the 'rewriter'. Replaces the original Exprs with the
+   * transformed ones in-place. Subclasses that have Exprs to be rewritten must
+   * override this method. Valid to call after analyze().
+   */
+  public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
+    throw new IllegalStateException(
+        "rewriteExprs() not implemented for this stmt: " + getClass().getSimpleName());
   }
 
   public Analyzer getAnalyzer() { return analyzer_; }
