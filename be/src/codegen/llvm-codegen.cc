@@ -572,7 +572,7 @@ Value* LlvmCodeGen::CastPtrToLlvmPtr(Type* type, const void* ptr) {
   return ConstantExpr::getIntToPtr(const_int, type);
 }
 
-Value* LlvmCodeGen::GetIntConstant(PrimitiveType type, uint64_t val) {
+Constant* LlvmCodeGen::GetIntConstant(PrimitiveType type, uint64_t val) {
   switch (type) {
     case TYPE_TINYINT:
       return ConstantInt::get(context(), APInt(8, val));
@@ -588,7 +588,7 @@ Value* LlvmCodeGen::GetIntConstant(PrimitiveType type, uint64_t val) {
   }
 }
 
-Value* LlvmCodeGen::GetIntConstant(int num_bytes, uint64_t low_bits, uint64_t high_bits) {
+Constant* LlvmCodeGen::GetIntConstant(int num_bytes, uint64_t low_bits, uint64_t high_bits) {
   DCHECK_GE(num_bytes, 1);
   DCHECK_LE(num_bytes, 16);
   DCHECK(BitUtil::IsPowerOf2(num_bytes));
@@ -1483,6 +1483,14 @@ Value* LlvmCodeGen::GetPtrTo(LlvmBuilder* builder, Value* v, const char* name) {
   Value* ptr = CreateEntryBlockAlloca(*builder, v->getType(), name);
   builder->CreateStore(v, ptr);
   return ptr;
+}
+
+Constant* LlvmCodeGen::ConstantToGVPtr(Type* type, Constant* ir_constant,
+    const string& name) {
+  GlobalVariable* gv = new GlobalVariable(*module_, type, true,
+      GlobalValue::PrivateLinkage, ir_constant, name);
+  return ConstantExpr::getGetElementPtr(NULL, gv,
+      ArrayRef<Constant*>({GetIntConstant(TYPE_INT, 0)}));
 }
 
 }

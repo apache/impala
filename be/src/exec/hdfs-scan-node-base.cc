@@ -129,7 +129,8 @@ Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
     }
 
     FilterContext filter_ctx;
-    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, target.target_expr, &filter_ctx.expr));
+    RETURN_IF_ERROR(
+        Expr::CreateExprTree(pool_, target.target_expr, &filter_ctx.expr_ctx));
     filter_ctx.filter = state->filter_bank()->RegisterFilter(filter, false);
 
     string filter_profile_title = Substitute("Filter $0 ($1)", filter.filter_id,
@@ -175,8 +176,8 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   scan_node_pool_.reset(new MemPool(mem_tracker()));
 
   for (FilterContext& filter: filter_ctxs_) {
-    RETURN_IF_ERROR(filter.expr->Prepare(state, row_desc(), expr_mem_tracker()));
-    AddExprCtxToFree(filter.expr);
+    RETURN_IF_ERROR(filter.expr_ctx->Prepare(state, row_desc(), expr_mem_tracker()));
+    AddExprCtxToFree(filter.expr_ctx);
   }
 
   // Parse Avro table schema if applicable
@@ -330,7 +331,7 @@ void HdfsScanNodeBase::Codegen(RuntimeState* state) {
         status = HdfsAvroScanner::Codegen(this, conjunct_ctxs_, &fn);
         break;
       case THdfsFileFormat::PARQUET:
-        status = HdfsParquetScanner::Codegen(this, conjunct_ctxs_, &fn);
+        status = HdfsParquetScanner::Codegen(this, conjunct_ctxs_, filter_ctxs_, &fn);
         break;
       default:
         // No codegen for this format
@@ -359,7 +360,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
     RETURN_IF_ERROR(Expr::Open(entry.second, state));
   }
 
-  for (FilterContext& filter: filter_ctxs_) RETURN_IF_ERROR(filter.expr->Open(state));
+  for (FilterContext& filter: filter_ctxs_) RETURN_IF_ERROR(filter.expr_ctx->Open(state));
 
   // Create template tuples for all partitions.
   for (int64_t partition_id: partition_ids_) {
@@ -466,7 +467,7 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
     Expr::Close(tid_conjunct.second, state);
   }
 
-  for (auto& filter_ctx: filter_ctxs_) filter_ctx.expr->Close(state);
+  for (auto& filter_ctx: filter_ctxs_) filter_ctx.expr_ctx->Close(state);
   ScanNode::Close(state);
 }
 
@@ -710,13 +711,10 @@ bool HdfsScanNodeBase::PartitionPassesFilters(int32_t partition_id,
     if (!ctx.filter->filter_desc().targets[target_ndx].is_bound_by_partition_columns) {
       continue;
     }
-    void* e = ctx.expr->GetValue(tuple_row_mem);
 
-    // Not quite right because bitmap could arrive after Eval(), but we're ok with
-    // off-by-one errors.
-    bool processed = ctx.filter->HasBloomFilter();
-    bool passed_filter = ctx.filter->Eval<void>(e, ctx.expr->root()->type());
-    ctx.stats->IncrCounters(stats_name, 1, processed, !passed_filter);
+    bool has_filter = ctx.filter->HasBloomFilter();
+    bool passed_filter = !has_filter || ctx.Eval(tuple_row_mem);
+    ctx.stats->IncrCounters(stats_name, 1, has_filter, !passed_filter);
     if (!passed_filter) return false;
   }
 

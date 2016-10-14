@@ -191,60 +191,6 @@ void RawValue::Write(const void* value, Tuple* tuple, const SlotDescriptor* slot
   }
 }
 
-uint32_t RawValue::GetHashValue(
-    const void* v, const ColumnType& type, uint32_t seed) noexcept {
-  // The choice of hash function needs to be consistent across all hosts of the cluster.
-
-  // Use HashCombine with arbitrary constant to ensure we don't return seed.
-  if (v == NULL) return HashUtil::HashCombine32(HASH_VAL_NULL, seed);
-
-  switch (type.type) {
-    case TYPE_CHAR:
-    case TYPE_STRING:
-    case TYPE_VARCHAR:
-      return RawValue::GetHashValueNonNull<impala::StringValue>(
-          reinterpret_cast<const StringValue*>(v), type, seed);
-    case TYPE_BOOLEAN:
-      return RawValue::GetHashValueNonNull<bool>(
-          reinterpret_cast<const bool*>(v), type, seed);
-    case TYPE_TINYINT:
-      return RawValue::GetHashValueNonNull<int8_t>(
-          reinterpret_cast<const int8_t*>(v), type, seed);
-    case TYPE_SMALLINT:
-      return RawValue::GetHashValueNonNull<int16_t>(
-          reinterpret_cast<const int16_t*>(v), type, seed);
-    case TYPE_INT:
-      return RawValue::GetHashValueNonNull<int32_t>(
-          reinterpret_cast<const int32_t*>(v), type, seed);
-    case TYPE_BIGINT:
-      return RawValue::GetHashValueNonNull<int64_t>(
-          reinterpret_cast<const int64_t*>(v), type, seed);
-    case TYPE_FLOAT:
-      return RawValue::GetHashValueNonNull<float>(
-          reinterpret_cast<const float*>(v), type, seed);
-    case TYPE_DOUBLE:
-      return RawValue::GetHashValueNonNull<double>(
-          reinterpret_cast<const double*>(v), type, seed);
-    case TYPE_TIMESTAMP:
-      return RawValue::GetHashValueNonNull<TimestampValue>(
-          reinterpret_cast<const TimestampValue*>(v), type, seed);
-    case TYPE_DECIMAL:
-      switch (type.GetByteSize()) {
-        case 4:
-          return RawValue::GetHashValueNonNull<Decimal4Value>(
-              reinterpret_cast<const impala::Decimal4Value*>(v), type, seed);
-        case 8:
-          return RawValue::GetHashValueNonNull<Decimal8Value>(
-              reinterpret_cast<const Decimal8Value*>(v), type, seed);
-        case 16:
-          return RawValue::GetHashValueNonNull<Decimal16Value>(
-              reinterpret_cast<const Decimal16Value*>(v), type, seed);
-          DCHECK(false);
-      }
-    default: DCHECK(false); return 0;
-  }
-}
-
 uint32_t RawValue::GetHashValueFnv(const void* v, const ColumnType& type, uint32_t seed) {
   // Use HashCombine with arbitrary constant to ensure we don't return seed.
   if (v == NULL) return HashUtil::HashCombine32(HASH_VAL_NULL, seed);

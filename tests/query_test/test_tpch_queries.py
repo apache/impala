@@ -36,7 +36,7 @@ class TestTpchQuery(ImpalaTestSuite):
     # TODO: the planner tests are based on text and need this.
     if cls.exploration_strategy() == 'core':
       cls.TestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format in ['text', 'kudu'])
+          v.get_value('table_format').file_format in ['text', 'parquet', 'kudu'])
 
   def get_test_file_prefix(self, vector):
     if vector.get_value('table_format').file_format in ['kudu']:

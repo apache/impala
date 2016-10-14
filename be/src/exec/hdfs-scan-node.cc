@@ -386,8 +386,8 @@ void HdfsScanNode::ScannerThread() {
           runtime_state_->resource_pool()->ReleaseThreadToken(false);
           if (filter_status.ok()) {
             for (auto& ctx: filter_ctxs) {
-              ctx.expr->FreeLocalAllocations();
-              ctx.expr->Close(runtime_state_);
+              ctx.expr_ctx->FreeLocalAllocations();
+              ctx.expr_ctx->Close(runtime_state_);
             }
           }
           return;
@@ -458,8 +458,8 @@ void HdfsScanNode::ScannerThread() {
 
   if (filter_status.ok()) {
     for (auto& ctx: filter_ctxs) {
-      ctx.expr->FreeLocalAllocations();
-      ctx.expr->Close(runtime_state_);
+      ctx.expr_ctx->FreeLocalAllocations();
+      ctx.expr_ctx->Close(runtime_state_);
     }
   }
 

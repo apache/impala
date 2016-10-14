@@ -22,6 +22,7 @@
 #include <sstream>
 #include <string>
 
+#include "codegen/impala-ir.h"
 #include "runtime/types.h"
 
 namespace impala {
@@ -54,14 +55,14 @@ class RawValue {
 
   /// Returns hash value for 'v' interpreted as 'type'.  The resulting hash value
   /// is combined with the seed value.
-  static uint32_t GetHashValue(
+  static uint32_t IR_ALWAYS_INLINE GetHashValue(
       const void* v, const ColumnType& type, uint32_t seed = 0) noexcept;
 
   /// Templatized version of GetHashValue, use if type is known ahead. GetHashValue
   /// handles nulls.
   template<typename T>
-  static inline uint32_t GetHashValue(const T* v, const ColumnType& type,
-      uint32_t seed = 0);
+  static inline uint32_t IR_ALWAYS_INLINE GetHashValue(const T* v, const ColumnType& type,
+      uint32_t seed = 0) noexcept;
 
   /// Returns hash value for non-nullable 'v' for type T. GetHashValueNonNull doesn't
   /// handle nulls.

@@ -96,6 +96,8 @@ struct ColumnType {
   /// Only set if type == TYPE_STRUCT. The field name of each child.
   std::vector<std::string> field_names;
 
+  static const char* LLVM_CLASS_NAME;
+
   ColumnType(PrimitiveType type = INVALID_TYPE)
     : type(type), len(-1), precision(-1), scale(-1) {
     DCHECK_NE(type, TYPE_CHAR);
@@ -279,8 +281,6 @@ struct ColumnType {
   /// Recursive implementation of ToThrift() that populates 'thrift_type' with the
   /// TTypeNodes for this type and its children.
   void ToThrift(TColumnType* thrift_type) const;
-
-  static const char* LLVM_CLASS_NAME;
 };
 
 std::ostream& operator<<(std::ostream& os, const ColumnType& type);

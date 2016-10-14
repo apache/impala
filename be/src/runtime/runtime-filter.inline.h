@@ -45,17 +45,6 @@ inline void RuntimeFilter::SetBloomFilter(BloomFilter* bloom_filter) {
   arrival_time_ = MonotonicMillis();
 }
 
-template<typename T>
-inline bool RuntimeFilter::Eval(T* val, const ColumnType& col_type) const {
-  // Safe to read bloom_filter_ concurrently with any ongoing SetBloomFilter() thanks
-  // to a) the atomicity of / pointer assignments and b) the x86 TSO memory model.
-  if (bloom_filter_ == NULL) return true;
-
-  uint32_t h = RawValue::GetHashValue(val, col_type,
-      RuntimeFilterBank::DefaultHashSeed());
-  return bloom_filter_->Find(h);
-}
-
 inline bool RuntimeFilter::AlwaysTrue() const  {
   return HasBloomFilter() && bloom_filter_ == BloomFilter::ALWAYS_TRUE_FILTER;
 }

@@ -98,7 +98,7 @@ Status PhjBuilder::Init(RuntimeState* state,
     }
     FilterContext filter_ctx;
     filter_ctx.filter = state->filter_bank()->RegisterFilter(filter, true);
-    RETURN_IF_ERROR(Expr::CreateExprTree(&pool_, filter.src_expr, &filter_ctx.expr));
+    RETURN_IF_ERROR(Expr::CreateExprTree(&pool_, filter.src_expr, &filter_ctx.expr_ctx));
     filters_.push_back(filter_ctx);
   }
   return Status::OK();
@@ -116,8 +116,8 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
       expr_ctxs_to_free_.end(), build_expr_ctxs_.begin(), build_expr_ctxs_.end());
 
   for (const FilterContext& ctx : filters_) {
-    RETURN_IF_ERROR(ctx.expr->Prepare(state, row_desc_, expr_mem_tracker_.get()));
-    expr_ctxs_to_free_.push_back(ctx.expr);
+    RETURN_IF_ERROR(ctx.expr_ctx->Prepare(state, row_desc_, expr_mem_tracker_.get()));
+    expr_ctxs_to_free_.push_back(ctx.expr_ctx);
   }
   RETURN_IF_ERROR(HashTableCtx::Create(state, build_expr_ctxs_, build_expr_ctxs_,
       HashTableStoresNulls(), is_not_distinct_from_, state->fragment_hash_seed(),
@@ -151,7 +151,9 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
 
 Status PhjBuilder::Open(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
-  for (const FilterContext& filter : filters_) RETURN_IF_ERROR(filter.expr->Open(state));
+  for (const FilterContext& filter : filters_) {
+    RETURN_IF_ERROR(filter.expr_ctx->Open(state));
+  }
   RETURN_IF_ERROR(CreateHashPartitions(0));
   AllocateRuntimeFilters();
 
@@ -227,7 +229,7 @@ void PhjBuilder::Close(RuntimeState* state) {
   CloseAndDeletePartitions();
   if (ht_ctx_ != NULL) ht_ctx_->Close();
   Expr::Close(build_expr_ctxs_, state);
-  for (const FilterContext& ctx : filters_) ctx.expr->Close(state);
+  for (const FilterContext& ctx : filters_) ctx.expr_ctx->Close(state);
   if (block_mgr_client_ != NULL) state->block_mgr()->ClearReservations(block_mgr_client_);
   pool_.Clear();
   DataSink::Close(state);

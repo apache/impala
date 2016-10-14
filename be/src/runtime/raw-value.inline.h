@@ -206,11 +206,12 @@ inline uint32_t RawValue::GetHashValueNonNull<Decimal16Value>(
 
 template<typename T>
 inline uint32_t RawValue::GetHashValue(const T* v, const ColumnType& type,
-    uint32_t seed) {
+    uint32_t seed) noexcept {
   // Use HashCombine with arbitrary constant to ensure we don't return seed.
   if (UNLIKELY(v == NULL)) return HashUtil::HashCombine32(HASH_VAL_NULL, seed);
   return RawValue::GetHashValueNonNull<T>(v, type, seed);
 }
+
 }
 
 #endif

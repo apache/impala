@@ -15,23 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "runtime/runtime-filter.inline.h"
+#include "runtime/runtime-filter.h"
 
-#include "util/time.h"
-
-#include "common/names.h"
+#include "runtime/raw-value.h"
 
 using namespace impala;
 
-const int RuntimeFilter::SLEEP_PERIOD_MS = 20;
-
-const char* RuntimeFilter::LLVM_CLASS_NAME = "class.impala::RuntimeFilter";
-
-bool RuntimeFilter::WaitForArrival(int32_t timeout_ms) const {
-  do {
-    if (HasBloomFilter()) return true;
-    SleepForMs(SLEEP_PERIOD_MS);
-  } while ((MonotonicMillis() - registration_time_) < timeout_ms);
-
-  return HasBloomFilter();
+bool RuntimeFilter::Eval(void* val, const ColumnType& col_type) const noexcept {
+  // Safe to read bloom_filter_ concurrently with any ongoing SetBloomFilter() thanks
+  // to a) the atomicity of / pointer assignments and b) the x86 TSO memory model.
+  if (bloom_filter_ == BloomFilter::ALWAYS_TRUE_FILTER) return true;
+  uint32_t h = RawValue::GetHashValue(val, col_type,
+      RuntimeFilterBank::DefaultHashSeed());
+  return bloom_filter_->Find(h);
 }

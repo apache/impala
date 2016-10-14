@@ -18,6 +18,7 @@
 #ifndef IMPALA_RUNTIME_RUNTIME_FILTER_BANK_H
 #define IMPALA_RUNTIME_RUNTIME_FILTER_BANK_H
 
+#include "codegen/impala-ir.h"
 #include "common/object-pool.h"
 #include "runtime/types.h"
 #include "util/runtime-profile.h"
@@ -100,7 +101,7 @@ class RuntimeFilterBank {
   BloomFilter* AllocateScratchBloomFilter(int32_t filter_id);
 
   /// Default hash seed to use when computing hashed values to insert into filters.
-  static int32_t DefaultHashSeed() { return 1234; }
+  static int32_t IR_ALWAYS_INLINE DefaultHashSeed() { return 1234; }
 
   /// Releases all memory allocated for BloomFilters.
   void Close();
