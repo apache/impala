@@ -20,15 +20,17 @@
 
 #include "common/status.h"
 #include "gen-cpp/Data_types.h"
+#include "gen-cpp/Results_types.h"
+#include "gen-cpp/TCLIService_types.h"
 
 #include <vector>
 
 namespace impala {
 
-/// Stores client-ready query result rows returned by
-/// QueryExecState::FetchRows(). Subclasses implement AddRows() / AddOneRow() to
-/// specialise how Impala's row batches are converted to client-API result
-/// representations.
+/// Wraps a client-API specific result representation, and implements the logic required
+/// to translate into that format from Impala's row format.
+///
+/// Subclasses implement AddRows() / AddOneRow() to specialise that logic.
 class QueryResultSet {
  public:
   QueryResultSet() {}
@@ -58,6 +60,17 @@ class QueryResultSet {
 
   /// Returns the size of this result set in number of rows.
   virtual size_t size() = 0;
+
+  /// Returns a result set suitable for Beeswax-based clients.
+  static QueryResultSet* CreateAsciiQueryResultSet(
+      const TResultSetMetadata& metadata, std::vector<std::string>* rowset);
+
+  /// Returns a result set suitable for HS2-based clients. If 'rowset' is nullptr, the
+  /// returned object will allocate and manage its own rowset.
+  static QueryResultSet* CreateHS2ResultSet(
+      apache::hive::service::cli::thrift::TProtocolVersion::type version,
+      const TResultSetMetadata& metadata,
+      apache::hive::service::cli::thrift::TRowSet* rowset);
 };
 }
 

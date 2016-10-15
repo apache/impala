@@ -33,6 +33,7 @@ add_library(Service
   impala-beeswax-server.cc
   query-exec-state.cc
   query-options.cc
+  query-result-set.cc
   child-query.cc
   impalad-main.cc
 )

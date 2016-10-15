@@ -47,99 +47,7 @@ using namespace beeswax;
     }                                                           \
   } while (false)
 
-namespace {
-
-/// Ascii output precision for double/float
-constexpr int ASCII_PRECISION = 16;
-}
-
 namespace impala {
-
-// Ascii result set for Beeswax.
-// Beeswax returns rows in ascii, using "\t" as column delimiter.
-class AsciiQueryResultSet : public QueryResultSet {
- public:
-  // Rows are added into rowset.
-  AsciiQueryResultSet(const TResultSetMetadata& metadata, vector<string>* rowset)
-    : metadata_(metadata), result_set_(rowset), owned_result_set_(NULL) {
-  }
-
-  // Rows are added into a new rowset that is owned by this result set.
-  AsciiQueryResultSet(const TResultSetMetadata& metadata)
-    : metadata_(metadata), result_set_(new vector<string>()),
-      owned_result_set_(result_set_) {
-  }
-
-  virtual ~AsciiQueryResultSet() { }
-
-  // Convert expr values (col_values) to ASCII using "\t" as column delimiter and store
-  // it in this result set.
-  // TODO: Handle complex types.
-  virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales) {
-    int num_col = col_values.size();
-    DCHECK_EQ(num_col, metadata_.columns.size());
-    stringstream out_stream;
-    out_stream.precision(ASCII_PRECISION);
-    for (int i = 0; i < num_col; ++i) {
-      // ODBC-187 - ODBC can only take "\t" as the delimiter
-      out_stream << (i > 0 ? "\t" : "");
-      DCHECK_EQ(1, metadata_.columns[i].columnType.types.size());
-      RawValue::PrintValue(col_values[i],
-          ColumnType::FromThrift(metadata_.columns[i].columnType),
-          scales[i], &out_stream);
-    }
-    result_set_->push_back(out_stream.str());
-    return Status::OK();
-  }
-
-  // Convert TResultRow to ASCII using "\t" as column delimiter and store it in this
-  // result set.
-  virtual Status AddOneRow(const TResultRow& row) {
-    int num_col = row.colVals.size();
-    DCHECK_EQ(num_col, metadata_.columns.size());
-    stringstream out_stream;
-    out_stream.precision(ASCII_PRECISION);
-    for (int i = 0; i < num_col; ++i) {
-      // ODBC-187 - ODBC can only take "\t" as the delimiter
-      out_stream << (i > 0 ? "\t" : "");
-      out_stream << row.colVals[i];
-    }
-    result_set_->push_back(out_stream.str());
-    return Status::OK();
-  }
-
-  virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) {
-    const AsciiQueryResultSet* o = static_cast<const AsciiQueryResultSet*>(other);
-    if (start_idx >= o->result_set_->size()) return 0;
-    const int rows_added =
-        min(static_cast<size_t>(num_rows), o->result_set_->size() - start_idx);
-    result_set_->insert(result_set_->end(), o->result_set_->begin() + start_idx,
-        o->result_set_->begin() + start_idx + rows_added);
-    return rows_added;
-  }
-
-  virtual int64_t ByteSize(int start_idx, int num_rows) {
-    int64_t bytes = 0;
-    const int end = min(static_cast<size_t>(num_rows), result_set_->size() - start_idx);
-    for (int i = start_idx; i < start_idx + end; ++i) {
-      bytes += sizeof(result_set_[i]) + result_set_[i].capacity();
-    }
-    return bytes;
-  }
-
-  virtual size_t size() { return result_set_->size(); }
-
- private:
-  // Metadata of the result set
-  const TResultSetMetadata& metadata_;
-
-  // Points to the result set to be filled. The result set this points to may be owned by
-  // this object, in which case owned_result_set_ is set.
-  vector<string>* result_set_;
-
-  // Set to result_set_ if result_set_ is owned.
-  scoped_ptr<vector<string>> owned_result_set_;
-};
 
 void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   VLOG_QUERY << "query(): query=" << query.query;
@@ -588,9 +496,9 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
   Status fetch_rows_status;
   query_results->data.clear();
   if (!exec_state->eos()) {
-    AsciiQueryResultSet result_set(*(exec_state->result_metadata()),
-        &(query_results->data));
-    fetch_rows_status = exec_state->FetchRows(fetch_size, &result_set);
+    scoped_ptr<QueryResultSet> result_set(QueryResultSet::CreateAsciiQueryResultSet(
+        *exec_state->result_metadata(), &query_results->data));
+    fetch_rows_status = exec_state->FetchRows(fetch_size, result_set.get());
   }
   query_results->__set_has_more(!exec_state->eos());
   query_results->__isset.data = true;
