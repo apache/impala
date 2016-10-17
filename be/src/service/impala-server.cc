@@ -777,7 +777,7 @@ Status ImpalaServer::ExecuteInternal(
   exec_state->reset(new QueryExecState(query_ctx, exec_env_, exec_env_->frontend(),
       this, session_state));
 
-  (*exec_state)->query_events()->MarkEvent("Start execution");
+  (*exec_state)->query_events()->MarkEvent("Query submitted");
 
   TExecRequest result;
   {
@@ -1604,6 +1604,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   }
   all_rows_returned = exec_state.eos();
   last_active_time = exec_state.last_active();
+  request_pool = exec_state.request_pool();
 }
 
 bool ImpalaServer::QueryStateRecordLessThan::operator() (

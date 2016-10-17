@@ -17,6 +17,7 @@
 
 # Tests admission control
 
+import itertools
 import logging
 import os
 import pytest
@@ -599,6 +600,33 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         if client is not None:
           client.close()
 
+  def _check_queries_page_resource_pools(self):
+    """Checks that all queries in the '/queries' webpage json have the correct resource
+    pool (this is called after all queries have been admitted, queued, or rejected, so
+    they should already have the pool set), or no pool for queries that don't go through
+    admission control."""
+    for impalad in self.impalads:
+      queries_json = impalad.service.get_debug_webpage_json('/queries')
+      for query in itertools.chain(queries_json['in_flight_queries'], \
+          queries_json['completed_queries']):
+        if query['stmt_type'] == 'QUERY' or query['stmt_type'] == 'DML':
+          assert query['last_event'] != 'Registered' and \
+              query['last_event'] != 'Planning finished'
+          assert query['resource_pool'] == self.pool_name
+        else:
+          assert query['resource_pool'] == ''
+
+  def _get_queries_page_num_queued(self):
+    """Returns the number of queries currently in the 'queued' state from the '/queries'
+    webpage json"""
+    num_queued = 0
+    for impalad in self.impalads:
+      queries_json = impalad.service.get_debug_webpage_json('/queries')
+      for query in queries_json['in_flight_queries']:
+        if query['last_event'] == 'Queued':
+          num_queued += 1
+    return num_queued
+
   def run_admission_test(self, vector, additional_query_options):
     LOG.debug("Starting test case with parameters: %s", vector)
     self.impalads = self.cluster.impalads
@@ -644,6 +672,13 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         num_queries - metric_deltas['admitted'] - metric_deltas['queued']
     initial_metric_deltas = metric_deltas
 
+    # Like above, check that the count from the queries webpage json is reasonable.
+    queries_page_num_queued = self._get_queries_page_num_queued()
+    assert queries_page_num_queued >=\
+        min(num_queries - metric_deltas['admitted'], MAX_NUM_QUEUED_QUERIES)
+    assert queries_page_num_queued <= MAX_NUM_QUEUED_QUERIES * len(self.impalads)
+    self._check_queries_page_resource_pools()
+
     while len(self.executing_threads) > 0:
       curr_metrics = self.get_admission_metrics();
       log_metrics("Main loop, curr_metrics: ", curr_metrics);
@@ -684,6 +719,11 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       assert metric_deltas['admitted'] == expected_admitted
       assert metric_deltas['queued'] == MAX_NUM_QUEUED_QUERIES
       assert metric_deltas['rejected'] == num_queries - expected_admitted
+
+    # All queries should be completed by now.
+    queries_page_num_queued = self._get_queries_page_num_queued()
+    assert queries_page_num_queued == 0
+    self._check_queries_page_resource_pools()
 
     for thread in self.all_threads:
       if thread.error is not None:

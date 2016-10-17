@@ -352,6 +352,9 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
   }
   Value val_waiting_time(waiting_time_str.c_str(), document->GetAllocator());
   value->AddMember("waiting_time", val_waiting_time, document->GetAllocator());
+
+  Value resource_pool(record.request_pool.c_str(), document->GetAllocator());
+  value->AddMember("resource_pool", resource_pool, document->GetAllocator());
 }
 
 void ImpalaHttpHandler::QueryStateHandler(const Webserver::ArgumentMap& args,

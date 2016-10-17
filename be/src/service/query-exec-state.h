@@ -154,6 +154,13 @@ class ImpalaServer::QueryExecState {
   bool eos() const { return eos_; }
   Coordinator* coord() const { return coord_.get(); }
   QuerySchedule* schedule() { return schedule_.get(); }
+
+  /// Resource pool associated with this query, or an empty string if the schedule has not
+  /// been created and had the pool set yet, or this StmtType doesn't go through admission
+  /// control.
+  std::string request_pool() const {
+    return schedule_ == nullptr ? "" : schedule_->request_pool();
+  }
   int num_rows_fetched() const { return num_rows_fetched_; }
   void set_fetched_rows() { fetched_rows_ = true; }
   bool fetched_rows() const { return fetched_rows_; }

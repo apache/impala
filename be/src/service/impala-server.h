@@ -491,6 +491,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // The most recent time this query was actively being processed, in Unix milliseconds.
     int64_t last_active_time;
 
+    /// Request pool to which the request was submitted for admission, or an empty string
+    /// if this request doesn't have a pool.
+    std::string request_pool;
+
     /// Initialise from an exec_state. If copy_profile is true, print the query
     /// profile to a string and copy that into this.profile (which is expensive),
     /// otherwise leave this.profile empty.
