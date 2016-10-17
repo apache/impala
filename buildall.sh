@@ -46,6 +46,7 @@ TESTS_ACTION=1
 FORMAT_CLUSTER=0
 FORMAT_METASTORE=0
 FORMAT_SENTRY_POLICY_DB=0
+NEED_MINICLUSTER=0
 START_IMPALA_CLUSTER=0
 IMPALA_KERBERIZE=0
 SNAPSHOT_FILE=
@@ -133,6 +134,9 @@ do
       METASTORE_SNAPSHOT_FILE="$(readlink -f "$METASTORE_SNAPSHOT_FILE")"
       shift;
       ;;
+    -start_minicluster)
+      NEED_MINICLUSTER=1
+      ;;
     -start_impala_cluster)
       START_IMPALA_CLUSTER=1
       ;;
@@ -169,6 +173,10 @@ do
       echo "[-asan] : Address sanitizer build [Default: False]"
       echo "[-skiptests] : Skips execution of all tests"
       echo "[-notests] : Skips building and execution of all tests"
+      echo "[-start_minicluster] : Start test cluster including Impala and all"\
+            " its dependencies. If already running, all services are restarted."\
+            " Regenerates test cluster config files. [Default: True if running "\
+            " tests or loading data, False otherwise]"
       echo "[-start_impala_cluster] : Start Impala minicluster after build"\
            " [Default: False]"
       echo "[-testpairwise] : Run tests in 'pairwise' mode (increases"\
@@ -191,8 +199,12 @@ Examples of common tasks:
   # Build and skip tests
   ./buildall.sh -skiptests
 
-  # Incrementally rebuild and skip tests. Keeps existing Hadoop services running.
-  ./buildall.sh -skiptests -noclean
+  # Build, then restart the minicluster and Impala with fresh configs.
+  ./buildall.sh -notests -start_minicluster -start_impala_cluster
+
+  # Incrementally rebuild and skip tests. Keeps existing minicluster services running
+  # and restart Impala.
+  ./buildall.sh -skiptests -noclean -start_impala_cluster
 
   # Build, load a snapshot file, run tests
   ./buildall.sh -snapshot_file <file>
@@ -256,7 +268,6 @@ if [[ -z "$METASTORE_SNAPSHOT_FILE" && "${TARGET_FILESYSTEM}" != "hdfs" &&
   exit 1
 fi
 
-NEED_MINICLUSTER=0
 if [[ $TESTS_ACTION -eq 1 || $TESTDATA_ACTION -eq 1 || $FORMAT_CLUSTER -eq 1 ||
       $FORMAT_METASTORE -eq 1 || $FORMAT_SENTRY_POLICY_DB -eq 1 || -n "$SNAPSHOT_FILE" ||
       -n "$METASTORE_SNAPSHOT_FILE" ]]; then
