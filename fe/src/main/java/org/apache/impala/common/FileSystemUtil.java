@@ -30,9 +30,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3.S3FileSystem;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3native.NativeS3FileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
@@ -280,8 +278,7 @@ public class FileSystemUtil {
     // Common case.
     if (isDistributedFileSystem(fs)) return true;
     // Blacklist FileSystems that are known to not implement getFileBlockLocations().
-    return !(fs instanceof S3AFileSystem || fs instanceof NativeS3FileSystem ||
-        fs instanceof S3FileSystem || fs instanceof LocalFileSystem);
+    return !(fs instanceof S3AFileSystem || fs instanceof LocalFileSystem);
   }
 
   /**
