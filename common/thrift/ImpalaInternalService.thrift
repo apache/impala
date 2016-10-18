@@ -213,6 +213,10 @@ struct TQueryOptions {
 
   // A limit on the amount of scratch directory space that can be used;
   50: optional i64 scratch_limit = -1
+
+  // Indicates whether the FE should rewrite Exprs for optimization purposes.
+  // It's sometimes useful to disable rewrites for testing, e.g., expr-test.cc.
+  51: optional bool enable_expr_rewrites = true
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

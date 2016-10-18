@@ -75,5 +75,11 @@ public class BetweenPredicate extends Predicate {
   }
 
   @Override
+  public boolean equals(Object obj) {
+    if (!super.equals(obj)) return false;
+    return isNotBetween_ == ((BetweenPredicate)obj).isNotBetween_;
+  }
+
+  @Override
   public Expr clone() { return new BetweenPredicate(this); }
 }

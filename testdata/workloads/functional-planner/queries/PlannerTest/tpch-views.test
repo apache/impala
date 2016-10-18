@@ -1253,14 +1253,16 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: tpch.lineitem.l_partkey = tpch.part.p_partkey
-|  other predicates: ((tpch.part.p_brand = 'Brand#12' AND tpch.part.p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') AND tpch.lineitem.l_quantity >= 1 AND tpch.lineitem.l_quantity <= 11 AND tpch.part.p_size >= 1 AND tpch.part.p_size <= 5 AND tpch.lineitem.l_shipmode IN ('AIR', 'AIR REG') AND tpch.lineitem.l_shipinstruct = 'DELIVER IN PERSON') OR (tpch.part.p_brand = 'Brand#23' AND tpch.part.p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') AND tpch.lineitem.l_quantity >= 10 AND tpch.lineitem.l_quantity <= 20 AND tpch.part.p_size >= 1 AND tpch.part.p_size <= 10 AND tpch.lineitem.l_shipmode IN ('AIR', 'AIR REG') AND tpch.lineitem.l_shipinstruct = 'DELIVER IN PERSON') OR (tpch.part.p_brand = 'Brand#34' AND tpch.part.p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG') AND tpch.lineitem.l_quantity >= 20 AND tpch.lineitem.l_quantity <= 30 AND tpch.part.p_size >= 1 AND tpch.part.p_size <= 15 AND tpch.lineitem.l_shipmode IN ('AIR', 'AIR REG') AND tpch.lineitem.l_shipinstruct = 'DELIVER IN PERSON'))
+|  other predicates: ((tpch.part.p_brand = 'Brand#12' AND tpch.part.p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') AND tpch.lineitem.l_quantity >= 1 AND tpch.lineitem.l_quantity <= 11 AND tpch.part.p_size <= 5) OR (tpch.part.p_brand = 'Brand#23' AND tpch.part.p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') AND tpch.lineitem.l_quantity >= 10 AND tpch.lineitem.l_quantity <= 20 AND tpch.part.p_size <= 10) OR (tpch.part.p_brand = 'Brand#34' AND tpch.part.p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG') AND tpch.lineitem.l_quantity >= 20 AND tpch.lineitem.l_quantity <= 30 AND tpch.part.p_size <= 15))
 |  runtime filters: RF000 <- tpch.part.p_partkey
 |
 |--01:SCAN HDFS [tpch.part]
 |     partitions=1/1 files=1 size=22.83MB
+|     predicates: tpch.part.p_size >= 1
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
+   predicates: tpch.lineitem.l_shipmode IN ('AIR', 'AIR REG'), tpch.lineitem.l_shipinstruct = 'DELIVER IN PERSON'
    runtime filters: RF000 -> tpch.lineitem.l_partkey
 ====
 # TPCH-Q20

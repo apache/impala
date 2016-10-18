@@ -37,6 +37,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
+import org.apache.impala.rewrite.ExtractCommonConjunctRule;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TQueryCtx;
@@ -65,7 +66,13 @@ public class AnalysisContext {
     catalog_ = catalog;
     queryCtx_ = queryCtx;
     authzConfig_ = authzConfig;
+    // BetweenPredicates must be rewritten to be executable. Other non-essential
+    // expr rewrites can be disabled via a query option. When rewrites are enabled
+    // BetweenPredicates should be rewritten first to help trigger other rules.
     List<ExprRewriteRule> rules = Lists.newArrayList(BetweenToCompoundRule.INSTANCE);
+    if (queryCtx.getRequest().getQuery_options().enable_expr_rewrites) {
+      rules.add(ExtractCommonConjunctRule.INSTANCE);
+    }
     rewriter_ = new ExprRewriter(rules);
   }
 

@@ -6124,6 +6124,9 @@ int main(int argc, char **argv) {
   ABORT_IF_ERROR(executor_->Setup());
 
   vector<string> options;
+  // Disable FE Expr rewrites to make sure the Exprs get executed exactly as specified
+  // in the tests here.
+  options.push_back("ENABLE_EXPR_REWRITES=0");
   options.push_back("DISABLE_CODEGEN=1");
   disable_codegen_ = true;
   executor_->setExecOptions(options);

@@ -441,6 +441,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
         }
         break;
       }
+      case TImpalaQueryOptions::ENABLE_EXPR_REWRITES: {
+        query_options->__set_enable_expr_rewrites(
+            iequals(value, "true") || iequals(value, "1"));
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

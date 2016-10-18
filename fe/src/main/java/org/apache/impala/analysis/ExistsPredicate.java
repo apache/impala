@@ -17,11 +17,11 @@
 
 package org.apache.impala.analysis;
 
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TExprNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.impala.common.AnalysisException;
-import org.apache.impala.thrift.TExprNode;
 import com.google.common.base.Preconditions;
 
 /**
@@ -66,6 +66,12 @@ public class ExistsPredicate extends Predicate {
   protected void toThrift(TExprNode msg) {
     // Cannot serialize a nested predicate
     Preconditions.checkState(false);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!super.equals(o)) return false;
+    return notExists_ == ((ExistsPredicate)o).notExists_;
   }
 
   @Override

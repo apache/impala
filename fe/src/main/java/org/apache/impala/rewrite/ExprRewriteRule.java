@@ -24,6 +24,9 @@ import org.apache.impala.common.AnalysisException;
 /**
  * Base class for all Expr rewrite rules. A rule is free to modify Exprs in place,
  * but must return a different Expr object if any modifications were made.
+ * An ExprRewriteRule is intended to apply its transformation on a single Expr and not
+ * recursively on all its children. The recursive and repeated application of
+ * ExprRewriteRules is driven by an ExprRewriter.
  */
 public interface ExprRewriteRule {
   /**
