@@ -20,21 +20,35 @@ under the License.
 
 <h2>Thread Group: {{thread-group.category}}</h2>
 
-<table class='table table-hover table-border'>
-  <tr>
-    <th>Thread name</th>
-    <th>Cumulative User CPU(s)</th>
-    <th>Cumulative Kernel CPU(s)</th>
-    <th>Cumulative IO-wait(s)</th>
-  </tr>
-  {{#threads}}
-  <tr>
-    <td>{{name}}</td>
-    <td>{{user_ns}}</td>
-    <td>{{kernel_ns}}</td>
-    <td>{{iowait_ns}}</td>
-  </tr>
-  {{/threads}}
+<table id="{{thread-group.category}}-tbl" class='table table-hover table-bordered'
+       style='table-layout:fixed; word-wrap: break-word'>
+  <thead>
+    <tr>
+      <th>Thread name</th>
+      <th>Cumulative User CPU(s)</th>
+      <th>Cumulative Kernel CPU(s)</th>
+      <th>Cumulative IO-wait(s)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#threads}}
+    <tr>
+      <td>{{name}}</td>
+      <td>{{user_ns}}</td>
+      <td>{{kernel_ns}}</td>
+      <td>{{iowait_ns}}</td>
+    </tr>
+    {{/threads}}
+  </tbody>
 </table>
+
+<script>
+    $(document).ready(function() {
+        $('#{{thread-group.category}}-tbl').DataTable({
+            "order": [[ 1, "desc" ]],
+            "pageLength": 100
+        });
+    });
+</script>
 
 {{> www/common-footer.tmpl}}

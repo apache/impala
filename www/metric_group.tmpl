@@ -19,32 +19,46 @@ under the License.
 {{!Renders a metric group and all its children, one table each}}
 <a id="{{name}}"><h3>{{name}}</h3></a>
 
-<table class='table table-bordered table-hover'>
-  <tr>
-    <th>Name</th>
-    <th>Value</th>
-    <th>Description</th>
-  </tr>
+<table id ="{{name}}-tbl" class='table table-bordered table-hover'>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
     {{#metrics}}
-  <tr>
-    <td><tt>{{name}}</tt></td>
-    {{! Is this a stats metric? }}
-    {{?mean}}
-    <td>
-      Last (of {{count}}): <strong>{{last}}</strong>.
-      Min: {{min}}, max: {{max}}, avg: {{mean}}</td>
-    {{/mean}}
-    {{^mean}}
-    <td>
-      {{human_readable}}
-    </td>
-    {{/mean}}
-    <td>
-      {{description}}
-    </td>
-  </tr>
-  {{/metrics}}
+    <tr>
+      <td><tt>{{name}}</tt></td>
+      {{! Is this a stats metric? }}
+      {{?mean}}
+      <td>
+        Last (of {{count}}): <strong>{{last}}</strong>.
+        Min: {{min}}, max: {{max}}, avg: {{mean}}</td>
+      {{/mean}}
+      {{^mean}}
+      <td>
+        {{human_readable}}
+      </td>
+      {{/mean}}
+      <td>
+        {{description}}
+      </td>
+    </tr>
+    {{/metrics}}
+  </tbody>
 </table>
+
+<script>
+    $(document).ready(function() {
+        $('#{{name}}-tbl').DataTable({
+            "order": [[ 1, "desc" ]],
+            "pageLength": 100
+        });
+    });
+</script>
+
 
 {{! Recurse into all child groups }}
 {{#child_groups}}
