@@ -248,7 +248,7 @@ def do_update(branch, gerrit_sha, apache_sha):
     return
 
   # Everything has been confirmed. Do the actual push
-  cmd = ['git', 'push', 'apache']
+  cmd = ['git', 'push', OPTIONS.apache_remote]
   if OPTIONS.dry_run:
     cmd.append('--dry-run')
   cmd.append('%s:refs/heads/%s' % (push_sha, branch))
