@@ -86,9 +86,14 @@ def wget_and_unpack_package(download_path, file_name, destination, wget_no_clobb
 def download_package(destination, product, version, compiler, platform_release=None):
   remove_existing_package(destination, product, version)
 
+  toolchain_build_id = os.environ["IMPALA_TOOLCHAIN_BUILD_ID"]
   label = get_platform_release_label(release=platform_release)
-  file_name = "{0}-{1}-{2}-{3}.tar.gz".format(product, version, compiler, label)
-  url_path="/{0}/{1}-{2}/{0}-{1}-{2}-{3}.tar.gz".format(product, version, compiler, label)
+  format_params = {'product': product, 'version': version, 'compiler': compiler,
+      'label': label, 'toolchain_build_id': toolchain_build_id}
+  file_name = "{product}-{version}-{compiler}-{label}.tar.gz".format(**format_params)
+  format_params['file_name'] = file_name
+  url_path = "/{toolchain_build_id}/{product}/{version}-{compiler}/{file_name}".format(
+      **format_params)
   download_path = HOST + url_path
 
   wget_and_unpack_package(download_path, file_name, destination, True)
