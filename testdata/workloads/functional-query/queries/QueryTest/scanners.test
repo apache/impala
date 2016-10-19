@@ -48,3 +48,29 @@ limit 10
 ---- TYPES
 INT, BOOLEAN, INT
 ====
+---- QUERY
+# The next sequence of queries is a regression test for IMPALA-4153
+# verifying the retrieval of empty and NULL string columns
+select count(*)
+from nulltable
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*)
+from nulltable where b = ''
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+select a,b
+from nulltable where b = ''
+---- RESULTS
+'a',''
+---- TYPES
+STRING, STRING
+====
