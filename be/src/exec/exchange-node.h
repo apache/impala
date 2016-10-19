@@ -46,6 +46,7 @@ class ExchangeNode : public ExecNode {
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
+  virtual void Codegen(RuntimeState* state);
   /// Blocks until the first batch is available for consumption via GetNext().
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
