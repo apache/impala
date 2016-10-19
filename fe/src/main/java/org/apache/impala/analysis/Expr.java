@@ -238,6 +238,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
   public boolean hasCost() { return evalCost_ >= 0; }
   public long getNumDistinctValues() { return numDistinctValues_; }
+  public boolean getPrintSqlInParens() { return printSqlInParens_; }
   public void setPrintSqlInParens(boolean b) { printSqlInParens_ = b; }
   public boolean isOnClauseConjunct() { return isOnClauseConjunct_; }
   public void setIsOnClauseConjunct(boolean b) { isOnClauseConjunct_ = b; }
@@ -1160,7 +1161,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     if (root instanceof CompoundPredicate) {
       Expr left = pushNegationToOperands(root.getChild(0));
       Expr right = pushNegationToOperands(root.getChild(1));
-      return new CompoundPredicate(((CompoundPredicate)root).getOp(), left, right);
+      CompoundPredicate compoundPredicate =
+        new CompoundPredicate(((CompoundPredicate)root).getOp(), left, right);
+      compoundPredicate.setPrintSqlInParens(root.getPrintSqlInParens());
+      return compoundPredicate;
     }
 
     return root;

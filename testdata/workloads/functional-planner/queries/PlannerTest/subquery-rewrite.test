@@ -99,6 +99,29 @@ PLAN-ROOT SINK
    predicates: bool_col = FALSE
    runtime filters: RF000 -> a.id, RF001 -> int_col
 ====
+# IMPALA-4325: Preserve parenthesis of expressions when rewriting subqueries
+select *
+from functional.alltypes t1
+where t1.int_col in
+  (select t2.int_col
+   from functional.alltypes t2
+   where (t2.int_col is not null and (t2.int_col < 0 or t2.int_col > 10)
+   or t2.bigint_col is not null and (t2.bigint_col < 0 or t2.bigint_col > 10)))
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|  runtime filters: RF000 <- t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: (t2.int_col IS NOT NULL AND (t2.int_col < 0 OR t2.int_col > 10) OR t2.bigint_col IS NOT NULL AND (t2.bigint_col < 0 OR t2.bigint_col > 10))
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.int_col
+====
 # Complex expression in the IN predicate
 select *
 from functional.alltypes t
