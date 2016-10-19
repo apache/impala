@@ -30,17 +30,27 @@
 
 namespace impala {
 
-/// Sink that takes RowBatches and writes them into Kudu.
-/// Currently the data is sent to Kudu on Send(), i.e. the data is batched on the
-/// KuduSession until all the rows in a RowBatch are applied and then the session
-/// is flushed.
+/// Sink that takes RowBatches and writes them into a Kudu table.
 ///
-/// Kudu doesn't have transactions (yet!) so some rows may fail to write while
-/// others are successful. This sink will return an error if any of the rows fails
-/// to be written.
+/// The data is added to Kudu in Send(). The Kudu client is configured to automatically
+/// flush records when enough data has been written (AUTO_FLUSH_BACKGROUND). This
+/// requires specifying a mutation buffer size and a buffer flush watermark percentage in
+/// the Kudu client. The mutation buffer needs to be large enough to buffer rows sent to
+/// all destination nodes because the buffer accounting is not specified per-tablet
+/// server (KUDU-1693). Tests showed that 100MB was a good default, and this is
+/// configurable via the gflag --kudu_mutation_buffer_size. The buffer flush watermark
+/// percentage is set to a value that results in Kudu flushing after 7MB is in a
+/// buffer for a particular destination (of the 100MB of the total mutation buffer space)
+/// because Kudu currently has some 8MB buffer limits.
 ///
-/// TODO Once Kudu actually implements AUTOFLUSH_BACKGROUND flush mode we should
-/// change the flushing behavior as it will likely make writes more efficient.
+/// Kudu doesn't have transactions yet, so some rows may fail to write while others are
+/// successful. The Kudu client reports errors, some of which may be considered to be
+/// expected: rows that fail to be written/updated/deleted due to a key conflict while
+/// the IGNORE option is specified, and these will not result in the sink returning an
+/// error. These errors when IGNORE is not specified, or any other kind of error
+/// reported by Kudu result in the sink returning an error status. The first non-ignored
+/// error is returned in the sink's Status. All reported errors (ignored or not) will be
+/// logged via the RuntimeState.
 class KuduTableSink : public DataSink {
  public:
   KuduTableSink(const RowDescriptor& row_desc,
@@ -59,7 +69,7 @@ class KuduTableSink : public DataSink {
   /// The KuduSession is flushed on each row batch.
   virtual Status Send(RuntimeState* state, RowBatch* batch);
 
-  /// Does nothing. We currently flush on each Send() call.
+  /// Forces any remaining buffered operations to be flushed to Kudu.
   virtual Status FlushFinal(RuntimeState* state);
 
   /// Closes the KuduSession and the expressions.
@@ -72,12 +82,11 @@ class KuduTableSink : public DataSink {
   /// Create a new write operation according to the sink type.
   kudu::client::KuduWriteOperation* NewWriteOp();
 
-  /// Flushes the Kudu session, making sure all previous operations were committed, and handles
-  /// errors returned from Kudu. Passes the number of errors during the flush operations as an
-  /// out parameter.
-  /// Returns a non-OK status if there was an unrecoverable error. This might return an OK
-  /// status even if 'error_count' is > 0, as some errors might be ignored.
-  Status Flush(int64_t* error_count);
+  /// Checks for any errors buffered in the Kudu session, and increments
+  /// appropriate counters for ignored errors.
+  //
+  /// Returns a bad Status if there are non-ignorable errors.
+  Status CheckForErrors(RuntimeState* state);
 
   /// Used to get the KuduTableDescriptor from the RuntimeState
   TableId table_id_;
@@ -102,14 +111,14 @@ class KuduTableSink : public DataSink {
   /// Captures parameters passed down from the frontend
   TKuduTableSink kudu_table_sink_;
 
-  /// Counts the number of calls to KuduSession::flush().
-  RuntimeProfile::Counter* kudu_flush_counter_;
-
-  /// Aggregates the times spent in KuduSession:flush().
-  RuntimeProfile::Counter* kudu_flush_timer_;
-
   /// Total number of errors returned from Kudu.
   RuntimeProfile::Counter* kudu_error_counter_;
+
+  /// Time spent applying Kudu operations. In normal circumstances, Apply() should be
+  /// negligible because it is asynchronous with AUTO_FLUSH_BACKGROUND enabled.
+  /// Significant time spent in Apply() may indicate that Kudu cannot buffer and send
+  /// rows as fast as the sink can write them.
+  RuntimeProfile::Counter* kudu_apply_timer_;
 
   /// Total number of rows written including errors.
   RuntimeProfile::Counter* rows_written_;

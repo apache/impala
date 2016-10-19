@@ -292,6 +292,12 @@ error_codes = (
 
   ("NO_REGISTERED_BACKENDS", 94, "Cannot schedule query: no registered backends "
    "available."),
+
+  ("KUDU_KEY_ALREADY_PRESENT", 95, "Key already present in Kudu table '$0'."),
+
+  ("KUDU_KEY_NOT_FOUND", 96, "Key not found in Kudu table '$0'."),
+
+  ("KUDU_SESSION_ERROR", 97, "Error in Kudu table '$0': $1")
 )
 
 import sys

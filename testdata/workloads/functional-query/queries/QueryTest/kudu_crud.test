@@ -29,10 +29,15 @@ insert into tdata values
 (3, "todd", cast(1.0 as float), 993393939, cast('c' as VARCHAR(20)), true)
 ---- RESULTS
 : 3
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 3.*
 ====
 ---- QUERY
 update tdata set vali=43 where id = 1
 ---- RESULTS
+# TODO: Verify row count after fixing IMPALA-3713 (Here and UPDATE/DELETE below)
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
 select * from tdata
@@ -48,6 +53,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 # Try updating a varchar col. with a value that is bigger than it's size (truncated).
 update tdata set valv=cast('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as VARCHAR(20)) where id = 1
 ---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
 select * from tdata
@@ -58,10 +65,11 @@ select * from tdata
 ---- TYPES
 INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ====
-====
 ---- QUERY
 update tdata set valb=false where id = 1
 ---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
 select * from tdata
@@ -75,6 +83,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ---- QUERY
 update tdata set vali=43 where id > 1
 ---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 2.*
 ====
 ---- QUERY
 select * from tdata
@@ -88,6 +98,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ---- QUERY
 update tdata set name='unknown' where name = 'martin'
 ---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
 select * from tdata
@@ -104,6 +116,8 @@ insert into tdata values
 (120, "she", cast(0.0 as float), 99, cast('f' as VARCHAR(20)), true)
 ---- RESULTS
 : 2
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 2.*
 ====
 ---- QUERY
 select * from tdata
@@ -119,6 +133,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ---- QUERY
 update tdata set name=null where id = 40
 ---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
 select * from tdata
@@ -133,6 +149,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ====
 ---- QUERY
 update tdata set name='he' where id = 40
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
 ---- RESULTS
 ====
 ---- QUERY
@@ -152,6 +170,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 insert into tdata values (320, '', 2.0, 932, cast('' as VARCHAR(20)), false)
 ---- RESULTS
 : 1
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
 select id, name, valv, valb from tdata where id = 320;
@@ -169,6 +189,10 @@ create table ignore_column_case (Id int, NAME string, vAlf float, vali bigint,
 ====
 ---- QUERY
 insert into ignore_column_case values (1, 'Martin', 1.0, 10);
+---- RESULTS
+: 1
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
 select ID, nAmE, VALF, VALI from ignore_column_case where NaMe = 'Martin';
@@ -182,36 +206,44 @@ insert into tdata values
 (666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
 ---- RESULTS
 : 1
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
 insert into tdata values
 (666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
 ---- CATCH
-Error while flushing Kudu session:
+Kudu error(s) reported, first error: Already present
 ====
 ---- QUERY
 insert ignore into tdata values
 (666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
 ---- RESULTS
 : 0
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 0.*
 ====
 ---- QUERY
--- Updating the same record twice
+-- Updating the same record many times: cross join produces 7 identical updates
 update a set a.name='Satan' from tdata a, tdata b where a.id = 666
 ---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 7.*
 ====
 ---- QUERY
--- Does not exercise any error path in the sink because updating the same record twice
--- is valid. Makes sure IGNORE works.
+-- Does not exercise any error path in the sink because updating the same record multiple
+-- times is valid. Makes sure IGNORE works.
 update ignore a set a.name='Satan' from tdata a, tdata b where a.id = 666
 ---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 7.*
 ====
 ---- QUERY
 -- Using a cross join to generate the same delete twice. After the first delete succeeded,
 -- trying to execute the second delete will fail because the record does not exist.
 delete a from tdata a, tdata b where a.id = 666
 ---- CATCH
-Error while flushing Kudu session:
+Kudu error(s) reported, first error: Not found: key not found
 ====
 ---- QUERY
 -- Re-insert the data
@@ -223,6 +255,8 @@ insert into tdata values
 ---- QUERY
 delete ignore a from tdata a, tdata b where a.id = 666
 ---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
 # IMPALA-3454: A delete that requires a rewrite may not get the Kudu column order correct
@@ -242,6 +276,8 @@ insert into impala_3454 values
 ---- QUERY
 delete from impala_3454 where key_1 < (select max(key_2) from impala_3454)
 ---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 2.*
 ====
 ---- QUERY
 select * from impala_3454
@@ -249,4 +285,50 @@ select * from impala_3454
 3,3
 ---- TYPES
 TINYINT,BIGINT
+====
+---- QUERY
+CREATE TABLE kudu_test_tbl PRIMARY KEY(id)
+DISTRIBUTE BY RANGE(id) SPLIT ROWS ((100000000))
+STORED AS KUDU AS
+SELECT * FROM functional_kudu.alltypes WHERE id < 100;
+---- RESULTS
+'Inserted 100 row(s)'
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 100.*
+====
+---- QUERY
+INSERT IGNORE INTO kudu_test_tbl
+SELECT * FROM functional_kudu.alltypes WHERE id < 100;
+---- RESULTS
+: 0
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 0.*
+====
+---- QUERY
+INSERT INTO kudu_test_tbl
+SELECT * FROM functional_kudu.alltypes WHERE id < 100;
+---- CATCH
+Kudu error(s) reported, first error: Already present: key already present
+====
+---- QUERY
+INSERT IGNORE INTO kudu_test_tbl
+SELECT * FROM functional_kudu.alltypes;
+---- RESULTS
+: 7200
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 7200.*
+====
+---- QUERY
+# Test a larger UPDATE
+UPDATE kudu_test_tbl SET int_col = -1;
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 7300.*
+====
+---- QUERY
+# Test a larger DELETE
+DELETE FROM kudu_test_tbl WHERE id > -1;
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 7300.*
 ====
