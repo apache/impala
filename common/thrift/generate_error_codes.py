@@ -289,6 +289,9 @@ error_codes = (
 
   ("PARQUET_ZERO_ROWS_IN_NON_EMPTY_FILE", 93, "File '$0' is corrupt: metadata indicates "
    "a zero row count but there is at least one non-empty row group."),
+
+  ("NO_REGISTERED_BACKENDS", 94, "Cannot schedule query: no registered backends "
+   "available."),
 )
 
 import sys

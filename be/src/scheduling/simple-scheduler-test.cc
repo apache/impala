@@ -361,6 +361,25 @@ TEST_F(SchedulerTest, TestSendUpdates) {
   EXPECT_EQ(0, result.NumDiskAssignedBytes(1));
 }
 
+/// IMPALA-4329: Test scheduling with no backends.
+TEST_F(SchedulerTest, TestEmptyBackendConfig) {
+  Cluster cluster;
+  cluster.AddHost(false, true);
+
+  Schema schema(cluster);
+  schema.AddMultiBlockTable("T", 1, ReplicaPlacement::REMOTE_ONLY, 1);
+
+  Plan plan(schema);
+  plan.AddTableScan("T");
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+  Status status = scheduler.Compute(&result);
+  EXPECT_TRUE(!status.ok());
+  EXPECT_EQ(
+      status.GetDetail(), "Cannot schedule query: no registered backends available.\n");
+}
+
 }  // end namespace impala
 
 IMPALA_TEST_MAIN();
