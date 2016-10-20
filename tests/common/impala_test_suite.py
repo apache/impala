@@ -235,7 +235,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
 
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
-      encoding=None, wait_secs_between_stmts=None):
+      encoding=None):
     """
     Runs the queries in the specified test based on the vector values
 
@@ -318,8 +318,6 @@ class ImpalaTestSuite(BaseTestSuite):
           if set_pattern_match != None:
             query_options_changed.append(set_pattern_match.groups()[0])
           result = self.__execute_query(target_impalad_client, query, user=user)
-          if wait_secs_between_stmts:
-            time.sleep(wait_secs_between_stmts)
       except Exception as e:
         if 'CATCH' in test_section:
           self.__verify_exceptions(test_section['CATCH'], str(e), use_db)

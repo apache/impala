@@ -1670,6 +1670,8 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       TInsertPartitionStatus* status = &(per_partition_status_[partition.first]);
       status->__set_num_modified_rows(
           status->num_modified_rows + partition.second.num_modified_rows);
+      status->__set_kudu_latest_observed_ts(std::max(
+          partition.second.kudu_latest_observed_ts, status->kudu_latest_observed_ts));
       status->__set_id(partition.second.id);
       status->__set_partition_base_dir(partition.second.partition_base_dir);
 
@@ -1734,6 +1736,15 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   }
 
   return Status::OK();
+}
+
+uint64_t Coordinator::GetLatestKuduInsertTimestamp() const {
+  uint64_t max_ts = 0;
+  for (const auto& entry : per_partition_status_) {
+    max_ts = std::max(max_ts,
+        static_cast<uint64_t>(entry.second.kudu_latest_observed_ts));
+  }
+  return max_ts;
 }
 
 RuntimeState* Coordinator::runtime_state() {

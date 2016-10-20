@@ -240,6 +240,9 @@ struct TSessionState {
 
   // Client network address
   4: required Types.TNetworkAddress network_address
+
+  // If set, the latest Kudu timestamp observed within this session.
+  7: optional i64 kudu_latest_observed_ts;
 }
 
 // Client request including stmt to execute and query options.
@@ -430,6 +433,10 @@ struct TInsertPartitionStatus {
 
   // Fully qualified URI to the base directory for this partition.
   4: required string partition_base_dir
+
+  // The latest observed Kudu timestamp reported by the KuduSession at this partition.
+  // This value is an unsigned int64.
+  5: optional i64 kudu_latest_observed_ts
 }
 
 // The results of an INSERT query, sent to the coordinator as part of

@@ -177,6 +177,11 @@ class Coordinator {
   /// This is safe to call only after Wait()
   const PartitionStatusMap& per_partition_status() { return per_partition_status_; }
 
+  /// Returns the latest Kudu timestamp observed across any backends where DML into Kudu
+  /// was executed, or 0 if there were no Kudu timestamps reported.
+  /// This should only be called after Wait().
+  uint64_t GetLatestKuduInsertTimestamp() const;
+
   /// Gathers all updates to the catalog required once this query has completed execution.
   /// Returns true if a catalog update is required, false otherwise.
   /// Must only be called after Wait()

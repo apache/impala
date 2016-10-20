@@ -1159,6 +1159,7 @@ void ImpalaServer::SessionState::ToThrift(const TUniqueId& session_id,
   // proxy user is authorized to delegate as this user.
   if (!do_as_user.empty()) state->__set_delegated_user(do_as_user);
   state->network_address = network_address;
+  state->__set_kudu_latest_observed_ts(kudu_latest_observed_ts);
 }
 
 void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
@@ -1625,6 +1626,8 @@ void ImpalaServer::ConnectionStart(
     session_state->session_type = TSessionType::BEESWAX;
     session_state->network_address = connection_context.network_address;
     session_state->default_query_options = default_query_options_;
+    session_state->kudu_latest_observed_ts = 0;
+
     // If the username was set by a lower-level transport, use it.
     if (!connection_context.username.empty()) {
       session_state->connected_user = connection_context.username;

@@ -278,6 +278,7 @@ Status KuduTableSink::CheckForErrors(RuntimeState* state) {
 
   // Get the pending errors from the Kudu session. If errors overflowed the error buffer
   // we can't be sure all errors can be ignored, so an error status will be reported.
+  // TODO: Make sure Kudu handles conflict errors properly if IGNORE is set (KUDU-1563).
   bool error_overflow = false;
   session_->GetPendingErrors(&errors, &error_overflow);
   if (UNLIKELY(error_overflow)) {
@@ -327,6 +328,8 @@ Status KuduTableSink::FlushFinal(RuntimeState* state) {
   Status status = CheckForErrors(state);
   (*state->per_partition_status())[ROOT_PARTITION_KEY].__set_num_modified_rows(
       rows_written_->value() - kudu_error_counter_->value());
+  (*state->per_partition_status())[ROOT_PARTITION_KEY].__set_kudu_latest_observed_ts(
+      client_->GetLatestObservedTimestamp());
   return status;
 }
 

@@ -708,6 +708,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// Time the session was last accessed.
     int64_t last_accessed_ms;
 
+    /// The latest Kudu timestamp observed after DML operations executed within this
+    /// session.
+    uint64_t kudu_latest_observed_ts;
+
     /// Number of RPCs concurrently accessing this session state. Used to detect when a
     /// session may be correctly expired after a timeout (when ref_count == 0). Typically
     /// at most one RPC will be issued against a session at a time, but clients may do
