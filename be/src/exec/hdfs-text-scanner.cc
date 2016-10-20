@@ -400,7 +400,7 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
       SCOPED_TIMER(scan_node_->materialize_tuple_timer());
       // If we are doing count(*) then we return tuples only containing partition keys
       boundary_row_.Clear();
-      num_tuples_materialized = WriteEmptyTuples(context_, tuple_row_mem, *num_tuples);
+      num_tuples_materialized = WriteTemplateTuples(tuple_row_mem, *num_tuples);
     }
 
     // Save contents that are split across buffers if we are going to return this column

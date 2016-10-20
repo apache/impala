@@ -485,7 +485,7 @@ Status HdfsRCFileScanner::ProcessRange() {
         // If there are no materialized slots (e.g. count(*) or just partition cols)
         // we can shortcircuit the parse loop
         row_pos_ += max_tuples;
-        int num_to_commit = WriteEmptyTuples(context_, current_row, max_tuples);
+        int num_to_commit = WriteTemplateTuples(current_row, max_tuples);
         COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
         RETURN_IF_ERROR(CommitRows(num_to_commit));
         continue;

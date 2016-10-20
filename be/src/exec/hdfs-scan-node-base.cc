@@ -351,8 +351,6 @@ void HdfsScanNodeBase::Codegen(RuntimeState* state) {
 Status HdfsScanNodeBase::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
 
-  if (file_descs_.empty()) return Status::OK();
-
   // Open collection conjuncts
   for (const auto& entry: conjuncts_map_) {
     // conjuncts_ are already opened in ExecNode::Open()
