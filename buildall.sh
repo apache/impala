@@ -286,6 +286,23 @@ if [[ $TESTS_ACTION -eq 1 || $TESTDATA_ACTION -eq 1 || $FORMAT_CLUSTER -eq 1 ||
   NEED_MINICLUSTER=1
 fi
 
+create_log_dirs() {
+  # Create all of the log directories.
+  mkdir -p $IMPALA_ALL_LOGS_DIRS
+
+  # Create symlinks Testing/Temporary and be/Testing/Temporary that point to the BE test
+  # log dir to capture the all logs of BE unit tests. Gtest has Testing/Temporary
+  # hardwired in its code, so we cannot change the output dir by configuration.
+  # We create two symlinks to capture the logs when running ctest either from
+  # ${IMPALA_HOME} or ${IMPALA_HOME}/be.
+  rm -rf "${IMPALA_HOME}/Testing"
+  mkdir -p "${IMPALA_HOME}/Testing"
+  ln -fs "${IMPALA_BE_TEST_LOGS_DIR}" "${IMPALA_HOME}/Testing/Temporary"
+  rm -rf "${IMPALA_HOME}/be/Testing"
+  mkdir -p "${IMPALA_HOME}/be/Testing"
+  ln -fs "${IMPALA_BE_TEST_LOGS_DIR}" "${IMPALA_HOME}/be/Testing/Temporary"
+}
+
 bootstrap_dependencies() {
   # Populate necessary thirdparty components unless it's set to be skipped.
   if [[ "${SKIP_TOOLCHAIN_BOOTSTRAP}" = true ]]; then
@@ -310,37 +327,20 @@ bootstrap_dependencies() {
 
 # Build the Impala frontend and its dependencies.
 build_fe() {
-  "$IMPALA_HOME/bin/make_impala.sh" ${MAKE_IMPALA_ARGS} -cmake_only
-  "${MAKE_CMD}" fe
+  "$IMPALA_HOME/bin/make_impala.sh" ${MAKE_IMPALA_ARGS} -fe_only
 }
 
 # Build all components.
 build_all_components() {
-  # Build common and backend. This also sets up the CMake files.
-  echo "Calling make_impala.sh ${MAKE_IMPALA_ARGS}"
-  "$IMPALA_HOME/bin/make_impala.sh" ${MAKE_IMPALA_ARGS}
-
+  # Build the Impala frontend, backend and external data source API.
+  MAKE_IMPALA_ARGS+=" -fe -cscope -tarballs"
   if [[ -e "$IMPALA_LZO" ]]
   then
-    pushd "$IMPALA_LZO"
-    LZO_CMAKE_ARGS+=" -DCMAKE_TOOLCHAIN_FILE=./cmake_modules/toolchain.cmake"
-    rm -f CMakeCache.txt
-    cmake ${LZO_CMAKE_ARGS}
-    "${MAKE_CMD}"
-    popd
+    MAKE_IMPALA_ARGS+=" -impala-lzo"
   fi
 
-  # Build the Java components (fe and external data source API).
-  pushd "$IMPALA_HOME"
-  "${MAKE_CMD}" ext-data-source fe
-  popd
-
-  # Build the shell tarball
-  echo "Creating shell tarball"
-  "${IMPALA_HOME}/shell/make_shell_tarball.sh"
-
-  # Generate list of files for Cscope to index
-  "$IMPALA_HOME/bin/gen-cscope.sh"
+  echo "Running make_impala.sh ${MAKE_IMPALA_ARGS}"
+  "$IMPALA_HOME/bin/make_impala.sh" ${MAKE_IMPALA_ARGS}
 }
 
 # Do any configuration of the test cluster required by the script arguments.
@@ -425,6 +425,8 @@ run_all_tests() {
 if [[ "$CLEAN_ACTION" -eq 1 ]]; then
   "$IMPALA_HOME/bin/clean.sh"
 fi
+
+create_log_dirs
 
 bootstrap_dependencies
 

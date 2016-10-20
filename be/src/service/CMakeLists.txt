@@ -53,11 +53,11 @@ add_executable(impalad
 # All Impala daemons run from the same binary. The code that is run is determined by the
 # name (i.e. argv[0]) of the command that executes the binary, so we create symlinks for
 # statestored and catalogd.
-ADD_CUSTOM_TARGET(statestored
+ADD_CUSTOM_TARGET(statestored ALL
   ${CMAKE_COMMAND} -E create_symlink ${EXECUTABLE_OUTPUT_PATH}/impalad
   ${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore/statestored DEPENDS impalad)
 
-ADD_CUSTOM_TARGET(catalogd
+ADD_CUSTOM_TARGET(catalogd ALL
   ${CMAKE_COMMAND} -E create_symlink ${EXECUTABLE_OUTPUT_PATH}/impalad
   ${BUILD_OUTPUT_ROOT_DIRECTORY}/catalog/catalogd DEPENDS impalad)
 

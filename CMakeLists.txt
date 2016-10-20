@@ -305,20 +305,21 @@ add_subdirectory(be)
 add_subdirectory(fe)
 add_subdirectory(ext-data-source)
 
-# Run FE and BE tests
-add_custom_target(testall
-  COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR}/fe mvn test
-  COMMAND ${CMAKE_SOURCE_DIR}/bin/runbackendtests.sh
+add_custom_target(tarballs ALL DEPENDS shell_tarball)
+
+add_custom_target(shell_tarball DEPENDS thrift-deps
+  COMMAND "${CMAKE_SOURCE_DIR}/shell/make_shell_tarball.sh"
 )
 
-# Load test data
-add_custom_target(loadtestdata
-  COMMAND ${CMAKE_SOURCE_DIR}/bin/load-test-data.sh
+add_custom_target(cscope ALL
+  COMMAND "${CMAKE_SOURCE_DIR}/bin/gen-cscope.sh"
 )
 
-add_custom_target(benchmark_run
-  COMMAND ${CMAKE_SOURCE_DIR}/be/bin/run_hive_benchmark.py
-)
+if (DEFINED ENV{IMPALA_LZO} AND EXISTS $ENV{IMPALA_LZO})
+  add_custom_target(impala-lzo ALL DEPENDS thrift-deps
+    COMMAND $ENV{IMPALA_LZO}/build.sh ${CMAKE_SOURCE_DIR} $ENV{IMPALA_TOOLCHAIN}
+  )
+endif()
 
 # Dump include paths to a file
 if (DUMP_INCLUDE_PATHS)
