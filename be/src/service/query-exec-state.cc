@@ -620,7 +620,7 @@ Status ImpalaServer::QueryExecState::WaitInternal() {
     RETURN_IF_ERROR(query_status_);
     RETURN_IF_ERROR(UpdateQueryStatus(child_queries_status));
   }
-  query_events_->MarkEvent("Child queries finished");
+  if (!child_queries.empty()) query_events_->MarkEvent("Child queries finished");
 
   if (coord_.get() != NULL) {
     RETURN_IF_ERROR(coord_->Wait());
