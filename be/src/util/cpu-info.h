@@ -36,7 +36,8 @@ class CpuInfo {
   static const int64_t SSE4_1  = (1 << 2);
   static const int64_t SSE4_2  = (1 << 3);
   static const int64_t POPCNT  = (1 << 4);
-  static const int64_t AVX2    = (1 << 5);
+  static const int64_t AVX     = (1 << 5);
+  static const int64_t AVX2    = (1 << 6);
 
   /// Cache enums for L1 (data), L2 and L3
   enum CacheLevel {
