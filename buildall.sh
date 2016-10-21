@@ -39,6 +39,9 @@ if ! . "$ROOT"/bin/impala-config.sh; then
   exit 1
 fi
 
+# Change to IMPALA_HOME so that coredumps, etc end up in IMPALA_HOME.
+cd "${IMPALA_HOME}"
+
 # Defaults that are only changable via the commandline.
 CLEAN_ACTION=1
 TESTDATA_ACTION=0
