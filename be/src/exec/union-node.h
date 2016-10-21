@@ -22,14 +22,16 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "exec/exec-node.h"
-#include "exprs/expr.h"
-#include "runtime/mem-pool.h"
-#include <boost/scoped_ptr.hpp>
+#include "runtime/row-batch.h"
 
 namespace impala {
 
+class DescriptorTbl;
+class ExprContext;
+class RuntimeState;
 class Tuple;
 class TupleRow;
+class TPlanNode;
 
 /// Node that merges the results of its children by materializing their
 /// evaluated expressions into row batches. The UnionNode pulls row batches from its
@@ -48,35 +50,36 @@ class UnionNode : public ExecNode {
 
  private:
   /// Tuple id resolved in Prepare() to set tuple_desc_;
-  int tuple_id_;
+  const int tuple_id_;
 
   /// Descriptor for tuples this union node constructs.
   const TupleDescriptor* tuple_desc_;
 
   /// Const exprs materialized by this node. These exprs don't refer to any children.
-  std::vector<std::vector<ExprContext*>> const_result_expr_ctx_lists_;
+  /// Only materialized by the first fragment instance to avoid duplication.
+  std::vector<std::vector<ExprContext*>> const_expr_lists_;
 
   /// Exprs materialized by this node. The i-th result expr list refers to the i-th child.
-  std::vector<std::vector<ExprContext*>> result_expr_ctx_lists_;
+  std::vector<std::vector<ExprContext*>> child_expr_lists_;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
-
-  /// Index of current const result expr list.
-  int const_result_expr_idx_;
 
   /// Index of current child.
   int child_idx_;
 
   /// Current row batch of current child. We reset the pointer to a new RowBatch
   /// when switching to a different child.
-  boost::scoped_ptr<RowBatch> child_row_batch_;
+  boost::scoped_ptr<RowBatch> child_batch_;
 
   /// Index of current row in child_row_batch_.
   int child_row_idx_;
 
   /// Saved from the last to GetNext() on the current child.
   bool child_eos_;
+
+  /// Index of current const result expr list.
+  int const_expr_list_idx_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
@@ -85,15 +88,10 @@ class UnionNode : public ExecNode {
   /// and sets child_row_idx_ to 0. May set child_eos_.
   Status OpenCurrentChild(RuntimeState* state);
 
-  /// Evaluates exprs on all rows in child_row_batch_ starting from child_row_idx_,
-  /// and materializes their results into *tuple.
-  /// Adds *tuple into row_batch, and increments *tuple.
-  /// If const_exprs is true, then the exprs are evaluated exactly once without
-  /// fetching rows from child_row_batch_.
-  /// Only commits tuples to row_batch if they are not filtered by conjuncts.
-  /// Returns an error status if evaluating an expression results in one.
-  Status EvalAndMaterializeExprs(const std::vector<ExprContext*>& ctxs,
-      bool const_exprs, Tuple** tuple, RowBatch* row_batch);
+  /// Evaluates 'exprs' over 'row', materializes the results in 'tuple_buf'.
+  /// and appends the new tuple to 'dst_batch'. Increments 'num_rows_returned_'.
+  inline void MaterializeExprs(const std::vector<ExprContext*>& exprs,
+      TupleRow* row, uint8_t* tuple_buf, RowBatch* dst_batch);
 };
 
 }
