@@ -380,10 +380,13 @@ class LlvmCodeGen {
   llvm::Value* CastPtrToLlvmPtr(llvm::Type* type, const void* ptr);
 
   /// Returns the constant 'val' of 'type'.
-  llvm::Value* GetIntConstant(PrimitiveType type, int64_t val);
+  llvm::Value* GetIntConstant(PrimitiveType type, uint64_t val);
 
-  /// Returns the constant 'val' of the int type of size 'byte_size'.
-  llvm::Value* GetIntConstant(int byte_size, int64_t val);
+  /// Returns a constant int of 'byte_size' bytes based on 'low_bits' and 'high_bits'
+  /// which stand for the lower and upper 64-bits of the constant respectively. For
+  /// values less than or equal to 64-bits, 'high_bits' is not used. This function
+  /// can generate constant up to 128-bit wide. 'byte_size' must be power of 2.
+  llvm::Value* GetIntConstant(int byte_size, uint64_t low_bits, uint64_t high_bits);
 
   /// Returns true/false constants (bool type)
   llvm::Value* true_value() { return true_value_; }

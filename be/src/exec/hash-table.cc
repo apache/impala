@@ -569,41 +569,51 @@ string HashTable::PrintStats() const {
 // we'll pick a more random value.
 static void CodegenAssignNullValue(LlvmCodeGen* codegen,
     LlvmCodeGen::LlvmBuilder* builder, Value* dst, const ColumnType& type) {
-  int64_t fvn_seed = HashUtil::FNV_SEED;
+  uint64_t fnv_seed = HashUtil::FNV_SEED;
 
   if (type.type == TYPE_STRING || type.type == TYPE_VARCHAR) {
     Value* dst_ptr = builder->CreateStructGEP(NULL, dst, 0, "string_ptr");
     Value* dst_len = builder->CreateStructGEP(NULL, dst, 1, "string_len");
-    Value* null_len = codegen->GetIntConstant(TYPE_INT, fvn_seed);
+    Value* null_len = codegen->GetIntConstant(TYPE_INT, fnv_seed);
     Value* null_ptr = builder->CreateIntToPtr(null_len, codegen->ptr_type());
     builder->CreateStore(null_ptr, dst_ptr);
     builder->CreateStore(null_len, dst_len);
   } else {
     Value* null_value = NULL;
-    // Get a type specific representation of fvn_seed
+    int byte_size = type.GetByteSize();
+    // Get a type specific representation of fnv_seed
     switch (type.type) {
       case TYPE_BOOLEAN:
         // In results, booleans are stored as 1 byte
         dst = builder->CreateBitCast(dst, codegen->ptr_type());
-        null_value = codegen->GetIntConstant(TYPE_TINYINT, fvn_seed);
+        null_value = codegen->GetIntConstant(TYPE_TINYINT, fnv_seed);
         break;
+      case TYPE_TIMESTAMP: {
+        // Cast 'dst' to 'i128*'
+        DCHECK_EQ(byte_size, 16);
+        PointerType* fnv_seed_ptr_type =
+            codegen->GetPtrType(Type::getIntNTy(codegen->context(), byte_size * 8));
+        dst = builder->CreateBitCast(dst, fnv_seed_ptr_type);
+        null_value = codegen->GetIntConstant(byte_size, fnv_seed, fnv_seed);
+        break;
+      }
       case TYPE_TINYINT:
       case TYPE_SMALLINT:
       case TYPE_INT:
       case TYPE_BIGINT:
       case TYPE_DECIMAL:
-        null_value = codegen->GetIntConstant(type.GetByteSize(), fvn_seed);
+        null_value = codegen->GetIntConstant(byte_size, fnv_seed, fnv_seed);
         break;
       case TYPE_FLOAT: {
         // Don't care about the value, just the bit pattern
-        float fvn_seed_float = *reinterpret_cast<float*>(&fvn_seed);
-        null_value = ConstantFP::get(codegen->context(), APFloat(fvn_seed_float));
+        float fnv_seed_float = *reinterpret_cast<float*>(&fnv_seed);
+        null_value = ConstantFP::get(codegen->context(), APFloat(fnv_seed_float));
         break;
       }
       case TYPE_DOUBLE: {
         // Don't care about the value, just the bit pattern
-        double fvn_seed_double = *reinterpret_cast<double*>(&fvn_seed);
-        null_value = ConstantFP::get(codegen->context(), APFloat(fvn_seed_double));
+        double fnv_seed_double = *reinterpret_cast<double*>(&fnv_seed);
+        null_value = ConstantFP::get(codegen->context(), APFloat(fnv_seed_double));
         break;
       }
       default:
@@ -685,13 +695,11 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
 // becomes the start of the next block for codegen (either the next expr or just the
 // end of the function).
 Status HashTableCtx::CodegenEvalRow(LlvmCodeGen* codegen, bool build, Function** fn) {
-  // TODO: CodegenAssignNullValue() can't handle TYPE_TIMESTAMP or TYPE_DECIMAL yet
   const vector<ExprContext*>& ctxs = build ? build_expr_ctxs_ : probe_expr_ctxs_;
   for (int i = 0; i < ctxs.size(); ++i) {
-    PrimitiveType type = ctxs[i]->root()->type().type;
-    if (type == TYPE_TIMESTAMP || type == TYPE_CHAR) {
-      return Status(Substitute("HashTableCtx::CodegenEvalRow(): type $0 NYI",
-          TypeToString(type)));
+    // Disable codegen for CHAR
+    if (ctxs[i]->root()->type().type == TYPE_CHAR) {
+      return Status("HashTableCtx::CodegenEvalRow(): CHAR NYI");
     }
   }
 

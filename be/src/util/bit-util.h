@@ -82,6 +82,10 @@ class BitUtil {
     return value & ~(factor - 1);
   }
 
+  constexpr static inline bool IsPowerOf2(int64_t value) {
+    return (value & (value - 1)) == 0;
+  }
+
   /// Specialized round up and down functions for frequently used factors,
   /// like 8 (bits->bytes), 32 (bits->i32), and 64 (bits->i64).
   /// Returns the rounded up number of bytes that fit the number of bits.
