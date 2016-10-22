@@ -20,21 +20,27 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.common.AnalysisException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.impala.catalog.ColumnStats;
-import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
  * Representation of a union with its list of operands, and optional order by and limit.
- * A union materializes its results, and its resultExprs are slotrefs into the
+ * A union materializes its results, and its resultExprs are SlotRefs into a new
  * materialized tuple.
  * During analysis, the operands are normalized (separated into a single sequence of
  * DISTINCT followed by a single sequence of ALL operands) and unnested to the extent
  * possible. This also creates the AggregationInfo for DISTINCT operands.
+ *
+ * Use of resultExprs vs. baseTblResultExprs:
+ * We consistently use/cast the resultExprs of union operands because the final expr
+ * substitution happens during planning. The only place where baseTblResultExprs are
+ * used is in materializeRequiredSlots() because that is called before plan generation
+ * and we need to mark the slots of resolved exprs as materialized.
  */
 public class UnionStmt extends QueryStmt {
   private final static Logger LOG = LoggerFactory.getLogger(UnionStmt.class);
@@ -198,10 +204,6 @@ public class UnionStmt extends QueryStmt {
     allOperands_.clear();
   }
 
-  /**
-   * Propagates DISTINCT from left to right, and checks that all
-   * union operands are union compatible, adding implicit casts if necessary.
-   */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed()) return;
@@ -212,43 +214,21 @@ public class UnionStmt extends QueryStmt {
     }
     Preconditions.checkState(operands_.size() > 0);
 
-    // Propagates DISTINCT from right to left
+    // Propagates DISTINCT from right to left.
     propagateDistinct();
 
-    // Make sure all operands return an equal number of exprs.
-    QueryStmt firstQuery = operands_.get(0).getQueryStmt();
+    // Analyze all operands and make sure they return an equal number of exprs.
+    analyzeOperands(analyzer);
 
-    try {
-      operands_.get(0).analyze(analyzer);
-    } catch (AnalysisException e) {
-      if (analyzer.getMissingTbls().isEmpty()) throw e;
-    }
+    // Remember the SQL string before unnesting operands.
+    toSqlString_ = toSql();
 
-    List<List<Expr>> resultExprLists = Lists.newArrayList();
-    List<Expr> firstQueryExprs = firstQuery.getBaseTblResultExprs();
-    resultExprLists.add(firstQueryExprs);
-    for (int i = 1; i < operands_.size(); ++i) {
-      QueryStmt query = operands_.get(i).getQueryStmt();
-      try {
-        operands_.get(i).analyze(analyzer);
-        List<Expr> exprs = query.getBaseTblResultExprs();
-        if (firstQueryExprs.size() != exprs.size()) {
-          throw new AnalysisException("Operands have unequal number of columns:\n" +
-              "'" + queryStmtToSql(firstQuery) + "' has " +
-              firstQueryExprs.size() + " column(s)\n" +
-              "'" + queryStmtToSql(query) + "' has " + exprs.size() + " column(s)");
-        }
-        resultExprLists.add(exprs);
-      } catch (AnalysisException e) {
-        if (analyzer.getMissingTbls().isEmpty()) throw e;
-      }
-    }
+    // Unnest the operands before casting the result exprs. Unnesting may add
+    // additional entries to operands_ and the result exprs of those unnested
+    // operands must also be cast properly.
+    unnestOperands(analyzer);
 
-    if (!analyzer.getMissingTbls().isEmpty()) {
-      throw new AnalysisException("Found missing tables. Aborting analysis.");
-    }
-
-    // compute hasAnalyticExprs_
+    // Compute hasAnalyticExprs_
     hasAnalyticExprs_ = false;
     for (UnionOperand op: operands_) {
       if (op.hasAnalyticExprs()) {
@@ -257,17 +237,66 @@ public class UnionStmt extends QueryStmt {
       }
     }
 
+    // Collect all result expr lists and cast the exprs as necessary.
+    List<List<Expr>> resultExprLists = Lists.newArrayList();
+    for (UnionOperand op: operands_) {
+      resultExprLists.add(op.getQueryStmt().getResultExprs());
+    }
     analyzer.castToUnionCompatibleTypes(resultExprLists);
 
-    // Create tuple descriptor materialized by this UnionStmt,
-    // its resultExprs, and its sortInfo if necessary.
+    // Create tuple descriptor materialized by this UnionStmt, its resultExprs, and
+    // its sortInfo if necessary.
     createMetadata(analyzer);
     createSortInfo(analyzer);
-    toSqlString_ = toSql();
 
-    unnestOperands(analyzer);
+    // Create unnested operands' smaps.
+    for (UnionOperand operand: operands_) setOperandSmap(operand, analyzer);
+
+    // Create distinctAggInfo, if necessary.
+    if (!distinctOperands_.isEmpty()) {
+      // Aggregate produces exactly the same tuple as the original union stmt.
+      ArrayList<Expr> groupingExprs = Expr.cloneList(resultExprs_);
+      try {
+        distinctAggInfo_ =
+            AggregateInfo.create(groupingExprs, null,
+              analyzer.getDescTbl().getTupleDesc(tupleId_), analyzer);
+      } catch (AnalysisException e) {
+        // Should never happen.
+        throw new IllegalStateException(
+            "Error creating agg info in UnionStmt.analyze()", e);
+      }
+    }
+
     if (evaluateOrderBy_) createSortTupleInfo(analyzer);
     baseTblResultExprs_ = resultExprs_;
+  }
+
+  /**
+   * Analyzes all operands and checks that they return an equal number of exprs.
+   * Throws an AnalysisException if that is not the case, or if analyzing
+   * an operand fails.
+   */
+  private void analyzeOperands(Analyzer analyzer) throws AnalysisException {
+    for (int i = 0; i < operands_.size(); ++i) {
+      try {
+        operands_.get(i).analyze(analyzer);
+        QueryStmt firstQuery = operands_.get(0).getQueryStmt();
+        List<Expr> firstExprs = operands_.get(0).getQueryStmt().getResultExprs();
+        QueryStmt query = operands_.get(i).getQueryStmt();
+        List<Expr> exprs = query.getResultExprs();
+        if (firstExprs.size() != exprs.size()) {
+          throw new AnalysisException("Operands have unequal number of columns:\n" +
+              "'" + queryStmtToSql(firstQuery) + "' has " +
+              firstExprs.size() + " column(s)\n" +
+              "'" + queryStmtToSql(query) + "' has " + exprs.size() + " column(s)");
+        }
+      } catch (AnalysisException e) {
+        if (analyzer.getMissingTbls().isEmpty()) throw e;
+      }
+    }
+    if (!analyzer.getMissingTbls().isEmpty()) {
+      throw new AnalysisException("Found missing tables. Aborting analysis.");
+    }
   }
 
   /**
@@ -278,17 +307,11 @@ public class UnionStmt extends QueryStmt {
   @Override
   public void materializeRequiredSlots(Analyzer analyzer) {
     TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tupleId_);
-    if (!distinctOperands_.isEmpty()) {
-      // to keep things simple we materialize all grouping exprs = output slots,
-      // regardless of what's being referenced externally
-      for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
-        slotDesc.setIsMaterialized(true);
-      }
-    }
+    // to keep things simple we materialize all grouping exprs = output slots,
+    // regardless of what's being referenced externally
+    if (!distinctOperands_.isEmpty()) tupleDesc.materializeSlots();
 
-    if (evaluateOrderBy_) {
-      sortInfo_.materializeRequiredSlots(analyzer, null);
-    }
+    if (evaluateOrderBy_) sortInfo_.materializeRequiredSlots(analyzer, null);
 
     // collect operands' result exprs
     List<SlotDescriptor> outputSlots = tupleDesc.getSlots();
@@ -320,7 +343,6 @@ public class UnionStmt extends QueryStmt {
     if (operands_.size() == 1) {
       // ValuesStmt for a single row.
       allOperands_.add(operands_.get(0));
-      setOperandSmap(operands_.get(0), analyzer);
       return;
     }
 
@@ -352,50 +374,33 @@ public class UnionStmt extends QueryStmt {
     operands_.clear();
     operands_.addAll(distinctOperands_);
     operands_.addAll(allOperands_);
-
-    // create unnested operands' smaps
-    for (UnionOperand operand: operands_) {
-      setOperandSmap(operand, analyzer);
-    }
-
-    // create distinctAggInfo, if necessary
-    if (!distinctOperands_.isEmpty()) {
-      // Aggregate produces exactly the same tuple as the original union stmt.
-      ArrayList<Expr> groupingExprs = Expr.cloneList(resultExprs_);
-      try {
-        distinctAggInfo_ =
-            AggregateInfo.create(groupingExprs, null,
-              analyzer.getDescTbl().getTupleDesc(tupleId_), analyzer);
-      } catch (AnalysisException e) {
-        // this should never happen
-        throw new AnalysisException("error creating agg info in UnionStmt.analyze()");
-      }
-    }
   }
 
   /**
    * Sets the smap for the given operand. It maps from the output slots this union's
-   * tuple to the corresponding base table exprs of the operand.
+   * tuple to the corresponding result exprs of the operand.
    */
   private void setOperandSmap(UnionOperand operand, Analyzer analyzer) {
     TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tupleId_);
     // operands' smaps were already set in the operands' analyze()
     operand.getSmap().clear();
+    List<Expr> resultExprs = operand.getQueryStmt().getResultExprs();
+    Preconditions.checkState(resultExprs.size() == tupleDesc.getSlots().size());
     for (int i = 0; i < tupleDesc.getSlots().size(); ++i) {
       SlotDescriptor outputSlot = tupleDesc.getSlots().get(i);
-      operand.getSmap().put(
-          new SlotRef(outputSlot),
-          // TODO: baseTblResultExprs?
-          operand.getQueryStmt().getResultExprs().get(i).clone());
+      // Map to the original (uncast) result expr of the operand.
+      Expr origExpr = resultExprs.get(i).unwrapExpr(true).clone();
+      operand.getSmap().put(new SlotRef(outputSlot), origExpr);
     }
   }
 
   /**
-   * Add a single operand to the target list; if the operand itself is a UnionStmt,
-   * apply unnesting to the extent possible (possibly modifying 'operand' in the process).
+   * Add a single operand to the target list; if the operand itself is a UnionStmt, apply
+   * unnesting to the extent possible (possibly modifying 'operand' in the process).
    */
   private void unnestOperand(
       List<UnionOperand> target, Qualifier targetQualifier, UnionOperand operand) {
+    Preconditions.checkState(operand.isAnalyzed());
     QueryStmt queryStmt = operand.getQueryStmt();
     if (queryStmt instanceof SelectStmt) {
       target.add(operand);
@@ -462,12 +467,12 @@ public class UnionStmt extends QueryStmt {
     LOG.trace("UnionStmt.createMetadata: tupleId=" + tupleId_.toString());
 
     // One slot per expr in the select blocks. Use first select block as representative.
-    List<Expr> firstSelectExprs = operands_.get(0).getQueryStmt().getBaseTblResultExprs();
+    List<Expr> firstSelectExprs = operands_.get(0).getQueryStmt().getResultExprs();
 
     // Compute column stats for the materialized slots from the source exprs.
     List<ColumnStats> columnStats = Lists.newArrayList();
     for (int i = 0; i < operands_.size(); ++i) {
-      List<Expr> selectExprs = operands_.get(i).getQueryStmt().getBaseTblResultExprs();
+      List<Expr> selectExprs = operands_.get(i).getQueryStmt().getResultExprs();
       for (int j = 0; j < selectExprs.size(); ++j) {
         ColumnStats statsToAdd = ColumnStats.fromExpr(selectExprs.get(j));
         if (i == 0) {
@@ -503,7 +508,7 @@ public class UnionStmt extends QueryStmt {
       // don't do that if the operand computes analytic exprs
       // (see Planner.createInlineViewPlan() for the reasoning)
       for (UnionOperand op: operands_) {
-        Expr resultExpr = op.getQueryStmt().getBaseTblResultExprs().get(i);
+        Expr resultExpr = op.getQueryStmt().getResultExprs().get(i);
         slotDesc.addSourceExpr(resultExpr);
         if (op.hasAnalyticExprs()) continue;
         SlotRef slotRef = resultExpr.unwrapSlotRef(true);

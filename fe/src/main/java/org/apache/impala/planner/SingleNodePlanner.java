@@ -1523,7 +1523,7 @@ public class SingleNodePlanner {
       if (queryStmt instanceof SelectStmt) {
         SelectStmt selectStmt = (SelectStmt) queryStmt;
         if (selectStmt.getTableRefs().isEmpty()) {
-          unionNode.addConstExprList(selectStmt.getBaseTblResultExprs());
+          unionNode.addConstExprList(selectStmt.getResultExprs());
           continue;
         }
       }
@@ -1532,7 +1532,7 @@ public class SingleNodePlanner {
       // Place them into a SelectNode on top of the operand's plan.
       opPlan = addUnassignedConjuncts(analyzer, opPlan.getTupleIds(), opPlan);
       if (opPlan instanceof EmptySetNode) continue;
-      unionNode.addChild(opPlan, op.getQueryStmt().getBaseTblResultExprs());
+      unionNode.addChild(opPlan, op.getQueryStmt().getResultExprs());
     }
 
     if (unionDistinctPlan != null) {

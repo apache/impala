@@ -22,9 +22,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SlotDescriptor;
@@ -35,6 +32,9 @@ import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TUnionNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -74,16 +74,11 @@ public class UnionNode extends PlanNode {
   public boolean isConstantUnion() { return resultExprLists_.isEmpty(); }
 
   /**
-   * Add a child tree plus its corresponding resolved resultExprs.
+   * Add a child tree plus its corresponding unresolved resultExprs.
    */
-  public void addChild(PlanNode node, List<Expr> baseTblResultExprs) {
+  public void addChild(PlanNode node, List<Expr> resultExprs) {
     super.addChild(node);
-    resultExprLists_.add(baseTblResultExprs);
-    if (baseTblResultExprs != null) {
-      // if we're materializing output, we can only do that into a single
-      // output tuple
-      Preconditions.checkState(tupleIds_.size() == 1, tupleIds_.size());
-    }
+    resultExprLists_.add(resultExprs);
   }
 
   @Override
