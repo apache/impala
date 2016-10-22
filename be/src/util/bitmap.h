@@ -37,10 +37,6 @@ class Bitmap {
     num_bits_ = num_bits;
   }
 
-  Bitmap(const uint64_t* from_buf, int64_t num_bits) {
-    SetFromBuffer(from_buf, num_bits);
-  }
-
   /// Resize bitmap and set all bits to zero.
   void Reset(int64_t num_bits) {
     DCHECK_GE(num_bits, 0);
@@ -49,30 +45,17 @@ class Bitmap {
     SetAllBits(false);
   }
 
-  void SetFromBuffer(const uint64_t* from_buf, int64_t num_bits) {
-    buffer_.resize(BitUtil::RoundUpNumi64(num_bits));
-    for (int i = 0; i < buffer_.size(); ++i) {
-      buffer_[i] = from_buf[i];
-    }
-    num_bits_ = num_bits;
-  }
-
   /// Compute memory usage of a bitmap, not including the Bitmap object itself.
   static int64_t MemUsage(int64_t num_bits) {
     DCHECK_GE(num_bits, 0);
     return BitUtil::RoundUpNumi64(num_bits) * sizeof(int64_t);
   }
 
-  static int64_t DefaultHashSeed() { return 1234; }
-
   /// Compute memory usage of this bitmap, not including the Bitmap object itself.
   int64_t MemUsage() const { return MemUsage(num_bits_); }
 
-  /// Sets the bit at 'bit_index' to v. If mod is true, this
-  /// function will first mod the bit_index by the bitmap size.
-  template<bool mod>
+  /// Sets the bit at 'bit_index' to v.
   void Set(int64_t bit_index, bool v) {
-    if (mod) bit_index &= (num_bits() - 1);
     int64_t word_index = bit_index >> NUM_OFFSET_BITS;
     bit_index &= BIT_INDEX_MASK;
     DCHECK_LT(word_index, buffer_.size());
@@ -83,31 +66,12 @@ class Bitmap {
     }
   }
 
-  /// Returns true if the bit at 'bit_index' is set. If mod is true, this
-  /// function will first mod the bit_index by the bitmap size.
-  template<bool mod>
+  /// Returns true if the bit at 'bit_index' is set.
   bool Get(int64_t bit_index) const {
-    if (mod) bit_index &= (num_bits() - 1);
     int64_t word_index = bit_index >> NUM_OFFSET_BITS;
     bit_index &= BIT_INDEX_MASK;
     DCHECK_LT(word_index, buffer_.size());
     return (buffer_[word_index] & (1LL << bit_index)) != 0;
-  }
-
-  /// Bitwise ANDs the src bitmap into this one.
-  void And(const Bitmap* src) {
-    DCHECK_EQ(num_bits(), src->num_bits());
-    for (int i = 0; i < buffer_.size(); ++i) {
-      buffer_[i] &= src->buffer_[i];
-    }
-  }
-
-  /// Bitwise ORs the src bitmap into this one.
-  void Or(const Bitmap* src) {
-    DCHECK_EQ(num_bits(), src->num_bits());
-    for (int i = 0; i < buffer_.size(); ++i) {
-      buffer_[i] |= src->buffer_[i];
-    }
   }
 
   void SetAllBits(bool b) {
@@ -117,7 +81,7 @@ class Bitmap {
   int64_t num_bits() const { return num_bits_; }
 
   /// If 'print_bits' prints 0/1 per bit, otherwise it prints the int64_t value.
-  std::string DebugString(bool print_bits);
+  std::string DebugString(bool print_bits) const;
 
  private:
   std::vector<uint64_t> buffer_;

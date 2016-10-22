@@ -23,21 +23,21 @@
 
 using namespace impala;
 
-string Bitmap::DebugString(bool print_bits) {
+string Bitmap::DebugString(bool print_bits) const {
   int64_t words = BitUtil::RoundUp(num_bits_, 64) / 64;
   stringstream ss;
   ss << "Size (" << num_bits_ << ") words (" << words << ") ";
   if (print_bits) {
     for (int i = 0; i < num_bits(); ++i) {
-      if (Get<false>(i)) {
+      if (Get(i)) {
         ss << "1";
       } else {
         ss << "0";
       }
     }
   } else {
-    for (vector<uint64_t>::iterator it = buffer_.begin(); it != buffer_.end(); ++it) {
-      ss << *it << ".";
+    for (auto v : buffer_) {
+      ss << v << ".";
     }
   }
   ss << endl;

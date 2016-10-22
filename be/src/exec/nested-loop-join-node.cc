@@ -410,7 +410,7 @@ Status NestedLoopJoinNode::GetNextRightSemiJoin(RuntimeState* state,
       }
 
       // Check if we already have a match for the build row.
-      if (matching_build_rows_->Get<false>(current_build_row_idx_)) {
+      if (matching_build_rows_->Get(current_build_row_idx_)) {
         build_row_iterator_.Next();
         ++current_build_row_idx_;
         continue;
@@ -424,7 +424,7 @@ Status NestedLoopJoinNode::GetNextRightSemiJoin(RuntimeState* state,
         continue;
       }
       TupleRow* output_row = output_batch->GetRow(output_batch->AddRow());
-      matching_build_rows_->Set<false>(current_build_row_idx_, true);
+      matching_build_rows_->Set(current_build_row_idx_, true);
       output_batch->CopyRow(build_row_iterator_.GetRow(), output_row);
       build_row_iterator_.Next();
       ++current_build_row_idx_;
@@ -461,7 +461,7 @@ Status NestedLoopJoinNode::GetNextRightAntiJoin(RuntimeState* state,
         RETURN_IF_ERROR(QueryMaintenance(state));
       }
 
-      if (matching_build_rows_->Get<false>(current_build_row_idx_)) {
+      if (matching_build_rows_->Get(current_build_row_idx_)) {
         build_row_iterator_.Next();
         ++current_build_row_idx_;
         continue;
@@ -469,7 +469,7 @@ Status NestedLoopJoinNode::GetNextRightAntiJoin(RuntimeState* state,
       CreateOutputRow(semi_join_staging_row_, current_probe_row_,
           build_row_iterator_.GetRow());
       if (EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, semi_join_staging_row_)) {
-        matching_build_rows_->Set<false>(current_build_row_idx_, true);
+        matching_build_rows_->Set(current_build_row_idx_, true);
       }
       build_row_iterator_.Next();
       ++current_build_row_idx_;
@@ -548,7 +548,7 @@ Status NestedLoopJoinNode::ProcessUnmatchedBuildRows(
       RETURN_IF_ERROR(QueryMaintenance(state));
     }
 
-    if (matching_build_rows_->Get<false>(current_build_row_idx_)) {
+    if (matching_build_rows_->Get(current_build_row_idx_)) {
       build_row_iterator_.Next();
       ++current_build_row_idx_;
       continue;
@@ -612,7 +612,7 @@ Status NestedLoopJoinNode::FindBuildMatches(
     if (!EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, output_row)) continue;
     matched_probe_ = true;
     if (matching_build_rows_ != NULL) {
-      matching_build_rows_->Set<false>(current_build_row_idx_ - 1, true);
+      matching_build_rows_->Set(current_build_row_idx_ - 1, true);
     }
     if (!EvalConjuncts(conjunct_ctxs, num_ctxs, output_row)) continue;
     VLOG_ROW << "match row: " << PrintRow(output_row, row_desc());

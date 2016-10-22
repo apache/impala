@@ -290,11 +290,11 @@ class HashTableCtx {
 
     /// Returns true if the current row is null but nulls are not considered in the current
     /// phase (build or probe).
-    bool ALWAYS_INLINE IsRowNull() const { return null_bitmap_.Get<false>(CurIdx()); }
+    bool ALWAYS_INLINE IsRowNull() const { return null_bitmap_.Get(CurIdx()); }
 
     /// Record in a bitmap that the current row is null but nulls are not considered in
     /// the current phase (build or probe).
-    void ALWAYS_INLINE SetRowNull() { null_bitmap_.Set<false>(CurIdx(), true); }
+    void ALWAYS_INLINE SetRowNull() { null_bitmap_.Set(CurIdx(), true); }
 
     /// Returns the hash values of the current row.
     uint32_t ALWAYS_INLINE CurExprValuesHash() const { return *cur_expr_values_hash_; }
