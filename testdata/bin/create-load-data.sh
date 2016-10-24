@@ -425,9 +425,9 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
       create-internal-hbase-table
 fi
 
-# TODO: Investigate why all stats are not preserved. Theorectically, we only need to
+# TODO: Investigate why all stats are not preserved. Theoretically, we only need to
 # recompute stats for HBase.
-run-step "Computing HBase stats" compute-hbase-stats.log \
+run-step "Computing table stats" compute-table-stats.log \
     ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh
 
 run-step "Copying auth policy file" copy-auth-policy.log copy-auth-policy
