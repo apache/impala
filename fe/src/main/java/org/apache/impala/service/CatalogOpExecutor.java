@@ -722,7 +722,7 @@ public class CatalogOpExecutor {
           entry.getValue().getNum_nulls(), entry.getValue().getMax_size(),
           entry.getValue().getAvg_size()));
       ColumnStatisticsObj colStatsObj = new ColumnStatisticsObj(colName,
-          tableCol.getType().toString(), colStatsData);
+          tableCol.getType().toString().toLowerCase(), colStatsData);
       colStats.addToStatsObj(colStatsObj);
     }
     return colStats;
