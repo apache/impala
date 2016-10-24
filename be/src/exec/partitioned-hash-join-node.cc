@@ -1048,18 +1048,25 @@ string PartitionedHashJoinNode::NodeDebugString() const {
   stringstream ss;
   ss << "PartitionedHashJoinNode (id=" << id() << " op=" << join_op_
      << " state=" << PrintState()
-     << " #hash_partitions=" << builder_->num_hash_partitions()
      << " #spilled_partitions=" << spilled_partitions_.size() << ")" << endl;
 
-  ss << "PhjBuilder: " << builder_->DebugString();
+  if (builder_ != NULL) {
+    ss << "PhjBuilder: " << builder_->DebugString();
+  }
 
   ss << "Probe hash partitions: " << probe_hash_partitions_.size() << ":" << endl;
   for (int i = 0; i < probe_hash_partitions_.size(); ++i) {
     ProbePartition* probe_partition = probe_hash_partitions_[i].get();
-    ss << "  Probe hash partition " << i << ": probe ptr=" << probe_partition
-       << "    Probe Rows: " << probe_partition->probe_rows()->num_rows()
-       << "    (Blocks pinned: " << probe_partition->probe_rows()->blocks_pinned() << ")"
-       << endl;
+    ss << "  Probe hash partition " << i << ": ";
+    if (probe_partition != NULL) {
+      ss << "probe ptr=" << probe_partition;
+      BufferedTupleStream* probe_rows = probe_partition->probe_rows();
+      if (probe_rows != NULL) {
+         ss << "    Probe Rows: " << probe_rows->num_rows()
+            << "    (Blocks pinned: " << probe_rows->blocks_pinned() << ")";
+      }
+    }
+    ss << endl;
   }
 
   if (!spilled_partitions_.empty()) {
