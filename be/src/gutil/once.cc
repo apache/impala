@@ -1,10 +1,10 @@
 // Copyright 2008 Google Inc. All Rights Reserved.
 
 #include <glog/logging.h>
-#include "gutil/logging-inl.h"
-#include "gutil/once.h"
-#include "gutil/dynamic_annotations.h"
-#include "gutil/spinlock_internal.h"
+#include "kudu/gutil/logging-inl.h"
+#include "kudu/gutil/once.h"
+#include "kudu/gutil/dynamic_annotations.h"
+#include "kudu/gutil/spinlock_internal.h"
 
 // All modifications to a GoogleOnceType occur inside GoogleOnceInternalInit.
 // The fast path reads the variable with an acquire-load..

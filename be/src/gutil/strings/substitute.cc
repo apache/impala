@@ -1,13 +1,13 @@
 // Copyright 2008 Google Inc.  All rights reserved.
 
-#include "gutil/strings/substitute.h"
+#include "kudu/gutil/strings/substitute.h"
 
 #include <glog/logging.h>
-#include "gutil/logging-inl.h"
-#include "gutil/macros.h"
-#include "gutil/strings/ascii_ctype.h"
-#include "gutil/strings/escaping.h"
-#include "gutil/stl_util.h"
+#include "kudu/gutil/logging-inl.h"
+#include "kudu/gutil/macros.h"
+#include "kudu/gutil/strings/ascii_ctype.h"
+#include "kudu/gutil/strings/escaping.h"
+#include "kudu/gutil/stl_util.h"
 
 namespace strings {
 
@@ -93,7 +93,7 @@ void SubstituteAndAppend(
     const SubstituteArg& arg6, const SubstituteArg& arg7,
     const SubstituteArg& arg8, const SubstituteArg& arg9) {
   const SubstituteArg* const args_array[] = {
-    &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8, &arg9, NULL
+    &arg0, &arg1, &arg2, &arg3, &arg4, &arg5, &arg6, &arg7, &arg8, &arg9, nullptr
   };
 
   // Determine total size needed.
@@ -112,7 +112,7 @@ void SubstituteAndAppend(
 SubstituteArg::SubstituteArg(const void* value) {
   COMPILE_ASSERT(sizeof(scratch_) >= sizeof(value) * 2 + 2,
                  fix_sizeof_scratch_);
-  if (value == NULL) {
+  if (value == nullptr) {
     text_ = "NULL";
     size_ = strlen(text_);
   } else {

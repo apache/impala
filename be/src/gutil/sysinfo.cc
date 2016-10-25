@@ -53,10 +53,10 @@
 #include <shlwapi.h>          // for SHGetValueA()
 #include <tlhelp32.h>         // for Module32First()
 #endif
-#include "gutil/dynamic_annotations.h"   // for RunningOnValgrind
-#include "gutil/macros.h"
-#include "gutil/sysinfo.h"
-#include "gutil/walltime.h"
+#include "kudu/gutil/dynamic_annotations.h"   // for RunningOnValgrind
+#include "kudu/gutil/macros.h"
+#include "kudu/gutil/sysinfo.h"
+#include "kudu/gutil/walltime.h"
 #include <glog/logging.h>
 
 // This isn't in the 'base' namespace in tcmallc. But, tcmalloc
@@ -74,6 +74,7 @@ namespace base {
 
 static double cpuinfo_cycles_per_second = 1.0;  // 0.0 might be dangerous
 static int cpuinfo_num_cpus = 1;  // Conservative guess
+static int cpuinfo_max_cpu_index = -1;
 
 void SleepForNanoseconds(int64_t nanoseconds) {
   // Sleep for nanosecond duration
@@ -142,6 +143,25 @@ static bool ReadIntFromFile(const char *file, int *value) {
     return true;
   }
   return false;
+}
+
+static int ReadMaxCPUIndex() {
+  char buf[1024];
+  CHECK(SlurpSmallTextFile("/sys/devices/system/cpu/present", buf, arraysize(buf)));
+
+  // On a single-core machine, 'buf' will contain the string '0' with a newline.
+  if (strcmp(buf, "0\n") == 0) {
+    return 0;
+  }
+
+  // On multi-core, it will have a CPU range like '0-7'.
+  CHECK_EQ(0, memcmp(buf, "0-", 2)) << "bad list of possible CPUs: " << buf;
+
+  char* max_cpu_str = &buf[2];
+  char* err;
+  int val = strtol(max_cpu_str, &err, 10);
+  CHECK(*err == '\n' || *err == '\0') << "unable to parse max CPU index from: " << buf;
+  return val;
 }
 
 #endif
@@ -286,6 +306,7 @@ static void InitializeSystemInfo() {
   if (num_cpus > 0) {
     cpuinfo_num_cpus = num_cpus;
   }
+  cpuinfo_max_cpu_index = ReadMaxCPUIndex();
 
 #elif defined __FreeBSD__
   // For this sysctl to work, the machine must be configured without
@@ -364,6 +385,13 @@ static void InitializeSystemInfo() {
   // Generic cycles per second counter
   cpuinfo_cycles_per_second = EstimateCyclesPerSecond(1000);
 #endif
+
+  // On platforms where we can't determine the max CPU index, just use the
+  // number of CPUs. This might break if CPUs are taken offline, but
+  // better than a wild guess.
+  if (cpuinfo_max_cpu_index < 0) {
+    cpuinfo_max_cpu_index = cpuinfo_num_cpus - 1;
+  }
 }
 
 double CyclesPerSecond(void) {
@@ -374,6 +402,11 @@ double CyclesPerSecond(void) {
 int NumCPUs(void) {
   InitializeSystemInfo();
   return cpuinfo_num_cpus;
+}
+
+int MaxCPUIndex(void) {
+  InitializeSystemInfo();
+  return cpuinfo_max_cpu_index;
 }
 
 } // namespace base

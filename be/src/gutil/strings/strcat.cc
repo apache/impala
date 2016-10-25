@@ -1,6 +1,6 @@
 // Copyright 2008 and onwards Google Inc.  All rights reserved.
 
-#include "gutil/strings/strcat.h"
+#include "kudu/gutil/strings/strcat.h"
 
 #include <stdarg.h>
 #include <stdint.h>
@@ -8,11 +8,11 @@
 #include <string.h>
 
 #include <glog/logging.h>
-#include "gutil/logging-inl.h"
-#include "gutil/gscoped_ptr.h"
-#include "gutil/strings/ascii_ctype.h"
-#include "gutil/strings/escaping.h"
-#include "gutil/stl_util.h"
+#include "kudu/gutil/logging-inl.h"
+#include "kudu/gutil/gscoped_ptr.h"
+#include "kudu/gutil/strings/ascii_ctype.h"
+#include "kudu/gutil/strings/escaping.h"
+#include "kudu/gutil/stl_util.h"
 
 AlphaNum gEmptyAlphaNum("");
 

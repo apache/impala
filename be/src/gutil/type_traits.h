@@ -63,7 +63,7 @@
 using std::make_pair;
 using std::pair;                  // For pair
 
-#include "gutil/template_util.h"     // For true_type and false_type
+#include "kudu/gutil/template_util.h"     // For true_type and false_type
 
 namespace base {
 
@@ -115,6 +115,10 @@ template<> struct is_integral<signed char> : true_type { };
 template<> struct is_integral<__wchar_t> : true_type { };
 #else
 template<> struct is_integral<wchar_t> : true_type { };
+#endif
+#if defined(__APPLE__)
+template<> struct is_integral<int64_t> : true_type { };
+template<> struct is_integral<uint64_t> : true_type { };
 #endif
 template<> struct is_integral<short> : true_type { };
 template<> struct is_integral<unsigned short> : true_type { };
@@ -350,10 +354,10 @@ struct is_convertible
 // these types are PODs, for human use.  They may be made more contentful
 // later.  The typedef is just to make it legal to put a semicolon after
 // these macros.
-#define DECLARE_POD(TypeName) typedef int Dummy_Type_For_DECLARE_POD
+#define DECLARE_POD(TypeName) typedef int Dummy_Type_For_DECLARE_POD ATTRIBUTE_UNUSED
 #define DECLARE_NESTED_POD(TypeName) DECLARE_POD(TypeName)
 #define PROPAGATE_POD_FROM_TEMPLATE_ARGUMENT(TemplateName)             \
-    typedef int Dummy_Type_For_PROPAGATE_POD_FROM_TEMPLATE_ARGUMENT
-#define ENFORCE_POD(TypeName) typedef int Dummy_Type_For_ENFORCE_POD
+    typedef int Dummy_Type_For_PROPAGATE_POD_FROM_TEMPLATE_ARGUMENT ATTRIBUTE_UNUSED
+#define ENFORCE_POD(TypeName) typedef int Dummy_Type_For_ENFORCE_POD ATTRIBUTE_UNUSED
 
 #endif  // BASE_TYPE_TRAITS_H_

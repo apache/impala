@@ -26,8 +26,8 @@ using std::multimap;
 #include <vector>
 using std::vector;
 
-#include "gutil/port.h"  // for LANG_CXX11
-#include "gutil/strings/stringpiece.h"
+#include "kudu/gutil/port.h"  // for LANG_CXX11
+#include "kudu/gutil/strings/stringpiece.h"
 
 #ifdef LANG_CXX11
 // This must be included after "base/port.h", which defines LANG_CXX11.
@@ -72,16 +72,22 @@ class SplitIterator
  public:
   // Two constructors for "end" iterators.
   explicit SplitIterator(Delimiter d)
-      : delimiter_(d), predicate_(), is_end_(true) {}
+      : delimiter_(std::move(d)), predicate_(), is_end_(true) {}
   SplitIterator(Delimiter d, Predicate p)
-      : delimiter_(d), predicate_(p), is_end_(true) {}
+      : delimiter_(std::move(d)), predicate_(std::move(p)), is_end_(true) {}
   // Two constructors taking the text to iterator.
   SplitIterator(StringPiece text, Delimiter d)
-      : text_(text), delimiter_(d), predicate_(), is_end_(false) {
+      : text_(std::move(text)),
+        delimiter_(std::move(d)),
+        predicate_(),
+        is_end_(false) {
     ++(*this);
   }
   SplitIterator(StringPiece text, Delimiter d, Predicate p)
-      : text_(text), delimiter_(d), predicate_(p), is_end_(false) {
+      : text_(std::move(text)),
+        delimiter_(std::move(d)),
+        predicate_(std::move(p)),
+        is_end_(false) {
     ++(*this);
   }
 
@@ -323,8 +329,8 @@ class Splitter {
     Container c;
     ReserveCapacity(&c, v.size());
     std::insert_iterator<Container> inserter(c, c.begin());
-    for (size_t i = 0; i < v.size(); ++i) {
-      *inserter++ = converter(v[i]);
+    for (const auto& sp : v) {
+      *inserter++ = converter(sp);
     }
     return c;
   }

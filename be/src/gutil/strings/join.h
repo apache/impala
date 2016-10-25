@@ -32,13 +32,13 @@ using std::pair;
 #include <vector>
 using std::vector;
 
-#include "gutil/integral_types.h"
-#include "gutil/macros.h"
-#include "gutil/template_util.h"
-#include "gutil/strings/numbers.h"
-#include "gutil/strings/strcat.h"    // For backward compatibility.
-#include "gutil/strings/stringpiece.h"
-#include "gutil/hash/hash.h"
+#include "kudu/gutil/integral_types.h"
+#include "kudu/gutil/macros.h"
+#include "kudu/gutil/template_util.h"
+#include "kudu/gutil/strings/numbers.h"
+#include "kudu/gutil/strings/strcat.h"    // For backward compatibility.
+#include "kudu/gutil/strings/stringpiece.h"
+#include "kudu/gutil/hash/hash.h"
 
 // ----------------------------------------------------------------------
 // JoinUsing()
@@ -115,6 +115,32 @@ string JoinStringsIterator(const ITERATOR& start,
                            const ITERATOR& end,
                            const StringPiece& delim);
 
+// Join the keys of a map using the specified delimiter.
+template<typename ITERATOR>
+void JoinKeysIterator(const ITERATOR& start,
+                      const ITERATOR& end,
+                      const StringPiece& delim,
+                      string *result) {
+  result->clear();
+  for (ITERATOR iter = start; iter != end; ++iter) {
+    if (iter == start) {
+      StrAppend(result, iter->first);
+    } else {
+      StrAppend(result, delim, iter->first);
+    }
+  }
+}
+
+template <typename ITERATOR>
+string JoinKeysIterator(const ITERATOR& start,
+                        const ITERATOR& end,
+                        const StringPiece& delim) {
+  string result;
+  JoinKeysIterator(start, end, delim, &result);
+  return result;
+}
+
+// Join the keys and values of a map using the specified delimiters.
 template<typename ITERATOR>
 void JoinKeysAndValuesIterator(const ITERATOR& start,
                                const ITERATOR& end,
@@ -171,6 +197,24 @@ inline string JoinStrings(const CONTAINER& components,
                           const StringPiece& delim) {
   string result;
   JoinStrings(components, delim, &result);
+  return result;
+}
+
+// Join the strings produced by calling 'functor' on each element of
+// 'components'.
+template<class CONTAINER, typename FUNC>
+string JoinMapped(const CONTAINER& components,
+                  const FUNC& functor,
+                  const StringPiece& delim) {
+  string result;
+  for (typename CONTAINER::const_iterator iter = components.begin();
+      iter != components.end();
+      iter++) {
+    if (iter != components.begin()) {
+      result.append(delim.data(), delim.size());
+    }
+    result.append(functor(*iter));
+  }
   return result;
 }
 

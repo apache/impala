@@ -12,7 +12,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "gutil/basictypes.h"  // For COMPILE_ASSERT
+#include "kudu/gutil/basictypes.h"  // For COMPILE_ASSERT
 
 // The LDREXD and STREXD instructions in ARM all v7 variants or above.  In v6,
 // only some variants support it.  For simplicity, we only use exclusive

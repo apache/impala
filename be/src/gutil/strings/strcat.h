@@ -10,9 +10,9 @@
 #include <string>
 using std::string;
 
-#include "gutil/integral_types.h"
-#include "gutil/strings/numbers.h"
-#include "gutil/strings/stringpiece.h"
+#include "kudu/gutil/integral_types.h"
+#include "kudu/gutil/strings/numbers.h"
+#include "kudu/gutil/strings/stringpiece.h"
 
 // The AlphaNum type was designed to be used as the parameter type for StrCat().
 // I suppose that any routine accepting either a string or a number could accept
@@ -51,16 +51,9 @@ struct AlphaNum {
   AlphaNum(uint64 u64)  // NOLINT(runtime/explicit)
       : piece(digits, FastUInt64ToBufferLeft(u64, digits) - &digits[0]) {}
 
-#ifdef _LP64
-  AlphaNum(long x)  // NOLINT(runtime/explicit)
-    : piece(digits, FastInt64ToBufferLeft(x, digits) - &digits[0]) {}
-  AlphaNum(unsigned long x)  // NOLINT(runtime/explicit)
-    : piece(digits, FastUInt64ToBufferLeft(x, digits) - &digits[0]) {}
-#else
-  AlphaNum(long x)  // NOLINT(runtime/explicit)
-    : piece(digits, FastInt32ToBufferLeft(x, digits) - &digits[0]) {}
-  AlphaNum(unsigned long x)  // NOLINT(runtime/explicit)
-    : piece(digits, FastUInt32ToBufferLeft(x, digits) - &digits[0]) {}
+#if defined(__APPLE__)
+  AlphaNum(size_t size)  // NOLINT(runtime/explicit)
+      : piece(digits, FastUInt64ToBufferLeft(size, digits) - &digits[0]) {}
 #endif
 
   AlphaNum(float f)  // NOLINT(runtime/explicit)
@@ -69,7 +62,8 @@ struct AlphaNum {
     : piece(digits, strlen(DoubleToBuffer(f, digits))) {}
 
   AlphaNum(const char *c_str) : piece(c_str) {}  // NOLINT(runtime/explicit)
-  AlphaNum(const StringPiece &pc) : piece(pc) {}  // NOLINT(runtime/explicit)
+  AlphaNum(StringPiece pc)
+      : piece(std::move(pc)) {}            // NOLINT(runtime/explicit)
   AlphaNum(const string &s) : piece(s) {}  // NOLINT(runtime/explicit)
 
   StringPiece::size_type size() const { return piece.size(); }

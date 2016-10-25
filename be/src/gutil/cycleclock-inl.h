@@ -1,16 +1,21 @@
 // Copyright (C) 1999-2007 Google, Inc.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 //
 // All rights reserved.
 // Extracted from base/timer.h by jrvb
@@ -26,13 +31,13 @@
 // with modifications by m3b.  See also
 //    https://setisvn.ssl.berkeley.edu/svn/lib/fftw-3.0.1/kernel/cycle.h
 
-#ifndef SUPERSONIC_OPENSOURCE_AUXILIARY_CYCLECLOCK_INL_H_
-#define SUPERSONIC_OPENSOURCE_AUXILIARY_CYCLECLOCK_INL_H_
+#ifndef GUTIL_CYCLECLOCK_INL_H_
+#define GUTIL_CYCLECLOCK_INL_H_
 
 #include <sys/time.h>
 
-#include "gutil/port.h"
-#include "gutil/arm_instruction_set_select.h"
+#include "kudu/gutil/port.h"
+#include "kudu/gutil/arm_instruction_set_select.h"
 
 // Please do not nest #if directives.  Keep one section, and one #if per
 // platform.
@@ -143,7 +148,7 @@ inline int64 CycleClock::Now() {
 
 // ----------------------------------------------------------------
 #elif defined(ARMV6)  // V6 is the earliest arm that has a standard cyclecount
-#include "base/sysinfo.h"
+#include "kudu/gutil/sysinfo.h"
 inline int64 CycleClock::Now() {
   uint32 pmccntr;
   uint32 pmuseren;
@@ -166,7 +171,7 @@ inline int64 CycleClock::Now() {
 
 // ----------------------------------------------------------------
 #elif defined(ARMV3)
-#include "base/sysinfo.h"   // for CyclesPerSecond()
+#include "kudu/gutil/sysinfo.h"   // for CyclesPerSecond()
 inline int64 CycleClock::Now() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
@@ -176,7 +181,7 @@ inline int64 CycleClock::Now() {
 
 // ----------------------------------------------------------------
 #elif defined(__mips__)
-#include "base/sysinfo.h"
+#include "kudu/gutil/sysinfo.h"
 inline int64 CycleClock::Now() {
   // mips apparently only allows rdtsc for superusers, so we fall
   // back to gettimeofday.  It's possible clock_gettime would be better.
@@ -195,4 +200,4 @@ inline int64 CycleClock::Now() {
 #error You need to define CycleTimer for your O/S and CPU
 #endif
 
-#endif  // SUPERSONIC_OPENSOURCE_AUXILIARY_CYCLECLOCK_INL_H_
+#endif  // GUTIL_CYCLECLOCK_INL_H_

@@ -14,9 +14,11 @@
 #include <string.h>         // for memcpy
 #include <limits.h>         // for enumeration casts and tests
 
-#include "gutil/macros.h"
-#include "gutil/template_util.h"
-#include "gutil/type_traits.h"
+#include <glog/logging.h>
+
+#include "kudu/gutil/macros.h"
+#include "kudu/gutil/template_util.h"
+#include "kudu/gutil/type_traits.h"
 
 // Use implicit_cast as a safe version of static_cast or const_cast
 // for implicit conversions. For example:
@@ -164,7 +166,7 @@ template <class Dest, class Source>
 inline Dest bit_cast(const Source& source) {
   // Compile time assertion: sizeof(Dest) == sizeof(Source)
   // A compile error here means your Dest and Source have different sizes.
-  typedef char VerifySizesAreEqual [sizeof(Dest) == sizeof(Source) ? 1 : -1];
+  COMPILE_ASSERT(sizeof(Dest) == sizeof(Source), VerifySizesAreEqual);
 
   Dest dest;
   memcpy(&dest, &source, sizeof(dest));
@@ -361,14 +363,12 @@ inline bool tight_enum_test_cast(int e_val, Enum* e_var) {
   }
 }
 
-// The plain casts require logging, and we get header recursion if
-// it is done directly.  So, we do it indirectly.
-// The following function is defined in logging.cc.
-
 namespace base {
 namespace internal {
 
-void WarnEnumCastError(int value_of_int);
+inline void WarnEnumCastError(int value_of_int) {
+  LOG(DFATAL) << "Bad enum value " << value_of_int;
+}
 
 }  // namespace internal
 }  // namespace base

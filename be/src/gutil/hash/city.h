@@ -23,8 +23,8 @@
 
 #include <stddef.h>  // for size_t.
 
-#include "gutil/int128.h"
-#include "gutil/integral_types.h"
+#include "kudu/gutil/int128.h"
+#include "kudu/gutil/integral_types.h"
 
 namespace util_hash {
 

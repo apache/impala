@@ -14,7 +14,7 @@
 // optimize the code here by writing a program that systematically explores
 // more of the space of possible hash functions, or by using SIMD instructions.
 
-#include "gutil/hash/city.h"
+#include "kudu/gutil/hash/city.h"
 
 #include <sys/types.h>
 #include <algorithm>
@@ -28,12 +28,12 @@ using std::swap;
 using std::make_pair;
 using std::pair;
 
-#include "gutil/int128.h"
-#include "gutil/integral_types.h"
+#include "kudu/gutil/int128.h"
+#include "kudu/gutil/integral_types.h"
 #include <glog/logging.h>
-#include "gutil/logging-inl.h"
-#include "gutil/hash/hash128to64.h"
-#include "gutil/endian.h"
+#include "kudu/gutil/logging-inl.h"
+#include "kudu/gutil/hash/hash128to64.h"
+#include "kudu/gutil/endian.h"
 
 namespace util_hash {
 
@@ -305,7 +305,7 @@ uint128 CityHash128(const char *s, size_t len) {
                                uint128(LittleEndian::Load64(s) ^ k3,
                                        LittleEndian::Load64(s + 8)));
   } else if (len >= 8) {
-    return CityHash128WithSeed(NULL,
+    return CityHash128WithSeed(nullptr,
                                0,
                                uint128(LittleEndian::Load64(s) ^ (len * k0),
                                        LittleEndian::Load64(s + len - 8) ^ k1));

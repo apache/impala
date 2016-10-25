@@ -7,7 +7,7 @@
 
 #include <iosfwd>
 using std::ostream;
-#include "gutil/integral_types.h"
+#include "kudu/gutil/integral_types.h"
 
 struct uint128_pod;
 

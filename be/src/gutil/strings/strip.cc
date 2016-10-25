@@ -4,7 +4,7 @@
 // This file contains functions that remove a defined part from the string,
 // i.e., strip the string.
 
-#include "gutil/strings/strip.h"
+#include "kudu/gutil/strings/strip.h"
 
 #include <assert.h>
 #include <string.h>
@@ -18,8 +18,8 @@ using std::swap;
 #include <string>
 using std::string;
 
-#include "gutil/strings/ascii_ctype.h"
-#include "gutil/strings/stringpiece.h"
+#include "kudu/gutil/strings/ascii_ctype.h"
+#include "kudu/gutil/strings/stringpiece.h"
 
 string StripPrefixString(StringPiece str, const StringPiece& prefix) {
   if (str.starts_with(prefix))
@@ -74,9 +74,9 @@ void StripString(char* str, int len, StringPiece remove, char replacewith) {
 }
 
 void StripString(string* s, StringPiece remove, char replacewith) {
-  for (string::iterator it = s->begin(), end = s->end(); it != end; ++it) {
-    if (remove.find(*it) != StringPiece::npos) {
-      *it = replacewith;
+  for (char& c : *s) {
+    if (remove.find(c) != StringPiece::npos) {
+      c = replacewith;
     }
   }
 }
@@ -286,7 +286,7 @@ int StripDupCharacters(string* s, char dup_char, int start_pos) {
 //   Remove leading, trailing, and duplicate internal whitespace.
 // ----------------------------------------------------------------------
 void RemoveExtraWhitespace(string* s) {
-  assert(s != NULL);
+  assert(s != nullptr);
   // Empty strings clearly have no whitespace, and this code assumes that
   // string length is greater than 0
   if (s->empty())
@@ -324,7 +324,7 @@ void RemoveExtraWhitespace(string* s) {
 void StripLeadingWhiteSpace(string* str) {
   char const* const leading = StripLeadingWhiteSpace(
       const_cast<char*>(str->c_str()));
-  if (leading != NULL) {
+  if (leading != nullptr) {
     string const tmp(leading);
     str->assign(tmp);
   } else {

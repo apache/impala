@@ -15,69 +15,59 @@
 # specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 2.6)
-
-set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/gutil")
-set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/gutil")
-
-# Ignore the code in proto/ for now until needed; otherwise this adds an extra dependency
-# on protoc to the build for no gain.
-
-# PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
-#   SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../
-#   BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../
-#   )
-# SET(GUTIL_SRCS ${PROTO_SRCS})
-
-# PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
-#   SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../
-#   BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../
-#   PROTO_FILES proto/types.proto
-#   )
-# SET(GUTIL_SRCS ${GUTIL_SRCS} ${PROTO_SRCS})
-
-INCLUDE_DIRECTORIES($ENV{IMPALA_HOME}/thirdparty/)
 INCLUDE_DIRECTORIES(${GLOG_INCLUDE_DIR})
 
-ADD_LIBRARY(gutil
-#  ${GUTIL_SRCS}
-./bits.cc
-./dynamic_annotations.cc
-./stringprintf.cc
-./strings/memutil.cc
-./strings/charset.cc
-./strings/util.cc
-./strings/human_readable.cc
-./strings/join.cc
-./strings/numbers.cc
-./strings/split.cc
-./strings/strip.cc
-./strings/ascii_ctype.cc
-./strings/escaping.cc
-./strings/stringpiece.cc
-./strings/substitute.cc
-./strings/strcat.cc
-./strings/serialize.cc
-./mathlimits.cc
-./int128.cc
-./strtoint.cc
-./once.cc
-./atomicops-internals-x86.cc
-./spinlock.cc
-./spinlock_internal.cc
-./sysinfo.cc
-./walltime.cc
-./hash/hash.cc
-./hash/jenkins.cc
-./hash/city.cc
-./utf/rune.cc
-)
+set(GUTIL_SRCS
+  atomicops-internals-x86.cc
+  bits.cc
+  callback_internal.cc
+  cpu.cc
+  dynamic_annotations.c
+  hash/city.cc
+  hash/hash.cc
+  hash/jenkins.cc
+  int128.cc
+  mathlimits.cc
+  once.cc
+  ref_counted.cc
+  ref_counted_memory.cc
+  spinlock.cc
+  spinlock_internal.cc
+  stringprintf.cc
+  strings/ascii_ctype.cc
+  strings/charset.cc
+  strings/escaping.cc
+  strings/human_readable.cc
+  strings/join.cc
+  strings/memutil.cc
+  strings/numbers.cc
+  strings/serialize.cc
+  strings/split.cc
+  strings/strcat.cc
+  strings/stringpiece.cc
+  strings/strip.cc
+  strings/substitute.cc
+  strings/util.cc
+  strtoint.cc
+  sysinfo.cc
+  threading/thread_collision_warner.cc
+  utf/rune.c
+  walltime.cc)
 
+set(GUTIL_LIBS
+  glog
+  protobuf)
 
+if (NOT APPLE)
+  set(GUTIL_LIBS
+    ${GUTIL_LIBS}
+    rt) # clock_gettime() requires -lrt
+endif()
 
-# Disable warnings which trigger a lot in the Google code:
-SET_TARGET_PROPERTIES(gutil PROPERTIES
-  COMPILE_FLAGS "${CXX_COMMON_FLAGS} -funsigned-char -Wno-deprecated -Wno-char-subscripts -fPIC")
+ADD_EXPORTABLE_LIBRARY(gutil
+  SRCS ${GUTIL_SRCS}
+  DEPS ${GUTIL_LIBS}
+  # Disable warnings which trigger a lot in the Google code:
+  COMPILE_FLAGS "-funsigned-char -Wno-deprecated -Wno-char-subscripts")
 
-TARGET_LINK_LIBRARIES(gutil glogstatic gflagsstatic)
-SET(GUTIL_LIBS gutil)
+add_kudu_test(strings/string_util-test)

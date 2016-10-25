@@ -39,10 +39,10 @@
 #ifndef BASE_SPINLOCK_H_
 #define BASE_SPINLOCK_H_
 
-#include "gutil/atomicops.h"
-#include "gutil/basictypes.h"
-#include "gutil/dynamic_annotations.h"
-#include "gutil/thread_annotations.h"
+#include "kudu/gutil/atomicops.h"
+#include "kudu/gutil/basictypes.h"
+#include "kudu/gutil/dynamic_annotations.h"
+#include "kudu/gutil/thread_annotations.h"
 
 // This isn't originally in the base:: namespace in tcmalloc,
 // but tcmalloc inadvertently exports these symbols. So, if we

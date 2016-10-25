@@ -16,7 +16,7 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include "gutil/port.h"
+#include "kudu/gutil/port.h"
 
 // Return a C++ string
 extern string StringPrintf(const char* format, ...)

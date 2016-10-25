@@ -36,8 +36,8 @@
 #ifndef BASE_SPINLOCK_INTERNAL_H_
 #define BASE_SPINLOCK_INTERNAL_H_
 
-#include "gutil/basictypes.h"
-#include "gutil/atomicops.h"
+#include "kudu/gutil/basictypes.h"
+#include "kudu/gutil/atomicops.h"
 
 namespace base {
 namespace internal {

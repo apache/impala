@@ -1,7 +1,7 @@
 // Copyright 2008 Google Inc. All Rights Reserved.
 // Authors: Numerous. See the .h for contact people.
 
-#include "gutil/strings/escaping.h"
+#include "kudu/gutil/strings/escaping.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -12,13 +12,13 @@ using std::numeric_limits;
 #include <vector>
 using std::vector;
 
-#include "gutil/integral_types.h"
-#include "gutil/port.h"
-#include "gutil/gscoped_ptr.h"
-#include "gutil/strings/join.h"
-#include "gutil/utf/utf.h"  // for runetochar
-#include "gutil/charmap.h"
-#include "gutil/stl_util.h"
+#include "kudu/gutil/integral_types.h"
+#include "kudu/gutil/port.h"
+#include "kudu/gutil/gscoped_ptr.h"
+#include "kudu/gutil/strings/join.h"
+#include "kudu/gutil/utf/utf.h"  // for runetochar
+#include "kudu/gutil/charmap.h"
+#include "kudu/gutil/stl_util.h"
 
 namespace strings {
 
@@ -75,7 +75,7 @@ int EscapeStrForCSV(const char* src, char* dest, int dest_len) {
 #define IS_OCTAL_DIGIT(c) (((c) >= '0') && ((c) <= '7'))
 
 int UnescapeCEscapeSequences(const char* source, char* dest) {
-  return UnescapeCEscapeSequences(source, dest, NULL);
+  return UnescapeCEscapeSequences(source, dest, nullptr);
 }
 
 int UnescapeCEscapeSequences(const char* source, char* dest,
@@ -215,7 +215,7 @@ int UnescapeCEscapeSequences(const char* source, char* dest,
 //
 // ----------------------------------------------------------------------
 int UnescapeCEscapeString(const string& src, string* dest) {
-  return UnescapeCEscapeString(src, dest, NULL);
+  return UnescapeCEscapeString(src, dest, nullptr);
 }
 
 int UnescapeCEscapeString(const string& src, string* dest,
@@ -230,7 +230,7 @@ int UnescapeCEscapeString(const string& src, string* dest,
 
 string UnescapeCEscapeString(const string& src) {
   gscoped_array<char> unescaped(new char[src.size() + 1]);
-  int len = UnescapeCEscapeSequences(src.c_str(), unescaped.get(), NULL);
+  int len = UnescapeCEscapeSequences(src.c_str(), unescaped.get(), nullptr);
   return string(unescaped.get(), len);
 }
 
@@ -1648,8 +1648,7 @@ void EscapeFileName(const StringPiece& src, string* dst) {
   // Reserve at least src.size() chars
   dst->reserve(dst->size() + src.size());
 
-  for (int i = 0; i < src.size(); ++i) {
-    const char c = src[i];
+  for (char c : src) {
     // We do not use "isalpha" because we want the behavior to be
     // independent of the current locale settings.
     if (escape_file_name_exceptions.contains(c)) {
@@ -1751,10 +1750,10 @@ static void b2a_hex_t(const unsigned char* b, T a, int num) {
 
 string b2a_bin(const string& b, bool byte_order_msb) {
   string result;
-  for (int byte_offset = 0; byte_offset < b.size(); ++byte_offset) {
+  for (char c : b) {
     for (int bit_offset = 0; bit_offset < 8; ++bit_offset) {
       int x = (byte_order_msb) ? 7-bit_offset : bit_offset;
-      result.append(1, (b[byte_offset] & (1 << x)) ? '1' : '0');
+      result.append(1, (c & (1 << x)) ? '1' : '0');
     }
   }
   return result;
@@ -1814,15 +1813,15 @@ string ShellEscape(StringPiece src) {
   } else {
     // needs double quote escaping
     string result = "\"";
-    for (size_t i = 0; i < src.size(); ++i) {
-      switch (src[i]) {
+    for (char c : src) {
+      switch (c) {
         case '\\':
         case '$':
         case '"':
         case '`':
           result.push_back('\\');
       };
-      result.push_back(src[i]);
+      result.push_back(c);
     }
     result.push_back('"');
     return result;

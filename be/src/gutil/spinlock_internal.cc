@@ -41,17 +41,17 @@
 // In all cases, it must return in bounded time even if SpinlockWake() is not
 // called.
 
-#include "gutil/spinlock_internal.h"
+#include "kudu/gutil/spinlock_internal.h"
 
 // forward declaration for use by spinlock_*-inl.h
 namespace base { namespace internal { static int SuggestedDelayNS(int loop); }}
 
 #if defined(_WIN32)
-#include "gutil/spinlock_win32-inl.h"
+#include "kudu/gutil/spinlock_win32-inl.h"
 #elif defined(__linux__)
-#include "gutil/spinlock_linux-inl.h"
+#include "kudu/gutil/spinlock_linux-inl.h"
 #else
-#include "gutil/spinlock_posix-inl.h"
+#include "kudu/gutil/spinlock_posix-inl.h"
 #endif
 
 namespace base {

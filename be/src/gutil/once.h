@@ -24,12 +24,12 @@
 #ifndef BASE_ONCE_H_
 #define BASE_ONCE_H_
 
-#include "gutil/atomicops.h"
-#include "gutil/integral_types.h"
-#include "gutil/dynamic_annotations.h"
-#include "gutil/macros.h"
-#include "gutil/port.h"
-#include "gutil/type_traits.h"
+#include "kudu/gutil/atomicops.h"
+#include "kudu/gutil/integral_types.h"
+#include "kudu/gutil/dynamic_annotations.h"
+#include "kudu/gutil/macros.h"
+#include "kudu/gutil/port.h"
+#include "kudu/gutil/type_traits.h"
 
 // The following enum values are not for use by clients
 enum {

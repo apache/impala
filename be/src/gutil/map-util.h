@@ -72,7 +72,8 @@ using std::pair;
 using std::vector;
 
 #include <glog/logging.h>
-#include "gutil/logging-inl.h"
+
+#include "kudu/gutil/logging-inl.h"
 
 //
 // Find*()
@@ -94,29 +95,29 @@ using std::vector;
 // This version assumes the key is printable, and includes it in the fatal log
 // message.
 template <class Collection>
-const typename Collection::value_type::second_type&
+const typename Collection::mapped_type&
 FindOrDie(const Collection& collection,
-          const typename Collection::value_type::first_type& key) {
-  typename Collection::const_iterator it = collection.find(key);
+          const typename Collection::key_type& key) {
+  auto it = collection.find(key);
   CHECK(it != collection.end()) << "Map key not found: " << key;
   return it->second;
 }
 
 // Same as above, but returns a non-const reference.
 template <class Collection>
-typename Collection::value_type::second_type&
+typename Collection::mapped_type&
 FindOrDie(Collection& collection,  // NOLINT
-          const typename Collection::value_type::first_type& key) {
-  typename Collection::iterator it = collection.find(key);
+          const typename Collection::key_type& key) {
+  auto it = collection.find(key);
   CHECK(it != collection.end()) << "Map key not found: " << key;
   return it->second;
 }
 
 // Same as FindOrDie above, but doesn't log the key on failure.
 template <class Collection>
-const typename Collection::value_type::second_type&
+const typename Collection::mapped_type&
 FindOrDieNoPrint(const Collection& collection,
-                 const typename Collection::value_type::first_type& key) {
+                 const typename Collection::key_type& key) {
   typename Collection::const_iterator it = collection.find(key);
   CHECK(it != collection.end()) << "Map key not found";
   return it->second;
@@ -124,9 +125,9 @@ FindOrDieNoPrint(const Collection& collection,
 
 // Same as above, but returns a non-const reference.
 template <class Collection>
-typename Collection::value_type::second_type&
+typename Collection::mapped_type&
 FindOrDieNoPrint(Collection& collection,  // NOLINT
-                 const typename Collection::value_type::first_type& key) {
+                 const typename Collection::key_type& key) {
   typename Collection::iterator it = collection.find(key);
   CHECK(it != collection.end()) << "Map key not found";
   return it->second;
@@ -142,11 +143,11 @@ FindOrDieNoPrint(Collection& collection,  // NOLINT
 // string values, and you pass a char* as the default "value," either use the
 // returned value immediately or store it in a string (not string&). Details:
 template <class Collection>
-const typename Collection::value_type::second_type&
+const typename Collection::mapped_type&
 FindWithDefault(const Collection& collection,
-                const typename Collection::value_type::first_type& key,
-                const typename Collection::value_type::second_type& value) {
-  typename Collection::const_iterator it = collection.find(key);
+                const typename Collection::key_type& key,
+                const typename Collection::mapped_type& value) {
+  auto it = collection.find(key);
   if (it == collection.end()) {
     return value;
   }
@@ -156,10 +157,10 @@ FindWithDefault(const Collection& collection,
 // Returns a pointer to the const value associated with the given key if it
 // exists, or NULL otherwise.
 template <class Collection>
-const typename Collection::value_type::second_type*
+const typename Collection::mapped_type*
 FindOrNull(const Collection& collection,
-           const typename Collection::value_type::first_type& key) {
-  typename Collection::const_iterator it = collection.find(key);
+           const typename Collection::key_type& key) {
+  auto it = collection.find(key);
   if (it == collection.end()) {
     return 0;
   }
@@ -168,14 +169,60 @@ FindOrNull(const Collection& collection,
 
 // Same as above but returns a pointer to the non-const value.
 template <class Collection>
-typename Collection::value_type::second_type*
+typename Collection::mapped_type*
 FindOrNull(Collection& collection,  // NOLINT
-           const typename Collection::value_type::first_type& key) {
-  typename Collection::iterator it = collection.find(key);
+           const typename Collection::key_type& key) {
+  auto it = collection.find(key);
   if (it == collection.end()) {
     return 0;
   }
   return &it->second;
+}
+
+// Returns a pointer to the const value associated with the greatest key
+// that's less than or equal to the given key, or NULL if no such key exists.
+template <class Collection>
+const typename Collection::mapped_type*
+FindFloorOrNull(const Collection& collection,
+                const typename Collection::key_type& key) {
+  auto it = collection.upper_bound(key);
+  if (it == collection.begin()) {
+    return 0;
+  }
+  return &(--it)->second;
+}
+
+// Same as above but returns a pointer to the non-const value.
+template <class Collection>
+typename Collection::mapped_type*
+FindFloorOrNull(Collection& collection,  // NOLINT
+                const typename Collection::key_type& key) {
+  auto it = collection.upper_bound(key);
+  if (it == collection.begin()) {
+    return 0;
+  }
+  return &(--it)->second;
+}
+
+// Returns a const-reference to the value associated with the greatest key
+// that's less than or equal to the given key, or crashes if it does not exist.
+template <class Collection>
+const typename Collection::mapped_type&
+FindFloorOrDie(const Collection& collection,
+               const typename Collection::key_type& key) {
+  auto it = collection.upper_bound(key);
+  CHECK(it != collection.begin());
+  return (--it)->second;
+}
+
+// Same as above, but returns a non-const reference.
+template <class Collection>
+typename Collection::mapped_type&
+FindFloorOrDie(Collection& collection,
+               const typename Collection::key_type& key) {
+  auto it = collection.upper_bound(key);
+  CHECK(it != collection.begin());
+  return (--it)->second;
 }
 
 // Returns the pointer value associated with the given key. If none is found,
@@ -185,12 +232,12 @@ FindOrNull(Collection& collection,  // NOLINT
 // This function does not distinguish between a missing key and a key mapped
 // to a NULL value.
 template <class Collection>
-typename Collection::value_type::second_type
+typename Collection::mapped_type
 FindPtrOrNull(const Collection& collection,
-              const typename Collection::value_type::first_type& key) {
-  typename Collection::const_iterator it = collection.find(key);
+              const typename Collection::key_type& key) {
+  auto it = collection.find(key);
   if (it == collection.end()) {
-    return typename Collection::value_type::second_type(0);
+    return typename Collection::mapped_type(0);
   }
   return it->second;
 }
@@ -200,14 +247,29 @@ FindPtrOrNull(const Collection& collection,
 // This function is needed for containers that propagate constness to the
 // pointee, such as boost::ptr_map.
 template <class Collection>
-typename Collection::value_type::second_type
+typename Collection::mapped_type
 FindPtrOrNull(Collection& collection,  // NOLINT
-              const typename Collection::value_type::first_type& key) {
-  typename Collection::iterator it = collection.find(key);
+              const typename Collection::key_type& key) {
+  auto it = collection.find(key);
   if (it == collection.end()) {
-    return typename Collection::value_type::second_type(0);
+    return typename Collection::mapped_type(0);
   }
   return it->second;
+}
+
+// FindPtrOrNull like function for maps whose value is a smart pointer like shared_ptr or
+// unique_ptr.
+// Returns the raw pointer contained in the smart pointer for the first found key, if it exists,
+// or null if it doesn't.
+template <class Collection>
+typename Collection::mapped_type::element_type*
+FindPointeeOrNull(const Collection& collection,  // NOLINT,
+                  const typename Collection::key_type& key) {
+  auto it = collection.find(key);
+  if (it == collection.end()) {
+    return nullptr;
+  }
+  return it->second.get();
 }
 
 // Finds the value associated with the given key and copies it to *value (if not
@@ -216,7 +278,7 @@ template <class Collection, class Key, class Value>
 bool FindCopy(const Collection& collection,
               const Key& key,
               Value* const value) {
-  typename Collection::const_iterator it = collection.find(key);
+  auto it = collection.find(key);
   if (it == collection.end()) {
     return false;
   }
@@ -233,7 +295,7 @@ bool FindCopy(const Collection& collection,
 // Returns true iff the given collection contains the given key.
 template <class Collection, class Key>
 bool ContainsKey(const Collection& collection, const Key& key) {
-  typename Collection::const_iterator it = collection.find(key);
+  auto it = collection.find(key);
   return it != collection.end();
 }
 
@@ -274,8 +336,8 @@ bool InsertOrUpdate(Collection* const collection,
 // Same as above, except that the key and value are passed separately.
 template <class Collection>
 bool InsertOrUpdate(Collection* const collection,
-                    const typename Collection::value_type::first_type& key,
-                    const typename Collection::value_type::second_type& value) {
+                    const typename Collection::key_type& key,
+                    const typename Collection::mapped_type& value) {
   return InsertOrUpdate(
       collection, typename Collection::value_type(key, value));
 }
@@ -297,8 +359,8 @@ void InsertOrUpdateMany(Collection* const collection,
 template <class Collection>
 bool InsertAndDeleteExisting(
     Collection* const collection,
-    const typename Collection::value_type::first_type& key,
-    const typename Collection::value_type::second_type& value) {
+    const typename Collection::key_type& key,
+    const typename Collection::mapped_type& value) {
   pair<typename Collection::iterator, bool> ret =
       collection->insert(typename Collection::value_type(key, value));
   if (!ret.second) {
@@ -323,8 +385,8 @@ bool InsertIfNotPresent(Collection* const collection,
 template <class Collection>
 bool InsertIfNotPresent(
     Collection* const collection,
-    const typename Collection::value_type::first_type& key,
-    const typename Collection::value_type::second_type& value) {
+    const typename Collection::key_type& key,
+    const typename Collection::mapped_type& value) {
   return InsertIfNotPresent(
       collection, typename Collection::value_type(key, value));
 }
@@ -347,9 +409,8 @@ void InsertOrDieNoPrint(Collection* const collection,
 // present.
 template <class Collection>
 void InsertOrDie(Collection* const collection,
-                 const typename Collection::value_type::first_type& key,
-                 const typename Collection::value_type::second_type& data) {
-  typedef typename Collection::value_type value_type;
+                 const typename Collection::key_type& key,
+                 const typename Collection::mapped_type& data) {
   CHECK(InsertIfNotPresent(collection, key, data))
       << "duplicate key: " << key;
 }
@@ -358,9 +419,8 @@ void InsertOrDie(Collection* const collection,
 template <class Collection>
 void InsertOrDieNoPrint(
     Collection* const collection,
-    const typename Collection::value_type::first_type& key,
-    const typename Collection::value_type::second_type& data) {
-  typedef typename Collection::value_type value_type;
+    const typename Collection::key_type& key,
+    const typename Collection::mapped_type& data) {
   CHECK(InsertIfNotPresent(collection, key, data)) << "duplicate key.";
 }
 
@@ -371,12 +431,12 @@ void InsertOrDieNoPrint(
 // SomeProto& proto = InsertKeyOrDie(&m, 3);
 // proto.set_field("foo");
 template <class Collection>
-typename Collection::value_type::second_type& InsertKeyOrDie(
+typename Collection::mapped_type& InsertKeyOrDie(
     Collection* const collection,
-    const typename Collection::value_type::first_type& key) {
+    const typename Collection::key_type& key) {
   typedef typename Collection::value_type value_type;
   pair<typename Collection::iterator, bool> res =
-      collection->insert(value_type(key, typename value_type::second_type()));
+      collection->insert(value_type(key, typename Collection::mapped_type()));
   CHECK(res.second) << "duplicate key: " << key;
   return res.first->second;
 }
@@ -389,7 +449,7 @@ typename Collection::value_type::second_type& InsertKeyOrDie(
 // pair if it's not already present. Returns a reference to the value associated
 // with the key.
 template <class Collection>
-typename Collection::value_type::second_type&
+typename Collection::mapped_type&
 LookupOrInsert(Collection* const collection,
                const typename Collection::value_type& vt) {
   return collection->insert(vt).first->second;
@@ -397,10 +457,10 @@ LookupOrInsert(Collection* const collection,
 
 // Same as above except the key-value are passed separately.
 template <class Collection>
-typename Collection::value_type::second_type&
+typename Collection::mapped_type&
 LookupOrInsert(Collection* const collection,
-               const typename Collection::value_type::first_type& key,
-               const typename Collection::value_type::second_type& value) {
+               const typename Collection::key_type& key,
+               const typename Collection::mapped_type& value) {
   return LookupOrInsert(
       collection, typename Collection::value_type(key, value));
 }
@@ -418,13 +478,13 @@ LookupOrInsert(Collection* const collection,
 template <typename Sequence, typename Collection>
 void AddTokenCounts(
     const Sequence& sequence,
-    const typename Collection::value_type::second_type& increment,
+    const typename Collection::mapped_type& increment,
     Collection* const count_map) {
   for (typename Sequence::const_iterator it = sequence.begin();
        it != sequence.end(); ++it) {
-    typename Collection::value_type::second_type& value =
+    typename Collection::mapped_type& value =
         LookupOrInsert(count_map, *it,
-                       typename Collection::value_type::second_type());
+                       typename Collection::mapped_type());
     value += increment;
   }
 }
@@ -448,13 +508,13 @@ void MapUtilAssignNewInstance(T** location, const Arg &arg) {
 // inserting a new key, value pair involves constructing a new heap-allocated
 // Value, and storing a pointer to that in the collection.
 template <class Collection>
-typename Collection::value_type::second_type&
+typename Collection::mapped_type&
 LookupOrInsertNew(Collection* const collection,
-                  const typename Collection::value_type::first_type& key) {
+                  const typename Collection::key_type& key) {
   pair<typename Collection::iterator, bool> ret =
       collection->insert(
           typename Collection::value_type(key,
-              static_cast<typename Collection::value_type::second_type>(NULL)));
+              static_cast<typename Collection::mapped_type>(NULL)));
   if (ret.second) {
     // This helper is needed to 'extract' the Value type from the type of the
     // container value, which is (Value*).
@@ -466,15 +526,15 @@ LookupOrInsertNew(Collection* const collection,
 // Same as above but constructs the value using the single-argument constructor
 // and the given "arg".
 template <class Collection, class Arg>
-typename Collection::value_type::second_type&
+typename Collection::mapped_type&
 LookupOrInsertNew(Collection* const collection,
-                  const typename Collection::value_type::first_type& key,
+                  const typename Collection::key_type& key,
                   const Arg& arg) {
   pair<typename Collection::iterator, bool> ret =
       collection->insert(
           typename Collection::value_type(
               key,
-              static_cast<typename Collection::value_type::second_type>(NULL)));
+              static_cast<typename Collection::mapped_type>(NULL)));
   if (ret.second) {
     // This helper is needed to 'extract' the Value type from the type of the
     // container value, which is (Value*).
@@ -497,12 +557,12 @@ LookupOrInsertNew(Collection* const collection,
 // LookupOrInsertNewLinkedPtr, this function returns the shared_ptr instead of
 // the raw pointer. Value::element_type must be default constructable.
 template <class Collection>
-typename Collection::value_type::second_type&
+typename Collection::mapped_type&
 LookupOrInsertNewSharedPtr(
     Collection* const collection,
-    const typename Collection::value_type::first_type& key) {
-  typedef typename Collection::value_type::second_type SharedPtr;
-  typedef typename Collection::value_type::second_type::element_type Element;
+    const typename Collection::key_type& key) {
+  typedef typename Collection::mapped_type SharedPtr;
+  typedef typename Collection::mapped_type::element_type Element;
   pair<typename Collection::iterator, bool> ret =
       collection->insert(typename Collection::value_type(key, SharedPtr()));
   if (ret.second) {
@@ -517,13 +577,13 @@ LookupOrInsertNewSharedPtr(
 // here.  On the other hand it does not matter how expensive the construction of
 // the actual stored value is, as that only occurs if necessary.
 template <class Collection, class Arg>
-typename Collection::value_type::second_type&
+typename Collection::mapped_type&
 LookupOrInsertNewSharedPtr(
     Collection* const collection,
-    const typename Collection::value_type::first_type& key,
+    const typename Collection::key_type& key,
     const Arg& arg) {
-  typedef typename Collection::value_type::second_type SharedPtr;
-  typedef typename Collection::value_type::second_type::element_type Element;
+  typedef typename Collection::mapped_type SharedPtr;
+  typedef typename Collection::mapped_type::element_type Element;
   pair<typename Collection::iterator, bool> ret =
       collection->insert(typename Collection::value_type(key, SharedPtr()));
   if (ret.second) {
@@ -545,9 +605,9 @@ LookupOrInsertNewSharedPtr(
 // address of an already existing value, rather than updating it.
 template <class Collection>
 bool UpdateReturnCopy(Collection* const collection,
-                      const typename Collection::value_type::first_type& key,
-                      const typename Collection::value_type::second_type& value,
-                      typename Collection::value_type::second_type* previous) {
+                      const typename Collection::key_type& key,
+                      const typename Collection::mapped_type& value,
+                      typename Collection::mapped_type* previous) {
   pair<typename Collection::iterator, bool> ret =
       collection->insert(typename Collection::value_type(key, value));
   if (!ret.second) {
@@ -565,7 +625,7 @@ bool UpdateReturnCopy(Collection* const collection,
 template <class Collection>
 bool UpdateReturnCopy(Collection* const collection,
                       const typename Collection::value_type& vt,
-                      typename Collection::value_type::second_type* previous) {
+                      typename Collection::mapped_type* previous) {
   pair<typename Collection::iterator, bool> ret =
     collection->insert(vt);
   if (!ret.second) {
@@ -587,7 +647,7 @@ bool UpdateReturnCopy(Collection* const collection,
 // twice. Unlike UpdateReturnCopy this also does not come with the issue of an
 // undefined previous* in case new data was inserted.
 template <class Collection>
-typename Collection::value_type::second_type* const
+typename Collection::mapped_type* const
 InsertOrReturnExisting(Collection* const collection,
                        const typename Collection::value_type& vt) {
   pair<typename Collection::iterator, bool> ret = collection->insert(vt);
@@ -600,11 +660,11 @@ InsertOrReturnExisting(Collection* const collection,
 
 // Same as above, except for explicit key and data.
 template <class Collection>
-typename Collection::value_type::second_type* const
+typename Collection::mapped_type* const
 InsertOrReturnExisting(
     Collection* const collection,
-    const typename Collection::value_type::first_type& key,
-    const typename Collection::value_type::second_type& data) {
+    const typename Collection::key_type& key,
+    const typename Collection::mapped_type& data) {
   return InsertOrReturnExisting(collection,
                                 typename Collection::value_type(key, data));
 }
@@ -638,15 +698,17 @@ void ReverseMap(const Collection& collection,
 //     if (value_ptr.get())
 //       value_ptr->DoSomething();
 //
+// Note: if 'collection' is a multimap, this will only erase and return the
+// first value.
 template <class Collection>
-typename Collection::value_type::second_type EraseKeyReturnValuePtr(
+typename Collection::mapped_type EraseKeyReturnValuePtr(
     Collection* const collection,
-    const typename Collection::value_type::first_type& key) {
-  typename Collection::iterator it = collection->find(key);
+    const typename Collection::key_type& key) {
+  auto it = collection->find(key);
   if (it == collection->end()) {
-    return NULL;
+    return typename Collection::mapped_type();
   }
-  typename Collection::value_type::second_type v = it->second;
+  typename Collection::mapped_type v = std::move(it->second);
   collection->erase(it);
   return v;
 }
@@ -738,10 +800,59 @@ void AppendValuesFromMap(const MapContainer& map_container,
   if (value_container->empty()) {
     value_container->reserve(map_container.size());
   }
-  for (typename MapContainer::const_iterator it = map_container.begin();
-       it != map_container.end(); ++it) {
-    value_container->push_back(it->second);
+  for (const auto& entry : map_container) {
+    value_container->push_back(entry.second);
   }
 }
+
+// Compute and insert new value if it's absent from the map. Return a pair with a reference to the
+// value and a bool indicating whether it was absent at first.
+//
+// This inspired on a similar java construct (url split in two lines):
+// https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ConcurrentHashMap.html
+// #computeIfAbsent-K-java.util.function.Function
+//
+// It takes a reference to the key and a lambda function. If the key exists in the map, returns
+// a pair with a pointer to the current value and 'false'. If the key does not exist in the map,
+// it uses the lambda function to create a value, inserts it into the map, and returns a pair with
+// a pointer to the new value and 'true'.
+//
+// Example usage:
+//
+// auto result = ComputeIfAbsentReturnAbsense(&my_collection,
+//                                            my_key,
+//                                            [] { return new_value; });
+// MyValue* const value = result.first;
+// if (result.second) ....
+//
+template <class MapContainer, typename Function>
+pair<typename MapContainer::mapped_type* const, bool>
+ComputeIfAbsentReturnAbsense(MapContainer* container,
+                             const typename MapContainer::key_type& key,
+                             Function compute_func) {
+  typename MapContainer::iterator iter = container->find(key);
+  bool new_value = iter == container->end();
+  if (new_value) {
+    pair<typename MapContainer::iterator, bool> result = container->emplace(key, compute_func());
+    DCHECK(result.second) << "duplicate key: " << key;
+    iter = result.first;
+  }
+  return make_pair(&iter->second, new_value);
+};
+
+// Like the above but doesn't return a pair, just returns a pointer to the value.
+// Example usage:
+//
+// MyValue* const value = ComputeIfAbsent(&my_collection,
+//                                        my_key,
+//                                        [] { return new_value; });
+//
+template <class MapContainer, typename Function>
+typename MapContainer::mapped_type* const
+ComputeIfAbsent(MapContainer* container,
+                const typename MapContainer::key_type& key,
+                Function compute_func) {
+  return ComputeIfAbsentReturnAbsense(container, key, compute_func).first;
+};
 
 #endif  // UTIL_GTL_MAP_UTIL_H_

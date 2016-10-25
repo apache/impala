@@ -51,13 +51,14 @@ using std::pair;
 #include <vector>
 using std::vector;
 
-#include "gutil/integral_types.h"
 #include <glog/logging.h>
-#include "gutil/logging-inl.h"
-#include "gutil/strings/charset.h"
-#include "gutil/strings/split_internal.h"
-#include "gutil/strings/stringpiece.h"
-#include "gutil/strings/strip.h"
+
+#include "kudu/gutil/integral_types.h"
+#include "kudu/gutil/logging-inl.h"
+#include "kudu/gutil/strings/charset.h"
+#include "kudu/gutil/strings/split_internal.h"
+#include "kudu/gutil/strings/stringpiece.h"
+#include "kudu/gutil/strings/strip.h"
 
 namespace strings {
 
@@ -400,7 +401,7 @@ template <typename Delimiter>
 class LimitImpl {
  public:
   LimitImpl(Delimiter delimiter, int limit)
-      : delimiter_(delimiter), limit_(limit), count_(0) {}
+      : delimiter_(std::move(delimiter)), limit_(limit), count_(0) {}
   StringPiece Find(StringPiece text) {
     if (count_++ == limit_) {
       return StringPiece(text.end(), 0);  // No more matches.
@@ -853,11 +854,11 @@ bool SplitRange(const char* rangestr, int* from, int* to);
 // The following variants of SplitCSVLine() are not recommended for new code.
 // Please consider the CSV parser in //util/csv as an alternative.  Examples:
 // To parse a single line:
-//     #include "util/csv/parser.h"
+//     #include "kudu/util/csv/parser.h"
 //     vector<string> fields = util::csv::ParseLine(line).fields();
 //
 // To parse an entire file:
-//     #include "util/csv/parser.h"
+//     #include "kudu/util/csv/parser.h"
 //     for (Record rec : Parser(source)) {
 //       vector<string> fields = rec.fields();
 //     }
@@ -1155,9 +1156,9 @@ bool SplitStringAndParseToInserter(
   vector<StringPiece> pieces = strings::Split(source,
                                               strings::delimiter::AnyOf(delim),
                                               strings::SkipEmpty());
-  for (size_t i = 0; i < pieces.size(); ++i) {
+  for (const auto& piece : pieces) {
     typename Container::value_type t;
-    if (parse(pieces[i].as_string(), &t)) {
+    if (parse(piece.as_string(), &t)) {
       insert_policy(result, t);
     } else {
       retval = false;

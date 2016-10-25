@@ -1,6 +1,6 @@
 // Copyright 2008 Google Inc. All Rights Reserved.
 
-#include "gutil/strings/charset.h"
+#include "kudu/gutil/strings/charset.h"
 
 #include <string.h>
 

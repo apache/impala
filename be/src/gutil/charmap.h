@@ -18,9 +18,9 @@
 
 #include <string.h>
 
-#include "gutil/basictypes.h"
-#include "gutil/integral_types.h"
-#include "gutil/type_traits.h"
+#include "kudu/gutil/basictypes.h"
+#include "kudu/gutil/integral_types.h"
+#include "kudu/gutil/type_traits.h"
 
 class Charmap {
  public:
@@ -64,8 +64,8 @@ class Charmap {
   }
 
   bool IsZero() const {
-    for (int i = 0; i < 8; ++i) {
-      if (m_[i] != 0)
+    for (uint32 c : m_) {
+      if (c != 0)
         return false;
     }
     return true;

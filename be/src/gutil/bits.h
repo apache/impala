@@ -2,8 +2,12 @@
 //
 // A collection of useful (static) bit-twiddling functions.
 
-#include "gutil/basictypes.h"
-#include "gutil/integral_types.h"
+#include <glog/logging.h>
+
+#include "kudu/gutil/basictypes.h"
+#include "kudu/gutil/integral_types.h"
+#include "kudu/gutil/logging-inl.h"
+#include "kudu/gutil/macros.h"
 
 #ifndef _BITS_H_
 #define _BITS_H_
@@ -76,10 +80,6 @@ class Bits {
   static int Log2Ceiling(uint32 n);
   static int Log2Ceiling64(uint64 n);
 
-  // Potentially faster version of Log2Ceiling() that returns an
-  // undefined value if n == 0
-  static int Log2CeilingNonZero64(uint64 n);
-
   // Return the first set least / most significant bit, 0-indexed.  Returns an
   // undefined value if n == 0.  FindLSBSetNonZero() is similar to ffs() except
   // that it's 0-indexed, while FindMSBSetNonZero() is the same as
@@ -140,36 +140,6 @@ inline int Bits::Log2FloorNonZero(uint32 n) {
   return 31 ^ __builtin_clz(n);
 }
 
-inline int Bits::Log2Ceiling(uint32 n) {
-  int floor = Log2Floor(n);
-  // Check if zero or a power of two. This pattern is recognised by gcc and optimised
-  // into branch-free code.
-  if (0 == (n & (n - 1)))
-    return floor;
-  else
-    return floor + 1;
-}
-
-inline int Bits::Log2Ceiling64(uint64 n) {
-  int floor = Log2Floor64(n);
-  // Check if zero or a power of two. This pattern is recognised by gcc and optimised
-  // into branch-free code.
-  if (0 == (n & (n - 1)))
-    return floor;
-  else
-    return floor + 1;
-}
-
-inline int Bits::Log2CeilingNonZero64(uint64 n) {
-  int floor = Log2FloorNonZero64(n);
-  // Check if zero or a power of two. This pattern is recognised by gcc and optimised
-  // into branch-free code.
-  if (0 == (n & (n - 1)))
-    return floor;
-  else
-    return floor + 1;
-}
-
 inline int Bits::FindLSBSetNonZero(uint32 n) {
   return __builtin_ctz(n);
 }
@@ -186,9 +156,9 @@ inline int Bits::FindLSBSetNonZero64(uint64 n) {
   return __builtin_ctzll(n);
 }
 #elif defined(_MSC_VER)
-#include "gutil/bits-internal-windows.h"
+#include "kudu/gutil/bits-internal-windows.h"
 #else
-#include "gutil/bits-internal-unknown.h"
+#include "kudu/gutil/bits-internal-unknown.h"
 #endif
 
 inline int Bits::CountOnesInByte(unsigned char n) {

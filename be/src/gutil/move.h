@@ -105,8 +105,8 @@
 //
 //
 //    Foo f(MakeFoo());      // R-value so alternate conversion executed.
-//    Foo f_copy(f.Pass());  // R-value so alternate conversion executed.
-//    f = f_copy.Pass();     // R-value so alternate conversion executed.
+//    Foo f_copy(std::move(f));  // R-value so alternate conversion executed.
+//    f = std::move(f_copy);     // R-value so alternate conversion executed.
 //
 //
 // IMPLEMENTATION SUBTLETIES WITH RValue
@@ -134,6 +134,16 @@
 //
 // In optimized builds, both implementations generate the same assembly so we
 // choose the one that adheres to the standard.
+//
+//
+// WHY HAVE typedef void MoveOnlyTypeForCPP03
+//
+// Callback<>/Bind() needs to understand movable-but-not-copyable semantics
+// to call .Pass() appropriately when it is expected to transfer the value.
+// The cryptic typedef MoveOnlyTypeForCPP03 is added to make this check
+// easy and automatic in helper templates for Callback<>/Bind().
+// See IsMoveOnlyType template and its usage in base/callback_internal.h
+// for more details.
 //
 //
 // COMPARED TO C++11
@@ -202,6 +212,7 @@
  public: \
   operator rvalue_type() { return rvalue_type(this); } \
   type Pass() { return type(rvalue_type(this)); } \
+  typedef void MoveOnlyTypeForCPP03; \
  private:
 
 #endif  // BASE_MOVE_H_

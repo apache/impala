@@ -7,13 +7,13 @@
 // To find the implementation of the core Bob Jenkins lookup2 hash, look in
 // jenkins.cc.
 
-#include "gutil/hash/hash.h"
+#include "kudu/gutil/hash/hash.h"
 
-#include "gutil/integral_types.h"
+#include "kudu/gutil/integral_types.h"
 #include <glog/logging.h>
-#include "gutil/logging-inl.h"
-#include "gutil/hash/jenkins.h"
-#include "gutil/hash/jenkins_lookup2.h"
+#include "kudu/gutil/logging-inl.h"
+#include "kudu/gutil/hash/jenkins.h"
+#include "kudu/gutil/hash/jenkins_lookup2.h"
 
 // For components that ship code externally (notably the Google Search
 // Appliance) we want to change the fingerprint function so that
@@ -34,10 +34,6 @@ static const uint32 kFingerprintSeed1 = 102072;
 
 static inline uint32 char2unsigned(char c) {
   return static_cast<uint32>(static_cast<unsigned char>(c));
-}
-
-static inline uint64 char2unsigned64(char c) {
-  return static_cast<uint64>(static_cast<unsigned char>(c));
 }
 
 uint64 FingerprintReferenceImplementation(const char *s, uint32 len) {
@@ -193,8 +189,8 @@ uint64 FingerprintInterleavedImplementation(const char *s, uint32 len) {
 #include <ext/hash_set>
 namespace __gnu_cxx {
 
-template class hash_set<string>;
-template class hash_map<string, string>;
+template class hash_set<std::string>;
+template class hash_map<std::string, std::string>;
 
 }  // namespace __gnu_cxx
 

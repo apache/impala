@@ -1,16 +1,21 @@
 // Copyright 2005 Google Inc.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 //
 // ---
 //
@@ -27,9 +32,9 @@
 
 #include <assert.h>
 
-#include "gutil/int128.h"
-#include "gutil/integral_types.h"
-#include "gutil/port.h"
+#include "kudu/gutil/int128.h"
+#include "kudu/gutil/integral_types.h"
+#include "kudu/gutil/port.h"
 
 inline uint64 gbswap_64(uint64 host_int) {
 #if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__)
@@ -74,15 +79,17 @@ inline uint64 ghtonll(uint64 x) { return x; }
 #error "Unsupported bytesex: Either IS_BIG_ENDIAN or IS_LITTLE_ENDIAN must be defined"  // NOLINT
 #endif  // bytesex
 
-// This one is safe to take as it's an extension
-#define htonll(x) ghtonll(x)
 
 // ntoh* and hton* are the same thing for any size and bytesex,
 // since the function is an involution, i.e., its own inverse.
 #define gntohl(x) ghtonl(x)
 #define gntohs(x) ghtons(x)
 #define gntohll(x) ghtonll(x)
+#if !defined(__APPLE__)
+// This one is safe to take as it's an extension
+#define htonll(x) ghtonll(x)
 #define ntohll(x) htonll(x)
+#endif
 
 // Utilities to convert numbers between the current hosts's native byte
 // order and little-endian byte order

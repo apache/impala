@@ -5,8 +5,8 @@
 #ifndef BASE_BASICTYPES_H_
 #define BASE_BASICTYPES_H_
 
-#include "gutil/integral_types.h"
-#include "gutil/macros.h"
+#include "kudu/gutil/integral_types.h"
+#include "kudu/gutil/macros.h"
 
 // Argument type used in interfaces that can optionally take ownership
 // of a passed in argument.  If TAKE_OWNERSHIP is passed, the called

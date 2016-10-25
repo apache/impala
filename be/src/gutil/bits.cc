@@ -2,7 +2,7 @@
 //
 // Derived from code by Moses Charikar
 
-#include "gutil/bits.h"
+#include "kudu/gutil/bits.h"
 
 #include <assert.h>
 
@@ -69,6 +69,22 @@ int Bits::Log2Floor_Portable(uint32 n) {
   }
   assert(value == 1);
   return log;
+}
+
+int Bits::Log2Ceiling(uint32 n) {
+  int floor = Log2Floor(n);
+  if (n == (n &~ (n - 1)))              // zero or a power of two
+    return floor;
+  else
+    return floor + 1;
+}
+
+int Bits::Log2Ceiling64(uint64 n) {
+  int floor = Log2Floor64(n);
+  if (n == (n &~ (n - 1)))              // zero or a power of two
+    return floor;
+  else
+    return floor + 1;
 }
 
 int Bits::FindLSBSetNonZero_Portable(uint32 n) {

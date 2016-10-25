@@ -1,16 +1,21 @@
 // Copyright 2002 Google Inc.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//   http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 //
 // ---
 //
@@ -47,10 +52,9 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include "gutil/integral_types.h"
-#include "gutil/macros.h"
-#include "gutil/port.h"
-#include "gutil/algorithm.h"
+#include "kudu/gutil/integral_types.h"
+#include "kudu/gutil/macros.h"
+#include "kudu/gutil/port.h"
 
 // Sort and remove duplicates of an STL vector or deque.
 template<class T>
@@ -575,8 +579,8 @@ void STLSetDifference(const SortedSTLContainerA &a,
                       const SortedSTLContainerB &b,
                       SortedSTLContainerC *c) {
   // The qualified name avoids an ambiguity error, particularly with C++11:
-  assert(util::gtl::is_sorted(a.begin(), a.end()));
-  assert(util::gtl::is_sorted(b.begin(), b.end()));
+  assert(std::is_sorted(a.begin(), a.end()));
+  assert(std::is_sorted(b.begin(), b.end()));
   assert(static_cast<const void *>(&a) !=
          static_cast<const void *>(c));
   assert(static_cast<const void *>(&b) !=
@@ -599,8 +603,8 @@ template<typename SortedSTLContainerA,
 void STLSetUnion(const SortedSTLContainerA &a,
                  const SortedSTLContainerB &b,
                  SortedSTLContainerC *c) {
-  assert(util::gtl::is_sorted(a.begin(), a.end()));
-  assert(util::gtl::is_sorted(b.begin(), b.end()));
+  assert(std::is_sorted(a.begin(), a.end()));
+  assert(std::is_sorted(b.begin(), b.end()));
   assert(static_cast<const void *>(&a) !=
          static_cast<const void *>(c));
   assert(static_cast<const void *>(&b) !=
@@ -615,8 +619,8 @@ template<typename SortedSTLContainerA,
 void STLSetSymmetricDifference(const SortedSTLContainerA &a,
                                const SortedSTLContainerB &b,
                                SortedSTLContainerC *c) {
-  assert(util::gtl::is_sorted(a.begin(), a.end()));
-  assert(util::gtl::is_sorted(b.begin(), b.end()));
+  assert(std::is_sorted(a.begin(), a.end()));
+  assert(std::is_sorted(b.begin(), b.end()));
   assert(static_cast<const void *>(&a) !=
          static_cast<const void *>(c));
   assert(static_cast<const void *>(&b) !=
@@ -647,8 +651,8 @@ template<typename SortedSTLContainerA,
 void STLSetIntersection(const SortedSTLContainerA &a,
                         const SortedSTLContainerB &b,
                         SortedSTLContainerC *c) {
-  assert(util::gtl::is_sorted(a.begin(), a.end()));
-  assert(util::gtl::is_sorted(b.begin(), b.end()));
+  assert(std::is_sorted(a.begin(), a.end()));
+  assert(std::is_sorted(b.begin(), b.end()));
   assert(static_cast<const void *>(&a) !=
          static_cast<const void *>(c));
   assert(static_cast<const void *>(&b) !=
@@ -671,8 +675,8 @@ template<typename SortedSTLContainerA,
          typename SortedSTLContainerB>
 bool STLIncludes(const SortedSTLContainerA &a,
                  const SortedSTLContainerB &b) {
-  assert(util::gtl::is_sorted(a.begin(), a.end()));
-  assert(util::gtl::is_sorted(b.begin(), b.end()));
+  assert(std::is_sorted(a.begin(), a.end()));
+  assert(std::is_sorted(b.begin(), b.end()));
   return std::includes(a.begin(), a.end(),
                        b.begin(), b.end());
 }
@@ -909,8 +913,8 @@ struct STLEmptyBaseHandle : public Base {
 template<typename InputIterator1, typename InputIterator2>
 bool SortedRangesHaveIntersection(InputIterator1 begin1, InputIterator1 end1,
                                   InputIterator2 begin2, InputIterator2 end2) {
-  assert(util::gtl::is_sorted(begin1, end1));
-  assert(util::gtl::is_sorted(begin2, end2));
+  assert(std::is_sorted(begin1, end1));
+  assert(std::is_sorted(begin2, end2));
   while (begin1 != end1 && begin2 != end2) {
     if (*begin1 < *begin2) {
       ++begin1;
@@ -929,8 +933,8 @@ template<typename InputIterator1, typename InputIterator2, typename Comp>
 bool SortedRangesHaveIntersection(InputIterator1 begin1, InputIterator1 end1,
                                   InputIterator2 begin2, InputIterator2 end2,
                                   Comp comparator) {
-  assert(util::gtl::is_sorted(begin1, end1, comparator));
-  assert(util::gtl::is_sorted(begin2, end2, comparator));
+  assert(std::is_sorted(begin1, end1, comparator));
+  assert(std::is_sorted(begin2, end2, comparator));
   while (begin1 != end1 && begin2 != end2) {
     if (comparator(*begin1, *begin2)) {
       ++begin1;

@@ -3,7 +3,7 @@
 #ifndef STRINGS_CHARSET_H_
 #define STRINGS_CHARSET_H_
 
-#include "gutil/integral_types.h"
+#include "kudu/gutil/integral_types.h"
 
 namespace strings {
 

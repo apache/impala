@@ -2,7 +2,7 @@
 //
 // Maintainer: Greg Miller <jgm@google.com>
 
-#include "gutil/strings/split.h"
+#include "kudu/gutil/strings/split.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -13,14 +13,14 @@ using std::iterator_traits;
 #include <limits>
 using std::numeric_limits;
 
-#include "gutil/integral_types.h"
+#include "kudu/gutil/integral_types.h"
 #include <glog/logging.h>
-#include "gutil/logging-inl.h"
-#include "gutil/macros.h"
-#include "gutil/strtoint.h"
-#include "gutil/strings/ascii_ctype.h"
-#include "gutil/strings/util.h"
-#include "gutil/hash/hash.h"
+#include "kudu/gutil/logging-inl.h"
+#include "kudu/gutil/macros.h"
+#include "kudu/gutil/strtoint.h"
+#include "kudu/gutil/strings/ascii_ctype.h"
+#include "kudu/gutil/strings/util.h"
+#include "kudu/gutil/hash/hash.h"
 
 // Implementations for some of the Split2 API. Much of the Split2 API is
 // templated so it exists in header files, either strings/split.h or
@@ -133,8 +133,8 @@ void AppendToImpl(vector<string>* container, Splitter splitter) {
   vector<StringPiece> vsp = splitter;  // Calls implicit conversion operator.
   size_t container_size = container->size();
   container->resize(container_size + vsp.size());
-  for (size_t i = 0; i < vsp.size(); ++i) {
-    vsp[i].CopyToString(&(*container)[container_size++]);
+  for (const auto& sp : vsp) {
+    sp.CopyToString(&(*container)[container_size++]);
   }
 }
 
@@ -464,7 +464,7 @@ void SplitStringPieceToVector(const StringPiece& full,
 // ----------------------------------------------------------------------
 
 vector<char*>* SplitUsing(char* full, const char* delim) {
-  vector<char*>* vec = new vector<char*>;
+  auto vec = new vector<char*>;
   SplitToVector(full, delim, vec, true);        // Omit empty strings
   return vec;
 }
@@ -472,12 +472,12 @@ vector<char*>* SplitUsing(char* full, const char* delim) {
 void SplitToVector(char* full, const char* delim, vector<char*>* vec,
                    bool omit_empty_strings) {
   char* next  = full;
-  while ((next = gstrsep(&full, delim)) != NULL) {
+  while ((next = gstrsep(&full, delim)) != nullptr) {
     if (omit_empty_strings && next[0] == '\0') continue;
     vec->push_back(next);
   }
   // Add last element (or full string if no delimeter found):
-  if (full != NULL) {
+  if (full != nullptr) {
     vec->push_back(full);
   }
 }
@@ -485,12 +485,12 @@ void SplitToVector(char* full, const char* delim, vector<char*>* vec,
 void SplitToVector(char* full, const char* delim, vector<const char*>* vec,
                    bool omit_empty_strings) {
   char* next  = full;
-  while ((next = gstrsep(&full, delim)) != NULL) {
+  while ((next = gstrsep(&full, delim)) != nullptr) {
     if (omit_empty_strings && next[0] == '\0') continue;
     vec->push_back(next);
   }
   // Add last element (or full string if no delimeter found):
-  if (full != NULL) {
+  if (full != nullptr) {
     vec->push_back(full);
   }
 }
@@ -691,7 +691,7 @@ DEFINE_SPLIT_ONE_NUMBER_TOKEN(HexUint64, uint64, strtou64_16)
 bool SplitRange(const char* rangestr, int* from, int* to) {
   // We need to do the const-cast because strol takes a char**, not const char**
   char* val = const_cast<char*>(rangestr);
-  if (val == NULL || EOS(*val))  return true;  // we'll say nothingness is ok
+  if (val == nullptr || EOS(*val))  return true;  // we'll say nothingness is ok
 
   if ( val[0] == '-' && EOS(val[1]) )    // CASE 1: -
     return true;                         // nothing changes
@@ -871,7 +871,7 @@ char* SplitStructuredLineInternal(char* line,
   if (!expected_to_close.empty()) {
     return current;  // Missing closing symbol(s)
   }
-  return NULL;  // Success
+  return nullptr;  // Success
 }
 
 bool SplitStructuredLineInternal(StringPiece line,
@@ -1004,10 +1004,10 @@ bool SplitStringIntoKeyValuePairs(const string& line,
   SplitStringUsing(line, key_value_pair_delimiters.c_str(), &pairs);
 
   bool success = true;
-  for (size_t i = 0; i < pairs.size(); ++i) {
+  for (const auto& pair : pairs) {
     string key;
     vector<string> value;
-    if (!SplitStringIntoKeyValues(pairs[i],
+    if (!SplitStringIntoKeyValues(pair,
                                   key_value_delimiters,
                                   "", &key, &value)) {
       // Don't return here, to allow for keys without associated
@@ -1033,7 +1033,7 @@ bool SplitStringIntoKeyValuePairs(const string& line,
 // --------------------------------------------------------------------
 const char* SplitLeadingDec32Values(const char *str, vector<int32> *result) {
   for (;;) {
-    char *end = NULL;
+    char *end = nullptr;
     long value = strtol(str, &end, 10);
     if (end == str)
       break;
@@ -1053,7 +1053,7 @@ const char* SplitLeadingDec32Values(const char *str, vector<int32> *result) {
 
 const char* SplitLeadingDec64Values(const char *str, vector<int64> *result) {
   for (;;) {
-    char *end = NULL;
+    char *end = nullptr;
     const int64 value = strtoll(str, &end, 10);
     if (end == str)
       break;
