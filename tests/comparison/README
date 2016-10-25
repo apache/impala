@@ -22,6 +22,10 @@ Requirements:
      sudo apt-get install python-mysqldb
      sudo apt-get install python-psycopg2   # Postgresql
 
+For Impala/Kudu CRUD random query generation and comparison, please see
+the supplemental POSTGRES.txt on setting up PostgresQL 9.5 or higher as
+a reference database.
+
 Please see the supplemental ORACLE.txt on setting up Oracle as a reference
 database.
 

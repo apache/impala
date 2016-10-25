@@ -1,0 +1,84 @@
+Motivation
+----------
+To test Impala/Kudu:
+  1. INSERT with ignorable primary key violations
+  2. "UPSERT"
+
+we need PostgresQL 9.5 or higher.
+
+https://www.postgresql.org/docs/9.5/static/sql-insert.html
+
+PostgresQL 9.5+ Installation
+----------------------------
+
+Common GNU/Linux distributions won't necessarily have PostgresQL as high
+as 9.5 available. Fortunately, PostgresQL understands this and provides
+instructions for adding sources for both Debian- and Redhat-based
+packages.
+
+https://wiki.postgresql.org/wiki/Apt
+https://yum.postgresql.org/repopackages.php
+
+What follows are instructions for getting this working on Ubuntu 14.04.
+
+Use the instructions at https://wiki.postgresql.org/wiki/Apt
+
+Note: apt pinning is possible, but if you already installed postgres
+from your standard GNU/Linux sources, you'll be forced to upgrade some
+packages like postgresql-common anyway. Resolving those problems is out
+of the scope of this document.
+
+Note: If you have postgresql-9.3 installed, your 9.3 installation will
+get updated to the latest point release version.
+
+If you then install a new PostgresQL version, you might be prompted what
+to do about /etc/postgresql-common/createcluster.conf . I elected to
+keep the local version installed.
+
+Before you start your new version of PostgresQL, you will probably want
+to make it easier to connect to the server:
+
+  $ sudo perl -pi -e 's/(?:peer|md5)/trust/g' /etc/postgresql/9.5/main/pg_hba.conf
+
+Note: By default, PostgresQL servers only bind to localhost, so the
+command above should only affect the localhost TCP server.
+
+Finally, you can 'sudo service postgresql start'. PostgresQL 9.3 is
+still listening on port 5432, but note 9.5 is also running, on 5433.
+
+PostgresQL 9.5+ Usage
+---------------------
+
+Databases aren't shared across versions. You'll need to load data, e.g.
+via:
+
+  $ tests/comparison/data_generator.py \
+      --use-postgresql \
+      --postgresql-port 5433 # <---- important \
+      [other options]
+
+... and use the random query generator in the same way:
+
+  $ tests/comparison/discrepancy_searcher.py \
+      --use-postgresql \
+      --postgresql-port 5433 # <---- important \
+      [other options]
+
+Testing
+-------
+
+The following steps have been taking to validate postgresql-9.5
+9.5.4-1.pgdg14.04+2 on Ubuntu 14.04.2 LTS:
+
+1. Migrating tpch and tpch_kudu from Impala into PostgresQL 9.5 (via
+  'data_generator.py migrate')
+2. Loading random data into PostgresQL 9.5 (via 'data_generator.py populate')
+3. Discrepancy tests between Impala and PostgresQL 9.5, and then again
+   on 9.3, to ensure results are the same.
+4. Quick experiments to make sure ON CONFLICT DO NOTHING and ON CONFLICT
+   DO UPDATE actually work when connecting to Postgres on port 5433.
+
+Other Resources
+---------------
+https://wiki.postgresql.org/wiki/Detailed_installation_guides
+https://wiki.postgresql.org/wiki/Apt/FAQ
