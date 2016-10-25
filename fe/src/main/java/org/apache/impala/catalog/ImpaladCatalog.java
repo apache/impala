@@ -96,7 +96,7 @@ public class ImpaladCatalog extends Catalog {
    * CatalogServer.
    */
   public ImpaladCatalog(String defaultKuduMasterHosts) {
-    super(false);
+    super();
     defaultKuduMasterHosts_ = defaultKuduMasterHosts;
   }
 

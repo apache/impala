@@ -107,6 +107,7 @@ import com.google.common.collect.Sets;
 public class CatalogServiceCatalog extends Catalog {
   private static final Logger LOG = Logger.getLogger(CatalogServiceCatalog.class);
 
+  private static final int INITIAL_META_STORE_CLIENT_POOL_SIZE = 10;
   private final TUniqueId catalogServiceId_;
 
   // Fair lock used to synchronize reads/writes of catalogVersion_. Because this lock
@@ -148,13 +149,16 @@ public class CatalogServiceCatalog extends Catalog {
   private static String localLibraryPath_;
 
   /**
-   * Initialize the CatalogServiceCatalog. If loadInBackground is true, table metadata
-   * will be loaded in the background
+   * Initialize the CatalogServiceCatalog. If 'loadInBackground' is true, table metadata
+   * will be loaded in the background. 'initialHmsCnxnTimeoutSec' specifies the time (in
+   * seconds) CatalogServiceCatalog will wait to establish an initial connection to the
+   * HMS before giving up. Using this setting allows catalogd and HMS to be started
+   * simultaneously.
    */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      SentryConfig sentryConfig, TUniqueId catalogServiceId, String kerberosPrincipal,
-      String localLibraryPath) {
-    super(true);
+      int initialHmsCnxnTimeoutSec, SentryConfig sentryConfig, TUniqueId catalogServiceId,
+      String kerberosPrincipal, String localLibraryPath) {
+    super(INITIAL_META_STORE_CLIENT_POOL_SIZE, initialHmsCnxnTimeoutSec);
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;

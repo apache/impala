@@ -18,6 +18,7 @@
 package org.apache.impala.catalog;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaHook;
@@ -72,15 +73,38 @@ public class MetaStoreClientPool {
     private final IMetaStoreClient hiveClient_;
     private boolean isInUse_;
 
-    private MetaStoreClient(HiveConf hiveConf) {
-      try {
-        LOG.debug("Creating MetaStoreClient. Pool Size = " + clientPool_.size());
-        hiveClient_ = RetryingMetaStoreClient.getProxy(hiveConf, dummyHookLoader,
-            HiveMetaStoreClient.class.getName());
-      } catch (Exception e) {
-        // Turn in to an unchecked exception
-        throw new IllegalStateException(e);
+    /**
+     * Creates a new instance of MetaStoreClient.
+     * 'cnxnTimeoutSec' specifies the time MetaStoreClient will wait to establish first
+     * connection to the HMS before giving up and failing out with an exception.
+     */
+    private MetaStoreClient(HiveConf hiveConf, int cnxnTimeoutSec) {
+      LOG.debug("Creating MetaStoreClient. Pool Size = " + clientPool_.size());
+
+      long retryDelaySeconds = hiveConf.getTimeVar(
+          HiveConf.ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY, TimeUnit.SECONDS);
+      long retryDelayMillis = retryDelaySeconds * 1000;
+      long endTimeMillis = System.currentTimeMillis() + cnxnTimeoutSec * 1000;
+      IMetaStoreClient hiveClient = null;
+      while (true) {
+        try {
+          hiveClient = RetryingMetaStoreClient.getProxy(hiveConf, dummyHookLoader,
+              HiveMetaStoreClient.class.getName());
+          break;
+        } catch (Exception e) {
+          // If time is up, throw an unchecked exception
+          long delayUntilMillis = System.currentTimeMillis() + retryDelayMillis;
+          if (delayUntilMillis >= endTimeMillis) throw new IllegalStateException(e);
+
+          LOG.warn("Failed to connect to Hive MetaStore. Retrying.", e);
+          while (delayUntilMillis > System.currentTimeMillis()) {
+            try {
+              Thread.sleep(delayUntilMillis - System.currentTimeMillis());
+            } catch (InterruptedException | IllegalArgumentException ignore) {}
+          }
+        }
       }
+      hiveClient_ = hiveClient;
       isInUse_ = false;
     }
 
@@ -119,23 +143,30 @@ public class MetaStoreClientPool {
     }
   }
 
-  public MetaStoreClientPool(int initialSize) {
-    this(initialSize, new HiveConf(MetaStoreClientPool.class));
+  public MetaStoreClientPool(int initialSize, int initialCnxnTimeoutSec) {
+    this(initialSize, initialCnxnTimeoutSec, new HiveConf(MetaStoreClientPool.class));
   }
 
-  public MetaStoreClientPool(int initialSize, HiveConf hiveConf) {
+  public MetaStoreClientPool(int initialSize, int initialCnxnTimeoutSec,
+      HiveConf hiveConf) {
     hiveConf_ = hiveConf;
     clientCreationDelayMs_ = hiveConf_.getInt(HIVE_METASTORE_CNXN_DELAY_MS_CONF,
         DEFAULT_HIVE_METASTORE_CNXN_DELAY_MS_CONF);
-    addClients(initialSize);
+    initClients(initialSize, initialCnxnTimeoutSec);
   }
 
   /**
-   * Add numClients to the client pool.
+   * Initialize client pool with 'numClients' client.
+   * 'initialCnxnTimeoutSec' specifies the time (in seconds) the first client will wait to
+   * establish an initial connection to the HMS.
    */
-  public void addClients(int numClients) {
-    for (int i = 0; i < numClients; ++i) {
-      clientPool_.add(new MetaStoreClient(hiveConf_));
+  public void initClients(int numClients, int initialCnxnTimeoutSec) {
+    Preconditions.checkState(clientPool_.size() == 0);
+    if (numClients > 0) {
+      clientPool_.add(new MetaStoreClient(hiveConf_, initialCnxnTimeoutSec));
+      for (int i = 0; i < numClients - 1; ++i) {
+        clientPool_.add(new MetaStoreClient(hiveConf_, 0));
+      }
     }
   }
 
@@ -163,7 +194,7 @@ public class MetaStoreClientPool {
         } catch (InterruptedException e) {
           /* ignore */
         }
-        client = new MetaStoreClient(hiveConf_);
+        client = new MetaStoreClient(hiveConf_, 0);
       }
     }
     client.markInUse();

@@ -17,13 +17,15 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.apache.log4j.Logger;
 
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -32,9 +34,7 @@ import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.PatternMatcher;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+import org.apache.log4j.Logger;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
@@ -60,11 +60,10 @@ public abstract class Catalog {
   // Initial catalog version.
   public final static long INITIAL_CATALOG_VERSION = 0L;
   public static final String DEFAULT_DB = "default";
-  private static final int META_STORE_CLIENT_POOL_SIZE = 10;
-
   public static final String BUILTINS_DB = "_impala_builtins";
 
-  protected final MetaStoreClientPool metaStoreClientPool_ = new MetaStoreClientPool(0);
+  protected final MetaStoreClientPool metaStoreClientPool_ =
+      new MetaStoreClientPool(0, 0);
 
   // Cache of authorization policy metadata. Populated from data retried from the
   // Sentry Service, if configured.
@@ -88,17 +87,22 @@ public abstract class Catalog {
   protected final CatalogObjectCache<HdfsCachePool> hdfsCachePools_ =
       new CatalogObjectCache<HdfsCachePool>(false);
 
-  /**
-   * Creates a new instance of a Catalog. If initMetastoreClientPool is true, will
-   * also add META_STORE_CLIENT_POOL_SIZE clients to metastoreClientPool_.
-   */
-  public Catalog(boolean initMetastoreClientPool) {
-    if (initMetastoreClientPool) {
-      metaStoreClientPool_.addClients(META_STORE_CLIENT_POOL_SIZE);
-    }
+  public Catalog() {
     dataSources_ = new CatalogObjectCache<DataSource>();
     builtinsDb_ = new BuiltinsDb(BUILTINS_DB, this);
     addDb(builtinsDb_);
+  }
+
+  /**
+   * Creates a new instance of Catalog. It also adds 'numClients' clients to
+   * 'metastoreClientPool_'.
+   * 'initialCnxnTimeoutSec' specifies the time (in seconds) Catalog will wait to
+   * establish an initial connection to the HMS. Using this setting allows catalogd and
+   * HMS to be started simultaneously.
+   */
+  public Catalog(int numClients, int initialCnxnTimeoutSec) {
+    this();
+    metaStoreClientPool_.initClients(numClients, initialCnxnTimeoutSec);
   }
 
   public Db getBuiltinsDb() { return builtinsDb_; }

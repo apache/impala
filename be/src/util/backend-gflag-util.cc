@@ -29,6 +29,7 @@ DECLARE_bool(load_auth_to_local_rules);
 DECLARE_int32(non_impala_java_vlog);
 DECLARE_int32(read_size);
 DECLARE_int32(num_metadata_loading_threads);
+DECLARE_int32(initial_hms_cnxn_timeout_s);
 DECLARE_int32(kudu_operation_timeout_ms);
 DECLARE_int64(inc_stats_size_limit_bytes);
 DECLARE_string(principal);
@@ -57,6 +58,7 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_kudu_master_hosts(FLAGS_kudu_master_hosts);
   cfg.__set_read_size(FLAGS_read_size);
   cfg.__set_num_metadata_loading_threads(FLAGS_num_metadata_loading_threads);
+  cfg.__set_initial_hms_cnxn_timeout_s(FLAGS_initial_hms_cnxn_timeout_s);
   cfg.__set_sentry_config(FLAGS_sentry_config);
   // auth_to_local rules are read if --load_auth_to_local_rules is set to true
   // and impala is kerberized.
