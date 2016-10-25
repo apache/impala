@@ -81,6 +81,7 @@ set_dep_root(LLVM)
 set(LLVM_DEBUG_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION})
 set_dep_root(LZ4)
 set_dep_root(OPENLDAP)
+set_dep_root(PROTOBUF)
 set_dep_root(RE2)
 set_dep_root(RAPIDJSON)
 set_dep_root(SNAPPY)
@@ -297,6 +298,17 @@ if (NOT APPLE)
   ADD_THIRDPARTY_LIB(dl
     SHARED_LIB "${DL_LIB_PATH}")
 endif()
+
+# find protobuf headers, libs and compiler
+find_package(Protobuf REQUIRED)
+include_directories(SYSTEM ${PROTOBUF_INCLUDE_DIR})
+message(STATUS "Protobuf include dir: " ${PROTOBUF_INCLUDE_DIR})
+
+ADD_THIRDPARTY_LIB(protobuf
+  STATIC_LIB "${PROTOBUF_STATIC_LIBRARY}")
+ADD_THIRDPARTY_LIB(protoc
+  STATIC_LIB "${PROTOBUF_PROTOC_STATIC_LIBRARY}"
+  DEPS protobuf)
 
 ###################################################################
 

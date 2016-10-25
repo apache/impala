@@ -239,6 +239,7 @@ set(CLANG_INCLUDE_FLAGS
   "-I${ZLIB_INCLUDE_DIR}"
   "-I${OPENSSL_INCLUDE_DIR}"
   "-I${LDAP_INCLUDE_DIR}"
+  "-I${PROTOBUF_INCLUDE_DIR}"
 )
 
 # allow linking of static libs into dynamic lib
