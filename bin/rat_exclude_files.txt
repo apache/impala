@@ -21,6 +21,7 @@ www/index.html
 
 # See LICENSE.txt
 be/src/gutil/*
+be/src/kudu/gutil
 www/highlight/*
 www/DataTables*/*
 www/datatables.*
@@ -37,6 +38,28 @@ www/d3.v3.min.js
 www/jquery/jquery-1.12.4.min.js
 tests/comparison/leopard/static/css/hljs.css
 tests/comparison/leopard/static/js/highlight.pack.js
+be/src/kudu/util/cache-test.cc
+be/src/kudu/util/cache.cc
+be/src/kudu/util/cache.h
+be/src/kudu/util/coding.cc
+be/src/kudu/util/coding.h
+be/src/kudu/util/condition_variable.cc
+be/src/kudu/util/condition_variable.h
+be/src/kudu/util/debug/trace_event.h
+be/src/kudu/util/debug/trace_event_impl.cc
+be/src/kudu/util/debug/trace_event_impl.h
+be/src/kudu/util/debug/trace_event_impl_constants.cc
+be/src/kudu/util/debug/trace_event_synthetic_delay.cc
+be/src/kudu/util/debug/trace_event_synthetic_delay.h
+be/src/kudu/util/env.cc
+be/src/kudu/util/env.h
+be/src/kudu/util/env_posix.cc
+be/src/kudu/util/nvm_cache.cc
+be/src/kudu/util/random.h
+be/src/kudu/util/slice.h
+be/src/kudu/util/status-test.cc
+be/src/kudu/util/status.cc
+be/src/kudu/util/status.h
 
 # http://www.apache.org/legal/src-headers.html: "Short informational text files; for
 # example README, INSTALL files. The expectation is that these files make it obvious which
