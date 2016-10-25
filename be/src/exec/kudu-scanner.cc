@@ -58,19 +58,10 @@ KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state)
   : scan_node_(scan_node),
     state_(state),
     cur_kudu_batch_num_read_(0),
-    last_alive_time_micros_(0),
-    num_string_slots_(0) {
+    last_alive_time_micros_(0) {
 }
 
 Status KuduScanner::Open() {
-  // Store columns that need relocation when materialized into the
-  // destination row batch.
-  for (int i = 0; i < scan_node_->tuple_desc_->slots().size(); ++i) {
-    if (scan_node_->tuple_desc_->slots()[i]->type().IsStringType()) {
-      string_slots_.push_back(scan_node_->tuple_desc_->slots()[i]);
-      ++num_string_slots_;
-    }
-  }
   return scan_node_->GetConjunctCtxs(&conjunct_ctxs_);
 }
 
@@ -109,7 +100,7 @@ Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
     RETURN_IF_CANCELLED(state_);
 
     if (cur_kudu_batch_num_read_ < cur_kudu_batch_.NumRows()) {
-      bool batch_done = false;
+      bool batch_done;
       RETURN_IF_ERROR(DecodeRowsIntoRowBatch(row_batch, &tuple, &batch_done));
       if (batch_done) break;
     }
@@ -172,167 +163,49 @@ Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch, bool* batch_done)
   return Status::OK();
 }
 
-Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
-    Tuple** tuple_mem, bool* batch_done) {
+Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_mem,
+    bool* batch_done) {
+  *batch_done = false;
 
   // Short-circuit the count(*) case.
   if (scan_node_->tuple_desc_->slots().empty()) {
     return HandleEmptyProjection(row_batch, batch_done);
   }
 
-  // TODO consider consolidating the tuple creation/initialization here with the version
-  // that happens inside the loop.
-  int idx = row_batch->AddRow();
-  TupleRow* row = row_batch->GetRow(idx);
-  (*tuple_mem)->ClearNullBits(*scan_node_->tuple_desc());
-  row->SetTuple(tuple_idx(), *tuple_mem);
-
+  // Iterate through the Kudu rows, evaluate conjuncts and deep-copy survivors into
+  // 'row_batch'.
+  bool has_conjuncts = !conjunct_ctxs_.empty();
   int num_rows = cur_kudu_batch_.NumRows();
-  // Now iterate through the Kudu rows.
   for (int krow_idx = cur_kudu_batch_num_read_; krow_idx < num_rows; ++krow_idx) {
-    // Clear any NULL indicators set by a previous iteration.
-    (*tuple_mem)->ClearNullBits(*scan_node_->tuple_desc());
-
-    // Transform a Kudu row into an Impala row.
+    // Evaluate the conjuncts that haven't been pushed down to Kudu. Conjunct evaluation
+    // is performed directly on the Kudu tuple because its memory layout is identical to
+    // Impala's. We only copy the surviving tuples to Impala's output row batch.
     KuduScanBatch::RowPtr krow = cur_kudu_batch_.Row(krow_idx);
-    RETURN_IF_ERROR(KuduRowToImpalaTuple(krow, row_batch, *tuple_mem));
+    Tuple* kudu_tuple = reinterpret_cast<Tuple*>(const_cast<void*>(krow.cell(0)));
     ++cur_kudu_batch_num_read_;
-
-    // Evaluate the conjuncts that haven't been pushed down to Kudu.
-    if (conjunct_ctxs_.empty() ||
-        ExecNode::EvalConjuncts(&conjunct_ctxs_[0], conjunct_ctxs_.size(), row)) {
-      // Materialize those slots that require auxiliary memory
-      RETURN_IF_ERROR(RelocateValuesFromKudu(*tuple_mem, row_batch->tuple_data_pool()));
-      // If the conjuncts pass on the row commit it.
-      row_batch->CommitLastRow();
-      // If we've reached the capacity, or the LIMIT for the scan, return.
-      if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) {
-        *batch_done = true;
-        break;
-      }
-      // Add another row.
-      idx = row_batch->AddRow();
-
-      // Move to the next tuple in the tuple buffer.
-      *tuple_mem = next_tuple(*tuple_mem);
-      (*tuple_mem)->ClearNullBits(*scan_node_->tuple_desc());
-      // Make 'row' point to the new row.
-      row = row_batch->GetRow(idx);
-      row->SetTuple(tuple_idx(), *tuple_mem);
+    if (has_conjuncts && !ExecNode::EvalConjuncts(&conjunct_ctxs_[0],
+        conjunct_ctxs_.size(), reinterpret_cast<TupleRow*>(&kudu_tuple))) {
+      continue;
     }
+    // Deep copy the tuple, set it in a new row, and commit the row.
+    kudu_tuple->DeepCopy(*tuple_mem, *scan_node_->tuple_desc(),
+        row_batch->tuple_data_pool());
+    TupleRow* row = row_batch->GetRow(row_batch->AddRow());
+    row->SetTuple(0, *tuple_mem);
+    row_batch->CommitLastRow();
+    // If we've reached the capacity, or the LIMIT for the scan, return.
+    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) {
+      *batch_done = true;
+      break;
+    }
+    // Move to the next tuple in the tuple buffer.
+    *tuple_mem = next_tuple(*tuple_mem);
   }
   ExprContext::FreeLocalAllocations(conjunct_ctxs_);
 
   // Check the status in case an error status was set during conjunct evaluation.
   return state_->GetQueryStatus();
 }
-
-void KuduScanner::SetSlotToNull(Tuple* tuple, const SlotDescriptor& slot) {
-  DCHECK(slot.is_nullable());
-  tuple->SetNull(slot.null_indicator_offset());
-}
-
-bool KuduScanner::IsSlotNull(Tuple* tuple, const SlotDescriptor& slot) {
-  return slot.is_nullable() && tuple->IsNull(slot.null_indicator_offset());
-}
-
-Status KuduScanner::RelocateValuesFromKudu(Tuple* tuple, MemPool* mem_pool) {
-  for (int i = 0; i < num_string_slots_; ++i) {
-    const SlotDescriptor* slot = string_slots_[i];
-    // NULL handling was done in KuduRowToImpalaTuple.
-    if (IsSlotNull(tuple, *slot)) continue;
-
-    // Extract the string value.
-    void* slot_ptr = tuple->GetSlot(slot->tuple_offset());
-    DCHECK(slot->type().IsVarLenStringType());
-
-    // The string value of the slot has a pointer to memory from the Kudu row.
-    StringValue* val = reinterpret_cast<StringValue*>(slot_ptr);
-    char* old_buf = val->ptr;
-    // Kudu never returns values larger than 8MB
-    DCHECK_LE(val->len, 8 * (1 << 20));
-    val->ptr = reinterpret_cast<char*>(mem_pool->TryAllocate(val->len));
-    if (LIKELY(val->len > 0)) {
-      // The allocator returns a NULL ptr when out of memory.
-      if (UNLIKELY(val->ptr == NULL)) {
-        return mem_pool->mem_tracker()->MemLimitExceeded(state_,
-            "Kudu scanner could not allocate memory for string", val->len);
-      }
-      memcpy(val->ptr, old_buf, val->len);
-    }
-  }
-  return Status::OK();
-}
-
-
-Status KuduScanner::KuduRowToImpalaTuple(const KuduScanBatch::RowPtr& row,
-    RowBatch* row_batch, Tuple* tuple) {
-  for (int i = 0; i < scan_node_->tuple_desc_->slots().size(); ++i) {
-    const SlotDescriptor* info = scan_node_->tuple_desc_->slots()[i];
-    void* slot = tuple->GetSlot(info->tuple_offset());
-
-    if (row.IsNull(i)) {
-      SetSlotToNull(tuple, *info);
-      continue;
-    }
-
-    int max_len = -1;
-    switch (info->type().type) {
-      case TYPE_VARCHAR:
-        max_len = info->type().len;
-        DCHECK_GT(max_len, 0);
-        // Fallthrough intended.
-      case TYPE_STRING: {
-        // For types with auxiliary memory (String, Binary,...) store the original memory
-        // location in the tuple to avoid the copy when the conjuncts do not pass. Relocate
-        // the memory into the row batch's memory in a later step.
-        kudu::Slice slice;
-        KUDU_RETURN_IF_ERROR(row.GetString(i, &slice),
-            "Error getting column value from Kudu.");
-        StringValue* sv = reinterpret_cast<StringValue*>(slot);
-        sv->ptr = const_cast<char*>(reinterpret_cast<const char*>(slice.data()));
-        sv->len = static_cast<int>(slice.size());
-        if (max_len > 0) sv->len = std::min(sv->len, max_len);
-        break;
-      }
-      case TYPE_TINYINT:
-        KUDU_RETURN_IF_ERROR(row.GetInt8(i, reinterpret_cast<int8_t*>(slot)),
-            "Error getting column value from Kudu.");
-        break;
-      case TYPE_SMALLINT:
-        KUDU_RETURN_IF_ERROR(row.GetInt16(i, reinterpret_cast<int16_t*>(slot)),
-            "Error getting column value from Kudu.");
-        break;
-      case TYPE_INT:
-        KUDU_RETURN_IF_ERROR(row.GetInt32(i, reinterpret_cast<int32_t*>(slot)),
-            "Error getting column value from Kudu.");
-        break;
-      case TYPE_BIGINT:
-        KUDU_RETURN_IF_ERROR(row.GetInt64(i, reinterpret_cast<int64_t*>(slot)),
-            "Error getting column value from Kudu.");
-        break;
-      case TYPE_FLOAT:
-        KUDU_RETURN_IF_ERROR(row.GetFloat(i, reinterpret_cast<float*>(slot)),
-            "Error getting column value from Kudu.");
-        break;
-      case TYPE_DOUBLE:
-        KUDU_RETURN_IF_ERROR(row.GetDouble(i, reinterpret_cast<double*>(slot)),
-            "Error getting column value from Kudu.");
-        break;
-      case TYPE_BOOLEAN:
-        KUDU_RETURN_IF_ERROR(row.GetBool(i, reinterpret_cast<bool*>(slot)),
-            "Error getting column value from Kudu.");
-        break;
-      default:
-        DCHECK(false) << "Impala type unsupported in Kudu: "
-            << TypeToString(info->type().type);
-        return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING,
-            TypeToString(info->type().type));
-    }
-  }
-  return Status::OK();
-}
-
 
 Status KuduScanner::GetNextScannerBatch() {
   SCOPED_TIMER(state_->total_storage_wait_timer());

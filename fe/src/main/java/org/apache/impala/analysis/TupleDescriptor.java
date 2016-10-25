@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +29,6 @@ import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.View;
 import org.apache.impala.thrift.TTupleDescriptor;
 
 import com.google.common.base.Joiner;
@@ -59,8 +59,9 @@ import com.google.common.collect.Lists;
  *
  * Memory Layout
  * Slots are placed in descending order by size with trailing bytes to store null flags.
- * Null flags are omitted for non-nullable slots. There is no padding between tuples when
- * stored back-to-back in a row batch.
+ * Null flags are omitted for non-nullable slots, except for Kudu scan slots which always
+ * have a null flag to match Kudu's client row format. There is no padding between tuples
+ * when stored back-to-back in a row batch.
  *
  * Example: select bool_col, int_col, string_col, smallint_col from functional.alltypes
  * Slots:   string_col|int_col|smallint_col|bool_col|null_byte
@@ -115,6 +116,21 @@ public class TupleDescriptor {
     for (SlotDescriptor slot: slots_) {
       if (slot.isMaterialized()) result.add(slot);
     }
+    return result;
+  }
+
+  /**
+   * Returns all materialized slots ordered by their offset. Valid to call after the
+   * mem layout has been computed.
+   */
+  public ArrayList<SlotDescriptor> getSlotsOrderedByOffset() {
+    Preconditions.checkState(hasMemLayout_);
+    ArrayList<SlotDescriptor> result = getMaterializedSlots();
+    Collections.sort(result, new Comparator<SlotDescriptor> () {
+      public int compare(SlotDescriptor a, SlotDescriptor b) {
+        return Integer.compare(a.getByteOffset(), b.getByteOffset());
+      }
+    });
     return result;
   }
 
@@ -199,9 +215,7 @@ public class TupleDescriptor {
    * Materialize all slots.
    */
   public void materializeSlots() {
-    for (SlotDescriptor slot: slots_) {
-      slot.setIsMaterialized(true);
-    }
+    for (SlotDescriptor slot: slots_) slot.setIsMaterialized(true);
   }
 
   public TTupleDescriptor toThrift(Integer tableId) {
@@ -223,7 +237,7 @@ public class TupleDescriptor {
         new HashMap<Integer, List<SlotDescriptor>>();
 
     // populate slotsBySize
-    int numNullableSlots = 0;
+    int numNullBits = 0;
     int totalSlotSize = 0;
     for (SlotDescriptor d: slots_) {
       if (!d.isMaterialized()) continue;
@@ -239,14 +253,14 @@ public class TupleDescriptor {
       }
       totalSlotSize += d.getType().getSlotSize();
       slotsBySize.get(d.getType().getSlotSize()).add(d);
-      if (d.getIsNullable()) ++numNullableSlots;
+      if (d.getIsNullable() || d.isKuduScanSlot()) ++numNullBits;
     }
     // we shouldn't have anything of size <= 0
     Preconditions.checkState(!slotsBySize.containsKey(0));
     Preconditions.checkState(!slotsBySize.containsKey(-1));
 
     // assign offsets to slots in order of descending size
-    numNullBytes_ = (numNullableSlots + 7) / 8;
+    numNullBytes_ = (numNullBits + 7) / 8;
     int slotOffset = 0;
     int nullIndicatorByte = totalSlotSize;
     int nullIndicatorBit = 0;
@@ -266,13 +280,16 @@ public class TupleDescriptor {
         slotOffset += slotSize;
 
         // assign null indicator
-        if (d.getIsNullable()) {
+        if (d.getIsNullable() || d.isKuduScanSlot()) {
           d.setNullIndicatorByte(nullIndicatorByte);
           d.setNullIndicatorBit(nullIndicatorBit);
           nullIndicatorBit = (nullIndicatorBit + 1) % 8;
           if (nullIndicatorBit == 0) ++nullIndicatorByte;
-        } else {
-          // non-nullable slots will have 0 for the byte offset and -1 for the bit mask
+        }
+        // non-nullable slots have 0 for the byte offset and -1 for the bit mask
+        // to make sure IS NULL always evaluates to false in the BE without having
+        // to check nullability explicitly
+        if (!d.getIsNullable()) {
           d.setNullIndicatorBit(-1);
           d.setNullIndicatorByte(0);
         }
