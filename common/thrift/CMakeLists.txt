@@ -63,8 +63,7 @@ function(THRIFT_GEN VAR)
       set(CPP_ARGS -r ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp -o ${BE_OUTPUT_DIR})
     ENDIF(FIL STREQUAL "beeswax.thrift")
 
-    IF (FIL STREQUAL "TCLIService.thrift" OR FIL STREQUAL "parquet.thrift" OR
-        FIL STREQUAL "cli_service.thrift")
+    IF (FIL STREQUAL "TCLIService.thrift" OR FIL STREQUAL "parquet.thrift")
       # HiveServer2 and Parquet thrift generation
       # Do not generate Java source because we should use the jar from Hive or Parquet
       add_custom_command(
@@ -75,8 +74,7 @@ function(THRIFT_GEN VAR)
         COMMENT "Running thrift compiler on ${FIL}"
         VERBATIM
       )
-    ELSE (FIL STREQUAL "TCLIService.thrift" OR FIL STREQUAL "parquet.thrift" OR
-          FIL STREQUAL "cli_service.thrift")
+    ELSE (FIL STREQUAL "TCLIService.thrift" OR FIL STREQUAL "parquet.thrift")
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${FIL}
@@ -86,8 +84,7 @@ function(THRIFT_GEN VAR)
         COMMENT "Running thrift compiler on ${FIL}"
         VERBATIM
     )
-    ENDIF(FIL STREQUAL "TCLIService.thrift" OR FIL STREQUAL "parquet.thrift" OR
-          FIL STREQUAL "cli_service.thrift")
+    ENDIF(FIL STREQUAL "TCLIService.thrift" OR FIL STREQUAL "parquet.thrift")
   endforeach(FIL)
 
   set(${VAR} ${${VAR}} PARENT_SCOPE)
@@ -151,7 +148,6 @@ set (SRC_FILES
   CatalogObjects.thrift
   CatalogService.thrift
   TCLIService.thrift
-  cli_service.thrift # TODO: Remove when thirdparty Hive supports V6
   DataSinks.thrift
   Descriptors.thrift
   ExecStats.thrift
