@@ -21,6 +21,8 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include <glog/logging.h>
+
 #include "gutil/macros.h"
 
 namespace impala {

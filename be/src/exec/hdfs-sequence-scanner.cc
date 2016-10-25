@@ -55,11 +55,9 @@ HdfsSequenceScanner::~HdfsSequenceScanner() {
 Status HdfsSequenceScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ExprContext*>& conjunct_ctxs, Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = NULL;
-  if (!node->runtime_state()->codegen_enabled()) {
-    return Status("Disabled by query option.");
-  }
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(node->runtime_state()->GetCodegen(&codegen));
+  DCHECK(node->runtime_state()->codegen_enabled());
+  LlvmCodeGen* codegen = node->runtime_state()->codegen();
+  DCHECK(codegen != NULL);
   Function* write_complete_tuple_fn;
   RETURN_IF_ERROR(CodegenWriteCompleteTuple(node, codegen, conjunct_ctxs,
       &write_complete_tuple_fn));
@@ -216,7 +214,7 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
 
   if (scan_node_->materialized_slots().empty()) {
     // Handle case where there are no slots to materialize (e.g. count(*))
-    num_to_process = WriteEmptyTuples(context_, tuple_row, num_to_process);
+    num_to_process = WriteTemplateTuples(tuple_row, num_to_process);
     COUNTER_ADD(scan_node_->rows_read_counter(), num_to_process);
     RETURN_IF_ERROR(CommitRows(num_to_process));
     return Status::OK();
@@ -336,7 +334,7 @@ Status HdfsSequenceScanner::ProcessRange() {
         RETURN_IF_ERROR(parse_status_);
       }
     } else {
-      add_row = WriteEmptyTuples(context_, tuple_row_mem, 1);
+      add_row = WriteTemplateTuples(tuple_row_mem, 1);
     }
 
     COUNTER_ADD(scan_node_->rows_read_counter(), 1);

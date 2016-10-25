@@ -27,7 +27,7 @@ import logging
 import os
 import pytest
 
-from common import KUDU_MASTER_HOST, KUDU_MASTER_PORT
+from common import KUDU_MASTER_HOSTS
 from common.test_result_verifier import QueryTestResult
 from tests.common.patterns import is_valid_impala_identifier
 from tests.util.filesystem_utils import FILESYSTEM, ISILON_WEBHDFS_PORT
@@ -288,7 +288,13 @@ def kudu_client():
   """Provides a new Kudu client as a pytest fixture. The client only exists for the
      duration of the method it is used in.
   """
-  kudu_client = kudu_connect(KUDU_MASTER_HOST, KUDU_MASTER_PORT)
+  if "," in KUDU_MASTER_HOSTS:
+    raise Exception("Multi-master not supported yet")
+  if ":" in KUDU_MASTER_HOSTS:
+    host, port = KUDU_MASTER_HOSTS.split(":")
+  else:
+    host, port = KUDU_MASTER_HOSTS, 7051
+  kudu_client = kudu_connect(host, port)
   try:
     yield kudu_client
   finally:

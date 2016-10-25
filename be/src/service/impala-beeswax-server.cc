@@ -523,8 +523,8 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
         for (const PartitionStatusMap::value_type& v:
              exec_state->coord()->per_partition_status()) {
           const pair<string, TInsertPartitionStatus> partition_status = v;
-          insert_result->rows_appended[partition_status.first] =
-              partition_status.second.num_appended_rows;
+          insert_result->rows_modified[partition_status.first] =
+              partition_status.second.num_modified_rows;
         }
       }
     }

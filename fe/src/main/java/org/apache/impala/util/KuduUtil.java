@@ -18,14 +18,15 @@
 package org.apache.impala.util;
 
 import java.io.StringReader;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonReader;
 
+import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TDistributeByRangeParam;
 import org.apache.impala.thrift.TRangeLiteral;
@@ -33,48 +34,17 @@ import org.apache.impala.thrift.TRangeLiteralList;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
-import org.apache.kudu.Type;
-import org.apache.kudu.client.KuduTable;
 import org.apache.kudu.client.PartialRow;
 
-import static org.apache.impala.catalog.Type.parseColumnType;
 import static java.lang.String.format;
 
 public class KuduUtil {
 
   private static final String SPLIT_KEYS_ERROR_MESSAGE = "Error parsing splits keys.";
-
-  /**
-   * Compare the schema of a HMS table and a Kudu table. Returns true if both tables have
-   * a matching schema.
-   */
-  public static boolean compareSchema(Table msTable, KuduTable kuduTable)
-      throws ImpalaRuntimeException {
-    List<FieldSchema> msFields = msTable.getSd().getCols();
-    List<ColumnSchema> kuduFields = kuduTable.getSchema().getColumns();
-    if (msFields.size() != kuduFields.size()) return false;
-
-    HashMap<String, ColumnSchema> kuduFieldMap = Maps.newHashMap();
-    for (ColumnSchema kuduField : kuduFields) {
-      kuduFieldMap.put(kuduField.getName().toUpperCase(), kuduField);
-    }
-
-    for (FieldSchema msField : msFields) {
-      ColumnSchema kuduField = kuduFieldMap.get(msField.getName().toUpperCase());
-      if (kuduField == null
-          || fromImpalaType(parseColumnType(msField.getType())) != kuduField.getType()) {
-        return false;
-      }
-    }
-
-    return true;
-  }
+  private static final String KUDU_TABLE_NAME_PREFIX = "impala::";
 
   /**
    * Parses split keys from statements.
@@ -145,10 +115,9 @@ public class KuduUtil {
   /**
    * Sets the value in 'key' at 'pos', given the json representation.
    */
-  private static void setKey(Type type, JsonArray array, int pos, PartialRow key)
-      throws ImpalaRuntimeException {
+  private static void setKey(org.apache.kudu.Type type, JsonArray array, int pos,
+      PartialRow key) throws ImpalaRuntimeException {
     switch (type) {
-      case BOOL: key.addBoolean(pos, array.getBoolean(pos)); break;
       case INT8: key.addByte(pos, (byte) array.getInt(pos)); break;
       case INT16: key.addShort(pos, (short) array.getInt(pos)); break;
       case INT32: key.addInt(pos, array.getInt(pos)); break;
@@ -163,13 +132,9 @@ public class KuduUtil {
   /**
    * Sets the value in 'key' at 'pos', given the range literal.
    */
-  private static void setKey(Type type, TRangeLiteral literal, int pos, String colName,
-      PartialRow key) throws ImpalaRuntimeException {
+  private static void setKey(org.apache.kudu.Type type, TRangeLiteral literal, int pos,
+      String colName, PartialRow key) throws ImpalaRuntimeException {
     switch (type) {
-      case BOOL:
-        checkCorrectType(literal.isSetBool_literal(), type, colName, literal);
-        key.addBoolean(pos, literal.isBool_literal());
-        break;
       case INT8:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
         key.addByte(pos, (byte) literal.getInt_literal());
@@ -200,8 +165,8 @@ public class KuduUtil {
    * If correctType is true, returns. Otherwise throws a formatted error message
    * indicating problems with the type of the literal of the range literal.
    */
-  private static void checkCorrectType(boolean correctType, Type t, String colName,
-      TRangeLiteral literal) throws ImpalaRuntimeException {
+  private static void checkCorrectType(boolean correctType, org.apache.kudu.Type t,
+      String colName, TRangeLiteral literal) throws ImpalaRuntimeException {
     if (correctType) return;
     throw new ImpalaRuntimeException(
         format("Expected %s literal for column '%s' got '%s'", t.getName(), colName,
@@ -220,11 +185,24 @@ public class KuduUtil {
     return Lists.newArrayList(Splitter.on(",").trimResults().split(cols.toLowerCase()));
   }
 
+  public static boolean isSupportedKeyType(org.apache.impala.catalog.Type type) {
+    return type.isIntegerType() || type.isStringType();
+  }
+
+  /**
+   * Return the name that should be used in Kudu when creating a table, assuming a custom
+   * name was not provided.
+   */
+  public static String getDefaultCreateKuduTableName(String metastoreDbName,
+      String metastoreTableName) {
+    return KUDU_TABLE_NAME_PREFIX + metastoreDbName + "." + metastoreTableName;
+  }
+
   /**
    * Converts a given Impala catalog type to the Kudu type. Throws an exception if the
    * type cannot be converted.
    */
-  public static Type fromImpalaType(org.apache.impala.catalog.Type t)
+  public static org.apache.kudu.Type fromImpalaType(Type t)
       throws ImpalaRuntimeException {
     if (!t.isScalarType()) {
       throw new ImpalaRuntimeException(format(
@@ -232,16 +210,16 @@ public class KuduUtil {
     }
     ScalarType s = (ScalarType) t;
     switch (s.getPrimitiveType()) {
-      case TINYINT: return Type.INT8;
-      case SMALLINT: return Type.INT16;
-      case INT: return Type.INT32;
-      case BIGINT: return Type.INT64;
-      case BOOLEAN: return Type.BOOL;
-      case CHAR: return Type.STRING;
-      case STRING: return Type.STRING;
-      case VARCHAR: return Type.STRING;
-      case DOUBLE: return Type.DOUBLE;
-      case FLOAT: return Type.FLOAT;
+      case TINYINT: return org.apache.kudu.Type.INT8;
+      case SMALLINT: return org.apache.kudu.Type.INT16;
+      case INT: return org.apache.kudu.Type.INT32;
+      case BIGINT: return org.apache.kudu.Type.INT64;
+      case BOOLEAN: return org.apache.kudu.Type.BOOL;
+      case CHAR: return org.apache.kudu.Type.STRING;
+      case STRING: return org.apache.kudu.Type.STRING;
+      case VARCHAR: return org.apache.kudu.Type.STRING;
+      case DOUBLE: return org.apache.kudu.Type.DOUBLE;
+      case FLOAT: return org.apache.kudu.Type.FLOAT;
         /* Fall through below */
       case INVALID_TYPE:
       case NULL_TYPE:
@@ -256,11 +234,27 @@ public class KuduUtil {
     }
   }
 
+  public static Type toImpalaType(org.apache.kudu.Type t)
+      throws ImpalaRuntimeException {
+    switch (t) {
+      case BOOL: return Type.BOOLEAN;
+      case DOUBLE: return Type.DOUBLE;
+      case FLOAT: return Type.FLOAT;
+      case INT8: return Type.TINYINT;
+      case INT16: return Type.SMALLINT;
+      case INT32: return Type.INT;
+      case INT64: return Type.BIGINT;
+      case STRING: return Type.STRING;
+      default:
+        throw new ImpalaRuntimeException(String.format(
+            "Kudu type %s is not supported in Impala", t));
+    }
+  }
+
   /**
    * Returns the string value of the RANGE literal.
    */
   static String toString(TRangeLiteral l) throws ImpalaRuntimeException {
-    if (l.isSetBool_literal()) return String.valueOf(l.bool_literal);
     if (l.isSetString_literal()) return String.valueOf(l.string_literal);
     if (l.isSetInt_literal()) return String.valueOf(l.int_literal);
     throw new ImpalaRuntimeException("Unsupported type for RANGE literal.");

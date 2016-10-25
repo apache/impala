@@ -1583,10 +1583,19 @@ void AggregateFunctions::OffsetFnInit(FunctionContext* ctx, T* dst) {
   *dst = *static_cast<T*>(ctx->GetConstantArg(2));
 }
 
+template <>
+void AggregateFunctions::OffsetFnInit(FunctionContext* ctx, StringVal* dst) {
+  DCHECK_EQ(ctx->GetNumArgs(), 3);
+  DCHECK(ctx->IsArgConstant(1));
+  DCHECK(ctx->IsArgConstant(2));
+  DCHECK_EQ(ctx->GetArgType(0)->type, ctx->GetArgType(2)->type);
+  CopyStringVal(ctx, *static_cast<StringVal*>(ctx->GetConstantArg(2)), dst);
+}
+
 template <typename T>
 void AggregateFunctions::OffsetFnUpdate(FunctionContext* ctx, const T& src,
     const BigIntVal&, const T& default_value, T* dst) {
-  *dst = src;
+  UpdateVal(ctx, src, dst);
 }
 
 // Stamp out the templates for the types we need.

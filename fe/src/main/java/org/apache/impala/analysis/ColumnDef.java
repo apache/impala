@@ -17,8 +17,15 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
@@ -26,9 +33,6 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.util.MetaStoreUtil;
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Represents a column definition in a CREATE/ALTER TABLE/VIEW statement.
@@ -47,9 +51,19 @@ public class ColumnDef {
   private final TypeDef typeDef_;
   private Type type_;
 
+  // Set to true if the user specified "PRIMARY KEY" in the column definition. Kudu table
+  // definitions may use this.
+  private boolean isPrimaryKey_;
+
   public ColumnDef(String colName, TypeDef typeDef, String comment) {
+    this(colName, typeDef, false, comment);
+  }
+
+  public ColumnDef(String colName, TypeDef typeDef, boolean isPrimaryKey,
+      String comment) {
     colName_ = colName.toLowerCase();
     typeDef_ = typeDef;
+    isPrimaryKey_ = isPrimaryKey;
     comment_ = comment;
   }
 
@@ -67,13 +81,15 @@ public class ColumnDef {
     colName_ = fs.getName();
     typeDef_ = new TypeDef(type);
     comment_ = fs.getComment();
+    isPrimaryKey_ = false;
     analyze();
   }
 
+  public String getColName() { return colName_; }
   public void setType(Type type) { type_ = type; }
   public Type getType() { return type_; }
   public TypeDef getTypeDef() { return typeDef_; }
-  public String getColName() { return colName_; }
+  boolean isPrimaryKey() { return isPrimaryKey_; }
   public void setComment(String comment) { comment_ = comment; }
   public String getComment() { return comment_; }
 
@@ -107,14 +123,30 @@ public class ColumnDef {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder(colName_);
+    StringBuilder sb = new StringBuilder(colName_).append(" ");
     if (type_ != null) {
-      sb.append(" " + type_.toString());
+      sb.append(type_);
     } else {
-      sb.append(" " + typeDef_.toString());
+      sb.append(typeDef_);
     }
+    if (isPrimaryKey_) sb.append(" PRIMARY KEY");
     if (comment_ != null) sb.append(String.format(" COMMENT '%s'", comment_));
     return sb.toString();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == null) return false;
+    if (obj == this) return true;
+    if (obj.getClass() != getClass()) return false;
+    ColumnDef rhs = (ColumnDef) obj;
+    return new EqualsBuilder()
+        .append(colName_, rhs.colName_)
+        .append(comment_, rhs.comment_)
+        .append(isPrimaryKey_, rhs.isPrimaryKey_)
+        .append(typeDef_, rhs.typeDef_)
+        .append(type_, rhs.type_)
+        .isEquals();
   }
 
   public TColumn toThrift() {
@@ -140,4 +172,24 @@ public class ColumnDef {
     });
   }
 
+  static List<String> toColumnNames(Collection<ColumnDef> colDefs) {
+    List<String> colNames = Lists.newArrayList();
+    for (ColumnDef colDef: colDefs) {
+      colNames.add(colDef.getColName());
+    }
+    return colNames;
+  }
+
+  /**
+   * Generates and returns a map of column names to column definitions. Assumes that
+   * the column names are unique.
+   */
+  static Map<String, ColumnDef> mapByColumnNames(Collection<ColumnDef> colDefs) {
+    Map<String, ColumnDef> colDefsByColName = Maps.newHashMap();
+    for (ColumnDef colDef: colDefs) {
+      ColumnDef def = colDefsByColName.put(colDef.getColName(), colDef);
+      Preconditions.checkState(def == null);
+    }
+    return colDefsByColName;
+  }
 }

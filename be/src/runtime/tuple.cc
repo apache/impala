@@ -306,19 +306,17 @@ void Tuple::MaterializeExprs(
 //   ; ----- end CodegenAnyVal::WriteToSlot() -------------------------------------------
 //   ret void
 // }
-Status Tuple::CodegenMaterializeExprs(RuntimeState* state, bool collect_string_vals,
+Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_vals,
     const TupleDescriptor& desc, const vector<ExprContext*>& materialize_expr_ctxs,
     MemPool* pool, Function** fn) {
   DCHECK(!collect_string_vals) << "CodegenMaterializeExprs: collect_string_vals NYI";
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   SCOPED_TIMER(codegen->codegen_timer());
   LLVMContext& context = codegen->context();
 
   // Codegen each compute function from materialize_expr_ctxs
   Function* materialize_expr_fns[materialize_expr_ctxs.size()];
   for (int i = 0; i < materialize_expr_ctxs.size(); ++i) {
-    Status status = materialize_expr_ctxs[i]->root()->GetCodegendComputeFn(state,
+    Status status = materialize_expr_ctxs[i]->root()->GetCodegendComputeFn(codegen,
         &materialize_expr_fns[i]);
     if (!status.ok()) {
       stringstream ss;

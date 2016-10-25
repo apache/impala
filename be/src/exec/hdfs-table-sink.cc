@@ -499,7 +499,7 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state,
     DCHECK(state->per_partition_status()->find(partition->partition_name) ==
         state->per_partition_status()->end());
     TInsertPartitionStatus partition_status;
-    partition_status.__set_num_appended_rows(0L);
+    partition_status.__set_num_modified_rows(0L);
     partition_status.__set_id(partition_descriptor->id());
     partition_status.__set_stats(TInsertStats());
     partition_status.__set_partition_base_dir(table_desc_->hdfs_base_dir());
@@ -594,7 +594,7 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
     // Should have been created in GetOutputPartition() when the partition was
     // initialised.
     DCHECK(it != state->per_partition_status()->end());
-    it->second.num_appended_rows += partition->num_rows;
+    it->second.num_modified_rows += partition->num_rows;
     DataSink::MergeInsertStats(partition->writer->stats(), &it->second.stats);
   }
 

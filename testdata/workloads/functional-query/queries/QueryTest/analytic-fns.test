@@ -1893,3 +1893,17 @@ DECIMAL, DECIMAL
 12345,1234
 132842,1234
 ====
+---- QUERY
+# Regression test for IMPALA-4120: Invoke UDFs which do local allocations and verifies
+# that the results are copied out.
+select count(*) from (
+select
+  from_unixtime(lead(bigint_col, 1) over (order by id), 'yyyyMMddHH:mm:ss') as a,
+  lead(from_unixtime(bigint_col, 'yyyyMMddHH:mm:ss'), 1) over (order by id) AS b
+from functional.alltypes) x
+where x.a = x.b
+---- TYPES
+BIGINT
+---- RESULTS
+7299
+====

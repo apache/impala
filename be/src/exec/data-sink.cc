@@ -142,6 +142,11 @@ string DataSink::OutputInsertStats(const PartitionStatusMap& stats,
     } else {
       ss << partition_key << endl;
     }
+    if (val.second.__isset.num_modified_rows) {
+      ss << "NumModifiedRows: " << val.second.num_modified_rows << endl;
+    }
+
+    if (!val.second.__isset.stats) continue;
     const TInsertStats& stats = val.second.stats;
     ss << indent << "BytesWritten: "
        << PrettyPrinter::Print(stats.bytes_written, TUnit::BYTES);

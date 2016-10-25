@@ -537,6 +537,10 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     const vector<TNetworkAddress>& host_list, bool exec_at_coord,
     const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
     FragmentScanRangeAssignment* assignment) {
+  if (backend_config.NumBackends() == 0) {
+    return Status(TErrorCode::NO_REGISTERED_BACKENDS);
+  }
+
   SCOPED_TIMER(timer);
   // We adjust all replicas with memory distance less than base_distance to base_distance
   // and collect all replicas with equal or better distance as candidates. For a full list
@@ -917,6 +921,7 @@ SimpleScheduler::AssignmentCtx::AssignmentCtx(
   : backend_config_(backend_config), first_unused_backend_idx_(0),
     total_assignments_(total_assignments),
     total_local_assignments_(total_local_assignments) {
+  DCHECK_GT(backend_config.NumBackends(), 0);
   backend_config.GetAllBackendIps(&random_backend_order_);
   std::mt19937 g(rand());
   std::shuffle(random_backend_order_.begin(), random_backend_order_.end(), g);
@@ -965,7 +970,8 @@ const IpAddr* SimpleScheduler::AssignmentCtx::SelectRemoteBackendHost() {
   } else {
     // Pick next backend from assignment_heap. All backends must have been inserted into
     // the heap at this point.
-    DCHECK(backend_config_.NumBackends() == assignment_heap_.size());
+    DCHECK_GT(backend_config_.NumBackends(), 0);
+    DCHECK_EQ(backend_config_.NumBackends(), assignment_heap_.size());
     candidate_ip = &(assignment_heap_.top().ip);
   }
   DCHECK(candidate_ip != NULL);

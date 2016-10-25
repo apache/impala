@@ -1,0 +1,9 @@
+====
+---- QUERY
+# IMPALA-4285: Test scan with no materialized slots.
+select count(*) from alltypes
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====

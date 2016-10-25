@@ -17,19 +17,20 @@
 
 package org.apache.impala.analysis;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDistributeByHashParam;
 import org.apache.impala.thrift.TDistributeByRangeParam;
 import org.apache.impala.thrift.TDistributeParam;
-import org.apache.impala.thrift.TDistributeType;
 import org.apache.impala.thrift.TRangeLiteral;
 import org.apache.impala.thrift.TRangeLiteralList;
+import org.apache.impala.util.KuduUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 
 /**
@@ -50,16 +51,16 @@ public class DistributeParam implements ParseNode {
   /**
    * Creates a DistributeParam partitioned by hash.
    */
-  public static DistributeParam createHashParam(List<String> cols, BigDecimal buckets) {
-    return new DistributeParam(Type.HASH, cols, buckets);
+  public static DistributeParam createHashParam(List<String> cols, int buckets) {
+    return new DistributeParam(Type.HASH, cols, buckets, null);
   }
 
   /**
    * Creates a DistributeParam partitioned by range.
    */
   public static DistributeParam createRangeParam(List<String> cols,
-      ArrayList<ArrayList<LiteralExpr>> splitRows) {
-    return new DistributeParam(Type.RANGE, cols, splitRows);
+      List<List<LiteralExpr>> splitRows) {
+    return new DistributeParam(Type.RANGE, cols, NO_BUCKETS, splitRows);
   }
 
   private static final int NO_BUCKETS = -1;
@@ -69,131 +70,159 @@ public class DistributeParam implements ParseNode {
    */
   public enum Type {
     HASH, RANGE
-  };
+  }
 
-  private List<String> columns_;
+  // May be empty indicating that all keys in the table should be used.
+  private final List<String> colNames_ = Lists.newArrayList();
 
+  // Map of primary key column names to the associated column definitions. Must be set
+  // before the call to analyze().
+  private Map<String, ColumnDef> pkColumnDefByName_;
+
+  // Distribution type
   private final Type type_;
 
   // Only relevant for hash partitioning, -1 otherwise
-  private final int num_buckets_;
+  private final int numBuckets_;
 
   // Only relevant for range partitioning, null otherwise
-  private final ArrayList<ArrayList<LiteralExpr>> splitRows_;
+  private final List<List<LiteralExpr>> splitRows_;
 
-  // Set in analyze()
-  private TDistributeByRangeParam rangeParam_;
-
-  private DistributeParam(Type t, List<String> cols, BigDecimal buckets) {
+  private DistributeParam(Type t, List<String> colNames, int buckets,
+      List<List<LiteralExpr>> splitRows) {
     type_ = t;
-    columns_ = cols;
-    num_buckets_ = buckets.intValue();
-    splitRows_ = null;
-  }
-
-  private DistributeParam(Type t, List<String> cols,
-      ArrayList<ArrayList<LiteralExpr>> splitRows) {
-    type_ = t;
-    columns_ = cols;
+    for (String name: colNames) colNames_.add(name.toLowerCase());
+    numBuckets_ = buckets;
     splitRows_ = splitRows;
-    num_buckets_ = NO_BUCKETS;
   }
 
-  /**
-   * TODO Refactor the logic below to analyze 'columns_'. This analysis should output
-   * a vector of column types that would then be used during the analysis of the split
-   * rows.
-   */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (type_ == Type.HASH && num_buckets_ <= 1) {
-      throw new AnalysisException(String.format(
-          "Number of buckets in DISTRIBUTE BY clause '%s' must be larger than 1.",
-          toSql()));
-    } else if (type_ == Type.RANGE) {
-      // Creating the thrift structure simultaneously checks for semantic errors
-      rangeParam_ = new TDistributeByRangeParam();
-      rangeParam_.setColumns(columns_);
+    Preconditions.checkState(!colNames_.isEmpty());
+    Preconditions.checkNotNull(pkColumnDefByName_);
+    Preconditions.checkState(!pkColumnDefByName_.isEmpty());
+    // Validate the columns specified in the DISTRIBUTE BY clause
+    for (String colName: colNames_) {
+      if (!pkColumnDefByName_.containsKey(colName)) {
+        throw new AnalysisException(String.format("Column '%s' in '%s' is not a key " +
+            "column. Only key columns can be used in DISTRIBUTE BY.", colName, toSql()));
+      }
+    }
 
-      for (ArrayList<LiteralExpr> splitRow : splitRows_) {
-        TRangeLiteralList list = new TRangeLiteralList();
-        if (splitRow.size() != columns_.size()) {
+    if (type_ == Type.RANGE) {
+      for (List<LiteralExpr> splitRow : splitRows_) {
+        if (splitRow.size() != colNames_.size()) {
           throw new AnalysisException(String.format(
               "SPLIT ROWS has different size than number of projected key columns: %d. "
-                  + "Split row: %s", columns_.size(), splitRowToString(splitRow)));
+                  + "Split row: %s", colNames_.size(), splitRowToString(splitRow)));
         }
-        for (LiteralExpr expr : splitRow) {
+        for (int i = 0; i < splitRow.size(); ++i) {
+          LiteralExpr expr = splitRow.get(i);
+          ColumnDef colDef = pkColumnDefByName_.get(colNames_.get(i));
+          org.apache.impala.catalog.Type colType = colDef.getType();
+          Preconditions.checkState(KuduUtil.isSupportedKeyType(colType));
           expr.analyze(analyzer);
-          TRangeLiteral literal = new TRangeLiteral();
-          if (expr instanceof NumericLiteral) {
-            NumericLiteral num = (NumericLiteral) expr;
-            if (num.getType().isDecimal() || num.getType().isFloatingPointType()) {
-              throw new AnalysisException("Only integral and string values allowed for" +
-                  " split rows.");
-            } else {
-              literal.setInt_literal(num.getIntValue());
-            }
-          } else if (expr instanceof StringLiteral) {
-            StringLiteral string = (StringLiteral) expr;
-            literal.setString_literal(string.getStringValue());
-          } else if (expr instanceof BoolLiteral) {
-            BoolLiteral bool = (BoolLiteral) expr;
-            literal.setBool_literal(bool.getValue());
-          } else {
-            throw new AnalysisException(String.format("Split row value is not supported: "
-                + "%s (Type: %s).", expr.getStringValue(), expr.getType().toSql()));
+          org.apache.impala.catalog.Type exprType = expr.getType();
+          if (exprType.isNull()) {
+            throw new AnalysisException("Split values cannot be NULL. Split row: " +
+                splitRowToString(splitRow));
           }
-          list.addToValues(literal);
+          if (!org.apache.impala.catalog.Type.isImplicitlyCastable(exprType, colType,
+              true)) {
+            throw new AnalysisException(String.format("Split value %s (type: %s) is " +
+                "not type compatible with column '%s' (type: %s).", expr.toSql(),
+                exprType, colDef.getColName(), colType.toSql()));
+          }
         }
-        rangeParam_.addToSplit_rows(list);
       }
     }
   }
 
   @Override
   public String toSql() {
-    if (num_buckets_ == NO_BUCKETS) {
-      List<String> splitRowStrings = Lists.newArrayList();
-      for (ArrayList<LiteralExpr> splitRow : splitRows_) {
-        splitRowStrings.add(splitRowToString(splitRow));
-      }
-      return String.format("RANGE(%s) INTO RANGES(%s)", Joiner.on(", ").join(columns_),
-          Joiner.on(", ").join(splitRowStrings));
+    StringBuilder builder = new StringBuilder(type_.toString());
+    if (!colNames_.isEmpty()) {
+      builder.append(" (");
+      Joiner.on(", ").appendTo(builder, colNames_).append(")");
+    }
+    if (type_ == Type.HASH) {
+      builder.append(" INTO ");
+      Preconditions.checkState(numBuckets_ != NO_BUCKETS);
+      builder.append(numBuckets_).append(" BUCKETS");
     } else {
-      return String.format("HASH(%s) INTO %d BUCKETS", Joiner.on(", ").join(columns_),
-          num_buckets_);
+      builder.append(" SPLIT ROWS (");
+      if (splitRows_ == null) {
+        builder.append("...");
+      } else {
+        for (List<LiteralExpr> splitRow: splitRows_) {
+          builder.append(splitRowToString(splitRow));
+        }
+      }
+      builder.append(")");
     }
-  }
-
-  private String splitRowToString(ArrayList<LiteralExpr> splitRow) {
-    StringBuilder builder = new StringBuilder();
-    builder.append("(");
-    List<String> rangeElementStrings = Lists.newArrayList();
-    for (LiteralExpr rangeElement : splitRow) {
-      rangeElementStrings.add(rangeElement.toSql());
-    }
-    builder.append(Joiner.on(", ").join(rangeElementStrings));
-    builder.append(")");
     return builder.toString();
   }
 
-  TDistributeParam toThrift() {
+  @Override
+  public String toString() { return toSql(); }
+
+  private String splitRowToString(List<LiteralExpr> splitRow) {
+    StringBuilder builder = new StringBuilder("(");
+    for (LiteralExpr expr: splitRow) {
+      if (builder.length() > 1) builder.append(", ");
+      builder.append(expr.toSql());
+    }
+    return builder.append(")").toString();
+  }
+
+  public TDistributeParam toThrift() {
     TDistributeParam result = new TDistributeParam();
+    // TODO: Add a validate() function to ensure the validity of distribute params.
     if (type_ == Type.HASH) {
       TDistributeByHashParam hash = new TDistributeByHashParam();
-      hash.setNum_buckets(num_buckets_);
-      hash.setColumns(columns_);
+      Preconditions.checkState(numBuckets_ != NO_BUCKETS);
+      hash.setNum_buckets(numBuckets_);
+      hash.setColumns(colNames_);
       result.setBy_hash_param(hash);
     } else {
       Preconditions.checkState(type_ == Type.RANGE);
-
-      result.setBy_range_param(rangeParam_);
+      TDistributeByRangeParam rangeParam = new TDistributeByRangeParam();
+      rangeParam.setColumns(colNames_);
+      if (splitRows_ == null) {
+        result.setBy_range_param(rangeParam);
+        return result;
+      }
+      for (List<LiteralExpr> splitRow : splitRows_) {
+        TRangeLiteralList list = new TRangeLiteralList();
+        for (int i = 0; i < splitRow.size(); ++i) {
+          LiteralExpr expr = splitRow.get(i);
+          TRangeLiteral literal = new TRangeLiteral();
+          if (expr instanceof NumericLiteral) {
+            literal.setInt_literal(((NumericLiteral)expr).getIntValue());
+          } else {
+            String exprValue = expr.getStringValue();
+            Preconditions.checkState(!Strings.isNullOrEmpty(exprValue));
+            literal.setString_literal(exprValue);
+          }
+          list.addToValues(literal);
+        }
+        rangeParam.addToSplit_rows(list);
+      }
+      result.setBy_range_param(rangeParam);
     }
     return result;
   }
 
-  public List<String> getColumns() { return columns_; }
-  public void setColumns(List<String> cols) { columns_ = cols; }
-  public Type getType_() { return type_; }
-  public int getNumBuckets() { return num_buckets_; }
+  void setPkColumnDefMap(Map<String, ColumnDef> pkColumnDefByName) {
+    pkColumnDefByName_ = pkColumnDefByName;
+  }
+
+  boolean hasColumnNames() { return !colNames_.isEmpty(); }
+
+  void setColumnNames(Collection<String> colNames) {
+    Preconditions.checkState(colNames_.isEmpty());
+    colNames_.addAll(colNames);
+  }
+
+  public Type getType() { return type_; }
 }

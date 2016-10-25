@@ -158,11 +158,18 @@ Status ExecNode::Prepare(RuntimeState* state) {
 
   RETURN_IF_ERROR(Expr::Prepare(conjunct_ctxs_, state, row_desc(), expr_mem_tracker()));
   AddExprCtxsToFree(conjunct_ctxs_);
-
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state));
   }
   return Status::OK();
+}
+
+void ExecNode::Codegen(RuntimeState* state) {
+  DCHECK(state->codegen_enabled());
+  DCHECK(state->codegen() != NULL);
+  for (int i = 0; i < children_.size(); ++i) {
+    children_[i]->Codegen(state);
+  }
 }
 
 Status ExecNode::Open(RuntimeState* state) {
@@ -272,12 +279,6 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
             || state->query_options().num_scanner_threads == 1);
         *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
       }
-      // If true, this node requests codegen over interpretation for conjuncts
-      // evaluation whenever possible. Turn codegen on for expr evaluation for
-      // the entire fragment.
-      if (tnode.hdfs_scan_node.codegen_conjuncts) state->SetCodegenExpr();
-      (*node)->runtime_profile()->AddCodegenMsg(
-          state->ShouldCodegenExpr(), "", "Expr Evaluation");
       break;
     case TPlanNodeType::HBASE_SCAN_NODE:
       *node = pool->Add(new HBaseScanNode(pool, tnode, descs));
@@ -492,15 +493,13 @@ void ExecNode::AddExprCtxsToFree(const SortExecExprs& sort_exec_exprs) {
 // false:                                            ; preds = %continue, %entry
 //   ret i1 false
 // }
-Status ExecNode::CodegenEvalConjuncts(RuntimeState* state,
+Status ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
     const vector<ExprContext*>& conjunct_ctxs, Function** fn, const char* name) {
   Function* conjunct_fns[conjunct_ctxs.size()];
   for (int i = 0; i < conjunct_ctxs.size(); ++i) {
     RETURN_IF_ERROR(
-        conjunct_ctxs[i]->root()->GetCodegendComputeFn(state, &conjunct_fns[i]));
+        conjunct_ctxs[i]->root()->GetCodegendComputeFn(codegen, &conjunct_fns[i]));
   }
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
 
   // Construct function signature to match
   // bool EvalConjuncts(Expr** exprs, int num_exprs, TupleRow* row)

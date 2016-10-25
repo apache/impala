@@ -612,9 +612,6 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # IMPALA-1016: Testing scanning newly added columns
-DROP TABLE IF EXISTS imp1016
-====
----- QUERY
 CREATE TABLE imp1016 (string1 string)
 ---- RESULTS
 ====
@@ -672,9 +669,6 @@ bigint
 ====
 ---- QUERY
 # Create a larger table to test scanning newly added columns
-DROP TABLE IF EXISTS imp1016Large
-====
----- QUERY
 CREATE TABLE imp1016Large (string1 string)
 ---- RESULTS
 ====
@@ -929,30 +923,38 @@ STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, 
 ====
 ---- QUERY
 # IMPALA-1740: Test setting the skip.header.line.count tblproperty
-drop table if exists i1740_alter;
-create table i1740_alter (i1 integer);
-alter table i1740_alter set tblproperties ('skip.header.line.count'='2');
+create table i1740_alter_1 (i1 integer);
+alter table i1740_alter_1 set tblproperties ('skip.header.line.count'='2');
 ---- RESULTS
 ====
 ---- QUERY
 # IMPALA-1740: Test setting the skip.header.line.count tblproperty
-drop table if exists i1740_alter;
-create table i1740_alter (i1 integer);
-alter table i1740_alter set tblproperties ('skip.header.line.count'='-1');
+create table i1740_alter_2 (i1 integer);
+alter table i1740_alter_2 set tblproperties ('skip.header.line.count'='-1');
 ---- CATCH
 Invalid value for table property skip.header.line.count:
 ====
 ---- QUERY
 # IMPALA-1740: Test setting the skip.header.line.count tblproperty
-drop table if exists i1740_alter;
-create table i1740_alter (i1 integer);
-alter table i1740_alter set tblproperties ('skip.header.line.count'='foo');
+create table i1740_alter_3 (i1 integer);
+alter table i1740_alter_3 set tblproperties ('skip.header.line.count'='foo');
 ---- CATCH
 Invalid value for table property skip.header.line.count:
 ====
 ---- QUERY
 # IMPALA-1740: Test setting the skip.header.line.count tblproperty
-drop table if exists i1740_alter;
-create table i1740_alter (i1 integer) stored as parquet;
-alter table i1740_alter set tblproperties ('skip.header.line.count'='2');
+create table i1740_alter_4 (i1 integer) stored as parquet;
+alter table i1740_alter_4 set tblproperties ('skip.header.line.count'='2');
+====
+---- QUERY
+# IMPALA-4155: Verify that the default partition is updated by the alter table statement
+create table i4155_alter (c1 int)
+partitioned by (p1 string) row format delimited fields terminated by ',';
+alter table i4155_alter set fileformat PARQUET;
+insert into i4155_alter partition(p1="abc") values (1);
+select * from i4155_alter;
+---- RESULTS
+1,'abc'
+---- TYPES
+INT, STRING
 ====

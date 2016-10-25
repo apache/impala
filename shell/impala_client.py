@@ -354,7 +354,7 @@ class ImpalaClient(object):
     if status != RpcStatus.OK:
       raise RPCException()
 
-    num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
+    num_rows = sum([int(k) for k in insert_result.rows_modified.values()])
     return num_rows
 
   def close_query(self, last_query_handle, query_handle_closed=False):

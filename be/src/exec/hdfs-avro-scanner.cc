@@ -80,15 +80,13 @@ Status HdfsAvroScanner::Open(ScannerContext* context) {
 Status HdfsAvroScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ExprContext*>& conjunct_ctxs, Function** decode_avro_data_fn) {
   *decode_avro_data_fn = NULL;
-  if (!node->runtime_state()->codegen_enabled()) {
-    return Status("Disabled by query option.");
-  }
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(node->runtime_state()->GetCodegen(&codegen));
+  DCHECK(node->runtime_state()->codegen_enabled());
+  LlvmCodeGen* codegen = node->runtime_state()->codegen();
+  DCHECK(codegen != NULL);
   Function* materialize_tuple_fn;
   RETURN_IF_ERROR(CodegenMaterializeTuple(node, codegen, &materialize_tuple_fn));
   DCHECK(materialize_tuple_fn != NULL);
-  RETURN_IF_ERROR(CodegenDecodeAvroData(node->runtime_state(), materialize_tuple_fn,
+  RETURN_IF_ERROR(CodegenDecodeAvroData(codegen, materialize_tuple_fn,
       conjunct_ctxs, decode_avro_data_fn));
   DCHECK(*decode_avro_data_fn != NULL);
   return Status::OK();
@@ -540,7 +538,7 @@ Status HdfsAvroScanner::ProcessRange() {
       int num_to_commit;
       if (scan_node_->materialized_slots().empty()) {
         // No slots to materialize (e.g. count(*)), no need to decode data
-        num_to_commit = WriteEmptyTuples(context_, tuple_row, max_tuples);
+        num_to_commit = WriteTemplateTuples(tuple_row, max_tuples);
       } else {
         if (codegend_decode_avro_data_ != NULL) {
           num_to_commit = codegend_decode_avro_data_(this, max_tuples, pool, &data,
@@ -1016,11 +1014,9 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
   return Status::OK();
 }
 
-Status HdfsAvroScanner::CodegenDecodeAvroData(RuntimeState* state,
+Status HdfsAvroScanner::CodegenDecodeAvroData(LlvmCodeGen* codegen,
     Function* materialize_tuple_fn, const vector<ExprContext*>& conjunct_ctxs,
     Function** decode_avro_data_fn) {
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(materialize_tuple_fn != NULL);
 
@@ -1030,7 +1026,7 @@ Status HdfsAvroScanner::CodegenDecodeAvroData(RuntimeState* state,
   DCHECK_EQ(replaced, 1);
 
   Function* eval_conjuncts_fn;
-  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs,
+  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, conjunct_ctxs,
       &eval_conjuncts_fn));
 
   replaced = codegen->ReplaceCallSites(fn, eval_conjuncts_fn, "EvalConjuncts");

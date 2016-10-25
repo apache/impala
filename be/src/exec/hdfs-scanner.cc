@@ -211,66 +211,14 @@ Status HdfsScanner::CommitRows(int num_rows) {
   return Status::OK();
 }
 
-// In this code path, no slots were materialized from the input files.  The only
-// slots are from partition keys.  This lets us simplify writing out the batches.
-//   1. template_tuple_ is the complete tuple.
-//   2. Eval conjuncts against the tuple.
-//   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
-int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
-  DCHECK_GT(num_tuples, 0);
-
-  if (template_tuple_ == NULL) {
-    // No slots from partitions keys or slots.  This is count(*).  Just add the
-    // number of rows to the batch.
-    row_batch->AddRows(num_tuples);
-    row_batch->CommitRows(num_tuples);
-  } else {
-    // Make a row and evaluate the row
-    int row_idx = row_batch->AddRow();
-
-    TupleRow* current_row = row_batch->GetRow(row_idx);
-    current_row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
-    if (!EvalConjuncts(current_row)) return 0;
-    // Add first tuple
-    row_batch->CommitLastRow();
-    --num_tuples;
-
-    DCHECK_LE(num_tuples, row_batch->capacity() - row_batch->num_rows());
-
-    for (int n = 0; n < num_tuples; ++n) {
-      DCHECK(!row_batch->AtCapacity());
-      TupleRow* current_row = row_batch->GetRow(row_batch->AddRow());
-      current_row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
-      row_batch->CommitLastRow();
-    }
-  }
-  return num_tuples;
-}
-
-// In this code path, no slots were materialized from the input files.  The only
-// slots are from partition keys.  This lets us simplify writing out the batches.
-//   1. template_tuple_ is the complete tuple.
-//   2. Eval conjuncts against the tuple.
-//   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
-int HdfsScanner::WriteEmptyTuples(ScannerContext* context,
-    TupleRow* row, int num_tuples) {
+int HdfsScanner::WriteTemplateTuples(TupleRow* row, int num_tuples) {
   DCHECK_GE(num_tuples, 0);
-  if (num_tuples == 0) return 0;
+  DCHECK_EQ(scan_node_->tuple_idx(), 0);
+  DCHECK_EQ(scanner_conjunct_ctxs_->size(), 0);
+  if (num_tuples == 0 || template_tuple_ == NULL) return num_tuples;
 
-  if (template_tuple_ == NULL) {
-    // Must be conjuncts on constant exprs.
-    if (!EvalConjuncts(row)) return 0;
-    return num_tuples;
-  } else {
-    row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
-    if (!EvalConjuncts(row)) return 0;
-    row = next_row(row);
-
-    for (int n = 1; n < num_tuples; ++n) {
-      row->SetTuple(scan_node_->tuple_idx(), template_tuple_);
-      row = next_row(row);
-    }
-  }
+  Tuple** row_tuple = reinterpret_cast<Tuple**>(row);
+  for (int i = 0; i < num_tuples; ++i) row_tuple[i] = template_tuple_;
   return num_tuples;
 }
 
@@ -530,7 +478,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
       parse_block = BasicBlock::Create(context, "parse", fn, eval_fail_block);
       Function* conjunct_fn;
       Status status =
-          conjunct_ctxs[conjunct_idx]->root()->GetCodegendComputeFn(state, &conjunct_fn);
+          conjunct_ctxs[conjunct_idx]->root()->GetCodegendComputeFn(codegen, &conjunct_fn);
       if (!status.ok()) {
         stringstream ss;
         ss << "Failed to codegen conjunct: " << status.GetDetail();

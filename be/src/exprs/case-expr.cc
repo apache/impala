@@ -182,7 +182,7 @@ string CaseExpr::DebugString() const {
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %else_val
 // }
-Status CaseExpr::GetCodegendComputeFn(RuntimeState* state, Function** fn) {
+Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK();
@@ -191,11 +191,9 @@ Status CaseExpr::GetCodegendComputeFn(RuntimeState* state, Function** fn) {
   const int num_children = GetNumChildren();
   Function* child_fns[num_children];
   for (int i = 0; i < num_children; ++i) {
-    RETURN_IF_ERROR(children()[i]->GetCodegendComputeFn(state, &child_fns[i]));
+    RETURN_IF_ERROR(children()[i]->GetCodegendComputeFn(codegen, &child_fns[i]));
   }
 
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
 

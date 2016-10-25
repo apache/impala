@@ -25,20 +25,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.junit.Assert;
-import org.junit.Test;
+import junit.framework.Assert;
 
+import org.apache.impala.analysis.CreateTableStmt;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
@@ -50,9 +45,20 @@ import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.util.MetaStoreUtil;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsPermission;
+
+import org.junit.Test;
 
 public class AnalyzeDDLTest extends FrontendTestBase {
 
@@ -1233,6 +1239,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table if not exists functional.zipcode_incomes like parquet "
         + "'/test-warehouse/schemas/malformed_decimal_tiny.parquet'",
         "Unsupported parquet type FIXED_LEN_BYTE_ARRAY for field c1");
+
+    // Invalid file format
+    AnalysisError("create table newtbl_kudu like parquet " +
+        "'/test-warehouse/schemas/alltypestiny.parquet' stored as kudu",
+        "CREATE TABLE LIKE FILE statement is not supported for Kudu tables.");
   }
 
   @Test
@@ -1278,11 +1289,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Unsupported file formats
     AnalysisError("create table foo stored as sequencefile as select 1",
-        "CREATE TABLE AS SELECT does not support (SEQUENCEFILE) file format. " +
-         "Supported formats are: (PARQUET, TEXTFILE)");
+        "CREATE TABLE AS SELECT does not support the (SEQUENCEFILE) file format. " +
+         "Supported formats are: (PARQUET, TEXTFILE, KUDU)");
     AnalysisError("create table foo stored as RCFILE as select 1",
-        "CREATE TABLE AS SELECT does not support (RCFILE) file format. " +
-         "Supported formats are: (PARQUET, TEXTFILE)");
+        "CREATE TABLE AS SELECT does not support the (RCFILE) file format. " +
+         "Supported formats are: (PARQUET, TEXTFILE, KUDU)");
 
     // CTAS with a WITH clause and inline view (IMPALA-1100)
     AnalyzesOk("create table test_with as with with_1 as (select 1 as int_col from " +
@@ -1330,6 +1341,17 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table p partitioned by (tinyint_col, int_col) as " +
         "select double_col, int_col, tinyint_col from functional.alltypes",
         "Partition column name mismatch: tinyint_col != int_col");
+
+    // CTAS into managed Kudu tables
+    AnalyzesOk("create table t primary key (id) distribute by hash (id) into 3 buckets" +
+        " stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col, " +
+        "bigint_col, float_col, double_col, date_string_col, string_col " +
+        "from functional.alltypestiny");
+    // CTAS in an external Kudu table
+    AnalysisError("create external table t stored as kudu " +
+        "tblproperties('kudu.table_name'='t') as select id, int_col from " +
+        "functional.alltypestiny", "CREATE TABLE AS SELECT is not supported for " +
+        "external Kudu tables.");
   }
 
   @Test
@@ -1376,6 +1398,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "No FileSystem for scheme: foofs");
     AnalysisError("create table functional.baz like functional.alltypes location '  '",
         "URI path cannot be empty.");
+
+    // CREATE TABLE LIKE is not currently supported for Kudu tables (see IMPALA-4052)
+    AnalysisError("create table kudu_tbl like functional.alltypestiny stored as kudu",
+        "CREATE TABLE LIKE is not supported for Kudu tables");
+    AnalysisError("create table tbl like functional_kudu.dimtbl", "Cloning a Kudu " +
+        "table using CREATE TABLE LIKE is not supported.");
   }
 
   @Test
@@ -1458,12 +1486,18 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     String [] fileFormats =
         {"TEXTFILE", "SEQUENCEFILE", "PARQUET", "PARQUETFILE", "RCFILE"};
     for (String format: fileFormats) {
-      AnalyzesOk(String.format("create table new_table (i int) " +
-          "partitioned by (d decimal) comment 'c' stored as %s", format));
-      // No column definitions.
-      AnalysisError(String.format("create table new_table " +
-          "partitioned by (d decimal) comment 'c' stored as %s", format),
-          "Table requires at least 1 column");
+      for (String create: ImmutableList.of("create table", "create external table")) {
+        AnalyzesOk(String.format("%s new_table (i int) " +
+            "partitioned by (d decimal) comment 'c' stored as %s", create, format));
+        // No column definitions.
+        AnalysisError(String.format("%s new_table " +
+            "partitioned by (d decimal) comment 'c' stored as %s", create, format),
+            "Table requires at least 1 column");
+      }
+      AnalysisError(String.format("create table t (i int primary key) stored as %s",
+          format), "Only Kudu tables can specify a PRIMARY KEY");
+      AnalysisError(String.format("create table t (i int, primary key(i)) stored as %s",
+          format), "Only Kudu tables can specify a PRIMARY KEY");
     }
 
     // Note: Backslashes need to be escaped twice - once for Java and once for Impala.
@@ -1541,7 +1575,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table cached_tbl(i int) location " +
         "'file:///test-warehouse/cache_tbl' cached in 'testPool'",
         "Location 'file:/test-warehouse/cache_tbl' cannot be cached. " +
-        "Please retry without caching: CREATE TABLE default.cached_tbl ... UNCACHED");
+        "Please retry without caching: CREATE TABLE ... UNCACHED");
 
     // Invalid database name.
     AnalysisError("create table `???`.new_table (x int) PARTITIONED BY (y int)",
@@ -1668,175 +1702,179 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestCreateKuduTable() {
+  public void TestCreateManagedKuduTable() {
     TestUtils.assumeKuduIsSupported();
-    // Create Kudu Table with all required properties
-    AnalyzesOk("create table tab (x int) " +
-        "distribute by hash into 2 buckets tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.master_addresses' = '127.0.0.1:8080, 127.0.0.1:8081', " +
-        "'kudu.key_columns' = 'a,b,c'" +
-        ")");
-
-    // Check that all properties are present
-    AnalysisError("create table tab (x int) " +
-        "distribute by hash into 2 buckets tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a,b,c'" +
-        ")",
-        "Kudu table is missing parameters in table properties. Please verify " +
-        "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-        "present and have valid values.");
-
-    AnalysisError("create table tab (x int) " +
-            "distribute by hash into 2 buckets tblproperties (" +
-            "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-            "'kudu.table_name'='tab'," +
-            "'kudu.key_columns' = 'a,b,c'"
-            + ")",
-        "Kudu table is missing parameters in table properties. Please verify " +
-            "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-            "present and have valid values.");
-
-    AnalysisError("create table tab (x int) " +
-        "distribute by hash into 2 buckets tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.master_addresses' = '127.0.0.1:8080'" +
-        ")",
-        "Kudu table is missing parameters in table properties. Please verify " +
-        "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-        "present and have valid values.");
-
-    // Check that properties are not empty
-    AnalysisError("create table tab (x int) " +
-            "distribute by hash into 2 buckets tblproperties (" +
-            "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-            "'kudu.table_name'=''," +
-            "'kudu.master_addresses' = '127.0.0.1:8080', " +
-            "'kudu.key_columns' = 'a,b,c'" +
-            ")",
-        "Kudu table is missing parameters in table properties. Please verify " +
-            "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-            "present and have valid values.");
-
-    AnalysisError("create table tab (x int) " +
-            "distribute by hash into 2 buckets tblproperties (" +
-            "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-            "'kudu.table_name'='asd'," +
-            "'kudu.master_addresses' = '', " +
-            "'kudu.key_columns' = 'a,b,c'" +
-            ")",
-        "Kudu table is missing parameters in table properties. Please verify " +
-            "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-            "present and have valid values.");
-
-    // Don't allow caching
-    AnalysisError("create table tab (x int) cached in 'testPool' " +
-        "distribute by hash into 2 buckets tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a,b,c'" +
-        ")", "A Kudu table cannot be cached in HDFS.");
-
+    // Test primary keys and distribute by clauses
+    AnalyzesOk("create table tab (x int primary key) distribute by hash(x) " +
+        "into 8 buckets stored as kudu");
+    AnalyzesOk("create table tab (x int, primary key(x)) distribute by hash(x) " +
+        "into 8 buckets stored as kudu");
+    AnalyzesOk("create table tab (x int, y int, primary key (x, y)) " +
+        "distribute by hash(x, y) into 8 buckets stored as kudu");
+    AnalyzesOk("create table tab (x int, y int, primary key (x)) " +
+        "distribute by hash(x) into 8 buckets stored as kudu");
+    AnalyzesOk("create table tab (x int, y int, primary key(x, y)) " +
+        "distribute by hash(y) into 8 buckets stored as kudu");
+    // Multilevel partitioning. Data is split into 3 buckets based on 'x' and each
+    // bucket is partitioned into 4 tablets based on the split points of 'y'.
+    AnalyzesOk("create table tab (x int, y string, primary key(x, y)) " +
+        "distribute by hash(x) into 3 buckets, range(y) split rows " +
+        "(('aa'), ('bb'), ('cc')) stored as kudu");
+    // Key column in upper case
+    AnalyzesOk("create table tab (x int, y int, primary key (X)) " +
+        "distribute by hash (x) into 8 buckets stored as kudu");
     // Flexible Partitioning
-    AnalyzesOk("create table tab (a int, b int, c int, d int) " +
-        "distribute by hash(a,b) into 8 buckets, hash(c) into 2 buckets " +
-        "tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a,b,c'" +
-        ")");
-
-    AnalyzesOk("create table tab (a int, b int, c int, d int) " +
-        "distribute by hash into 8 buckets " +
-        "tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a,b,c'" +
-        ")");
-
-    // DISTRIBUTE BY is required for managed tables.
-    AnalysisError("create table tab (a int) tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a'" +
-        ")",
-        "A data distribution must be specified using the DISTRIBUTE BY clause.");
-
-    // DISTRIBUTE BY is not allowed for external tables.
-    AnalysisError("create external table tab (a int) " +
-        "distribute by hash into 3 buckets tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a'" +
-        ")",
-        "The DISTRIBUTE BY clause may not be specified for external tables.");
-
-    // Number of buckets must be larger 1
-    AnalysisError("create table tab (a int, b int, c int, d int) " +
-        "distribute by hash(a,b) into 8 buckets, hash(c) into 1 buckets " +
-        "tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a,b,c'" +
-        ")",
-        "Number of buckets in DISTRIBUTE BY clause 'HASH(c) INTO 1 BUCKETS' must " +
-            "be larger than 1");
-
-    // Key ranges must match the column types.
-    // TODO(kudu-merge) uncomment this when IMPALA-3156 is addressed.
-    //AnalysisError("create table tab (a int, b int, c int, d int) " +
-    //    "distribute by hash(a,b,c) into 8 buckets, " +
-    //    "range(a) split rows ((1),('abc'),(3)) " +
-    //    "tblproperties (" +
-    //    "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-    //    "'kudu.table_name'='tab'," +
-    //    "'kudu.master_addresses' = '127.0.0.1:8080', " +
-    //    "'kudu.key_columns' = 'a,b,c')");
-
-    // Distribute range data types are picked up during analysis and forwarded to Kudu
-    AnalyzesOk("create table tab (a int, b int, c int, d int) " +
-        "distribute by hash(a,b,c) into 8 buckets, " +
-        "range(a) split rows ((1),(2),(3)) " +
-        "tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a,b,c'" +
-        ")");
-
+    AnalyzesOk("create table tab (a int, b int, c int, d int, primary key (a, b, c))" +
+        "distribute by hash (a, b) into 8 buckets, hash(c) into 2 buckets stored as " +
+        "kudu");
+    // No columns specified in the DISTRIBUTE BY HASH clause
+    AnalyzesOk("create table tab (a int primary key, b int, c int, d int) " +
+        "distribute by hash into 8 buckets stored as kudu");
+    // Distribute range data types are picked up during analysis and forwarded to Kudu.
+    // Column names in distribute params should also be case-insensitive.
+    AnalyzesOk("create table tab (a int, b int, c int, d int, primary key(a, b, c, d))" +
+        "distribute by hash (a, B, c) into 8 buckets, " +
+        "range (A) split rows ((1),(2),(3)) stored as kudu");
+    // Allowing range distribution on a subset of the primary keys
+    AnalyzesOk("create table tab (id int, name string, valf float, vali bigint, " +
+        "primary key (id, name)) distribute by range (name) split rows (('abc')) " +
+        "stored as kudu");
+    // Null values in SPLIT ROWS
+    AnalysisError("create table tab (id int, name string, primary key(id, name)) " +
+        "distribute by hash (id) into 3 buckets, range (name) split rows ((null),(1)) " +
+        "stored as kudu", "Split values cannot be NULL. Split row: (NULL)");
+    // Primary key specified in tblproperties
+    AnalysisError(String.format("create table tab (x int) distribute by hash (x) " +
+        "into 8 buckets stored as kudu tblproperties ('%s' = 'x')",
+        KuduTable.KEY_KEY_COLUMNS), "PRIMARY KEY must be used instead of the table " +
+        "property");
+    // Primary key column that doesn't exist
+    AnalysisError("create table tab (x int, y int, primary key (z)) " +
+        "distribute by hash (x) into 8 buckets stored as kudu",
+        "PRIMARY KEY column 'z' does not exist in the table");
+    // Invalid composite primary key
+    AnalysisError("create table tab (x int primary key, primary key(x)) stored " +
+        "as kudu", "Multiple primary keys specified. Composite primary keys can " +
+        "be specified using the PRIMARY KEY (col1, col2, ...) syntax at the end " +
+        "of the column definition.");
+    AnalysisError("create table tab (x int primary key, y int primary key) stored " +
+        "as kudu", "Multiple primary keys specified. Composite primary keys can " +
+        "be specified using the PRIMARY KEY (col1, col2, ...) syntax at the end " +
+        "of the column definition.");
+    // Specifying the same primary key column multiple times
+    AnalysisError("create table tab (x int, primary key (x, x)) distribute by hash (x) " +
+        "into 8 buckets stored as kudu",
+        "Column 'x' is listed multiple times as a PRIMARY KEY.");
     // Each split row size should equals to the number of range columns.
-    AnalysisError("create table tab (a int, b int, c int, d int) " +
-        "distribute by range(a) split rows ((1,'extra_val'),(2),(3)) " +
-        "tblproperties (" +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='tab'," +
-        "'kudu.master_addresses' = '127.0.0.1:8080', " +
-        "'kudu.key_columns' = 'a,b,c'" +
-        ")",
+    AnalysisError("create table tab (a int, b int, c int, d int, primary key(a, b, c)) " +
+        "distribute by range(a) split rows ((1,'extra_val'),(2),(3)) stored as kudu",
         "SPLIT ROWS has different size than number of projected key columns: 1. " +
         "Split row: (1, 'extra_val')");
-
+    // Key ranges must match the column types.
+    AnalysisError("create table tab (a int, b int, c int, d int, primary key(a, b, c)) " +
+        "distribute by hash (a, b, c) into 8 buckets, " +
+        "range (a) split rows ((1), ('abc'), (3)) stored as kudu",
+        "Split value 'abc' (type: STRING) is not type compatible with column 'a'" +
+        " (type: INT).");
+    // Non-key column used in DISTRIBUTE BY
+    AnalysisError("create table tab (a int, b string, c bigint, primary key (a)) " +
+        "distribute by range (b) split rows (('abc')) stored as kudu",
+        "Column 'b' in 'RANGE (b) SPLIT ROWS (('abc'))' is not a key column. " +
+        "Only key columns can be used in DISTRIBUTE BY.");
     // No float split keys
-    AnalysisError("create table tab (a int, b int, c int, d int) " +
-            "distribute by hash(a,b,c) into 8 buckets, " +
-            "range(a) split rows ((1.2),('abc'),(3)) " +
-            "tblproperties (" +
-            "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-            "'kudu.table_name'='tab'," +
-            "'kudu.master_addresses' = '127.0.0.1:8080', " +
-            "'kudu.key_columns' = 'a,b,c'" +
-            ")",
-        "Only integral and string values allowed for split rows.");
+    AnalysisError("create table tab (a int, b int, c int, d int, primary key (a, b, c))" +
+        "distribute by hash (a, b, c) into 8 buckets, " +
+        "range (a) split rows ((1.2), ('abc'), (3)) stored as kudu",
+        "Split value 1.2 (type: DECIMAL(2,1)) is not type compatible with column 'a' " +
+        "(type: INT).");
+    // Non-existing column used in DISTRIBUTE BY
+    AnalysisError("create table tab (a int, b int, primary key (a, b)) " +
+        "distribute by range(unknown_column) split rows (('abc')) stored as kudu",
+        "Column 'unknown_column' in 'RANGE (unknown_column) SPLIT ROWS (('abc'))' " +
+        "is not a key column. Only key columns can be used in DISTRIBUTE BY");
+    // Kudu table name is specified in tblproperties
+    AnalyzesOk("create table tab (x int primary key) distribute by hash (x) " +
+        "into 8 buckets stored as kudu tblproperties ('kudu.table_name'='tab_1'," +
+        "'kudu.num_tablet_replicas'='1'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080, 127.0.0.1:8081')");
+    // No port is specified in kudu master address
+    AnalyzesOk("create table tdata_no_port (id int primary key, name string, " +
+        "valf float, vali bigint) DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30)) " +
+        "STORED AS KUDU tblproperties('kudu.master_addresses'='127.0.0.1')");
+    // Not using the STORED AS KUDU syntax to specify a Kudu table
+    AnalysisError("create table tab (x int primary key) tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')",
+        CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
+    AnalysisError("create table tab (x int primary key) stored as kudu tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')",
+        CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
+    // Invalid value for number of replicas
+    AnalysisError("create table t (x int primary key) stored as kudu tblproperties (" +
+        "'kudu.num_tablet_replicas'='1.1')",
+        "Table property 'kudu.num_tablet_replicas' must be an integer.");
+    // Don't allow caching
+    AnalysisError("create table tab (x int primary key) stored as kudu cached in " +
+        "'testPool'", "A Kudu table cannot be cached in HDFS.");
+    // LOCATION cannot be used with Kudu tables
+    AnalysisError("create table tab (a int primary key) distribute by hash (a) " +
+        "into 3 buckets stored as kudu location '/test-warehouse/'",
+        "LOCATION cannot be specified for a Kudu table.");
+    // DISTRIBUTE BY is required for managed tables.
+    AnalysisError("create table tab (a int, primary key (a)) stored as kudu",
+        "Table distribution must be specified for managed Kudu tables.");
+    AnalysisError("create table tab (a int) stored as kudu",
+        "A primary key is required for a Kudu table.");
+    // Using ROW FORMAT with a Kudu table
+    AnalysisError("create table tab (x int primary key) " +
+        "row format delimited escaped by 'X' stored as kudu",
+        "ROW FORMAT cannot be specified for file format KUDU.");
+    // Using PARTITIONED BY with a Kudu table
+    AnalysisError("create table tab (x int primary key) " +
+        "partitioned by (y int) stored as kudu", "PARTITIONED BY cannot be used " +
+        "in Kudu tables.");
+  }
+
+  @Test
+  public void TestCreateExternalKuduTable() {
+    AnalyzesOk("create external table t stored as kudu " +
+        "tblproperties('kudu.table_name'='t')");
+    // Use all allowed optional table props.
+    AnalyzesOk("create external table t stored as kudu tblproperties (" +
+        "'kudu.table_name'='tab'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080, 127.0.0.1:8081')");
+    // Kudu table should be specified using the STORED AS KUDU syntax.
+    AnalysisError("create external table t tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler'," +
+        "'kudu.table_name'='t')",
+        CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
+    // Columns should not be specified in an external Kudu table
+    AnalysisError("create external table t (x int) stored as kudu " +
+        "tblproperties('kudu.table_name'='t')",
+        "Columns cannot be specified with an external Kudu table.");
+    // Primary keys cannot be specified in an external Kudu table
+    AnalysisError("create external table t (x int primary key) stored as kudu " +
+        "tblproperties('kudu.table_name'='t')", "Primary keys cannot be specified " +
+        "for an external Kudu table");
+    // Invalid syntax for specifying a Kudu table
+    AnalysisError("create external table t (x int) stored as parquet tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler'," +
+        "'kudu.table_name'='t')", CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
+    AnalysisError("create external table t stored as kudu tblproperties (" +
+        "'storage_handler'='foo', 'kudu.table_name'='t')",
+        CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
+    // Cannot specify the number of replicas for external Kudu tables
+    AnalysisError("create external table tab (x int) stored as kudu " +
+        "tblproperties ('kudu.num_tablet_replicas' = '1', " +
+        "'kudu.table_name'='tab')",
+        "Table property 'kudu.num_tablet_replicas' cannot be used with an external " +
+        "Kudu table.");
+    // Don't allow caching
+    AnalysisError("create external table t stored as kudu cached in 'testPool' " +
+        "tblproperties('kudu.table_name'='t')", "A Kudu table cannot be cached in HDFS.");
+    // LOCATION cannot be used for a Kudu table
+    AnalysisError("create external table t stored as kudu " +
+        "location '/test-warehouse' tblproperties('kudu.table_name'='t')",
+        "LOCATION cannot be specified for a Kudu table.");
   }
 
   @Test
@@ -2036,6 +2074,13 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table functional.new_table (i int) " +
         "partitioned by (x struct<f1:int>)",
         "Type 'STRUCT<f1:INT>' is not supported as partition-column type in column: x");
+
+    // Kudu specific clauses used in an Avro table.
+    AnalysisError("create table functional.new_table (i int primary key) " +
+        "distribute by hash(i) into 3 buckets stored as avro",
+        "Only Kudu tables can use the DISTRIBUTE BY clause.");
+    AnalysisError("create table functional.new_table (i int primary key) " +
+        "stored as avro", "Only Kudu tables can specify a PRIMARY KEY.");
   }
 
   @Test

@@ -58,11 +58,13 @@ DEFINE_string(authorized_proxy_user_config, "",
     "users. For example: hue=user1,user2;admin=*");
 DEFINE_string(authorized_proxy_user_config_delimiter, ",",
     "Specifies the delimiter used in authorized_proxy_user_config. ");
-
+DEFINE_string(kudu_master_hosts, "", "Specifies the default Kudu master(s). The given "
+    "value should be a comma separated list of hostnames or IP addresses; ports are "
+    "optional.");
 Frontend::Frontend() {
   JniMethodDescriptor methods[] = {
     {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;"
-        "Ljava/lang/String;IIZ)V", &fe_ctor_},
+        "Ljava/lang/String;IIZLjava/lang/String;)V", &fe_ctor_},
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "([B)[B", &get_hadoop_config_id_},
@@ -111,9 +113,10 @@ Frontend::Frontend() {
   // auth_to_local rules are read if --load_auth_to_local_rules is set to true
   // and impala is kerberized.
   jboolean auth_to_local = FLAGS_load_auth_to_local_rules && !FLAGS_principal.empty();
+  jstring kudu_master_hosts = jni_env->NewStringUTF(FLAGS_kudu_master_hosts.c_str());
   jobject fe = jni_env->NewObject(fe_class_, fe_ctor_, lazy, server_name,
       policy_file_path, sentry_config, auth_provider_class, FlagToTLogLevel(FLAGS_v),
-      FlagToTLogLevel(FLAGS_non_impala_java_vlog), auth_to_local);
+      FlagToTLogLevel(FLAGS_non_impala_java_vlog), auth_to_local, kudu_master_hosts);
   EXIT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 }

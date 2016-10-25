@@ -110,7 +110,7 @@ struct TestData {
 void Benchmark(int batch_size, void* data) {
   TestData* d = reinterpret_cast<TestData*>(data);
   for (int i = 0; i < batch_size; ++i) {
-    d->bm.Set<true>(d->data[i & (d->data.size() - 1)], true);
+    d->bm.Set(d->data[i & (d->data.size() - 1)] % d->bm.num_bits(), true);
   }
 }
 
@@ -122,7 +122,7 @@ struct TestData {
   TestData(int64_t size)
     : bm(size), data (1ull << 20) {
     for (size_t i = 0; i < size/2; ++i) {
-      bm.Set<true>(MakeNonNegativeRand(), true);
+      bm.Set(MakeNonNegativeRand() % size, true);
     }
     for (size_t i = 0; i < data.size(); ++i) {
       data[i] = MakeNonNegativeRand();
@@ -138,7 +138,7 @@ struct TestData {
 void Benchmark(int batch_size, void* data) {
   TestData* d = reinterpret_cast<TestData*>(data);
   for (int i = 0; i < batch_size; ++i) {
-    d->result += d->bm.Get<true>(d->data[i & (d->data.size() - 1)]);
+    d->result += d->bm.Get(d->data[i & (d->data.size() - 1)] % d->bm.num_bits());
   }
 }
 

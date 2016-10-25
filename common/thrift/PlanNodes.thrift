@@ -196,17 +196,14 @@ struct THdfsScanNode {
   // Option to control tie breaks during scan scheduling.
   4: optional bool random_replica
 
-  // Option to control whether codegen should be used for conjuncts evaluation.
-  5: optional bool codegen_conjuncts
-
   // Number of header lines to skip at the beginning of each file of this table. Only set
   // for hdfs text files.
-  6: optional i32 skip_header_line_count
+  5: optional i32 skip_header_line_count
 
   // Indicates whether the MT scan node implementation should be used.
   // If this is true then the MT_DOP query option must be > 0.
   // TODO: Remove this option when the MT scan node supports all file formats.
-  7: optional bool use_mt_scan_node
+  6: optional bool use_mt_scan_node
 }
 
 struct TDataSourceScanNode {

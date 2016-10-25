@@ -105,9 +105,6 @@ public class HdfsScanNode extends ScanNode {
   // Total number of bytes from partitions_
   private long totalBytes_ = 0;
 
-  // True if this scan node should use codegen for evaluting conjuncts.
-  private boolean codegenConjuncts_;
-
   // True if this scan node should use the MT implementation in the backend.
   private boolean useMtScanNode_;
 
@@ -188,9 +185,6 @@ public class HdfsScanNode extends ScanNode {
 
     // TODO: do we need this?
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
-
-    // Decide whether codegen should be used for evaluating conjuncts.
-    checkForCodegen(analyzer);
   }
 
   /**
@@ -505,39 +499,6 @@ public class HdfsScanNode extends ScanNode {
         " clusterNodes=" + cluster.numNodes());
   }
 
-  /**
-   * Approximate the cost of evaluating all conjuncts bound by this node by
-   * aggregating total number of nodes in expression trees of all conjuncts.
-   */
-  private int computeConjunctsCost() {
-    int cost = 0;
-    for (Expr expr: getConjuncts()) {
-      cost += expr.numNodes();
-    }
-    for (List<Expr> exprs: collectionConjuncts_.values()) {
-      for (Expr expr: exprs) {
-        cost += expr.numNodes();
-      }
-    }
-    return cost;
-  }
-
-  /**
-   * Scan node is not a codegen-enabled operator. Decide whether to use codegen for
-   * conjuncts evaluation by estimating the cost of interpretation.
-   */
-  private void checkForCodegen(Analyzer analyzer) {
-    long conjunctsCost = computeConjunctsCost();
-    long inputCardinality = getInputCardinality();
-    long threshold =
-        analyzer.getQueryCtx().getRequest().query_options.scan_node_codegen_threshold;
-    if (inputCardinality == -1) {
-      codegenConjuncts_ = conjunctsCost > 0;
-    } else {
-      codegenConjuncts_ = inputCardinality * conjunctsCost > threshold;
-    }
-  }
-
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.hdfs_scan_node = new THdfsScanNode(desc_.getId().asInt());
@@ -546,7 +507,6 @@ public class HdfsScanNode extends ScanNode {
     }
     msg.hdfs_scan_node.setRandom_replica(randomReplica_);
     msg.node_type = TPlanNodeType.HDFS_SCAN_NODE;
-    msg.hdfs_scan_node.setCodegen_conjuncts(codegenConjuncts_);
     if (!collectionConjuncts_.isEmpty()) {
       Map<Integer, List<TExpr>> tcollectionConjuncts = Maps.newLinkedHashMap();
       for (Map.Entry<TupleDescriptor, List<Expr>> entry:

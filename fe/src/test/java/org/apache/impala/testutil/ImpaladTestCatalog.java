@@ -43,7 +43,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
    * Takes an AuthorizationConfig to bootstrap the backing CatalogServiceCatalog.
    */
   public ImpaladTestCatalog(AuthorizationConfig authzConfig) {
-    super();
+    super("127.0.0.1");
     CatalogServiceCatalog catalogServerCatalog =
         CatalogServiceTestCatalog.createWithAuth(authzConfig.getSentryConfig());
     // Bootstrap the catalog by adding all dbs, tables, and functions.
@@ -51,7 +51,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
       // Adding DB should include all tables/fns in that database.
       addDb(db);
     }
-    authPolicy_ = ((CatalogServiceTestCatalog) catalogServerCatalog).getAuthPolicy();
+    authPolicy_ = catalogServerCatalog.getAuthPolicy();
     srcCatalog_ = catalogServerCatalog;
     setIsReady(true);
   }

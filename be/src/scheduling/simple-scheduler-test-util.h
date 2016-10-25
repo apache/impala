@@ -21,6 +21,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "common/status.h"
 #include "gen-cpp/ImpalaInternalService.h" // for TQueryOptions
 #include "scheduling/query-schedule.h"
 #include "util/metrics.h"
@@ -421,10 +422,10 @@ class SchedulerWrapper {
   SchedulerWrapper(const Plan& plan);
 
   /// Call ComputeScanRangeAssignment() with exec_at_coord set to false.
-  void Compute(Result* result) { Compute(false, result); }
+  Status Compute(Result* result) { return Compute(false, result); }
 
   /// Call ComputeScanRangeAssignment().
-  void Compute(bool exec_at_coord, Result* result);
+  Status Compute(bool exec_at_coord, Result* result);
 
   /// Reset the state of the scheduler by re-creating and initializing it.
   void Reset() { InitializeScheduler(); }

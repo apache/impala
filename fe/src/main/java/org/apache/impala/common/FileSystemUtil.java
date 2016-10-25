@@ -278,7 +278,7 @@ public class FileSystemUtil {
     // Common case.
     if (isDistributedFileSystem(fs)) return true;
     // Blacklist FileSystems that are known to not implement getFileBlockLocations().
-    return !(fs instanceof S3AFileSystem|| fs instanceof LocalFileSystem);
+    return !(fs instanceof S3AFileSystem || fs instanceof LocalFileSystem);
   }
 
   /**

@@ -110,6 +110,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
+  virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Reset(RuntimeState* state);
@@ -355,7 +356,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
   /// Returns non-OK if codegen was not possible.
-  Status CodegenProcessProbeBatch(RuntimeState* state);
+  Status CodegenProcessProbeBatch(
+      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode);
 
   /// Returns the current state of the partition as a string.
   std::string PrintState() const;

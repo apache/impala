@@ -564,7 +564,7 @@ Value* LlvmCodeGen::CastPtrToLlvmPtr(Type* type, const void* ptr) {
   return ConstantExpr::getIntToPtr(const_int, type);
 }
 
-Value* LlvmCodeGen::GetIntConstant(PrimitiveType type, int64_t val) {
+Value* LlvmCodeGen::GetIntConstant(PrimitiveType type, uint64_t val) {
   switch (type) {
     case TYPE_TINYINT:
       return ConstantInt::get(context(), APInt(8, val));
@@ -580,8 +580,12 @@ Value* LlvmCodeGen::GetIntConstant(PrimitiveType type, int64_t val) {
   }
 }
 
-Value* LlvmCodeGen::GetIntConstant(int num_bytes, int64_t val) {
-  return ConstantInt::get(context(), APInt(8 * num_bytes, val));
+Value* LlvmCodeGen::GetIntConstant(int num_bytes, uint64_t low_bits, uint64_t high_bits) {
+  DCHECK_GE(num_bytes, 1);
+  DCHECK_LE(num_bytes, 16);
+  DCHECK(BitUtil::IsPowerOf2(num_bytes));
+  vector<uint64_t> vals({low_bits, high_bits});
+  return ConstantInt::get(context(), APInt(8 * num_bytes, vals));
 }
 
 AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(Function* f, const NamedVariable& var) {

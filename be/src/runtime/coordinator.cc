@@ -1668,11 +1668,15 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     for (const PartitionStatusMap::value_type& partition:
          params.insert_exec_status.per_partition_status) {
       TInsertPartitionStatus* status = &(per_partition_status_[partition.first]);
-      status->num_appended_rows += partition.second.num_appended_rows;
-      status->id = partition.second.id;
-      status->partition_base_dir = partition.second.partition_base_dir;
-      if (!status->__isset.stats) status->__set_stats(TInsertStats());
-      DataSink::MergeInsertStats(partition.second.stats, &status->stats);
+      status->__set_num_modified_rows(
+          status->num_modified_rows + partition.second.num_modified_rows);
+      status->__set_id(partition.second.id);
+      status->__set_partition_base_dir(partition.second.partition_base_dir);
+
+      if (partition.second.__isset.stats) {
+        if (!status->__isset.stats) status->__set_stats(TInsertStats());
+        DataSink::MergeInsertStats(partition.second.stats, &status->stats);
+      }
     }
     files_to_move_.insert(
         params.insert_exec_status.files_to_move.begin(),

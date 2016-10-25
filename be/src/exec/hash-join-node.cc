@@ -143,19 +143,24 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
           child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
           is_not_distinct_from_, state->fragment_hash_seed(), mem_tracker(), filters_));
   build_pool_.reset(new MemPool(mem_tracker()));
+  if (!state->codegen_enabled()) {
+    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
+  }
+  return Status::OK();
+}
 
+void HashJoinNode::Codegen(RuntimeState* state) {
+  DCHECK(state->codegen_enabled());
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != NULL);
   bool build_codegen_enabled = false;
   bool probe_codegen_enabled = false;
-  if (state->codegen_enabled()) {
-    LlvmCodeGen* codegen;
-    RETURN_IF_ERROR(state->GetCodegen(&codegen));
 
-    // Codegen for hashing rows
-    Function* hash_fn = hash_tbl_->CodegenHashCurrentRow(state);
-    if (hash_fn == NULL) return Status::OK();
-
+  // Codegen for hashing rows
+  Function* hash_fn = hash_tbl_->CodegenHashCurrentRow(codegen);
+  if (hash_fn != NULL) {
     // Codegen for build path
-    codegen_process_build_batch_fn_ = CodegenProcessBuildBatch(state, hash_fn);
+    codegen_process_build_batch_fn_ = CodegenProcessBuildBatch(codegen, hash_fn);
     if (codegen_process_build_batch_fn_ != NULL) {
       codegen->AddFunctionToJit(codegen_process_build_batch_fn_,
           reinterpret_cast<void**>(&process_build_batch_fn_));
@@ -164,7 +169,8 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 
     // Codegen for probe path (only for left joins)
     if (!match_all_build_) {
-      Function* codegen_process_probe_batch_fn = CodegenProcessProbeBatch(state, hash_fn);
+      Function* codegen_process_probe_batch_fn =
+          CodegenProcessProbeBatch(codegen, hash_fn);
       if (codegen_process_probe_batch_fn != NULL) {
         codegen->AddFunctionToJit(codegen_process_probe_batch_fn,
             reinterpret_cast<void**>(&process_probe_batch_fn_));
@@ -174,7 +180,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   }
   runtime_profile()->AddCodegenMsg(build_codegen_enabled, "", "Build Side");
   runtime_profile()->AddCodegenMsg(probe_codegen_enabled, "", "Probe Side");
-  return Status::OK();
+  ExecNode::Codegen(state);
 }
 
 Status HashJoinNode::Reset(RuntimeState* state) {
@@ -591,18 +597,15 @@ Function* HashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) {
   return codegen->FinalizeFunction(fn);
 }
 
-Function* HashJoinNode::CodegenProcessBuildBatch(RuntimeState* state,
+Function* HashJoinNode::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
     Function* hash_fn) {
-  LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
-
   // Get cross compiled function
   Function* process_build_batch_fn =
       codegen->GetFunction(IRFunction::HASH_JOIN_PROCESS_BUILD_BATCH, true);
   DCHECK(process_build_batch_fn != NULL);
 
   // Codegen for evaluating build rows
-  Function* eval_row_fn = hash_tbl_->CodegenEvalTupleRow(state, true);
+  Function* eval_row_fn = hash_tbl_->CodegenEvalTupleRow(codegen, true);
   if (eval_row_fn == NULL) return NULL;
 
   int replaced = codegen->ReplaceCallSites(process_build_batch_fn, eval_row_fn,
@@ -615,36 +618,34 @@ Function* HashJoinNode::CodegenProcessBuildBatch(RuntimeState* state,
   return codegen->FinalizeFunction(process_build_batch_fn);
 }
 
-Function* HashJoinNode::CodegenProcessProbeBatch(RuntimeState* state, Function* hash_fn) {
-  LlvmCodeGen* codegen;
-  if (!state->GetCodegen(&codegen).ok()) return NULL;
-
+Function* HashJoinNode::CodegenProcessProbeBatch(LlvmCodeGen* codegen,
+    Function* hash_fn) {
   // Get cross compiled function
   Function* process_probe_batch_fn =
       codegen->GetFunction(IRFunction::HASH_JOIN_PROCESS_PROBE_BATCH, true);
   DCHECK(process_probe_batch_fn != NULL);
 
-  // Codegen HashTable::Equals
-  Function* equals_fn = hash_tbl_->CodegenEquals(state);
+  // Codegen HashTable::Equals()
+  Function* equals_fn = hash_tbl_->CodegenEquals(codegen);
   if (equals_fn == NULL) return NULL;
 
   // Codegen for evaluating build rows
-  Function* eval_row_fn = hash_tbl_->CodegenEvalTupleRow(state, false);
+  Function* eval_row_fn = hash_tbl_->CodegenEvalTupleRow(codegen, false);
   if (eval_row_fn == NULL) return NULL;
 
-  // Codegen CreateOutputRow
+  // Codegen CreateOutputRow()
   Function* create_output_row_fn = CodegenCreateOutputRow(codegen);
   if (create_output_row_fn == NULL) return NULL;
 
   // Codegen evaluating other join conjuncts
   Function* eval_other_conjuncts_fn;
-  Status status = ExecNode::CodegenEvalConjuncts(state, other_join_conjunct_ctxs_,
+  Status status = ExecNode::CodegenEvalConjuncts(codegen, other_join_conjunct_ctxs_,
       &eval_other_conjuncts_fn, "EvalOtherConjuncts");
   if (!status.ok()) return NULL;
 
   // Codegen evaluating conjuncts
   Function* eval_conjuncts_fn;
-  status = ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs_, &eval_conjuncts_fn);
+  status = ExecNode::CodegenEvalConjuncts(codegen, conjunct_ctxs_, &eval_conjuncts_fn);
   if (!status.ok()) return NULL;
 
   // Replace all call sites with codegen version

@@ -375,15 +375,13 @@ string Literal::DebugString() const {
 // entry:
 //   ret { i8, i64 } { i8 0, i64 10 }
 // }
-Status Literal::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
+Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK();
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   Value* args[2];
   *fn = CreateIrFunctionPrototype(codegen, "Literal", &args);
   BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);

@@ -50,20 +50,21 @@ Status SortNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(sort_exec_exprs_.Prepare(
       state, child(0)->row_desc(), row_descriptor_, expr_mem_tracker()));
   AddExprCtxsToFree(sort_exec_exprs_);
-  TupleRowComparator less_than(sort_exec_exprs_, is_asc_order_, nulls_first_);
-
-  bool codegen_enabled = false;
-  Status codegen_status;
-  if (state->codegen_enabled()) {
-    codegen_status = less_than.Codegen(state);
-    codegen_enabled = codegen_status.ok();
-  }
-  runtime_profile()->AddCodegenMsg(codegen_enabled, codegen_status);
-
-  sorter_.reset(new Sorter(less_than, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
+  less_than_.reset(new TupleRowComparator(sort_exec_exprs_, is_asc_order_, nulls_first_));
+  sorter_.reset(new Sorter(*less_than_.get(), sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
       &row_descriptor_, mem_tracker(), runtime_profile(), state));
   RETURN_IF_ERROR(sorter_->Init());
+  if (!state->codegen_enabled()) {
+    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
+  }
   return Status::OK();
+}
+
+void SortNode::Codegen(RuntimeState* state) {
+  DCHECK(state->codegen_enabled());
+  Status codegen_status = less_than_->Codegen(state);
+  runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  ExecNode::Codegen(state);
 }
 
 Status SortNode::Open(RuntimeState* state) {

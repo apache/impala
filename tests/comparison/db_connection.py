@@ -225,6 +225,11 @@ class DbCursor(object):
     db_name = db_name.lower()
     self.execute('CREATE DATABASE ' + db_name)
 
+  def create_db_if_not_exists(self, db_name):
+    LOG.info("Creating database %s", db_name)
+    db_name = db_name.lower()
+    self.execute('CREATE DATABASE IF NOT EXISTS ' + db_name)
+
   def drop_db_if_exists(self, db_name):
     '''This should not be called from a conn to the database being dropped.'''
     db_name = db_name.lower()

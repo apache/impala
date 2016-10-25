@@ -975,7 +975,10 @@ public class HdfsTable extends Table {
     return partition;
   }
 
-  private void addDefaultPartition(StorageDescriptor storageDescriptor)
+  /**
+   * Adds or replaces the default partition.
+   */
+  public void addDefaultPartition(StorageDescriptor storageDescriptor)
       throws CatalogException {
     // Default partition has no files and is not referred to by scan nodes. Data sinks
     // refer to this to understand how to create new partitions.
@@ -1035,15 +1038,7 @@ public class HdfsTable extends Table {
         return;
       }
       // Load partition and file metadata
-      if (!reuseMetadata) {
-        // Load all partitions from Hive Metastore, including file metadata.
-        LOG.debug("load table from Hive Metastore: " + db_.getName() + "." + name_);
-        List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
-            Lists.newArrayList();
-        msPartitions.addAll(MetaStoreUtil.fetchAllPartitions(
-            client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES));
-        loadAllPartitions(msPartitions, msTbl);
-      } else {
+      if (reuseMetadata) {
         // Incrementally update this table's partitions and file metadata
         LOG.debug("incremental update for table: " + db_.getName() + "." + name_);
         Preconditions.checkState(partitionsToUpdate == null || loadFileMetadata);
@@ -1053,6 +1048,14 @@ public class HdfsTable extends Table {
         } else {
           updatePartitionsFromHms(client, partitionsToUpdate, loadFileMetadata);
         }
+      } else {
+        // Load all partitions from Hive Metastore, including file metadata.
+        LOG.debug("load table from Hive Metastore: " + db_.getName() + "." + name_);
+        List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
+            Lists.newArrayList();
+        msPartitions.addAll(MetaStoreUtil.fetchAllPartitions(
+            client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES));
+        loadAllPartitions(msPartitions, msTbl);
       }
       if (loadTableSchema) setAvroSchema(client, msTbl);
       updateStatsFromHmsTable(msTbl);
@@ -1430,9 +1433,9 @@ public class HdfsTable extends Table {
     HdfsStorageDescriptor fileFormatDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, msTbl.getSd());
     Map<FsKey, FileBlocksInfo> perFsFileBlocks = Maps.newHashMap();
-    for (HdfsPartition part: partitions) {
+    for (HdfsPartition partition: partitions) {
       org.apache.hadoop.hive.metastore.api.Partition msPart =
-          part.toHmsPartition();
+          partition.toHmsPartition();
       StorageDescriptor sd = null;
       if (msPart == null) {
         // If this partition is not stored in the Hive Metastore (e.g. default partition
@@ -1442,7 +1445,7 @@ public class HdfsTable extends Table {
       } else {
         sd = msPart.getSd();
       }
-      loadPartitionFileMetadata(sd, part, fileFormatDescriptor.getFileFormat(),
+      loadPartitionFileMetadata(sd, partition, fileFormatDescriptor.getFileFormat(),
           perFsFileBlocks);
     }
     loadDiskIds(perFsFileBlocks);

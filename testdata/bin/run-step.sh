@@ -36,7 +36,7 @@ function run-step {
   fi
   local LOG=${LOG_DIR}/${LOG_FILE_NAME}
 
-  echo -n "${MSG} (logging to ${LOG_FILE_NAME})... "
+  echo -n "${MSG} (logging to ${LOG})... "
   echo "Log for command '$@'" > ${LOG}
   if ! "$@" >> ${LOG} 2>&1 ; then
     echo "FAILED"
@@ -46,4 +46,3 @@ function run-step {
   fi
   echo OK
 }
-

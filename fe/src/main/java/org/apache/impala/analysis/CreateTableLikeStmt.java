@@ -17,16 +17,18 @@
 
 package org.apache.impala.analysis;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.permission.FsAction;
 
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCreateTableLikeParams;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TTableName;
-import com.google.common.base.Preconditions;
 
 /**
  * Represents a CREATE TABLE LIKE statement which creates a new table based on
@@ -134,10 +136,19 @@ public class CreateTableLikeStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
     Preconditions.checkState(srcTableName_ != null && !srcTableName_.isEmpty());
+    // We currently don't support creating a Kudu table using a CREATE TABLE LIKE
+    // statement (see IMPALA-4052).
+    if (fileFormat_ == THdfsFileFormat.KUDU) {
+      throw new AnalysisException("CREATE TABLE LIKE is not supported for Kudu tables");
+    }
+
     // Make sure the source table exists and the user has permission to access it.
-    srcDbName_ = analyzer
-        .getTable(srcTableName_, Privilege.VIEW_METADATA)
-        .getDb().getName();
+    Table srcTable = analyzer.getTable(srcTableName_, Privilege.VIEW_METADATA);
+    if (KuduTable.isKuduTable(srcTable.getMetaStoreTable())) {
+      throw new AnalysisException("Cloning a Kudu table using CREATE TABLE LIKE is " +
+          "not supported.");
+    }
+    srcDbName_ = srcTable.getDb().getName();
     tableName_.analyze();
     dbName_ = analyzer.getTargetDbName(tableName_);
     owner_ = analyzer.getUser().getName();

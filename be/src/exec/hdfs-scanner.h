@@ -347,14 +347,9 @@ class HdfsScanner {
                                    scanner_conjunct_ctxs_->size(), row);
   }
 
-  /// Utility method to write out tuples when there are no materialized
-  /// fields (e.g. select count(*) or only partition keys).
-  ///   num_tuples - Total number of tuples to write out.
-  /// Returns the number of tuples added to the row batch.
-  int WriteEmptyTuples(RowBatch* row_batch, int num_tuples);
-
-  /// Write empty tuples and commit them to the context object
-  int WriteEmptyTuples(ScannerContext* context, TupleRow* tuple_row, int num_tuples);
+  /// Sets 'num_tuples' template tuples in the batch that 'row' points to. Assumes the
+  /// 'tuple_row' only has a single tuple. Returns the number of tuples set.
+  int WriteTemplateTuples(TupleRow* row, int num_tuples);
 
   /// Processes batches of fields and writes them out to tuple_row_mem.
   /// - 'pool' mempool to allocate from for auxiliary tuple memory
@@ -455,9 +450,10 @@ class HdfsScanner {
     return reinterpret_cast<Tuple*>(mem + tuple_byte_size);
   }
 
+  /// Assumes the row only has a single tuple.
   inline TupleRow* next_row(TupleRow* r) const {
     uint8_t* mem = reinterpret_cast<uint8_t*>(r);
-    return reinterpret_cast<TupleRow*>(mem + batch_->row_byte_size());
+    return reinterpret_cast<TupleRow*>(mem + sizeof(Tuple*));
   }
 
   /// Simple wrapper around scanner_conjunct_ctxs_. Used in the codegen'd version of

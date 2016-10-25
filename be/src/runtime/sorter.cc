@@ -420,7 +420,7 @@ class Sorter::TupleSorter {
   const int tuple_size_;
 
   /// Tuple comparator with method Less() that returns true if lhs < rhs.
-  const TupleRowComparator comparator_;
+  const TupleRowComparator& comparator_;
 
   /// Number of times comparator_.Less() can be invoked again before
   /// comparator_.FreeLocalAllocations() needs to be called.

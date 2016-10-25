@@ -422,8 +422,8 @@ struct TInsertPartitionStatus {
   // query). See THdfsTable.partitions.
   1: optional i64 id
 
-  // The number of rows appended to this partition
-  2: optional i64 num_appended_rows
+  // The number of rows modified in this partition
+  2: optional i64 num_modified_rows
 
   // Detailed statistics gathered by table writers for this partition
   3: optional TInsertStats stats

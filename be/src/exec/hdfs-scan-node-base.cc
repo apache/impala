@@ -146,7 +146,6 @@ Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
   // Add row batch conjuncts
   DCHECK(conjuncts_map_[tuple_id_].empty());
   conjuncts_map_[tuple_id_] = conjunct_ctxs_;
-
   return Status::OK();
 }
 
@@ -293,10 +292,15 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   UpdateHdfsSplitStats(*scan_range_params_, &per_volume_stats);
   PrintHdfsSplitStats(per_volume_stats, &str);
   runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
+  if (!state->codegen_enabled()) {
+    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
+  }
+  return Status::OK();
+}
 
+void HdfsScanNodeBase::Codegen(RuntimeState* state) {
   // Create codegen'd functions
-  for (int format = THdfsFileFormat::TEXT;
-       format <= THdfsFileFormat::PARQUET; ++format) {
+  for (int format = THdfsFileFormat::TEXT; format <= THdfsFileFormat::PARQUET; ++format) {
     vector<HdfsFileDesc*>& file_descs =
         per_type_files_[static_cast<THdfsFileFormat::type>(format)];
 
@@ -332,26 +336,20 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
         status = Status("Not implemented for this format.");
     }
     DCHECK(fn != NULL || !status.ok());
-
     const char* format_name = _THdfsFileFormat_VALUES_TO_NAMES.find(format)->second;
-    if (!status.ok()) {
-      runtime_profile()->AddCodegenMsg(false, status, format_name);
-    } else {
-      runtime_profile()->AddCodegenMsg(true, status, format_name);
-      LlvmCodeGen* codegen;
-      RETURN_IF_ERROR(runtime_state_->GetCodegen(&codegen));
-      codegen->AddFunctionToJit(
-          fn, &codegend_fn_map_[static_cast<THdfsFileFormat::type>(format)]);
+    if (status.ok()) {
+      LlvmCodeGen* codegen = state->codegen();
+      DCHECK(codegen != NULL);
+      codegen->AddFunctionToJit(fn,
+          &codegend_fn_map_[static_cast<THdfsFileFormat::type>(format)]);
     }
+    runtime_profile()->AddCodegenMsg(status.ok(), status, format_name);
   }
-
-  return Status::OK();
+  ExecNode::Codegen(state);
 }
 
 Status HdfsScanNodeBase::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
-
-  if (file_descs_.empty()) return Status::OK();
 
   // Open collection conjuncts
   for (const auto& entry: conjuncts_map_) {

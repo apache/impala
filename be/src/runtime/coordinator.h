@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_RUNTIME_COORDINATOR_H
 #define IMPALA_RUNTIME_COORDINATOR_H
 

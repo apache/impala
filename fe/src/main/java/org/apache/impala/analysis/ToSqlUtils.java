@@ -22,10 +22,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.impala.catalog.KuduTable;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.antlr.runtime.ANTLRStringStream;
 import org.antlr.runtime.Token;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.parse.HiveLexer;
 
@@ -35,16 +41,11 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.View;
-import org.apache.impala.common.PrintUtils;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import org.apache.impala.util.KuduUtil;
 
 /**
  * Contains utility methods for creating SQL strings, for example,
@@ -132,8 +133,9 @@ public class ToSqlUtils {
     }
     // TODO: Pass the correct compression, if applicable.
     return getCreateTableSql(stmt.getDb(), stmt.getTbl(), stmt.getComment(), colsSql,
-        partitionColsSql, stmt.getTblProperties(), stmt.getSerdeProperties(),
-        stmt.isExternal(), stmt.getIfNotExists(), stmt.getRowFormat(),
+        partitionColsSql, stmt.getTblPrimaryKeyColumnNames(), null,
+        stmt.getTblProperties(), stmt.getSerdeProperties(), stmt.isExternal(),
+        stmt.getIfNotExists(), stmt.getRowFormat(),
         HdfsFileFormat.fromThrift(stmt.getFileFormat()), HdfsCompression.NONE, null,
         stmt.getLocation());
   }
@@ -152,7 +154,8 @@ public class ToSqlUtils {
     }
     // TODO: Pass the correct compression, if applicable.
     String createTableSql = getCreateTableSql(innerStmt.getDb(), innerStmt.getTbl(),
-        innerStmt.getComment(), null, partitionColsSql, innerStmt.getTblProperties(),
+        innerStmt.getComment(), null, partitionColsSql,
+        innerStmt.getTblPrimaryKeyColumnNames(), null, innerStmt.getTblProperties(),
         innerStmt.getSerdeProperties(), innerStmt.isExternal(),
         innerStmt.getIfNotExists(), innerStmt.getRowFormat(),
         HdfsFileFormat.fromThrift(innerStmt.getFileFormat()), HdfsCompression.NONE, null,
@@ -169,6 +172,9 @@ public class ToSqlUtils {
     if (table instanceof View) return getCreateViewSql((View)table);
     org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
     HashMap<String, String> properties = Maps.newHashMap(msTable.getParameters());
+    if (properties.containsKey("transient_lastDdlTime")) {
+      properties.remove("transient_lastDdlTime");
+    }
     boolean isExternal = msTable.getTableType() != null &&
         msTable.getTableType().equals(TableType.EXTERNAL_TABLE.toString());
     String comment = properties.get("comment");
@@ -194,17 +200,40 @@ public class ToSqlUtils {
     Map<String, String> serdeParameters = msTable.getSd().getSerdeInfo().getParameters();
 
     String storageHandlerClassName = table.getStorageHandlerClassName();
+    List<String> primaryKeySql = Lists.newArrayList();
+    String kuduDistributeByParams = null;
     if (table instanceof KuduTable) {
+      KuduTable kuduTable = (KuduTable) table;
       // Kudu tables don't use LOCATION syntax
       location = null;
-      format = null;
+      format = HdfsFileFormat.KUDU;
       // Kudu tables cannot use the Hive DDL syntax for the storage handler
       storageHandlerClassName = null;
+      properties.remove(KuduTable.KEY_STORAGE_HANDLER);
+      String kuduTableName = properties.get(KuduTable.KEY_TABLE_NAME);
+      Preconditions.checkNotNull(kuduTableName);
+      if (kuduTableName.equals(KuduUtil.getDefaultCreateKuduTableName(
+          table.getDb().getName(), table.getName()))) {
+        properties.remove(KuduTable.KEY_TABLE_NAME);
+      }
+      // Internal property, should not be exposed to the user.
+      properties.remove(StatsSetupConst.DO_NOT_UPDATE_STATS);
+
+      if (!isExternal) {
+        primaryKeySql.addAll(kuduTable.getPrimaryKeyColumnNames());
+
+        List<String> paramsSql = Lists.newArrayList();
+        for (DistributeParam param: kuduTable.getDistributeBy()) {
+          paramsSql.add(param.toSql());
+        }
+        kuduDistributeByParams = Joiner.on(", ").join(paramsSql);
+      }
     }
     HdfsUri tableLocation = location == null ? null : new HdfsUri(location);
     return getCreateTableSql(table.getDb().getName(), table.getName(), comment, colsSql,
-        partitionColsSql, properties, serdeParameters, isExternal, false, rowFormat,
-        format, compression, storageHandlerClassName, tableLocation);
+        partitionColsSql, primaryKeySql, kuduDistributeByParams, properties,
+        serdeParameters, isExternal, false, rowFormat, format, compression,
+        storageHandlerClassName, tableLocation);
   }
 
   /**
@@ -214,6 +243,7 @@ public class ToSqlUtils {
    */
   public static String getCreateTableSql(String dbName, String tableName,
       String tableComment, List<String> columnsSql, List<String> partitionColumnsSql,
+      List<String> primaryKeysSql, String kuduDistributeByParams,
       Map<String, String> tblProperties, Map<String, String> serdeParameters,
       boolean isExternal, boolean ifNotExists, RowFormat rowFormat,
       HdfsFileFormat fileFormat, HdfsCompression compression, String storageHandlerClass,
@@ -227,7 +257,11 @@ public class ToSqlUtils {
     sb.append(tableName);
     if (columnsSql != null) {
       sb.append(" (\n  ");
-      sb.append(Joiner.on(", \n  ").join(columnsSql));
+      sb.append(Joiner.on(",\n  ").join(columnsSql));
+      if (!primaryKeysSql.isEmpty()) {
+        sb.append(",\n  PRIMARY KEY (");
+        Joiner.on(", ").appendTo(sb, primaryKeysSql).append(")");
+      }
       sb.append("\n)");
     }
     sb.append("\n");
@@ -236,6 +270,10 @@ public class ToSqlUtils {
     if (partitionColumnsSql != null && partitionColumnsSql.size() > 0) {
       sb.append(String.format("PARTITIONED BY (\n  %s\n)\n",
           Joiner.on(", \n  ").join(partitionColumnsSql)));
+    }
+
+    if (kuduDistributeByParams != null) {
+      sb.append("DISTRIBUTE BY " + kuduDistributeByParams + "\n");
     }
 
     if (rowFormat != null && !rowFormat.isDefault()) {

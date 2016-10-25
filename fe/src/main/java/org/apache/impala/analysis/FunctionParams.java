@@ -53,9 +53,10 @@ class FunctionParams implements Cloneable {
 
   public boolean isStar() { return isStar_; }
   public boolean isDistinct() { return isDistinct_; }
-  public boolean isIgnoreNulls() { return isIgnoreNulls_; }
-  public List<Expr> exprs() { return exprs_; }
   public void setIsDistinct(boolean v) { isDistinct_ = v; }
+  public boolean isIgnoreNulls() { return isIgnoreNulls_; }
+  public void setIsIgnoreNulls(boolean b) { isIgnoreNulls_ = b; }
+  public List<Expr> exprs() { return exprs_; }
   public int size() { return exprs_ == null ? 0 : exprs_.size(); }
 
   // c'tor for <agg>(*)

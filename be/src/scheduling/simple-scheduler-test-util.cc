@@ -449,13 +449,13 @@ SchedulerWrapper::SchedulerWrapper(const Plan& plan)
   InitializeScheduler();
 }
 
-void SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
+Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
   DCHECK(scheduler_ != NULL);
 
   // Compute Assignment.
   FragmentScanRangeAssignment* assignment = result->AddAssignment();
-  scheduler_->ComputeScanRangeAssignment(*scheduler_->GetBackendConfig(), 0, NULL, false,
-      plan_.scan_range_locations(), plan_.referenced_datanodes(), exec_at_coord,
+  return scheduler_->ComputeScanRangeAssignment(*scheduler_->GetBackendConfig(), 0, NULL,
+      false, plan_.scan_range_locations(), plan_.referenced_datanodes(), exec_at_coord,
       plan_.query_options(), NULL, assignment);
 }
 

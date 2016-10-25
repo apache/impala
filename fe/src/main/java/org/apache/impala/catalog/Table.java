@@ -455,6 +455,11 @@ public abstract class Table implements CatalogObject {
   @Override
   public boolean isLoaded() { return true; }
 
+  public static boolean isExternalTable(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    return msTbl.getTableType().equalsIgnoreCase(TableType.EXTERNAL_TABLE.toString());
+  }
+
   /**
    * If the table is cached, it returns a <cache pool name, replication factor> pair
    * and adds the table cached directive ID to 'cacheDirIds'. Otherwise, it

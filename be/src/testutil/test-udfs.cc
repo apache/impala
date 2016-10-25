@@ -333,3 +333,32 @@ IntVal EightArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
     const IntVal& v7, const IntVal& v8) {
   return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val + v6.val + v7.val + v8.val);
 }
+
+IntVal NineArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
+    const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6,
+    const IntVal& v7, const IntVal& v8, const IntVal& v9) {
+  return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val + v6.val + v7.val + v8.val +
+      v9.val);
+}
+
+IntVal TwentyArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
+    const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6,
+    const IntVal& v7, const IntVal& v8, const IntVal& v9, const IntVal& v10,
+    const IntVal& v11, const IntVal& v12, const IntVal& v13, const IntVal& v14,
+    const IntVal& v15, const IntVal& v16, const IntVal& v17, const IntVal& v18,
+    const IntVal& v19, const IntVal& v20) {
+  return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val + v6.val + v7.val + v8.val +
+      v9.val + v10.val + v11.val + v12.val + v13.val + v14.val + v15.val + v16.val +
+      v17.val + v18.val + v19.val + v20.val);
+}
+
+IntVal TwentyOneArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
+    const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6,
+    const IntVal& v7, const IntVal& v8, const IntVal& v9, const IntVal& v10,
+    const IntVal& v11, const IntVal& v12, const IntVal& v13, const IntVal& v14,
+    const IntVal& v15, const IntVal& v16, const IntVal& v17, const IntVal& v18,
+    const IntVal& v19, const IntVal& v20, const IntVal& v21) {
+  return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val + v6.val + v7.val + v8.val +
+      v9.val + v10.val + v11.val + v12.val + v13.val + v14.val + v15.val + v16.val +
+      v17.val + v18.val + v19.val + v20.val + v21.val);
+}

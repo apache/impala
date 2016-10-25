@@ -1,20 +1,13 @@
 ====
 ---- QUERY
-create table simple (id int, name string, valf float, vali bigint)
-distribute by hash into 3 buckets
-TBLPROPERTIES(
- 'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
- 'kudu.table_name' = 'query_test_simple',
- 'kudu.split_keys' = '[[10], [30]]',
- 'kudu.master_addresses' = '127.0.0.1',
- 'kudu.key_columns' = 'id'
-)
+create table simple (id int primary key, name string, valf float, vali bigint)
+  distribute by hash (id) into 3 buckets stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
 -- Alter master address to a different location
 alter table simple set tblproperties (
-  'kudu.master_addresses' = '192.168.0.1'
+  'kudu.master_addresses' = 'localhost'
 )
 ---- RESULTS
 ====
@@ -22,13 +15,19 @@ alter table simple set tblproperties (
 -- Show that new address is picked up
 describe formatted simple
 ---- RESULTS: VERIFY_IS_SUBSET
-'','kudu.master_addresses','192.168.0.1         '
+'','kudu.master_addresses','localhost           '
 ---- TYPES
 STRING,STRING,STRING
 ====
 ---- QUERY
 alter table simple set tblproperties ('kudu.master_addresses' = '127.0.0.1')
 ---- RESULTS
+====
+---- QUERY
+-- Try to use an invalid master address
+alter table simple set tblproperties ('kudu.master_addresses' = 'invalid_host')
+---- CATCH
+ImpalaRuntimeException: Kudu table 'impala::$DATABASE.simple' does not exist on master 'invalid_host'
 ====
 ---- QUERY
 alter table simple rename to simple_new;

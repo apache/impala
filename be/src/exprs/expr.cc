@@ -267,6 +267,16 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
   }
 }
 
+bool Expr::NeedCodegen(const TExpr& texpr) {
+  for (const TExprNode& texpr_node : texpr.nodes) {
+    if (texpr_node.node_type == TExprNodeType::FUNCTION_CALL && texpr_node.__isset.fn &&
+        texpr_node.fn.binary_type == TFunctionBinaryType::IR) {
+      return true;
+    }
+  }
+  return false;
+}
+
 struct MemLayoutData {
   int expr_idx;
   int byte_size;
@@ -655,13 +665,11 @@ int Expr::InlineConstants(const FunctionContext::TypeDesc& return_type,
   return replaced;
 }
 
-Status Expr::GetCodegendComputeFnWrapper(RuntimeState* state, Function** fn) {
+Status Expr::GetCodegendComputeFnWrapper(LlvmCodeGen* codegen, Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK();
   }
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   Function* static_getval_fn = GetStaticGetValWrapper(type(), codegen);
 
   // Call it passing this as the additional first argument.

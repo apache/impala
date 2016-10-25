@@ -27,7 +27,6 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableId;
-import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.THdfsFileFormat;
@@ -62,7 +61,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
   /////////////////////////////////////////
 
   private final static EnumSet<THdfsFileFormat> SUPPORTED_INSERT_FORMATS =
-      EnumSet.of(THdfsFileFormat.PARQUET, THdfsFileFormat.TEXT);
+      EnumSet.of(THdfsFileFormat.PARQUET, THdfsFileFormat.TEXT, THdfsFileFormat.KUDU);
 
   /**
    * Builds a CREATE TABLE AS SELECT statement
@@ -94,6 +93,18 @@ public class CreateTableAsSelectStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed()) return;
     super.analyze(analyzer);
+
+    if (!SUPPORTED_INSERT_FORMATS.contains(createStmt_.getFileFormat())) {
+      throw new AnalysisException(String.format("CREATE TABLE AS SELECT " +
+          "does not support the (%s) file format. Supported formats are: (%s)",
+          createStmt_.getFileFormat().toString().replace("_", ""),
+          "PARQUET, TEXTFILE, KUDU"));
+    }
+    if (createStmt_.getFileFormat() == THdfsFileFormat.KUDU && createStmt_.isExternal()) {
+      // TODO: Add support for CTAS on external Kudu tables (see IMPALA-4318)
+      throw new AnalysisException(String.format("CREATE TABLE AS SELECT is not " +
+          "supported for external Kudu tables."));
+    }
 
     // The analysis for CTAS happens in two phases - the first phase happens before
     // the target table exists and we want to validate the CREATE statement and the
@@ -154,12 +165,6 @@ public class CreateTableAsSelectStmt extends StatementBase {
     }
     createStmt_.analyze(analyzer);
 
-    if (!SUPPORTED_INSERT_FORMATS.contains(createStmt_.getFileFormat())) {
-      throw new AnalysisException(String.format("CREATE TABLE AS SELECT " +
-          "does not support (%s) file format. Supported formats are: (%s)",
-          createStmt_.getFileFormat().toString().replace("_", ""),
-          "PARQUET, TEXTFILE"));
-    }
 
     // The full privilege check for the database will be done as part of the INSERT
     // analysis.
@@ -188,14 +193,20 @@ public class CreateTableAsSelectStmt extends StatementBase {
       // SelectStmt (or the BE will be very confused). To ensure the ID is unique within
       // this query, just assign it the invalid table ID. The CatalogServer will assign
       // this table a proper ID once it is created there as part of the CTAS execution.
-      Table table = Table.fromMetastoreTable(TableId.createInvalidId(), db, msTbl);
-      Preconditions.checkState(table != null &&
-          (table instanceof HdfsTable || table instanceof KuduTable));
+      Table tmpTable = null;
+      if (KuduTable.isKuduTable(msTbl)) {
+        tmpTable = KuduTable.createCtasTarget(db, msTbl, createStmt_.getColumnDefs(),
+            createStmt_.getTblPrimaryKeyColumnNames(), createStmt_.getDistributeParams());
+      } else {
+        // TODO: Creating a tmp table using load() is confusing.
+        // Refactor it to use a 'createCtasTarget()' function similar to Kudu table.
+        tmpTable = Table.fromMetastoreTable(TableId.createInvalidId(), db, msTbl);
+        tmpTable.load(true, client.getHiveClient(), msTbl);
+      }
+      Preconditions.checkState(tmpTable != null &&
+          (tmpTable instanceof HdfsTable || tmpTable instanceof KuduTable));
 
-      table.load(true, client.getHiveClient(), msTbl);
-      insertStmt_.setTargetTable(table);
-    } catch (TableLoadingException e) {
-      throw new AnalysisException(e.getMessage(), e);
+      insertStmt_.setTargetTable(tmpTable);
     } catch (Exception e) {
       throw new AnalysisException(e.getMessage(), e);
     }

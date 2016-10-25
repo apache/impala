@@ -22,9 +22,6 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.AnalyticWindow.Boundary;
 import org.apache.impala.analysis.AnalyticWindow.BoundaryType;
 import org.apache.impala.catalog.AggregateFunction;
@@ -38,6 +35,9 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.util.TColumnValueUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -750,7 +750,8 @@ public class AnalyticExpr extends Expr {
           window_.getRightBoundary());
     }
 
-    // 8. Append IGNORE NULLS to fn name if set.
+    // 8. Change fn name to the IGNORE NULLS version. Also unset the IGNORE NULLS flag
+    // to allow statement rewriting for subqueries.
     if (getFnCall().getParams().isIgnoreNulls()) {
       if (analyticFnName.getFunction().equals(LAST_VALUE)) {
         fnCall_ = new FunctionCallExpr(new FunctionName(LAST_VALUE_IGNORE_NULLS),
@@ -760,6 +761,7 @@ public class AnalyticExpr extends Expr {
         fnCall_ = new FunctionCallExpr(new FunctionName(FIRST_VALUE_IGNORE_NULLS),
             getFnCall().getParams());
       }
+      getFnCall().getParams().setIsIgnoreNulls(false);
 
       fnCall_.setIsAnalyticFnCall(true);
       fnCall_.setIsInternalFnCall(true);

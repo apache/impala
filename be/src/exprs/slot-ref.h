@@ -43,7 +43,7 @@ class SlotRef : public Expr {
   virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const;
   const SlotId& slot_id() const { return slot_id_; }
 
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
 
   virtual impala_udf::BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
   virtual impala_udf::TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow*);

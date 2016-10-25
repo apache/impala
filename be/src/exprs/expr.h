@@ -173,6 +173,10 @@ class Expr {
   /// Returns the number of slots added to the vector
   virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const;
 
+  /// Returns true iff the expression 'texpr' contains UDF available only as LLVM IR. In
+  /// which case, it's impossible to interpret this expression and codegen must be used.
+  static bool NeedCodegen(const TExpr& texpr);
+
   /// Create expression tree from the list of nodes contained in texpr within 'pool'.
   /// Returns the root of expression tree in 'expr' and the corresponding ExprContext in
   /// 'ctx'.
@@ -234,7 +238,7 @@ class Expr {
   //
   /// The function should evaluate this expr over 'row' and return the result as the
   /// appropriate type of AnyVal.
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) = 0;
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) = 0;
 
   /// If this expr is constant, evaluates the expr with no input row argument and returns
   /// the output. Returns NULL if the argument is not constant. The returned AnyVal* is
@@ -389,7 +393,7 @@ class Expr {
   /// functions that use the IRBuilder. It doesn't provide any performance benefit over
   /// the interpreted path.
   /// TODO: this should be replaced with fancier xcompiling infrastructure
-  Status GetCodegendComputeFnWrapper(RuntimeState* state, llvm::Function** fn);
+  Status GetCodegendComputeFnWrapper(LlvmCodeGen* codegen, llvm::Function** fn);
 
   /// Returns the IR version of the static Get*Val() wrapper function corresponding to
   /// 'type'. This is used for calling interpreted Get*Val() functions from codegen'd

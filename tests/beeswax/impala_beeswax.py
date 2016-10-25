@@ -416,8 +416,8 @@ class ImpalaBeeswaxClient(object):
     """Executes an insert query"""
     result = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
     # The insert was successful
-    num_rows = sum(map(int, result.rows_appended.values()))
-    data = ["%s: %s" % row for row in result.rows_appended.iteritems()]
+    num_rows = sum(map(int, result.rows_modified.values()))
+    data = ["%s: %s" % row for row in result.rows_modified.iteritems()]
     exec_result = ImpalaBeeswaxResult(success=True, data=data)
     exec_result.summary = "Inserted %d rows" % (num_rows,)
     return exec_result

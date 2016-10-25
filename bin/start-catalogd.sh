@@ -34,29 +34,17 @@ JVM_ARGS=""
 for ARG in $*
 do
   case "$ARG" in
-    -build_type=debug)
-      BUILD_TYPE=debug
-      ;;
-    -build_type=release)
-      BUILD_TYPE=release
-      ;;
-    -build_type=latest)
-      ;;
+    -build_type=debug) BUILD_TYPE=debug;;
+    -build_type=release) BUILD_TYPE=release;;
+    -build_type=latest) ;;
     -build_type=*)
       echo "Invalid build type. Valid values are: debug, release"
-      exit 1
-      ;;
-    -jvm_debug_port=*)
-      JVM_DEBUG_PORT="${ARG#*=}"
-      ;;
-    -jvm_suspend)
-      JVM_SUSPEND="y"
-      ;;
-    -jvm_args=*)
-      JVM_ARGS="${ARG#*=}"
-      ;;
-    *)
-      CATALOGD_ARGS="${CATALOGD_ARGS} ${ARG}"
+      exit 1;;
+    -jvm_debug_port=*) JVM_DEBUG_PORT="${ARG#*=}";;
+    -jvm_suspend) JVM_SUSPEND="y";;
+    -jvm_args=*) JVM_ARGS="${ARG#*=}";;
+    -kudu_masters=*) CATALOGD_ARGS+=" ${ARG#*=}";;
+    *) CATALOGD_ARGS="${CATALOGD_ARGS} ${ARG}";;
   esac
 done
 

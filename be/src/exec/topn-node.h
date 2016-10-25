@@ -45,6 +45,7 @@ class TopNNode : public ExecNode {
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
+  virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Reset(RuntimeState* state);
@@ -56,9 +57,6 @@ class TopNNode : public ExecNode {
  private:
 
   friend class TupleLessThan;
-
-  /// Creates a codegen'd version of InsertBatch() that is used in Open().
-  Status Codegen(RuntimeState* state);
 
   /// Inserts all the rows in 'batch' into the queue.
   void InsertBatch(RowBatch* batch);

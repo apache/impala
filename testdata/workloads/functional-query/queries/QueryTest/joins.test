@@ -720,3 +720,13 @@ on extract(minute from t1.timestamp_col) = extract(hour from t2.timestamp_col);
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Regression for IMPALA-3884. Exercise HashTableCtx::AssignNullValue() for
+# 128-bit TimestampValue.
+select count(*) from functional.alltypes t1 right outer join functional.decimal_tbl t2 on
+t1.timestamp_col = cast(t2.d4 as TIMESTAMP);
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====

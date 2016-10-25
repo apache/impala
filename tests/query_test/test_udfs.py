@@ -73,6 +73,11 @@ class TestUdfs(ImpalaTestSuite):
       self.run_test_case('QueryTest/udf-init-close', vector, use_db=database)
 
   def test_udf_errors(self, vector):
+    # Disable codegen to force interpretation path to be taken.
+    # Aim to exercise two failure cases:
+    # 1. too many arguments
+    # 2. IR UDF
+    vector.get_value('exec_option')['disable_codegen'] = 1
     self.run_test_case('QueryTest/udf-errors', vector)
 
   def test_udf_invalid_symbol(self, vector):
@@ -371,6 +376,11 @@ drop function if exists {database}.five_args(int, int, int, int, int);
 drop function if exists {database}.six_args(int, int, int, int, int, int);
 drop function if exists {database}.seven_args(int, int, int, int, int, int, int);
 drop function if exists {database}.eight_args(int, int, int, int, int, int, int, int);
+drop function if exists {database}.nine_args(int, int, int, int, int, int, int, int, int);
+drop function if exists {database}.twenty_args(int, int, int, int, int, int, int, int, int,
+    int, int, int, int, int, int, int, int, int, int, int);
+drop function if exists {database}.twenty_one_args(int, int, int, int, int, int, int, int,
+    int, int, int, int, int, int, int, int, int, int, int, int, int);
 
 create database if not exists {database};
 
@@ -493,4 +503,12 @@ location '{location}' symbol='SevenArgs';
 
 create function {database}.eight_args(int, int, int, int, int, int, int, int) returns int
 location '{location}' symbol='EightArgs';
+
+create function {database}.twenty_args(int, int, int, int, int, int, int, int, int, int,
+    int, int, int, int, int, int, int, int, int, int) returns int
+location '{location}' symbol='TwentyArgs';
+
+create function {database}.twenty_one_args(int, int, int, int, int, int, int, int, int, int,
+    int, int, int, int, int, int, int, int, int, int, int) returns int
+location '{location}' symbol='TwentyOneArgs';
 """

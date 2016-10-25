@@ -26,9 +26,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.Assert;
-import org.junit.Test;
-
 import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Catalog;
@@ -47,6 +44,9 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TQueryOptions;
+import org.junit.Assert;
+import org.junit.Test;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -729,6 +729,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         + "functional.alltypesagg");
     AnalyzesOk("select last_value(tinyint_col ignore nulls) over (order by id) from "
         + "functional.alltypesagg");
+    // IMPALA-4301: Test IGNORE NULLS with subqueries.
+    AnalyzesOk("select first_value(tinyint_col ignore nulls) over (order by id)," +
+               "last_value(tinyint_col ignore nulls) over (order by id)" +
+               "from functional.alltypesagg a " +
+               "where exists (select 1 from functional.alltypes b where a.id = b.id)");
 
     // legal combinations of analytic and agg functions
     AnalyzesOk("select sum(count(id)) over (partition by min(int_col) "

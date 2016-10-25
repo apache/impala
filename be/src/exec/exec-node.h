@@ -63,11 +63,16 @@ class ExecNode {
   /// Sets up internal structures, etc., without doing any actual work.
   /// Must be called prior to Open(). Will only be called once in this
   /// node's lifetime.
-  /// All code generation (adding functions to the LlvmCodeGen object) must happen
-  /// in Prepare().  Retrieving the jit compiled function pointer must happen in
-  /// Open().
   /// If overridden in subclass, must first call superclass's Prepare().
   virtual Status Prepare(RuntimeState* state);
+
+  /// Recursively calls Codegen() on all children.
+  /// Expected to be overriden in subclass to generate LLVM IR functions and register
+  /// them with the LlvmCodeGen object. The function pointers of the compiled IR functions
+  /// will be set up in PlanFragmentExecutor::Open(). If overridden in subclass, must also
+  /// call superclass's Codegen() before or after the code generation for this exec node.
+  /// Will only be called once in the node's lifetime.
+  virtual void Codegen(RuntimeState* state);
 
   /// Performs any preparatory work prior to calling GetNext().
   /// Caller must not be holding any io buffers. This will cause deadlock.
@@ -146,7 +151,7 @@ class ExecNode {
   /// Codegen EvalConjuncts(). Returns a non-OK status if the function couldn't be
   /// codegen'd. The codegen'd version uses inlined, codegen'd GetBooleanVal() functions.
   static Status CodegenEvalConjuncts(
-      RuntimeState* state, const std::vector<ExprContext*>& conjunct_ctxs,
+      LlvmCodeGen* codegen, const std::vector<ExprContext*>& conjunct_ctxs,
       llvm::Function** fn, const char* name = "EvalConjuncts");
 
   /// Returns a string representation in DFS order of the plan rooted at this.

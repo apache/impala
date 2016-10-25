@@ -5,9 +5,9 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.testtbl]
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=testtbl, range-partition: [(int64 id=1003), (int64 id=1007))}
-  ScanToken{table=testtbl, range-partition: [(int64 id=1007), <end>)}
-  ScanToken{table=testtbl, range-partition: [<start>, (int64 id=1003))}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1003), (int64 id=1007))}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1007), <end>)}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1003))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -23,9 +23,9 @@ PLAN-ROOT SINK
    kudu predicates: name = '10'
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=testtbl, range-partition: [(int64 id=1003), (int64 id=1007))}
-  ScanToken{table=testtbl, range-partition: [(int64 id=1007), <end>)}
-  ScanToken{table=testtbl, range-partition: [<start>, (int64 id=1003))}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1003), (int64 id=1007))}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1007), <end>)}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1003))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -111,7 +111,7 @@ PLAN-ROOT SINK
    kudu predicates: id <= 20, zip <= 30, id >= 10, zip < 50, zip <= 5, zip > 1, zip >= 0, name = 'foo'
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=testtbl, range-partition: [<start>, (int64 id=1003))}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1003))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -131,7 +131,7 @@ PLAN-ROOT SINK
    kudu predicates: id <= 60, id < 40, id < 103
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=testtbl, range-partition: [<start>, (int64 id=1003))}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1003))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -152,9 +152,9 @@ PLAN-ROOT SINK
    kudu predicates: name = 'a'
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=testtbl, range-partition: [(int64 id=1003), (int64 id=1007))}
-  ScanToken{table=testtbl, range-partition: [(int64 id=1007), <end>)}
-  ScanToken{table=testtbl, range-partition: [<start>, (int64 id=1003))}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1003), (int64 id=1007))}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1007), <end>)}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1003))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -175,9 +175,9 @@ PLAN-ROOT SINK
    predicates: name IS NULL, CAST(sin(id) AS BOOLEAN) = TRUE
 ---- SCANRANGELOCATIONS
 NODE 0:
-  ScanToken{table=testtbl, range-partition: [(int64 id=1003), (int64 id=1007))}
-  ScanToken{table=testtbl, range-partition: [(int64 id=1007), <end>)}
-  ScanToken{table=testtbl, range-partition: [<start>, (int64 id=1003))}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1003), (int64 id=1007))}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1007), <end>)}
+  ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1003))}
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |

@@ -24,3 +24,11 @@ visit the [Impala homepage](https://impala.apache.org).
 If you are interested in contributing to Impala as a developer, or learning more about
 Impala's internals and architecture, visit the
 [Impala wiki](https://cwiki.apache.org/confluence/display/IMPALA/Impala+Home).
+
+## Supported Platforms
+
+Impala only supports Linux at the moment.
+
+## Build Instructions
+
+./buildall.sh -notests

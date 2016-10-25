@@ -28,7 +28,7 @@ class TExprNode;
 class NullLiteral: public Expr {
  public:
   NullLiteral(PrimitiveType type) : Expr(type) { }
-  virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
 
   virtual impala_udf::BooleanVal GetBooleanVal(ExprContext*, const TupleRow*);
   virtual impala_udf::TinyIntVal GetTinyIntVal(ExprContext*, const TupleRow*);

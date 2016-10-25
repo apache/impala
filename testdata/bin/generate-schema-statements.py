@@ -134,7 +134,7 @@ FILE_FORMAT_MAP = {
     "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'",
   'avro': 'AVRO',
   'hbase': "'org.apache.hadoop.hive.hbase.HBaseStorageHandler'",
-  'kudu': "'com.cloudera.kudu.hive.KuduStorageHandler'",
+  'kudu': "KUDU",
   }
 
 HIVE_TO_AVRO_TYPE_MAP = {
@@ -193,17 +193,17 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   if file_format == 'hbase':
     return build_hbase_create_stmt_in_hive(columns, partition_columns, table_name)
 
+  primary_keys_clause = ""
+
   partitioned_by = str()
   if partition_columns:
     partitioned_by = 'PARTITIONED BY (%s)' % ', '.join(partition_columns.split('\n'))
 
   row_format_stmt = str()
-  if row_format:
+  if row_format and file_format != 'kudu':
     row_format_stmt = 'ROW FORMAT ' + row_format
 
-  file_format_string = str()
-  if file_format != 'kudu':
-    file_format_string = "STORED AS {file_format}"
+  file_format_string = "STORED AS {file_format}"
 
   tblproperties_clause = "TBLPROPERTIES (\n{0}\n)"
   tblproperties = {}
@@ -218,7 +218,7 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     else:
       tblproperties["avro.schema.url"] = "hdfs://%s/%s/%s/{table_name}.json" \
         % (options.hdfs_namenode, options.hive_warehouse_dir, avro_schema_dir)
-  elif file_format == 'parquet':
+  elif file_format in 'parquet':
     row_format_stmt = str()
   elif file_format == 'kudu':
     # Use partitioned_by to set a trivial hash distribution
@@ -229,11 +229,9 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     kudu_master = os.getenv("KUDU_MASTER_ADDRESS", "127.0.0.1")
     kudu_master_port = os.getenv("KUDU_MASTER_PORT", "7051")
     row_format_stmt = str()
-    tblproperties["storage_handler"] = "com.cloudera.kudu.hive.KuduStorageHandler"
     tblproperties["kudu.master_addresses"] = \
       "{0}:{1}".format(kudu_master, kudu_master_port)
-    tblproperties["kudu.table_name"] = table_name
-    tblproperties["kudu.key_columns"] = columns.split("\n")[0].split(" ")[0]
+    primary_keys_clause = ", PRIMARY KEY (%s)" % columns.split("\n")[0].split(" ")[0]
     # Kudu's test tables are managed.
     external = ""
 
@@ -261,7 +259,8 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   # (e.g. Avro)
   stmt = """
 CREATE {external} TABLE IF NOT EXISTS {{db_name}}{{db_suffix}}.{{table_name}} (
-{columns})
+{columns}
+{primary_keys})
 {partitioned_by}
 {row_format}
 {file_format_string}
@@ -271,6 +270,7 @@ LOCATION '{{hdfs_location}}'
     external=external,
     row_format=row_format_stmt,
     columns=',\n'.join(columns.split('\n')),
+    primary_keys=primary_keys_clause,
     partitioned_by=partitioned_by,
     tblproperties=tblproperties_clause,
     file_format_string=file_format_string

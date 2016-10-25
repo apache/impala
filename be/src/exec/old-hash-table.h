@@ -233,15 +233,15 @@ class OldHashTable {
   /// Codegen for evaluating a tuple row.  Codegen'd function matches the signature
   /// for EvalBuildRow and EvalTupleRow.
   /// if build_row is true, the codegen uses the build_exprs, otherwise the probe_exprs
-  llvm::Function* CodegenEvalTupleRow(RuntimeState* state, bool build_row);
+  llvm::Function* CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build_row);
 
   /// Codegen for hashing the expr values in 'expr_values_buffer_'.  Function
   /// prototype matches HashCurrentRow identically.
-  llvm::Function* CodegenHashCurrentRow(RuntimeState* state);
+  llvm::Function* CodegenHashCurrentRow(LlvmCodeGen* codegen);
 
   /// Codegen for evaluating a TupleRow and comparing equality against
   /// 'expr_values_buffer_'.  Function signature matches OldHashTable::Equals()
-  llvm::Function* CodegenEquals(RuntimeState* state);
+  llvm::Function* CodegenEquals(LlvmCodeGen* codegen);
 
   static const char* LLVM_CLASS_NAME;
 

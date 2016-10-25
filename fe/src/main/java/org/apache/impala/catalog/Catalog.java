@@ -519,4 +519,8 @@ public abstract class Catalog {
     }
     return result;
   }
+
+  public static boolean isDefaultDb(String dbName) {
+    return DEFAULT_DB.equals(dbName.toLowerCase());
+  }
 }

@@ -126,6 +126,7 @@ class PartitionedAggregationNode : public ExecNode {
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
+  virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Reset(RuntimeState* state);
@@ -136,7 +137,6 @@ class PartitionedAggregationNode : public ExecNode {
  protected:
   /// Frees local allocations from aggregate_evaluators_ and agg_fn_ctxs
   virtual Status QueryMaintenance(RuntimeState* state);
-
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
@@ -637,11 +637,11 @@ class PartitionedAggregationNode : public ExecNode {
 
   /// Codegen UpdateSlot(). Returns non-OK status if codegen is unsuccessful.
   /// Assumes is_merge = false;
-  Status CodegenUpdateSlot(AggFnEvaluator* evaluator, SlotDescriptor* slot_desc,
-      llvm::Function** fn);
+  Status CodegenUpdateSlot(LlvmCodeGen* codegen, AggFnEvaluator* evaluator,
+      SlotDescriptor* slot_desc, llvm::Function** fn);
 
   /// Codegen UpdateTuple(). Returns non-OK status if codegen is unsuccessful.
-  Status CodegenUpdateTuple(llvm::Function** fn);
+  Status CodegenUpdateTuple(LlvmCodeGen* codegen, llvm::Function** fn);
 
   /// Codegen the non-streaming process row batch loop. The loop has already been
   /// compiled to IR and loaded into the codegen object. UpdateAggTuple has also been
@@ -650,11 +650,12 @@ class PartitionedAggregationNode : public ExecNode {
   /// 'process_batch_no_grouping_fn_' will be updated with the codegened function
   /// depending on whether this is a grouping or non-grouping aggregation.
   /// Assumes AGGREGATED_ROWS = false.
-  Status CodegenProcessBatch();
+  Status CodegenProcessBatch(LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode);
 
   /// Codegen the materialization loop for streaming preaggregations.
   /// 'process_batch_streaming_fn_' will be updated with the codegened function.
-  Status CodegenProcessBatchStreaming();
+  Status CodegenProcessBatchStreaming(
+      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode);
 
   /// We need two buffers per partition, one for the aggregated stream and one
   /// for the unaggregated stream. We need an additional buffer to read the stream

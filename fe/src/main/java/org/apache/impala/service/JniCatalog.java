@@ -102,7 +102,7 @@ public class JniCatalog {
     try {
       catalog_.reset();
     } catch (CatalogException e) {
-      LOG.error("Error initialializing Catalog. Please run 'invalidate metadata'", e);
+      LOG.error("Error initializing Catalog. Please run 'invalidate metadata'", e);
     }
     catalogOpExecutor_ = new CatalogOpExecutor(catalog_);
   }

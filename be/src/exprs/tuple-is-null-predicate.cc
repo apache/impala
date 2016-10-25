@@ -59,9 +59,9 @@ Status TupleIsNullPredicate::Prepare(RuntimeState* state, const RowDescriptor& r
   return Status::OK();
 }
 
-Status TupleIsNullPredicate::GetCodegendComputeFn(RuntimeState* state,
-                                                  llvm::Function** fn) {
-  return GetCodegendComputeFnWrapper(state, fn);
+Status TupleIsNullPredicate::GetCodegendComputeFn(LlvmCodeGen* codegen,
+    llvm::Function** fn) {
+  return GetCodegendComputeFnWrapper(codegen, fn);
 }
 
 string TupleIsNullPredicate::DebugString() const {

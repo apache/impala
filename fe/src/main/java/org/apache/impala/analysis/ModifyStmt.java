@@ -190,7 +190,7 @@ public abstract class ModifyStmt extends StatementBase {
 
     // cast result expressions to the correct type of the referenced slot of the
     // target table
-    int keyColumnsOffset = table_.getKuduKeyColumnNames().size();
+    int keyColumnsOffset = table_.getPrimaryKeyColumnNames().size();
     for (int i = keyColumnsOffset; i < sourceStmt_.resultExprs_.size(); ++i) {
       sourceStmt_.resultExprs_.set(i, sourceStmt_.resultExprs_.get(i).castTo(
           assignments_.get(i - keyColumnsOffset).first.getType()));
@@ -225,7 +225,7 @@ public abstract class ModifyStmt extends StatementBase {
     }
 
     // Add the key columns as slot refs
-    for (String k : table_.getKuduKeyColumnNames()) {
+    for (String k : table_.getPrimaryKeyColumnNames()) {
       ArrayList<String> path = Path.createRawPath(targetTableRef_.getUniqueAlias(), k);
       SlotRef ref = new SlotRef(path);
       ref.analyze(analyzer);

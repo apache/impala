@@ -380,12 +380,8 @@ void CodegenAnyVal::SetVal(int64_t val) {
 
 void CodegenAnyVal::SetVal(int128_t val) {
   DCHECK_EQ(type_.type, TYPE_DECIMAL);
-  // TODO: is there a better way to do this?
-  // Set high bits
-  Value* ir_val = ConstantInt::get(codegen_->i128_type(), HighBits(val));
-  ir_val = builder_->CreateShl(ir_val, 64, "tmp");
-  // Set low bits
-  ir_val = builder_->CreateOr(ir_val, LowBits(val), "tmp");
+  vector<uint64_t> vals({LowBits(val), HighBits(val)});
+  Value* ir_val = ConstantInt::get(codegen_->context(), APInt(128, vals));
   SetVal(ir_val);
 }
 

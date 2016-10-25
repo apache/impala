@@ -160,7 +160,7 @@ class Sorter {
   RuntimeState* const state_;
 
   /// In memory sorter and less-than comparator.
-  TupleRowComparator compare_less_than_;
+  const TupleRowComparator& compare_less_than_;
   boost::scoped_ptr<TupleSorter> in_mem_tuple_sorter_;
 
   /// Block manager object used to allocate, pin and release runs. Not owned by Sorter.

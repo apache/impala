@@ -1035,7 +1035,9 @@ public class BuiltinsDb extends Db {
           db, "lead", Lists.newArrayList(t, Type.BIGINT, t), t, t,
           prefix + OFFSET_FN_INIT_SYMBOL.get(t),
           prefix + OFFSET_FN_UPDATE_SYMBOL.get(t),
-          null, null, null));
+          null,
+          t == Type.STRING ? stringValGetValue : null,
+          t == Type.STRING ? stringValSerializeOrFinalize : null));
 
       // lead() and lag() the default offset and the default value should be
       // rewritten to call the overrides that take all parameters.

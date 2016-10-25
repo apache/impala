@@ -84,6 +84,11 @@ class PhjBuilder : public DataSink {
   virtual Status FlushFinal(RuntimeState* state) override;
   virtual void Close(RuntimeState* state) override;
 
+  /// Does all codegen for the builder (if codegen is enabled).
+  /// Updates the the builder's runtime profile with info about whether any errors
+  /// occured during codegen.
+  void Codegen(LlvmCodeGen* codegen);
+
   /////////////////////////////////////////
   // The following functions are used only by PartitionedHashJoinNode.
   /////////////////////////////////////////
@@ -312,20 +317,16 @@ class PhjBuilder : public DataSink {
   /// unacceptably high false-positive rate.
   void PublishRuntimeFilters(int64_t num_build_rows);
 
-  /// Does all codegen for the builder (if codegen is enabled).
-  /// Updates the the builder's runtime profile with info about whether the codegen was
-  /// enabled and whether any errors occured during codegen.
-  void Codegen(RuntimeState* state);
-
   /// Codegen processing build batches. Identical signature to ProcessBuildBatch().
   /// Returns non-OK status if codegen was not possible.
-  Status CodegenProcessBuildBatch(llvm::Function* hash_fn, llvm::Function* murmur_hash_fn,
-      llvm::Function* eval_row_fn);
+  Status CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
+      llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn);
 
   /// Codegen inserting batches into a partition's hash table. Identical signature to
   /// Partition::InsertBatch(). Returns non-OK if codegen was not possible.
-  Status CodegenInsertBatch(llvm::Function* hash_fn, llvm::Function* murmur_hash_fn,
-      llvm::Function* eval_row_fn);
+  Status CodegenInsertBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
+      llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
+      TPrefetchMode::type prefetch_mode);
 
   RuntimeState* const runtime_state_;
 

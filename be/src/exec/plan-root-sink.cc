@@ -84,7 +84,11 @@ void ValidateCollectionSlots(const RowDescriptor& row_desc, RowBatch* batch) {
 Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
   ValidateCollectionSlots(row_desc_, batch);
   int current_batch_row = 0;
-  do {
+
+  // Don't enter the loop if batch->num_rows() == 0; no point triggering the consumer with
+  // 0 rows to return. Be wary of ever returning 0-row batches to the client; some poorly
+  // written clients may not cope correctly with them. See IMPALA-4335.
+  while (current_batch_row < batch->num_rows()) {
     unique_lock<mutex> l(lock_);
     while (results_ == nullptr && !consumer_done_) sender_cv_.wait(l);
     if (consumer_done_ || batch == nullptr) {
@@ -114,7 +118,7 @@ Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
     results_ = nullptr;
     ExprContext::FreeLocalAllocations(output_expr_ctxs_);
     consumer_cv_.notify_all();
-  } while (current_batch_row < batch->num_rows());
+  }
   return Status::OK();
 }
 

@@ -63,39 +63,6 @@ Status TopNNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
-Status TopNNode::Codegen(RuntimeState* state) {
-  DCHECK(materialized_tuple_desc_ != NULL);
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
-  Function* insert_batch_fn =
-      codegen->GetFunction(IRFunction::TOPN_NODE_INSERT_BATCH, true);
-
-  // Generate two MaterializeExprs() functions, one using tuple_pool_ and one with no
-  // pool.
-  Function* materialize_exprs_tuple_pool_fn;
-  RETURN_IF_ERROR(Tuple::CodegenMaterializeExprs(state, false, *materialized_tuple_desc_,
-      sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), tuple_pool_.get(),
-      &materialize_exprs_tuple_pool_fn));
-
-  Function* materialize_exprs_no_pool_fn;
-  RETURN_IF_ERROR(Tuple::CodegenMaterializeExprs(state, false, *materialized_tuple_desc_,
-      sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), NULL, &materialize_exprs_no_pool_fn));
-
-  int replaced = codegen->ReplaceCallSites(insert_batch_fn,
-      materialize_exprs_tuple_pool_fn, Tuple::MATERIALIZE_EXPRS_SYMBOL);
-  DCHECK_EQ(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
-
-  replaced = codegen->ReplaceCallSites(insert_batch_fn, materialize_exprs_no_pool_fn,
-      Tuple::MATERIALIZE_EXPRS_NULL_POOL_SYMBOL);
-  DCHECK_EQ(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
-
-  insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);
-  DCHECK(insert_batch_fn != NULL);
-  codegen->AddFunctionToJit(insert_batch_fn,
-      reinterpret_cast<void**>(&codegend_insert_batch_fn_));
-  return Status::OK();
-}
-
 Status TopNNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
@@ -106,21 +73,64 @@ Status TopNNode::Prepare(RuntimeState* state) {
   AddExprCtxsToFree(sort_exec_exprs_);
   tuple_row_less_than_.reset(
       new TupleRowComparator(sort_exec_exprs_, is_asc_order_, nulls_first_));
-  bool codegen_enabled = false;
-  Status codegen_status;
-  if (state->codegen_enabled()) {
-    // TODO: inline tuple_row_less_than_->Compare()
-    codegen_status = tuple_row_less_than_->Codegen(state);
-    codegen_status.MergeStatus(Codegen(state));
-    codegen_enabled = codegen_status.ok();
-  }
-  runtime_profile()->AddCodegenMsg(codegen_enabled, codegen_status);
   priority_queue_.reset(
       new priority_queue<Tuple*, vector<Tuple*>, ComparatorWrapper<TupleRowComparator>>(
           *tuple_row_less_than_));
   materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   insert_batch_timer_ = ADD_TIMER(runtime_profile(), "InsertBatchTime");
+  if (!state->codegen_enabled()) {
+    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
+  }
+
+runtime_profile()->AddCodegenMsg(false);
   return Status::OK();
+}
+
+void TopNNode::Codegen(RuntimeState* state) {
+  DCHECK(state->codegen_enabled());
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != NULL);
+
+  // TODO: inline tuple_row_less_than_->Compare()
+  Status codegen_status = tuple_row_less_than_->Codegen(state);
+  if (codegen_status.ok()) {
+    Function* insert_batch_fn =
+        codegen->GetFunction(IRFunction::TOPN_NODE_INSERT_BATCH, true);
+    DCHECK(insert_batch_fn != NULL);
+
+    // Generate two MaterializeExprs() functions, one using tuple_pool_ and
+    // one with no pool.
+    DCHECK(materialized_tuple_desc_ != NULL);
+    Function* materialize_exprs_tuple_pool_fn;
+    Function* materialize_exprs_no_pool_fn;
+
+    codegen_status = Tuple::CodegenMaterializeExprs(codegen, false,
+        *materialized_tuple_desc_, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
+        tuple_pool_.get(), &materialize_exprs_tuple_pool_fn);
+
+    if (codegen_status.ok()) {
+      codegen_status = Tuple::CodegenMaterializeExprs(codegen, false,
+          *materialized_tuple_desc_, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
+          NULL, &materialize_exprs_no_pool_fn);
+
+      if (codegen_status.ok()) {
+        int replaced = codegen->ReplaceCallSites(insert_batch_fn,
+            materialize_exprs_tuple_pool_fn, Tuple::MATERIALIZE_EXPRS_SYMBOL);
+        DCHECK_EQ(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
+
+        replaced = codegen->ReplaceCallSites(insert_batch_fn,
+            materialize_exprs_no_pool_fn, Tuple::MATERIALIZE_EXPRS_NULL_POOL_SYMBOL);
+        DCHECK_EQ(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
+
+        insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);
+        DCHECK(insert_batch_fn != NULL);
+        codegen->AddFunctionToJit(insert_batch_fn,
+            reinterpret_cast<void**>(&codegend_insert_batch_fn_));
+      }
+    }
+  }
+  runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  ExecNode::Codegen(state);
 }
 
 Status TopNNode::Open(RuntimeState* state) {

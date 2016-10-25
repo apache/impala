@@ -2225,7 +2225,20 @@ public class ParserTest {
       // No column definitions.
       ParsesOk(String.format(
           "CREATE EXTERNAL TABLE Foo COMMENT 'c' STORED AS %s LOCATION '/b'", format));
+      ParserError(String.format("CREATE EXTERNAL TABLE t PRIMARY KEYS (i) STORED AS " +
+          "%s", format));
     }
+
+    ParsesOk("CREATE TABLE foo (i INT) STORED AS KUDU");
+    ParsesOk("CREATE TABLE foo (i INT PRIMARY KEY) STORED AS KUDU");
+    ParsesOk("CREATE TABLE foo (i INT, j INT, PRIMARY KEY (i, j)) STORED AS KUDU");
+    ParsesOk("CREATE TABLE foo (i INT, j INT, PRIMARY KEY (j, i)) STORED AS KUDU");
+    ParsesOk("CREATE TABLE foo (i INT PRIMARY KEY, PRIMARY KEY(i)) STORED AS KUDU");
+    ParsesOk("CREATE TABLE foo (i INT PRIMARY KEY, j INT PRIMARY KEY) STORED AS KUDU");
+    ParserError("CREATE TABLE foo (i INT) PRIMARY KEY (i) STORED AS KUDU");
+    ParserError("CREATE TABLE foo (i INT, PRIMARY KEY) STORED AS KUDU");
+    ParserError("CREATE TABLE foo (PRIMARY KEY(a), a INT) STORED AS KUDU");
+    ParserError("CREATE TABLE foo (i INT) PRIMARY KEY (i) STORED AS KUDU");
 
     // Table Properties
     String[] tblPropTypes = {"TBLPROPERTIES", "WITH SERDEPROPERTIES"};
@@ -2383,6 +2396,7 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
         "SPLIT ROWS ()");
     ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i)");
+    ParserError("CREATE EXTERNAL TABLE Foo DISTRIBUTE BY HASH INTO 4 BUCKETS");
 
     // Combine both
     ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS, RANGE(i) " +
@@ -2391,6 +2405,9 @@ public class ParserTest {
     // Can only have one range clause
     ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS, RANGE(i) " +
         "SPLIT ROWS ((1, 2.0, 'asdas')), RANGE(i) SPLIT ROWS ((1, 2.0, 'asdas'))");
+    // Range needs to be the last DISTRIBUTE BY clause
+    ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) SPLIT ROWS ((1),(2)), " +
+        "HASH (i) INTO 3 BUCKETS");
   }
 
   @Test
@@ -2527,6 +2544,15 @@ public class ParserTest {
     ParsesOk("CREATE TABLE Foo STORED AS PARQUET AS SELECT 1");
     ParsesOk("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS SELECT 1");
     ParsesOk("CREATE TABLE Foo TBLPROPERTIES ('a'='b', 'c'='d') AS SELECT * from bar");
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) AS SELECT * from bar");
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) DISTRIBUTE BY HASH INTO 2 BUCKETS " +
+        "AS SELECT * from bar");
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) DISTRIBUTE BY HASH (b) INTO 2 " +
+        "BUCKETS AS SELECT * from bar");
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) DISTRIBUTE BY RANGE (b) SPLIT ROWS " +
+        "(('foo'), ('bar')) STORED AS KUDU AS SELECT * from bar");
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) DISTRIBUTE BY RANGE SPLIT ROWS " +
+        "(('foo'), ('bar')) STORED AS KUDU AS SELECT * from bar");
 
     // With clause works
     ParsesOk("CREATE TABLE Foo AS with t1 as (select 1) select * from t1");
@@ -2554,8 +2580,10 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo PARTITIONED BY (a, b=2) AS SELECT * from Bar");
 
     // Flexible partitioning
-    ParsesOk("CREATE TABLE Foo DISTRIBUTE BY HASH(i) INTO 4 BUCKETS AS SELECT 1");
-    ParsesOk("CREATE TABLE Foo DISTRIBUTE BY HASH(a) INTO 4 BUCKETS " +
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (i) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS AS " +
+        "SELECT 1");
+    ParserError("CREATE TABLE Foo DISTRIBUTE BY HASH(i) INTO 4 BUCKETS AS SELECT 1");
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a) DISTRIBUTE BY HASH(a) INTO 4 BUCKETS " +
         "TBLPROPERTIES ('a'='b', 'c'='d') AS SELECT * from bar");
   }
 

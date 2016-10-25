@@ -289,6 +289,15 @@ error_codes = (
 
   ("PARQUET_ZERO_ROWS_IN_NON_EMPTY_FILE", 93, "File '$0' is corrupt: metadata indicates "
    "a zero row count but there is at least one non-empty row group."),
+
+  ("NO_REGISTERED_BACKENDS", 94, "Cannot schedule query: no registered backends "
+   "available."),
+
+  ("KUDU_KEY_ALREADY_PRESENT", 95, "Key already present in Kudu table '$0'."),
+
+  ("KUDU_KEY_NOT_FOUND", 96, "Key not found in Kudu table '$0'."),
+
+  ("KUDU_SESSION_ERROR", 97, "Error in Kudu table '$0': $1")
 )
 
 import sys

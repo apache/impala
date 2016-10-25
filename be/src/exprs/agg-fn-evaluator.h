@@ -147,9 +147,11 @@ class AggFnEvaluator {
   void Finalize(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst);
 
   /// Puts the finalized value from Tuple* src in Tuple* dst just as Finalize() does.
-  /// However, unlike Finalize(), GetValue() does not clean up state in src. GetValue()
-  /// can be called repeatedly with the same src. Only used internally for analytic fn
-  /// builtins.
+  /// However, unlike Finalize(), GetValue() does not clean up state in src.
+  /// GetValue() can be called repeatedly with the same src. Only used internally for
+  /// analytic fn builtins. Note that StringVal result is from local allocation (which
+  /// will be freed in the next QueryMaintenance()) so it needs to be copied out if it
+  /// needs to survive beyond QueryMaintenance() (e.g. if 'dst' lives in a row batch).
   void GetValue(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst);
 
   /// Helper functions for calling the above functions on many evaluators.
@@ -229,10 +231,13 @@ class AggFnEvaluator {
   /// fn must be a function that implement's the UDA Update() signature.
   void Update(FunctionContext* agg_fn_ctx, const TupleRow* row, Tuple* dst, void* fn);
 
-  /// Sets up the arguments to call fn. This converts from the agg-expr signature,
+  /// Sets up the arguments to call 'fn'. This converts from the agg-expr signature,
   /// taking TupleRow to the UDA signature taking AnvVals. Writes the serialize/finalize
-  /// result to the given destination slot/tuple. The fn can be NULL to indicate the src
-  /// value should simply be written into the destination.
+  /// result to the given destination slot/tuple. 'fn' can be NULL to indicate the src
+  /// value should simply be written into the destination. Note that StringVal result is
+  /// from local allocation (which will be freed in the next QueryMaintenance()) so it
+  /// needs to be copied out if it needs to survive beyond QueryMaintenance() (e.g. if
+  /// 'dst' lives in a row batch).
   void SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src,
       const SlotDescriptor* dst_slot_desc, Tuple* dst, void* fn);
 
@@ -265,7 +270,7 @@ inline void AggFnEvaluator::GetValue(
 }
 
 inline void AggFnEvaluator::Init(const std::vector<AggFnEvaluator*>& evaluators,
-      const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst) {
+    const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst) {
   DCHECK_EQ(evaluators.size(), fn_ctxs.size());
   for (int i = 0; i < evaluators.size(); ++i) {
     evaluators[i]->Init(fn_ctxs[i], dst);
@@ -279,28 +284,28 @@ inline void AggFnEvaluator::Add(const std::vector<AggFnEvaluator*>& evaluators,
   }
 }
 inline void AggFnEvaluator::Remove(const std::vector<AggFnEvaluator*>& evaluators,
-      const std::vector<FunctionContext*>& fn_ctxs, const TupleRow* src, Tuple* dst) {
+    const std::vector<FunctionContext*>& fn_ctxs, const TupleRow* src, Tuple* dst) {
   DCHECK_EQ(evaluators.size(), fn_ctxs.size());
   for (int i = 0; i < evaluators.size(); ++i) {
     evaluators[i]->Remove(fn_ctxs[i], src, dst);
   }
 }
 inline void AggFnEvaluator::Serialize(const std::vector<AggFnEvaluator*>& evaluators,
-      const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst) {
+    const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst) {
   DCHECK_EQ(evaluators.size(), fn_ctxs.size());
   for (int i = 0; i < evaluators.size(); ++i) {
     evaluators[i]->Serialize(fn_ctxs[i], dst);
   }
 }
 inline void AggFnEvaluator::GetValue(const std::vector<AggFnEvaluator*>& evaluators,
-      const std::vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst) {
+    const std::vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst) {
   DCHECK_EQ(evaluators.size(), fn_ctxs.size());
   for (int i = 0; i < evaluators.size(); ++i) {
     evaluators[i]->GetValue(fn_ctxs[i], src, dst);
   }
 }
 inline void AggFnEvaluator::Finalize(const std::vector<AggFnEvaluator*>& evaluators,
-      const std::vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst) {
+    const std::vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst) {
   DCHECK_EQ(evaluators.size(), fn_ctxs.size());
   for (int i = 0; i < evaluators.size(); ++i) {
     evaluators[i]->Finalize(fn_ctxs[i], src, dst);

@@ -54,11 +54,6 @@ class TestShowCreateTable(ImpalaTestSuite):
     self.__run_show_create_table_test_case('QueryTest/show-create-table', vector,
                                            unique_database)
 
-  @SkipIf.kudu_not_supported
-  def test_kudu_show_create_table(self, vector, unique_database):
-    self.__run_show_create_table_test_case('QueryTest/kudu-show-create', vector,
-                                           unique_database)
-
   def __run_show_create_table_test_case(self, test_file_name, vector, unique_db_name):
     """
     Runs a show-create-table test file, containing the following sections:

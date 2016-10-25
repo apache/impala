@@ -21,12 +21,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
-
 import parquet.hadoop.ParquetFileReader;
 import parquet.hadoop.metadata.ParquetMetadata;
 import parquet.schema.OriginalType;
@@ -36,8 +36,8 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MapType;
-import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
@@ -45,8 +45,6 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.THdfsFileFormat;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 
 /**
@@ -60,16 +58,9 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
   private final static String ERROR_MSG =
       "Failed to convert Parquet type\n%s\nto an Impala %s type:\n%s\n";
 
-  public CreateTableLikeFileStmt(TableName tableName, THdfsFileFormat schemaFileFormat,
-      HdfsUri schemaLocation, List<ColumnDef> partitionColumnDescs,
-      boolean isExternal, String comment, RowFormat rowFormat,
-      THdfsFileFormat fileFormat, HdfsUri location, HdfsCachingOp cachingOp,
-      boolean ifNotExists, Map<String, String> tblProperties,
-      Map<String, String> serdeProperties) {
-    super(tableName, new ArrayList<ColumnDef>(), partitionColumnDescs,
-        isExternal, comment, rowFormat,
-        fileFormat, location, cachingOp, ifNotExists, tblProperties, serdeProperties,
-        null);
+  public CreateTableLikeFileStmt(CreateTableStmt createTableStmt,
+      THdfsFileFormat schemaFileFormat, HdfsUri schemaLocation) {
+    super(createTableStmt);
     schemaLocation_ = schemaLocation;
     schemaFileFormat_ = schemaFileFormat;
   }
@@ -351,8 +342,8 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
         schemaLocation_.toString());
     String s = ToSqlUtils.getCreateTableSql(getDb(),
         getTbl() + " __LIKE_FILEFORMAT__ ",  getComment(), colsSql, partitionColsSql,
-        getTblProperties(), getSerdeProperties(), isExternal(), getIfNotExists(),
-        getRowFormat(), HdfsFileFormat.fromThrift(getFileFormat()),
+        null, null, getTblProperties(), getSerdeProperties(), isExternal(),
+        getIfNotExists(), getRowFormat(), HdfsFileFormat.fromThrift(getFileFormat()),
         compression, null, getLocation());
     s = s.replace("__LIKE_FILEFORMAT__", "LIKE " + schemaFileFormat_ + " " +
         schemaLocation_.toString());
@@ -361,6 +352,10 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (getFileFormat() == THdfsFileFormat.KUDU) {
+      throw new AnalysisException("CREATE TABLE LIKE FILE statement is not supported " +
+          "for Kudu tables.");
+    }
     schemaLocation_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
     switch (schemaFileFormat_) {
       case PARQUET:

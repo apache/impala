@@ -51,10 +51,9 @@ int TupleRowComparator::CompareInterpreted(
 
 Status TupleRowComparator::Codegen(RuntimeState* state) {
   Function* fn;
-  RETURN_IF_ERROR(CodegenCompare(state, &fn));
-  LlvmCodeGen* codegen;
-  bool got_codegen = state->GetCodegen(&codegen).ok();
-  DCHECK(got_codegen);
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != NULL);
+  RETURN_IF_ERROR(CodegenCompare(codegen, &fn));
   codegend_compare_fn_ = state->obj_pool()->Add(new CompareFn);
   codegen->AddFunctionToJit(fn, reinterpret_cast<void**>(codegend_compare_fn_));
   return Status::OK();
@@ -175,9 +174,7 @@ Status TupleRowComparator::Codegen(RuntimeState* state) {
 // next_key2:                                        ; preds = %rhs_non_null12, %next_key
 //   ret i32 0
 // }
-Status TupleRowComparator::CodegenCompare(RuntimeState* state, Function** fn) {
-  LlvmCodeGen* codegen;
-  RETURN_IF_ERROR(state->GetCodegen(&codegen));
+Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, Function** fn) {
   SCOPED_TIMER(codegen->codegen_timer());
   LLVMContext& context = codegen->context();
 
@@ -188,7 +185,7 @@ Status TupleRowComparator::CodegenCompare(RuntimeState* state, Function** fn) {
   Function* key_fns[key_expr_ctxs_lhs_.size()];
   for (int i = 0; i < key_expr_ctxs_lhs_.size(); ++i) {
     Status status =
-        key_expr_ctxs_lhs_[i]->root()->GetCodegendComputeFn(state, &key_fns[i]);
+        key_expr_ctxs_lhs_[i]->root()->GetCodegendComputeFn(codegen, &key_fns[i]);
     if (!status.ok()) {
       return Status(Substitute("Could not codegen TupleRowComparator::Compare(): $0",
           status.GetDetail()));

@@ -620,7 +620,7 @@ Status ImpalaServer::QueryExecState::WaitInternal() {
     RETURN_IF_ERROR(query_status_);
     RETURN_IF_ERROR(UpdateQueryStatus(child_queries_status));
   }
-  query_events_->MarkEvent("Child queries finished");
+  if (!child_queries.empty()) query_events_->MarkEvent("Child queries finished");
 
   if (coord_.get() != NULL) {
     RETURN_IF_ERROR(coord_->Wait());
@@ -956,7 +956,7 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
   if (catalog_op_executor_->ddl_exec_response()->new_table_created) {
     DCHECK(coord_.get());
     for (const PartitionStatusMap::value_type& p: coord_->per_partition_status()) {
-      total_num_rows_inserted += p.second.num_appended_rows;
+      total_num_rows_inserted += p.second.num_modified_rows;
     }
   }
   const string& summary_msg = Substitute("Inserted $0 row(s)", total_num_rows_inserted);

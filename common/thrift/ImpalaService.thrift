@@ -247,10 +247,10 @@ enum TImpalaQueryOptions {
 
 // The summary of an insert.
 struct TInsertResult {
-  // Number of appended rows per modified partition. Only applies to HDFS tables.
-  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the
-  // root in an unpartitioned table being the empty string.
-  1: required map<string, i64> rows_appended
+  // Number of modified rows per partition. Only applies to HDFS and Kudu tables.
+  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with
+  // the root in an unpartitioned table being the empty string.
+  1: required map<string, i64> rows_modified
 }
 
 // Response from a call to PingImpalaService

@@ -33,6 +33,8 @@
 
 DEFINE_int32(kudu_session_timeout_seconds, 60, "Timeout set on the Kudu session. "
     "How long to wait before considering a write failed.");
+DEFINE_int32(kudu_mutation_buffer_size, 100 * 1024 * 1024, "The size (bytes) of the "
+    "Kudu client buffer for mutations.");
 
 using kudu::client::KuduColumnSchema;
 using kudu::client::KuduSchema;
@@ -48,6 +50,9 @@ namespace impala {
 const static string& ROOT_PARTITION_KEY =
     g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
 
+// Send 7MB buffers to Kudu, matching a hard-coded size in Kudu (KUDU-1693).
+const static int INDIVIDUAL_BUFFER_SIZE = 7 * 1024 * 1024;
+
 KuduTableSink::KuduTableSink(const RowDescriptor& row_desc,
     const vector<TExpr>& select_list_texprs,
     const TDataSink& tsink)
@@ -56,8 +61,6 @@ KuduTableSink::KuduTableSink(const RowDescriptor& row_desc,
       select_list_texprs_(select_list_texprs),
       sink_action_(tsink.table_sink.action),
       kudu_table_sink_(tsink.table_sink.kudu_table_sink),
-      kudu_flush_counter_(NULL),
-      kudu_flush_timer_(NULL),
       kudu_error_counter_(NULL),
       rows_written_(NULL),
       rows_written_rate_(NULL) {
@@ -91,16 +94,14 @@ Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
 
   // Add a 'root partition' status in which to collect write statistics
   TInsertPartitionStatus root_status;
-  root_status.__set_num_appended_rows(0L);
-  root_status.__set_stats(TInsertStats());
+  root_status.__set_num_modified_rows(0L);
   root_status.__set_id(-1L);
   state->per_partition_status()->insert(make_pair(ROOT_PARTITION_KEY, root_status));
 
   // Add counters
-  kudu_flush_counter_ = ADD_COUNTER(profile(), "TotalKuduFlushOperations", TUnit::UNIT);
   kudu_error_counter_ = ADD_COUNTER(profile(), "TotalKuduFlushErrors", TUnit::UNIT);
-  kudu_flush_timer_ = ADD_TIMER(profile(), "KuduFlushTimer");
   rows_written_ = ADD_COUNTER(profile(), "RowsWritten", TUnit::UNIT);
+  kudu_apply_timer_ = ADD_TIMER(profile(), "KuduApplyTimer");
   rows_written_rate_ = profile()->AddDerivedCounter(
       "RowsWrittenRate", TUnit::UNIT_PER_SECOND,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_written_,
@@ -124,8 +125,40 @@ Status KuduTableSink::Open(RuntimeState* state) {
 
   session_ = client_->NewSession();
   session_->SetTimeoutMillis(FLAGS_kudu_session_timeout_seconds * 1000);
+
+  // KuduSession Set* methods here and below return a status for API compatibility.
+  // As long as the Kudu client is statically linked, these shouldn't fail and thus these
+  // calls could also DCHECK status is OK for debug builds (while still returning errors
+  // for release).
   KUDU_RETURN_IF_ERROR(session_->SetFlushMode(
-      kudu::client::KuduSession::MANUAL_FLUSH), "Unable to set flush mode");
+      kudu::client::KuduSession::AUTO_FLUSH_BACKGROUND), "Unable to set flush mode");
+
+  const int32_t buf_size = FLAGS_kudu_mutation_buffer_size;
+  if (buf_size < 1024 * 1024) {
+    return Status(strings::Substitute(
+        "Invalid kudu_mutation_buffer_size: '$0'. Must be greater than 1MB.", buf_size));
+  }
+  KUDU_RETURN_IF_ERROR(session_->SetMutationBufferSpace(buf_size),
+      "Couldn't set mutation buffer size");
+
+  // Configure client memory used for buffering.
+  // Internally, the Kudu client keeps one or more buffers for writing operations. When a
+  // single buffer is flushed, it is locked (that space cannot be reused) until all
+  // operations within it complete, so it is important to have a number of buffers. In
+  // our testing, we found that allowing a total of 100MB of buffer space to provide good
+  // results; this is the default.  Then, because of some existing 8MB limits in Kudu, we
+  // want to have that total space broken up into 7MB buffers (INDIVIDUAL_BUFFER_SIZE).
+  // The mutation flush watermark is set to flush every INDIVIDUAL_BUFFER_SIZE.
+  int num_buffers = FLAGS_kudu_mutation_buffer_size / INDIVIDUAL_BUFFER_SIZE;
+  if (num_buffers == 0) num_buffers = 1;
+  KUDU_RETURN_IF_ERROR(session_->SetMutationBufferFlushWatermark(1.0 / num_buffers),
+      "Couldn't set mutation buffer watermark");
+
+  // No limit on the buffer count since the settings above imply a max number of buffers.
+  // Note that the Kudu client API has a few too many knobs for configuring the size and
+  // number of these buffers; there are a few ways to accomplish similar behaviors.
+  KUDU_RETURN_IF_ERROR(session_->SetMutationBufferMaxNum(0),
+      "Couldn't set mutation buffer count");
   return Status::OK();
 }
 
@@ -135,7 +168,8 @@ kudu::client::KuduWriteOperation* KuduTableSink::NewWriteOp() {
   } else if (sink_action_ == TSinkAction::UPDATE) {
     return table_->NewUpdate();
   } else {
-    DCHECK(sink_action_ == TSinkAction::DELETE) << "Sink type not supported. " << sink_action_;
+    DCHECK(sink_action_ == TSinkAction::DELETE) << "Sink type not supported: "
+        << sink_action_;
     return table_->NewDelete();
   }
 }
@@ -145,11 +179,15 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
   ExprContext::FreeLocalAllocations(output_expr_ctxs_);
   RETURN_IF_ERROR(state->CheckQueryState());
 
+  // Collect all write operations and apply them together so the time in Apply() can be
+  // easily timed.
+  vector<unique_ptr<kudu::client::KuduWriteOperation>> write_ops;
+
   int rows_added = 0;
   // Since everything is set up just forward everything to the writer.
   for (int i = 0; i < batch->num_rows(); ++i) {
     TupleRow* current_row = batch->GetRow(i);
-    gscoped_ptr<kudu::client::KuduWriteOperation> write(NewWriteOp());
+    unique_ptr<kudu::client::KuduWriteOperation> write(NewWriteOp());
 
     for (int j = 0; j < output_expr_ctxs_.size(); ++j) {
       int col = kudu_table_sink_.referenced_columns.empty() ?
@@ -173,7 +211,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
         case TYPE_STRING: {
           StringValue* sv = reinterpret_cast<StringValue*>(value);
           kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
-          KUDU_RETURN_IF_ERROR(write->mutable_row()->SetStringNoCopy(col, slice),
+          KUDU_RETURN_IF_ERROR(write->mutable_row()->SetString(col, slice),
               "Could not add Kudu WriteOp.");
           break;
         }
@@ -216,46 +254,38 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
           return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(type));
       }
     }
-
-    KUDU_RETURN_IF_ERROR(session_->Apply(write.release()),
-        "Error while applying Kudu session.");
-    ++rows_added;
+    write_ops.push_back(move(write));
   }
+
+  {
+    SCOPED_TIMER(kudu_apply_timer_);
+    for (auto&& write: write_ops) {
+      KUDU_RETURN_IF_ERROR(session_->Apply(write.release()), "Error applying Kudu Op.");
+      ++rows_added;
+    }
+  }
+
   COUNTER_ADD(rows_written_, rows_added);
-  int64_t error_count = 0;
-  RETURN_IF_ERROR(Flush(&error_count));
-  (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows +=
-      rows_added - error_count;
+  RETURN_IF_ERROR(CheckForErrors(state));
   return Status::OK();
 }
 
-Status KuduTableSink::Flush(int64_t* error_count) {
-  // TODO right now we always flush an entire row batch, if these are small we'll
-  // be inefficient. Consider decoupling impala's batch size from kudu's
-  kudu::Status s;
-  {
-    SCOPED_TIMER(kudu_flush_timer_);
-    COUNTER_ADD(kudu_flush_counter_, 1);
-    s = session_->Flush();
-  }
-  if (LIKELY(s.ok())) return Status::OK();
+Status KuduTableSink::CheckForErrors(RuntimeState* state) {
+  if (session_->CountPendingErrors() == 0) return Status::OK();
 
-  stringstream error_msg_buffer;
   vector<KuduError*> errors;
+  Status status = Status::OK();
 
-  // Check if there are pending errors in the Kudu session. If errors overflowed the error
-  // buffer we can't be sure all errors can be ignored and fail immediately, setting 'failed'
-  // to true.
-  bool failed = false;
-  session_->GetPendingErrors(&errors, &failed);
-  if (UNLIKELY(failed)) {
-    error_msg_buffer << "Error overflow in Kudu session, "
-                     << "previous write operation might be inconsistent.\n";
+  // Get the pending errors from the Kudu session. If errors overflowed the error buffer
+  // we can't be sure all errors can be ignored, so an error status will be reported.
+  bool error_overflow = false;
+  session_->GetPendingErrors(&errors, &error_overflow);
+  if (UNLIKELY(error_overflow)) {
+    status = Status("Error overflow in Kudu session.");
   }
 
   // The memory for the errors is manually managed. Iterate over all errors and delete
   // them accordingly.
-  bool first_error = true;
   for (int i = 0; i < errors.size(); ++i) {
     kudu::Status e = errors[i]->status();
     // If the sink has the option "ignore_not_found_or_duplicate" set, duplicate key or
@@ -265,24 +295,39 @@ Status KuduTableSink::Flush(int64_t* error_count) {
         ((sink_action_ == TSinkAction::DELETE && !e.IsNotFound()) ||
             (sink_action_ == TSinkAction::UPDATE && !e.IsNotFound()) ||
             (sink_action_ == TSinkAction::INSERT && !e.IsAlreadyPresent()))) {
-      if (first_error) {
-        error_msg_buffer << "Error while flushing Kudu session: \n";
-        first_error = false;
+      if (status.ok()) {
+        status = Status(strings::Substitute(
+            "Kudu error(s) reported, first error: $0", e.ToString()));
       }
-      error_msg_buffer << e.ToString() << "\n";
-      failed = true;
+    }
+    if (e.IsNotFound()) {
+      state->LogError(ErrorMsg::Init(TErrorCode::KUDU_KEY_NOT_FOUND,
+          table_desc_->table_name()));
+    } else if (e.IsAlreadyPresent()) {
+      state->LogError(ErrorMsg::Init(TErrorCode::KUDU_KEY_ALREADY_PRESENT,
+          table_desc_->table_name()));
+    } else {
+      state->LogError(ErrorMsg::Init(TErrorCode::KUDU_SESSION_ERROR,
+          table_desc_->table_name(), e.ToString()));
     }
     delete errors[i];
   }
   COUNTER_ADD(kudu_error_counter_, errors.size());
-  if (error_count != NULL) *error_count = errors.size();
-  if (failed) return Status(error_msg_buffer.str());
-  return Status::OK();
+  return status;
 }
 
 Status KuduTableSink::FlushFinal(RuntimeState* state) {
-  // No buffered state to flush.
-  return Status::OK();
+  kudu::Status flush_status = session_->Flush();
+
+  // Flush() may return an error status but any errors will also be reported by
+  // CheckForErrors(), so it's safe to ignore and always call CheckForErrors.
+  if (!flush_status.ok()) {
+    VLOG_RPC << "Ignoring Flush() error status: " << flush_status.ToString();
+  }
+  Status status = CheckForErrors(state);
+  (*state->per_partition_status())[ROOT_PARTITION_KEY].__set_num_modified_rows(
+      rows_written_->value() - kudu_error_counter_->value());
+  return status;
 }
 
 void KuduTableSink::Close(RuntimeState* state) {
