@@ -33,6 +33,7 @@ import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
@@ -175,7 +176,7 @@ public class ColumnDef {
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // Check whether the column name meets the Metastore's requirements.
-    if (!MetaStoreUtils.validateName(colName_)) {
+    if (!MetastoreShim.validateName(colName_)) {
       throw new AnalysisException("Invalid column/field name: " + colName_);
     }
     if (typeDef_ != null) {

@@ -63,7 +63,7 @@ function(THRIFT_GEN VAR)
       set(CPP_ARGS -r ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp -o ${BE_OUTPUT_DIR})
     ENDIF(FIL STREQUAL "beeswax.thrift")
 
-    IF (FIL STREQUAL "TCLIService.thrift" OR FIL STREQUAL "parquet.thrift")
+    IF (FIL STREQUAL ${TCLI_SERVICE_THRIFT} OR FIL STREQUAL "parquet.thrift")
       # HiveServer2 and Parquet thrift generation
       # Do not generate Java source because we should use the jar from Hive or Parquet
       add_custom_command(
@@ -74,7 +74,7 @@ function(THRIFT_GEN VAR)
         COMMENT "Running thrift compiler on ${FIL}"
         VERBATIM
       )
-    ELSE (FIL STREQUAL "TCLIService.thrift" OR FIL STREQUAL "parquet.thrift")
+    ELSE (FIL STREQUAL ${TCLI_SERVICE_THRIFT} OR FIL STREQUAL "parquet.thrift")
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${FIL}
@@ -84,7 +84,7 @@ function(THRIFT_GEN VAR)
         COMMENT "Running thrift compiler on ${FIL}"
         VERBATIM
     )
-    ENDIF(FIL STREQUAL "TCLIService.thrift" OR FIL STREQUAL "parquet.thrift")
+    ENDIF(FIL STREQUAL ${TCLI_SERVICE_THRIFT} OR FIL STREQUAL "parquet.thrift")
   endforeach(FIL)
 
   set(${VAR} ${${VAR}} PARENT_SCOPE)
@@ -115,8 +115,12 @@ function(THRIFT_GEN_DS VAR)
   set(${VAR} ${${VAR}} PARENT_SCOPE)
 endfunction(THRIFT_GEN_DS)
 
+
+set(HIVE_THRIFT_SOURCE_DIR "hive-$ENV{IMPALA_HIVE_MAJOR_VERSION}-api")
+set(TCLI_SERVICE_THRIFT "${HIVE_THRIFT_SOURCE_DIR}/TCLIService.thrift")
 message("Using Thrift compiler: ${THRIFT_COMPILER}")
-set(THRIFT_INCLUDE_DIR_OPTION -I ${THRIFT_CONTRIB_DIR} -I $ENV{HIVE_SRC_DIR}/metastore/if)
+set(THRIFT_INCLUDE_DIR_OPTION -I ${THRIFT_CONTRIB_DIR} -I $ENV{HIVE_SRC_DIR}/metastore/if
+  -I ${HIVE_THRIFT_SOURCE_DIR})
 set(BE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources)
 set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources)
 # TODO: avoid duplicating generated java classes
@@ -148,7 +152,6 @@ set (SRC_FILES
   CatalogInternalService.thrift
   CatalogObjects.thrift
   CatalogService.thrift
-  TCLIService.thrift
   DataSinks.thrift
   Descriptors.thrift
   ExecStats.thrift
@@ -170,6 +173,7 @@ set (SRC_FILES
   Results.thrift
   RuntimeProfile.thrift
   StatestoreService.thrift
+  ${TCLI_SERVICE_THRIFT}
   ${EXT_DATA_SRC_FILES}
 )
 
@@ -182,6 +186,18 @@ add_custom_command(OUTPUT ErrorCodes.thrift
 add_custom_command(OUTPUT MetricDefs.thrift
   COMMAND python generate_metrics.py
   DEPENDS generate_metrics.py metrics.json)
+
+# The thrift-generated java classes defined in TCLIService are also pulled into our build
+# in the Hive jars that are downloaded via Maven. Hive2 moved the classes from
+# org.apache.hive.service.cli.thrift to org.apache.hive.service.rpc.thrift. Impala calls
+# various Hive methods that have these classes in the interface and if the packages don't
+# match it won't compile.
+add_custom_command(OUTPUT hive-2-api/TCLIService.thrift
+  COMMAND sed
+      's/namespace java org.apache.hive.service.cli.thrift/namespace java org.apache.hive.service.rpc.thrift/'
+      hive-1-api/TCLIService.thrift > hive-2-api/TCLIService.thrift
+  DEPENDS hive-1-api/TCLIService.thrift
+)
 
 # Create a build command for each of the thrift src files and generate
 # a list of files they produce

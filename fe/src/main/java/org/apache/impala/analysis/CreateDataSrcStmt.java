@@ -18,13 +18,13 @@
 package org.apache.impala.analysis;
 
 import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.extdatasource.ApiVersion;
 import org.apache.impala.thrift.TCreateDataSourceParams;
 import org.apache.impala.thrift.TDataSource;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
@@ -54,7 +54,7 @@ public class CreateDataSrcStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (!MetaStoreUtils.validateName(dataSrcName_)) {
+    if (!MetastoreShim.validateName(dataSrcName_)) {
       throw new AnalysisException("Invalid data source name: " + dataSrcName_);
     }
     if (!ifNotExists_ && analyzer.getCatalog().getDataSource(dataSrcName_) != null) {

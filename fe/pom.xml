@@ -40,6 +40,7 @@ under the License.
     <testExecutionMode>reduced</testExecutionMode>
     <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
     <hive.version>${env.IMPALA_HIVE_VERSION}</hive.version>
+    <hive.major.version>${env.IMPALA_HIVE_MAJOR_VERSION}</hive.major.version>
     <sentry.version>${env.IMPALA_SENTRY_VERSION}</sentry.version>
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
     <parquet.version>${env.IMPALA_PARQUET_VERSION}</parquet.version>
@@ -493,6 +494,7 @@ under the License.
                         -->
                 <source>${project.basedir}/generated-sources/gen-java</source>
                 <source>${project.build.directory}/generated-sources/cup</source>
+                <source>${project.basedir}/src/compat-hive-${hive.major.version}/java</source>
               </sources>
             </configuration>
           </execution>

@@ -93,6 +93,7 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.JniCatalogConstants;
 import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
@@ -809,8 +810,7 @@ public class CatalogOpExecutor {
       }
       PartitionStatsUtil.partStatsToParameters(partitionStats, partition);
       partition.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
-      partition.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
-          StatsSetupConst.TRUE);
+      partition.putToParameters(MetastoreShim.statsGeneratedViaStatsTaskParam());
       ++numTargetedPartitions;
       modifiedParts.add(partition);
     }
@@ -828,8 +828,8 @@ public class CatalogOpExecutor {
     // Update the table's ROW_COUNT parameter.
     msTbl.putToParameters(StatsSetupConst.ROW_COUNT,
         String.valueOf(params.getTable_stats().num_rows));
-    msTbl.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
-        StatsSetupConst.TRUE);
+    Pair<String, String> statsTaskParam = MetastoreShim.statsGeneratedViaStatsTaskParam();
+    msTbl.putToParameters(statsTaskParam.first, statsTaskParam.second);
     return numTargetedPartitions;
   }
 
@@ -2655,7 +2655,7 @@ public class CatalogOpExecutor {
             cacheIds.add(id);
           }
           // Update the partition metadata to include the cache directive id.
-          msClient.getHiveClient().alter_partitions(tableName.getDb(),
+          MetastoreShim.alterPartitions(msClient.getHiveClient(), tableName.getDb(),
               tableName.getTbl(), hmsAddedPartitions);
         }
         updateLastDdlTime(msTbl, msClient);
@@ -2807,8 +2807,8 @@ public class CatalogOpExecutor {
       MetaStoreClient msClient, TableName tableName, List<Partition> hmsPartitions)
       throws ImpalaException {
     try {
-      msClient.getHiveClient().alter_partitions(tableName.getDb(), tableName.getTbl(),
-          hmsPartitions);
+      MetastoreShim.alterPartitions(
+          msClient.getHiveClient(), tableName.getDb(), tableName.getTbl(), hmsPartitions);
       updateLastDdlTime(msTbl, msClient);
     } catch (TException e) {
       throw new ImpalaRuntimeException(
@@ -2962,11 +2962,11 @@ public class CatalogOpExecutor {
             Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, hmsPartitions.size());
         try {
           // Alter partitions in bulk.
-          msClient.getHiveClient().alter_partitions(dbName, tableName,
+          MetastoreShim.alterPartitions(msClient.getHiveClient(), dbName, tableName,
               hmsPartitions.subList(i, endPartitionIndex));
           // Mark the corresponding HdfsPartition objects as dirty
           for (org.apache.hadoop.hive.metastore.api.Partition msPartition:
-               hmsPartitions.subList(i, endPartitionIndex)) {
+              hmsPartitions.subList(i, endPartitionIndex)) {
             try {
               catalog_.getHdfsPartition(dbName, tableName, msPartition).markDirty();
             } catch (PartitionNotFoundException e) {
@@ -3221,7 +3221,7 @@ public class CatalogOpExecutor {
               partition.getSd().setSerdeInfo(msTbl.getSd().getSerdeInfo().deepCopy());
               partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" +
                   partName.substring(0, partName.length() - 1));
-              MetaStoreUtils.updatePartitionStatsFast(partition, warehouse);
+              MetastoreShim.updatePartitionStatsFast(partition, warehouse);
             }
 
             // First add_partitions and then alter_partitions the successful ones with
@@ -3251,7 +3251,7 @@ public class CatalogOpExecutor {
                   }
                 }
                 try {
-                  msClient.getHiveClient().alter_partitions(tblName.getDb(),
+                  MetastoreShim.alterPartitions(msClient.getHiveClient(), tblName.getDb(),
                       tblName.getTbl(), cachedHmsParts);
                 } catch (Exception e) {
                   LOG.error("Failed in alter_partitions: ", e);

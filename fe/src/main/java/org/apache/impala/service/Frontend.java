@@ -35,10 +35,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hive.service.cli.thrift.TGetColumnsReq;
-import org.apache.hive.service.cli.thrift.TGetFunctionsReq;
-import org.apache.hive.service.cli.thrift.TGetSchemasReq;
-import org.apache.hive.service.cli.thrift.TGetTablesReq;
+import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
+import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
+import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
+import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
@@ -87,6 +87,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.planner.HdfsScanNode;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
@@ -1197,32 +1198,12 @@ public class Frontend {
         ImpalaInternalAdminUser.getInstance();
     switch (request.opcode) {
       case GET_TYPE_INFO: return MetadataOp.getTypeInfo();
-      case GET_SCHEMAS:
-      {
-        TGetSchemasReq req = request.getGet_schemas_req();
-        return MetadataOp.getSchemas(this, req.getCatalogName(),
-            req.getSchemaName(), user);
-      }
-      case GET_TABLES:
-      {
-        TGetTablesReq req = request.getGet_tables_req();
-        return MetadataOp.getTables(this, req.getCatalogName(),
-            req.getSchemaName(), req.getTableName(), req.getTableTypes(), user);
-      }
-      case GET_COLUMNS:
-      {
-        TGetColumnsReq req = request.getGet_columns_req();
-        return MetadataOp.getColumns(this, req.getCatalogName(),
-            req.getSchemaName(), req.getTableName(), req.getColumnName(), user);
-      }
+      case GET_SCHEMAS: return MetastoreShim.execGetSchemas(this, request, user);
+      case GET_TABLES: return MetastoreShim.execGetTables(this, request, user);
+      case GET_COLUMNS: return MetastoreShim.execGetColumns(this, request, user);
       case GET_CATALOGS: return MetadataOp.getCatalogs();
       case GET_TABLE_TYPES: return MetadataOp.getTableTypes();
-      case GET_FUNCTIONS:
-      {
-        TGetFunctionsReq req = request.getGet_functions_req();
-        return MetadataOp.getFunctions(this, req.getCatalogName(),
-            req.getSchemaName(), req.getFunctionName(), user);
-      }
+      case GET_FUNCTIONS: return MetastoreShim.execGetFunctions(this, request, user);
       default:
         throw new NotImplementedException(request.opcode + " has not been implemented.");
     }

@@ -24,11 +24,12 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
-import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -63,8 +64,8 @@ public class MetaStoreUtil {
   static {
     // Get the value from the Hive configuration, if present.
     HiveConf hiveConf = new HiveConf(HdfsTable.class);
-    String strValue = hiveConf.get(
-        HiveConf.ConfVars.METASTORE_BATCH_RETRIEVE_TABLE_PARTITION_MAX.toString());
+    String strValue =
+        hiveConf.get(MetastoreShim.metastoreBatchRetrieveObjectsMaxConfigKey());
     if (strValue != null) {
       try {
         maxPartitionsPerRpc_ = Short.parseShort(strValue);

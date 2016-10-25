@@ -19,8 +19,6 @@ package org.apache.impala.analysis;
 
 import java.util.Set;
 
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.PrimitiveType;
@@ -29,6 +27,8 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.compat.MetastoreShim;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 
@@ -128,12 +128,11 @@ public class TypeDef implements ParseNode {
     for (StructField f: structType.getFields()) {
       analyze(f.getType(), analyzer);
       if (!fieldNames.add(f.getName().toLowerCase())) {
-        throw new AnalysisException(
-            String.format("Duplicate field name '%s' in struct '%s'",
-                f.getName(), toSql()));
+        throw new AnalysisException(String.format(
+            "Duplicate field name '%s' in struct '%s'", f.getName(), toSql()));
       }
       // Check whether the column name meets the Metastore's requirements.
-      if (!MetaStoreUtils.validateName(f.getName().toLowerCase())) {
+      if (!MetastoreShim.validateName(f.getName().toLowerCase())) {
         throw new AnalysisException("Invalid struct field name: " + f.getName());
       }
     }

@@ -351,8 +351,8 @@ export HADOOP_HOME="$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
 export HADOOP_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 # The include and lib paths are needed to pick up hdfs.h and libhdfs.*
 # Allow overriding in case we want to point to a package/install with a different layout.
-export HADOOP_INCLUDE_DIR=${HADOOP_INCLUDE_DIR:-"${HADOOP_HOME}/include"}
-export HADOOP_LIB_DIR=${HADOOP_LIB_DIR:-"${HADOOP_HOME}/lib"}
+export HADOOP_INCLUDE_DIR=${HADOOP_INCLUDE_DIR_OVERRIDE:-"${HADOOP_HOME}/include"}
+export HADOOP_LIB_DIR=${HADOOP_LIB_DIR_OVERRIDE:-"${HADOOP_HOME}/lib"}
 
 # Please note that the * is inside quotes, thus it won't get expanded by bash but
 # by java, see "Understanding class path wildcards" at http://goo.gl/f0cfft
@@ -368,11 +368,13 @@ export MINIKDC_HOME="$CDH_COMPONENTS_HOME/llama-minikdc-${IMPALA_LLAMA_MINIKDC_V
 export SENTRY_HOME="$CDH_COMPONENTS_HOME/sentry-${IMPALA_SENTRY_VERSION}"
 export SENTRY_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 
+# Extract the first component of the hive version.
+export IMPALA_HIVE_MAJOR_VERSION=$(echo "$IMPALA_HIVE_VERSION" | cut -d . -f 1)
 export HIVE_HOME="$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}/"
 export PATH="$HIVE_HOME/bin:$PATH"
 # Allow overriding of Hive source location in case we want to build Impala without
 # a complete Hive build.
-export HIVE_SRC_DIR=${HIVE_SRC_DIR:-"${HIVE_HOME}/src"}
+export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${HIVE_HOME}/src"}
 export HIVE_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 
 # Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus

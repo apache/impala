@@ -17,10 +17,10 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TDropDataSourceParams;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -39,10 +39,10 @@ public class DropDataSrcStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (!MetaStoreUtils.validateName(dataSrcName_) ||
+    if (!MetastoreShim.validateName(dataSrcName_) ||
         (!ifExists_ && analyzer.getCatalog().getDataSource(dataSrcName_) == null)) {
-      throw new AnalysisException(Analyzer.DATA_SRC_DOES_NOT_EXIST_ERROR_MSG +
-          dataSrcName_);
+      throw new AnalysisException(
+          Analyzer.DATA_SRC_DOES_NOT_EXIST_ERROR_MSG + dataSrcName_);
     }
   }
 

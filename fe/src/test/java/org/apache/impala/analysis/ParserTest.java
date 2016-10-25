@@ -26,10 +26,10 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.testutil.TestUtils;
 import org.junit.Test;
 
@@ -2947,7 +2947,7 @@ public class ParserTest extends FrontendTestBase {
     // may have unquoted identifiers corresponding to keywords.
     for (String keyword: SqlScanner.keywordMap.keySet()) {
       // Skip keywords that are not valid field/column names in the Metastore.
-      if (!MetaStoreUtils.validateName(keyword)) continue;
+      if (!MetastoreShim.validateName(keyword)) continue;
       String structType = "STRUCT<" + keyword + ":INT>";
       TypeDefsParseOk(structType);
     }

@@ -19,10 +19,10 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TTableName;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -54,12 +54,12 @@ public class TableName {
    */
   public void analyze() throws AnalysisException {
     if (db_ != null) {
-      if (!MetaStoreUtils.validateName(db_)) {
+      if (!MetastoreShim.validateName(db_)) {
         throw new AnalysisException("Invalid database name: " + db_);
       }
     }
     Preconditions.checkNotNull(tbl_);
-    if (!MetaStoreUtils.validateName(tbl_)) {
+    if (!MetastoreShim.validateName(tbl_)) {
       throw new AnalysisException("Invalid table/view name: " + tbl_);
     }
   }

@@ -23,6 +23,7 @@ import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TCreateDbParams;
 
 /**
@@ -81,7 +82,7 @@ public class CreateDbStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // Check whether the db name meets the Metastore's requirements.
-    if (!MetaStoreUtils.validateName(dbName_)) {
+    if (!MetastoreShim.validateName(dbName_)) {
       throw new AnalysisException("Invalid database name: " + dbName_);
     }
 

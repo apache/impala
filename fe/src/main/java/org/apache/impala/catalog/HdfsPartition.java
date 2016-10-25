@@ -36,6 +36,7 @@ import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TExpr;
@@ -442,6 +443,9 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   public Map<String, String> getParameters() { return hmsParameters_; }
 
   public void putToParameters(String k, String v) { hmsParameters_.put(k, v); }
+  public void putToParameters(Pair<String, String> kv) {
+    putToParameters(kv.first, kv.second);
+  }
 
   /**
    * Marks this partition's metadata as "dirty" indicating that changes have been
