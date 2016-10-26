@@ -1,0 +1,7 @@
+====
+---- QUERY
+# IMPALA-4369: Parquet file with invalid metadata size in the file footer.
+select * from functional_parquet.bad_metadata_len
+---- CATCH
+Invalid metadata size in file footer
+====
