@@ -91,9 +91,8 @@ Status HdfsSequenceTableWriter::Init() {
   return Status::OK();
 }
 
-Status HdfsSequenceTableWriter::AppendRowBatch(RowBatch* batch,
-                                           const vector<int32_t>& row_group_indices,
-                                           bool* new_file) {
+Status HdfsSequenceTableWriter::AppendRows(
+    RowBatch* batch, const vector<int32_t>& row_group_indices, bool* new_file) {
   int32_t limit;
   if (row_group_indices.empty()) {
     limit = batch->num_rows();

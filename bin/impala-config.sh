@@ -197,6 +197,10 @@ elif [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
   # isilon manages its own replication.
   export HDFS_REPLICATION=1
 elif [ "${TARGET_FILESYSTEM}" = "local" ]; then
+  if [[ "${WAREHOUSE_LOCATION_PREFIX}" = "" ]]; then
+    echo "WAREHOUSE_LOCATION_PREFIX cannot be an empty string for local filesystem"
+    return 1
+  fi
   if [ ! -d "${WAREHOUSE_LOCATION_PREFIX}" ]; then
     echo "'$WAREHOUSE_LOCATION_PREFIX' is not a directory on the local filesystem."
     return 1

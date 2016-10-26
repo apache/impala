@@ -55,7 +55,7 @@ class TestInsertQueries(ImpalaTestSuite):
       cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
     else:
       cls.TestMatrix.add_dimension(create_exec_option_dimension(
-          cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
+          cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0, 1, 16],
           sync_ddl=[0, 1]))
       cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
       # Insert is currently only supported for text and parquet
@@ -68,6 +68,12 @@ class TestInsertQueries(ImpalaTestSuite):
             v.get_value('compression_codec') == 'none'))
       cls.TestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').compression_codec == 'none')
+      # Only test other batch sizes for uncompressed parquet to keep the execution time
+      # within reasonable bounds.
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('exec_option')['batch_size'] == 0 or \
+            (v.get_value('table_format').file_format == 'parquet' and \
+            v.get_value('compression_codec') == 'none'))
 
   def test_insert_large_string(self, vector, unique_database):
     """Test handling of large strings in inserter and scanner."""
@@ -103,7 +109,7 @@ class TestInsertQueries(ImpalaTestSuite):
     super(TestInsertQueries, cls).setup_class()
 
   @pytest.mark.execute_serially
-  def test_insert(self, vector):
+  def test_insert_test(self, vector):
     if (vector.get_value('table_format').file_format == 'parquet'):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
           vector.get_value('compression_codec')

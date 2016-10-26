@@ -793,7 +793,7 @@ public class InsertStmt extends StatementBase {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
     return TableSink.create(table_, isUpsert_ ? TableSink.Op.UPSERT : TableSink.Op.INSERT,
-        partitionKeyExprs_, mentionedColumns_, overwrite_);
+        partitionKeyExprs_, mentionedColumns_, overwrite_, hasClusteredHint_);
   }
 
   /**

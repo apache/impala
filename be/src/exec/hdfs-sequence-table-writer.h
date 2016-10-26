@@ -57,9 +57,8 @@ class HdfsSequenceTableWriter : public HdfsTableWriter {
 
   /// Outputs the given rows into an HDFS sequence file. The rows are buffered
   /// to fill a sequence file block.
-  virtual Status AppendRowBatch(RowBatch* rows,
-                                const std::vector<int32_t>& row_group_indices,
-                                bool* new_file);
+  virtual Status AppendRows(
+      RowBatch* rows, const std::vector<int32_t>& row_group_indices, bool* new_file);
 
  private:
   /// processes a single row, delegates to Compress or NoCompress ConsumeRow().

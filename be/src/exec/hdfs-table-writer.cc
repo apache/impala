@@ -39,6 +39,7 @@ HdfsTableWriter::HdfsTableWriter(HdfsTableSink* parent,
 
 Status HdfsTableWriter::Write(const uint8_t* data, int32_t len) {
   DCHECK_GE(len, 0);
+  DCHECK(output_->tmp_hdfs_file != nullptr);
   int ret = hdfsWrite(output_->hdfs_connection, output_->tmp_hdfs_file, data, len);
   if (ret == -1) {
     string error_msg = GetHdfsErrorMsg("");

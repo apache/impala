@@ -67,9 +67,8 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   virtual Status InitNewFile();
 
   /// Appends parquet representation of rows in the batch to the current file.
-  virtual Status AppendRowBatch(RowBatch* batch,
-                                const std::vector<int32_t>& row_group_indices,
-                                bool* new_file);
+  virtual Status AppendRows(
+      RowBatch* batch, const std::vector<int32_t>& row_group_indices, bool* new_file);
 
   /// Write out all the data.
   virtual Status Finalize();

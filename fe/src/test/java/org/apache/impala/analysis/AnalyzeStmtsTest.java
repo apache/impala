@@ -1750,6 +1750,22 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "partition (year, month) /* +shuffle,noshuffle */ " +
           "select * from functional.alltypes",
           "Conflicting INSERT hints: shuffle and noshuffle");
+
+      // Test clustered hint.
+      AnalyzesOk(String.format(
+          "insert into functional.alltypessmall partition (year, month) %sclustered%s " +
+          "select * from functional.alltypes", prefix, suffix));
+      AnalyzesOk(String.format(
+          "insert into table functional.alltypesnopart %sclustered%s " +
+          "select * from functional.alltypesnopart", prefix, suffix));
+      AnalyzesOk(String.format(
+          "insert into table functional.alltypesnopart %snoclustered%s " +
+          "select * from functional.alltypesnopart", prefix, suffix));
+      // Conflicting clustered hints.
+      AnalysisError(String.format(
+          "insert into table functional.alltypessmall partition (year, month) " +
+          "/* +clustered,noclustered */ select * from functional.alltypes", prefix,
+          suffix), "Conflicting INSERT hints: clustered and noclustered");
     }
 
     // Multiple non-conflicting hints and case insensitivity of hints.

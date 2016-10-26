@@ -872,8 +872,8 @@ Status HdfsParquetTableWriter::InitNewFile() {
   return Status::OK();
 }
 
-Status HdfsParquetTableWriter::AppendRowBatch(RowBatch* batch,
-    const vector<int32_t>& row_group_indices, bool* new_file) {
+Status HdfsParquetTableWriter::AppendRows(
+    RowBatch* batch, const vector<int32_t>& row_group_indices, bool* new_file) {
   SCOPED_TIMER(parent_->encode_timer());
   *new_file = false;
   int limit;

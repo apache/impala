@@ -90,13 +90,13 @@ public abstract class TableSink extends DataSink {
    */
   public static TableSink create(Table table, Op sinkAction,
       List<Expr> partitionKeyExprs,  List<Integer> referencedColumns,
-      boolean overwrite) {
+      boolean overwrite, boolean inputIsClustered) {
     if (table instanceof HdfsTable) {
       // Hdfs only supports inserts.
       Preconditions.checkState(sinkAction == Op.INSERT);
       // Referenced columns don't make sense for an Hdfs table.
       Preconditions.checkState(referencedColumns.isEmpty());
-      return new HdfsTableSink(table, partitionKeyExprs, overwrite);
+      return new HdfsTableSink(table, partitionKeyExprs, overwrite, inputIsClustered);
     } else if (table instanceof HBaseTable) {
       // HBase only supports inserts.
       Preconditions.checkState(sinkAction == Op.INSERT);

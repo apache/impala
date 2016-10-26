@@ -46,12 +46,17 @@ public class HdfsTableSink extends TableSink {
   // Whether to overwrite the existing partition(s).
   protected final boolean overwrite_;
 
+  // Indicates whether the input is ordered by the partition keys, meaning partitions can
+  // be opened, written, and closed one by one.
+  protected final boolean inputIsClustered_;
+
   public HdfsTableSink(Table targetTable, List<Expr> partitionKeyExprs,
-      boolean overwrite) {
+      boolean overwrite, boolean inputIsClustered) {
     super(targetTable, Op.INSERT);
     Preconditions.checkState(targetTable instanceof HdfsTable);
     partitionKeyExprs_ = partitionKeyExprs;
     overwrite_ = overwrite;
+    inputIsClustered_ = inputIsClustered;
   }
 
   @Override
@@ -140,7 +145,7 @@ public class HdfsTableSink extends TableSink {
   protected TDataSink toThrift() {
     TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
     THdfsTableSink hdfsTableSink = new THdfsTableSink(
-        Expr.treesToThrift(partitionKeyExprs_), overwrite_);
+        Expr.treesToThrift(partitionKeyExprs_), overwrite_, inputIsClustered_);
     HdfsTable table = (HdfsTable) targetTable_;
     StringBuilder error = new StringBuilder();
     int skipHeaderLineCount = table.parseSkipHeaderLineCount(error);

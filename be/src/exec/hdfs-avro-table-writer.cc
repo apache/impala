@@ -175,8 +175,8 @@ void HdfsAvroTableWriter::Close() {
   mem_pool_->FreeAll();
 }
 
-Status HdfsAvroTableWriter::AppendRowBatch(RowBatch* batch,
-    const vector<int32_t>& row_group_indices, bool* new_file) {
+Status HdfsAvroTableWriter::AppendRows(
+    RowBatch* batch, const vector<int32_t>& row_group_indices, bool* new_file) {
   int32_t limit;
   bool all_rows = row_group_indices.empty();
   if (all_rows) {

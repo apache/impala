@@ -23,11 +23,14 @@ import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
-from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
+from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_S3
 
 @SkipIfLocal.hdfs_client
 class TestInsertBehaviour(ImpalaTestSuite):
   """Tests for INSERT behaviour that isn't covered by checking query results"""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
 
   TEST_DB_NAME = "insert_empty_result_db"
 
@@ -473,3 +476,106 @@ class TestInsertBehaviour(ImpalaTestSuite):
         "other::---".format(groups[0]))
     self.execute_query_expect_success(self.client, "REFRESH " + table)
     self.execute_query_expect_failure(self.client, insert_query)
+
+  def test_clustered_partition_single_file(self, unique_database):
+    """IMPALA-2523: Tests that clustered insert creates one file per partition, even when
+    inserting over multiple row batches."""
+    # On s3 this test takes about 220 seconds and we are unlikely to break it, so only run
+    # it in exhaustive strategy.
+    if self.exploration_strategy() != 'exhaustive' and IS_S3:
+      pytest.skip("only runs in exhaustive")
+    table = "{0}.insert_clustered".format(unique_database)
+    table_path = "test-warehouse/{0}.db/insert_clustered".format(unique_database)
+    table_location = get_fs_path("/" + table_path)
+
+    create_stmt = """create table {0} like functional.alltypes""".format(table)
+    self.execute_query_expect_success(self.client, create_stmt)
+
+    set_location_stmt = """alter table {0} set location '{1}'""".format(
+        table, table_location)
+    self.execute_query_expect_success(self.client, set_location_stmt)
+
+    # Setting a lower batch size will result in multiple row batches being written.
+    self.execute_query_expect_success(self.client, "set batch_size=10")
+
+    insert_stmt = """insert into {0} partition(year, month) /*+ clustered,shuffle */
+                     select * from functional.alltypes""".format(table)
+    self.execute_query_expect_success(self.client, insert_stmt)
+
+    # We expect exactly one partition per year and month, since subsequent row batches of
+    # a partition will be written into the same file.
+    expected_partitions = \
+        ["year=%s/month=%s" % (y, m) for y in [2009, 2010] for m in range(1,13)]
+
+    for partition in expected_partitions:
+      partition_path = "{0}/{1}".format(table_path, partition)
+      files = self.filesystem_client.ls(partition_path)
+      assert len(files) == 1, "%s: %s" % (partition, files)
+
+  def test_clustered_partition_multiple_files(self, unique_database):
+    """IMPALA-2523: Tests that clustered insert creates the right number of files per
+    partition when inserting over multiple row batches."""
+    # This test takes about 30 seconds and we are unlikely to break it, so only run it in
+    # exhaustive strategy.
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip("only runs in exhaustive")
+    table = "{0}.insert_clustered".format(unique_database)
+    table_path = "test-warehouse/{0}.db/insert_clustered".format(unique_database)
+    table_location = get_fs_path("/" + table_path)
+
+    create_stmt = """create table {0} (
+                     l_orderkey BIGINT,
+                     l_partkey BIGINT,
+                     l_suppkey BIGINT,
+                     l_linenumber INT,
+                     l_quantity DECIMAL(12,2),
+                     l_extendedprice DECIMAL(12,2),
+                     l_discount DECIMAL(12,2),
+                     l_tax DECIMAL(12,2),
+                     l_linestatus STRING,
+                     l_shipdate STRING,
+                     l_commitdate STRING,
+                     l_receiptdate STRING,
+                     l_shipinstruct STRING,
+                     l_shipmode STRING,
+                     l_comment STRING)
+                     partitioned by (l_returnflag STRING) stored as parquet
+                     """.format(table)
+    self.execute_query_expect_success(self.client, create_stmt)
+
+    set_location_stmt = """alter table {0} set location '{1}'""".format(
+        table, table_location)
+    self.execute_query_expect_success(self.client, set_location_stmt)
+
+    # Setting a lower parquet file size will result in multiple files being written.
+    self.execute_query_expect_success(self.client, "set parquet_file_size=10485760")
+
+    insert_stmt = """insert into {0} partition(l_returnflag) /*+ clustered,shuffle */
+        select l_orderkey,
+               l_partkey,
+               l_suppkey,
+               l_linenumber,
+               l_quantity,
+               l_extendedprice,
+               l_discount,
+               l_tax,
+               l_linestatus,
+               l_shipdate,
+               l_commitdate,
+               l_receiptdate,
+               l_shipinstruct,
+               l_shipmode,
+               l_comment,
+               l_returnflag
+               from tpch_parquet.lineitem""".format(table)
+    self.execute_query_expect_success(self.client, insert_stmt)
+
+    expected_partition_files = [("l_returnflag=A", 3, 30),
+                                ("l_returnflag=N", 3, 30),
+                                ("l_returnflag=R", 3, 30)]
+
+    for partition, min_files, max_files in expected_partition_files:
+      partition_path = "{0}/{1}".format(table_path, partition)
+      files = self.filesystem_client.ls(partition_path)
+      assert min_files <= len(files) and len(files) <= max_files, \
+          "%s: %s" % (partition, files)
