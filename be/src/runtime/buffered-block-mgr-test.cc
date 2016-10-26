@@ -142,8 +142,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
   BufferedBlockMgr* CreateMgr(int64_t query_id, int max_buffers, int block_size,
       RuntimeState** query_state = NULL, TQueryOptions* query_options = NULL) {
     RuntimeState* state;
-    EXPECT_OK(test_env_->CreatePerQueryState(
-        query_id, max_buffers, block_size, &state, query_options));
+    EXPECT_OK(test_env_->CreateQueryState(
+        query_id, max_buffers, block_size, query_options, &state));
     if (query_state != NULL) *query_state = state;
     return state->block_mgr();
   }
@@ -558,8 +558,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
     thread_group workers;
     // Create a shared RuntimeState with no BufferedBlockMgr.
     RuntimeState* shared_state =
-        new RuntimeState(TExecPlanFragmentParams(), test_env_->exec_env());
-    shared_state->InitMemTrackers(TUniqueId(), NULL, -1);
+        new RuntimeState(TQueryCtx(), test_env_->exec_env());
+    shared_state->InitMemTrackers(NULL, -1);
 
     for (int i = 0; i < num_threads; ++i) {
       thread* t = new thread(

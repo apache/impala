@@ -309,7 +309,7 @@ public class HdfsScanNode extends ScanNode {
    * Returns the set of file formats being scanned.
    */
   private Set<HdfsFileFormat> computeScanRangeLocations(Analyzer analyzer) {
-    long maxScanRangeLength = analyzer.getQueryCtx().getRequest().getQuery_options()
+    long maxScanRangeLength = analyzer.getQueryCtx().client_request.getQuery_options()
         .getMax_scan_range_length();
     scanRanges_ = Lists.newArrayList();
     Set<HdfsFileFormat> fileFormats = Sets.newHashSet();

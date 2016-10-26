@@ -45,12 +45,12 @@ RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* s
       state->runtime_profile()->AddCounter("BloomFilterBytes", TUnit::BYTES);
 
   // Clamp bloom filter size down to the limits {MIN,MAX}_BLOOM_FILTER_SIZE
-  max_filter_size_ = query_ctx.request.query_options.runtime_filter_max_size;
+  max_filter_size_ = query_ctx.client_request.query_options.runtime_filter_max_size;
   max_filter_size_ = max<int64_t>(max_filter_size_, MIN_BLOOM_FILTER_SIZE);
   max_filter_size_ =
       BitUtil::RoundUpToPowerOfTwo(min<int64_t>(max_filter_size_, MAX_BLOOM_FILTER_SIZE));
 
-  min_filter_size_ = query_ctx.request.query_options.runtime_filter_min_size;
+  min_filter_size_ = query_ctx.client_request.query_options.runtime_filter_min_size;
   min_filter_size_ = max<int64_t>(min_filter_size_, MIN_BLOOM_FILTER_SIZE);
   min_filter_size_ =
       BitUtil::RoundUpToPowerOfTwo(min<int64_t>(min_filter_size_, MAX_BLOOM_FILTER_SIZE));
@@ -61,7 +61,7 @@ RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* s
   DCHECK_GT(min_filter_size_, 0);
   DCHECK_GT(max_filter_size_, 0);
 
-  default_filter_size_ = query_ctx.request.query_options.runtime_bloom_filter_size;
+  default_filter_size_ = query_ctx.client_request.query_options.runtime_bloom_filter_size;
   default_filter_size_ = max<int64_t>(default_filter_size_, min_filter_size_);
   default_filter_size_ =
       BitUtil::RoundUpToPowerOfTwo(min<int64_t>(default_filter_size_, max_filter_size_));

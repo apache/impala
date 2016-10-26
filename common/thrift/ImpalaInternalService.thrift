@@ -267,8 +267,7 @@ struct TClientRequest {
 // TODO: Separate into FE/BE initialized vars.
 struct TQueryCtx {
   // Client request containing stmt to execute and query options.
-  // TODO: rename to client_request, we have too many requests
-  1: required TClientRequest request
+  1: required TClientRequest client_request
 
   // A globally unique id assigned to the entire query in the BE.
   // The bottom 4 bytes are 0 (for details see be/src/util/uid-util.h).

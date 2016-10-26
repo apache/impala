@@ -101,7 +101,8 @@ class SimpleTupleStreamTest : public testing::Test {
   /// Setup a block manager with the provided settings and client with no reservation,
   /// tracked by tracker_.
   void InitBlockMgr(int64_t limit, int block_size) {
-    ASSERT_OK(test_env_->CreatePerQueryState(0, limit, block_size, &runtime_state_));
+    ASSERT_OK(
+        test_env_->CreateQueryState(0, limit, block_size, nullptr, &runtime_state_));
     MemTracker* client_tracker = pool_.Add(
         new MemTracker(-1, "client", runtime_state_->instance_mem_tracker()));
     ASSERT_OK(runtime_state_->block_mgr()->RegisterClient(

@@ -45,6 +45,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/types.h"
+#include "statestore/statestore-subscriber.h"
 
 namespace impala {
 
@@ -259,8 +260,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   ///  - incoming_topic_deltas: all changes to registered statestore topics
   ///  - subscriber_topic_updates: output parameter to publish any topic updates to.
   ///                              Currently unused.
-  void MembershipCallback(const StatestoreSubscriber::TopicDeltaMap&
-      incoming_topic_deltas, std::vector<TTopicDelta>* subscriber_topic_updates);
+  void MembershipCallback(
+      const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+      std::vector<TTopicDelta>* subscriber_topic_updates);
 
   void CatalogUpdateCallback(const StatestoreSubscriber::TopicDeltaMap& topic_deltas,
       std::vector<TTopicDelta>* topic_updates);

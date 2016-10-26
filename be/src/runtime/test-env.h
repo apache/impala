@@ -23,6 +23,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
+#include "runtime/query-state.h"
 
 namespace impala {
 
@@ -39,9 +40,9 @@ class TestEnv {
 
   /// Create a RuntimeState for a query with a new block manager and the given query
   /// options. The RuntimeState is owned by the TestEnv. Returns an error if
-  /// CreatePerQueryState() has been called with the same query ID already.
-  Status CreatePerQueryState(int64_t query_id, int max_buffers, int block_size,
-      RuntimeState** runtime_state, TQueryOptions* query_options = NULL);
+  /// CreateQueryState() has been called with the same query ID already.
+  Status CreateQueryState(int64_t query_id, int max_buffers, int block_size,
+      const TQueryOptions* query_options, RuntimeState** runtime_state);
 
   /// Destroy all RuntimeStates and block managers created by this TestEnv.
   void TearDownRuntimeStates();

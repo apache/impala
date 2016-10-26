@@ -38,6 +38,7 @@ add_library(Runtime
   disk-io-mgr-stress.cc
   exec-env.cc
   free-pool.cc
+  fragment-instance-state.cc
   hbase-table.cc
   hbase-table-factory.cc
   hdfs-fs-cache.cc
@@ -47,6 +48,8 @@ add_library(Runtime
   multi-precision.cc
   parallel-executor.cc
   plan-fragment-executor.cc
+  query-exec-mgr.cc
+  query-state.cc
   test-env.cc
   types.cc
   raw-value.cc

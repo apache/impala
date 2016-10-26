@@ -160,7 +160,7 @@ Status RequestPoolService::ResolveRequestPool(const TQueryCtx& ctx,
     user = DEFAULT_USER;
   }
 
-  const string& requested_pool = ctx.request.query_options.request_pool;
+  const string& requested_pool = ctx.client_request.query_options.request_pool;
   TResolveRequestPoolParams params;
   params.__set_user(user);
   params.__set_requested_pool(requested_pool);

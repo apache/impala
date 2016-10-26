@@ -344,9 +344,9 @@ public class PlannerTest extends PlannerTestBase {
   private void testEffectiveMtDop(String stmt, int userMtDop, int expectedMtDop) {
     TQueryCtx queryCtx = TestUtils.createQueryContext(
         Catalog.DEFAULT_DB, System.getProperty("user.name"));
-    queryCtx.request.setStmt(stmt);
-    queryCtx.request.query_options = defaultQueryOptions();
-    if (userMtDop != -1) queryCtx.request.query_options.setMt_dop(userMtDop);
+    queryCtx.client_request.setStmt(stmt);
+    queryCtx.client_request.query_options = defaultQueryOptions();
+    if (userMtDop != -1) queryCtx.client_request.query_options.setMt_dop(userMtDop);
     StringBuilder explainBuilder = new StringBuilder();
     TExecRequest request = null;
     try {

@@ -235,7 +235,7 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
       // TODO: this should be a DCHECK but we sometimes hit it. It's likely IMPALA-1702.
       LOG(ERROR) << "Bad table descriptor! table_id=" << hdfs_table_->id()
                  << " partition_id=" << split.partition_id
-                 << "\n" << PrintThrift(state->fragment_params());
+                 << "\n" << PrintThrift(state->instance_ctx());
       return Status("Query encountered invalid metadata, likely due to IMPALA-1702."
                     " Try rerunning the query.");
     }
@@ -367,7 +367,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
     DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
                                    << " partition_id=" << partition_id
-                                   << "\n" << PrintThrift(state->fragment_params());
+                                   << "\n" << PrintThrift(state->instance_ctx());
     partition_template_tuple_map_[partition_id] = InitTemplateTuple(
         partition_desc->partition_key_value_ctxs(), scan_node_pool_.get(), state);
   }

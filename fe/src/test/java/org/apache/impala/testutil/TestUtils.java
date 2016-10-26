@@ -252,7 +252,7 @@ public class TestUtils {
    */
   public static TQueryCtx createQueryContext(String defaultDb, String user) {
     TQueryCtx queryCtx = new TQueryCtx();
-    queryCtx.setRequest(new TClientRequest("FeTests", new TQueryOptions()));
+    queryCtx.setClient_request(new TClientRequest("FeTests", new TQueryOptions()));
     queryCtx.setQuery_id(new TUniqueId());
     queryCtx.setSession(new TSessionState(new TUniqueId(), TSessionType.BEESWAX,
         defaultDb, user, new TNetworkAddress("localhost", 0)));
@@ -262,7 +262,7 @@ public class TestUtils {
     queryCtx.setPid(1000);
     // Disable rewrites by default because some analyzer tests have non-executable
     // constant exprs (e.g. dummy UDFs) that do not work with constant folding.
-    queryCtx.request.query_options.setEnable_expr_rewrites(false);
+    queryCtx.client_request.query_options.setEnable_expr_rewrites(false);
     return queryCtx;
   }
 

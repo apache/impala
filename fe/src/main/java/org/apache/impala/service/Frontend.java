@@ -887,7 +887,7 @@ public class Frontend {
 
     AnalysisContext analysisCtx = new AnalysisContext(impaladCatalog_, queryCtx,
         authzConfig_);
-    if (LOG.isTraceEnabled()) LOG.trace("analyze query " + queryCtx.request.stmt);
+    if (LOG.isTraceEnabled()) LOG.trace("analyze query " + queryCtx.client_request.stmt);
 
     // Run analysis in a loop until it any of the following events occur:
     // 1) Analysis completes successfully.
@@ -896,7 +896,7 @@ public class Frontend {
     try {
       while (true) {
         try {
-          analysisCtx.analyze(queryCtx.request.stmt);
+          analysisCtx.analyze(queryCtx.client_request.stmt);
           Preconditions.checkState(analysisCtx.getAnalyzer().getMissingTbls().isEmpty());
           return analysisCtx.getAnalysisResult();
         } catch (AnalysisException e) {
@@ -965,7 +965,7 @@ public class Frontend {
     } catch (Exception e) {
       // Turn exceptions into a warning to allow the query to execute.
       LOG.error("Failed to compute resource requirements for query\n" +
-          queryCtx.request.getStmt(), e);
+          queryCtx.client_request.getStmt(), e);
     }
 
     // The fragment at this point has all state set, serialize it to thrift.
@@ -984,9 +984,9 @@ public class Frontend {
       Planner planner, StringBuilder explainString) throws ImpalaException {
     TQueryCtx queryCtx = planner.getQueryCtx();
     AnalysisContext.AnalysisResult analysisResult = planner.getAnalysisResult();
-    boolean isMtExec = analysisResult.isQueryStmt() &&
-        queryCtx.request.query_options.isSetMt_dop() &&
-        queryCtx.request.query_options.mt_dop > 0;
+    boolean isMtExec = analysisResult.isQueryStmt()
+        && queryCtx.client_request.query_options.isSetMt_dop()
+        && queryCtx.client_request.query_options.mt_dop > 0;
 
     List<PlanFragment> planRoots = Lists.newArrayList();
     TQueryExecRequest result = new TQueryExecRequest();
@@ -1009,7 +1009,7 @@ public class Frontend {
     // Optionally disable spilling in the backend. Allow spilling if there are plan hints
     // or if all tables have stats.
     boolean disableSpilling =
-        queryCtx.request.query_options.isDisable_unsafe_spills()
+        queryCtx.client_request.query_options.isDisable_unsafe_spills()
           && !queryCtx.tables_missing_stats.isEmpty()
           && !analysisResult.getAnalyzer().hasPlanHints();
     // for now, always disable spilling for multi-threaded execution
@@ -1041,11 +1041,11 @@ public class Frontend {
     timeline.markEvent("Analysis finished");
     Preconditions.checkNotNull(analysisResult.getStmt());
     TExecRequest result = new TExecRequest();
-    result.setQuery_options(queryCtx.request.getQuery_options());
+    result.setQuery_options(queryCtx.client_request.getQuery_options());
     result.setAccess_events(analysisResult.getAccessEvents());
     result.analysis_warnings = analysisResult.getAnalyzer().getWarnings();
 
-    TQueryOptions queryOptions = queryCtx.request.query_options;
+    TQueryOptions queryOptions = queryCtx.client_request.query_options;
     if (analysisResult.isCatalogOp()) {
       result.stmt_type = TStmtType.DDL;
       createCatalogOpRequest(analysisResult, result);

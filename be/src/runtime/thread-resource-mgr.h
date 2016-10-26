@@ -60,6 +60,8 @@ namespace impala {
 ///  - Priorities for different pools
 /// If both the mgr and pool locks need to be taken, the mgr lock must
 /// be taken first.
+///
+/// TODO: make ResourcePool a stand-alone class
 class ThreadResourceMgr {
  public:
   class ResourcePool;

@@ -367,10 +367,10 @@ public class ColumnLineageGraph {
     Preconditions.checkNotNull(analyzer);
     Preconditions.checkState(analyzer.isRootAnalyzer());
     TQueryCtx queryCtx = analyzer.getQueryCtx();
-    if (queryCtx.request.isSetRedacted_stmt()) {
-      queryStr_ = queryCtx.request.redacted_stmt;
+    if (queryCtx.client_request.isSetRedacted_stmt()) {
+      queryStr_ = queryCtx.client_request.redacted_stmt;
     } else {
-      queryStr_ = queryCtx.request.stmt;
+      queryStr_ = queryCtx.client_request.stmt;
     }
     Preconditions.checkNotNull(queryStr_);
     timestamp_ = queryCtx.start_unix_millis / 1000;

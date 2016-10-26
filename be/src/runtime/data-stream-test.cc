@@ -28,6 +28,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/data-stream-mgr.h"
+#include "runtime/exec-env.h"
 #include "runtime/data-stream-sender.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
@@ -112,10 +113,12 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
 
 class DataStreamTest : public testing::Test {
  protected:
-  DataStreamTest() : runtime_state_(TExecPlanFragmentParams(), &exec_env_), next_val_(0) {
+  DataStreamTest()
+    : runtime_state_(TQueryCtx(), &exec_env_),
+      next_val_(0) {
     // Initialize Mem trackers for use by the data stream receiver.
     exec_env_.InitForFeTests();
-    runtime_state_.InitMemTrackers(TUniqueId(), NULL, -1);
+    runtime_state_.InitMemTrackers(NULL, -1);
 
     // Stop tests that rely on mismatched sender / receiver pairs timing out from failing.
     FLAGS_datastream_sender_timeout_ms = 250;
@@ -480,9 +483,9 @@ class DataStreamTest : public testing::Test {
 
   void Sender(int sender_num, int channel_buffer_size,
               TPartitionType::type partition_type) {
-    RuntimeState state(TExecPlanFragmentParams(), &exec_env_);
+    RuntimeState state(TQueryCtx(), &exec_env_);
     state.set_desc_tbl(desc_tbl_);
-    state.InitMemTrackers(TUniqueId(), NULL, -1);
+    state.InitMemTrackers(NULL, -1);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataStreamSink& sink = GetSink(partition_type);
     DataStreamSender sender(
@@ -593,9 +596,8 @@ TEST_F(DataStreamTest, BasicTest) {
 //
 // TODO: Make lifecycle requirements more explicit.
 TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
-  scoped_ptr<RuntimeState> runtime_state(
-      new RuntimeState(TExecPlanFragmentParams(), &exec_env_));
-  runtime_state->InitMemTrackers(TUniqueId(), NULL, -1);
+  scoped_ptr<RuntimeState> runtime_state(new RuntimeState(TQueryCtx(), &exec_env_));
+  runtime_state->InitMemTrackers(NULL, -1);
 
   scoped_ptr<RuntimeProfile> profile(new RuntimeProfile(&obj_pool_, "TestReceiver"));
 

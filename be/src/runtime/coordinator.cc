@@ -58,9 +58,11 @@
 #include "runtime/parallel-executor.h"
 #include "runtime/plan-fragment-executor.h"
 #include "runtime/row-batch.h"
+#include "runtime/query-exec-mgr.h"
+#include "runtime/query-state.h"
+#include "runtime/fragment-instance-state.h"
 #include "runtime/tuple-row.h"
 #include "scheduling/scheduler.h"
-#include "service/fragment-exec-state.h"
 #include "util/bloom-filter.h"
 #include "util/container-util.h"
 #include "util/counting-barrier.h"
@@ -123,9 +125,9 @@ struct DebugOptions {
 ///
 /// Concurrent accesses:
 /// - updates through UpdateFragmentExecStatus()
-class Coordinator::FragmentInstanceState {
+class Coordinator::InstanceState {
  public:
-  FragmentInstanceState(const FInstanceExecParams& params, ObjectPool* obj_pool)
+  InstanceState(const FInstanceExecParams& params, ObjectPool* obj_pool)
     : exec_params_(params),
       total_split_size_(0),
       profile_(nullptr),
@@ -333,7 +335,7 @@ class Coordinator::FilterState {
 
 };
 
-void Coordinator::FragmentInstanceState::ComputeTotalSplitSize(
+void Coordinator::InstanceState::ComputeTotalSplitSize(
     const PerNodeScanRanges& per_node_scan_ranges) {
   total_split_size_ = 0;
 
@@ -345,7 +347,7 @@ void Coordinator::FragmentInstanceState::ComputeTotalSplitSize(
   }
 }
 
-int64_t Coordinator::FragmentInstanceState::UpdateNumScanRangesCompleted() {
+int64_t Coordinator::InstanceState::UpdateNumScanRangesCompleted() {
   int64_t total = 0;
   CounterMap& complete = aggregate_counters_.scan_ranges_complete_counters;
   for (CounterMap::iterator i = complete.begin(); i != complete.end(); ++i) {
@@ -380,6 +382,10 @@ Coordinator::~Coordinator() {
   }
   filter_mem_tracker_.reset();
   query_mem_tracker_.reset();
+}
+
+PlanFragmentExecutor* Coordinator::executor() {
+  return coord_instance_->executor();
 }
 
 TExecNodePhase::type GetExecNodePhase(const string& key) {
@@ -439,7 +445,7 @@ Status Coordinator::Exec() {
   if (needs_finalization_) finalize_params_ = request.finalize_params;
 
   VLOG_QUERY << "Exec() query_id=" << schedule_.query_id()
-             << " stmt=" << request.query_ctx.request.stmt;
+             << " stmt=" << request.query_ctx.client_request.stmt;
   stmt_type_ = request.stmt_type;
   query_id_ = schedule_.query_id();
   desc_tbl_ = request.desc_tbl;
@@ -457,7 +463,7 @@ Status Coordinator::Exec() {
   progress_.Init(str, schedule_.num_scan_ranges());
 
   // runtime filters not yet supported for mt execution
-  bool is_mt_execution = request.query_ctx.request.query_options.mt_dop > 0;
+  bool is_mt_execution = request.query_ctx.client_request.query_options.mt_dop > 0;
   if (is_mt_execution) filter_mode_ = TRuntimeFilterMode::OFF;
 
   // to keep things simple, make async Cancel() calls wait until plan fragment
@@ -468,9 +474,9 @@ Status Coordinator::Exec() {
   // The coordinator may require a query mem tracker for result-caching, which tracks
   // memory via the query mem tracker.
   int64_t query_limit = -1;
-  if (query_ctx_.request.query_options.__isset.mem_limit
-      && query_ctx_.request.query_options.mem_limit > 0) {
-    query_limit = query_ctx_.request.query_options.mem_limit;
+  if (query_ctx_.client_request.query_options.__isset.mem_limit
+      && query_ctx_.client_request.query_options.mem_limit > 0) {
+    query_limit = query_ctx_.client_request.query_options.mem_limit;
   }
   MemTracker* pool_tracker = MemTracker::GetRequestPoolMemTracker(
       schedule_.request_pool(), exec_env_->process_mem_tracker());
@@ -484,38 +490,42 @@ Status Coordinator::Exec() {
   InitExecSummary();
   StartFInstances();
 
-  // In the error case, it's safe to return and not to get root_sink_ here to close - if
+  // In the error case, it's safe to return and not to get coord_sink_ here to close - if
   // there was an error, but the coordinator fragment was successfully started, it should
   // cancel itself when it receives an error status after reporting its profile.
   RETURN_IF_ERROR(FinishInstanceStartup());
 
   // Grab executor and wait until Prepare() has finished so that runtime state etc. will
-  // be set up. Must do this here in order to get a reference to root_fragment_instance_
-  // so that root_sink_ remains valid throughout query lifetime.
+  // be set up. Must do this here in order to get a reference to coord_instance_
+  // so that coord_sink_ remains valid throughout query lifetime.
   if (schedule_.GetCoordFragment() != nullptr) {
-    // Coordinator fragment instance has same ID as query.
-    root_fragment_instance_ =
-        ExecEnv::GetInstance()->fragment_mgr()->GetFragmentExecState(query_id_);
-    // Fragment instance might have been failed and unregistered itself even though it was
-    // successfully started (e.g. Prepare() might have failed).
-    if (root_fragment_instance_.get() == nullptr) {
-      FragmentInstanceState* root_state = fragment_instance_states_[0];
-      DCHECK(root_state != nullptr);
-      lock_guard<mutex> instance_state_lock(*root_state->lock());
+    QueryState* qs = ExecEnv::GetInstance()->query_exec_mgr()->GetQueryState(query_id_);
+    if (qs != nullptr) coord_instance_ = qs->GetFInstanceState(query_id_);
+    if (coord_instance_ == nullptr) {
+      // Coordinator instance might have failed and unregistered itself even
+      // though it was successfully started (e.g. Prepare() might have failed).
+      if (qs != nullptr) {
+        ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(qs);
+        qs = nullptr;
+      }
+      InstanceState* coord_state = fragment_instance_states_[0];
+      DCHECK(coord_state != nullptr);
+      lock_guard<mutex> instance_state_lock(*coord_state->lock());
       // Try and return the fragment instance status if it was already set.
-      // TODO: Consider waiting for root_state->done() here.
-      RETURN_IF_ERROR(*root_state->status());
-      return Status(Substitute("Root fragment instance ($0) failed", PrintId(query_id_)));
+      // TODO: Consider waiting for coord_state->done() here.
+      RETURN_IF_ERROR(*coord_state->status());
+      return Status(
+          Substitute("Coordinator fragment instance ($0) failed", PrintId(query_id_)));
     }
-    executor_ = root_fragment_instance_->executor();
+
     // When WaitForPrepare() returns OK(), the executor's root sink will be set up. At
     // that point, the coordinator must be sure to call root_sink()->CloseConsumer(); the
     // fragment instance's executor will not complete until that point.
     // TODO: Consider moving this to Wait().
-    Status prepare_status = executor_->WaitForPrepare();
-    root_sink_ = executor_->root_sink();
+    Status prepare_status = executor()->WaitForPrepare();
+    coord_sink_ = executor()->root_sink();
     RETURN_IF_ERROR(prepare_status);
-    DCHECK(root_sink_ != nullptr);
+    DCHECK(coord_sink_ != nullptr);
   }
 
   PrintFragmentInstanceInfo();
@@ -523,7 +533,7 @@ Status Coordinator::Exec() {
 }
 
 void Coordinator::UpdateFilterRoutingTable(const FragmentExecParams& fragment_params) {
-  DCHECK(schedule_.request().query_ctx.request.query_options.mt_dop == 0);
+  DCHECK(schedule_.request().query_ctx.client_request.query_options.mt_dop == 0);
   int num_hosts = fragment_params.instance_exec_params.size();
   DCHECK_GT(num_hosts, 0);
   DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
@@ -614,8 +624,8 @@ void Coordinator::StartFInstances() {
     num_instances += fragment_params.instance_exec_params.size();
     for (const FInstanceExecParams& instance_params:
         fragment_params.instance_exec_params) {
-      FragmentInstanceState* exec_state = obj_pool()->Add(
-          new FragmentInstanceState(instance_params, obj_pool()));
+      InstanceState* exec_state = obj_pool()->Add(
+          new InstanceState(instance_params, obj_pool()));
       int instance_state_idx = GetInstanceIdx(instance_params.instance_id);
       fragment_instance_states_[instance_state_idx] = exec_state;
 
@@ -638,7 +648,7 @@ Status Coordinator::FinishInstanceStartup() {
   const TMetricDef& def =
       MakeTMetricDef("fragment-latencies", TMetricKind::HISTOGRAM, TUnit::TIME_MS);
   HistogramMetric latencies(def, 20000, 3);
-  for (FragmentInstanceState* exec_state: fragment_instance_states_) {
+  for (InstanceState* exec_state: fragment_instance_states_) {
     lock_guard<mutex> l(*exec_state->lock());
     // Preserve the first non-OK status, if there is one
     if (status.ok()) status = *exec_state->status();
@@ -859,7 +869,7 @@ Status Coordinator::FinalizeSuccessfulInsert() {
       HdfsPartitionDescriptor* part = hdfs_table->GetPartition(partition.second.id);
       DCHECK(part != NULL) << "table_id=" << hdfs_table->id()
                            << " partition_id=" << partition.second.id
-                           << "\n" <<  PrintThrift(runtime_state()->fragment_params());
+                           << "\n" <<  PrintThrift(runtime_state()->instance_ctx());
       part_path_ss << part->location();
     }
     const string& part_path = part_path_ss.str();
@@ -924,7 +934,8 @@ Status Coordinator::FinalizeSuccessfulInsert() {
           partition_create_ops.Add(CREATE_DIR, part_path);
         }
       }
-    } else if (!is_s3_path || !query_ctx_.request.query_options.s3_skip_insert_staging) {
+    } else if (!is_s3_path
+        || !query_ctx_.client_request.query_options.s3_skip_insert_staging) {
       // If the S3_SKIP_INSERT_STAGING query option is set, then the partition directories
       // would have already been created by the table sinks.
       if (FLAGS_insert_inherit_permissions && !is_s3_path) {
@@ -1071,8 +1082,8 @@ Status Coordinator::Wait() {
   has_called_wait_ = true;
 
   if (stmt_type_ == TStmtType::QUERY) {
-    DCHECK(executor_ != nullptr);
-    return UpdateStatus(executor_->WaitForOpen(), runtime_state()->fragment_instance_id(),
+    DCHECK(executor() != nullptr);
+    return UpdateStatus(executor()->WaitForOpen(), runtime_state()->fragment_instance_id(),
         FLAGS_hostname);
   }
 
@@ -1106,15 +1117,15 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
 
   if (returned_all_results_) {
     // May be called after the first time we set *eos. Re-set *eos and return here;
-    // already torn-down root_sink_ so no more work to do.
+    // already torn-down coord_sink_ so no more work to do.
     *eos = true;
     return Status::OK();
   }
 
-  DCHECK(root_sink_ != nullptr)
+  DCHECK(coord_sink_ != nullptr)
       << "GetNext() called without result sink. Perhaps Prepare() failed and was not "
       << "checked?";
-  Status status = root_sink_->GetNext(runtime_state(), results, max_rows, eos);
+  Status status = coord_sink_->GetNext(runtime_state(), results, max_rows, eos);
 
   // if there was an error, we need to return the query's error status rather than
   // the status we just got back from the local executor (which may well be CANCELLED
@@ -1126,8 +1137,8 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
     returned_all_results_ = true;
     // Trigger tear-down of coordinator fragment by closing the consumer. Must do before
     // WaitForAllInstances().
-    root_sink_->CloseConsumer();
-    root_sink_ = nullptr;
+    coord_sink_->CloseConsumer();
+    coord_sink_ = nullptr;
 
     // Don't return final NULL until all instances have completed.  GetNext must wait for
     // all instances to complete before ultimately signalling the end of execution via a
@@ -1148,12 +1159,12 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
 }
 
 void Coordinator::PrintFragmentInstanceInfo() {
-  for (FragmentInstanceState* state: fragment_instance_states_) {
+  for (InstanceState* state: fragment_instance_states_) {
     SummaryStats& acc = fragment_profiles_[state->fragment_idx()].bytes_assigned;
     acc(state->total_split_size());
   }
 
-  for (int id = (executor_ == NULL ? 0 : 1); id < fragment_profiles_.size(); ++id) {
+  for (int id = (executor() == NULL ? 0 : 1); id < fragment_profiles_.size(); ++id) {
     SummaryStats& acc = fragment_profiles_[id].bytes_assigned;
     double min = accumulators::min(acc);
     double max = accumulators::max(acc);
@@ -1168,7 +1179,7 @@ void Coordinator::PrintFragmentInstanceInfo() {
 
     if (VLOG_FILE_IS_ON) {
       VLOG_FILE << "Byte split for fragment " << id << " " << ss.str();
-      for (FragmentInstanceState* exec_state: fragment_instance_states_) {
+      for (InstanceState* exec_state: fragment_instance_states_) {
         if (exec_state->fragment_idx() != id) continue;
         VLOG_FILE << "data volume for ipaddress " << exec_state << ": "
                   << PrettyPrinter::Print(exec_state->total_split_size(), TUnit::BYTES);
@@ -1284,7 +1295,7 @@ void Coordinator::ExecRemoteFInstance(
     rpc_params.fragment_instance_ctx.__set_debug_phase(debug_options->phase);
   }
   int instance_state_idx = GetInstanceIdx(exec_params.instance_id);
-  FragmentInstanceState* exec_state = fragment_instance_states_[instance_state_idx];
+  InstanceState* exec_state = fragment_instance_states_[instance_state_idx];
   exec_state->ComputeTotalSplitSize(
       rpc_params.fragment_instance_ctx.per_node_scan_ranges);
   VLOG_FILE << "making rpc: ExecPlanFragment"
@@ -1357,7 +1368,7 @@ void Coordinator::CancelInternal() {
 
 void Coordinator::CancelFragmentInstances() {
   int num_cancelled = 0;
-  for (FragmentInstanceState* exec_state: fragment_instance_states_) {
+  for (InstanceState* exec_state: fragment_instance_states_) {
     DCHECK(exec_state != nullptr);
 
     // lock each exec_state individually to synchronize correctly with
@@ -1433,7 +1444,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
         Substitute("Unknown fragment instance index $0 (max known: $1)",
             instance_state_idx, fragment_instance_states_.size() - 1));
   }
-  FragmentInstanceState* exec_state = fragment_instance_states_[instance_state_idx];
+  InstanceState* exec_state = fragment_instance_states_[instance_state_idx];
 
   const TRuntimeProfileTree& cumulative_profile = params.profile;
   Status status(params.status);
@@ -1507,9 +1518,8 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   if (VLOG_FILE_IS_ON) {
     stringstream s;
     exec_state->profile()->PrettyPrint(&s);
-    VLOG_FILE << "profile for query_id=" << query_id_
-              << " instance_id=" << exec_state->fragment_instance_id()
-               << "\n" << s.str();
+    VLOG_FILE << "profile for instance_id=" << exec_state->fragment_instance_id()
+              << "\n" << s.str();
   }
   // also print the cumulative profile
   // TODO: fix the coordinator/PlanFragmentExecutor, so this isn't needed
@@ -1533,14 +1543,14 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     lock_guard<mutex> l(lock_);
     exec_state->stopwatch()->Stop();
     DCHECK_GT(num_remaining_fragment_instances_, 0);
-    VLOG_QUERY << "Fragment instance completed: "
+    VLOG_QUERY << "Fragment instance completed:"
         << " id=" << PrintId(exec_state->fragment_instance_id())
         << " host=" << exec_state->impalad_address()
         << " remaining=" << num_remaining_fragment_instances_ - 1;
     if (VLOG_QUERY_IS_ON && num_remaining_fragment_instances_ > 1) {
       // print host/port info for the first backend that's still in progress as a
       // debugging aid for backend deadlocks
-      for (FragmentInstanceState* exec_state: fragment_instance_states_) {
+      for (InstanceState* exec_state: fragment_instance_states_) {
         lock_guard<mutex> l2(*exec_state->lock());
         if (!exec_state->done()) {
           VLOG_QUERY << "query_id=" << query_id_ << ": first in-progress backend: "
@@ -1567,7 +1577,7 @@ uint64_t Coordinator::GetLatestKuduInsertTimestamp() const {
 }
 
 RuntimeState* Coordinator::runtime_state() {
-  return executor_ == NULL ? NULL : executor_->runtime_state();
+  return executor() == NULL ? NULL : executor()->runtime_state();
 }
 
 MemTracker* Coordinator::query_mem_tracker() {
@@ -1595,7 +1605,7 @@ typedef struct {
   }
 } InstanceComparator;
 
-void Coordinator::UpdateAverageProfile(FragmentInstanceState* instance_state) {
+void Coordinator::UpdateAverageProfile(InstanceState* instance_state) {
   FragmentIdx fragment_idx = instance_state->fragment_idx();
   DCHECK_GE(fragment_idx, 0);
   DCHECK_LT(fragment_idx, fragment_profiles_.size());
@@ -1608,7 +1618,7 @@ void Coordinator::UpdateAverageProfile(FragmentInstanceState* instance_state) {
   data->root_profile->AddChild(instance_state->profile());
 }
 
-void Coordinator::ComputeFragmentSummaryStats(FragmentInstanceState* instance_state) {
+void Coordinator::ComputeFragmentSummaryStats(InstanceState* instance_state) {
   FragmentIdx fragment_idx = instance_state->fragment_idx();
   DCHECK_GE(fragment_idx, 0);
   DCHECK_LT(fragment_idx, fragment_profiles_.size());
@@ -1625,7 +1635,7 @@ void Coordinator::ComputeFragmentSummaryStats(FragmentInstanceState* instance_st
   data->root_profile->AddChild(instance_state->profile());
 }
 
-void Coordinator::UpdateExecSummary(const FragmentInstanceState& instance_state) {
+void Coordinator::UpdateExecSummary(const InstanceState& instance_state) {
   vector<RuntimeProfile*> children;
   instance_state.profile()->GetAllChildren(&children);
 
@@ -1667,12 +1677,12 @@ void Coordinator::ReportQuerySummary() {
 
   if (!fragment_instance_states_.empty()) {
     // Average all fragment instances for each fragment.
-    for (FragmentInstanceState* state: fragment_instance_states_) {
+    for (InstanceState* state: fragment_instance_states_) {
       state->profile()->ComputeTimeInProfile();
       UpdateAverageProfile(state);
       // Skip coordinator fragment, if one exists.
       // TODO: Can we remove the special casing here?
-      if (executor_ == nullptr || state->fragment_idx() != 0) {
+      if (coord_instance_ == nullptr || state->fragment_idx() != 0) {
         ComputeFragmentSummaryStats(state);
       }
       UpdateExecSummary(*state);
@@ -1680,7 +1690,7 @@ void Coordinator::ReportQuerySummary() {
 
     InstanceComparator comparator;
     // Per fragment instances have been collected, output summaries
-    for (int i = (executor_ != NULL ? 1 : 0); i < fragment_profiles_.size(); ++i) {
+    for (int i = (executor() != NULL ? 1 : 0); i < fragment_profiles_.size(); ++i) {
       fragment_profiles_[i].root_profile->SortChildren(comparator);
       SummaryStats& completion_times = fragment_profiles_[i].completion_times;
       SummaryStats& rates = fragment_profiles_[i].rates;
@@ -1719,7 +1729,7 @@ void Coordinator::ReportQuerySummary() {
     // Map from Impalad address to peak memory usage of this query
     typedef unordered_map<TNetworkAddress, int64_t> PerNodePeakMemoryUsage;
     PerNodePeakMemoryUsage per_node_peak_mem_usage;
-    for (FragmentInstanceState* state: fragment_instance_states_) {
+    for (InstanceState* state: fragment_instance_states_) {
       int64_t initial_usage = 0;
       int64_t* mem_usage = FindOrInsert(&per_node_peak_mem_usage,
           state->impalad_address(), initial_usage);
@@ -1740,7 +1750,7 @@ void Coordinator::ReportQuerySummary() {
 
 string Coordinator::GetErrorLog() {
   ErrorLogMap merged;
-  for (FragmentInstanceState* state: fragment_instance_states_) {
+  for (InstanceState* state: fragment_instance_states_) {
     lock_guard<mutex> l(*state->lock());
     if (state->error_log()->size() > 0)  MergeErrorMaps(&merged, *state->error_log());
   }
@@ -1760,7 +1770,7 @@ void Coordinator::SetExecPlanFragmentParams(
 
   // Remove filters that weren't selected during filter routing table construction.
   if (filter_mode_ != TRuntimeFilterMode::OFF) {
-    DCHECK(schedule_.request().query_ctx.request.query_options.mt_dop == 0);
+    DCHECK(schedule_.request().query_ctx.client_request.query_options.mt_dop == 0);
     int instance_idx = GetInstanceIdx(params.instance_id);
     for (TPlanNode& plan_node: rpc_params->fragment_ctx.fragment.plan.nodes) {
       if (plan_node.__isset.runtime_filters) {
@@ -1893,6 +1903,8 @@ void DistributeFilters(shared_ptr<TPublishFilterParams> params,
 
 }
 
+// TODO: call this as soon as it's clear that we won't reference the state
+// anymore, ie, in CancelInternal() and when GetNext() hits eos
 void Coordinator::TearDown() {
   DCHECK(!torn_down_) << "Coordinator::TearDown() may not be called twice";
   torn_down_ = true;
@@ -1909,7 +1921,15 @@ void Coordinator::TearDown() {
   }
 
   // Need to protect against failed Prepare(), where root_sink() would not be set.
-  if (root_sink_ != nullptr) root_sink_->CloseConsumer();
+  if (coord_sink_ != nullptr) {
+    coord_sink_->CloseConsumer();
+    coord_sink_ = nullptr;
+  }
+  if (coord_instance_ != nullptr) {
+    ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(
+        coord_instance_->query_state());
+    coord_instance_ = nullptr;
+  }
 }
 
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
@@ -1987,7 +2007,7 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
   rpc_params->filter_id = params.filter_id;
 
   for (int target_idx: target_fragment_instance_state_idxs) {
-    FragmentInstanceState* fragment_inst = fragment_instance_states_[target_idx];
+    InstanceState* fragment_inst = fragment_instance_states_[target_idx];
     DCHECK(fragment_inst != NULL) << "Missing fragment instance: " << target_idx;
     exec_env_->rpc_pool()->Offer(bind<void>(DistributeFilters, rpc_params,
         fragment_inst->impalad_address(), fragment_inst->fragment_instance_id()));

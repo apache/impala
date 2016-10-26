@@ -36,10 +36,10 @@
 #include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
+#include "runtime/query-exec-mgr.h"
 #include "runtime/tmp-file-mgr.h"
 #include "scheduling/request-pool-service.h"
 #include "scheduling/simple-scheduler.h"
-#include "service/fragment-mgr.h"
 #include "service/frontend.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/debug-util.h"
@@ -146,7 +146,7 @@ ExecEnv::ExecEnv()
     fragment_exec_thread_pool_(new CallableThreadPool("coordinator-fragment-rpc",
         "worker", FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
-    fragment_mgr_(new FragmentMgr()),
+    query_exec_mgr_(new QueryExecMgr()),
     enable_webserver_(FLAGS_enable_webserver),
     is_fe_tests_(false),
     backend_address_(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port)) {
@@ -199,7 +199,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     fragment_exec_thread_pool_(new CallableThreadPool("coordinator-fragment-rpc",
         "worker", FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
-    fragment_mgr_(new FragmentMgr()),
+    query_exec_mgr_(new QueryExecMgr()),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     is_fe_tests_(false),
     backend_address_(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port)) {

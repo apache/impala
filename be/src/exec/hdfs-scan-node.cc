@@ -501,7 +501,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
   HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
   DCHECK(partition != NULL) << "table_id=" << hdfs_table_->id()
                             << " partition_id=" << partition_id
-                            << "\n" << PrintThrift(runtime_state_->fragment_params());
+                            << "\n" << PrintThrift(runtime_state_->instance_ctx());
 
   // IMPALA-3798: Filtering before the scanner is created can cause hangs if a header
   // split is filtered out, for sequence-based file formats. If the scanner does not

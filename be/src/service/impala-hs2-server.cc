@@ -36,6 +36,7 @@
 #include "exprs/expr.h"
 #include "rpc/thrift-util.h"
 #include "runtime/raw-value.h"
+#include "runtime/exec-env.h"
 #include "service/hs2-util.h"
 #include "service/query-exec-state.h"
 #include "service/query-options.h"
@@ -87,7 +88,15 @@ const string IMPALA_RESULT_CACHING_OPT = "impala.resultset.cache.size";
 
 // Helper function to translate between Beeswax and HiveServer2 type
 static TOperationState::type QueryStateToTOperationState(
-    const beeswax::QueryState::type& query_state);
+    const beeswax::QueryState::type& query_state) {
+  switch (query_state) {
+    case beeswax::QueryState::CREATED: return TOperationState::INITIALIZED_STATE;
+    case beeswax::QueryState::RUNNING: return TOperationState::RUNNING_STATE;
+    case beeswax::QueryState::FINISHED: return TOperationState::FINISHED_STATE;
+    case beeswax::QueryState::EXCEPTION: return TOperationState::ERROR_STATE;
+    default: return TOperationState::UKNOWN_STATE;
+  }
+}
 
 void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     TMetadataOpRequest* request, TOperationHandle* handle, thrift::TStatus* status) {
@@ -131,7 +140,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
       _TMetadataOpcode_VALUES_TO_NAMES.find(request->opcode);
   const string& query_text = query_text_it == _TMetadataOpcode_VALUES_TO_NAMES.end() ?
       "N/A" : query_text_it->second;
-  query_ctx.request.stmt = query_text;
+  query_ctx.client_request.stmt = query_text;
   exec_state.reset(new QueryExecState(query_ctx, exec_env_,
       exec_env_->frontend(), this, session));
   Status register_status = RegisterQuery(session, exec_state);
@@ -151,7 +160,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     return;
   }
 
-  exec_state->UpdateNonErrorQueryState(QueryState::FINISHED);
+  exec_state->UpdateNonErrorQueryState(beeswax::QueryState::FINISHED);
 
   Status inflight_status = SetQueryInflight(session, exec_state);
   if (!inflight_status.ok()) {
@@ -215,7 +224,7 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
 
 Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     const TExecuteStatementReq execute_request, TQueryCtx* query_ctx) {
-  query_ctx->request.stmt = execute_request.statement;
+  query_ctx->client_request.stmt = execute_request.statement;
   VLOG_QUERY << "TExecuteStatementReq: " << ThriftDebugString(execute_request);
   QueryOptionsMask set_query_options_mask;
   {
@@ -228,7 +237,7 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     RETURN_IF_ERROR(GetSessionState(session_id, &session_state));
     session_state->ToThrift(session_id, &query_ctx->session);
     lock_guard<mutex> l(session_state->lock);
-    query_ctx->request.query_options = session_state->default_query_options;
+    query_ctx->client_request.query_options = session_state->default_query_options;
     set_query_options_mask = session_state->set_query_options_mask;
   }
 
@@ -243,14 +252,14 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
         continue;
       }
       RETURN_IF_ERROR(SetQueryOption(conf_itr->first, conf_itr->second,
-          &query_ctx->request.query_options, &set_query_options_mask));
+          &query_ctx->client_request.query_options, &set_query_options_mask));
     }
   }
   // Only query options not set in the session or confOverlay can be overridden by the
   // pool options.
   AddPoolQueryOptions(query_ctx, ~set_query_options_mask);
   VLOG_QUERY << "TClientRequest.queryOptions: "
-             << ThriftDebugString(query_ctx->request.query_options);
+             << ThriftDebugString(query_ctx->client_request.query_options);
   return Status::OK();
 }
 
@@ -455,7 +464,7 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
       HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
     }
   }
-  exec_state->UpdateNonErrorQueryState(QueryState::RUNNING);
+  exec_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
   // Start thread to wait for results to become available.
   exec_state->WaitAsync();
   // Once the query is running do a final check for session closure and add it to the
@@ -878,14 +887,5 @@ void ImpalaServer::RenewDelegationToken(TRenewDelegationTokenResp& return_val,
   return_val.status.__set_errorMessage("Not implemented");
 }
 
-TOperationState::type QueryStateToTOperationState(const QueryState::type& query_state) {
-  switch (query_state) {
-    case QueryState::CREATED: return TOperationState::INITIALIZED_STATE;
-    case QueryState::RUNNING: return TOperationState::RUNNING_STATE;
-    case QueryState::FINISHED: return TOperationState::FINISHED_STATE;
-    case QueryState::EXCEPTION: return TOperationState::ERROR_STATE;
-    default: return TOperationState::UKNOWN_STATE;
-  }
-}
 
 }

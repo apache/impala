@@ -26,16 +26,16 @@
 // NOTE: try not to add more headers here: runtime-state.h is included in many many files.
 #include "common/global-types.h"  // for PlanNodeId
 #include "runtime/client-cache-types.h"
-#include "runtime/exec-env.h"
 #include "runtime/thread-resource-mgr.h"
-#include "util/auth-util.h" // for GetEffectiveUser()
 #include "util/runtime-profile.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 
 namespace impala {
 
 class BufferedBlockMgr;
 class DataStreamRecvr;
 class DescriptorTbl;
+class DiskIoMgr;
 class DiskIoRequestContext;
 class Expr;
 class LlvmCodeGen;
@@ -45,8 +45,15 @@ class RuntimeFilterBank;
 class ScalarFnCall;
 class Status;
 class TimestampValue;
-class TQueryOptions;
 class TUniqueId;
+class ExecEnv;
+class DataStreamMgr;
+class HBaseTableFactory;
+class TPlanFragmentCtx;
+class TPlanFragmentInstanceCtx;
+class QueryState;
+
+/// TODO: move the typedefs into a separate .h (and fix the includes for that)
 
 /// Counts how many rows an INSERT query has added to a particular partition
 /// (partitions are identified by their partition keys: k1=v1/k2=v2
@@ -68,10 +75,13 @@ typedef std::map<std::string, std::string> FileMoveMap;
 /// destruction.
 class RuntimeState {
  public:
-  RuntimeState(const TExecPlanFragmentParams& fragment_params, ExecEnv* exec_env);
+  /// query_state, fragment_ctx, and instance_ctx need to be alive at least as long as
+  /// the constructed RuntimeState
+  RuntimeState(QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
+      const TPlanFragmentInstanceCtx& instance_ctx, ExecEnv* exec_env);
 
   /// RuntimeState for executing expr in fe-support.
-  RuntimeState(const TQueryCtx& query_ctx);
+  RuntimeState(const TQueryCtx& query_ctx, ExecEnv* exec_env = nullptr);
 
   /// Empty d'tor to avoid issues with scoped_ptr.
   ~RuntimeState();
@@ -82,8 +92,7 @@ class RuntimeState {
   /// when they are initialized. This function also initializes a user function mem
   /// tracker (in the fifth level). If 'request_pool' is null, no request pool mem
   /// tracker is set up, i.e. query pools will have the process mem pool as the parent.
-  void InitMemTrackers(const TUniqueId& query_id, const std::string* request_pool,
-      int64_t query_bytes_limit);
+  void InitMemTrackers(const std::string* request_pool, int64_t query_bytes_limit);
 
   /// Initializes the runtime filter bank. Must be called after InitMemTrackers().
   void InitFilterBank();
@@ -91,30 +100,19 @@ class RuntimeState {
   /// Gets/Creates the query wide block mgr.
   Status CreateBlockMgr();
 
+  QueryState* query_state() const { return query_state_; }
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
   void set_desc_tbl(DescriptorTbl* desc_tbl) { desc_tbl_ = desc_tbl; }
-  const TQueryOptions& query_options() const {
-    return query_ctx().request.query_options;
-  }
-  int batch_size() const { return query_ctx().request.query_options.batch_size; }
-  bool abort_on_error() const {
-    return query_ctx().request.query_options.abort_on_error;
-  }
-  bool strict_mode() const {
-    return query_ctx().request.query_options.strict_mode;
-  }
+  const TQueryOptions& query_options() const;
+  int batch_size() const { return query_options().batch_size; }
+  bool abort_on_error() const { return query_options().abort_on_error; }
+  bool strict_mode() const { return query_options().strict_mode; }
   bool abort_on_default_limit_exceeded() const {
-    return query_ctx().request.query_options.abort_on_default_limit_exceeded;
+    return query_options().abort_on_default_limit_exceeded;
   }
-  const TQueryCtx& query_ctx() const { return fragment_params_.query_ctx; }
-  const TPlanFragmentInstanceCtx& fragment_ctx() const {
-    return fragment_params_.fragment_instance_ctx;
-  }
-  const TExecPlanFragmentParams& fragment_params() const { return fragment_params_; }
-  const std::string& effective_user() const {
-    return GetEffectiveUser(query_ctx().session);
-  }
+  const TQueryCtx& query_ctx() const;
+  const TPlanFragmentInstanceCtx& instance_ctx() const { return *instance_ctx_; }
   const TUniqueId& session_id() const { return query_ctx().session.session_id; }
   const std::string& do_as_user() const { return query_ctx().session.delegated_user; }
   const std::string& connected_user() const {
@@ -124,18 +122,16 @@ class RuntimeState {
   void set_now(const TimestampValue* now);
   const TUniqueId& query_id() const { return query_ctx().query_id; }
   const TUniqueId& fragment_instance_id() const {
-    return fragment_ctx().fragment_instance_id;
+    return instance_ctx_ != nullptr
+        ? instance_ctx_->fragment_instance_id
+        : no_instance_id_;
   }
   ExecEnv* exec_env() { return exec_env_; }
-  DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
-  HBaseTableFactory* htable_factory() { return exec_env_->htable_factory(); }
-  ImpalaBackendClientCache* impalad_client_cache() {
-    return exec_env_->impalad_client_cache();
-  }
-  CatalogServiceClientCache* catalogd_client_cache() {
-    return exec_env_->catalogd_client_cache();
-  }
-  DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
+  DataStreamMgr* stream_mgr();
+  HBaseTableFactory* htable_factory();
+  ImpalaBackendClientCache* impalad_client_cache();
+  CatalogServiceClientCache* catalogd_client_cache();
+  DiskIoMgr* io_mgr();
   MemTracker* instance_mem_tracker() { return instance_mem_tracker_.get(); }
   MemTracker* query_mem_tracker() { return query_mem_tracker_.get(); }
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
@@ -160,6 +156,8 @@ class RuntimeState {
 
   /// Returns the LlvmCodeGen object for this fragment instance.
   LlvmCodeGen* codegen() { return codegen_.get(); }
+
+  const std::string& GetEffectiveUser() const;
 
   /// Add ScalarFnCall expression 'udf' to be codegen'd later if it's not disabled by
   /// query option. This is for cases in which the UDF cannot be interpreted or if the
@@ -321,14 +319,12 @@ class RuntimeState {
   friend class TestEnv;
 
   /// Set per-fragment state.
-  Status Init(ExecEnv* exec_env);
+  void Init();
 
   /// Use a custom block manager for the query for testing purposes.
   void set_block_mgr(const std::shared_ptr<BufferedBlockMgr>& block_mgr) {
     block_mgr_ = block_mgr;
   }
-
-  static const int DEFAULT_BATCH_SIZE = 1024;
 
   DescriptorTbl* desc_tbl_ = nullptr;
   boost::scoped_ptr<ObjectPool> obj_pool_;
@@ -339,15 +335,23 @@ class RuntimeState {
   /// Logs error messages.
   ErrorLogMap error_log_;
 
-  /// Original thrift descriptor for this fragment. Includes its unique id, the total
-  /// number of fragment instances, the query context, the coordinator address, the
-  /// descriptor table, etc.
-  TExecPlanFragmentParams fragment_params_;
+  /// Global QueryState and original thrift descriptors for this fragment instance.
+  /// Not set by the (const TQueryCtx&) c'tor.
+  QueryState* const query_state_;
+  const TPlanFragmentCtx* const fragment_ctx_;
+  const TPlanFragmentInstanceCtx* const instance_ctx_;
+
+  /// Provides query ctx if query_state_ == nullptr.
+  TQueryCtx local_query_ctx_;
+
+  /// Provides instance id if instance_ctx_ == nullptr
+  TUniqueId no_instance_id_;
 
   /// Query-global timestamp, e.g., for implementing now(). Set from query_globals_.
   /// Use pointer to avoid inclusion of timestampvalue.h and avoid clang issues.
   boost::scoped_ptr<TimestampValue> now_;
 
+  /// TODO: get rid of this and use ExecEnv::GetInstance() instead
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
 

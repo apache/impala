@@ -54,7 +54,6 @@
 #include "runtime/lib-cache.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/tmp-file-mgr.h"
-#include "service/fragment-exec-state.h"
 #include "service/impala-internal-service.h"
 #include "service/impala-http-handler.h"
 #include "service/query-exec-state.h"
@@ -72,6 +71,8 @@
 #include "util/string-parser.h"
 #include "util/summary-util.h"
 #include "util/uid-util.h"
+#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
@@ -742,7 +743,7 @@ void ImpalaServer::AddPoolQueryOptions(TQueryCtx* ctx,
            << " override_options_mask=" << override_options_mask.to_string()
            << " set_pool_mask=" << set_pool_options_mask.to_string()
            << " overlay_mask=" << overlay_mask.to_string();
-  OverlayQueryOptions(pool_options, overlay_mask, &ctx->request.query_options);
+  OverlayQueryOptions(pool_options, overlay_mask, &ctx->client_request.query_options);
 }
 
 Status ImpalaServer::Execute(TQueryCtx* query_ctx,
@@ -752,9 +753,9 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx,
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
 
   // Redact the SQL stmt and update the query context
-  string stmt = replace_all_copy(query_ctx->request.stmt, "\n", " ");
+  string stmt = replace_all_copy(query_ctx->client_request.stmt, "\n", " ");
   Redact(&stmt);
-  query_ctx->request.__set_redacted_stmt((const string) stmt);
+  query_ctx->client_request.__set_redacted_stmt((const string) stmt);
 
   bool registered_exec_state;
   Status status = ExecuteInternal(*query_ctx, session_state, &registered_exec_state,

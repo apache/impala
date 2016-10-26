@@ -72,7 +72,7 @@ public class AnalysisContext {
     // expr rewrites can be disabled via a query option. When rewrites are enabled
     // BetweenPredicates should be rewritten first to help trigger other rules.
     List<ExprRewriteRule> rules = Lists.newArrayList(BetweenToCompoundRule.INSTANCE);
-    if (queryCtx.getRequest().getQuery_options().enable_expr_rewrites) {
+    if (queryCtx.getClient_request().getQuery_options().enable_expr_rewrites) {
       rules.add(FoldConstantsRule.INSTANCE);
       rules.add(ExtractCommonConjunctRule.INSTANCE);
     }

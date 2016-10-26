@@ -406,7 +406,7 @@ public class PlannerTestBase extends FrontendTestBase {
     }
     TQueryCtx queryCtx = TestUtils.createQueryContext(
         dbName, System.getProperty("user.name"));
-    queryCtx.request.query_options = options;
+    queryCtx.client_request.query_options = options;
     // Test single node plan, scan range locations, and column lineage.
     TExecRequest singleNodeExecRequest =
         testPlan(testCase, Section.PLAN, queryCtx, errorLog, actualOutput);
@@ -475,16 +475,16 @@ public class PlannerTestBase extends FrontendTestBase {
   private TExecRequest testPlan(TestCase testCase, Section section,
       TQueryCtx queryCtx, StringBuilder errorLog, StringBuilder actualOutput) {
     String query = testCase.getQuery();
-    queryCtx.request.setStmt(query);
+    queryCtx.client_request.setStmt(query);
     if (section == Section.PLAN) {
-      queryCtx.request.getQuery_options().setNum_nodes(1);
+      queryCtx.client_request.getQuery_options().setNum_nodes(1);
     } else {
       // for distributed and parallel execution we want to run on all available nodes
-      queryCtx.request.getQuery_options().setNum_nodes(
+      queryCtx.client_request.getQuery_options().setNum_nodes(
           ImpalaInternalServiceConstants.NUM_NODES_ALL);
     }
     if (section == Section.PARALLELPLANS) {
-      queryCtx.request.query_options.setMt_dop(2);
+      queryCtx.client_request.query_options.setMt_dop(2);
     }
     ArrayList<String> expectedPlan = testCase.getSectionContents(section);
     boolean sectionExists = expectedPlan != null && !expectedPlan.isEmpty();
@@ -537,14 +537,14 @@ public class PlannerTestBase extends FrontendTestBase {
     StringBuilder explainBuilder = new StringBuilder();
     TExecRequest execRequest = null;
     TExplainLevel origExplainLevel =
-        queryCtx.request.getQuery_options().getExplain_level();
+        queryCtx.client_request.getQuery_options().getExplain_level();
     try {
-      queryCtx.request.getQuery_options().setExplain_level(TExplainLevel.VERBOSE);
+      queryCtx.client_request.getQuery_options().setExplain_level(TExplainLevel.VERBOSE);
       execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
     } catch (ImpalaException e) {
       return ExceptionUtils.getStackTrace(e);
     } finally {
-      queryCtx.request.getQuery_options().setExplain_level(origExplainLevel);
+      queryCtx.client_request.getQuery_options().setExplain_level(origExplainLevel);
     }
     Preconditions.checkNotNull(execRequest);
     String explainStr = removeExplainHeader(explainBuilder.toString());

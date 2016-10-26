@@ -37,7 +37,9 @@
 #include "runtime/descriptors.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
+#include "runtime/query-state.h"
 #include "runtime/runtime-filter-bank.h"
+#include "runtime/exec-env.h"
 #include "util/container-util.h"
 #include "runtime/runtime-state.h"
 #include "util/cpu-info.h"
@@ -69,9 +71,8 @@ const string EXEC_TIMER_NAME = "ExecTime";
 }
 
 PlanFragmentExecutor::PlanFragmentExecutor(
-    ExecEnv* exec_env, const ReportStatusCallback& report_status_cb)
-  : exec_env_(exec_env),
-    exec_tree_(NULL),
+    const ReportStatusCallback& report_status_cb)
+  : exec_tree_(NULL),
     report_status_cb_(report_status_cb),
     report_thread_active_(false),
     closed_(false),
@@ -92,8 +93,10 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
   DCHECK(!report_thread_active_);
 }
 
-Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
-  Status status = PrepareInternal(request);
+Status PlanFragmentExecutor::Prepare(
+    QueryState* query_state, const TDescriptorTable& desc_tbl,
+    const TPlanFragmentCtx& fragment_ctx, const TPlanFragmentInstanceCtx& instance_ctx) {
+  Status status = PrepareInternal(query_state, desc_tbl, fragment_ctx, instance_ctx);
   prepared_promise_.Set(status);
   if (!status.ok()) FragmentComplete(status);
   return status;
@@ -105,7 +108,9 @@ Status PlanFragmentExecutor::WaitForOpen() {
   return opened_promise_.Get();
 }
 
-Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& request) {
+Status PlanFragmentExecutor::PrepareInternal(
+    QueryState* qs, const TDescriptorTable& tdesc_tbl,
+    const TPlanFragmentCtx& fragment_ctx, const TPlanFragmentInstanceCtx& instance_ctx) {
   lock_guard<mutex> l(prepare_lock_);
   DCHECK(!is_prepared_);
 
@@ -113,19 +118,17 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
   is_prepared_ = true;
 
   // TODO: Break this method up.
-  const TPlanFragmentInstanceCtx& fragment_instance_ctx = request.fragment_instance_ctx;
-  query_id_ = request.query_ctx.query_id;
+  query_id_ = qs->query_ctx().query_id;
 
-  VLOG_QUERY << "Prepare(): query_id=" << PrintId(query_id_) << " instance_id="
-             << PrintId(request.fragment_instance_ctx.fragment_instance_id);
-  VLOG(2) << "fragment_instance_ctx:\n" << ThriftDebugString(fragment_instance_ctx);
-
-  DCHECK(request.__isset.fragment_ctx);
+  VLOG_QUERY << "Prepare(): instance_id="
+             << PrintId(instance_ctx.fragment_instance_id);
+  VLOG(2) << "fragment_instance_ctx:\n" << ThriftDebugString(instance_ctx);
 
   // Prepare() must not return before runtime_state_ is set if is_prepared_ was
   // set. Having runtime_state_.get() != NULL is a postcondition of this method in that
   // case. Do not call RETURN_IF_ERROR or explicitly return before this line.
-  runtime_state_.reset(new RuntimeState(request, exec_env_));
+  runtime_state_.reset(
+      new RuntimeState(qs, fragment_ctx, instance_ctx, ExecEnv::GetInstance()));
 
   // total_time_counter() is in the runtime_state_ so start it up now.
   SCOPED_TIMER(profile()->total_time_counter());
@@ -143,9 +146,8 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
                << PrettyPrinter::Print(bytes_limit, TUnit::BYTES);
   }
 
-  DCHECK(!fragment_instance_ctx.request_pool.empty());
-  runtime_state_->InitMemTrackers(
-      query_id_, &fragment_instance_ctx.request_pool, bytes_limit);
+  DCHECK(!instance_ctx.request_pool.empty());
+  runtime_state_->InitMemTrackers(&instance_ctx.request_pool, bytes_limit);
   RETURN_IF_ERROR(runtime_state_->CreateBlockMgr());
   runtime_state_->InitFilterBank();
 
@@ -167,27 +169,21 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
 
   // set up desc tbl
   DescriptorTbl* desc_tbl = NULL;
-  DCHECK(request.__isset.query_ctx);
-  DCHECK(request.query_ctx.__isset.desc_tbl);
-  RETURN_IF_ERROR(
-      DescriptorTbl::Create(obj_pool(), request.query_ctx.desc_tbl, &desc_tbl));
+  RETURN_IF_ERROR(DescriptorTbl::Create(obj_pool(), tdesc_tbl, &desc_tbl));
   runtime_state_->set_desc_tbl(desc_tbl);
-  VLOG_QUERY << "descriptor table for fragment="
-             << request.fragment_instance_ctx.fragment_instance_id
+  VLOG_QUERY << "descriptor table for fragment=" << instance_ctx.fragment_instance_id
              << "\n" << desc_tbl->DebugString();
 
   // set up plan
-  DCHECK(request.__isset.fragment_ctx);
   RETURN_IF_ERROR(ExecNode::CreateTree(
-      runtime_state_.get(), request.fragment_ctx.fragment.plan, *desc_tbl, &exec_tree_));
+      runtime_state_.get(), fragment_ctx.fragment.plan, *desc_tbl, &exec_tree_));
   runtime_state_->set_fragment_root_id(exec_tree_->id());
 
-  if (fragment_instance_ctx.__isset.debug_node_id) {
-    DCHECK(fragment_instance_ctx.__isset.debug_action);
-    DCHECK(fragment_instance_ctx.__isset.debug_phase);
-    ExecNode::SetDebugOptions(fragment_instance_ctx.debug_node_id,
-        fragment_instance_ctx.debug_phase, fragment_instance_ctx.debug_action,
-        exec_tree_);
+  if (instance_ctx.__isset.debug_node_id) {
+    DCHECK(instance_ctx.__isset.debug_action);
+    DCHECK(instance_ctx.__isset.debug_phase);
+    ExecNode::SetDebugOptions(instance_ctx.debug_node_id, instance_ctx.debug_phase,
+        instance_ctx.debug_action, exec_tree_);
   }
 
   // set #senders of exchange nodes before calling Prepare()
@@ -195,8 +191,8 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
   exec_tree_->CollectNodes(TPlanNodeType::EXCHANGE_NODE, &exch_nodes);
   for (ExecNode* exch_node : exch_nodes) {
     DCHECK_EQ(exch_node->type(), TPlanNodeType::EXCHANGE_NODE);
-    int num_senders = FindWithDefault(fragment_instance_ctx.per_exch_num_senders,
-        exch_node->id(), 0);
+    int num_senders =
+        FindWithDefault(instance_ctx.per_exch_num_senders, exch_node->id(), 0);
     DCHECK_GT(num_senders, 0);
     static_cast<ExchangeNode*>(exch_node)->set_num_senders(num_senders);
   }
@@ -208,7 +204,7 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
   for (int i = 0; i < scan_nodes.size(); ++i) {
     ScanNode* scan_node = static_cast<ScanNode*>(scan_nodes[i]);
     const vector<TScanRangeParams>& scan_ranges = FindWithDefault(
-        fragment_instance_ctx.per_node_scan_ranges, scan_node->id(), no_scan_ranges);
+        instance_ctx.per_node_scan_ranges, scan_node->id(), no_scan_ranges);
     scan_node->SetScanRanges(scan_ranges);
   }
 
@@ -220,13 +216,13 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
     RETURN_IF_ERROR(exec_tree_->Prepare(state));
   }
 
-  PrintVolumeIds(fragment_instance_ctx.per_node_scan_ranges);
+  PrintVolumeIds(instance_ctx.per_node_scan_ranges);
 
-  DCHECK(request.fragment_ctx.fragment.__isset.output_sink);
+  DCHECK(fragment_ctx.fragment.__isset.output_sink);
   RETURN_IF_ERROR(
-      DataSink::CreateDataSink(obj_pool(), request.fragment_ctx.fragment.output_sink,
-          request.fragment_ctx.fragment.output_exprs, fragment_instance_ctx,
-          exec_tree_->row_desc(), &sink_));
+      DataSink::CreateDataSink(obj_pool(), fragment_ctx.fragment.output_sink,
+          fragment_ctx.fragment.output_exprs, instance_ctx, exec_tree_->row_desc(),
+          &sink_));
   RETURN_IF_ERROR(
       sink_->Prepare(runtime_state(), runtime_state_->instance_mem_tracker()));
 
@@ -235,7 +231,7 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
     profile()->AddChild(sink_profile);
   }
 
-  if (request.fragment_ctx.fragment.output_sink.type == TDataSinkType::PLAN_ROOT_SINK) {
+  if (fragment_ctx.fragment.output_sink.type == TDataSinkType::PLAN_ROOT_SINK) {
     root_sink_ = reinterpret_cast<PlanRootSink*>(sink_.get());
     // Release the thread token on the root fragment instance. This fragment spends most
     // of the time waiting and doing very little work. Holding on to the token causes

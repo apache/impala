@@ -2285,7 +2285,7 @@ public class Analyzer {
   public User getUser() { return user_; }
   public TQueryCtx getQueryCtx() { return globalState_.queryCtx; }
   public TQueryOptions getQueryOptions() {
-    return globalState_.queryCtx.getRequest().getQuery_options();
+    return globalState_.queryCtx.client_request.getQuery_options();
   }
   public AuthorizationConfig getAuthzConfig() { return globalState_.authzConfig; }
   public ListMap<TNetworkAddress> getHostIndex() { return globalState_.hostIndex; }

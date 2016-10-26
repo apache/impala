@@ -95,7 +95,7 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   query_ctx.disable_codegen_hint = true;
   // Allow logging of at least one error, so we can detect and convert it into a
   // Java exception.
-  query_ctx.request.query_options.max_errors = 1;
+  query_ctx.client_request.query_options.max_errors = 1;
   RuntimeState state(query_ctx);
   // Make sure to close the runtime state no matter how this scope is exited.
   const auto close_runtime_state =
@@ -106,11 +106,11 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   // Exprs can allocate memory so we need to set up the mem trackers before
   // preparing/running the exprs.
   int64_t mem_limit = -1;
-  if (query_ctx.request.query_options.__isset.mem_limit
-      && query_ctx.request.query_options.mem_limit > 0) {
-    mem_limit = query_ctx.request.query_options.mem_limit;
+  if (query_ctx.client_request.query_options.__isset.mem_limit
+      && query_ctx.client_request.query_options.mem_limit > 0) {
+    mem_limit = query_ctx.client_request.query_options.mem_limit;
   }
-  state.InitMemTrackers(state.query_id(), NULL, mem_limit);
+  state.InitMemTrackers(NULL, mem_limit);
 
   // Prepare() the exprs. Always Close() the exprs even in case of errors.
   vector<ExprContext*> expr_ctxs;

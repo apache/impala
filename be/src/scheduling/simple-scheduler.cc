@@ -480,7 +480,8 @@ void SimpleScheduler::CreateUnionInstances(
 void SimpleScheduler::CreateScanInstances(
     PlanNodeId leftmost_scan_id, FragmentExecParams* fragment_params,
     QuerySchedule* schedule) {
-  int max_num_instances = schedule->request().query_ctx.request.query_options.mt_dop;
+  int max_num_instances =
+      schedule->request().query_ctx.client_request.query_options.mt_dop;
   if (max_num_instances == 0) max_num_instances = 1;
 
   if (fragment_params->scan_range_assignment.empty()) {

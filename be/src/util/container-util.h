@@ -22,6 +22,7 @@
 #include <map>
 #include <unordered_map>
 #include <boost/unordered_map.hpp>
+#include <boost/functional/hash.hpp>
 
 #include "util/hash-util.h"
 #include "gen-cpp/Types_types.h"

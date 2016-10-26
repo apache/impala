@@ -31,7 +31,7 @@ namespace impala {
 class CallableThreadPool;
 class DataStreamMgr;
 class DiskIoMgr;
-class FragmentMgr;
+class QueryExecMgr;
 class Frontend;
 class HBaseTableFactory;
 class HdfsFsCache;
@@ -96,7 +96,7 @@ class ExecEnv {
   Frontend* frontend() { return frontend_.get(); }
   RequestPoolService* request_pool_service() { return request_pool_service_.get(); }
   CallableThreadPool* rpc_pool() { return async_rpc_pool_.get(); }
-  FragmentMgr* fragment_mgr() { return fragment_mgr_.get(); }
+  QueryExecMgr* query_exec_mgr() { return query_exec_mgr_.get(); }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
@@ -138,7 +138,7 @@ class ExecEnv {
   boost::scoped_ptr<Frontend> frontend_;
   boost::scoped_ptr<CallableThreadPool> fragment_exec_thread_pool_;
   boost::scoped_ptr<CallableThreadPool> async_rpc_pool_;
-  boost::scoped_ptr<FragmentMgr> fragment_mgr_;
+  boost::scoped_ptr<QueryExecMgr> query_exec_mgr_;
 
   /// Not owned by this class
   ImpalaServer* impala_server_;

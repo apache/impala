@@ -84,7 +84,7 @@ public class FrontendTestBase {
 
   protected Analyzer createAnalyzer(TQueryOptions queryOptions) {
     TQueryCtx queryCtx = TestUtils.createQueryContext();
-    queryCtx.request.query_options = queryOptions;
+    queryCtx.client_request.query_options = queryOptions;
     return new Analyzer(catalog_, queryCtx,
         AuthorizationConfig.createAuthDisabledConfig());
   }

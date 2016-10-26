@@ -84,7 +84,7 @@ class PlanFragmentExecutor {
 
   /// report_status_cb, if !empty(), is used to report the accumulated profile
   /// information periodically during execution.
-  PlanFragmentExecutor(ExecEnv* exec_env, const ReportStatusCallback& report_status_cb);
+  PlanFragmentExecutor(const ReportStatusCallback& report_status_cb);
 
   /// It is an error to delete a PlanFragmentExecutor with a report callback before Exec()
   /// indicated that execution is finished, or to delete one that has not been Close()'d
@@ -103,11 +103,16 @@ class PlanFragmentExecutor {
   /// Status::CANCELLED;
   ///
   /// If Prepare() fails, it will invoke final status callback with the error status.
-  Status Prepare(const TExecPlanFragmentParams& request);
+  /// TODO: remove desc_tbl parameter once we do a per-query exec rpc (and we
+  /// have a single descriptor table to cover all fragment instances); at the moment
+  /// we need to pass the TDescriptorTable explicitly
+  Status Prepare(QueryState* query_state, const TDescriptorTable& desc_tbl,
+      const TPlanFragmentCtx& fragment_ctx, const TPlanFragmentInstanceCtx& instance_ctx);
 
   /// Opens the fragment plan and sink. Starts the profile reporting thread, if
   /// required.  Can be called only if Prepare() succeeded. If Open() fails it will
   /// invoke the final status callback with the error status.
+  /// TODO: is this needed? It's only ever called in conjunction with Exec() and Close()
   Status Open();
 
   /// Executes the fragment by repeatedly driving the sink with batches produced by the
@@ -153,7 +158,6 @@ class PlanFragmentExecutor {
   static const std::string PER_HOST_PEAK_MEM_COUNTER;
 
  private:
-  ExecEnv* exec_env_;  // not owned
   ExecNode* exec_tree_; // lives in runtime_state_->obj_pool()
   TUniqueId query_id_;
 
@@ -278,7 +282,10 @@ class PlanFragmentExecutor {
   Status ExecInternal();
 
   /// Performs all the logic of Prepare() and returns resulting status.
-  Status PrepareInternal(const TExecPlanFragmentParams& request);
+  /// TODO: remove desc_tbl parameter as part of per-query exec rpc
+  Status PrepareInternal(QueryState* qs, const TDescriptorTable& desc_tbl,
+      const TPlanFragmentCtx& fragment_ctx,
+      const TPlanFragmentInstanceCtx& instance_ctx);
 
   /// Releases the thread token for this fragment executor.
   void ReleaseThreadToken();
@@ -288,7 +295,6 @@ class PlanFragmentExecutor {
   void StopReportThread();
 
   /// Print stats about scan ranges for each volumeId in params to info log.
-  void PrintVolumeIds(const TPlanExecParams& params);
   void PrintVolumeIds(const PerNodeScanRanges& per_node_scan_ranges);
 
   const DescriptorTbl& desc_tbl() { return runtime_state_->desc_tbl(); }

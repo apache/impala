@@ -103,6 +103,11 @@ class Thread {
   /// will be unregistered with the ThreadMgr and will not appear in the debug UI.
   void Join() const { thread_->join(); }
 
+  /// Detaches the underlying thread from this Thread object. It's illegal to call
+  /// Join() after calling Detach(). When the underlying thread finishes execution,
+  /// it unregisters itself from the ThreadMgr.
+  void Detach() const { thread_->detach(); }
+
   /// The thread ID assigned to this thread by the operating system. If the OS does not
   /// support retrieving the tid, returns Thread::INVALID_THREAD_ID.
   int64_t tid() const { return tid_; }

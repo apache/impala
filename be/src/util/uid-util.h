@@ -29,13 +29,27 @@
 
 namespace impala {
 
-/// This function must be called 'hash_value' to be picked up by boost.
-inline std::size_t hash_value(const impala::TUniqueId& id) {
+inline std::size_t hash_value(const TUniqueId& id) {
   std::size_t seed = 0;
   boost::hash_combine(seed, id.lo);
   boost::hash_combine(seed, id.hi);
   return seed;
 }
+
+}
+
+/// Hash function for std:: containers
+namespace std {
+
+template<> struct hash<impala::TUniqueId> {
+  std::size_t operator()(const impala::TUniqueId& id) const {
+    return impala::hash_value(id);
+  }
+};
+
+}
+
+namespace impala {
 
 inline void UUIDToTUniqueId(const boost::uuids::uuid& uuid, TUniqueId* unique_id) {
   memcpy(&(unique_id->hi), &uuid.data[0], 8);

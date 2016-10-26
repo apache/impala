@@ -124,7 +124,7 @@ public class UnionNode extends PlanNode {
     List<Pair<Long, Integer>> memByChildIdx = Lists.newArrayList();
     for (int i = 0; i < children_.size(); ++i) {
       PlanNode child = children_.get(i);
-      child.computeCosts(analyzer.getQueryCtx().request.getQuery_options());
+      child.computeCosts(analyzer.getQueryCtx().client_request.getQuery_options());
       memByChildIdx.add(new Pair<Long, Integer>(child.getPerHostMemCost(), i));
     }
 

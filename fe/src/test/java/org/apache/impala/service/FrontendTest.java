@@ -101,7 +101,7 @@ public class FrontendTest {
     System.out.println(stmt);
     TQueryCtx queryCtx = TestUtils.createQueryContext(
         Catalog.DEFAULT_DB, AuthorizationTest.USER.getName());
-    queryCtx.request.setStmt(stmt);
+    queryCtx.client_request.setStmt(stmt);
     try {
       fe.createExecRequest(queryCtx, new StringBuilder());
     } catch (Exception e) {
@@ -116,7 +116,7 @@ public class FrontendTest {
   private void testCatalogIsNotReady(String stmt, Frontend fe) {
     TQueryCtx queryCtx = TestUtils.createQueryContext(
         Catalog.DEFAULT_DB, AuthorizationTest.USER.getName());
-    queryCtx.request.setStmt(stmt);
+    queryCtx.client_request.setStmt(stmt);
     try {
       fe.createExecRequest(queryCtx, new StringBuilder());
       fail("Expected failure to due uninitialized catalog.");

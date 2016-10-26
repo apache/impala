@@ -15,39 +15,51 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "service/fragment-exec-state.h"
 
-#include <sstream>
+#include "runtime/fragment-instance-state.h"
 
-#include "codegen/llvm-codegen.h"
-#include "gen-cpp/ImpalaInternalService.h"
-#include "rpc/thrift-util.h"
-#include "gutil/strings/substitute.h"
-#include "runtime/runtime-filter-bank.h"
-#include "util/bloom-filter.h"
+#include <boost/thread/locks.hpp>
+#include <boost/thread/lock_guard.hpp>
+
+#include "runtime/exec-env.h"
 #include "runtime/backend-client.h"
+#include "runtime/runtime-filter-bank.h"
+#include "runtime/client-cache.h"
+#include "runtime/runtime-state.h"
+#include "runtime/query-state.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 
-#include "common/names.h"
-
-using namespace apache::thrift;
-using namespace strings;
 using namespace impala;
 
-Status FragmentMgr::FragmentExecState::UpdateStatus(const Status& status) {
+FragmentInstanceState::FragmentInstanceState(
+    QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
+    const TPlanFragmentInstanceCtx& instance_ctx, const TDescriptorTable& desc_tbl)
+  : query_state_(query_state),
+    fragment_ctx_(fragment_ctx),
+    instance_ctx_(instance_ctx),
+    desc_tbl_(desc_tbl),
+    executor_(
+        [this](const Status& status, RuntimeProfile* profile, bool done) {
+          ReportStatusCb(status, profile, done);
+        }) {
+}
+
+Status FragmentInstanceState::UpdateStatus(const Status& status) {
   lock_guard<mutex> l(status_lock_);
   if (!status.ok() && exec_status_.ok()) exec_status_ = status;
   return exec_status_;
 }
 
-Status FragmentMgr::FragmentExecState::Cancel() {
+Status FragmentInstanceState::Cancel() {
   lock_guard<mutex> l(status_lock_);
   RETURN_IF_ERROR(exec_status_);
   executor_.Cancel();
   return Status::OK();
 }
 
-void FragmentMgr::FragmentExecState::Exec() {
-  Status status = executor_.Prepare(exec_params_);
+void FragmentInstanceState::Exec() {
+  Status status =
+      executor_.Prepare(query_state_, desc_tbl_, fragment_ctx_, instance_ctx_);
   prepare_promise_.Set(status);
   if (status.ok()) {
     if (executor_.Open().ok()) {
@@ -57,13 +69,14 @@ void FragmentMgr::FragmentExecState::Exec() {
   executor_.Close();
 }
 
-void FragmentMgr::FragmentExecState::ReportStatusCb(
+void FragmentInstanceState::ReportStatusCb(
     const Status& status, RuntimeProfile* profile, bool done) {
   DCHECK(status.ok() || done);  // if !status.ok() => done
   Status exec_status = UpdateStatus(status);
 
   Status coord_status;
-  ImpalaBackendConnection coord(client_cache_, coord_address(), &coord_status);
+  ImpalaBackendConnection coord(
+      ExecEnv::GetInstance()->impalad_client_cache(), coord_address(), &coord_status);
   if (!coord_status.ok()) {
     stringstream s;
     s << "Couldn't get a client for " << coord_address() <<"\tReason: "
@@ -74,8 +87,8 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
 
   TReportExecStatusParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
-  params.__set_query_id(query_ctx_.query_id);
-  params.__set_fragment_instance_id(fragment_instance_ctx_.fragment_instance_id);
+  params.__set_query_id(query_state_->query_ctx().query_id);
+  params.__set_fragment_instance_id(instance_ctx_.fragment_instance_id);
   exec_status.SetTStatus(&params);
   params.__set_done(done);
 
@@ -112,8 +125,8 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   bool retry_is_safe;
   // Try to send the RPC 3 times before failing.
   for (int i = 0; i < 3; ++i) {
-    rpc_status = coord.DoRpc(&ImpalaBackendClient::ReportExecStatus, params, &res,
-        &retry_is_safe);
+    rpc_status = coord.DoRpc(
+        &ImpalaBackendClient::ReportExecStatus, params, &res, &retry_is_safe);
     if (rpc_status.ok()) {
       rpc_status = Status(res.status);
       break;
@@ -127,19 +140,26 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   }
 }
 
-void FragmentMgr::FragmentExecState::PublishFilter(int32_t filter_id,
-    const TBloomFilter& thrift_bloom_filter) {
+void FragmentInstanceState::PublishFilter(
+    int32_t filter_id, const TBloomFilter& thrift_bloom_filter) {
+  VLOG_FILE << "PublishFilter(): instance_id=" << PrintId(instance_id())
+            << " filter_id=" << filter_id;
   // Defensively protect against blocking forever in case there's some problem with
   // Prepare().
   static const int WAIT_MS = 30000;
   bool timed_out = false;
   // Wait until Prepare() is done, so we know that the filter bank is set up.
+  // TODO: get rid of concurrency in the setup phase as part of the per-query exec rpc
   Status prepare_status = prepare_promise_.Get(WAIT_MS, &timed_out);
   if (timed_out) {
     LOG(ERROR) << "Unexpected timeout in PublishFilter()";
     return;
   }
   if (!prepare_status.ok()) return;
-  executor_.runtime_state()->filter_bank()->PublishGlobalFilter(filter_id,
-      thrift_bloom_filter);
+  executor_.runtime_state()->filter_bank()->PublishGlobalFilter(
+      filter_id, thrift_bloom_filter);
+}
+
+const TQueryCtx& FragmentInstanceState::query_ctx() const {
+  return query_state_->query_ctx();
 }

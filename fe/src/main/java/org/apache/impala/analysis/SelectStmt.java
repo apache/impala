@@ -641,7 +641,7 @@ public class SelectStmt extends QueryStmt {
 
     // Optionally rewrite all count(distinct <expr>) into equivalent NDV() calls.
     ExprSubstitutionMap ndvSmap = null;
-    if (analyzer.getQueryCtx().getRequest().query_options.appx_count_distinct) {
+    if (analyzer.getQueryCtx().client_request.query_options.appx_count_distinct) {
       ndvSmap = new ExprSubstitutionMap();
       for (FunctionCallExpr aggExpr: aggExprs) {
         if (!aggExpr.isDistinct()

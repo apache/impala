@@ -185,8 +185,8 @@ class HashTableTest : public testing::Test {
   bool CreateHashTable(bool quadratic, int64_t initial_num_buckets,
       scoped_ptr<HashTable>* table, int block_size = 8 * 1024 * 1024,
       int max_num_blocks = 100, int reserved_blocks = 10) {
-    EXPECT_OK(test_env_->CreatePerQueryState(
-        next_query_id_++, max_num_blocks, block_size, &runtime_state_));
+    EXPECT_OK(test_env_->CreateQueryState(
+        next_query_id_++, max_num_blocks, block_size, nullptr, &runtime_state_));
     MemTracker* client_tracker = pool_.Add(
         new MemTracker(-1, "client", runtime_state_->instance_mem_tracker()));
     BufferedBlockMgr::Client* client;
@@ -604,7 +604,8 @@ TEST_F(HashTableTest, QuadraticInsertFullTest) {
 // Test that hashing empty string updates hash value.
 TEST_F(HashTableTest, HashEmpty) {
   EXPECT_TRUE(
-      test_env_->CreatePerQueryState(0, 100, 8 * 1024 * 1024, &runtime_state_).ok());
+      test_env_->CreateQueryState(
+        0, 100, 8 * 1024 * 1024, nullptr, &runtime_state_).ok());
   scoped_ptr<HashTableCtx> ht_ctx;
   Status status = HashTableCtx::Create(runtime_state_, build_expr_ctxs_,
       probe_expr_ctxs_, false /* !stores_nulls_ */,

@@ -601,7 +601,7 @@ public class SingleNodePlanner {
     // of table scans. This is only feasible if all materialized aggregate expressions
     // have distinct semantics. Please see createHdfsScanPlan() for details.
     boolean fastPartitionKeyScans =
-        analyzer.getQueryCtx().getRequest().query_options.optimize_partition_key_scans &&
+        analyzer.getQueryCtx().client_request.query_options.optimize_partition_key_scans &&
         aggInfo != null && aggInfo.hasAllDistinctAgg();
 
     // Separate table refs into parent refs (uncorrelated or absolute) and

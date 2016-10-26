@@ -38,13 +38,11 @@
 #include "common/status.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
-#include "runtime/runtime-state.h"
-#include "scheduling/simple-scheduler.h"
-#include "service/fragment-exec-state.h"
-#include "service/fragment-mgr.h"
 #include "util/histogram-metric.h"
 #include "util/progress-updater.h"
 #include "util/runtime-profile.h"
+#include "scheduling/query-schedule.h"
+#include "runtime/runtime-state.h"  // for PartitionStatusMap; TODO: disentangle
 
 namespace impala {
 
@@ -69,6 +67,9 @@ class RuntimeProfile;
 class TablePrinter;
 class TPlanFragment;
 class QueryResultSet;
+class MemTracker;
+class PlanRootSink;
+class FragmentInstanceState;
 
 struct DebugOptions;
 
@@ -212,7 +213,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   void TearDown();
 
  private:
-  class FragmentInstanceState;
+  class InstanceState;
   struct FilterTarget;
   class FilterState;
 
@@ -249,10 +250,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
     CounterMap scan_ranges_complete_counters;
   };
 
-  /// FragmentInstanceStates for all fragment instances, including that of the coordinator
+  /// InstanceStates for all fragment instances, including that of the coordinator
   /// fragment. All elements are non-nullptr. Owned by obj_pool(). Filled in
   /// StartFInstances().
-  std::vector<FragmentInstanceState*> fragment_instance_states_;
+  std::vector<InstanceState*> fragment_instance_states_;
 
   /// True if the query needs a post-execution step to tidy up
   bool needs_finalization_;
@@ -273,7 +274,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// time.
   /// Lock ordering is
   /// 1. lock_
-  /// 2. FragmentInstanceState::lock_
+  /// 2. InstanceState::lock_
   boost::mutex lock_;
 
   /// Overall status of the entire query; set to the first reported fragment error
@@ -294,13 +295,13 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Result rows are materialized by this fragment instance in its own thread. They are
   /// materialized into a QueryResultSet provided to the coordinator during GetNext().
   ///
-  /// Created during fragment instance start-up by FragmentExecState and set here in
-  /// Exec().  Keep a shared_ptr reference to the fragment state so that root_sink_ will
-  /// be valid for the lifetime of the coordinator. This is important if, for example, the
-  /// fragment instance is cancelled while the coordinator is calling GetNext().
-  std::shared_ptr<FragmentMgr::FragmentExecState> root_fragment_instance_;
-  PlanFragmentExecutor* executor_ = nullptr;
-  PlanRootSink* root_sink_ = nullptr;
+  /// Not owned by this class. Set in Exec(). Reset to nullptr (and the implied
+  /// reference of QueryState released) in TearDown().
+  FragmentInstanceState* coord_instance_ = nullptr;
+
+  /// Not owned by this class. Set in Exec(). Reset to nullptr in TearDown() or when
+  /// GetNext() hits eos.
+  PlanRootSink* coord_sink_ = nullptr;
 
   /// Query mem tracker for this coordinator initialized in Exec(). Only valid if there
   /// is no coordinator fragment (i.e. executor_ == NULL). If executor_ is not NULL,
@@ -313,6 +314,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Returns a local object pool.
   ObjectPool* obj_pool() { return obj_pool_.get(); }
+
+  PlanFragmentExecutor* executor();
 
   // Sets the TDescriptorTable(s) for the current fragment.
   void SetExecPlanDescriptorTable(const TPlanFragment& fragment,
@@ -501,11 +504,11 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   void InitExecSummary();
 
   /// Update fragment profile information from a fragment instance state.
-  void UpdateAverageProfile(FragmentInstanceState* fragment_instance_state);
+  void UpdateAverageProfile(InstanceState* instance_state);
 
   /// Compute the summary stats (completion_time and rates)
   /// for an individual fragment_profile_ based on the specified instance state.
-  void ComputeFragmentSummaryStats(FragmentInstanceState* fragment_instance_state);
+  void ComputeFragmentSummaryStats(InstanceState* instance_state);
 
   /// Outputs aggregate query profile summary.  This is assumed to be called at the end of
   /// a query -- remote fragments' profiles must not be updated while this is running.
@@ -513,7 +516,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Populates the summary execution stats from the profile. Can only be called when the
   /// query is done.
-  void UpdateExecSummary(const FragmentInstanceState& instance_state);
+  void UpdateExecSummary(const InstanceState& instance_state);
 
   /// Determines what the permissions of directories created by INSERT statements should
   /// be if permission inheritance is enabled. Populates a map from all prefixes of
