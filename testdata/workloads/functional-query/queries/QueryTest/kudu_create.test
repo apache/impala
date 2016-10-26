@@ -62,8 +62,8 @@ NonRecoverableException: hash bucket schema components must not contain columns 
 ---- QUERY
 # Kudu table that uses Impala keywords as table name and column names
 create table `add`(`analytic` int, `function` int, primary key(`analytic`, `function`))
-distribute by hash (`analytic`) into 4 buckets, range (`function`) split rows ((1), (10))
-stored as kudu;
+distribute by hash (`analytic`) into 4 buckets, range (`function`)
+(partition values <= 1, partition 1 < values <= 10, partition 10 < values) stored as kudu;
 insert into `add` select id, int_col from functional.alltypestiny;
 select * from `add`
 ---- RESULTS
@@ -77,4 +77,10 @@ select * from `add`
 7,1
 ---- TYPES
 INT,INT
+====
+---- QUERY
+# Test implicit casting/folding of partition values.
+create table tab (a int primary key) distribute by range (a) (partition value = false)
+stored as kudu
+---- RESULTS
 ====

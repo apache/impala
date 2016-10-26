@@ -349,20 +349,17 @@ struct TDistributeByHashParam {
   2: required i32 num_buckets
 }
 
-struct TRangeLiteral {
-  1: optional i64 int_literal
-  2: optional string string_literal
+struct TRangePartition {
+  1: optional list<Exprs.TExpr> lower_bound_values
+  2: optional bool is_lower_bound_inclusive
+  3: optional list<Exprs.TExpr> upper_bound_values
+  4: optional bool is_upper_bound_inclusive
 }
 
-struct TRangeLiteralList {
-  // TODO: Replace TRangeLiteral with Exprs.TExpr.
-  1: required list<TRangeLiteral> values
-}
-
-// A range distribution is identified by a list of columns and a series of split rows.
+// A range distribution is identified by a list of columns and a list of range partitions.
 struct TDistributeByRangeParam {
   1: required list<string> columns
-  2: optional list<TRangeLiteralList> split_rows;
+  2: optional list<TRangePartition> range_partitions
 }
 
 // Parameters for the DISTRIBUTE BY clause.

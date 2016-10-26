@@ -1349,6 +1349,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         " stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col, " +
         "bigint_col, float_col, double_col, date_string_col, string_col " +
         "from functional.alltypestiny");
+    AnalyzesOk("create table t primary key (id) distribute by range (id) " +
+        "(partition values < 10, partition 20 <= values < 30, partition value = 50) " +
+        "stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col, " +
+        "bigint_col, float_col, double_col, date_string_col, string_col " +
+        "from functional.alltypestiny");
+    AnalyzesOk("create table t primary key (id) distribute by hash (id) into 3 buckets, "+
+        "range (id) (partition values < 10, partition 10 <= values < 20, " +
+        "partition value = 30) stored as kudu as select id, bool_col, tinyint_col, " +
+        "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
+        "string_col from functional.alltypestiny");
     // CTAS in an external Kudu table
     AnalysisError("create external table t stored as kudu " +
         "tblproperties('kudu.table_name'='t') as select id, int_col from " +
@@ -1743,11 +1753,39 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "distribute by hash(x) into 8 buckets stored as kudu");
     AnalyzesOk("create table tab (x int, y int, primary key(x, y)) " +
         "distribute by hash(y) into 8 buckets stored as kudu");
+    AnalyzesOk("create table tab (x int, y string, primary key (x)) distribute by " +
+        "hash (x) into 3 buckets, range (x) (partition values < 1, partition " +
+        "1 <= values < 10, partition 10 <= values < 20, partition value = 30) " +
+        "stored as kudu");
+    AnalyzesOk("create table tab (x int, y int, primary key (x, y)) distribute by " +
+        "range (x, y) (partition value = (2001, 1), partition value = (2002, 1), " +
+        "partition value = (2003, 2)) stored as kudu");
+    // Non-literal boundary values in range partitions
+    AnalyzesOk("create table tab (x int, y int, primary key (x)) distribute by " +
+        "range (x) (partition values < 1 + 1, partition (1+3) + 2 < values < 10, " +
+        "partition factorial(4) < values < factorial(5), " +
+        "partition value = factorial(6)) stored as kudu");
+    AnalyzesOk("create table tab (x int, y int, primary key(x, y)) distribute by " +
+        "range(x, y) (partition value = (1+1, 2+2), partition value = ((1+1+1)+1, 10), " +
+        "partition value = (cast (30 as int), factorial(5))) stored as kudu");
+    AnalysisError("create table tab (x int primary key) distribute by range (x) " +
+        "(partition values < x + 1) stored as kudu", "Only constant values are allowed " +
+        "for range-partition bounds: x + 1");
+    AnalysisError("create table tab (x int primary key) distribute by range (x) " +
+        "(partition values <= isnull(null, null)) stored as kudu", "Range partition " +
+        "values cannot be NULL. Range partition: 'PARTITION VALUES <= " +
+        "isnull(NULL, NULL)'");
+    AnalysisError("create table tab (x int primary key) distribute by range (x) " +
+        "(partition values <= (select count(*) from functional.alltypestiny)) " +
+        "stored as kudu", "Only constant values are allowed for range-partition " +
+        "bounds: (SELECT count(*) FROM functional.alltypestiny)");
     // Multilevel partitioning. Data is split into 3 buckets based on 'x' and each
-    // bucket is partitioned into 4 tablets based on the split points of 'y'.
+    // bucket is partitioned into 4 tablets based on the range partitions of 'y'.
     AnalyzesOk("create table tab (x int, y string, primary key(x, y)) " +
-        "distribute by hash(x) into 3 buckets, range(y) split rows " +
-        "(('aa'), ('bb'), ('cc')) stored as kudu");
+        "distribute by hash(x) into 3 buckets, range(y) " +
+        "(partition values < 'aa', partition 'aa' <= values < 'bb', " +
+        "partition 'bb' <= values < 'cc', partition 'cc' <= values) " +
+        "stored as kudu");
     // Key column in upper case
     AnalyzesOk("create table tab (x int, y int, primary key (X)) " +
         "distribute by hash (x) into 8 buckets stored as kudu");
@@ -1762,15 +1800,19 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Column names in distribute params should also be case-insensitive.
     AnalyzesOk("create table tab (a int, b int, c int, d int, primary key(a, b, c, d))" +
         "distribute by hash (a, B, c) into 8 buckets, " +
-        "range (A) split rows ((1),(2),(3)) stored as kudu");
+        "range (A) (partition values < 1, partition 1 <= values < 2, " +
+        "partition 2 <= values < 3, partition 3 <= values < 4, partition 4 <= values) " +
+        "stored as kudu");
     // Allowing range distribution on a subset of the primary keys
     AnalyzesOk("create table tab (id int, name string, valf float, vali bigint, " +
-        "primary key (id, name)) distribute by range (name) split rows (('abc')) " +
-        "stored as kudu");
-    // Null values in SPLIT ROWS
+        "primary key (id, name)) distribute by range (name) " +
+        "(partition 'aa' < values <= 'bb') stored as kudu");
+    // Null values in range partition values
     AnalysisError("create table tab (id int, name string, primary key(id, name)) " +
-        "distribute by hash (id) into 3 buckets, range (name) split rows ((null),(1)) " +
-        "stored as kudu", "Split values cannot be NULL. Split row: (NULL)");
+        "distribute by hash (id) into 3 buckets, range (name) " +
+        "(partition value = null, partition value = 1) stored as kudu",
+        "Range partition values cannot be NULL. Range partition: 'PARTITION " +
+        "VALUE = NULL'");
     // Primary key specified in tblproperties
     AnalysisError(String.format("create table tab (x int) distribute by hash (x) " +
         "into 8 buckets stored as kudu tblproperties ('%s' = 'x')",
@@ -1793,32 +1835,53 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (x int, primary key (x, x)) distribute by hash (x) " +
         "into 8 buckets stored as kudu",
         "Column 'x' is listed multiple times as a PRIMARY KEY.");
-    // Each split row size should equals to the number of range columns.
+    // Number of range partition boundary values should be equal to the number of range
+    // columns.
     AnalysisError("create table tab (a int, b int, c int, d int, primary key(a, b, c)) " +
-        "distribute by range(a) split rows ((1,'extra_val'),(2),(3)) stored as kudu",
-        "SPLIT ROWS has different size than number of projected key columns: 1. " +
-        "Split row: (1, 'extra_val')");
+        "distribute by range(a) (partition value = (1, 2), " +
+        "partition value = 3, partition value = 4) stored as kudu",
+        "Number of specified range partition values is different than the number of " +
+        "distribution columns: (2 vs 1). Range partition: 'PARTITION VALUE = (1,2)'");
     // Key ranges must match the column types.
     AnalysisError("create table tab (a int, b int, c int, d int, primary key(a, b, c)) " +
-        "distribute by hash (a, b, c) into 8 buckets, " +
-        "range (a) split rows ((1), ('abc'), (3)) stored as kudu",
-        "Split value 'abc' (type: STRING) is not type compatible with column 'a'" +
-        " (type: INT).");
+        "distribute by hash (a, b, c) into 8 buckets, range (a) " +
+        "(partition value = 1, partition value = 'abc', partition 3 <= values) " +
+        "stored as kudu", "Range partition value 'abc' (type: STRING) is not type " +
+        "compatible with distribution column 'a' (type: INT).");
+    AnalysisError("create table tab (a tinyint primary key) distribute by range (a) " +
+        "(partition value = 128) stored as kudu", "Range partition value 128 " +
+        "(type: SMALLINT) is not type compatible with distribution column 'a' " +
+        "(type: TINYINT)");
+    AnalysisError("create table tab (a smallint primary key) distribute by range (a) " +
+        "(partition value = 32768) stored as kudu", "Range partition value 32768 " +
+        "(type: INT) is not type compatible with distribution column 'a' " +
+        "(type: SMALLINT)");
+    AnalysisError("create table tab (a int primary key) distribute by range (a) " +
+        "(partition value = 2147483648) stored as kudu", "Range partition value " +
+        "2147483648 (type: BIGINT) is not type compatible with distribution column 'a' " +
+        "(type: INT)");
+    AnalysisError("create table tab (a bigint primary key) distribute by range (a) " +
+        "(partition value = 9223372036854775808) stored as kudu", "Range partition " +
+        "value 9223372036854775808 (type: DECIMAL(19,0)) is not type compatible with " +
+        "distribution column 'a' (type: BIGINT)");
+    // Test implicit casting/folding of partition values.
+    AnalyzesOk("create table tab (a int primary key) distribute by range (a) " +
+        "(partition value = false, partition value = true) stored as kudu");
     // Non-key column used in DISTRIBUTE BY
     AnalysisError("create table tab (a int, b string, c bigint, primary key (a)) " +
-        "distribute by range (b) split rows (('abc')) stored as kudu",
-        "Column 'b' in 'RANGE (b) SPLIT ROWS (('abc'))' is not a key column. " +
+        "distribute by range (b) (partition value = 'abc') stored as kudu",
+        "Column 'b' in 'RANGE (b) (PARTITION VALUE = 'abc')' is not a key column. " +
         "Only key columns can be used in DISTRIBUTE BY.");
-    // No float split keys
+    // No float range partition values
     AnalysisError("create table tab (a int, b int, c int, d int, primary key (a, b, c))" +
         "distribute by hash (a, b, c) into 8 buckets, " +
-        "range (a) split rows ((1.2), ('abc'), (3)) stored as kudu",
-        "Split value 1.2 (type: DECIMAL(2,1)) is not type compatible with column 'a' " +
-        "(type: INT).");
+        "range (a) (partition value = 1.2, partition value = 2) stored as kudu",
+        "Range partition value 1.2 (type: DECIMAL(2,1)) is not type compatible with " +
+        "distribution column 'a' (type: INT).");
     // Non-existing column used in DISTRIBUTE BY
     AnalysisError("create table tab (a int, b int, primary key (a, b)) " +
-        "distribute by range(unknown_column) split rows (('abc')) stored as kudu",
-        "Column 'unknown_column' in 'RANGE (unknown_column) SPLIT ROWS (('abc'))' " +
+        "distribute by range(unknown_column) (partition value = 'abc') stored as kudu",
+        "Column 'unknown_column' in 'RANGE (unknown_column) (PARTITION VALUE = 'abc')' " +
         "is not a key column. Only key columns can be used in DISTRIBUTE BY");
     // Kudu table name is specified in tblproperties
     AnalyzesOk("create table tab (x int primary key) distribute by hash (x) " +
@@ -1827,8 +1890,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "'kudu.master_addresses' = '127.0.0.1:8080, 127.0.0.1:8081')");
     // No port is specified in kudu master address
     AnalyzesOk("create table tdata_no_port (id int primary key, name string, " +
-        "valf float, vali bigint) DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30)) " +
-        "STORED AS KUDU tblproperties('kudu.master_addresses'='127.0.0.1')");
+        "valf float, vali bigint) distribute by range(id) (partition values <= 10, " +
+        "partition 10 < values <= 30, partition 30 < values) " +
+        "stored as kudu tblproperties('kudu.master_addresses'='127.0.0.1')");
     // Not using the STORED AS KUDU syntax to specify a Kudu table
     AnalysisError("create table tab (x int primary key) tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')",

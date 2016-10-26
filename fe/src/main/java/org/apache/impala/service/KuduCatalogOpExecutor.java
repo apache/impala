@@ -29,14 +29,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TDistributeParam;
+import org.apache.impala.thrift.TRangePartition;
 import org.apache.impala.util.KuduUtil;
 import org.apache.kudu.ColumnSchema.ColumnSchemaBuilder;
 import org.apache.kudu.ColumnSchema;
@@ -44,6 +45,7 @@ import org.apache.kudu.Schema;
 import org.apache.kudu.client.CreateTableOptions;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.PartialRow;
+import org.apache.kudu.client.RangePartitionBound;
 import org.apache.log4j.Logger;
 
 /**
@@ -91,7 +93,7 @@ public class KuduCatalogOpExecutor {
     Set<String> keyColNames = new HashSet<>(params.getPrimary_key_column_names());
     List<FieldSchema> fieldSchemas = msTbl.getSd().getCols();
     List<ColumnSchema> colSchemas = new ArrayList<>(fieldSchemas.size());
-    for (FieldSchema fieldSchema : fieldSchemas) {
+    for (FieldSchema fieldSchema: fieldSchemas) {
       Type type = Type.parseColumnType(fieldSchema.getType());
       Preconditions.checkState(type != null);
       org.apache.kudu.Type kuduType = KuduUtil.fromImpalaType(type);
@@ -117,7 +119,7 @@ public class KuduCatalogOpExecutor {
     List<TDistributeParam> distributeParams = params.getDistribute_by();
     if (distributeParams != null) {
       boolean hasRangePartitioning = false;
-      for (TDistributeParam distParam : distributeParams) {
+      for (TDistributeParam distParam: distributeParams) {
         if (distParam.isSetBy_hash_param()) {
           Preconditions.checkState(!distParam.isSetBy_range_param());
           tableOpts.addHashPartitions(distParam.getBy_hash_param().getColumns(),
@@ -125,11 +127,22 @@ public class KuduCatalogOpExecutor {
         } else {
           Preconditions.checkState(distParam.isSetBy_range_param());
           hasRangePartitioning = true;
-          tableOpts.setRangePartitionColumns(
-              distParam.getBy_range_param().getColumns());
-          for (PartialRow partialRow :
-              KuduUtil.parseSplits(schema, distParam.getBy_range_param())) {
-            tableOpts.addSplitRow(partialRow);
+          List<String> rangePartitionColumns = distParam.getBy_range_param().getColumns();
+          tableOpts.setRangePartitionColumns(rangePartitionColumns);
+          for (TRangePartition rangePartition:
+               distParam.getBy_range_param().getRange_partitions()) {
+            Preconditions.checkState(rangePartition.isSetLower_bound_values()
+                || rangePartition.isSetUpper_bound_values());
+            Pair<PartialRow, RangePartitionBound> lowerBound =
+                KuduUtil.buildRangePartitionBound(schema, rangePartitionColumns,
+                    rangePartition.getLower_bound_values(),
+                    rangePartition.isIs_lower_bound_inclusive());
+            Pair<PartialRow, RangePartitionBound> upperBound =
+                KuduUtil.buildRangePartitionBound(schema, rangePartitionColumns,
+                    rangePartition.getUpper_bound_values(),
+                    rangePartition.isIs_upper_bound_inclusive());
+            tableOpts.addRangePartition(lowerBound.first, upperBound.first,
+                lowerBound.second, upperBound.second);
           }
         }
       }

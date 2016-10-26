@@ -1,9 +1,9 @@
 ====
 ---- QUERY
--- Test HASH partitioning
+-- Test hash partitioning
 create table simple_hash (id int, name string, valf float, vali bigint,
-  PRIMARY KEY (id, name)) DISTRIBUTE BY HASH(id) INTO 4 BUCKETS,
-  HASH(name) INTO 2 BUCKETS STORED AS KUDU
+  primary key (id, name)) distribute by hash(id) INTO 4 buckets,
+  hash(name) INTO 2 buckets stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -23,10 +23,109 @@ show table stats simple_hash
 INT,STRING,STRING,STRING,INT
 ====
 ---- QUERY
--- Test HASH and RANGE partitioning
+-- Test single column range partitioning with bounded and unbounded partitions
+create table range_part_bounds (id int, name string, valf float, vali bigint,
+  primary key (id, name)) distribute by range (id)
+  (partition values <= 10, partition 10 < values <= 20, partition 20 < values)
+  stored as kudu
+---- RESULTS
+====
+---- QUERY
+show table stats range_part_bounds
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'','8000000B',regex:.*?:\d+,3
+-1,'8000000B','80000015',regex:.*?:\d+,3
+-1,'80000015','',regex:.*?:\d+,3
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+-- Test single column range partitioning with single value partitions
+create table range_part_single (id int, name string, valf float, vali bigint,
+  primary key (id, name)) distribute by range (id)
+  (partition value = 1, partition value = 10, partition value = 100)
+  stored as kudu
+---- RESULTS
+====
+---- QUERY
+show table stats range_part_single
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'80000001','80000002',regex:.*?:\d+,3
+-1,'8000000A','8000000B',regex:.*?:\d+,3
+-1,'80000064','80000065',regex:.*?:\d+,3
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+-- Test single column range partitioning with bounded, unbounded and single
+-- value partitions
+create table range_part_multiple_bounds (id int, name string, valf float,
+  primary key (id, name)) distribute by range (id)
+  (partition values <= 10, partition 10 < values <= 20, partition 20 < values <= 30,
+   partition value = 40, partition value = 50) stored as kudu
+---- RESULTS
+====
+---- QUERY
+show table stats range_part_multiple_bounds
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'','8000000B',regex:.*?:\d+,3
+-1,'8000000B','80000015',regex:.*?:\d+,3
+-1,'80000015','8000001F',regex:.*?:\d+,3
+-1,'80000028','80000029',regex:.*?:\d+,3
+-1,'80000032','80000033',regex:.*?:\d+,3
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+-- Test multiple column range partitioning
+create table range_part_multiple_cols (id int, name string, valf float, vali bigint,
+  primary key (id, name)) distribute by range (id, name)
+  (partition value = (10, 'martin'), partition value = (20, 'dimitris'),
+   partition value = (30, 'matthew')) stored as kudu
+---- RESULTS
+====
+---- QUERY
+show table stats range_part_multiple_cols
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'8000000A6D617274696E','8000000A6D617274696E00',regex:.*?:\d+,3
+-1,'8000001464696D6974726973','8000001464696D697472697300',regex:.*?:\d+,3
+-1,'8000001E6D617474686577','8000001E6D61747468657700',regex:.*?:\d+,3
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+-- Test single column range partitioning with string partition column
+create table range_part_single_string_col (id int, name string, valf float,
+  primary key (id, name)) distribute by range(name)
+  (partition values <= 'aaa', partition 'aaa' < values <= 'bbb',
+   partition 'bbb' < values <= 'ccc', partition value = 'ddd') stored as kudu
+---- RESULTS
+====
+---- QUERY
+show table stats range_part_single_string_col
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'','61616100',regex:.*?:\d+,3
+-1,'61616100','62626200',regex:.*?:\d+,3
+-1,'62626200','63636300',regex:.*?:\d+,3
+-1,'646464','64646400',regex:.*?:\d+,3
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+-- Test hash and range partitioning
 create table simple_hash_range (id int, name string, valf float, vali bigint,
-  PRIMARY KEY (id, name)) DISTRIBUTE BY HASH(id) INTO 4 BUCKETS,
-  RANGE(id, name) SPLIT ROWS ((10, 'martin'), (20, 'Peter')) STORED AS KUDU
+  primary key (id, name)) distribute by hash(id) into 4 buckets, range(id, name)
+  (partition value = (10, 'martin'), partition value = (20, 'alex')) stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -34,25 +133,22 @@ show table stats simple_hash_range
 ---- LABELS
 # Rows,Start Key,Stop Key,Leader Replica,# Replicas
 ---- RESULTS
--1,'','000000008000000A6D617274696E',regex:.*?:\d+,3
--1,'000000008000000A6D617274696E','00000000800000145065746572',regex:.*?:\d+,3
--1,'00000000800000145065746572','00000001',regex:.*?:\d+,3
--1,'00000001','000000018000000A6D617274696E',regex:.*?:\d+,3
--1,'000000018000000A6D617274696E','00000001800000145065746572',regex:.*?:\d+,3
--1,'00000001800000145065746572','00000002',regex:.*?:\d+,3
--1,'00000002','000000028000000A6D617274696E',regex:.*?:\d+,3
--1,'000000028000000A6D617274696E','00000002800000145065746572',regex:.*?:\d+,3
--1,'00000002800000145065746572','00000003',regex:.*?:\d+,3
--1,'00000003','000000038000000A6D617274696E',regex:.*?:\d+,3
--1,'000000038000000A6D617274696E','00000003800000145065746572',regex:.*?:\d+,3
--1,'00000003800000145065746572','',regex:.*?:\d+,3
+-1,'000000008000000A6D617274696E','000000008000000A6D617274696E00',regex:.*?:\d+,3
+-1,'0000000080000014616C6578','0000000080000014616C657800',regex:.*?:\d+,3
+-1,'000000018000000A6D617274696E','000000018000000A6D617274696E00',regex:.*?:\d+,3
+-1,'0000000180000014616C6578','0000000180000014616C657800',regex:.*?:\d+,3
+-1,'000000028000000A6D617274696E','000000028000000A6D617274696E00',regex:.*?:\d+,3
+-1,'0000000280000014616C6578','0000000280000014616C657800',regex:.*?:\d+,3
+-1,'000000038000000A6D617274696E','000000038000000A6D617274696E00',regex:.*?:\d+,3
+-1,'0000000380000014616C6578','0000000380000014616C657800',regex:.*?:\d+,3
 ---- TYPES
 INT,STRING,STRING,STRING,INT
 ====
 ---- QUERY
 create table simple_hash_range_ctas
-  PRIMARY KEY (id, name) DISTRIBUTE BY HASH(id) INTO 4 BUCKETS,
-  RANGE(id, name) SPLIT ROWS ((10, 'martin'), (20, 'Peter')) STORED AS KUDU
+  primary key (id, name) distribute by hash(id) into 4 buckets,
+  range(id, name) (partition value = (10, 'casey'), partition value = (20, 'marcel'))
+  stored as kudu
 as select * from simple_hash
 ---- RESULTS
 'Inserted 0 row(s)'
@@ -62,25 +158,21 @@ show table stats simple_hash_range_ctas
 ---- LABELS
 # Rows,Start Key,Stop Key,Leader Replica,# Replicas
 ---- RESULTS
--1,'','000000008000000A6D617274696E',regex:.*?:\d+,3
--1,'000000008000000A6D617274696E','00000000800000145065746572',regex:.*?:\d+,3
--1,'00000000800000145065746572','00000001',regex:.*?:\d+,3
--1,'00000001','000000018000000A6D617274696E',regex:.*?:\d+,3
--1,'000000018000000A6D617274696E','00000001800000145065746572',regex:.*?:\d+,3
--1,'00000001800000145065746572','00000002',regex:.*?:\d+,3
--1,'00000002','000000028000000A6D617274696E',regex:.*?:\d+,3
--1,'000000028000000A6D617274696E','00000002800000145065746572',regex:.*?:\d+,3
--1,'00000002800000145065746572','00000003',regex:.*?:\d+,3
--1,'00000003','000000038000000A6D617274696E',regex:.*?:\d+,3
--1,'000000038000000A6D617274696E','00000003800000145065746572',regex:.*?:\d+,3
--1,'00000003800000145065746572','',regex:.*?:\d+,3
+-1,'000000008000000A6361736579','000000008000000A636173657900',regex:.*?:\d+,3
+-1,'00000000800000146D617263656C','00000000800000146D617263656C00',regex:.*?:\d+,3
+-1,'000000018000000A6361736579','000000018000000A636173657900',regex:.*?:\d+,3
+-1,'00000001800000146D617263656C','00000001800000146D617263656C00',regex:.*?:\d+,3
+-1,'000000028000000A6361736579','000000028000000A636173657900',regex:.*?:\d+,3
+-1,'00000002800000146D617263656C','00000002800000146D617263656C00',regex:.*?:\d+,3
+-1,'000000038000000A6361736579','000000038000000A636173657900',regex:.*?:\d+,3
+-1,'00000003800000146D617263656C','00000003800000146D617263656C00',regex:.*?:\d+,3
 ---- TYPES
 INT,STRING,STRING,STRING,INT
 ====
 ---- QUERY
--- Test HASH defaults to all columns
+-- Test hash defaults to all columns
 create table simple_hash_all_columns (id int, name string, valf float, vali bigint,
-  PRIMARY KEY (id, name)) DISTRIBUTE BY HASH INTO 4 BUCKETS STORED AS KUDU
+  primary key (id, name)) distribute by hash into 4 buckets stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -96,10 +188,11 @@ show table stats simple_hash_all_columns
 INT,STRING,STRING,STRING,INT
 ====
 ---- QUERY
--- Test RANGE defaults to all columns
+-- Test range defaults to all columns
 create table simple_range_all_columns (id int, name string, valf float, vali bigint,
-  PRIMARY KEY (id, name)) DISTRIBUTE BY RANGE SPLIT ROWS ((1, 'a'), (2, 'b'))
-  STORED AS KUDU
+  primary key (id, name)) distribute by range
+  (partition value = (1, 'a'), partition value = (2, 'b'))
+  stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -107,9 +200,52 @@ show table stats simple_range_all_columns
 ---- LABELS
 # Rows,Start Key,Stop Key,Leader Replica,# Replicas
 ---- RESULTS
--1,'','8000000161',regex:.*?:\d+,3
--1,'8000000161','8000000262',regex:.*?:\d+,3
--1,'8000000262','',regex:.*?:\d+,3
+-1,'8000000161','800000016100',regex:.*?:\d+,3
+-1,'8000000262','800000026200',regex:.*?:\d+,3
 ---- TYPES
 INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+-- Test using non-literal constant values in range-partition bounds
+create table range_complex_const_boundary_vals (x int, y int, primary key (x))
+  distribute by range (x) (partition values < 1 + 1, partition (1+3) + 2 < values < 10,
+  partition factorial(4) < values < factorial(5), partition value = factorial(6))
+  stored as kudu
+---- RESULTS
+====
+---- QUERY
+show table stats range_complex_const_boundary_vals
+---- LABELS
+# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+---- RESULTS
+-1,'','80000002',regex:.*?:\d+,3
+-1,'80000007','8000000A',regex:.*?:\d+,3
+-1,'80000019','80000078',regex:.*?:\d+,3
+-1,'800002D0','800002D1',regex:.*?:\d+,3
+---- TYPES
+INT,STRING,STRING,STRING,INT
+====
+---- QUERY
+-- Test range partitioning with overlapping partitions
+create table simple_range_with_overlapping (id int, name string, valf float, vali bigint,
+  primary key (id, name)) distribute by range (id)
+  (partition values <= 10, partition values < 20, partition value = 5) stored as kudu
+---- CATCH
+NonRecoverableException: overlapping range partitions: first range partition: [<start>, (int32 id=11)), second range partition: [<start>, (int32 id=20))
+====
+---- QUERY
+-- Test range partitioning with the same partition specified multiple times
+create table simple_range_duplicate_parts (id int, name string, valf float, vali bigint,
+  primary key(id, name)) distribute by range (id)
+  (partition 10 < values <= 20, partition 10 < values <= 20) stored as kudu
+---- CATCH
+NonRecoverableException: overlapping range partitions: first range partition: [(int32 id=11), (int32 id=21)), second range partition: [(int32 id=11), (int32 id=21))
+====
+---- QUERY
+-- Test multi-column range partitioning with the same partition specified multiple times
+create table range_multi_col_duplicate_parts (id int, name string, valf float,
+  vali bigint, primary key (id, name)) distribute by range (id, name)
+  (partition value = (10, 'dimitris'), partition value = (10, 'dimitris')) stored as kudu
+---- CATCH
+NonRecoverableException: overlapping range partitions: first range partition: [(int32 id=10, string name=dimitris), (int32 id=10, string name=dimitris\000)), second range partition: [(int32 id=10, string name=dimitris), (int32 id=10, string name=dimitris\000))
 ====

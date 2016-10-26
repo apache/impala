@@ -2381,34 +2381,46 @@ public class ParserTest {
     ParsesOk("CREATE TABLE Foo (i int, k int) DISTRIBUTE BY HASH INTO 4 BUCKETS," +
         " HASH(k) INTO 4 BUCKETS");
     ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i)");
-
-    // Range partitioning, the split rows are not validated in the parser
-    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
-        "SPLIT ROWS ((1, 2.0, 'asdas'))");
-    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE " +
-        "SPLIT ROWS ((1, 2.0, 'asdas'))");
-
-    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
-            "SPLIT ROWS (('asdas'))");
-
-    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
-        "SPLIT ROWS ((1, 2.0, 'asdas'), (2,3.0, 'adas'))");
-
-    ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
-        "SPLIT ROWS ()");
-    ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i)");
     ParserError("CREATE EXTERNAL TABLE Foo DISTRIBUTE BY HASH INTO 4 BUCKETS");
 
-    // Combine both
-    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS, RANGE(i) " +
-        "SPLIT ROWS ((1, 2.0, 'asdas'))");
+    // Range partitioning
+    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE (PARTITION VALUE = 10)");
+    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
+        "(PARTITION 1 <= VALUES < 10, PARTITION 10 <= VALUES < 20, " +
+        "PARTITION 21 < VALUES <= 30, PARTITION VALUE = 50)");
+    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE(a) " +
+        "(PARTITION 10 <= VALUES)");
+    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE(a) " +
+        "(PARTITION VALUES < 10)");
+    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+        "(PARTITION VALUE = 10, PARTITION VALUE = 20)");
+    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE(a) " +
+        "(PARTITION VALUES <= 10, PARTITION VALUE = 20)");
+    ParsesOk("CREATE TABLE Foo (a int, b int) DISTRIBUTE BY RANGE(a, b) " +
+        "(PARTITION VALUE = (2001, 1), PARTITION VALUE = (2001, 2), " +
+        "PARTITION VALUE = (2002, 1))");
+    ParsesOk("CREATE TABLE Foo (a int, b string) DISTRIBUTE BY " +
+        "HASH (a) INTO 3 BUCKETS, RANGE (a, b) (PARTITION VALUE = (1, 'abc'), " +
+        "PARTITION VALUE = (2, 'def'))");
+    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+        "(PARTITION VALUE = 1 + 1) STORED AS KUDU");
+    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+        "(PARTITION 1 + 1 < VALUES) STORED AS KUDU");
+    ParsesOk("CREATE TABLE Foo (a int, b int) DISTRIBUTE BY RANGE (a) " +
+        "(PARTITION b < VALUES <= a) STORED AS KUDU");
+    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+        "(PARTITION now() <= VALUES, PARTITION VALUE = add_months(now(), 2)) " +
+        "STORED AS KUDU");
 
-    // Can only have one range clause
-    ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS, RANGE(i) " +
-        "SPLIT ROWS ((1, 2.0, 'asdas')), RANGE(i) SPLIT ROWS ((1, 2.0, 'asdas'))");
-    // Range needs to be the last DISTRIBUTE BY clause
-    ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) SPLIT ROWS ((1),(2)), " +
-        "HASH (i) INTO 3 BUCKETS");
+    ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) ()");
+    ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY HASH (a) INTO 4 BUCKETS, " +
+        "RANGE (a) (PARTITION VALUE = 10), RANGE (a) (PARTITION VALUES < 10)");
+    ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+        "(PARTITION VALUE = 10), HASH (a) INTO 3 BUCKETS");
+    ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+        "(PARTITION VALUES = 10) STORED AS KUDU");
+    ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+        "(PARTITION 10 < VALUE < 20) STORED AS KUDU");
   }
 
   @Test
@@ -2550,10 +2562,6 @@ public class ParserTest {
         "AS SELECT * from bar");
     ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) DISTRIBUTE BY HASH (b) INTO 2 " +
         "BUCKETS AS SELECT * from bar");
-    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) DISTRIBUTE BY RANGE (b) SPLIT ROWS " +
-        "(('foo'), ('bar')) STORED AS KUDU AS SELECT * from bar");
-    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) DISTRIBUTE BY RANGE SPLIT ROWS " +
-        "(('foo'), ('bar')) STORED AS KUDU AS SELECT * from bar");
 
     // With clause works
     ParsesOk("CREATE TABLE Foo AS with t1 as (select 1) select * from t1");
@@ -2586,6 +2594,9 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo DISTRIBUTE BY HASH(i) INTO 4 BUCKETS AS SELECT 1");
     ParsesOk("CREATE TABLE Foo PRIMARY KEY (a) DISTRIBUTE BY HASH(a) INTO 4 BUCKETS " +
         "TBLPROPERTIES ('a'='b', 'c'='d') AS SELECT * from bar");
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a) DISTRIBUTE BY RANGE(a) " +
+        "(PARTITION 1 < VALUES < 10, PARTITION 10 <= VALUES < 20, PARTITION VALUE = 30) " +
+        "STORED AS KUDU AS SELECT * FROM Bar");
   }
 
   @Test

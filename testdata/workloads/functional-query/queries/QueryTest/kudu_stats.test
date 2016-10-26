@@ -1,8 +1,8 @@
 ====
 ---- QUERY
 create table simple (id int primary key, name string, valf float, vali bigint)
-  DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30)) STORED AS KUDU
-  TBLPROPERTIES('kudu.num_tablet_replicas' = '2')
+  distribute by range (partition values < 10, partition 10 <= values < 30,
+  partition 30 <= values) stored as kudu tblproperties('kudu.num_tablet_replicas' = '2')
 ---- RESULTS
 ====
 ---- QUERY

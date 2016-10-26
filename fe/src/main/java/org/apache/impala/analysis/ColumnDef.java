@@ -19,12 +19,12 @@ package org.apache.impala.analysis;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -182,10 +182,11 @@ public class ColumnDef {
 
   /**
    * Generates and returns a map of column names to column definitions. Assumes that
-   * the column names are unique.
+   * the column names are unique. It guarantees that the iteration order of the map
+   * is the same as the iteration order of 'colDefs'.
    */
   static Map<String, ColumnDef> mapByColumnNames(Collection<ColumnDef> colDefs) {
-    Map<String, ColumnDef> colDefsByColName = Maps.newHashMap();
+    Map<String, ColumnDef> colDefsByColName = new LinkedHashMap<String, ColumnDef>();
     for (ColumnDef colDef: colDefs) {
       ColumnDef def = colDefsByColName.put(colDef.getColName(), colDef);
       Preconditions.checkState(def == null);

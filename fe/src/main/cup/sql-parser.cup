@@ -21,6 +21,7 @@ import com.google.common.collect.Lists;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java_cup.runtime.Symbol;
@@ -28,6 +29,7 @@ import java_cup.runtime.Symbol;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.UnionStmt.Qualifier;
 import org.apache.impala.analysis.UnionStmt.UnionOperand;
+import org.apache.impala.analysis.RangePartition;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.RowFormat;
@@ -319,7 +321,7 @@ nonterminal SelectListItem star_expr;
 nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr;
 nonterminal ArrayList<Expr> expr_list;
 nonterminal String alias_clause;
-nonterminal ArrayList<String> ident_list, primary_keys, opt_primary_keys;
+nonterminal ArrayList<String> ident_list, primary_keys;
 nonterminal ArrayList<String> opt_ident_list;
 nonterminal TableName table_name;
 nonterminal FunctionName function_name;
@@ -395,11 +397,13 @@ nonterminal ShowDataSrcsStmt show_data_srcs_stmt;
 nonterminal StructField struct_field_def;
 nonterminal String ident_or_keyword;
 nonterminal DistributeParam distribute_hash_param;
+nonterminal List<RangePartition> range_params_list;
+nonterminal RangePartition range_param;
+nonterminal Pair<Expr, Boolean> opt_lower_range_val,
+   opt_upper_range_val;
 nonterminal ArrayList<DistributeParam> distribute_hash_param_list;
 nonterminal ArrayList<DistributeParam> distribute_param_list;
 nonterminal DistributeParam distribute_range_param;
-nonterminal List<List<LiteralExpr>> split_row_list;
-nonterminal List<LiteralExpr> literal_list;
 nonterminal ColumnDef column_def, view_column_def;
 nonterminal ArrayList<ColumnDef> column_def_list, partition_column_defs,
   view_column_def_list, view_column_defs;
@@ -489,6 +493,7 @@ precedence left BITAND, BITOR, BITXOR, BITNOT;
 precedence left FACTORIAL;
 precedence left KW_ORDER, KW_BY, KW_LIMIT;
 precedence left LPAREN, RPAREN;
+precedence left KW_VALUES;
 // Support chaining of timestamp arithmetic exprs.
 precedence left KW_INTERVAL;
 precedence left KW_TBLPROPERTIES;
@@ -1141,31 +1146,63 @@ distribute_hash_param ::=
 
 // The column list for a RANGE clause is optional.
 distribute_range_param ::=
-  KW_RANGE LPAREN ident_list:cols RPAREN KW_SPLIT KW_ROWS
-  LPAREN split_row_list:list RPAREN
-  {: RESULT = DistributeParam.createRangeParam(cols, list); :}
-  | KW_RANGE KW_SPLIT KW_ROWS LPAREN split_row_list:list RPAREN
-  {: RESULT = DistributeParam.createRangeParam(Lists.<String>newArrayList(), list); :}
+  KW_RANGE LPAREN ident_list:cols RPAREN LPAREN range_params_list:ranges RPAREN
+  {:
+    RESULT = DistributeParam.createRangeParam(cols, ranges);
+  :}
+  | KW_RANGE LPAREN range_params_list:ranges RPAREN
+  {:
+    RESULT = DistributeParam.createRangeParam(Collections.<String>emptyList(), ranges);
+  :}
   ;
 
-split_row_list ::=
-  LPAREN literal_list:l RPAREN
-  {: RESULT = Lists.<List<LiteralExpr>>newArrayList(l); :}
-  | split_row_list:list COMMA LPAREN literal_list:l RPAREN
+range_params_list ::=
+  range_param:param
   {:
-    list.add(l);
+    RESULT = Lists.<RangePartition>newArrayList(param);
+  :}
+  | range_params_list:list COMMA range_param:param
+  {:
+    list.add(param);
     RESULT = list;
   :}
   ;
 
-literal_list ::=
-  literal:l
-  {: RESULT = Lists.newArrayList(l); :}
-  | literal_list:list COMMA literal:l
+range_param ::=
+  KW_PARTITION opt_lower_range_val:lower_val KW_VALUES opt_upper_range_val:upper_val
+  {: RESULT = RangePartition.createFromRange(lower_val, upper_val); :}
+  // Use dotted_path to avoid reduce/reduce conflicts with expr
+  | KW_PARTITION dotted_path:val EQUAL expr:l
   {:
-    list.add(l);
-    RESULT = list;
+    if (!val.get(0).toUpperCase().equals("VALUE")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "VALUE");
+    }
+    RESULT = RangePartition.createFromValues(Lists.newArrayList(l)); :}
+  | KW_PARTITION dotted_path:val EQUAL LPAREN expr_list:l RPAREN
+  {:
+    if (!val.get(0).toUpperCase().equals("VALUE")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "VALUE");
+    }
+    RESULT = RangePartition.createFromValues(l);
   :}
+  ;
+
+opt_lower_range_val ::=
+  expr:l LESSTHAN
+  {: RESULT = new Pair<Expr, Boolean>(l, false); :}
+  | expr:l LESSTHAN EQUAL
+  {: RESULT = new Pair<Expr, Boolean>(l, true); :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+opt_upper_range_val ::=
+  LESSTHAN expr:l
+  {: RESULT = new Pair<Expr, Boolean>(l, false); :}
+  | LESSTHAN EQUAL expr:l
+  {: RESULT = new Pair<Expr, Boolean>(l, true); :}
+  | /* empty */
+  {: RESULT = null; :}
   ;
 
 create_udf_stmt ::=

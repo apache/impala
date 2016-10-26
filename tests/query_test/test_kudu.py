@@ -230,15 +230,16 @@ class TestShowCreateTable(KuduTestSuite):
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT PRIMARY KEY, d STRING)
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c) SPLIT ROWS ((1), (2))
-        STORED AS KUDU""",
+        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c)
+        (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
+         PARTITION 2 < VALUES) STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
           c INT,
           d STRING,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c) SPLIT ROWS (...)
+        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
@@ -259,21 +260,23 @@ class TestShowCreateTable(KuduTestSuite):
         """
         CREATE TABLE {table} (c INT, d STRING, PRIMARY KEY(c, d))
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS,
-        RANGE (c, d) SPLIT ROWS ((1, 'aaa'), (2, 'bbb')) STORED AS KUDU""",
+        RANGE (c, d) (PARTITION VALUE = (1, 'aaa'), PARTITION VALUE = (2, 'bbb'))
+        STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
           c INT,
           d STRING,
           PRIMARY KEY (c, d)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS, RANGE (c, d) SPLIT ROWS (...)
+        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS, RANGE (c, d) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT, d STRING, e INT, PRIMARY KEY(c, d))
-        DISTRIBUTE BY RANGE (c) SPLIT ROWS ((1), (2), (3)) STORED AS KUDU""",
+        DISTRIBUTE BY RANGE (c) (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
+        PARTITION 2 < VALUES <= 3, PARTITION 3 < VALUES) STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
           c INT,
@@ -281,7 +284,7 @@ class TestShowCreateTable(KuduTestSuite):
           e INT,
           PRIMARY KEY (c, d)
         )
-        DISTRIBUTE BY RANGE (c) SPLIT ROWS (...)
+        DISTRIBUTE BY RANGE (c) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))

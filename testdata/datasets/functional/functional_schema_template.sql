@@ -766,7 +766,8 @@ create table {db_name}{db_suffix}.{table_name} (
   name string,
   zip int
 )
-distribute by range(id) split rows ((1003), (1007)) stored as kudu;
+distribute by range(id) (partition values <= 1003, partition 1003 < values <= 1007,
+partition 1007 < values) stored as kudu;
 ====
 ---- DATASET
 functional
@@ -789,7 +790,8 @@ create table {db_name}{db_suffix}.{table_name} (
   name string,
   zip int
 )
-distribute by range(id) split rows ((1003), (1007)) stored as kudu;
+distribute by range(id) (partition values <= 1003, partition 1003 < values <= 1007,
+partition 1007 < values) stored as kudu;
 ====
 ---- DATASET
 functional
@@ -815,7 +817,8 @@ create table {db_name}{db_suffix}.{table_name} (
   alltypes_id int,
   primary key (test_id, test_name, test_zip, alltypes_id)
 )
-distribute by range(test_id) split rows ((1003), (1007)) stored as kudu;
+distribute by range(test_id) (partition values <= 1003, partition 1003 < values <= 1007,
+partition 1007 < values) stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1261,7 +1264,8 @@ create table {db_name}{db_suffix}.{table_name} (
   a string primary key,
   b string
 )
-distribute by range(a) split rows (('b'), ('d')) stored as kudu;
+distribute by range(a) (partition values <= 'b', partition 'b' < values <= 'd',
+partition 'd' < values) stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1280,7 +1284,9 @@ DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   int_col int primary key
 )
-distribute by range(int_col) split rows ((2), (4), (6), (8)) stored as kudu;
+distribute by range(int_col) (partition values <= 2, partition 2 < values <= 4,
+partition 4 < values <= 6, partition 6 < values <= 8, partition 8 < values)
+stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1405,14 +1411,17 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/ImpalaDemoDataset/DEC_00_SF3_P077
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
-  id string,
+  id string primary key,
   zip string,
   description1 string,
   description2 string,
-  income int,
-  primary key (id, zip))
-distribute by range(id, zip) split rows (('8600000US01475', '01475'), ('8600000US63121', '63121'), ('8600000US84712', '84712'))
-stored as kudu;
+  income int)
+distribute by range(id)
+(partition values <= '8600000US01475',
+ partition '8600000US01475' < values <= '8600000US63121',
+ partition '8600000US63121' < values <= '8600000US84712',
+ partition '8600000US84712' < values
+) stored as kudu;
 ====
 ---- DATASET
 functional
