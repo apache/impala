@@ -30,6 +30,7 @@ import pytest
 from common import KUDU_MASTER_HOSTS
 from common.test_result_verifier import QueryTestResult
 from tests.common.patterns import is_valid_impala_identifier
+from tests.comparison.db_connection import ImpalaConnection
 from tests.util.filesystem_utils import FILESYSTEM, ISILON_WEBHDFS_PORT
 
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
@@ -246,9 +247,12 @@ def unique_database(request, testid_checksum):
   num_dbs = 1
   fixture_params = getattr(request, 'param', None)
   if fixture_params is not None:
-    if "name_prefix" in fixture_params: db_name_prefix = fixture_params["name_prefix"]
-    if "sync_ddl" in fixture_params: sync_ddl = fixture_params["sync_ddl"]
-    if "num_dbs" in fixture_params: num_dbs = fixture_params["num_dbs"]
+    if "name_prefix" in fixture_params:
+      db_name_prefix = fixture_params["name_prefix"]
+    if "sync_ddl" in fixture_params:
+      sync_ddl = fixture_params["sync_ddl"]
+    if "num_dbs" in fixture_params:
+      num_dbs = fixture_params["num_dbs"]
 
   first_db_name = '{0}_{1}'.format(db_name_prefix, testid_checksum)
   db_names = [first_db_name]
@@ -256,8 +260,8 @@ def unique_database(request, testid_checksum):
     db_names.append(first_db_name + str(i))
   for db_name in db_names:
     if not is_valid_impala_identifier(db_name):
-      raise ValueError('Unique database name "{0}" is not a valid Impala identifer; check '
-                       'test function name or any prefixes for long length or invalid '
+      raise ValueError('Unique database name "{0}" is not a valid Impala identifer; check'
+                       ' test function name or any prefixes for long length or invalid '
                        'characters.'.format(db_name))
 
   def cleanup():
@@ -267,8 +271,8 @@ def unique_database(request, testid_checksum):
       request.instance.execute_query_expect_success(
           request.instance.client, 'DROP DATABASE `{0}` CASCADE'.format(db_name),
           {'sync_ddl': sync_ddl})
-      LOG.info('Dropped database "{0}" for test ID "{1}"'.format(db_name,
-                                                          str(request.node.nodeid)))
+      LOG.info('Dropped database "{0}" for test ID "{1}"'.format(
+          db_name, str(request.node.nodeid)))
 
   request.addfinalizer(cleanup)
 
@@ -282,6 +286,7 @@ def unique_database(request, testid_checksum):
     LOG.info('Created database "{0}" for test ID "{1}"'.format(db_name,
                                                                str(request.node.nodeid)))
   return first_db_name
+
 
 @pytest.yield_fixture
 def kudu_client():
@@ -401,6 +406,7 @@ def cursor(conn):
   with __auto_closed_cursor(conn) as cur:
     yield cur
 
+
 @pytest.yield_fixture(scope="class")
 def cls_cursor(conn):
   """Provides a new DB-API compliant cursor from a connection provided by the conn()
@@ -441,3 +447,20 @@ def __auto_closed_cursor(conn):
       cursor.close()
     except Exception as e:
       LOG.warn("Error closing Impala cursor: %s", e)
+
+
+@pytest.yield_fixture
+def impala_testinfra_cursor():
+  """
+  Return ImpalaCursor object. Used for "tests of tests" for the infra for the query
+  generator, stress test, etc.
+  """
+  # This differs from the cursors above, which return direct Impyla cursors. Tests that
+  # use this fixture want to interact with the objects in
+  # tests.comparison.db_connection, which need testing.
+  with ImpalaConnection() as conn:
+    cursor = conn.cursor()
+    try:
+      yield cursor
+    finally:
+      cursor.close()

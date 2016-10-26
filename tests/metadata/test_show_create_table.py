@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import pprint
+import pytest
 import re
 import shlex
 
@@ -46,8 +47,8 @@ class TestShowCreateTable(ImpalaTestSuite):
     cls.TestMatrix.clear_dimension('exec_option')
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
-    cls.TestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'text' and
+    cls.TestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'text' and
         v.get_value('table_format').compression_codec == 'none')
 
   def test_show_create_table(self, vector, unique_database):
@@ -163,7 +164,8 @@ class TestShowCreateTable(ImpalaTestSuite):
 
   def __remove_properties_maps(self, s):
     """ Removes the tblproperties and serdeproperties from the string """
-    return re.sub(self.__properties_map_regex("WITH SERDEPROPERTIES"), "",
+    return re.sub(
+        self.__properties_map_regex("WITH SERDEPROPERTIES"), "",
         re.sub(self.__properties_map_regex("TBLPROPERTIES"), "", s)).strip()
 
   def __get_properties_map(self, s, properties_map_name):
@@ -194,11 +196,11 @@ class ShowCreateTableTestCase(object):
       self.existing_table = True
       self.show_create_table_sql = remove_comments(test_section['QUERY']).strip()
     elif 'CREATE_TABLE' in test_section:
-      self.__process_create_section(test_section['CREATE_TABLE'], test_file_name,
-          test_db_name, 'table')
+      self.__process_create_section(
+          test_section['CREATE_TABLE'], test_file_name, test_db_name, 'table')
     elif 'CREATE_VIEW' in test_section:
-      self.__process_create_section(test_section['CREATE_VIEW'], test_file_name,
-          test_db_name, 'view')
+      self.__process_create_section(
+          test_section['CREATE_VIEW'], test_file_name, test_db_name, 'view')
     else:
       assert 0, 'Error in test file %s. Test cases require a '\
           'CREATE_TABLE section.\n%s' %\
@@ -225,7 +227,7 @@ class ShowCreateTableTestCase(object):
     if len(tokens) < 3 or tokens[0].lower() != "create":
       assert 0, 'Error in test. Invalid CREATE TABLE statement: %s' % (create_table_sql)
     if tokens[1].lower() != table_type.lower() and \
-      (tokens[1].lower() != "external" or tokens[2].lower() != table_type.lower()):
+       (tokens[1].lower() != "external" or tokens[2].lower() != table_type.lower()):
       assert 0, 'Error in test. Invalid CREATE TABLE statement: %s' % (create_table_sql)
 
     if tokens[1].lower() == "external":
@@ -234,3 +236,48 @@ class ShowCreateTableTestCase(object):
     else:
       # expect a create table table_name ...
       return tokens[2]
+
+
+class TestInfraCompat(ImpalaTestSuite):
+  """
+  This test suite ensures our test infra (qgen, stress) can always properly read the
+  output of "SHOW CREATE TABLE" and find primary keys and updatable columns.
+  """
+
+  TABLE_PRIMARY_KEYS_MAPS = [
+      {'table': 'tpch.customer',
+       'primary_keys': (),
+       'updatable_columns': ()},
+      {'table': 'tpch_kudu.customer',
+       'primary_keys': ('c_custkey',),
+       'updatable_columns': ('c_name', 'c_address', 'c_nationkey', 'c_phone',
+                             'c_acctbal', 'c_mktsegment', 'c_comment')},
+      {'table': 'tpch_kudu.lineitem',
+       'primary_keys': ('l_orderkey', 'l_partkey', 'l_suppkey', 'l_linenumber'),
+       'updatable_columns': ('l_quantity', 'l_extendedprice', 'l_discount', 'l_tax',
+                             'l_returnflag', 'l_linestatus', 'l_shipdate', 'l_commitdate',
+                             'l_receiptdate', 'l_shipinstruct', 'l_shipmode',
+                             'l_comment')}]
+
+  @SkipIf.kudu_not_supported
+  @pytest.mark.parametrize('table_primary_keys_map', TABLE_PRIMARY_KEYS_MAPS)
+  def test_primary_key_parse(self, impala_testinfra_cursor, table_primary_keys_map):
+    """
+    Test the query generator's Impala -> Postgres data migrator's ability to parse primary
+    keys via SHOW CREATE TABLE. If this test fails, update _fetch_primary_key_names, or fix
+    the SHOW CREATE TABLE defect.
+    """
+    assert impala_testinfra_cursor._fetch_primary_key_names(
+        table_primary_keys_map['table']) == table_primary_keys_map['primary_keys']
+
+  @SkipIf.kudu_not_supported
+  @pytest.mark.parametrize('table_primary_keys_map', TABLE_PRIMARY_KEYS_MAPS)
+  def test_load_table_with_primary_key_attr(self, impala_testinfra_cursor,
+                                            table_primary_keys_map):
+    """
+    Test that when we load a table for the query generator that the primary keys are
+    found and stored in the object model.
+    """
+    table = impala_testinfra_cursor.describe_table(table_primary_keys_map['table'])
+    assert table_primary_keys_map['primary_keys'] == table.primary_key_names
+    assert table_primary_keys_map['updatable_columns'] == table.updatable_column_names

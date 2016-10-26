@@ -23,6 +23,7 @@
 '''
 import hashlib
 import impala.dbapi
+import re
 import shelve
 from abc import ABCMeta, abstractmethod
 from contextlib import closing
@@ -39,7 +40,6 @@ from pyparsing import (
     nums,
     Suppress,
     Word)
-from re import compile
 from tempfile import gettempdir
 from threading import Lock
 from time import time
@@ -73,6 +73,7 @@ IMPALA = "IMPALA"
 MYSQL = "MYSQL"
 ORACLE = "ORACLE"
 POSTGRESQL = "POSTGRESQL"
+
 
 class DbCursor(object):
   '''Wraps a DB API 2 cursor to provide access to the related conn. This class
@@ -125,10 +126,10 @@ class DbCursor(object):
 
     return tables
 
-  SQL_TYPE_PATTERN = compile(r'([^()]+)(\((\d+,? ?)*\))?')
+  SQL_TYPE_PATTERN = re.compile(r'([^()]+)(\((\d+,? ?)*\))?')
   TYPE_NAME_ALIASES = \
       dict((type_.name().upper(), type_.name().upper()) for type_ in EXACT_TYPES)
-  TYPES_BY_NAME =  dict((type_.name().upper(), type_) for type_ in EXACT_TYPES)
+  TYPES_BY_NAME = dict((type_.name().upper(), type_) for type_ in EXACT_TYPES)
   EXACT_TYPES_TO_SQL = dict((type_, type_.name().upper()) for type_ in EXACT_TYPES)
 
   @classmethod
@@ -396,11 +397,13 @@ class DbCursor(object):
     raise Exception('unable to parse: {0}, type: {1}'.format(col_name, col_type))
 
   def create_table_from_describe(self, table_name, describe_rows):
+    primary_key_names = self._fetch_primary_key_names(table_name)
     table = Table(table_name.lower())
     for row in describe_rows:
       col_name, data_type = row[:2]
       col_type = self.parse_col_desc(data_type)
       col = self.create_column(col_name, col_type)
+      col.is_primary_key = col_name in primary_key_names
       table.add_col(col)
     return table
 
@@ -526,6 +529,16 @@ class DbCursor(object):
         unique_cols.append(cols)
       table.unique_cols = unique_cols
 
+  def _fetch_primary_key_names(self, table_name):
+    """
+    This must return a tuple of strings representing the primary keys of table_name,
+    or an empty tuple if there are no primary keys.
+    """
+    # This is the base method. Since we haven't tested this on Oracle or Mysql or plan
+    # to implement this for those databases, the base method needs to return an empty
+    # tuple.
+    return ()
+
 
 class DbConnection(object):
 
@@ -558,7 +571,7 @@ class DbConnection(object):
         try:
           unlink(link)
         except OSError as e:
-          if not 'No such file' in str(e):
+          if 'No such file' not in str(e):
             raise e
         try:
           symlink(sql_log_path, link)
@@ -641,6 +654,8 @@ class DbConnection(object):
 
 class ImpalaCursor(DbCursor):
 
+  PK_SEARCH_PATTERN = re.compile('PRIMARY KEY \((?P<keys>.*?)\)')
+
   @classmethod
   def make_insert_sql_from_data(cls, table, rows):
     if not rows:
@@ -672,6 +687,31 @@ class ImpalaCursor(DbCursor):
   @property
   def cluster(self):
     return self.conn.cluster
+
+  def _fetch_primary_key_names(self, table_name):
+    self.execute("SHOW CREATE TABLE {0}".format(table_name))
+    # This returns 1 column with 1 multiline string row, resembling:
+    #
+    # CREATE TABLE db.table (
+    #   pk1 BIGINT,
+    #   pk2 BIGINT,
+    #   col BIGINT,
+    #   PRIMARY KEY (pk1, pk2)
+    # )
+    #
+    # Even a 1-column primary key will be shown as a PRIMARY KEY constraint, like:
+    #
+    # CREATE TABLE db.table (
+    #   pk1 BIGINT,
+    #   col BIGINT,
+    #   PRIMARY KEY (pk1)
+    # )
+    (raw_result,) = self.fetchone()
+    search_result = ImpalaCursor.PK_SEARCH_PATTERN.search(raw_result)
+    if search_result is None:
+      return ()
+    else:
+      return tuple(search_result.group("keys").split(", "))
 
   def invalidate_metadata(self, table_name=None):
     self.execute("INVALIDATE METADATA %s" % (table_name or ""))
@@ -958,6 +998,10 @@ class MySQLConnection(DbConnection):
   PORT = 3306
   USER_NAME = "root"
 
+  def __init__(self, client, conn, db_name=None):
+    DbConnection.__init__(self, client, conn, db_name=db_name)
+    self._session_id = self.execute_and_fetchall('SELECT connection_id()')[0][0]
+
   def _connect(self):
     try:
       import MySQLdb
@@ -972,12 +1016,6 @@ class MySQLConnection(DbConnection):
         passwd=self._password,
         db=self.db_name)
     self._conn.autocommit = True
-
-class MySQLConnection(DbConnection):
-
-  def __init__(self, client, conn, db_name=None):
-    DbConnection.__init__(self, client, conn, db_name=db_name)
-    self._session_id = self.execute_and_fetchall('SELECT connection_id()')[0][0]
 
   @property
   def supports_kill_connection(self):
