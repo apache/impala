@@ -37,7 +37,7 @@ void UdfTestHarness::SetConstantArgs(
     context->SetError("SetConstantArgs() called on non-test FunctionContext");
     return;
   }
-  context->impl()->SetConstantArgs(constant_args);
+  context->impl()->SetConstantArgs(vector<AnyVal*>(constant_args));
 }
 
 void UdfTestHarness::CloseContext(FunctionContext* context) {

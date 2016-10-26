@@ -34,3 +34,10 @@ select trunc_sum(double_col),sum(double_col) from functional_parquet.alltypes wh
 ---- TYPES
 bigint,double
 ====
+---- QUERY
+select arg_is_const(int_col, 1) from functional_parquet.alltypes;
+---- RESULTS
+true
+---- TYPES
+boolean
+====

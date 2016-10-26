@@ -54,6 +54,8 @@ struct JniContext {
   uint8_t output_null_value;
   bool warning_logged;
 
+  /// AnyVal to evaluate the expression into. Only used as temporary storage during
+  /// expression evaluation.
   AnyVal* output_anyval;
 
   JniContext()
@@ -62,13 +64,10 @@ struct JniContext {
       input_nulls_buffer(NULL),
       output_value_buffer(NULL),
       warning_logged(false),
-      output_anyval(NULL) {
-  }
+      output_anyval(NULL) {}
 };
 
-HiveUdfCall::HiveUdfCall(const TExprNode& node)
-  : Expr(node),
-    input_buffer_size_(0) {
+HiveUdfCall::HiveUdfCall(const TExprNode& node) : Expr(node), input_buffer_size_(0) {
   DCHECK_EQ(node.node_type, TExprNodeType::FUNCTION_CALL);
   DCHECK_EQ(node.fn.binary_type, TFunctionBinaryType::JAVA);
   DCHECK(executor_cl_ != NULL) << "Init() was not called!";
@@ -232,8 +231,8 @@ Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
   RETURN_ERROR_IF_EXC(env);
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, jni_ctx->executor, &jni_ctx->executor));
 
-  jni_ctx->output_anyval = CreateAnyVal(type_);
-
+  RETURN_IF_ERROR(AllocateAnyVal(state, ctx->pool_.get(), type_,
+      "Could not allocate JNI output value", &jni_ctx->output_anyval));
   return Status::OK();
 }
 
@@ -264,10 +263,7 @@ void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
         delete[] jni_ctx->output_value_buffer;
         jni_ctx->output_value_buffer = NULL;
       }
-      if (jni_ctx->output_anyval != NULL) {
-        delete jni_ctx->output_anyval;
-        jni_ctx->output_anyval = NULL;
-      }
+      jni_ctx->output_anyval = NULL;
       delete jni_ctx;
     } else {
       DCHECK(!ctx->opened_);

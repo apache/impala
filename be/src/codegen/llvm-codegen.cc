@@ -588,9 +588,19 @@ Value* LlvmCodeGen::GetIntConstant(int num_bytes, uint64_t low_bits, uint64_t hi
   return ConstantInt::get(context(), APInt(8 * num_bytes, vals));
 }
 
+Value* LlvmCodeGen::GetStringConstant(LlvmBuilder* builder, char* data, int len) {
+  // Create a global string with private linkage.
+  Constant* const_string =
+      ConstantDataArray::getString(context(), StringRef(data, len), false);
+  GlobalVariable* gv = new GlobalVariable(
+      *module_, const_string->getType(), true, GlobalValue::PrivateLinkage, const_string);
+  // Get a pointer to the first element of the string.
+  return builder->CreateConstInBoundsGEP2_32(NULL, gv, 0, 0, "");
+}
+
 AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(Function* f, const NamedVariable& var) {
   IRBuilder<> tmp(&f->getEntryBlock(), f->getEntryBlock().begin());
-  AllocaInst* alloca = tmp.CreateAlloca(var.type, 0, var.name.c_str());
+  AllocaInst* alloca = tmp.CreateAlloca(var.type, NULL, var.name.c_str());
   if (var.type == GetType(CodegenAnyVal::LLVM_DECIMALVAL_NAME)) {
     // Generated functions may manipulate DecimalVal arguments via SIMD instructions such
     // as 'movaps' that require 16-byte memory alignment. LLVM uses 8-byte alignment by
@@ -600,10 +610,20 @@ AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(Function* f, const NamedVariable
   return alloca;
 }
 
+AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(
+    const LlvmBuilder& builder, Type* type, const char* name) {
+  return CreateEntryBlockAlloca(
+      builder.GetInsertBlock()->getParent(), NamedVariable(name, type));
+}
+
 AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(const LlvmBuilder& builder, Type* type,
-                                                const char* name) {
-  return CreateEntryBlockAlloca(builder.GetInsertBlock()->getParent(),
-                                NamedVariable(name, type));
+    int num_entries, int alignment, const char* name) {
+  Function* fn = builder.GetInsertBlock()->getParent();
+  IRBuilder<> tmp(&fn->getEntryBlock(), fn->getEntryBlock().begin());
+  AllocaInst* alloca =
+      tmp.CreateAlloca(type, GetIntConstant(TYPE_INT, num_entries), name);
+  alloca->setAlignment(alignment);
+  return alloca;
 }
 
 void LlvmCodeGen::CreateIfElseBlocks(Function* fn, const string& if_name,
@@ -1237,7 +1257,8 @@ Value* LlvmCodeGen::CodegenAllocate(LlvmBuilder* builder, MemPool* pool, Value* 
   Function* allocate_fn = GetFunction(IRFunction::MEMPOOL_ALLOCATE, false);
   PointerType* pool_type = GetPtrType(MemPool::LLVM_CLASS_NAME);
   Value* pool_val = CastPtrToLlvmPtr(pool_type, pool);
-  Value* fn_args[] = { pool_val, size };
+  Value* alignment = GetIntConstant(TYPE_INT, MemPool::DEFAULT_ALIGNMENT);
+  Value* fn_args[] = {pool_val, size, alignment};
   return builder->CreateCall(allocate_fn, fn_args, name);
 }
 

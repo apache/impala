@@ -29,10 +29,8 @@
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
-#include "exprs/anyval-util.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
 #include "exprs/aggregate-functions.h"
+#include "exprs/anyval-util.h"
 #include "exprs/bit-byte-functions.h"
 #include "exprs/case-expr.h"
 #include "exprs/cast-functions.h"
@@ -40,6 +38,8 @@
 #include "exprs/conditional-functions.h"
 #include "exprs/decimal-functions.h"
 #include "exprs/decimal-operators.h"
+#include "exprs/expr-context.h"
+#include "exprs/expr.h"
 #include "exprs/hive-udf-call.h"
 #include "exprs/in-predicate.h"
 #include "exprs/is-not-empty-predicate.h"
@@ -56,15 +56,16 @@
 #include "exprs/tuple-is-null-predicate.h"
 #include "exprs/udf-builtins.h"
 #include "exprs/utility-functions.h"
-#include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/Data_types.h"
+#include "gen-cpp/Exprs_types.h"
 #include "runtime/lib-cache.h"
-#include "runtime/runtime-state.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
-#include "runtime/tuple.h"
+#include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
-#include "udf/udf.h"
+#include "runtime/tuple.h"
 #include "udf/udf-internal.h"
+#include "udf/udf.h"
 
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/ImpalaService_types.h"
@@ -526,63 +527,69 @@ void Expr::InitBuiltinsDummy() {
   UtilityFunctions::Pid(NULL);
 }
 
-AnyVal* Expr::GetConstVal(ExprContext* context) {
+Status Expr::GetConstVal(RuntimeState* state, ExprContext* context, AnyVal** const_val) {
   DCHECK(context->opened_);
-  if (!IsConstant()) return NULL;
-  if (constant_val_.get() != NULL) return constant_val_.get();
+  if (!IsConstant()) {
+    *const_val = NULL;
+    return Status::OK();
+  }
 
+  RETURN_IF_ERROR(AllocateAnyVal(state, context->pool_.get(), type_,
+      "Could not allocate constant expression value", const_val));
   switch (type_.type) {
-    case TYPE_BOOLEAN: {
-      constant_val_.reset(new BooleanVal(GetBooleanVal(context, NULL)));
+    case TYPE_BOOLEAN:
+      *reinterpret_cast<BooleanVal*>(*const_val) = GetBooleanVal(context, NULL);
       break;
-    }
-    case TYPE_TINYINT: {
-      constant_val_.reset(new TinyIntVal(GetTinyIntVal(context, NULL)));
+    case TYPE_TINYINT:
+      *reinterpret_cast<TinyIntVal*>(*const_val) = GetTinyIntVal(context, NULL);
       break;
-    }
-    case TYPE_SMALLINT: {
-      constant_val_.reset(new SmallIntVal(GetSmallIntVal(context, NULL)));
+    case TYPE_SMALLINT:
+      *reinterpret_cast<SmallIntVal*>(*const_val) = GetSmallIntVal(context, NULL);
       break;
-    }
-    case TYPE_INT: {
-      constant_val_.reset(new IntVal(GetIntVal(context, NULL)));
+    case TYPE_INT:
+      *reinterpret_cast<IntVal*>(*const_val) = GetIntVal(context, NULL);
       break;
-    }
-    case TYPE_BIGINT: {
-      constant_val_.reset(new BigIntVal(GetBigIntVal(context, NULL)));
+    case TYPE_BIGINT:
+      *reinterpret_cast<BigIntVal*>(*const_val) = GetBigIntVal(context, NULL);
       break;
-    }
-    case TYPE_FLOAT: {
-      constant_val_.reset(new FloatVal(GetFloatVal(context, NULL)));
+    case TYPE_FLOAT:
+      *reinterpret_cast<FloatVal*>(*const_val) = GetFloatVal(context, NULL);
       break;
-    }
-    case TYPE_DOUBLE: {
-      constant_val_.reset(new DoubleVal(GetDoubleVal(context, NULL)));
+    case TYPE_DOUBLE:
+      *reinterpret_cast<DoubleVal*>(*const_val) = GetDoubleVal(context, NULL);
       break;
-    }
     case TYPE_STRING:
     case TYPE_CHAR:
     case TYPE_VARCHAR: {
-      constant_val_.reset(new StringVal(GetStringVal(context, NULL)));
+      StringVal* sv = reinterpret_cast<StringVal*>(*const_val);
+      *sv = GetStringVal(context, NULL);
+      if (sv->len > 0) {
+        // Make sure the memory is owned by 'context'.
+        uint8_t* ptr_copy = context->pool_->TryAllocate(sv->len);
+        if (ptr_copy == NULL) {
+          return context->pool_->mem_tracker()->MemLimitExceeded(
+              state, "Could not allocate constant string value", sv->len);
+        }
+        memcpy(ptr_copy, sv->ptr, sv->len);
+        sv->ptr = ptr_copy;
+      }
       break;
     }
-    case TYPE_TIMESTAMP: {
-      constant_val_.reset(new TimestampVal(GetTimestampVal(context, NULL)));
+    case TYPE_TIMESTAMP:
+      *reinterpret_cast<TimestampVal*>(*const_val) = GetTimestampVal(context, NULL);
       break;
-    }
-    case TYPE_DECIMAL: {
-      constant_val_.reset(new DecimalVal(GetDecimalVal(context, NULL)));
+    case TYPE_DECIMAL:
+      *reinterpret_cast<DecimalVal*>(*const_val) = GetDecimalVal(context, NULL);
       break;
-    }
     default:
       DCHECK(false) << "Type not implemented: " << type();
   }
-  DCHECK(constant_val_.get() != NULL);
-  return constant_val_.get();
+  // Errors may have been set during the GetConstVal() call.
+  return GetFnContextError(context);
 }
 
 int Expr::GetConstantInt(const FunctionContext::TypeDesc& return_type,
-      const std::vector<FunctionContext::TypeDesc>& arg_types, ExprConstant c, int i) {
+    const std::vector<FunctionContext::TypeDesc>& arg_types, ExprConstant c, int i) {
   switch (c) {
     case RETURN_TYPE_SIZE:
       DCHECK_EQ(i, -1);

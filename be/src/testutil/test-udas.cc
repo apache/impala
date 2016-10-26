@@ -117,3 +117,16 @@ const DoubleVal TruncSumSerialize(FunctionContext* context, const DoubleVal& tot
 BigIntVal TruncSumFinalize(FunctionContext* context, const DoubleVal& total) {
   return BigIntVal(static_cast<int64_t>(total.val));
 }
+
+// Defines aggregate function for testing constant argument handling. The UDA returns
+// true if its second argument is constant for all calls to Update().
+void ArgIsConstInit(FunctionContext* context, BooleanVal* is_const) {
+  *is_const = BooleanVal(context->IsArgConstant(1));
+}
+
+void ArgIsConstUpdate(FunctionContext* context, const IntVal& val,
+    const IntVal& const_arg, BooleanVal* is_const) {}
+
+void ArgIsConstMerge(FunctionContext* context, const BooleanVal& src, BooleanVal* dst) {
+  dst->val |= src.val;
+}

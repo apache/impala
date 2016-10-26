@@ -36,6 +36,7 @@ const int MemPool::INITIAL_CHUNK_SIZE;
 const int MemPool::MAX_CHUNK_SIZE;
 
 const char* MemPool::LLVM_CLASS_NAME = "class.impala::MemPool";
+const int MemPool::DEFAULT_ALIGNMENT;
 uint32_t MemPool::zero_length_region_ = MEM_POOL_POISON;
 
 MemPool::MemPool(MemTracker* mem_tracker)
@@ -101,8 +102,6 @@ void MemPool::FreeAll() {
 }
 
 bool MemPool::FindChunk(int64_t min_size, bool check_limits) noexcept {
-  DCHECK(current_chunk_idx_ == -1 || chunks_[current_chunk_idx_].size <
-      chunks_[current_chunk_idx_].allocated_bytes + min_size);
   // Try to allocate from a free chunk. We may have free chunks after the current chunk
   // if Clear() was called. The current chunk may be free if ReturnPartialAllocation()
   // was called. The first free chunk (if there is one) can therefore be either the
@@ -133,7 +132,8 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) noexcept {
 
   if (FLAGS_disable_mem_pools) {
     // Disable pooling by sizing the chunk to fit only this allocation.
-    chunk_size = min_size;
+    // Make sure the alignment guarantees are respected.
+    chunk_size = std::max<int64_t>(min_size, sizeof(std::max_align_t));
   } else {
     DCHECK_GE(next_chunk_size_, INITIAL_CHUNK_SIZE);
     chunk_size = max<int64_t>(min_size, next_chunk_size_);

@@ -253,14 +253,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     needs_serialize_ |= aggregate_evaluators_[i]->SupportsSerialize();
   }
 
-  if (grouping_expr_ctxs_.empty()) {
-    // Create single output tuple; we need to output something even if our input is empty.
-    singleton_output_tuple_ =
-        ConstructSingletonOutputTuple(agg_fn_ctxs_, mem_pool_.get());
-    // Check for failures during AggFnEvaluator::Init().
-    RETURN_IF_ERROR(state_->GetQueryStatus());
-    singleton_output_tuple_returned_ = false;
-  } else {
+  if (!grouping_expr_ctxs_.empty()) {
     RETURN_IF_ERROR(HashTableCtx::Create(state, build_expr_ctxs_, grouping_expr_ctxs_,
         true, vector<bool>(build_expr_ctxs_.size(), true), state->fragment_hash_seed(),
         MAX_PARTITION_DEPTH, 1, mem_tracker(), &ht_ctx_));
@@ -312,6 +305,16 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   DCHECK_EQ(aggregate_evaluators_.size(), agg_fn_ctxs_.size());
   for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
     RETURN_IF_ERROR(aggregate_evaluators_[i]->Open(state, agg_fn_ctxs_[i]));
+  }
+
+  if (grouping_expr_ctxs_.empty()) {
+    // Create the single output tuple for this non-grouping agg. This must happen after
+    // opening the aggregate evaluators.
+    singleton_output_tuple_ =
+        ConstructSingletonOutputTuple(agg_fn_ctxs_, mem_pool_.get());
+    // Check for failures during AggFnEvaluator::Init().
+    RETURN_IF_ERROR(state_->GetQueryStatus());
+    singleton_output_tuple_returned_ = false;
   }
 
   RETURN_IF_ERROR(children_[0]->Open(state));
@@ -673,14 +676,7 @@ void PartitionedAggregationNode::CleanupHashTbl(
 
 Status PartitionedAggregationNode::Reset(RuntimeState* state) {
   DCHECK(!is_streaming_preagg_) << "Cannot reset preaggregation";
-  if (grouping_expr_ctxs_.empty()) {
-    // Re-create the single output tuple for this non-grouping agg.
-    singleton_output_tuple_ =
-        ConstructSingletonOutputTuple(agg_fn_ctxs_, mem_pool_.get());
-    // Check for failures during AggFnEvaluator::Init().
-    RETURN_IF_ERROR(state_->GetQueryStatus());
-    singleton_output_tuple_returned_ = false;
-  } else {
+  if (!grouping_expr_ctxs_.empty()) {
     child_eos_ = false;
     partition_eos_ = false;
     // Reset the HT and the partitions for this grouping agg.

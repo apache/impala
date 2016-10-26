@@ -359,11 +359,16 @@ class LlvmCodeGen {
   /// struct allocated.  The allocated variable is scoped to the function.
   //
   /// This should always be used instead of calling LlvmBuilder::CreateAlloca directly.
-  /// LLVM doesn't optimize alloca's occuring in the middle of functions very well (e.g, an
-  /// alloca may end up in a loop, potentially blowing the stack).
+  /// LLVM doesn't optimize alloca's occurring in the middle of functions very well (e.g,
+  /// an alloca may end up in a loop, potentially blowing the stack).
   llvm::AllocaInst* CreateEntryBlockAlloca(llvm::Function* f, const NamedVariable& var);
+  llvm::AllocaInst* CreateEntryBlockAlloca(
+      const LlvmBuilder& builder, llvm::Type* type, const char* name = "");
+
+  /// Same as above, except allocates an array of 'type' with 'num_entries' entries
+  /// and alignment 'alignment'.
   llvm::AllocaInst* CreateEntryBlockAlloca(const LlvmBuilder& builder, llvm::Type* type,
-                                           const char* name = "");
+      int num_entries, int alignment, const char* name = "");
 
   /// Utility to create two blocks in 'fn' for if/else codegen.  if_block and else_block
   /// are return parameters.  insert_before is optional and if set, the two blocks
@@ -387,6 +392,9 @@ class LlvmCodeGen {
   /// values less than or equal to 64-bits, 'high_bits' is not used. This function
   /// can generate constant up to 128-bit wide. 'byte_size' must be power of 2.
   llvm::Value* GetIntConstant(int byte_size, uint64_t low_bits, uint64_t high_bits);
+
+  /// Initialise a constant global string and returns an i8* pointer to it.
+  llvm::Value* GetStringConstant(LlvmBuilder* builder, char* data, int len);
 
   /// Returns true/false constants (bool type)
   llvm::Value* true_value() { return true_value_; }

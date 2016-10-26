@@ -15,15 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_UDF_UDF_INTERNAL_H
 #define IMPALA_UDF_UDF_INTERNAL_H
 
-#include <boost/cstdint.hpp>
+#include <string.h>
 #include <map>
 #include <string>
-#include <string.h>
+#include <utility>
 #include <vector>
+#include <boost/cstdint.hpp>
 
 /// Be very careful when adding Impala includes in this file. We don't want to pull
 /// in unnecessary dependencies for the development libs.
@@ -31,14 +31,15 @@
 
 namespace impala {
 
-#define RETURN_IF_NULL(ctx, ptr) \
-  do { \
-    if (UNLIKELY(ptr == NULL)) { \
+#define RETURN_IF_NULL(ctx, ptr)                            \
+  do {                                                      \
+    if (UNLIKELY(ptr == NULL)) {                            \
       DCHECK(!ctx->impl()->state()->GetQueryStatus().ok()); \
-      return; \
-    } \
+      return;                                               \
+    }                                                       \
   } while (false)
 
+class Expr;
 class FreePool;
 class MemPool;
 class RuntimeState;
@@ -71,7 +72,8 @@ class FunctionContextImpl {
 
   /// Returns a new FunctionContext with the same constant args, fragment-local state, and
   /// debug flag as this FunctionContext. The caller is responsible for calling delete on
-  /// it.
+  /// it. The cloned FunctionContext cannot be used after the original FunctionContext is
+  /// destroyed because it may reference fragment-local state from the original.
   impala_udf::FunctionContext* Clone(MemPool* pool);
 
   /// Allocates a buffer of 'byte_size' with "local" memory management.
@@ -90,8 +92,21 @@ class FunctionContextImpl {
   /// Returns true if there are any allocations returned by AllocateLocal().
   bool HasLocalAllocations() const { return !local_allocations_.empty(); }
 
-  /// Sets constant_args_. The AnyVal* values are owned by the caller.
-  void SetConstantArgs(const std::vector<impala_udf::AnyVal*>& constant_args);
+  /// Sets the constant arg list. The vector should contain one entry per argument,
+  /// with a non-NULL entry if the argument is constant. The AnyVal* values are
+  /// owned by the caller and must be allocated from the ExprContext's MemPool.
+  void SetConstantArgs(std::vector<impala_udf::AnyVal*>&& constant_args);
+
+  /// Sets the non-constant args. Contains one entry per non-constant argument. All
+  /// pointers should be non-NULL. The Expr* and AnyVal* values are owned by the caller.
+  /// The AnyVal* values must be allocated from the ExprContext's MemPool.
+  void SetNonConstantArgs(
+      std::vector<std::pair<Expr*, impala_udf::AnyVal*>>&& non_constant_args);
+
+  const std::vector<impala_udf::AnyVal*>& constant_args() const { return constant_args_; }
+  const std::vector<std::pair<Expr*, impala_udf::AnyVal*>>& non_constant_args() const {
+    return non_constant_args_;
+  }
 
   uint8_t* varargs_buffer() { return varargs_buffer_; }
 
@@ -111,6 +126,9 @@ class FunctionContextImpl {
     return arg_types_;
   }
 
+  // UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'
+  // that require 16-byte memory alignment.
+  static const int VARARGS_BUFFER_ALIGNMENT = 16;
   static const char* LLVM_FUNCTIONCONTEXT_NAME;
 
   RuntimeState* state() { return state_; }
@@ -127,10 +145,8 @@ class FunctionContextImpl {
   bool CheckAllocResult(const char* fn_name, uint8_t* buf, int64_t byte_size);
 
   /// Preallocated buffer for storing varargs (if the function has any). Allocated and
-  /// owned by this object, but populated by an Expr function.
-  //
-  /// This is the first field in the class so it's easy to access in codegen'd functions.
-  /// Don't move it or add fields above unless you know what you're doing.
+  /// owned by this object, but populated by an Expr function. The buffer is interpreted
+  /// as an array of the appropriate AnyVal subclass.
   uint8_t* varargs_buffer_;
   int varargs_buffer_size_;
 
@@ -186,13 +202,20 @@ class FunctionContextImpl {
 
   /// Contains an AnyVal* for each argument of the function. If the AnyVal* is NULL,
   /// indicates that the corresponding argument is non-constant. Otherwise contains the
-  /// value of the argument.
+  /// value of the argument. The AnyVal* objects and associated data are owned by the
+  /// ExprContext provided when opening the FRAGMENT_LOCAL expression contexts.
   std::vector<impala_udf::AnyVal*> constant_args_;
 
-  /// Used by ScalarFnCall to store the arguments when running without codegen. Allows us
-  /// to pass AnyVal* arguments to the scalar function directly, rather than codegening a
-  /// call that passes the correct AnyVal subclass pointer type. Note that this is only
-  /// used for non-variadic arguments; varargs are always stored in varargs_buffer_.
+  /// Vector of all non-constant children expressions that need to be evaluated for
+  /// each input row. The first element of each pair is the child expression and the
+  /// second element is the value it must be evaluated into.
+  std::vector<std::pair<Expr*, impala_udf::AnyVal*>> non_constant_args_;
+
+  /// Used by ScalarFnCall to temporarily store arguments for a UDF when running without
+  /// codegen. Allows us to pass AnyVal* arguments to the scalar function directly,
+  /// rather than codegening a call that passes the correct AnyVal subclass pointer type.
+  /// Note that this is only used for non-variadic arguments; varargs are always stored
+  /// in varargs_buffer_.
   std::vector<impala_udf::AnyVal*> staging_input_vals_;
 
   /// Indicates whether this context has been closed. Used for verification/debugging.

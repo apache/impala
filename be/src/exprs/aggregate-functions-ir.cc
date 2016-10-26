@@ -186,7 +186,7 @@ void AggregateFunctions::InitZero(FunctionContext*, T* dst) {
 template<>
 void AggregateFunctions::InitZero(FunctionContext*, DecimalVal* dst) {
   dst->is_null = false;
-  dst->val16 = 0;
+  dst->val16 = 0; // Also initializes val4 and val8 to 0.
 }
 
 template <typename T>
@@ -1026,6 +1026,8 @@ bool SampleValLess(const ReservoirSample<StringVal>& i,
 template <>
 bool SampleValLess(const ReservoirSample<DecimalVal>& i,
     const ReservoirSample<DecimalVal>& j) {
+  // Also handles val4 and val8 - the DecimalVal memory layout ensures the least
+  // significant bits overlap in memory.
   return i.val.val16 < j.val.val16;
 }
 
@@ -1091,6 +1093,8 @@ void PrintSample(const ReservoirSample<StringVal>& v, ostream* os) {
 
 template <>
 void PrintSample(const ReservoirSample<DecimalVal>& v, ostream* os) {
+  // Also handles val4 and val8 - the DecimalVal memory layout ensures the least
+  // significant bits overlap in memory.
   *os << v.val.val16;
 }
 

@@ -21,9 +21,9 @@
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
+#include "gen-cpp/Exprs_types.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
-#include "gen-cpp/Exprs_types.h"
 
 #include "common/names.h"
 
@@ -414,7 +414,8 @@ Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
     case TYPE_VARCHAR:
     case TYPE_CHAR:
       v.SetLen(builder.getInt32(value_.string_val.len));
-      v.SetPtr(codegen->CastPtrToLlvmPtr(codegen->ptr_type(), value_.string_val.ptr));
+      v.SetPtr(codegen->GetStringConstant(
+          &builder, value_.string_val.ptr, value_.string_val.len));
       break;
     case TYPE_DECIMAL:
       switch (type().GetByteSize()) {

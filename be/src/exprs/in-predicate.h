@@ -28,33 +28,32 @@
 
 namespace impala {
 
-/// Predicate for evaluating expressions of the form "val [NOT] IN (x1, x2, x3...)".
-//
+/// Utilities for evaluating expressions of the form "val [NOT] IN (x1, x2, x3...)".
+/// In predicates are implemented using ScalarFnCall and the UDF interface.
+///
 /// There are two strategies for evaluating the IN predicate:
 //
-/// 1) SET_LOOKUP: This strategy is for when all the values in the IN list are constant. In
-///    the prepare function, we create a set of the constant values from the IN list, and
-///    use this set to lookup a given 'val'.
+/// 1) SET_LOOKUP: This strategy is for when all the values in the IN list are constant.
+///    In the prepare function, we create a set of the constant values from the IN list,
+///    and use this set to lookup a given 'val'.
 //
-/// 2) ITERATE: This is the fallback strategy for when their are non-constant IN list
+/// 2) ITERATE: This is the fallback strategy for when there are non-constant IN list
 ///    values, or very few values in the IN list. We simply iterate through every
 ///    expression and compare it to val. This strategy has no prepare function.
 //
-/// The FE chooses which strategy we should use by choosing the appropriate function (e.g.,
-/// InIterate() or InSetLookup()). If it chooses SET_LOOKUP, it also sets the appropriate
-/// SetLookupPrepare and SetLookupClose functions.
-//
-/// TODO: the set lookup logic is not yet implemented for TimestampVals or DecimalVals
-class InPredicate : public Predicate {
+/// The FE chooses which strategy we should use by choosing the appropriate function
+/// (e.g., InIterate() or InSetLookup()). If it chooses SET_LOOKUP, it also sets the
+/// appropriate SetLookupPrepare and SetLookupClose functions.
+class InPredicate {
  public:
   /// Functions for every type
-  static impala_udf::BooleanVal InIterate(
-      impala_udf::FunctionContext* context, const impala_udf::BooleanVal& val,
-      int num_args, const impala_udf::BooleanVal* args);
+  static impala_udf::BooleanVal InIterate(impala_udf::FunctionContext* context,
+      const impala_udf::BooleanVal& val, int num_args,
+      const impala_udf::BooleanVal* args);
 
-  static impala_udf::BooleanVal NotInIterate(
-      impala_udf::FunctionContext* context, const impala_udf::BooleanVal& val,
-      int num_args, const impala_udf::BooleanVal* args);
+  static impala_udf::BooleanVal NotInIterate(impala_udf::FunctionContext* context,
+      const impala_udf::BooleanVal& val, int num_args,
+      const impala_udf::BooleanVal* args);
 
   static void SetLookupPrepare_boolean(impala_udf::FunctionContext* ctx,
       impala_udf::FunctionContext::FunctionStateScope scope);

@@ -49,15 +49,22 @@ TEST(MemPoolTest, Basic) {
   MemPool p2(&tracker);
   MemPool p3(&tracker);
 
+  uint8_t* ptr = NULL;
+
   for (int iter = 0; iter < 2; ++iter) {
-    // allocate a total of 24K in 32-byte pieces (for which we only request 25 bytes)
+    // Allocate 768 25 + 7 byte allocations.
     for (int i = 0; i < 768; ++i) {
-      // pads to 32 bytes
-      p.Allocate(25);
+      ptr = p.Allocate(25);
+      EXPECT_TRUE(ptr != NULL);
+      EXPECT_EQ(0, reinterpret_cast<uintptr_t>(ptr) % MemPool::DEFAULT_ALIGNMENT)
+          << "Allocation should be aligned";
+
+      // Allocate the padding to get 32 bytes
+      ptr = p.TryAllocateAligned(7, 1);
+      EXPECT_TRUE(ptr != NULL);
     }
-    // we handed back 24K
+    // We allocated 24K from 28K of chunks (4, 8, 16)
     EXPECT_EQ(24 * 1024, p.total_allocated_bytes());
-    // .. and allocated 28K of chunks (4, 8, 16)
     EXPECT_EQ(28 * 1024, p.GetTotalChunkSizes());
 
     // we're passing on the first two chunks, containing 12K of data; we're left with
@@ -133,7 +140,7 @@ TEST(MemPoolTest, Basic) {
   }
 
   // Test zero byte allocation.
-  uint8_t* ptr = p.Allocate(0);
+  ptr = p.Allocate(0);
   EXPECT_TRUE(ptr != NULL);
   EXPECT_EQ(0, p.GetTotalChunkSizes());
 }
@@ -487,6 +494,24 @@ TEST(MemPoolTest, ReturnAllocationThenFailedAllocation) {
   src.FreeAll();
 }
 
+TEST(MemPoolTest, TryAllocateAligned) {
+  MemTracker tracker(-1);
+  MemPool pool(&tracker);
+  int alignment = 1;
+  int64_t size = 1;
+  constexpr int NUM_ALLOCATIONS = 100000;
+  constexpr int MAX_ALLOCATION_SIZE = 113;
+
+  for (int i = 0; i < NUM_ALLOCATIONS; ++i) {
+    uint8_t* ptr = pool.TryAllocateAligned(size, alignment);
+    ASSERT_TRUE(ptr != NULL);
+    ASSERT_EQ(0, reinterpret_cast<uintptr_t>(ptr) % alignment);
+    alignment = alignment == sizeof(std::max_align_t) ? 1 : alignment * 2;
+    size = (size + 1) % MAX_ALLOCATION_SIZE;
+  }
+
+  pool.FreeAll();
+}
 }
 
 IMPALA_TEST_MAIN();

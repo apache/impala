@@ -329,6 +329,7 @@ returns decimal(9,2) location '{location}' update_fn='SumSmallDecimalUpdate';
   # Create test UDA functions in {database} from library {location}
   create_test_udas_template = """
 drop function if exists {database}.trunc_sum(double);
+drop function if exists {database}.arg_is_const(int, int);
 
 create database if not exists {database};
 
@@ -336,6 +337,10 @@ create aggregate function {database}.trunc_sum(double)
 returns bigint intermediate double location '{location}'
 update_fn='TruncSumUpdate' merge_fn='TruncSumMerge'
 serialize_fn='TruncSumSerialize' finalize_fn='TruncSumFinalize';
+
+create aggregate function {database}.arg_is_const(int, int)
+returns boolean location '{location}'
+init_fn='ArgIsConstInit' update_fn='ArgIsConstUpdate' merge_fn='ArgIsConstMerge';
 """
 
   # Create test UDF functions in {database} from library {location}

@@ -45,14 +45,22 @@
 using namespace impala;
 using namespace impala_udf;
 using namespace strings;
+using llvm::ArrayType;
+using llvm::BasicBlock;
+using llvm::Function;
+using llvm::GlobalVariable;
+using llvm::PointerType;
+using llvm::Type;
+using llvm::Value;
+using std::move;
+using std::pair;
 
 // Maximum number of arguments the interpretation path supports.
 #define MAX_INTERP_ARGS 20
 
 ScalarFnCall::ScalarFnCall(const TExprNode& node)
   : Expr(node),
-    vararg_start_idx_(node.__isset.vararg_start_idx ?
-        node.vararg_start_idx : -1),
+    vararg_start_idx_(node.__isset.vararg_start_idx ? node.vararg_start_idx : -1),
     scalar_fn_wrapper_(NULL),
     prepare_fn_(NULL),
     close_fn_(NULL),
@@ -84,17 +92,8 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
     has_char_arg_or_result |= children_[i]->type_.type == TYPE_CHAR;
   }
 
-  // Compute buffer size for varargs
-  int varargs_buffer_size = 0;
-  if (vararg_start_idx_ != -1) {
-    DCHECK_GT(GetNumChildren(), vararg_start_idx_);
-    for (int i = vararg_start_idx_; i < GetNumChildren(); ++i) {
-      varargs_buffer_size += AnyValUtil::AnyValSize(children_[i]->type());
-    }
-  }
-
-  fn_context_index_ = context->Register(state, return_type, arg_types,
-      varargs_buffer_size);
+  fn_context_index_ =
+      context->Register(state, return_type, arg_types, ComputeVarArgsBufferSize());
 
   // Use the interpreted path and call the builtin without codegen if:
   // 1. codegen is disabled or
@@ -149,7 +148,7 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
       RETURN_IF_ERROR(codegen->LinkModule(local_path));
     }
 
-    llvm::Function* ir_udf_wrapper;
+    Function* ir_udf_wrapper;
     RETURN_IF_ERROR(GetCodegendComputeFn(codegen, &ir_udf_wrapper));
     // TODO: don't do this for child exprs
     codegen->AddFunctionToJit(ir_udf_wrapper, &scalar_fn_wrapper_);
@@ -177,23 +176,52 @@ Status ScalarFnCall::Open(RuntimeState* state, ExprContext* ctx,
     // We're in the interpreted path (i.e. no JIT). Populate our FunctionContext's
     // staging_input_vals, which will be reused across calls to scalar_fn_.
     DCHECK(scalar_fn_wrapper_ == NULL);
-    ObjectPool* obj_pool = state->obj_pool();
     vector<AnyVal*>* input_vals = fn_ctx->impl()->staging_input_vals();
     for (int i = 0; i < NumFixedArgs(); ++i) {
-      input_vals->push_back(CreateAnyVal(obj_pool, children_[i]->type()));
+      AnyVal* input_val;
+      RETURN_IF_ERROR(AllocateAnyVal(state, ctx->pool_.get(), children_[i]->type(),
+          "Could not allocate expression value", &input_val));
+      input_vals->push_back(input_val);
     }
   }
 
-  // Only evaluate constant arguments once per fragment
+  // Only evaluate constant arguments at the top level of function contexts.
+  // If 'ctx' was cloned, the constant values were copied from the parent.
   if (scope == FunctionContext::FRAGMENT_LOCAL) {
     vector<AnyVal*> constant_args;
     for (int i = 0; i < children_.size(); ++i) {
-      constant_args.push_back(children_[i]->GetConstVal(ctx));
-      // Check if any errors were set during the GetConstVal() call
-      Status child_status = children_[i]->GetFnContextError(ctx);
-      if (!child_status.ok()) return child_status;
+      AnyVal* const_val;
+      RETURN_IF_ERROR(children_[i]->GetConstVal(state, ctx, &const_val));
+      constant_args.push_back(const_val);
     }
-    fn_ctx->impl()->SetConstantArgs(constant_args);
+    fn_ctx->impl()->SetConstantArgs(move(constant_args));
+  }
+
+  if (scalar_fn_ != NULL) {
+    // Now we have the constant values, cache them so that the interpreted path can
+    // call the UDF without reevaluating the arguments. 'staging_input_vals' and
+    // 'varargs_buffer' in the FunctionContext are used to pass fixed and variable-length
+    // arguments respectively. 'non_constant_args()' in the FunctionContext will contain
+    // pointers to the remaining (non-constant) children that are evaluated for every row.
+    vector<pair<Expr*, AnyVal*>> non_constant_args;
+    uint8_t* varargs_buffer = fn_ctx->impl()->varargs_buffer();
+    for (int i = 0; i < children_.size(); ++i) {
+      AnyVal* input_arg;
+      int arg_bytes = AnyValUtil::AnyValSize(children_[i]->type());
+      if (i < NumFixedArgs()) {
+        input_arg = (*fn_ctx->impl()->staging_input_vals())[i];
+      } else {
+        input_arg = reinterpret_cast<AnyVal*>(varargs_buffer);
+        varargs_buffer += arg_bytes;
+      }
+      const AnyVal* constant_arg = fn_ctx->impl()->constant_args()[i];
+      if (constant_arg == NULL) {
+        non_constant_args.emplace_back(children_[i], input_arg);
+      } else {
+        memcpy(input_arg, constant_arg, arg_bytes);
+      }
+    }
+    fn_ctx->impl()->SetNonConstantArgs(move(non_constant_args));
   }
 
   if (prepare_fn_ != NULL) {
@@ -264,7 +292,7 @@ bool ScalarFnCall::IsConstant() const {
 //        i32 4,
 //        i64* inttoptr (i64 89111072 to i64*))
 //   ret { i8, double } %result
-Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
+Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK();
@@ -279,62 +307,56 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function**
     }
   }
 
-  llvm::Function* udf;
+  Function* udf;
   RETURN_IF_ERROR(GetUdf(codegen, &udf));
 
   // Create wrapper that computes args and calls UDF
   stringstream fn_name;
   fn_name << udf->getName().str() << "Wrapper";
 
-  llvm::Value* args[2];
+  Value* args[2];
   *fn = CreateIrFunctionPrototype(codegen, fn_name.str(), &args);
-  llvm::Value* expr_ctx = args[0];
-  llvm::Value* row = args[1];
-  llvm::BasicBlock* block = llvm::BasicBlock::Create(codegen->context(), "entry", *fn);
+  Value* expr_ctx = args[0];
+  Value* row = args[1];
+  BasicBlock* block = BasicBlock::Create(codegen->context(), "entry", *fn);
   LlvmCodeGen::LlvmBuilder builder(block);
 
   // Populate UDF arguments
-  vector<llvm::Value*> udf_args;
+  vector<Value*> udf_args;
 
   // First argument is always FunctionContext*.
   // Index into our registered offset in the ExprContext.
-  llvm::Value* expr_ctx_gep = builder.CreateStructGEP(NULL, expr_ctx, 1, "expr_ctx_gep");
-  llvm::Value* fn_ctxs_base = builder.CreateLoad(expr_ctx_gep, "fn_ctxs_base");
+  Value* expr_ctx_gep = builder.CreateStructGEP(NULL, expr_ctx, 1, "expr_ctx_gep");
+  Value* fn_ctxs_base = builder.CreateLoad(expr_ctx_gep, "fn_ctxs_base");
   // Use GEP to add our index to the base pointer
-  llvm::Value* fn_ctx_ptr =
+  Value* fn_ctx_ptr =
       builder.CreateConstGEP1_32(fn_ctxs_base, fn_context_index_, "fn_ctx_ptr");
-  llvm::Value* fn_ctx = builder.CreateLoad(fn_ctx_ptr, "fn_ctx");
+  Value* fn_ctx = builder.CreateLoad(fn_ctx_ptr, "fn_ctx");
   udf_args.push_back(fn_ctx);
 
-  // Get IR i8* pointer to varargs buffer from FunctionContext* argument
-  // (if there are varargs)
-  llvm::Value* varargs_buffer = NULL;
+  // Allocate a varargs array. The array's entry type is the appropriate AnyVal subclass.
+  // E.g. if the vararg type is STRING, and the function is called with 10 arguments, we
+  // allocate a StringVal[10] array. We allocate the buffer with Alloca so that LLVM can
+  // optimise out the buffer once the function call is inlined.
+  Value* varargs_buffer = NULL;
   if (vararg_start_idx_ != -1) {
-    // FunctionContextImpl is first field of FunctionContext
-    // fn_ctx_impl_ptr has type FunctionContextImpl**
-    llvm::Value* fn_ctx_impl_ptr = builder.CreateStructGEP(NULL, fn_ctx, 0, "fn_ctx_impl_ptr");
-    llvm::Value* fn_ctx_impl = builder.CreateLoad(fn_ctx_impl_ptr, "fn_ctx_impl");
-    // varargs_buffer is first field of FunctionContextImpl
-    // varargs_buffer_ptr has type i8**
-    llvm::Value* varargs_buffer_ptr = builder.CreateStructGEP(NULL, fn_ctx_impl, 0,
-        "varargs_buffer");
-    varargs_buffer = builder.CreateLoad(varargs_buffer_ptr);
+    Type* unlowered_varargs_type =
+        CodegenAnyVal::GetUnloweredType(codegen, VarArgsType());
+    varargs_buffer = codegen->CreateEntryBlockAlloca(builder, unlowered_varargs_type,
+        NumVarArgs(), FunctionContextImpl::VARARGS_BUFFER_ALIGNMENT, "varargs_buffer");
   }
-  // Tracks where to write the next vararg to
-  int varargs_buffer_offset = 0;
 
   // Call children to populate remaining arguments
   for (int i = 0; i < GetNumChildren(); ++i) {
-    llvm::Function* child_fn = NULL;
-    vector<llvm::Value*> child_fn_args;
+    Function* child_fn = NULL;
+    vector<Value*> child_fn_args;
     // Set 'child_fn' to the codegen'd function, sets child_fn = NULL if codegen fails
     children_[i]->GetCodegendComputeFn(codegen, &child_fn);
-
     if (child_fn == NULL) {
       // Set 'child_fn' to the interpreted function
       child_fn = GetStaticGetValWrapper(children_[i]->type(), codegen);
       // First argument to interpreted function is children_[i]
-      llvm::Type* expr_ptr_type = codegen->GetPtrType(Expr::LLVM_CLASS_NAME);
+      Type* expr_ptr_type = codegen->GetPtrType(Expr::LLVM_CLASS_NAME);
       child_fn_args.push_back(codegen->CastPtrToLlvmPtr(expr_ptr_type, children_[i]));
     }
     child_fn_args.push_back(expr_ctx);
@@ -342,33 +364,21 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function**
 
     // Call 'child_fn', adding the result to either 'udf_args' or 'varargs_buffer'
     DCHECK(child_fn != NULL);
-    llvm::Type* arg_type = CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type());
-    llvm::Value* arg_val_ptr;
-    if (vararg_start_idx_ == -1 || i < vararg_start_idx_) {
-      // Either no varargs or arguments before varargs begin. Allocate space to store
-      // 'child_fn's result so we can pass the pointer to the UDF.
+    Type* arg_type = CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type());
+    Value* arg_val_ptr;
+    if (i < NumFixedArgs()) {
+      // Allocate space to store 'child_fn's result so we can pass the pointer to the UDF.
       arg_val_ptr = codegen->CreateEntryBlockAlloca(builder, arg_type, "arg_val_ptr");
-
-      if (children_[i]->type().type == TYPE_DECIMAL) {
-        // UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'
-        // that require 16-byte memory alignment. LLVM uses 8-byte alignment by default,
-        // so explicitly set the alignment for DecimalVals.
-        llvm::cast<llvm::AllocaInst>(arg_val_ptr)->setAlignment(16);
-      }
       udf_args.push_back(arg_val_ptr);
-     } else {
-      // Store the result of 'child_fn' in varargs_buffer + varargs_buffer_offset
+    } else {
+      // Store the result of 'child_fn' in varargs_buffer[i].
       arg_val_ptr =
-          builder.CreateConstGEP1_32(varargs_buffer, varargs_buffer_offset, "arg_val_ptr");
-      varargs_buffer_offset += AnyValUtil::AnyValSize(children_[i]->type());
-      // Cast arg_val_ptr from i8* to AnyVal pointer type
-      arg_val_ptr =
-          builder.CreateBitCast(arg_val_ptr, arg_type->getPointerTo(), "arg_val_ptr");
+          builder.CreateConstGEP1_32(varargs_buffer, i - NumFixedArgs(), "arg_val_ptr");
     }
     DCHECK_EQ(arg_val_ptr->getType(), arg_type->getPointerTo());
     // The result of the call must be stored in a lowered AnyVal
-    llvm::Value* lowered_arg_val_ptr = builder.CreateBitCast(
-        arg_val_ptr, CodegenAnyVal::GetLoweredPtrType(codegen, children_[i]->type()),
+    Value* lowered_arg_val_ptr = builder.CreateBitCast(arg_val_ptr,
+        CodegenAnyVal::GetLoweredPtrType(codegen, children_[i]->type()),
         "lowered_arg_val_ptr");
     CodegenAnyVal::CreateCall(
         codegen, &builder, child_fn, child_fn_args, "arg_val", lowered_arg_val_ptr);
@@ -379,16 +389,15 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function**
     DCHECK_EQ(udf_args.size(), vararg_start_idx_ + 1);
     DCHECK_GE(GetNumChildren(), 1);
     // Add the number of varargs
-    udf_args.push_back(codegen->GetIntConstant(
-        TYPE_INT, GetNumChildren() - vararg_start_idx_));
+    udf_args.push_back(codegen->GetIntConstant(TYPE_INT, NumVarArgs()));
     // Add all the accumulated vararg inputs as one input argument.
-    llvm::PointerType* vararg_type = codegen->GetPtrType(
-        CodegenAnyVal::GetUnloweredType(codegen, children_.back()->type()));
+    PointerType* vararg_type =
+        codegen->GetPtrType(CodegenAnyVal::GetUnloweredType(codegen, VarArgsType()));
     udf_args.push_back(builder.CreateBitCast(varargs_buffer, vararg_type, "varargs"));
   }
 
   // Call UDF
-  llvm::Value* result_val =
+  Value* result_val =
       CodegenAnyVal::CreateCall(codegen, &builder, udf, udf_args, "result");
   builder.CreateRet(result_val);
 
@@ -401,7 +410,7 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function**
   return Status::OK();
 }
 
-Status ScalarFnCall::GetUdf(LlvmCodeGen* codegen, llvm::Function** udf) {
+Status ScalarFnCall::GetUdf(LlvmCodeGen* codegen, Function** udf) {
   // from_utc_timestamp() and to_utc_timestamp() have inline ASM that cannot be JIT'd.
   // TimestampFunctions::AddSub() contains a try/catch which doesn't work in JIT'd
   // code. Always use the interpreted version of these functions.
@@ -428,16 +437,16 @@ Status ScalarFnCall::GetUdf(LlvmCodeGen* codegen, llvm::Function** udf) {
     // Per the x64 ABI, DecimalVals are returned via a DecmialVal* output argument.
     // So, the return type is void.
     bool is_decimal = type().type == TYPE_DECIMAL;
-    llvm::Type* return_type = is_decimal ? codegen->void_type() :
-        CodegenAnyVal::GetLoweredType(codegen, type());
+    Type* return_type = is_decimal ? codegen->void_type() :
+                                     CodegenAnyVal::GetLoweredType(codegen, type());
 
-    // Convert UDF function pointer to llvm::Function*. Start by creating a function
+    // Convert UDF function pointer to Function*. Start by creating a function
     // prototype for it.
     LlvmCodeGen::FnPrototype prototype(codegen, fn_.scalar_fn.symbol, return_type);
 
     if (is_decimal) {
       // Per the x64 ABI, DecimalVals are returned via a DecmialVal* output argument
-      llvm::Type* output_type =
+      Type* output_type =
           codegen->GetPtrType(CodegenAnyVal::GetUnloweredType(codegen, type()));
       prototype.AddArgument("output", output_type);
     }
@@ -450,19 +459,19 @@ Status ScalarFnCall::GetUdf(LlvmCodeGen* codegen, llvm::Function** udf) {
     for (int i = 0; i < NumFixedArgs(); ++i) {
       stringstream arg_name;
       arg_name << "fixed_arg_" << i;
-      llvm::Type* arg_type = codegen->GetPtrType(
+      Type* arg_type = codegen->GetPtrType(
           CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type()));
       prototype.AddArgument(arg_name.str(), arg_type);
     }
     // The varargs for the UDF function if there is any.
-    if (vararg_start_idx_ >= 0) {
-      llvm::Type* vararg_type = CodegenAnyVal::GetUnloweredPtrType(
+    if (NumVarArgs() > 0) {
+      Type* vararg_type = CodegenAnyVal::GetUnloweredPtrType(
           codegen, children_[vararg_start_idx_]->type());
       prototype.AddArgument("num_var_arg", codegen->GetType(TYPE_INT));
       prototype.AddArgument("var_arg", vararg_type);
     }
 
-    // Create a llvm::Function* with the generated type. This is only a function
+    // Create a Function* with the generated type. This is only a function
     // declaration, not a definition, since we do not create any basic blocks or
     // instructions in it.
     *udf = prototype.GeneratePrototype(NULL, NULL, false);
@@ -518,11 +527,11 @@ Status ScalarFnCall::GetFunction(RuntimeState* state, const string& symbol, void
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
     LlvmCodeGen* codegen = state->codegen();
     DCHECK(codegen != NULL);
-    llvm::Function* ir_fn = codegen->GetFunction(symbol);
+    Function* ir_fn = codegen->GetFunction(symbol);
     if (ir_fn == NULL) {
       stringstream ss;
-      ss << "Unable to locate function " << symbol
-         << " from LLVM module " << fn_.hdfs_location;
+      ss << "Unable to locate function " << symbol << " from LLVM module "
+         << fn_.hdfs_location;
       return Status(ss.str());
     }
     codegen->AddFunctionToJit(ir_fn, fn);
@@ -530,21 +539,12 @@ Status ScalarFnCall::GetFunction(RuntimeState* state, const string& symbol, void
   }
 }
 
-void ScalarFnCall::EvaluateChildren(ExprContext* context, const TupleRow* row,
-                                    vector<AnyVal*>* input_vals) {
-  DCHECK_EQ(input_vals->size(), NumFixedArgs());
+void ScalarFnCall::EvaluateNonConstantChildren(
+    ExprContext* context, const TupleRow* row) {
   FunctionContext* fn_ctx = context->fn_context(fn_context_index_);
-  uint8_t* varargs_buffer = fn_ctx->impl()->varargs_buffer();
-  for (int i = 0; i < children_.size(); ++i) {
-    void* src_slot = context->GetValue(children_[i], row);
-    AnyVal* dst_val;
-    if (vararg_start_idx_ == -1 || i < vararg_start_idx_) {
-      dst_val = (*input_vals)[i];
-    } else {
-      dst_val = reinterpret_cast<AnyVal*>(varargs_buffer);
-      varargs_buffer += AnyValUtil::AnyValSize(children_[i]->type());
-    }
-    AnyValUtil::SetAnyVal(src_slot, children_[i]->type(), dst_val);
+  for (pair<Expr*, AnyVal*> child : fn_ctx->impl()->non_constant_args()) {
+    void* val = context->GetValue(child.first, row);
+    AnyValUtil::SetAnyVal(val, child.first->type(), child.second);
   }
 }
 
@@ -553,14 +553,13 @@ RETURN_TYPE ScalarFnCall::InterpretEval(ExprContext* context, const TupleRow* ro
   DCHECK(scalar_fn_ != NULL) << DebugString();
   FunctionContext* fn_ctx = context->fn_context(fn_context_index_);
   vector<AnyVal*>* input_vals = fn_ctx->impl()->staging_input_vals();
-  EvaluateChildren(context, row, input_vals);
+  EvaluateNonConstantChildren(context, row);
 
   if (vararg_start_idx_ == -1) {
     switch (children_.size()) {
-
 #define ARG_DECL_ONE(z, n, data) BOOST_PP_COMMA_IF(n) const AnyVal&
 #define ARG_DECL_LIST(n) \
-    FunctionContext* BOOST_PP_COMMA_IF(n) BOOST_PP_REPEAT(n, ARG_DECL_ONE, unused)
+  FunctionContext* BOOST_PP_COMMA_IF(n) BOOST_PP_REPEAT(n, ARG_DECL_ONE, unused)
 #define ARG_ONE(z, n, data) BOOST_PP_COMMA_IF(n) *(*input_vals)[n]
 #define ARG_LIST(n) fn_ctx BOOST_PP_COMMA_IF(n) BOOST_PP_REPEAT(n, ARG_ONE, unused)
 
@@ -706,8 +705,15 @@ DecimalVal ScalarFnCall::GetDecimalVal(ExprContext* context, const TupleRow* row
 
 string ScalarFnCall::DebugString() const {
   stringstream out;
-  out << "ScalarFnCall(udf_type=" << fn_.binary_type
-      << " location=" << fn_.hdfs_location
+  out << "ScalarFnCall(udf_type=" << fn_.binary_type << " location=" << fn_.hdfs_location
       << " symbol_name=" << fn_.scalar_fn.symbol << Expr::DebugString() << ")";
   return out.str();
+}
+
+int ScalarFnCall::ComputeVarArgsBufferSize() const {
+  for (int i = NumFixedArgs(); i < children_.size(); ++i) {
+    // All varargs should have same type.
+    DCHECK_EQ(children_[i]->type(), VarArgsType());
+  }
+  return NumVarArgs() == 0 ? 0 : NumVarArgs() * AnyValUtil::AnyValSize(VarArgsType());
 }

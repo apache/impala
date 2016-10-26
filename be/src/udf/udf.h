@@ -606,17 +606,18 @@ struct StringVal : public AnyVal {
 
 struct DecimalVal : public impala_udf::AnyVal {
   /// Decimal data is stored as an unscaled integer value. For example, the decimal 1.00
-  /// (precison 3, scale 2) is stored as 100. The byte size necessary to store the decimal
-  /// depends on the precision, which determines which field of the union should be used to
-  /// store and manipulate the unscaled value.
-  //
+  /// (precision 3, scale 2) is stored as 100. The byte size necessary to store the
+  /// decimal depends on the precision, which determines which field of the union should
+  /// be used to store and manipulate the unscaled value.
+  ///
   ///   precision between 0-9:   val4  (4 bytes)
   ///   precision between 10-18: val8  (8 bytes)
   ///   precision between 19-38: val16 (16 bytes)
-  //
+  ///
   /// While it is always safe to use a larger field than necessary, it may result in worse
-  /// performance. For example, a UDF that only uses val16 can handle any precision but may
-  /// be slower than one that uses val4 or val8.
+  /// performance. For example, a UDF that only uses val16 can handle any precision but
+  /// may be slower than one that uses val4 or val8. This is because the least-significant
+  /// bits of all three union fields are the same (assuming a little-endian architecture).
   union {
     int32_t val4;
     int64_t val8;

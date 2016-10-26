@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_EXPRS_ANYVAL_UTIL_H
 #define IMPALA_EXPRS_ANYVAL_UTIL_H
 
@@ -271,7 +270,7 @@ class AnyValUtil {
             return;
 #if __BYTE_ORDER == __LITTLE_ENDIAN
           case 16:
-            memcpy(&reinterpret_cast<DecimalVal*>(dst)->val4, slot, type.GetByteSize());
+            memcpy(&reinterpret_cast<DecimalVal*>(dst)->val16, slot, 16);
 #else
             DCHECK(false) << "Not implemented.";
 #endif
@@ -286,19 +285,20 @@ class AnyValUtil {
 
  private:
   /// Implementations of Equals().
-  template<typename T>
+  template <typename T>
   static inline bool EqualsInternal(const T& x, const T& y);
-  static inline bool DecimalEquals(int precision, const DecimalVal& x,
-      const DecimalVal& y);
+  static inline bool DecimalEquals(
+      int precision, const DecimalVal& x, const DecimalVal& y);
 };
 
-/// Creates the corresponding AnyVal subclass for type. The object is added to the pool.
-impala_udf::AnyVal* CreateAnyVal(ObjectPool* pool, const ColumnType& type);
+/// Allocates an AnyVal subclass of 'type' from 'pool'. The AnyVal's memory is
+/// initialized to all 0's. Returns a MemLimitExceeded() error with message
+/// 'mem_limit_exceeded_msg' if the allocation cannot be made because of a memory
+/// limit.
+Status AllocateAnyVal(RuntimeState* state, MemPool* pool, const ColumnType& type,
+    const std::string& mem_limit_exceeded_msg, AnyVal** result);
 
-/// Creates the corresponding AnyVal subclass for type. The object is owned by the caller.
-impala_udf::AnyVal* CreateAnyVal(const ColumnType& type);
-
-template<typename T>
+template <typename T>
 inline bool AnyValUtil::EqualsInternal(const T& x, const T& y) {
   DCHECK(!x.is_null);
   DCHECK(!y.is_null);

@@ -19,6 +19,9 @@
 #include "codegen/llvm-codegen.h"
 
 #include "common/object-pool.h"
+#include "gutil/strings/substitute.h"
+#include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 
 #include "common/names.h"
 
@@ -26,30 +29,19 @@ using namespace impala_udf;
 
 namespace impala {
 
-AnyVal* CreateAnyVal(ObjectPool* pool, const ColumnType& type) {
-  return pool->Add(CreateAnyVal(type));
-}
-
-AnyVal* CreateAnyVal(const ColumnType& type) {
-  switch(type.type) {
-    case TYPE_NULL: return new AnyVal;
-    case TYPE_BOOLEAN: return new BooleanVal;
-    case TYPE_TINYINT: return new TinyIntVal;
-    case TYPE_SMALLINT: return new SmallIntVal;
-    case TYPE_INT: return new IntVal;
-    case TYPE_BIGINT: return new BigIntVal;
-    case TYPE_FLOAT: return new FloatVal;
-    case TYPE_DOUBLE: return new DoubleVal;
-    case TYPE_STRING:
-    case TYPE_VARCHAR:
-    case TYPE_CHAR:
-      return new StringVal;
-    case TYPE_TIMESTAMP: return new TimestampVal;
-    case TYPE_DECIMAL: return new DecimalVal;
-    default:
-      DCHECK(false) << "Unsupported type: " << type;
-      return NULL;
+Status AllocateAnyVal(RuntimeState* state, MemPool* pool, const ColumnType& type,
+    const std::string& mem_limit_exceeded_msg, AnyVal** result) {
+  int anyval_size = AnyValUtil::AnyValSize(type);
+  // Ensure the allocation is sufficiently aligned (e.g. DecimalVal has a 16-byte
+  // alignment requirement).
+  int alignment = BitUtil::RoundUpToPowerOfTwo(anyval_size);
+  *result = reinterpret_cast<AnyVal*>(pool->TryAllocateAligned(anyval_size, alignment));
+  if (*result == NULL) {
+    return pool->mem_tracker()->MemLimitExceeded(
+        state, mem_limit_exceeded_msg, anyval_size);
   }
+  memset(*result, 0, anyval_size);
+  return Status::OK();
 }
 
 FunctionContext::TypeDesc AnyValUtil::ColumnTypeToTypeDesc(const ColumnType& type) {

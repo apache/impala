@@ -20,9 +20,11 @@
 #define IMPALA_RUNTIME_MEM_POOL_H
 
 #include <stdio.h>
+
 #include <algorithm>
-#include <vector>
+#include <cstddef>
 #include <string>
+#include <vector>
 
 #include "common/logging.h"
 #include "util/bit-util.h"
@@ -93,11 +95,11 @@ class MemPool {
   /// from the registered limits.
   ~MemPool();
 
-  /// Allocates 8-byte aligned section of memory of 'size' bytes at the end
+  /// Allocates a section of memory of 'size' bytes with DEFAULT_ALIGNMENT at the end
   /// of the the current chunk. Creates a new chunk if there aren't any chunks
   /// with enough capacity.
   uint8_t* Allocate(int64_t size) noexcept {
-    return Allocate<false>(size);
+    return Allocate<false>(size, DEFAULT_ALIGNMENT);
   }
 
   /// Same as Allocate() except the mem limit is checked before the allocation and
@@ -105,7 +107,16 @@ class MemPool {
   /// The caller must handle the NULL case. This should be used for allocations
   /// where the size can be very big to bound the amount by which we exceed mem limits.
   uint8_t* TryAllocate(int64_t size) noexcept {
-    return Allocate<true>(size);
+    return Allocate<true>(size, DEFAULT_ALIGNMENT);
+  }
+
+  /// Same as TryAllocate() except a non-default alignment can be specified. It
+  /// should be a power-of-two in [1, sizeof(std::max_align_t)].
+  uint8_t* TryAllocateAligned(int64_t size, int alignment) noexcept {
+    DCHECK_GE(alignment, 1);
+    DCHECK_LE(alignment, sizeof(std::max_align_t));
+    DCHECK_EQ(BitUtil::RoundUpToPowerOfTwo(alignment), alignment);
+    return Allocate<true>(size, alignment);
   }
 
   /// Returns 'byte_size' to the current chunk back to the mem pool. This can
@@ -150,6 +161,8 @@ class MemPool {
   /// TODO: make a macro for doing this
   /// For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
+
+  static const int DEFAULT_ALIGNMENT = 8;
 
  private:
   friend class MemPoolTest;
@@ -224,22 +237,37 @@ class MemPool {
   }
 
   template <bool CHECK_LIMIT_FIRST>
-  uint8_t* Allocate(int64_t size) noexcept {
+  uint8_t* Allocate(int64_t size, int alignment) noexcept {
     DCHECK_GE(size, 0);
-    if (UNLIKELY(size == 0)) return reinterpret_cast<uint8_t *>(&zero_length_region_);
+    if (UNLIKELY(size == 0)) return reinterpret_cast<uint8_t*>(&zero_length_region_);
 
-    int64_t num_bytes = BitUtil::RoundUp(size, 8);
-    if (current_chunk_idx_ == -1
-        || num_bytes + chunks_[current_chunk_idx_].allocated_bytes
-          > chunks_[current_chunk_idx_].size) {
-      // If we couldn't allocate a new chunk, return NULL.
-      if (UNLIKELY(!FindChunk(num_bytes, CHECK_LIMIT_FIRST))) return NULL;
+    bool fits_in_chunk = false;
+    if (current_chunk_idx_ != -1) {
+      int64_t aligned_allocated_bytes = BitUtil::RoundUpToPowerOf2(
+          chunks_[current_chunk_idx_].allocated_bytes, alignment);
+      if (aligned_allocated_bytes + size <= chunks_[current_chunk_idx_].size) {
+        // Ensure the requested alignment is respected.
+        total_allocated_bytes_ +=
+            aligned_allocated_bytes - chunks_[current_chunk_idx_].allocated_bytes;
+        chunks_[current_chunk_idx_].allocated_bytes = aligned_allocated_bytes;
+        fits_in_chunk = true;
+      }
     }
+
+    if (!fits_in_chunk) {
+      // If we couldn't allocate a new chunk, return NULL.
+      // malloc() guarantees alignment of min(std::max_align_t, min_chunk_size),
+      // so we do not need to do anything additional to guarantee alignment.
+      static_assert(
+          INITIAL_CHUNK_SIZE >= sizeof(std::max_align_t), "Min chunk size too low");
+      if (UNLIKELY(!FindChunk(size, CHECK_LIMIT_FIRST))) return NULL;
+    }
+
     ChunkInfo& info = chunks_[current_chunk_idx_];
     uint8_t* result = info.data + info.allocated_bytes;
-    DCHECK_LE(info.allocated_bytes + num_bytes, info.size);
-    info.allocated_bytes += num_bytes;
-    total_allocated_bytes_ += num_bytes;
+    DCHECK_LE(info.allocated_bytes + size, info.size);
+    info.allocated_bytes += size;
+    total_allocated_bytes_ += size;
     DCHECK_LE(current_chunk_idx_, chunks_.size() - 1);
     peak_allocated_bytes_ = std::max(total_allocated_bytes_, peak_allocated_bytes_);
     return result;
@@ -247,9 +275,8 @@ class MemPool {
 };
 
 // Stamp out templated implementations here so they're included in IR module
-template uint8_t* MemPool::Allocate<false>(int64_t size) noexcept;
-template uint8_t* MemPool::Allocate<true>(int64_t size) noexcept;
-
+template uint8_t* MemPool::Allocate<false>(int64_t size, int alignment) noexcept;
+template uint8_t* MemPool::Allocate<true>(int64_t size, int alignment) noexcept;
 }
 
 #endif

@@ -200,9 +200,9 @@ ir_functions = [
   ["TOPN_NODE_INSERT_BATCH",
    "_ZN6impala8TopNNode11InsertBatchEPNS_8RowBatchE"],
   ["MEMPOOL_ALLOCATE",
-   "_ZN6impala7MemPool8AllocateILb0EEEPhl"],
+   "_ZN6impala7MemPool8AllocateILb0EEEPhli"],
   ["MEMPOOL_CHECKED_ALLOCATE",
-   "_ZN6impala7MemPool8AllocateILb1EEEPhl"]
+   "_ZN6impala7MemPool8AllocateILb1EEEPhli"]
 ]
 
 enums_preamble = '\

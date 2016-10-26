@@ -57,6 +57,7 @@ BigIntVal UtilityFunctions::FnvHashDecimal(FunctionContext* ctx,
   if (input_val.is_null) return BigIntVal::null();
   const FunctionContext::TypeDesc& input_type = *ctx->GetArgType(0);
   int byte_size = ColumnType::GetDecimalByteSize(input_type.precision);
+  // val4, val8 and val16 all start at the same memory address.
   return BigIntVal(HashUtil::FnvHash64(&input_val.val16, byte_size, HashUtil::FNV_SEED));
 }
 
