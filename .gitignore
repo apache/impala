@@ -57,4 +57,3 @@ hs_err_pid*.log
 # Vim related files
 .*.swp
 .vimrc
-be/.ycm_extra_conf.py
