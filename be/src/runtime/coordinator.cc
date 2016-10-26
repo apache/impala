@@ -162,12 +162,14 @@ class Coordinator::FragmentInstanceState {
   }
 
   /// Called to set the initial status of the fragment instance after the
-  /// ExecRemoteFragment() RPC has returned.
-  void SetInitialStatus(const Status& status) {
+  /// ExecRemoteFragment() RPC has returned. If 'rpc_sent' is true,
+  /// CancelFragmentInstances() will include this instance in the set of potential
+  /// fragment instances to cancel.
+  void SetInitialStatus(const Status& status, bool rpc_sent) {
     DCHECK(!rpc_sent_);
+    rpc_sent_ = rpc_sent;
     status_ = status;
     if (!status_.ok()) return;
-    rpc_sent_ = true;
     stopwatch_.Start();
   }
 
@@ -244,7 +246,8 @@ class Coordinator::FragmentInstanceState {
   /// been initiated; either way, execution must not be cancelled.
   Status status_;
 
-  /// If true, ExecPlanFragment() rpc has been sent.
+  /// If true, ExecPlanFragment() rpc has been sent - even if it was not determined to be
+  /// successful.
   bool rpc_sent_;
 
   /// If true, execution terminated; do not cancel in that case.
@@ -502,17 +505,30 @@ Status Coordinator::Exec() {
     StartFragments();
   }
 
+  // In the error case, it's safe to return and not to get root_sink_ here to close - if
+  // there was an error, but the coordinator fragment was successfully started, it should
+  // cancel itself when it receives an error status after reporting its profile.
   RETURN_IF_ERROR(FinishInstanceStartup());
 
   // Grab executor and wait until Prepare() has finished so that runtime state etc. will
-  // be set up.
+  // be set up. Must do this here in order to get a reference to root_fragment_instance_
+  // so that root_sink_ remains valid throughout query lifetime.
   if (schedule_.GetCoordFragment() != nullptr) {
     // Coordinator fragment instance has same ID as query.
-    shared_ptr<FragmentMgr::FragmentExecState> root_fragment_instance =
+    root_fragment_instance_ =
         ExecEnv::GetInstance()->fragment_mgr()->GetFragmentExecState(query_id_);
-    DCHECK(root_fragment_instance.get() != nullptr);
-    executor_ = root_fragment_instance->executor();
-
+    // Fragment instance might have been failed and unregistered itself even though it was
+    // successfully started (e.g. Prepare() might have failed).
+    if (root_fragment_instance_.get() == nullptr) {
+      FragmentInstanceState* root_state = fragment_instance_states_[0];
+      DCHECK(root_state != nullptr);
+      lock_guard<mutex> instance_state_lock(*root_state->lock());
+      // Try and return the fragment instance status if it was already set.
+      // TODO: Consider waiting for root_state->done() here.
+      RETURN_IF_ERROR(*root_state->status());
+      return Status(Substitute("Root fragment instance ($0) failed", PrintId(query_id_)));
+    }
+    executor_ = root_fragment_instance_->executor();
     // When WaitForPrepare() returns OK(), the executor's root sink will be set up. At
     // that point, the coordinator must be sure to call root_sink()->CloseConsumer(); the
     // fragment instance's executor will not complete until that point.
@@ -1417,7 +1433,7 @@ void Coordinator::MtExecRemoteFInstance(
   ImpalaBackendConnection backend_client(exec_env_->impalad_client_cache(),
       exec_state->impalad_address(), &client_connect_status);
   if (!client_connect_status.ok()) {
-    exec_state->SetInitialStatus(client_connect_status);
+    exec_state->SetInitialStatus(client_connect_status, false);
     return;
   }
 
@@ -1432,7 +1448,7 @@ void Coordinator::MtExecRemoteFInstance(
     const string& err_msg = Substitute(ERR_TEMPLATE, PrintId(query_id()),
         PrintId(exec_state->fragment_instance_id()), rpc_status.msg().msg());
     VLOG_QUERY << err_msg;
-    exec_state->SetInitialStatus(Status(err_msg));
+    exec_state->SetInitialStatus(Status(err_msg), true);
     return;
   }
 
@@ -1442,11 +1458,11 @@ void Coordinator::MtExecRemoteFInstance(
         PrintId(exec_state->fragment_instance_id()),
         exec_status.msg().GetFullMessageDetails());
     VLOG_QUERY << err_msg;
-    exec_state->SetInitialStatus(Status(err_msg));
+    exec_state->SetInitialStatus(Status(err_msg), true);
     return;
   }
 
-  exec_state->SetInitialStatus(Status::OK());
+  exec_state->SetInitialStatus(Status::OK(), true);
   VLOG_FILE << "rpc succeeded: ExecPlanFragment"
       << " instance_id=" << PrintId(exec_state->fragment_instance_id());
 }
@@ -1480,7 +1496,7 @@ void Coordinator::ExecRemoteFragment(const FragmentExecParams& fragment_exec_par
   ImpalaBackendConnection backend_client(exec_env_->impalad_client_cache(),
       exec_state->impalad_address(), &client_connect_status);
   if (!client_connect_status.ok()) {
-    exec_state->SetInitialStatus(client_connect_status);
+    exec_state->SetInitialStatus(client_connect_status, true);
     return;
   }
 
@@ -1497,7 +1513,7 @@ void Coordinator::ExecRemoteFragment(const FragmentExecParams& fragment_exec_par
         Substitute(ERR_TEMPLATE, PrintId(exec_state->fragment_instance_id()),
           rpc_status.msg().msg());
     VLOG_QUERY << err_msg;
-    exec_state->SetInitialStatus(Status(err_msg));
+    exec_state->SetInitialStatus(Status(err_msg), true);
     return;
   }
 
@@ -1507,11 +1523,11 @@ void Coordinator::ExecRemoteFragment(const FragmentExecParams& fragment_exec_par
         Substitute(ERR_TEMPLATE, PrintId(exec_state->fragment_instance_id()),
           exec_plan_status.msg().GetFullMessageDetails());
     VLOG_QUERY << err_msg;
-    exec_state->SetInitialStatus(Status(err_msg));
+    exec_state->SetInitialStatus(Status(err_msg), true);
     return;
   }
 
-  exec_state->SetInitialStatus(Status::OK());
+  exec_state->SetInitialStatus(Status::OK(), true);
   return;
 }
 
@@ -1547,14 +1563,15 @@ void Coordinator::CancelFragmentInstances() {
     // to set its status)
     lock_guard<mutex> l(*exec_state->lock());
 
-    // no need to cancel if we already know it terminated w/ an error status
-    if (!exec_state->status()->ok()) continue;
-
     // Nothing to cancel if the exec rpc was not sent
     if (!exec_state->rpc_sent()) continue;
 
     // don't cancel if it already finished
     if (exec_state->done()) continue;
+
+    /// If the status is not OK, we still try to cancel - !OK status might mean
+    /// communication failure between fragment instance and coordinator, but fragment
+    /// instance might still be running.
 
     // set an error status to make sure we only cancel this once
     exec_state->set_status(Status::CANCELLED);

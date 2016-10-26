@@ -504,6 +504,12 @@ void PlanFragmentExecutor::Cancel() {
     VLOG_QUERY << "Cancel() called before Prepare()";
     return;
   }
+
+  // Ensure that the sink is closed from both sides. Although in ordinary executions we
+  // rely on the consumer to do this, in error cases the consumer may not be able to send
+  // CloseConsumer() (see IMPALA-4348 for an example).
+  if (root_sink_ != nullptr) root_sink_->CloseConsumer();
+
   DCHECK(runtime_state_ != NULL);
   VLOG_QUERY << "Cancel(): instance_id=" << runtime_state_->fragment_instance_id();
   runtime_state_->set_is_cancelled(true);

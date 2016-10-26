@@ -152,16 +152,15 @@ void PlanRootSink::CloseConsumer() {
 Status PlanRootSink::GetNext(
     RuntimeState* state, QueryResultSet* results, int num_results, bool* eos) {
   unique_lock<mutex> l(lock_);
-  DCHECK(!consumer_done_);
 
   results_ = results;
   num_rows_requested_ = num_results;
   sender_cv_.notify_all();
 
   while (!eos_ && results_ != nullptr && !sender_done_) consumer_cv_.wait(l);
+
   *eos = eos_;
-  RETURN_IF_ERROR(state->CheckQueryState());
-  return Status::OK();
+  return state->CheckQueryState();
 }
 
 void PlanRootSink::GetRowValue(

@@ -296,8 +296,11 @@ class Coordinator {
   /// Result rows are materialized by this fragment instance in its own thread. They are
   /// materialized into a QueryResultSet provided to the coordinator during GetNext().
   ///
-  /// Not owned by this class, created during fragment instance start-up by
-  /// FragmentExecState and set here in Exec().
+  /// Created during fragment instance start-up by FragmentExecState and set here in
+  /// Exec().  Keep a shared_ptr reference to the fragment state so that root_sink_ will
+  /// be valid for the lifetime of the coordinator. This is important if, for example, the
+  /// fragment instance is cancelled while the coordinator is calling GetNext().
+  std::shared_ptr<FragmentMgr::FragmentExecState> root_fragment_instance_;
   PlanFragmentExecutor* executor_ = nullptr;
   PlanRootSink* root_sink_ = nullptr;
 

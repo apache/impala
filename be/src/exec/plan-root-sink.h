@@ -36,16 +36,18 @@ class ExprContext;
 ///
 /// The consumer calls GetNext() with a QueryResultSet and a requested fetch
 /// size. GetNext() shares these fields with Send(), and then signals Send() to begin
-/// populating the result set. GetNext() returns when either the sender has sent all of
-/// its rows, or the requested fetch size has been satisfied.
+/// populating the result set. GetNext() returns when a) the sender has sent all of its
+/// rows b) the requested fetch size has been satisfied or c) the sender calls Close().
 ///
 /// Send() fills in as many rows as are requested from the current batch. When the batch
 /// is exhausted - which may take several calls to GetNext() - control is returned to the
 /// sender to produce another row batch.
 ///
-/// Consumers must call CloseConsumer() when finished to allow the fragment to shut
-/// down. Senders must call Close() to signal to the consumer that no more batches will be
-/// produced.
+/// When the consumer is finished, CloseConsumer() must be called to allow the sender to
+/// exit Send(). Senders must call Close() to signal to the consumer that no more batches
+/// will be produced. CloseConsumer() may be called concurrently with GetNext(). Senders
+/// should ensure that the consumer is not blocked in GetNext() before destroying the
+/// PlanRootSink.
 ///
 /// The sink is thread safe up to a single producer and single consumer.
 ///
@@ -72,17 +74,20 @@ class PlanRootSink : public DataSink {
   virtual Status FlushFinal(RuntimeState* state);
 
   /// To be called by sender only. Signals to the consumer that no more batches will be
-  /// produced, then blocks until the consumer calls CloseConsumer().
+  /// produced, then blocks until someone calls CloseConsumer().
   virtual void Close(RuntimeState* state);
 
   /// Populates 'result_set' with up to 'num_rows' rows produced by the fragment instance
-  /// that calls Send(). *eos is set to 'true' when there are no more rows to consume.
+  /// that calls Send(). *eos is set to 'true' when there are no more rows to consume. If
+  /// CloseConsumer() is called concurrently, GetNext() will return and may not populate
+  /// 'result_set'. All subsequent calls after CloseConsumer() will do no work.
   Status GetNext(
       RuntimeState* state, QueryResultSet* result_set, int num_rows, bool* eos);
 
-  /// Signals to the producer that the sink will no longer be used. It's an error to call
-  /// GetNext() after this returns. May be called more than once; only the first call has
-  /// any effect.
+  /// Signals to the producer that the sink will no longer be used. GetNext() may be
+  /// safely called after this returns (it does nothing), but consumers should consider
+  /// that the PlanRootSink may be undergoing destruction. May be called more than once;
+  /// only the first call has any effect.
   void CloseConsumer();
 
   static const std::string NAME;
