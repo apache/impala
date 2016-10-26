@@ -28,6 +28,7 @@
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 
@@ -221,13 +222,8 @@ TmpFileMgr::File::File(TmpFileMgr* mgr, FileGroup* file_group, DeviceId device_i
   DCHECK(file_group != NULL);
 }
 
-Status TmpFileMgr::File::AllocateSpace(int64_t write_size, int64_t* offset) {
-  DCHECK_GT(write_size, 0);
-  if (file_group_->bytes_limit_ != -1 &&
-      file_group_->current_bytes_allocated_ + write_size
-      > file_group_->bytes_limit_) {
-    return Status(TErrorCode::SCRATCH_LIMIT_EXCEEDED, file_group_->bytes_limit_);
-  }
+Status TmpFileMgr::File::AllocateSpace(int64_t num_bytes, int64_t* offset) {
+  DCHECK_GT(num_bytes, 0);
   Status status;
   if (mgr_->IsBlacklisted(device_id_)) {
     blacklisted_ = true;
@@ -242,14 +238,13 @@ Status TmpFileMgr::File::AllocateSpace(int64_t write_size, int64_t* offset) {
     }
     disk_id_ = DiskInfo::disk_id(path_.c_str());
   }
-  int64_t new_size = current_size_ + write_size;
+  int64_t new_size = current_size_ + num_bytes;
   status = FileSystemUtil::ResizeFile(path_, new_size);
   if (!status.ok()) {
     ReportIOError(status.msg());
     return status;
   }
   *offset = current_size_;
-  file_group_->current_bytes_allocated_ += write_size;
   current_size_ = new_size;
   return Status::OK();
 }
@@ -266,11 +261,46 @@ Status TmpFileMgr::File::Remove() {
   return Status::OK();
 }
 
-TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, int64_t bytes_limit)
+TmpFileMgr::FileGroup::FileGroup(
+    TmpFileMgr* tmp_file_mgr, RuntimeProfile* profile, int64_t bytes_limit)
   : tmp_file_mgr_(tmp_file_mgr),
     current_bytes_allocated_(0),
-    bytes_limit_(bytes_limit) {
+    bytes_limit_(bytes_limit),
+    next_allocation_index_(0) {
   DCHECK(tmp_file_mgr != NULL);
+  scratch_space_bytes_used_counter_ =
+      ADD_COUNTER(profile, "ScratchFileUsedBytes", TUnit::BYTES);
+}
+
+Status TmpFileMgr::FileGroup::CreateFiles(const TUniqueId& query_id) {
+  DCHECK(tmp_files_.empty());
+  vector<Status> errs;
+  vector<DeviceId> tmp_devices = tmp_file_mgr_->active_tmp_devices();
+  int files_allocated = 0;
+  // Initialize the tmp files and the initial file to use.
+  for (int i = 0; i < tmp_devices.size(); ++i) {
+    TmpFileMgr::DeviceId tmp_device_id = tmp_devices[i];
+    // It is possible for a device to be blacklisted after it was returned by
+    // active_tmp_devices(), handle this gracefully by skipping devices if NewFile()
+    // fails.
+    Status status = NewFile(tmp_device_id, query_id);
+    if (status.ok()) {
+      ++files_allocated;
+    } else {
+      errs.push_back(std::move(status));
+    }
+  }
+  DCHECK_EQ(tmp_files_.size(), files_allocated);
+  if (tmp_files_.size() == 0) {
+    Status err_status("Could not create files in any configured scratch directories "
+        "(--scratch_dirs).");
+    for (Status& err : errs) err_status.MergeStatus(err);
+    return err_status;
+  }
+
+  // Start allocating on a random device to avoid overloading the first device.
+  next_allocation_index_ = rand() % tmp_files_.size();
+  return Status::OK();
 }
 
 Status TmpFileMgr::FileGroup::NewFile(const DeviceId& device_id,
@@ -293,4 +323,34 @@ void TmpFileMgr::FileGroup::Close() {
   tmp_files_.clear();
 }
 
-} //namespace impala
+Status TmpFileMgr::FileGroup::AllocateSpace(
+    int64_t num_bytes, File** tmp_file, int64_t* file_offset) {
+  if (bytes_limit_ != -1 && current_bytes_allocated_ + num_bytes > bytes_limit_) {
+    return Status(TErrorCode::SCRATCH_LIMIT_EXCEEDED, bytes_limit_);
+  }
+  vector<Status> errs;
+  // Find the next physical file in round-robin order and allocate a range from it.
+  for (int attempt = 0; attempt < tmp_files_.size(); ++attempt) {
+    *tmp_file = tmp_files_[next_allocation_index_].get();
+    next_allocation_index_ = (next_allocation_index_ + 1) % tmp_files_.size();
+    if ((*tmp_file)->is_blacklisted()) continue;
+    Status status = (*tmp_file)->AllocateSpace(num_bytes, file_offset);
+    if (status.ok()) {
+      scratch_space_bytes_used_counter_->Add(num_bytes);
+      current_bytes_allocated_ += num_bytes;
+      return Status::OK();
+    }
+    // Log error and try other files if there was a problem. Problematic files will be
+    // blacklisted so we will not repeatedly log the same error.
+    LOG(WARNING) << "Error while allocating range in scratch file '"
+                 << (*tmp_file)->path() << "': " << status.msg().msg()
+                 << ". Will try another scratch file.";
+    errs.push_back(status);
+  }
+  Status err_status("No usable scratch files: space could not be allocated in any "
+                    "of the configured scratch directories (--scratch_dirs).");
+  for (Status& err : errs) err_status.MergeStatus(err);
+  return err_status;
+}
+
+} // namespace impala

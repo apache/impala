@@ -209,25 +209,24 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, TmpFileMgr* tmp_file_mgr
   : max_block_size_(block_size),
     // Keep two writes in flight per scratch disk so the disks can stay busy.
     block_write_threshold_(tmp_file_mgr->num_active_tmp_devices() * 2),
-    disable_spill_(state->query_ctx().disable_spilling || block_write_threshold_ == 0 ||
-        scratch_limit == 0),
+    disable_spill_(state->query_ctx().disable_spilling || block_write_threshold_ == 0
+        || scratch_limit == 0),
     query_id_(state->query_id()),
-    tmp_file_mgr_(tmp_file_mgr),
     initialized_(false),
     unfullfilled_reserved_buffers_(0),
     total_pinned_buffers_(0),
     non_local_outstanding_writes_(0),
-    tmp_file_group(new TmpFileMgr::FileGroup(tmp_file_mgr, scratch_limit)),
+    tmp_file_group_(NULL),
     io_mgr_(state->io_mgr()),
     is_cancelled_(false),
     writes_issued_(0),
-    debug_write_delay_ms_(0) {
-}
+    debug_write_delay_ms_(0) {}
 
 Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
     RuntimeProfile* profile, TmpFileMgr* tmp_file_mgr, int64_t mem_limit,
     int64_t block_size, shared_ptr<BufferedBlockMgr>* block_mgr) {
   DCHECK(parent != NULL);
+  int64_t scratch_limit = state->query_options().scratch_limit;
   block_mgr->reset();
   {
     lock_guard<SpinLock> lock(static_block_mgrs_lock_);
@@ -238,12 +237,13 @@ Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
       // all shared_ptr references have gone to 0 and it is in the process of
       // being deleted. This can happen if the last shared reference is released
       // but before the weak ptr is removed from the map.
-      block_mgr->reset(new BufferedBlockMgr(state, tmp_file_mgr, block_size,
-          state->query_options().scratch_limit));
+      block_mgr->reset(
+          new BufferedBlockMgr(state, tmp_file_mgr, block_size, scratch_limit));
       query_to_block_mgrs_[state->query_id()] = *block_mgr;
     }
   }
-  (*block_mgr)->Init(state->io_mgr(), profile, parent, mem_limit);
+  (*block_mgr)
+      ->Init(state->io_mgr(), tmp_file_mgr, profile, parent, mem_limit, scratch_limit);
   return Status::OK();
 }
 
@@ -276,7 +276,6 @@ Status BufferedBlockMgr::RegisterClient(const string& debug_info,
 
 void BufferedBlockMgr::ClearReservations(Client* client) {
   lock_guard<mutex> lock(lock_);
-  // TODO: Can the modifications to the client's mem variables can be made w/o the lock?
   if (client->num_pinned_buffers_ < client->num_reserved_buffers_) {
     unfullfilled_reserved_buffers_ -=
         client->num_reserved_buffers_ - client->num_pinned_buffers_;
@@ -289,7 +288,6 @@ void BufferedBlockMgr::ClearReservations(Client* client) {
 
 bool BufferedBlockMgr::TryAcquireTmpReservation(Client* client, int num_buffers) {
   lock_guard<mutex> lock(lock_);
-  // TODO: Can the modifications to the client's mem variables can be made w/o the lock?
   DCHECK_EQ(client->num_tmp_reserved_buffers_, 0);
   if (client->num_pinned_buffers_ < client->num_reserved_buffers_) {
     // If client has unused reserved buffers, we use those first.
@@ -430,7 +428,6 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
     if (len > 0 && len < max_block_size_) {
       DCHECK(unpin_block == NULL);
       if (client->tracker_->TryConsume(len)) {
-        // TODO: Have a cache of unused blocks of size 'len' (0, max_block_size_)
         uint8_t* buffer = new uint8_t[len];
         // Descriptors for non-I/O sized buffers are deleted when the block is deleted.
         new_block->buffer_desc_ = new BufferDescriptor(buffer, len);
@@ -558,7 +555,7 @@ BufferedBlockMgr::~BufferedBlockMgr() {
   // See IMPALA-1890.
   DCHECK_EQ(non_local_outstanding_writes_, 0) << endl << DebugInternal();
   // Delete tmp files.
-  tmp_file_group->Close();
+  tmp_file_group_->Close();
 
   // Validate that clients deleted all of their blocks. Since all writes have
   // completed at this point, any deleted blocks should be in unused_blocks_.
@@ -594,8 +591,6 @@ MemTracker* BufferedBlockMgr::get_tracker(Client* client) const {
   return client->tracker_;
 }
 
-// TODO: It would be good if we had a sync primitive that supports is_mine() calls, see
-//       IMPALA-1884.
 Status BufferedBlockMgr::DeleteOrUnpinBlock(Block* block, bool unpin) {
   if (block == NULL) {
     return IsCancelled() ? Status::CANCELLED : Status::OK();
@@ -746,12 +741,15 @@ Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
   DCHECK_EQ(block->buffer_desc_->len, max_block_size_);
 
   if (block->write_range_ == NULL) {
-    if (tmp_file_group->NumFiles() == 0) RETURN_IF_ERROR(InitTmpFiles());
+    if (tmp_file_group_->NumFiles() == 0) {
+      RETURN_IF_ERROR(tmp_file_group_->CreateFiles(query_id_));
+    }
 
     // First time the block is being persisted - need to allocate tmp file space.
     TmpFileMgr::File* tmp_file;
     int64_t file_offset;
-    RETURN_IF_ERROR(AllocateScratchSpace(max_block_size_, &tmp_file, &file_offset));
+    RETURN_IF_ERROR(
+        tmp_file_group_->AllocateSpace(max_block_size_, &tmp_file, &file_offset));
     int disk_id = tmp_file->disk_id();
     if (disk_id < 0) {
       // Assign a valid disk id to the write range if the tmp file was not assigned one.
@@ -797,38 +795,6 @@ void BufferedBlockMgr::WaitForWrite(unique_lock<mutex>& lock, Block* block) {
   while (block->in_write_ && !is_cancelled_) {
     block->write_complete_cv_.wait(lock);
   }
-}
-
-Status BufferedBlockMgr::AllocateScratchSpace(int64_t block_size,
-    TmpFileMgr::File** tmp_file, int64_t* file_offset) {
-  // Assumes block manager lock is already taken.
-  vector<Status> errs;
-  // Find the next physical file in round-robin order and create a write range for it.
-  for (int attempt = 0; attempt < tmp_file_group->NumFiles(); ++attempt) {
-    *tmp_file = tmp_file_group->GetFileAt(next_block_index_);
-    next_block_index_ = (next_block_index_ + 1) % tmp_file_group->NumFiles();
-    if ((*tmp_file)->is_blacklisted()) continue;
-    Status status = (*tmp_file)->AllocateSpace(block_size, file_offset);
-    if (status.ok()) {
-      scratch_space_bytes_used_counter_->Add(block_size);
-      return Status::OK();
-    } else if (status.code() == TErrorCode::SCRATCH_LIMIT_EXCEEDED) {
-      // We cannot allocate from any files if we're at the scratch limit.
-      return status;
-    }
-    // Log error and try other files if there was a problem. Problematic files will be
-    // blacklisted so we will not repeatedly log the same error.
-    LOG(WARNING) << "Error while allocating range in scratch file '"
-                 << (*tmp_file)->path() << "': " << status.msg().msg()
-                 << ". Will try another scratch file.";
-    errs.push_back(status);
-  }
-  Status err_status("No usable scratch files: space could not be allocated in any "
-      "of the configured scratch directories (--scratch_dirs).");
-  for (int i = 0; i < errs.size(); ++i) {
-    err_status.MergeStatus(errs[i]);
-  }
-  return err_status;
 }
 
 void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
@@ -1271,8 +1237,9 @@ string BufferedBlockMgr::DebugInternal() const {
   return ss.str();
 }
 
-void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, RuntimeProfile* parent_profile,
-    MemTracker* parent_tracker, int64_t mem_limit) {
+void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, TmpFileMgr* tmp_file_mgr,
+    RuntimeProfile* parent_profile, MemTracker* parent_tracker, int64_t mem_limit,
+    int64_t scratch_limit) {
   unique_lock<mutex> l(lock_);
   if (initialized_) return;
 
@@ -1280,6 +1247,9 @@ void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, RuntimeProfile* parent_profile,
 
   profile_.reset(new RuntimeProfile(&obj_pool_, "BlockMgr"));
   parent_profile->AddChild(profile_.get());
+
+  tmp_file_group_.reset(
+      new TmpFileMgr::FileGroup(tmp_file_mgr, profile_.get(), scratch_limit));
 
   mem_limit_counter_ = ADD_COUNTER(profile_.get(), "MemoryLimit", TUnit::BYTES);
   mem_limit_counter_->Set(mem_limit);
@@ -1294,37 +1264,12 @@ void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, RuntimeProfile* parent_profile,
   disk_read_timer_ = ADD_TIMER(profile_.get(), "TotalReadBlockTime");
   buffer_wait_timer_ = ADD_TIMER(profile_.get(), "TotalBufferWaitTime");
   encryption_timer_ = ADD_TIMER(profile_.get(), "TotalEncryptionTime");
-  scratch_space_bytes_used_counter_ =
-    ADD_COUNTER(profile_.get(), "ScratchFileUsedBytes", TUnit::BYTES);
 
   // Create a new mem_tracker and allocate buffers.
   mem_tracker_.reset(
       new MemTracker(profile(), mem_limit, "Block Manager", parent_tracker));
 
   initialized_ = true;
-}
-
-Status BufferedBlockMgr::InitTmpFiles() {
-  DCHECK(tmp_file_group->NumFiles() == 0);
-  DCHECK(tmp_file_mgr_ != NULL);
-
-  vector<TmpFileMgr::DeviceId> tmp_devices = tmp_file_mgr_->active_tmp_devices();
-  int files_allocated = 0;
-  // Initialize the tmp files and the initial file to use.
-  for (int i = 0; i < tmp_devices.size(); ++i) {
-    TmpFileMgr::DeviceId tmp_device_id = tmp_devices[i];
-    // It is possible for a device to be blacklisted after it was returned by
-    // active_tmp_devices(), handle this gracefully by ignoring the return status of
-    // NewFile().
-    if (tmp_file_group->NewFile(tmp_device_id, query_id_).ok()) ++files_allocated;
-  }
-  DCHECK_EQ(tmp_file_group->NumFiles(), files_allocated);
-  if (tmp_file_group->NumFiles() == 0) {
-    return Status("No spilling directories configured. Cannot spill. Set --scratch_dirs"
-        " or see log for previous errors that prevented use of provided directories");
-  }
-  next_block_index_ = rand() % tmp_file_group->NumFiles();
-  return Status::OK();
 }
 
 Status BufferedBlockMgr::EncryptAndHash(Block* block, uint8_t** outbuf) {

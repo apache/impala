@@ -79,16 +79,8 @@ class RuntimeState;
 /// used simultaneously by multiple clients in any capacity.
 /// However, the block manager client is not thread-safe. That is, the block manager
 /// allows multiple single-threaded block manager clients.
-//
-/// TODO: When a block is read from disk, data is copied from the IOMgr buffer to the
-/// block manager's buffer. This should be avoided in the common case where these buffers
-/// are of the same size.
-/// TODO: See if the one big lock is a bottleneck. Break it up. This object is shared by
-/// all operators within a query (across fragments), see IMPALA-1883.
-/// TODO: No reason we can't spill the smaller buffers. Add it if we need to (it's likely
-/// just removing dchecks).
-/// TODO: The requirements on this object has grown organically. Consider a major
-/// reworking.
+///
+/// TODO: replace with BufferPool.
 class BufferedBlockMgr {
  private:
   struct BufferDescriptor;
@@ -100,8 +92,6 @@ class BufferedBlockMgr {
   /// The remaining memory that is not reserved by any clients is free for all and
   /// available to all clients.
   /// This is an opaque handle.
-  /// TODO: move the APIs to client we don't need to pass the BufferedBlockMgr around.
-  /// TODO: how can we ensure that each operator uses a separate client?
   struct Client;
 
   /// A fixed-size block of data that may be be persisted to disk. The state of the block
@@ -267,7 +257,6 @@ class BufferedBlockMgr {
 
     /// Block state variables. The block's buffer can be freed only if is_pinned_ and
     /// in_write_ are both false.
-    /// TODO: this might be better expressed as an enum.
 
     /// is_pinned_ is true while the block is pinned by a client.
     bool is_pinned_;
@@ -282,8 +271,6 @@ class BufferedBlockMgr {
     /// Condition variable to wait for the write to this block to finish. If 'in_write_'
     /// is true, notify_one() will eventually be called on this condition variable. Only
     /// on thread should wait on this cv at a time.
-    /// TODO: Currently we use block_mgr_->lock_ for this condvar. There is no reason to
-    /// use that lock_ that is already overloaded, see IMPALA-1883.
     boost::condition_variable write_complete_cv_;
 
     /// If true, this block is being written out so the underlying buffer can be
@@ -302,21 +289,20 @@ class BufferedBlockMgr {
 
   ~BufferedBlockMgr();
 
-  /// Registers a client with num_reserved_buffers. The returned client is owned
+  /// Registers a client with 'num_reserved_buffers'. The returned client is owned
   /// by the BufferedBlockMgr and has the same lifetime as it.
   /// We allow oversubscribing the reserved buffers. It is likely that the
-  /// num_reserved_buffers will be very pessimistic for small queries and we don't want to
+  /// 'num_reserved_buffers' will be very pessimistic for small queries and we don't want
+  /// to
   /// fail all of them with mem limit exceeded.
   /// The min reserved buffers is often independent of data size and we still want
   /// to run small queries with very small limits.
   /// Buffers used by this client are reflected in tracker.
-  /// tolerates_oversubscription determines how oversubscription is handled. If true,
+  /// 'tolerates_oversubscription' determines how oversubscription is handled. If true,
   /// failure to allocate a reserved buffer is not an error. If false, failure to
   /// allocate a reserved buffer is a MEM_LIMIT_EXCEEDED error.
-  /// debug_info is a string that will be printed in debug messages and errors to
+  /// 'debug_info' is a string that will be printed in debug messages and errors to
   /// identify the client.
-  /// TODO: The fact that we allow oversubscription is problematic.
-  /// as some code expects the reservations to always be granted (currently not the case).
   Status RegisterClient(const std::string& debug_info, int num_reserved_buffers,
       bool tolerates_oversubscription, MemTracker* tracker, RuntimeState* state,
       Client** client);
@@ -365,8 +351,9 @@ class BufferedBlockMgr {
   /// TryAcquireTmpReservation may be used to fulfill the request if available. If the
   /// request is unsuccessful, that temporary buffer space is not consumed.
   /// Returns false if there was not enough memory.
-  /// TODO: this is added specifically to support the Buckets structure in the hash table
-  /// which does not map well to Blocks. Revisit this.
+  ///
+  /// This is used only for the Buckets structure in the hash table, which cannot be
+  /// segmented into blocks.
   bool ConsumeMemory(Client* client, int64_t size);
 
   /// All successful allocates bytes from ConsumeMemory() must have a corresponding
@@ -410,21 +397,15 @@ class BufferedBlockMgr {
     /// Iterator into all_io_buffers_ for this buffer.
     std::list<BufferDescriptor*>::iterator all_buffers_it;
 
-    BufferDescriptor(uint8_t* buf, int64_t len)
-      : buffer(buf), len(len), block(NULL) {
-    }
+    BufferDescriptor(uint8_t* buf, int64_t len) : buffer(buf), len(len), block(NULL) {}
   };
 
-  BufferedBlockMgr(RuntimeState* state, TmpFileMgr* tmp_file_mgr,
-      int64_t block_size, int64_t scratch_limit);
+  BufferedBlockMgr(RuntimeState* state, TmpFileMgr* tmp_file_mgr, int64_t block_size,
+      int64_t scratch_limit);
 
   /// Initializes the block mgr. Idempotent and thread-safe.
-  void Init(DiskIoMgr* io_mgr, RuntimeProfile* profile,
-      MemTracker* parent_tracker, int64_t mem_limit);
-
-  /// Initializes tmp_files_. This is initialized the first time we need to write to disk.
-  /// Must be called with lock_ taken.
-  Status InitTmpFiles();
+  void Init(DiskIoMgr* io_mgr, TmpFileMgr* tmp_file_mgr, RuntimeProfile* profile,
+      MemTracker* parent_tracker, int64_t mem_limit, int64_t scratch_limit);
 
   /// PinBlock(), UnpinBlock(), DeleteBlock() perform the actual work of Block::Pin(),
   /// Unpin() and Delete(). DeleteBlock() must be called without the lock_ taken and
@@ -484,12 +465,6 @@ class BufferedBlockMgr {
   /// 'lock_' must be held with 'lock'.
   void WaitForWrite(boost::unique_lock<boost::mutex>& lock, Block* block);
 
-  /// Allocate block_size bytes in a temporary file. Try multiple disks if error occurs.
-  /// Returns an error only if no temporary files are usable or the scratch limit is
-  /// exceeded.
-  Status AllocateScratchSpace(int64_t block_size, TmpFileMgr::File** tmp_file,
-      int64_t* file_offset);
-
   /// Callback used by DiskIoMgr to indicate a block write has completed.  write_status
   /// is the status of the write. is_cancelled_ is set to true if write_status is not
   /// Status::OK or a re-issue of the write fails. Returns the block's buffer to the
@@ -528,14 +503,10 @@ class BufferedBlockMgr {
   /// Track buffers allocated by the block manager.
   boost::scoped_ptr<MemTracker> mem_tracker_;
 
-  /// The temporary file manager used to allocate temporary file space.
-  TmpFileMgr* tmp_file_mgr_;
-
   /// This lock protects the block and buffer lists below, except for unused_blocks_.
-  /// It also protects the various counters and changes to block state. Additionally, it is
-  /// used for the blocking condvars: buffer_available_cv_ and block->write_complete_cv_.
-  /// TODO: We should break the protection of the various structures and usages to
-  ///       different spinlocks and a mutex to be used in the wait()s, see IMPALA-1883.
+  /// It also protects the various counters and changes to block state. Additionally, it
+  /// is used for the blocking condvars: buffer_available_cv_ and
+  /// block->write_complete_cv_.
   boost::mutex lock_;
 
   /// If true, Init() has been called.
@@ -586,11 +557,7 @@ class BufferedBlockMgr {
 
   /// Group of temporary physical files, (one per tmp device) to which
   /// blocks may be written. Blocks are round-robined across these files.
-  boost::scoped_ptr<TmpFileMgr::FileGroup> tmp_file_group;
-
-  /// Index into 'tmp_file_group_' denoting the file to which the next block will be
-  /// written.
-  int next_block_index_;
+  boost::scoped_ptr<TmpFileMgr::FileGroup> tmp_file_group_;
 
   /// DiskIoMgr handles to read and write blocks.
   DiskIoMgr* io_mgr_;
@@ -631,9 +598,6 @@ class BufferedBlockMgr {
 
   /// Time spent in disk spill encryption, decryption, and integrity checking.
   RuntimeProfile::Counter* encryption_timer_;
-
-  /// Amount of scratch space allocated in bytes.
-  RuntimeProfile::Counter* scratch_space_bytes_used_counter_;
 
   /// Number of writes issued.
   int writes_issued_;
