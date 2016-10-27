@@ -8,16 +8,20 @@ The only requirement you should need to be aware of is, the scripts in this fold
 only tested on Linux. If you are using OS X, things probably won't work out of the box.
 
 Assuming you are using Linux, if you use the scripts in this folder, there shouldn't be
-any other requirements. The distcc program should be installed and configured
-automatically. Still, understanding what is involved could be useful.
+any other requirements other than setting up your build farm and your BUILD_FARM variable.
+
+Setting up a new distcc server is covered at the bottom of this document. Once your distcc
+servers are configured, set the environment variable BUILD_FARM on your build machine to
+to "host1/limit1,lzo host2/limit2,lzo" and so on.
+
+The rest of the setup is done for you; here is a short description of what they do:
 
 **You shouldn't need to do any of this, this scripts do this for you.**
 
 1. Install distcc and ccache. Most Linux distros have these packages. The scripts will
    install it if you have a yum or apt-get based system. Otherwise you should install
    distcc and ccache yourself through whatever package manager your system uses.
-1. Configure the remote distcc hosts. Set your environment variable BUILD_FARM to
-   "host1/limit1,lzo host2/limit2,lzo" and so on.
+1. Configure the remote distcc hosts.
 1. Your local compiler needs to be at the same path as it is on the remote build slaves.
    That path is /opt/Impala-Toolchain/<gcc-version-folder>/bin/gcc. In other words, make
    sure the Impala toolchain is available at /opt/Impala-Toolchain. That can be done
@@ -33,7 +37,7 @@ automatically. Still, understanding what is involved could be useful.
 1. Source "distcc_env.sh" in this directory. The script will attempt to install distcc
    if needed.
 
-        source "$IMPALA_AUX_TEST_HOME"/distcc/distcc_env.sh
+        source "$IMPALA_HOME"/bin/distcc/distcc_env.sh
 
 1. Run buildall.sh. The main purpose is to regenerate cmakefiles.
 
@@ -53,7 +57,7 @@ or
 bin/make_impala.sh
 ```
 
-### Switiching back to local compilation
+### Switching back to local compilation
 If you want to compile a very small change, a local build might be faster.
 ```
 switch_compiler local
