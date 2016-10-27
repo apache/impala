@@ -124,11 +124,13 @@ struct ColumnType {
     return ret;
   }
 
+  static bool ValidateDecimalParams(int precision, int scale) {
+    return precision >= 1 && precision <= MAX_PRECISION && scale >= 0
+        && scale <= MAX_SCALE && scale <= precision;
+  }
+
   static ColumnType CreateDecimalType(int precision, int scale) {
-    DCHECK_LE(precision, MAX_PRECISION);
-    DCHECK_LE(scale, MAX_SCALE);
-    DCHECK_GE(precision, 0);
-    DCHECK_LE(scale, precision);
+    DCHECK(ValidateDecimalParams(precision, scale)) << precision << ", " << scale;
     ColumnType ret;
     ret.type = TYPE_DECIMAL;
     ret.precision = precision;

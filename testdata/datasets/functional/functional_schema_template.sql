@@ -1509,6 +1509,16 @@ c1 FLOAT
 LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_avro_snap/truncated_float.avro' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
+functional
+---- BASE_TABLE_NAME
+bad_avro_decimal_schema
+---- COLUMNS
+name STRING
+value DECIMAL(5,2)
+---- DEPENDENT_LOAD
+LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_avro_snap/invalid_decimal_schema.avro' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
 -- IMPALA-694: uses data file produced by parquet-mr version 1.2.5-cdh4.5.0
 -- (can't use LOAD DATA LOCAL with Impala so copied in create-load-data.sh)
 functional

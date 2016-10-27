@@ -385,12 +385,15 @@ Status HdfsAvroScanner::VerifyTypesMatch(const AvroSchemaElement& table_schema,
     return Status::OK();
   }
 
-  ColumnType reader_type = AvroSchemaToColumnType(table_schema.schema);
-  ColumnType writer_type = AvroSchemaToColumnType(file_schema.schema);
+  ColumnType reader_type;
+  RETURN_IF_ERROR(AvroSchemaToColumnType(table_schema.schema, field_name, &reader_type));
+  ColumnType writer_type;
+  RETURN_IF_ERROR(AvroSchemaToColumnType(file_schema.schema, field_name, &writer_type));
   bool match = VerifyTypesMatch(reader_type, writer_type);
   if (match) return Status::OK();
   return Status(TErrorCode::AVRO_SCHEMA_RESOLUTION_ERROR, field_name,
-      avro_type_name(table_schema.schema->type), avro_type_name(file_schema.schema->type));
+      avro_type_name(table_schema.schema->type),
+      avro_type_name(file_schema.schema->type));
 }
 
 Status HdfsAvroScanner::VerifyTypesMatch(SlotDescriptor* slot_desc, avro_obj_t* schema) {
@@ -405,10 +408,12 @@ Status HdfsAvroScanner::VerifyTypesMatch(SlotDescriptor* slot_desc, avro_obj_t* 
   // TODO: update if/when we have TYPE_STRUCT primitive type
   if (schema->type == AVRO_RECORD) {
     return Status(TErrorCode::AVRO_SCHEMA_METADATA_MISMATCH, col_name,
-      slot_desc->type().DebugString(), avro_type_name(schema->type));
+        slot_desc->type().DebugString(), avro_type_name(schema->type));
   }
 
-  bool match = VerifyTypesMatch(slot_desc->type(), AvroSchemaToColumnType(schema));
+  ColumnType file_type;
+  RETURN_IF_ERROR(AvroSchemaToColumnType(schema, col_name, &file_type));
+  bool match = VerifyTypesMatch(slot_desc->type(), file_type);
   if (match) return Status::OK();
   return Status(TErrorCode::AVRO_SCHEMA_METADATA_MISMATCH, col_name,
       slot_desc->type().DebugString(), avro_type_name(schema->type));
