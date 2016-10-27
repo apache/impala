@@ -1,6 +1,7 @@
 ---- Template SQL statements to create and load TPCDS tables in KUDU.
----- TODO: Change to the new syntax for CREATE TABLE statements (IMPALA-3719)
 ---- TODO: Use range partitioning for some tables
+---- TODO: Remove the 'kudu.master_addresses' from TBLPROPERTIES once CM properly sets
+---- the 'kudu_masters' startup option in Impala.
 ---- TODO: Fix the primary key column order
 ---- TODO: Use different number of buckets for fact and dimension tables
 
@@ -28,15 +29,11 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.store_sales (
   ss_coupon_amt DOUBLE,
   ss_net_paid DOUBLE,
   ss_net_paid_inc_tax DOUBLE,
-  ss_net_profit DOUBLE
+  ss_net_profit DOUBLE,
+  PRIMARY KEY (ss_ticket_number, ss_item_sk)
 )
 DISTRIBUTE BY HASH (ss_ticket_number,ss_item_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = '{target_db_name}_store_sales',
-'kudu.master_addresses' = '{kudu_master}:7051',
-'kudu.key_columns' = 'ss_ticket_number, ss_item_sk'
-);
+TBLPROPERTIES ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.store_sales
 SELECT
@@ -99,15 +96,11 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.web_sales (
   ws_net_paid_inc_tax DOUBLE,
   ws_net_paid_inc_ship DOUBLE,
   ws_net_paid_inc_ship_tax DOUBLE,
-  ws_net_profit DOUBLE
+  ws_net_profit DOUBLE,
+  PRIMARY KEY (wd_order_number, ws_item_sk)
 )
 DISTRIBUTE BY HASH (ws_order_number,ws_item_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = '{target_db_name}_web_sales',
-'kudu.master_addresses' = '{kudu_master}:7051',
-'kudu.key_columns' = 'ws_order_number, ws_item_sk'
-);
+TBLPROPERTIES ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.web_sales
 SELECT
@@ -182,15 +175,11 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.catalog_sales (
   cs_net_paid_inc_tax DOUBLE,
   cs_net_paid_inc_ship DOUBLE,
   cs_net_paid_inc_ship_tax DOUBLE,
-  cs_net_profit DOUBLE
+  cs_net_profit DOUBLE,
+  PRIMARY KEY (cs_order_number, cs_item_sk)
 )
 DISTRIBUTE BY HASH (cs_order_number,cs_item_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES(
-'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-'kudu.table_name' = '{target_db_name}_catalog_sales',
-'kudu.master_addresses' = '{kudu_master}:7051',
-'kudu.key_columns' = 'cs_order_number, cs_item_sk'
-);
+TBLPROPERTIES ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.catalog_sales
 SELECT
@@ -251,14 +240,11 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.store_returns (
   sr_refunded_cash DOUBLE,
   sr_reversed_charge DOUBLE,
   sr_store_credit DOUBLE,
-  sr_net_loss DOUBLE
+  sr_net_loss DOUBLE,
+  PRIMARY KEY (sr_ticket_number, sr_item_sk)
 )
 DISTRIBUTE BY HASH (sr_ticket_number,sr_item_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='sr_ticket_number, sr_item_sk',
-'kudu.table_name'='{target_db_name}_store_returns',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.store_returns
 SELECT
@@ -309,14 +295,11 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.web_returns (
   wr_refunded_cash DOUBLE,
   wr_reversed_charge DOUBLE,
   wr_account_credit DOUBLE,
-  wr_net_loss DOUBLE
+  wr_net_loss DOUBLE,
+  PRIMARY KEY (wr_order_number, wr_item_sk)
 )
 DISTRIBUTE BY HASH (wr_order_number,wr_item_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='wr_order_number, wr_item_sk',
-'kudu.table_name'='{target_db_name}_web_returns',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.web_returns
 SELECT
@@ -374,14 +357,11 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.catalog_returns (
   cr_refunded_cash DOUBLE,
   cr_reversed_charge DOUBLE,
   cr_store_credit DOUBLE,
-  cr_net_loss DOUBLE
+  cr_net_loss DOUBLE,
+  PRIMARY KEY (cr_order_number, cr_item_sk)
 )
 DISTRIBUTE BY HASH (cr_order_number,cr_item_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='cr_order_number, cr_item_sk',
-'kudu.table_name'='{target_db_name}_catalog_returns',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.catalog_returns
 SELECT
@@ -419,21 +399,18 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.inventory (
   inv_date_sk BIGINT,
   inv_item_sk BIGINT,
   inv_warehouse_sk BIGINT,
-  inv_quantity_on_hand BIGINT
+  inv_quantity_on_hand BIGINT,
+  PRIMARY KEY (inv_date_sk, inv_item_sk, inv_warehouse_sk)
 )
 DISTRIBUTE BY HASH (inv_item_sk,inv_date_sk,inv_warehouse_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='inv_date_sk,inv_item_sk,inv_warehouse_sk',
-'kudu.table_name'='{target_db_name}_inventory',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.inventory SELECT * FROM {source_db_name}.inventory;
 
 ---- CUSTOMER
 
 CREATE TABLE {target_db_name}.customer (
-  c_customer_sk BIGINT,
+  c_customer_sk BIGINT PRIMARY KEY,
   c_customer_id STRING,
   c_current_cdemo_sk BIGINT,
   c_current_hdemo_sk BIGINT,
@@ -453,17 +430,13 @@ CREATE TABLE {target_db_name}.customer (
   c_last_review_date BIGINT
 )
 DISTRIBUTE BY HASH (c_customer_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='c_customer_sk',
-'kudu.table_name'='{target_db_name}_customer',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.customer SELECT * FROM {source_db_name}.customer;
 
 ---- CUSTOMER_ADDRESS
 CREATE TABLE IF NOT EXISTS {target_db_name}.customer_address (
-  ca_address_sk BIGINT,
+  ca_address_sk BIGINT PRIMARY KEY,
   ca_address_id STRING,
   ca_street_number STRING,
   ca_street_name STRING,
@@ -478,18 +451,14 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.customer_address (
   ca_location_type STRING
 )
 DISTRIBUTE BY HASH (ca_address_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='ca_address_sk',
-'kudu.table_name'='{target_db_name}_customer_address',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.customer_address
 SELECT * FROM {source_db_name}.customer_address;
 
 ---- CUSTOMER_DEMOGRAPHICS
 CREATE TABLE IF NOT EXISTS {target_db_name}.customer_demographics (
-  cd_demo_sk BIGINT,
+  cd_demo_sk BIGINT PRIMARY KEY,
   cd_gender STRING,
   cd_marital_status STRING,
   cd_education_status STRING,
@@ -500,18 +469,14 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.customer_demographics (
   cd_dep_college_count BIGINT
 )
 DISTRIBUTE BY HASH (cd_demo_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='cd_demo_sk',
-'kudu.table_name'='{target_db_name}_customer_demographics',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.customer_demographics
 SELECT * FROM {source_db_name}.customer_demographics;
 
 ---- DATE_DIM
 CREATE TABLE IF NOT EXISTS {target_db_name}.date_dim (
-  d_date_sk BIGINT,
+  d_date_sk BIGINT PRIMARY KEY,
   d_date_id STRING,
   d_date STRING,
   d_month_seq BIGINT,
@@ -541,35 +506,27 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.date_dim (
   d_current_year STRING
 )
 DISTRIBUTE BY HASH (d_date_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='d_date_sk',
-'kudu.table_name'='{target_db_name}_date_dim',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.date_dim SELECT * FROM {source_db_name}.date_dim;
 
 ---- HOUSEHOLD_DEMOGRAPHICS
 CREATE TABLE IF NOT EXISTS {target_db_name}.household_demographics (
-  hd_demo_sk BIGINT,
+  hd_demo_sk BIGINT PRIMARY KEY,
   hd_income_band_sk BIGINT,
   hd_buy_potential STRING,
   hd_dep_count BIGINT,
   hd_vehicle_count BIGINT
 )
 DISTRIBUTE BY HASH (hd_demo_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='hd_demo_sk',
-'kudu.table_name'='{target_db_name}_household_demographics',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.household_demographics
 SELECT * FROM {source_db_name}.household_demographics;
 
 ---- ITEM
 CREATE TABLE IF NOT EXISTS {target_db_name}.item (
-  i_item_sk BIGINT,
+  i_item_sk BIGINT PRIMARY KEY,
   i_item_id STRING,
   i_rec_start_date STRING,
   i_rec_end_date STRING,
@@ -593,17 +550,13 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.item (
   i_product_name STRING
 )
 DISTRIBUTE BY HASH (i_item_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='i_item_sk',
-'kudu.table_name'='{target_db_name}_item',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.item SELECT * FROM {source_db_name}.item;
 
 ---- PROMOTION
 CREATE TABLE IF NOT EXISTS {target_db_name}.promotion (
-  p_promo_sk BIGINT,
+  p_promo_sk BIGINT PRIMARY KEY,
   p_item_sk BIGINT,
   p_start_date_sk BIGINT,
   p_end_date_sk BIGINT,
@@ -624,11 +577,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.promotion (
   p_discount_active STRING
 )
 DISTRIBUTE BY HASH (p_promo_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='p_promo_sk',
-'kudu.table_name'='{target_db_name}_promotion',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.promotion
 SELECT
@@ -655,7 +604,7 @@ FROM {source_db_name}.promotion;
 
 ---- STORE
 CREATE TABLE IF NOT EXISTS {target_db_name}.store (
-  s_store_sk BIGINT,
+  s_store_sk BIGINT PRIMARY KEY,
   s_store_id STRING,
   s_rec_start_date STRING,
   s_rec_end_date STRING,
@@ -686,17 +635,13 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.store (
   s_tax_precentage DOUBLE
 )
 DISTRIBUTE BY HASH (s_store_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='s_store_sk',
-'kudu.table_name'='{target_db_name}_store',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.store SELECT * FROM {source_db_name}.store;
 
 ---- TIME_DIM
 CREATE TABLE IF NOT EXISTS {target_db_name}.time_dim (
-  t_time_sk BIGINT,
+  t_time_sk BIGINT PRIMARY KEY,
   t_time_id STRING,
   t_time BIGINT,
   t_hour BIGINT,
@@ -708,17 +653,13 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.time_dim (
   t_meal_time STRING
 )
 DISTRIBUTE BY HASH (t_time_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='t_time_sk',
-'kudu.table_name'='{target_db_name}_time_dim',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.time_dim SELECT * FROM {source_db_name}.time_dim;
 
 ---- CALL_CENTER
 CREATE TABLE IF NOT EXISTS {target_db_name}.call_center (
-  cc_call_center_sk BIGINT,
+  cc_call_center_sk BIGINT PRIMARY KEY,
   cc_call_center_id STRING,
   cc_rec_start_date STRING,
   cc_rec_end_date STRING,
@@ -751,17 +692,13 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.call_center (
   cc_tax_percentage DOUBLE
 )
 DISTRIBUTE BY HASH (cc_call_center_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='cc_call_center_sk',
-'kudu.table_name'='{target_db_name}_call_center',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.call_center SELECT * FROM {source_db_name}.call_center;
 
 ---- CATALOG_PAGE
 CREATE TABLE IF NOT EXISTS {target_db_name}.catalog_page (
-  cp_catalog_page_sk BIGINT,
+  cp_catalog_page_sk BIGINT PRIMARY KEY,
   cp_catalog_page_id STRING,
   cp_start_date_sk BIGINT,
   cp_end_date_sk BIGINT,
@@ -772,47 +709,35 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.catalog_page (
   cp_type STRING
 )
 DISTRIBUTE BY HASH (cp_catalog_page_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='cp_catalog_page_sk',
-'kudu.table_name'='{target_db_name}_catalog_page',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.catalog_page SELECT * FROM {source_db_name}.catalog_page;
 
 ---- INCOME_BANDS
 CREATE TABLE IF NOT EXISTS {target_db_name}.income_band (
-  ib_income_band_sk BIGINT,
+  ib_income_band_sk BIGINT PRIMARY KEY,
   ib_lower_bound BIGINT,
   ib_upper_bound BIGINT
 )
 DISTRIBUTE BY HASH (ib_income_band_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='ib_income_band_sk',
-'kudu.table_name'='{target_db_name}_income_band',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.income_band SELECT * FROM {source_db_name}.income_band;
 
 ---- REASON
 CREATE TABLE IF NOT EXISTS {target_db_name}.reason (
-  r_reason_sk BIGINT,
+  r_reason_sk BIGINT PRIMARY KEY,
   r_reason_id STRING,
   r_reason_desc STRING
 )
 DISTRIBUTE BY HASH (r_reason_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='r_reason_sk',
-'kudu.table_name'='{target_db_name}_reason',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.reason SELECT * FROM {source_db_name}.reason;
 
 ---- SHIP_MODE
 CREATE TABLE IF NOT EXISTS {target_db_name}.ship_mode (
-  sm_ship_mode_sk BIGINT,
+  sm_ship_mode_sk BIGINT PRIMARY KEY,
   sm_ship_mode_id STRING,
   sm_type STRING,
   sm_code STRING,
@@ -820,17 +745,13 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.ship_mode (
   sm_contract STRING
 )
 DISTRIBUTE BY HASH (sm_ship_mode_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='sm_ship_mode_sk',
-'kudu.table_name'='{target_db_name}_ship_mode',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.ship_mode SELECT * FROM {source_db_name}.ship_mode;
 
 ---- WAREHOUSE
 CREATE TABLE IF NOT EXISTS {target_db_name}.warehouse (
-  w_warehouse_sk BIGINT,
+  w_warehouse_sk BIGINT PRIMARY KEY,
   w_warehouse_id STRING,
   w_warehouse_name STRING,
   w_warehouse_sq_ft BIGINT,
@@ -846,17 +767,13 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.warehouse (
   w_gmt_offset DOUBLE
 )
 DISTRIBUTE BY HASH (w_warehouse_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='w_warehouse_sk',
-'kudu.table_name'='{target_db_name}_warehouse',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.warehouse SELECT * FROM {source_db_name}.warehouse;
 
 ---- WEB_PAGE
 CREATE TABLE IF NOT EXISTS {target_db_name}.web_page (
-  wp_web_page_sk BIGINT,
+  wp_web_page_sk BIGINT PRIMARY KEY,
   wp_web_page_id STRING,
   wp_rec_start_date STRING,
   wp_rec_end_date STRING,
@@ -872,17 +789,13 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.web_page (
   wp_max_ad_count BIGINT
 )
 DISTRIBUTE BY HASH (wp_web_page_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='wp_web_page_sk',
-'kudu.table_name'='{target_db_name}_web_page',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.web_page SELECT * FROM {source_db_name}.web_page;
 
 ---- WEB_SITE
 CREATE TABLE IF NOT EXISTS {target_db_name}.web_site (
-  web_site_sk BIGINT,
+  web_site_sk BIGINT PRIMARY KEY,
   web_site_id STRING,
   web_rec_start_date STRING,
   web_rec_end_date STRING,
@@ -910,11 +823,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.web_site (
   web_tax_percentage DOUBLE
 )
 DISTRIBUTE BY HASH (web_site_sk) INTO {buckets} BUCKETS
-TBLPROPERTIES (
-'kudu.master_addresses'='{kudu_master}:7051',
-'kudu.key_columns'='web_site_sk',
-'kudu.table_name'='{target_db_name}_web_site',
-'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler');
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.web_site SELECT * FROM {source_db_name}.web_site;
 
