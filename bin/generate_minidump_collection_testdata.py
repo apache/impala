@@ -68,10 +68,10 @@ CONFIG_FILE = '''-beeswax_port=21000
 -log_dir={0}
 -minidump_path={1}
 -max_lineage_log_file_size=5000
--hostname=vb0204.halxg.cloudera.com
--state_store_host=vb0202.halxg.cloudera.com
+-hostname=host1.example.com
+-state_store_host=host2.example.com
 -state_store_port=24000
--catalog_service_host=vb0202.halxg.cloudera.com
+-catalog_service_host=host2.example.com
 -catalog_service_port=26000
 -local_library_dir=/var/lib/impala/udfs
 -disable_admission_control=true
