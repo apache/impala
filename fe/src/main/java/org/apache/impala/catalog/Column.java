@@ -124,7 +124,7 @@ public class Column {
     return Lists.transform(columns, new Function<Column, FieldSchema>() {
       public FieldSchema apply(Column column) {
         Preconditions.checkNotNull(column.getType());
-        return new FieldSchema(column.getName(), column.getType().toSql(),
+        return new FieldSchema(column.getName(), column.getType().toSql().toLowerCase(),
             column.getComment());
       }
     });

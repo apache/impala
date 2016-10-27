@@ -18,6 +18,7 @@
 # Impala tests for queries that query metadata and set session settings
 
 import pytest
+import re
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -75,13 +76,36 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   @SkipIfS3.hive
   @SkipIfLocal.hive
   def test_describe_formatted(self, vector, unique_database):
+    # For describe formmated, we try to match Hive's output as closely as possible.
+    # However, we're inconsistent with our handling of NULLs vs theirs - Impala sometimes
+    # specifies 'NULL' where Hive uses an empty string, and Hive somtimes specifies 'null'
+    # with padding where Impala uses a sequence of blank spaces - and for now
+    # we want to leave it that way to not affect users who rely on this output.
+    def compare_describe_formatted(impala_results, hive_results):
+      for impala, hive in zip(re.split(',|\n', impala_results),
+          re.split(',|\n', hive_results)):
+
+        if impala != hive:
+          # If they don't match, check if it's because of the inconsistent null handling.
+          impala = impala.replace(' ', '').lower()
+          hive = hive.replace(' ', '').lower()
+          if not ((impala == "'null'" and hive ==  "''") or
+              (impala == "''" and hive == "'null'")):
+            return False
+      return True
+
     # Describe a partitioned table.
-    self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes")
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes",
+        compare=compare_describe_formatted)
     self.exec_and_compare_hive_and_impala_hs2(
-        "describe formatted functional_text_lzo.alltypes")
+        "describe formatted functional_text_lzo.alltypes",
+        compare=compare_describe_formatted)
+
     # Describe an unpartitioned table.
-    self.exec_and_compare_hive_and_impala_hs2("describe formatted tpch.lineitem")
-    self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.jointbl")
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted tpch.lineitem",
+        compare=compare_describe_formatted)
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.jointbl",
+        compare=compare_describe_formatted)
 
     # Create and describe an unpartitioned and partitioned Avro table created
     # by Impala without any column definitions.
@@ -91,20 +115,19 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     self.client.execute((
         "create table %s.%s with serdeproperties ('avro.schema.url'='%s') stored as avro"
         % (unique_database, "avro_alltypes_nopart", self.AVRO_SCHEMA_LOC)))
-    self.exec_and_compare_hive_and_impala_hs2("describe formatted avro_alltypes_nopart")
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted avro_alltypes_nopart",
+        compare=compare_describe_formatted)
 
     self.client.execute((
         "create table %s.%s partitioned by (year int, month int) "
         "with serdeproperties ('avro.schema.url'='%s') stored as avro"
         % (unique_database, "avro_alltypes_part", self.AVRO_SCHEMA_LOC)))
-    self.exec_and_compare_hive_and_impala_hs2("describe formatted avro_alltypes_part")
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted avro_alltypes_part",
+        compare=compare_describe_formatted)
 
-    try:
-      # Describe a view
-      self.exec_and_compare_hive_and_impala_hs2(\
-          "describe formatted functional.alltypes_view_sub")
-    except AssertionError:
-      pytest.xfail("Investigate minor difference in displaying null vs empty values")
+    self.exec_and_compare_hive_and_impala_hs2(\
+        "describe formatted functional.alltypes_view_sub",
+        compare=compare_describe_formatted)
 
   @pytest.mark.execute_serially # due to data src setup/teardown
   def test_show_data_sources(self, vector):

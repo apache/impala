@@ -467,24 +467,23 @@ class ImpalaTestSuite(BaseTestSuite):
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
 
-  def exec_and_compare_hive_and_impala_hs2(self, stmt):
+  def exec_and_compare_hive_and_impala_hs2(self, stmt, compare = lambda x, y: x == y):
     """Compare Hive and Impala results when executing the same statment over HS2"""
     # execute_using_jdbc expects a Query object. Convert the query string into a Query
     # object
     query = Query()
     query.query_str = stmt
     # Run the statement targeting Hive
-    exec_opts = JdbcQueryExecConfig(impalad=HIVE_HS2_HOST_PORT)
+    exec_opts = JdbcQueryExecConfig(impalad=HIVE_HS2_HOST_PORT, transport='SASL')
     hive_results = execute_using_jdbc(query, exec_opts).data
 
     # Run the statement targeting Impala
-    exec_opts = JdbcQueryExecConfig(impalad=IMPALAD_HS2_HOST_PORT)
+    exec_opts = JdbcQueryExecConfig(impalad=IMPALAD_HS2_HOST_PORT, transport='NOSASL')
     impala_results = execute_using_jdbc(query, exec_opts).data
 
     # Compare the results
     assert (impala_results is not None) and (hive_results is not None)
-    for impala, hive in zip(impala_results, hive_results):
-      assert impala == hive
+    assert compare(impala_results, hive_results)
 
   def load_query_test_file(self, workload, file_name, valid_section_names=None,
       encoding=None):

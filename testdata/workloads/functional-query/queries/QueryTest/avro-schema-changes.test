@@ -101,8 +101,8 @@ DESCRIBE FORMATTED avro_alter_schema_add_new_column;
 ---- TYPES
 string,string,string
 ---- RESULTS: VERIFY_IS_SUBSET
-'old_col','STRING','from deserializer'
-'new_col','STRING','from deserializer'
+'old_col','string','from deserializer'
+'new_col','string','from deserializer'
 ====
 ---- QUERY
 # IMPALA-3776: Create an Avro table, remove a column from the Avro schema and make sure
@@ -134,5 +134,5 @@ DESCRIBE FORMATTED avro_alter_schema_remove_column;
 ---- TYPES
 string,string,string
 ---- RESULTS: VERIFY_IS_SUBSET
-'col1','STRING','from deserializer'
+'col1','string','from deserializer'
 ====
