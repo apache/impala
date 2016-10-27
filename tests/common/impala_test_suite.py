@@ -169,14 +169,14 @@ class ImpalaTestSuite(BaseTestSuite):
     self.client.set_configuration({'sync_ddl': sync_ddl})
     self.client.execute("drop database if exists `" + db_name + "` cascade")
 
-  def __restore_query_options(self, query_options_changed):
+  def __restore_query_options(self, query_options_changed, impalad_client):
     """
     Restore the list of modified query options to their default values.
     """
     # Populate the default query option if it's empty.
     if not self.default_query_options:
       try:
-        query_options = self.client.get_default_configuration()
+        query_options = impalad_client.get_default_configuration()
         for query_option in query_options:
           self.default_query_options[query_option.key.upper()] = query_option.value
       except Exception as e:
@@ -190,7 +190,7 @@ class ImpalaTestSuite(BaseTestSuite):
       default_val = self.default_query_options[query_option]
       query_str = 'SET '+ query_option + '=' + default_val + ';'
       try:
-        self.client.execute(query_str)
+        impalad_client.execute(query_str)
       except Exception as e:
         LOG.info('Unexpected exception when executing ' + query_str + ' : ' + str(e))
 
@@ -325,7 +325,7 @@ class ImpalaTestSuite(BaseTestSuite):
         raise
       finally:
         if len(query_options_changed) > 0:
-          self.__restore_query_options(query_options_changed)
+          self.__restore_query_options(query_options_changed, target_impalad_client)
 
       if 'CATCH' in test_section:
         assert test_section['CATCH'].strip() == ''
