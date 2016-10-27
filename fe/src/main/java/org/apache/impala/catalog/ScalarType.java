@@ -266,7 +266,7 @@ public class ScalarType extends Type {
 
   @Override
   public boolean isSupported() {
-    return !getUnsupportedTypes().contains(this);
+    return isValid() && !getUnsupportedTypes().contains(this);
   }
 
   @Override

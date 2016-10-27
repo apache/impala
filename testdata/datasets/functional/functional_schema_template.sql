@@ -1434,6 +1434,7 @@ unsupported_types
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   int_col INT,
   dec_col DECIMAL,
+  date_col DATE,
   str_col STRING,
   bin_col BINARY,
   bigint_col BIGINT)
