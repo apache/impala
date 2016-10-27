@@ -1,0 +1,13 @@
+====
+---- QUERY
+# Expected timeout while planning the scan node.
+# TODO: improve error messages (here and below) when KUDU-1734 is resolved
+select * from functional_kudu.alltypes
+---- CATCH
+Unable to initialize the Kudu scan node
+====
+---- QUERY
+show table stats functional_kudu.alltypes
+---- CATCH
+Error accessing Kudu for table stats
+====

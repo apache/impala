@@ -211,7 +211,8 @@ class ImpalaTestSuite(BaseTestSuite):
       # Strip newlines so we can split error message into multiple lines
       expected_str = expected_str.replace('\n', '')
       if expected_str in actual_str: return
-    assert False, 'Unexpected exception string: %s' % actual_str
+    assert False, 'Unexpected exception string. Expected: %s\nNot found in actual: %s' % \
+      (expected_str, actual_str)
 
   def __verify_results_and_errors(self, vector, test_section, result, use_db):
     """Verifies that both results and error sections are as expected. Rewrites both

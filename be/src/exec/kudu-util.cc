@@ -28,9 +28,12 @@
 #include "common/status.h"
 
 using kudu::client::KuduSchema;
+using kudu::client::KuduClient;
+using kudu::client::KuduClientBuilder;
 using kudu::client::KuduColumnSchema;
 
 DECLARE_bool(disable_kudu);
+DECLARE_int32(kudu_operation_timeout_ms);
 
 namespace impala {
 
@@ -52,6 +55,14 @@ Status CheckKuduAvailability() {
     }
   }
   return Status(TErrorCode::KUDU_NOT_SUPPORTED_ON_OS);
+}
+
+Status CreateKuduClient(const vector<string>& master_addrs,
+    kudu::client::sp::shared_ptr<KuduClient>* client) {
+  kudu::client::KuduClientBuilder b;
+  for (const string& address: master_addrs) b.add_master_server_addr(address);
+  KUDU_RETURN_IF_ERROR(b.Build(client), "Unable to create Kudu client");
+  return Status::OK();
 }
 
 string KuduSchemaDebugString(const KuduSchema& schema) {

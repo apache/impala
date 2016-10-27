@@ -42,10 +42,11 @@ DEFINE_string(sentry_config, "", "Local path to a sentry-site.xml configuration 
     "file. If set, authorization will be enabled.");
 
 DECLARE_int32(non_impala_java_vlog);
+DECLARE_int32(kudu_operation_timeout_ms);
 
 Catalog::Catalog() {
   JniMethodDescriptor methods[] = {
-    {"<init>", "(ZILjava/lang/String;IIZLjava/lang/String;Ljava/lang/String;)V",
+    {"<init>", "(ZILjava/lang/String;IIZLjava/lang/String;Ljava/lang/String;I)V",
         &catalog_ctor_},
     {"updateCatalog", "([B)[B", &update_metastore_id_},
     {"execDdl", "([B)[B", &exec_ddl_id_},
@@ -77,10 +78,11 @@ Catalog::Catalog() {
   jboolean auth_to_local = FLAGS_load_auth_to_local_rules && !FLAGS_principal.empty();
   jstring principal = jni_env->NewStringUTF(FLAGS_principal.c_str());
   jstring local_library_dir = jni_env->NewStringUTF(FLAGS_local_library_dir.c_str());
+  jint kudu_operation_timeout = FLAGS_kudu_operation_timeout_ms;
   jobject catalog = jni_env->NewObject(catalog_class_, catalog_ctor_,
       load_in_background, num_metadata_loading_threads, sentry_config,
       FlagToTLogLevel(FLAGS_v), FlagToTLogLevel(FLAGS_non_impala_java_vlog),
-      auth_to_local, principal, local_library_dir);
+      auth_to_local, principal, local_library_dir, kudu_operation_timeout);
   EXIT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, catalog, &catalog_));
 }

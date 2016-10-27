@@ -100,10 +100,10 @@ class KuduTableSink : public DataSink {
   std::vector<ExprContext*> output_expr_ctxs_;
 
   /// The Kudu client, table and session.
-  /// This uses 'std::tr1::shared_ptr' as that is the type expected by Kudu.
-  std::tr1::shared_ptr<kudu::client::KuduClient> client_;
-  std::tr1::shared_ptr<kudu::client::KuduTable> table_;
-  std::tr1::shared_ptr<kudu::client::KuduSession> session_;
+  /// This uses 'kudu::client::sp::shared_ptr' as that is the type expected by Kudu.
+  kudu::client::sp::shared_ptr<kudu::client::KuduClient> client_;
+  kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
+  kudu::client::sp::shared_ptr<kudu::client::KuduSession> session_;
 
   /// Used to specify the type of write operation (INSERT/UPDATE/DELETE).
   TSinkAction::type sink_action_;

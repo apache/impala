@@ -21,12 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
@@ -36,7 +30,6 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
@@ -56,6 +49,12 @@ import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -81,9 +80,10 @@ public class JniCatalog {
 
   public JniCatalog(boolean loadInBackground, int numMetadataLoadingThreads,
       String sentryServiceConfig, int impalaLogLevel, int otherLogLevel,
-      boolean allowAuthToLocal, String kerberosPrincipal, String localLibraryPath)
-      throws InternalException {
+      boolean allowAuthToLocal, String kerberosPrincipal, String localLibraryPath,
+      int kuduOperationTimeoutMs) throws InternalException {
     BackendConfig.setAuthToLocal(allowAuthToLocal);
+    BackendConfig.setKuduClientTimeoutMs(kuduOperationTimeoutMs);
     Preconditions.checkArgument(numMetadataLoadingThreads > 0);
     // This trick saves having to pass a TLogLevel enum, which is an object and more
     // complex to pass through JNI.

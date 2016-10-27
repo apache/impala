@@ -17,6 +17,8 @@
 
 package org.apache.impala.service;
 
+import com.google.common.base.Preconditions;
+
 /**
  * This class is meant to provide the FE with impalad backend configuration parameters,
  * including command line arguments.
@@ -31,9 +33,14 @@ public class BackendConfig {
   // the default FLAGS_read_size used by the IO manager in the backend.
   private final long READ_SIZE;
 
-  // This is overriden by JniFrontend/JniCatalog classes with user set configuration.
-  // TODO: Read this from backend instead of using static variables.
+  // Variables below are overriden by JniFrontend/JniCatalog with user set configuration.
+  // TODO: Read from backend instead of using static variables.
+
+  // Determines how principal to short name conversion works. See User.java for more info.
   private static boolean allowAuthToLocalRules_ = false;
+
+  // Kudu client timeout (ms).
+  private static int kuduOperationTimeoutMs_ = 3 * 60 * 1000;
 
   private BackendConfig() {
     // TODO: Populate these by making calls to the backend instead of default constants.
@@ -45,5 +52,12 @@ public class BackendConfig {
   public static boolean isAuthToLocalEnabled() { return allowAuthToLocalRules_; }
   public static void setAuthToLocal(boolean authToLocal) {
     allowAuthToLocalRules_ = authToLocal;
+  }
+
+  public static int getKuduClientTimeoutMs() { return kuduOperationTimeoutMs_; }
+
+  public static void setKuduClientTimeoutMs(int kuduOperationTimeoutMs) {
+    Preconditions.checkArgument(kuduOperationTimeoutMs > 0);
+    BackendConfig.kuduOperationTimeoutMs_ = kuduOperationTimeoutMs;
   }
 }

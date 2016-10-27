@@ -108,7 +108,15 @@ DEFINE_int32(fault_injection_rpc_type, 0, "A fault injection option that specifi
     "which rpc call will be injected with the delay. Effective in debug builds only.");
 #endif
 
+// Used for testing the path where the Kudu client is stubbed.
 DEFINE_bool(disable_kudu, false, "If true, Kudu features will be disabled.");
+
+// Timeout (ms) used in the FE for admin and metadata operations (set on the KuduClient),
+// and in the BE for scans and writes (set on the KuduScanner and KuduSession
+// accordingly).
+DEFINE_int32(kudu_operation_timeout_ms, 3 * 60 * 1000, "Timeout (milliseconds) set for "
+    "all Kudu operations. This must be a positive value, and there is no way to disable "
+    "timeouts.");
 
 DEFINE_bool(enable_accept_queue_server, true,
     "If true, uses a modified version of "

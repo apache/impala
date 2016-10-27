@@ -33,6 +33,7 @@ DECLARE_string(sentry_config);
 DECLARE_int32(non_impala_java_vlog);
 DECLARE_bool(load_auth_to_local_rules);
 DECLARE_string(principal);
+DECLARE_int32(kudu_operation_timeout_ms);
 
 DEFINE_bool(load_catalog_at_startup, false, "if true, load all catalog data at startup");
 
@@ -64,7 +65,7 @@ DEFINE_string(kudu_master_hosts, "", "Specifies the default Kudu master(s). The 
 Frontend::Frontend() {
   JniMethodDescriptor methods[] = {
     {"<init>", "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;"
-        "Ljava/lang/String;IIZLjava/lang/String;)V", &fe_ctor_},
+        "Ljava/lang/String;IIZLjava/lang/String;I)V", &fe_ctor_},
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "([B)[B", &get_hadoop_config_id_},
@@ -114,9 +115,11 @@ Frontend::Frontend() {
   // and impala is kerberized.
   jboolean auth_to_local = FLAGS_load_auth_to_local_rules && !FLAGS_principal.empty();
   jstring kudu_master_hosts = jni_env->NewStringUTF(FLAGS_kudu_master_hosts.c_str());
+  jint kudu_operation_timeout = FLAGS_kudu_operation_timeout_ms;
   jobject fe = jni_env->NewObject(fe_class_, fe_ctor_, lazy, server_name,
       policy_file_path, sentry_config, auth_provider_class, FlagToTLogLevel(FLAGS_v),
-      FlagToTLogLevel(FLAGS_non_impala_java_vlog), auth_to_local, kudu_master_hosts);
+      FlagToTLogLevel(FLAGS_non_impala_java_vlog), auth_to_local, kudu_master_hosts,
+      kudu_operation_timeout);
   EXIT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 }

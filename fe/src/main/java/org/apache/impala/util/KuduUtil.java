@@ -17,31 +17,47 @@
 
 package org.apache.impala.util;
 
+import static java.lang.String.format;
+
 import java.util.HashSet;
 import java.util.List;
+
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TExpr;
+import org.apache.impala.thrift.TExprNode;
+import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Schema;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduClient.KuduClientBuilder;
+import org.apache.kudu.client.PartialRow;
+import org.apache.kudu.client.RangePartitionBound;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
-import org.apache.impala.catalog.ScalarType;
-import org.apache.impala.catalog.Type;
-import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.common.Pair;
-import org.apache.impala.thrift.TExpr;
-import org.apache.impala.thrift.TExprNode;
-
-import org.apache.kudu.ColumnSchema;
-import org.apache.kudu.Schema;
-import org.apache.kudu.client.PartialRow;
-import org.apache.kudu.client.RangePartitionBound;
-
-import static java.lang.String.format;
-
 public class KuduUtil {
 
   private static final String KUDU_TABLE_NAME_PREFIX = "impala::";
+
+  /**
+   * Creates a KuduClient with the specified Kudu master addresses (as a comma-separated
+   * list of host:port pairs). The 'admin operation timeout' and the 'operation timeout'
+   * are set to BackendConfig.getKuduClientTimeoutMs(). The 'admin operations timeout' is
+   * used for operations like creating/deleting tables. The 'operation timeout' is used
+   * when fetching tablet metadata.
+   */
+  public static KuduClient createKuduClient(String kuduMasters) {
+    KuduClientBuilder b = new KuduClient.KuduClientBuilder(kuduMasters);
+    b.defaultAdminOperationTimeoutMs(BackendConfig.getKuduClientTimeoutMs());
+    b.defaultOperationTimeoutMs(BackendConfig.getKuduClientTimeoutMs());
+    return b.build();
+  }
 
   /**
    * Creates a PartialRow from a list of range partition boundary values.

@@ -117,9 +117,11 @@ public class JniFrontend {
    */
   public JniFrontend(boolean lazy, String serverName, String authorizationPolicyFile,
       String sentryConfigFile, String authPolicyProviderClass, int impalaLogLevel,
-      int otherLogLevel, boolean allowAuthToLocal, String defaultKuduMasterHosts)
+      int otherLogLevel, boolean allowAuthToLocal, String defaultKuduMasterHosts,
+      int kuduOperationTimeoutMs)
       throws InternalException {
     BackendConfig.setAuthToLocal(allowAuthToLocal);
+    BackendConfig.setKuduClientTimeoutMs(kuduOperationTimeoutMs);
     GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
         TLogLevel.values()[otherLogLevel]);
 

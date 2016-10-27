@@ -31,10 +31,10 @@
 
 #include "common/names.h"
 
-DEFINE_int32(kudu_session_timeout_seconds, 60, "Timeout set on the Kudu session. "
-    "How long to wait before considering a write failed.");
 DEFINE_int32(kudu_mutation_buffer_size, 100 * 1024 * 1024, "The size (bytes) of the "
     "Kudu client buffer for mutations.");
+
+DECLARE_int32(kudu_operation_timeout_ms);
 
 using kudu::client::KuduColumnSchema;
 using kudu::client::KuduSchema;
@@ -112,19 +112,13 @@ Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
 
 Status KuduTableSink::Open(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, state));
-
-  kudu::client::KuduClientBuilder b;
-  for (const string& address: table_desc_->kudu_master_addresses()) {
-    b.add_master_server_addr(address);
-  }
-
-  KUDU_RETURN_IF_ERROR(b.Build(&client_), "Unable to create Kudu client");
+  RETURN_IF_ERROR(CreateKuduClient(table_desc_->kudu_master_addresses(), &client_));
 
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc_->table_name(), &table_),
       "Unable to open Kudu table");
 
   session_ = client_->NewSession();
-  session_->SetTimeoutMillis(FLAGS_kudu_session_timeout_seconds * 1000);
+  session_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms);
 
   // KuduSession Set* methods here and below return a status for API compatibility.
   // As long as the Kudu client is statically linked, these shouldn't fail and thus these

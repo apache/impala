@@ -44,10 +44,10 @@ import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
+import org.apache.impala.util.KuduUtil;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
-import org.apache.kudu.client.KuduClient.KuduClientBuilder;
 import org.apache.kudu.client.KuduPredicate;
 import org.apache.kudu.client.KuduPredicate.ComparisonOp;
 import org.apache.kudu.client.KuduScanToken;
@@ -106,8 +106,7 @@ public class KuduScanNode extends ScanNode {
     analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
     conjuncts_ = orderConjunctsByCost(conjuncts_);
 
-    try (KuduClient client =
-         new KuduClientBuilder(kuduTable_.getKuduMasterHosts()).build()) {
+    try (KuduClient client = KuduUtil.createKuduClient(kuduTable_.getKuduMasterHosts())) {
       org.apache.kudu.client.KuduTable rpcTable =
           client.openTable(kuduTable_.getKuduTableName());
       validateSchema(rpcTable);

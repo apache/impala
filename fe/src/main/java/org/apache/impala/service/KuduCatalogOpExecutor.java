@@ -17,16 +17,12 @@
 
 package org.apache.impala.service;
 
-import java.lang.NumberFormatException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.KuduTable;
@@ -39,14 +35,17 @@ import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TDistributeParam;
 import org.apache.impala.thrift.TRangePartition;
 import org.apache.impala.util.KuduUtil;
-import org.apache.kudu.ColumnSchema.ColumnSchemaBuilder;
 import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.ColumnSchema.ColumnSchemaBuilder;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.CreateTableOptions;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.PartialRow;
 import org.apache.kudu.client.RangePartitionBound;
 import org.apache.log4j.Logger;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 /**
  * This is a helper for the CatalogOpExecutor to provide Kudu related DDL functionality
@@ -67,7 +66,7 @@ public class KuduCatalogOpExecutor {
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
     LOG.debug(String.format("Creating table '%s' in master '%s'", kuduTableName,
         masterHosts));
-    try (KuduClient kudu = new KuduClient.KuduClientBuilder(masterHosts).build()) {
+    try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
       // TODO: The IF NOT EXISTS case should be handled by Kudu to ensure atomicity.
       // (see KUDU-1710).
       if (kudu.tableExists(kuduTableName)) {
@@ -79,7 +78,7 @@ public class KuduCatalogOpExecutor {
       CreateTableOptions tableOpts = buildTableOptions(msTbl, params, schema);
       kudu.createTable(kuduTableName, schema, tableOpts);
     } catch (Exception e) {
-      throw new ImpalaRuntimeException(String.format("Error creating table '%s'",
+      throw new ImpalaRuntimeException(String.format("Error creating Kudu table '%s'",
           kuduTableName), e);
     }
   }
@@ -158,14 +157,16 @@ public class KuduCatalogOpExecutor {
     // Set the number of table replicas, if specified.
     String replication = msTbl.getParameters().get(KuduTable.KEY_TABLET_REPLICAS);
     if (!Strings.isNullOrEmpty(replication)) {
+      int parsedReplicas = -1;
       try {
-        int r = Integer.parseInt(replication);
-        Preconditions.checkState(r > 0);
-        tableOpts.setNumReplicas(r);
-      } catch (NumberFormatException e) {
+        parsedReplicas = Integer.parseInt(replication);
+        Preconditions.checkState(parsedReplicas > 0,
+            "Invalid number of replicas table property:" + replication);
+      } catch (Exception e) {
         throw new ImpalaRuntimeException(String.format("Invalid number of table " +
-            "replicas specified: '%s'", replication), e);
+            "replicas specified: '%s'", replication));
       }
+      tableOpts.setNumReplicas(parsedReplicas);
     }
     return tableOpts;
   }
@@ -182,7 +183,7 @@ public class KuduCatalogOpExecutor {
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
     LOG.debug(String.format("Dropping table '%s' from master '%s'", tableName,
         masterHosts));
-    try (KuduClient kudu = new KuduClient.KuduClientBuilder(masterHosts).build()) {
+    try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
       Preconditions.checkState(!Strings.isNullOrEmpty(tableName));
       // TODO: The IF EXISTS case should be handled by Kudu to ensure atomicity.
       // (see KUDU-1710).
@@ -211,7 +212,7 @@ public class KuduCatalogOpExecutor {
     String masterHosts = msTblCopy.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
     LOG.debug(String.format("Loading schema of table '%s' from master '%s'",
         kuduTableName, masterHosts));
-    try (KuduClient kudu = new KuduClient.KuduClientBuilder(masterHosts).build()) {
+    try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
       if (!kudu.tableExists(kuduTableName)) {
         throw new ImpalaRuntimeException(String.format("Table does not exist in Kudu: " +
             "'%s'", kuduTableName));
@@ -247,9 +248,10 @@ public class KuduCatalogOpExecutor {
     Preconditions.checkState(!Strings.isNullOrEmpty(masterHosts));
     String kuduTableName = properties.get(KuduTable.KEY_TABLE_NAME);
     Preconditions.checkState(!Strings.isNullOrEmpty(kuduTableName));
-    try (KuduClient kudu = new KuduClient.KuduClientBuilder(masterHosts).build()) {
+    try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
       kudu.tableExists(kuduTableName);
     } catch (Exception e) {
+      // TODO: This is misleading when there are other errors, e.g. timeouts.
       throw new ImpalaRuntimeException(String.format("Kudu table '%s' does not exist " +
           "on master '%s'", kuduTableName, masterHosts), e);
     }
