@@ -1058,19 +1058,12 @@ tbl_def_with_col_defs ::=
     tbl_def.getColumnDefs().addAll(list);
     RESULT = tbl_def;
   :}
-  | tbl_def_without_col_defs:tbl_def LPAREN column_def_list:list COMMA opt_primary_keys:primary_keys RPAREN
+  | tbl_def_without_col_defs:tbl_def LPAREN column_def_list:list COMMA primary_keys:primary_keys RPAREN
   {:
     tbl_def.getColumnDefs().addAll(list);
     tbl_def.getPrimaryKeyColumnNames().addAll(primary_keys);
     RESULT = tbl_def;
   :}
-  ;
-
-opt_primary_keys ::=
-  primary_keys:col_names
-  {: RESULT = col_names; :}
-  | /* empty */
-  {: RESULT = null; :}
   ;
 
 primary_keys ::=

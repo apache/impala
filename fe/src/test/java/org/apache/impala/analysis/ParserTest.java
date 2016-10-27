@@ -28,11 +28,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-import org.junit.Test;
-
 import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.testutil.TestUtils;
+import org.junit.Test;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -2346,6 +2346,7 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo i int");
     ParserError("CREATE TABLE Foo (i intt)");
     ParserError("CREATE TABLE Foo (int i)");
+    ParserError("CREATE TABLE Foo (i int,)");
     ParserError("CREATE TABLE Foo ()");
     ParserError("CREATE TABLE");
     ParserError("CREATE EXTERNAL");
