@@ -23,7 +23,9 @@ from kudu.schema import (
     INT32,
     INT64,
     INT8,
-    STRING)
+    STRING,
+    BINARY,
+    UNIXTIME_MICROS)
 import logging
 import pytest
 import textwrap
@@ -79,8 +81,6 @@ class TestCreateExternalTable(KuduTestSuite):
 
   def test_col_types(self, cursor, kudu_client):
     """Check that a table can be created using all available column types."""
-    # TODO: The python Kudu client doesn't yet support TIMESTAMP or BYTE[], those should
-    #       be tested for graceful failure.
     kudu_types = [STRING, BOOL, DOUBLE, FLOAT, INT16, INT32, INT64, INT8]
     with self.temp_kudu_table(kudu_client, kudu_types) as kudu_table:
       impala_table_name = self.get_kudu_table_base_name(kudu_table.name)
@@ -95,6 +95,34 @@ class TestCreateExternalTable(KuduTestSuite):
           assert col_name == kudu_col.name
           assert col_type.upper() == \
               self.kudu_col_type_to_impala_col_type(kudu_col.type.type)
+
+  def test_unsupported_binary_col(self, cursor, kudu_client):
+    """Check that external tables with BINARY columns fail gracefully.
+    """
+    with self.temp_kudu_table(kudu_client, [INT32, BINARY]) as kudu_table:
+      impala_table_name = self.random_table_name()
+      try:
+        cursor.execute("""
+            CREATE EXTERNAL TABLE %s
+            STORED AS KUDU
+            TBLPROPERTIES('kudu.table_name' = '%s')""" % (impala_table_name,
+                kudu_table.name))
+      except Exception as e:
+        assert "Kudu type 'binary' is not supported in Impala" in str(e)
+
+  def test_unsupported_unixtime_col(self, cursor, kudu_client):
+    """Check that external tables with UNIXTIME_MICROS columns fail gracefully.
+    """
+    with self.temp_kudu_table(kudu_client, [INT32, UNIXTIME_MICROS]) as kudu_table:
+      impala_table_name = self.random_table_name()
+      try:
+        cursor.execute("""
+            CREATE EXTERNAL TABLE %s
+            STORED AS KUDU
+            TBLPROPERTIES('kudu.table_name' = '%s')""" % (impala_table_name,
+                kudu_table.name))
+      except Exception as e:
+        assert "Kudu type 'unixtime_micros' is not supported in Impala" in str(e)
 
   def test_drop_external_table(self, cursor, kudu_client):
     """Check that dropping an external table only affects the catalog and does not delete

@@ -206,7 +206,7 @@ public class KuduUtil {
       throws ImpalaRuntimeException {
     if (!t.isScalarType()) {
       throw new ImpalaRuntimeException(format(
-          "Non-scalar type %s is not supported in Kudu", t.toSql()));
+          "Type %s is not supported in Kudu", t.toSql()));
     }
     ScalarType s = (ScalarType) t;
     switch (s.getPrimitiveType()) {
@@ -215,9 +215,7 @@ public class KuduUtil {
       case INT: return org.apache.kudu.Type.INT32;
       case BIGINT: return org.apache.kudu.Type.INT64;
       case BOOLEAN: return org.apache.kudu.Type.BOOL;
-      case CHAR: return org.apache.kudu.Type.STRING;
       case STRING: return org.apache.kudu.Type.STRING;
-      case VARCHAR: return org.apache.kudu.Type.STRING;
       case DOUBLE: return org.apache.kudu.Type.DOUBLE;
       case FLOAT: return org.apache.kudu.Type.FLOAT;
         /* Fall through below */
@@ -228,6 +226,8 @@ public class KuduUtil {
       case DATE:
       case DATETIME:
       case DECIMAL:
+      case CHAR:
+      case VARCHAR:
       default:
         throw new ImpalaRuntimeException(format(
             "Type %s is not supported in Kudu", s.toSql()));
@@ -247,7 +247,7 @@ public class KuduUtil {
       case STRING: return Type.STRING;
       default:
         throw new ImpalaRuntimeException(String.format(
-            "Kudu type %s is not supported in Impala", t));
+            "Kudu type '%s' is not supported in Impala", t.getName()));
     }
   }
 

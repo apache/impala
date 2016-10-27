@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Preconditions;
@@ -220,15 +221,24 @@ public class KuduCatalogOpExecutor {
   }
 
   /**
-   * Validates the table properties of a Kudu table. It checks that the specified master
-   * addresses point to valid Kudu masters and that the table exists.
+   * Validates the table properties of a Kudu table. It checks that the msTbl represents
+   * a Kudu table (indicated by the Kudu storage handler), that the master
+   * addresses point to valid Kudu masters, and that the table exists.
    * Throws an ImpalaRuntimeException if this is not the case.
    */
   public static void validateKuduTblExists(
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws ImpalaRuntimeException {
-    String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
+    Map<String, String> properties = msTbl.getParameters();
+    if (!KuduTable.isKuduTable(msTbl)) {
+      throw new ImpalaRuntimeException(String.format("Table '%s' does not represent a " +
+          "Kudu table. Expected storage_handler '%s' but found '%s'",
+          msTbl.getTableName(), KuduTable.KUDU_STORAGE_HANDLER,
+          properties.get(KuduTable.KEY_STORAGE_HANDLER)));
+    }
+
+    String masterHosts = properties.get(KuduTable.KEY_MASTER_HOSTS);
     Preconditions.checkState(!Strings.isNullOrEmpty(masterHosts));
-    String kuduTableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
+    String kuduTableName = properties.get(KuduTable.KEY_TABLE_NAME);
     Preconditions.checkState(!Strings.isNullOrEmpty(kuduTableName));
     try (KuduClient kudu = new KuduClient.KuduClientBuilder(masterHosts).build()) {
       kudu.tableExists(kuduTableName);

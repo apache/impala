@@ -25,9 +25,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-import junit.framework.Assert;
-
-import org.apache.impala.analysis.CreateTableStmt;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.ColumnStats;
@@ -45,20 +48,14 @@ import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.util.MetaStoreUtil;
+import org.junit.Test;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.fs.permission.FsPermission;
-
-import org.junit.Test;
+import junit.framework.Assert;
 
 public class AnalyzeDDLTest extends FrontendTestBase {
 
@@ -1352,6 +1349,29 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "tblproperties('kudu.table_name'='t') as select id, int_col from " +
         "functional.alltypestiny", "CREATE TABLE AS SELECT is not supported for " +
         "external Kudu tables.");
+
+    // CTAS into Kudu tables with unsupported types
+    AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
+        " stored as kudu as select id, timestamp_col from functional.alltypestiny",
+        "Cannot create table 't': Type TIMESTAMP is not supported in Kudu");
+    AnalysisError("create table t primary key (cs) distribute by hash into 3 buckets" +
+        " stored as kudu as select cs from functional.chars_tiny",
+        "Cannot create table 't': Type CHAR(5) is not supported in Kudu");
+    AnalysisError("create table t primary key (vc) distribute by hash into 3 buckets" +
+        " stored as kudu as select vc from functional.chars_tiny",
+        "Cannot create table 't': Type VARCHAR(32) is not supported in Kudu");
+    AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
+        " stored as kudu as select id, s from functional.complextypes_fileformat",
+        "Expr 's' in select list returns a complex type 'STRUCT<f1:STRING,f2:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
+        " stored as kudu as select id, m from functional.complextypes_fileformat",
+        "Expr 'm' in select list returns a complex type 'MAP<STRING,BIGINT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
+        " stored as kudu as select id, a from functional.complextypes_fileformat",
+        "Expr 'a' in select list returns a complex type 'ARRAY<INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
   }
 
   @Test
@@ -1832,6 +1852,25 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (x int primary key) " +
         "partitioned by (y int) stored as kudu", "PARTITIONED BY cannot be used " +
         "in Kudu tables.");
+
+    // Test unsupported Kudu types
+    List<String> unsupportedTypes = Lists.newArrayList(
+        "DECIMAL(9,0)", "TIMESTAMP", "VARCHAR(20)", "CHAR(20)",
+        "STRUCT<F1:INT,F2:STRING>", "ARRAY<INT>", "MAP<STRING,STRING>");
+    for (String t: unsupportedTypes) {
+      String expectedError = String.format(
+          "Cannot create table 'tab': Type %s is not supported in Kudu", t);
+
+      // Unsupported type is PK and partition col
+      String stmt = String.format("create table tab (x %s primary key) " +
+          "distribute by hash(x) into 3 buckets stored as kudu", t);
+      AnalysisError(stmt, expectedError);
+
+      // Unsupported type is not PK/partition col
+      stmt = String.format("create table tab (x int primary key, y %s) " +
+          "distribute by hash(x) into 3 buckets stored as kudu", t);
+      AnalysisError(stmt, expectedError);
+    }
   }
 
   @Test

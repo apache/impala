@@ -1,30 +1,5 @@
 ====
 ---- QUERY
-# This test file contains several cases for what basically amount to analysis errors,
-# but they only show up at runtime. These cases correspond to constraints enforced by
-# the Kudu storage engine.
-#
-# Incompatible column types in CTAS.
-create table t primary key (id) distribute by hash (id) into 3 buckets
-stored as kudu
-as select * from functional.alltypestiny
----- CATCH
-ImpalaRuntimeException: Type TIMESTAMP is not supported in Kudu
-====
----- QUERY
-create table t primary key (id) distribute by hash (id) into 3 buckets
-stored as kudu
-as select c1 as id from functional.decimal_tiny
----- CATCH
-ImpalaRuntimeException: Type DECIMAL(10,4) is not supported in Kudu
-====
----- QUERY
-create table t (a int, b array<string>, primary key(a)) distribute by hash (a)
-into 3 buckets stored as kudu
----- CATCH
-ImpalaRuntimeException: Non-scalar type ARRAY<STRING> is not supported in Kudu
-====
----- QUERY
 create table t primary key (id) distribute by hash (id) into 3 buckets
 stored as kudu
 as select id, int_col from functional.alltypestiny;

@@ -49,14 +49,6 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
-import org.apache.log4j.Logger;
-import org.apache.thrift.TException;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
@@ -150,6 +142,14 @@ import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.util.HdfsCachingUtil;
+import org.apache.log4j.Logger;
+import org.apache.thrift.TException;
+
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * Class used to execute Catalog Operations, including DDL and refresh/invalidate
@@ -2082,8 +2082,9 @@ public class CatalogOpExecutor {
           tbl.getMetaStoreTable().deepCopy();
       switch (params.getTarget()) {
         case TBL_PROPERTY:
+          boolean isKuduTable = KuduTable.isKuduTable(msTbl);
           msTbl.getParameters().putAll(properties);
-          if (KuduTable.isKuduTable(msTbl)) {
+          if (isKuduTable) {
             KuduCatalogOpExecutor.validateKuduTblExists(msTbl);
           }
           break;

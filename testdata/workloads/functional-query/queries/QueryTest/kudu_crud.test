@@ -18,15 +18,15 @@ Couldn't resolve this master's address bogus.host.name:7051
 ====
 ---- QUERY
 create table tdata
-  (id int primary key, name string, valf float, vali bigint, valv varchar(20), valb boolean)
+  (id int primary key, name string, valf float, vali bigint, valv string, valb boolean)
   DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30)) STORED AS KUDU
 ---- RESULTS
 ====
 ---- QUERY
 insert into tdata values
 (1, "martin", 1.0, 232232323, cast('a' as VARCHAR(20)), true),
-(2, "david", cast(1.0 as float), 99398493939, cast('b' as VARCHAR(20)), false),
-(3, "todd", cast(1.0 as float), 993393939, cast('c' as VARCHAR(20)), true)
+(2, "david", cast(1.0 as float), 99398493939, cast('b' as CHAR(1)), false),
+(3, "todd", cast(1.0 as float), 993393939, "c", true)
 ---- RESULTS
 : 3
 ---- RUNTIME_PROFILE
@@ -50,7 +50,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ====
 ====
 ---- QUERY
-# Try updating a varchar col. with a value that is bigger than it's size (truncated).
+# Try updating a string col where casting a value that is bigger than the varchar in the
+# cast. The value gets truncated and stored to the string col.
 update tdata set valv=cast('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as VARCHAR(20)) where id = 1
 ---- RESULTS
 ---- RUNTIME_PROFILE
