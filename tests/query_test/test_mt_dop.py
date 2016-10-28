@@ -42,9 +42,20 @@ class TestMtDop(ImpalaTestSuite):
     return 'functional-query'
 
   def test_mt_dop(self, vector):
-    new_vector = deepcopy(vector)
-    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
-    self.run_test_case('QueryTest/mt-dop', new_vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    self.run_test_case('QueryTest/mt-dop', vector)
+
+  def test_compute_stats(self, unique_database, vector):
+    table_loc = self._get_table_location("alltypes", vector)
+    # Create a second table in the same format pointing to the same data files.
+    # This function switches to the format-specific DB in vector.
+    self.execute_query_using_client(self.client,
+      "create external table %s.mt_dop like alltypes location '%s'"
+      % (unique_database, table_loc), vector)
+    self.execute_query_using_client(self.client,
+      "alter table %s.mt_dop recover partitions" % unique_database, vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    self.run_test_case('QueryTest/mt-dop-compute-stats', vector, unique_database)
 
 class TestMtDopParquet(ImpalaTestSuite):
   @classmethod
@@ -59,4 +70,5 @@ class TestMtDopParquet(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def test_parquet(self, vector):
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-parquet', vector)

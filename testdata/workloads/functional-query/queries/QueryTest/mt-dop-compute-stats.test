@@ -1,0 +1,8 @@
+====
+---- QUERY
+compute stats mt_dop
+---- RESULTS
+'Updated 24 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
