@@ -687,8 +687,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     TSessionType::type session_type;
 
-    /// Time the session was created.
-    TimestampValue start_time;
+    /// Time the session was created, in ms since epoch (UTC).
+    int64_t start_time_ms;
 
     /// Connected user for this session, i.e. the user which originated this session.
     std::string connected_user;
@@ -733,7 +733,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// Total number of queries run as part of this session.
     int64_t total_queries;
 
-    /// Time the session was last accessed.
+    /// Time the session was last accessed, in ms since epoch (UTC).
     int64_t last_accessed_ms;
 
     /// The latest Kudu timestamp observed after DML operations executed within this

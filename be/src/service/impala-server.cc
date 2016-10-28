@@ -1621,7 +1621,7 @@ void ImpalaServer::ConnectionStart(
     shared_ptr<SessionState> session_state;
     session_state.reset(new SessionState);
     session_state->closed = false;
-    session_state->start_time = TimestampValue::LocalTime();
+    session_state->start_time_ms = UnixMillis();
     session_state->last_accessed_ms = UnixMillis();
     session_state->database = "default";
     session_state->session_timeout = FLAGS_idle_session_timeout;

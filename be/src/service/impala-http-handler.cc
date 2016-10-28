@@ -427,6 +427,7 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::ArgumentMap& args,
     Document* document) {
   lock_guard<mutex> l(server_->session_state_map_lock_);
   Value sessions(kArrayType);
+  int num_active = 0;
   for (const ImpalaServer::SessionStateMap::value_type& session:
            server_->session_state_map_) {
     shared_ptr<ImpalaServer::SessionState> state = session.second;
@@ -457,18 +458,26 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::ArgumentMap& args,
     Value default_db(state->database.c_str(), document->GetAllocator());
     session_json.AddMember("default_database", default_db, document->GetAllocator());
 
-    Value start_time(state->start_time.DebugString().c_str(), document->GetAllocator());
+    TimestampValue local_start_time(session.second->start_time_ms / 1000);
+    local_start_time.UtcToLocal();
+    Value start_time(local_start_time.DebugString().c_str(), document->GetAllocator());
     session_json.AddMember("start_time", start_time, document->GetAllocator());
+    session_json.AddMember(
+        "start_time_sort", session.second->start_time_ms, document->GetAllocator());
 
+    TimestampValue local_last_accessed(session.second->last_accessed_ms / 1000);
+    local_last_accessed.UtcToLocal();
     Value last_accessed(
-        TimestampValue(session.second->last_accessed_ms / 1000).DebugString().c_str(),
-        document->GetAllocator());
+        local_last_accessed.DebugString().c_str(), document->GetAllocator());
     session_json.AddMember("last_accessed", last_accessed, document->GetAllocator());
+    session_json.AddMember(
+        "last_accessed_sort", session.second->last_accessed_ms, document->GetAllocator());
 
     session_json.AddMember("session_timeout", state->session_timeout,
         document->GetAllocator());
     session_json.AddMember("expired", state->expired, document->GetAllocator());
     session_json.AddMember("closed", state->closed, document->GetAllocator());
+    if (!state->expired && !state->closed) ++num_active;
     session_json.AddMember("ref_count", state->ref_count, document->GetAllocator());
     sessions.PushBack(session_json, document->GetAllocator());
   }
@@ -476,6 +485,9 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::ArgumentMap& args,
   document->AddMember("sessions", sessions, document->GetAllocator());
   document->AddMember("num_sessions",
       static_cast<uint64_t>(server_->session_state_map_.size()),
+      document->GetAllocator());
+  document->AddMember("num_active", num_active, document->GetAllocator());
+  document->AddMember("num_inactive", server_->session_state_map_.size() - num_active,
       document->GetAllocator());
 }
 

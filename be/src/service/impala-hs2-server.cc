@@ -281,7 +281,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // TODO: Fix duplication of code between here and ConnectionStart().
   shared_ptr<SessionState> state = make_shared<SessionState>();
   state->closed = false;
-  state->start_time = TimestampValue::LocalTime();
+  state->start_time_ms = UnixMillis();
   state->session_type = TSessionType::HIVESERVER2;
   state->network_address = ThriftServer::GetThreadConnectionContext()->network_address;
   state->last_accessed_ms = UnixMillis();
