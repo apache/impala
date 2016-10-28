@@ -35,7 +35,7 @@ class BufferAllocator {
 
   /// Allocate memory for a buffer of 'len' bytes. 'len' must be a power-of-two multiple
   /// of the minimum buffer length.
-  Status Allocate(int64_t len, uint8_t** buffer);
+  Status Allocate(int64_t len, uint8_t** buffer) WARN_UNUSED_RESULT;
 
   /// Free the memory for a previously-allocated buffer.
   void Free(uint8_t* buffer, int64_t len);

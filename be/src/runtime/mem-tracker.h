@@ -151,6 +151,7 @@ class MemTracker {
   /// they can all consume 'bytes'. If this brings any of them over, none of them
   /// are updated.
   /// Returns true if the try succeeded.
+  WARN_UNUSED_RESULT
   bool TryConsume(int64_t bytes) {
     if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
     if (UNLIKELY(bytes <= 0)) return true;
@@ -318,7 +319,7 @@ class MemTracker {
   /// If 'failed_allocation_size' is greater than zero, logs the allocation size. If
   /// 'failed_allocation_size' is zero, nothing about the allocation size is logged.
   Status MemLimitExceeded(RuntimeState* state, const std::string& details,
-      int64_t failed_allocation = 0);
+      int64_t failed_allocation = 0) WARN_UNUSED_RESULT;
 
   static const std::string COUNTER_NAME;
 

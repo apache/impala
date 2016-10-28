@@ -38,7 +38,7 @@ class IntegrityHash {
 
   /// Verify that the data in a buffer matches this hash. Returns true on match, false
   /// otherwise.
-  bool Verify(const uint8_t* data, int64_t len) const;
+  bool Verify(const uint8_t* data, int64_t len) const WARN_UNUSED_RESULT;
 
  private:
   uint8_t hash_[SHA256_DIGEST_LENGTH];
@@ -67,13 +67,13 @@ class EncryptionKey {
   /// Encrypts a buffer of input data 'data' of length 'len' into an output buffer 'out'.
   /// Exactly 'len' bytes will be written to 'out'. This key must be initialized before
   /// calling. Operates in-place if 'in' == 'out', otherwise the buffers must not overlap.
-  Status Encrypt(const uint8_t* data, int64_t len, uint8_t* out) const;
+  Status Encrypt(const uint8_t* data, int64_t len, uint8_t* out) const WARN_UNUSED_RESULT;
 
   /// Decrypts a buffer of input data 'data' of length 'len' that was encrypted with this
   /// key into an output buffer 'out'. Exactly 'len' bytes will be written to 'out'.
   /// This key must be initialized before calling. Operates in-place if 'in' == 'out',
   /// otherwise the buffers must not overlap.
-  Status Decrypt(const uint8_t* data, int64_t len, uint8_t* out) const;
+  Status Decrypt(const uint8_t* data, int64_t len, uint8_t* out) const WARN_UNUSED_RESULT;
 
  private:
   /// Helper method that encrypts/decrypts if 'encrypt' is true/false respectively.
@@ -81,8 +81,8 @@ class EncryptionKey {
   /// key into an output buffer 'out'. Exactly 'len' bytes will be written to 'out'.
   /// This key must be initialized before calling. Operates in-place if 'in' == 'out',
   /// otherwise the buffers must not overlap.
-  Status EncryptInternal(
-      bool encrypt, const uint8_t* data, int64_t len, uint8_t* out) const;
+  Status EncryptInternal(bool encrypt, const uint8_t* data, int64_t len,
+      uint8_t* out) const WARN_UNUSED_RESULT;
 
   /// Track whether this key has been initialized, to avoid accidentally using
   /// uninitialized keys.

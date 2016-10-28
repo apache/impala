@@ -436,7 +436,7 @@ class DiskIoMgr {
     /// called when all buffers have been returned, *buffer is set to NULL and Status::OK
     /// is returned.
     /// Only one thread can be in GetNext() at any time.
-    Status GetNext(BufferDescriptor** buffer);
+    Status GetNext(BufferDescriptor** buffer) WARN_UNUSED_RESULT;
 
     /// Cancel this scan range. This cleans up all queued buffers and
     /// wakes up any threads blocked on GetNext().
@@ -481,13 +481,14 @@ class DiskIoMgr {
 
     /// Reads from this range into 'buffer', which has length 'buffer_len' bytes. Returns
     /// the number of bytes read. The read position in this scan range is updated.
-    Status Read(uint8_t* buffer, int64_t buffer_len, int64_t* bytes_read, bool* eosr);
+    Status Read(uint8_t* buffer, int64_t buffer_len, int64_t* bytes_read,
+        bool* eosr) WARN_UNUSED_RESULT;
 
     /// Reads from the DN cache. On success, sets cached_buffer_ to the DN buffer
     /// and *read_succeeded to true.
     /// If the data is not cached, returns ok() and *read_succeeded is set to false.
     /// Returns a non-ok status if it ran into a non-continuable error.
-    Status ReadFromCache(bool* read_succeeded);
+    Status ReadFromCache(bool* read_succeeded) WARN_UNUSED_RESULT;
 
     /// Pointer to caller specified metadata. This is untouched by the io manager
     /// and the caller can put whatever auxiliary data in here.
@@ -645,7 +646,7 @@ class DiskIoMgr {
   ~DiskIoMgr();
 
   /// Initialize the IoMgr. Must be called once before any of the other APIs.
-  Status Init(MemTracker* process_mem_tracker);
+  Status Init(MemTracker* process_mem_tracker) WARN_UNUSED_RESULT;
 
   /// Allocates tracking structure for a request context.
   /// Register a new request context which is returned in *request_context.
@@ -655,7 +656,7 @@ class DiskIoMgr {
   ///    used for this reader will be tracked by this. If the limit is exceeded
   ///    the reader will be cancelled and MEM_LIMIT_EXCEEDED will be returned via
   ///    GetNext().
-  Status RegisterContext(DiskIoRequestContext** request_context,
+  void RegisterContext(DiskIoRequestContext** request_context,
       MemTracker* reader_mem_tracker);
 
   /// Unregisters context from the disk IoMgr. This must be called for every
@@ -683,20 +684,22 @@ class DiskIoMgr {
   /// This can be used to do synchronous reads as well as schedule dependent ranges,
   /// as in the case for columnar formats.
   Status AddScanRanges(DiskIoRequestContext* reader,
-      const std::vector<ScanRange*>& ranges, bool schedule_immediately = false);
-  Status AddScanRange(
-      DiskIoRequestContext* reader, ScanRange* range, bool schedule_immediately = false);
+      const std::vector<ScanRange*>& ranges,
+      bool schedule_immediately = false) WARN_UNUSED_RESULT;
+  Status AddScanRange(DiskIoRequestContext* reader, ScanRange* range,
+      bool schedule_immediately = false) WARN_UNUSED_RESULT;
 
   /// Add a WriteRange for the writer. This is non-blocking and schedules the context
   /// on the IoMgr disk queue. Does not create any files.
-  Status AddWriteRange(DiskIoRequestContext* writer, WriteRange* write_range);
+  Status AddWriteRange(
+      DiskIoRequestContext* writer, WriteRange* write_range) WARN_UNUSED_RESULT;
 
   /// Returns the next unstarted scan range for this reader. When the range is returned,
   /// the disk threads in the IoMgr will already have started reading from it. The
   /// caller is expected to call ScanRange::GetNext on the returned range.
   /// If there are no more unstarted ranges, NULL is returned.
   /// This call is blocking.
-  Status GetNextRange(DiskIoRequestContext* reader, ScanRange** range);
+  Status GetNextRange(DiskIoRequestContext* reader, ScanRange** range) WARN_UNUSED_RESULT;
 
   /// Reads the range and returns the result in buffer.
   /// This behaves like the typical synchronous read() api, blocking until the data
@@ -705,7 +708,8 @@ class DiskIoMgr {
   /// range *cannot* have already been added via AddScanRanges.
   /// This can only be used if the scan range fits in a single IO buffer (i.e. is smaller
   /// than max_read_buffer_size()) or if reading into a client-provided buffer.
-  Status Read(DiskIoRequestContext* reader, ScanRange* range, BufferDescriptor** buffer);
+  Status Read(DiskIoRequestContext* reader, ScanRange* range,
+      BufferDescriptor** buffer) WARN_UNUSED_RESULT;
 
   /// Determine which disk queue this file should be assigned to.  Returns an index into
   /// disk_queues_.  The disk_id is the volume ID for the local disk that holds the
@@ -715,7 +719,7 @@ class DiskIoMgr {
 
   /// TODO: The functions below can be moved to DiskIoRequestContext.
   /// Returns the current status of the context.
-  Status context_status(DiskIoRequestContext* context) const;
+  Status context_status(DiskIoRequestContext* context) const WARN_UNUSED_RESULT;
 
   void set_bytes_read_counter(DiskIoRequestContext*, RuntimeProfile::Counter*);
   void set_read_timer(DiskIoRequestContext*, RuntimeProfile::Counter*);
@@ -932,11 +936,11 @@ class DiskIoMgr {
   /// The write_status does not affect the writer->status_. That is, an write error does
   /// not cancel the writer context - that decision is left to the callback handler.
   /// TODO: On the read path, consider not canceling the reader context on error.
-  void HandleWriteFinished(DiskIoRequestContext* writer, WriteRange* write_range,
-      const Status& write_status);
+  void HandleWriteFinished(
+      DiskIoRequestContext* writer, WriteRange* write_range, const Status& write_status);
 
   /// Validates that range is correctly initialized
-  Status ValidateScanRange(ScanRange* range);
+  Status ValidateScanRange(ScanRange* range) WARN_UNUSED_RESULT;
 
   /// Write the specified range to disk and calls HandleWriteFinished when done.
   /// Responsible for opening and closing the file that is written.
@@ -945,11 +949,10 @@ class DiskIoMgr {
   /// Helper method to write a range using the specified FILE handle. Returns Status:OK
   /// if the write succeeded, or a RUNTIME_ERROR with an appropriate message otherwise.
   /// Does not open or close the file that is written.
-  Status WriteRangeHelper(FILE* file_handle, WriteRange* write_range);
+  Status WriteRangeHelper(FILE* file_handle, WriteRange* write_range) WARN_UNUSED_RESULT;
 
   /// Reads the specified scan range and calls HandleReadFinished when done.
-  void ReadRange(DiskQueue* disk_queue, DiskIoRequestContext* reader,
-      ScanRange* range);
+  void ReadRange(DiskQueue* disk_queue, DiskIoRequestContext* reader, ScanRange* range);
 
   /// Try to allocate the next buffer for the scan range, returning the new buffer
   /// if successful. If 'reader' is cancelled, cancels the range and returns NULL.

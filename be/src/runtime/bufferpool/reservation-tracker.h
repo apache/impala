@@ -116,14 +116,14 @@ class ReservationTracker {
   /// Returns true if the reservation increase is granted, or false if not granted.
   /// If the reservation is not granted, no modifications are made to the state of
   /// any ReservationTrackers.
-  bool IncreaseReservation(int64_t bytes);
+  bool IncreaseReservation(int64_t bytes) WARN_UNUSED_RESULT;
 
   /// Tries to ensure that 'bytes' of unused reservation is available. If not already
   /// available, tries to increase the reservation such that the unused reservation is
   /// exactly equal to 'bytes'. Uses any unused reservation on ancestors and increase
   /// ancestors' reservations if needed to fit the increased reservation.
   /// Returns true if the reservation increase was successful or not necessary.
-  bool IncreaseReservationToFit(int64_t bytes);
+  bool IncreaseReservationToFit(int64_t bytes) WARN_UNUSED_RESULT;
 
   /// Decrease tracker's reservation by 'bytes'. This tracker's reservation must be at
   /// least 'bytes' before calling this method.

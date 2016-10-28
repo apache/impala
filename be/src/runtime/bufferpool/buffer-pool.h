@@ -172,7 +172,7 @@ class BufferPool {
   /// 'profile'. 'client' is the client to register. 'client' should not already be
   /// registered.
   Status RegisterClient(const std::string& name, ReservationTracker* reservation,
-      RuntimeProfile* profile, Client* client);
+      RuntimeProfile* profile, Client* client) WARN_UNUSED_RESULT;
 
   /// Deregister 'client' if it is registered. Idempotent.
   void DeregisterClient(Client* client);
@@ -183,7 +183,7 @@ class BufferPool {
   /// CreatePage() only fails when a system error prevents the buffer pool from fulfilling
   /// the reservation.
   /// On success, the handle is mapped to the new page.
-  Status CreatePage(Client* client, int64_t len, PageHandle* handle);
+  Status CreatePage(Client* client, int64_t len, PageHandle* handle) WARN_UNUSED_RESULT;
 
   /// Increment the pin count of 'handle'. After Pin() the underlying page will
   /// be mapped to a buffer, which will be accessible through 'handle'. Uses
@@ -191,7 +191,7 @@ class BufferPool {
   /// unused reservation before calling Pin() (otherwise it will DCHECK). Pin() only
   /// fails when a system error prevents the buffer pool from fulfilling the reservation.
   /// 'handle' must be open.
-  Status Pin(Client* client, PageHandle* handle);
+  Status Pin(Client* client, PageHandle* handle) WARN_UNUSED_RESULT;
 
   /// Decrement the pin count of 'handle'. Decrease client's reservation usage. If the
   /// handle's pin count becomes zero, it is no longer valid for the underlying page's
@@ -219,7 +219,8 @@ class BufferPool {
   /// is responsible for ensuring it has enough unused reservation before calling
   /// AllocateBuffer() (otherwise it will DCHECK). AllocateBuffer() only fails when
   /// a system error prevents the buffer pool from fulfilling the reservation.
-  Status AllocateBuffer(Client* client, int64_t len, BufferHandle* handle);
+  Status AllocateBuffer(
+      Client* client, int64_t len, BufferHandle* handle) WARN_UNUSED_RESULT;
 
   /// If 'handle' is open, close 'handle', free the buffer and and decrease the
   /// reservation usage from 'client'. Idempotent.
@@ -231,7 +232,7 @@ class BufferPool {
   /// closed before calling. 'src'/'dst' and 'src_client'/'dst_client' must be different.
   /// After a successful call, 'src' is closed and 'dst' is open.
   Status TransferBuffer(Client* src_client, BufferHandle* src, Client* dst_client,
-      BufferHandle* dst);
+      BufferHandle* dst) WARN_UNUSED_RESULT;
 
   /// Print a debug string with the state of the buffer pool.
   std::string DebugString();
@@ -255,7 +256,8 @@ class BufferPool {
   /// Allocate a buffer of length 'len'. Assumes that the client's reservation has already
   /// been consumed for the buffer. Returns an error if the pool is unable to fulfill the
   /// reservation.
-  Status AllocateBufferInternal(Client* client, int64_t len, BufferHandle* buffer);
+  Status AllocateBufferInternal(
+      Client* client, int64_t len, BufferHandle* buffer) WARN_UNUSED_RESULT;
 
   /// Frees 'buffer', which must be open before calling. Closes 'buffer' and updates
   /// internal state but does not release to any reservation.

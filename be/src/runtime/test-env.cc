@@ -39,10 +39,12 @@ TestEnv::TestEnv() {
   exec_env_.reset(new ExecEnv);
   exec_env_->InitForFeTests();
   io_mgr_tracker_.reset(new MemTracker(-1));
-  exec_env_->disk_io_mgr()->Init(io_mgr_tracker_.get());
+  Status status = exec_env_->disk_io_mgr()->Init(io_mgr_tracker_.get());
+  CHECK(status.ok()) << status.msg().msg();
   InitMetrics();
   tmp_file_mgr_.reset(new TmpFileMgr);
-  tmp_file_mgr_->Init(metrics_.get());
+  status = tmp_file_mgr_->Init(metrics_.get());
+  CHECK(status.ok()) << status.msg().msg();
 }
 
 void TestEnv::InitMetrics() {
@@ -53,7 +55,8 @@ void TestEnv::InitTmpFileMgr(const vector<string>& tmp_dirs, bool one_dir_per_de
   // Need to recreate metrics to avoid error when registering metric twice.
   InitMetrics();
   tmp_file_mgr_.reset(new TmpFileMgr);
-  tmp_file_mgr_->InitCustom(tmp_dirs, one_dir_per_device, metrics_.get());
+  Status status = tmp_file_mgr_->InitCustom(tmp_dirs, one_dir_per_device, metrics_.get());
+  CHECK(status.ok()) << status.msg().msg();
 }
 
 TestEnv::~TestEnv() {

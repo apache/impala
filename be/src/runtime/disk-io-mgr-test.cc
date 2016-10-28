@@ -204,7 +204,7 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
   MemTracker reader_mem_tracker(LARGE_MEM_LIMIT);
   ASSERT_OK(read_io_mgr->Init(&reader_mem_tracker));
   DiskIoRequestContext* reader;
-  ASSERT_OK(read_io_mgr->RegisterContext(&reader, &reader_mem_tracker));
+  read_io_mgr->RegisterContext(&reader, &reader_mem_tracker);
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
     for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
       pool_.reset(new ObjectPool);
@@ -248,7 +248,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   DiskIoMgr io_mgr(1, 1, 1, 10);
   ASSERT_OK(io_mgr.Init(&mem_tracker));
   DiskIoRequestContext* writer;
-  ASSERT_OK(io_mgr.RegisterContext(&writer, NULL));
+  io_mgr.RegisterContext(&writer, NULL);
   int32_t* data = pool_->Add(new int32_t);
   *data = rand();
 
@@ -310,7 +310,7 @@ TEST_F(DiskIoMgrTest, SingleWriterCancel) {
   MemTracker reader_mem_tracker(LARGE_MEM_LIMIT);
   ASSERT_OK(read_io_mgr->Init(&reader_mem_tracker));
   DiskIoRequestContext* reader;
-  ASSERT_OK(read_io_mgr->RegisterContext(&reader, &reader_mem_tracker));
+  read_io_mgr->RegisterContext(&reader, &reader_mem_tracker);
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
     for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
       pool_.reset(new ObjectPool);
@@ -381,7 +381,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
           ASSERT_OK(io_mgr.Init(&mem_tracker));
           MemTracker reader_mem_tracker;
           DiskIoRequestContext* reader;
-          ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
+          io_mgr.RegisterContext(&reader, &reader_mem_tracker);
 
           vector<DiskIoMgr::ScanRange*> ranges;
           for (int i = 0; i < len; ++i) {
@@ -435,7 +435,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
         ASSERT_OK(io_mgr.Init(&mem_tracker));
         MemTracker reader_mem_tracker;
         DiskIoRequestContext* reader;
-        ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
+        io_mgr.RegisterContext(&reader, &reader_mem_tracker);
 
         vector<DiskIoMgr::ScanRange*> ranges_first_half;
         vector<DiskIoMgr::ScanRange*> ranges_second_half;
@@ -508,7 +508,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         ASSERT_OK(io_mgr.Init(&mem_tracker));
         MemTracker reader_mem_tracker;
         DiskIoRequestContext* reader;
-        ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
+        io_mgr.RegisterContext(&reader, &reader_mem_tracker);
 
         DiskIoMgr::ScanRange* complete_range = InitRange(1, tmp_file, 0, strlen(data), 0,
             stat_val.st_mtime);
@@ -578,7 +578,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         ASSERT_OK(io_mgr.Init(&mem_tracker));
         MemTracker reader_mem_tracker;
         DiskIoRequestContext* reader;
-        ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
+        io_mgr.RegisterContext(&reader, &reader_mem_tracker);
 
         vector<DiskIoMgr::ScanRange*> ranges;
         for (int i = 0; i < len; ++i) {
@@ -643,7 +643,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     ASSERT_OK(io_mgr.Init(&root_mem_tracker));
     MemTracker reader_mem_tracker(-1, "Reader", &root_mem_tracker);
     DiskIoRequestContext* reader;
-    ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
+    io_mgr.RegisterContext(&reader, &reader_mem_tracker);
 
     vector<DiskIoMgr::ScanRange*> ranges;
     for (int i = 0; i < num_buffers; ++i) {
@@ -718,7 +718,7 @@ TEST_F(DiskIoMgrTest, CachedReads) {
     ASSERT_OK(io_mgr.Init(&mem_tracker));
     MemTracker reader_mem_tracker;
     DiskIoRequestContext* reader;
-    ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
+    io_mgr.RegisterContext(&reader, &reader_mem_tracker);
 
     DiskIoMgr::ScanRange* complete_range =
         InitRange(1, tmp_file, 0, strlen(data), 0, stat_val.st_mtime, NULL, true);
@@ -788,9 +788,9 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
     for (int threads_per_disk = 1; threads_per_disk <= 5; ++threads_per_disk) {
       for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
         DiskIoMgr io_mgr(num_disks, threads_per_disk, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
-        io_mgr.Init(&mem_tracker);
+        ASSERT_OK(io_mgr.Init(&mem_tracker));
         for (int file_index = 0; file_index < num_contexts; ++file_index) {
-          ASSERT_OK(io_mgr.RegisterContext(&contexts[file_index], &mem_tracker));
+          io_mgr.RegisterContext(&contexts[file_index], &mem_tracker);
         }
         pool_.reset(new ObjectPool);
         int read_offset = 0;
@@ -904,7 +904,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
           EXPECT_OK(io_mgr.Init(&mem_tracker));
 
           for (int i = 0; i < NUM_READERS; ++i) {
-            ASSERT_OK(io_mgr.RegisterContext(&readers[i], &mem_tracker));
+            io_mgr.RegisterContext(&readers[i], &mem_tracker);
 
             vector<DiskIoMgr::ScanRange*> ranges;
             for (int j = 0; j < DATA_LEN; ++j) {
@@ -958,7 +958,7 @@ TEST_F(DiskIoMgrTest, Buffers) {
 
   MemTracker reader_mem_tracker(-1, "Reader", &root_mem_tracker);
   DiskIoRequestContext* reader;
-  ASSERT_OK(io_mgr.RegisterContext(&reader, &reader_mem_tracker));
+  io_mgr.RegisterContext(&reader, &reader_mem_tracker);
 
   DiskIoMgr::ScanRange* dummy_range = InitRange(1, "dummy", 0, 0, 0, 0);
 
@@ -1030,7 +1030,7 @@ TEST_F(DiskIoMgrTest, PartialRead) {
   ASSERT_OK(io_mgr->Init(&mem_tracker));
   MemTracker reader_mem_tracker;
   DiskIoRequestContext* reader;
-  ASSERT_OK(io_mgr->RegisterContext(&reader, &reader_mem_tracker));
+  io_mgr->RegisterContext(&reader, &reader_mem_tracker);
 
   // We should not read past the end of file.
   DiskIoMgr::ScanRange* range = InitRange(1, tmp_file, 0, read_len, 0, stat_val.st_mtime);
@@ -1063,7 +1063,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
   // Reader doesn't need to provide mem tracker if it's providing buffers.
   MemTracker* reader_mem_tracker = NULL;
   DiskIoRequestContext* reader;
-  ASSERT_OK(io_mgr->RegisterContext(&reader, reader_mem_tracker));
+  io_mgr->RegisterContext(&reader, reader_mem_tracker);
 
   for (int buffer_len : vector<int>({len - 1, len, len + 1})) {
     vector<uint8_t> client_buffer(buffer_len);
@@ -1105,7 +1105,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferError) {
   DiskIoRequestContext* reader;
   vector<uint8_t> client_buffer(SCAN_LEN);
   for (int i = 0; i < 1000; ++i) {
-    ASSERT_OK(io_mgr->RegisterContext(&reader, reader_mem_tracker));
+    io_mgr->RegisterContext(&reader, reader_mem_tracker);
     DiskIoMgr::ScanRange* range = AllocateRange(1);
     range->Reset(NULL, tmp_file, SCAN_LEN, 0, 0, true,
         DiskIoMgr::BufferOpts::ReadInto(&client_buffer[0], SCAN_LEN));

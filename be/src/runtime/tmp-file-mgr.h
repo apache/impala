@@ -119,20 +119,20 @@ class TmpFileMgr {
     ///
     /// 'handle' must be destroyed by passing the DestroyWriteHandle() or
     /// CancelWriteAndRestoreData().
-    Status Write(
-        MemRange buffer, WriteDoneCallback cb, std::unique_ptr<WriteHandle>* handle);
+    Status Write(MemRange buffer, WriteDoneCallback cb,
+        std::unique_ptr<WriteHandle>* handle) WARN_UNUSED_RESULT;
 
     /// Synchronously read the data referenced by 'handle' from the temporary file into
     /// 'buffer'. buffer.len() must be the same as handle->len(). Can only be called
     /// after a write successfully completes.
-    Status Read(WriteHandle* handle, MemRange buffer);
+    Status Read(WriteHandle* handle, MemRange buffer) WARN_UNUSED_RESULT;
 
     /// Cancels the write referenced by 'handle' and destroy associate resources. Also
     /// restore the original data in the 'buffer' passed to Write(), decrypting or
     /// decompressing as necessary. The cancellation always succeeds, but an error
     /// is returned if restoring the data fails.
     Status CancelWriteAndRestoreData(
-        std::unique_ptr<WriteHandle> handle, MemRange buffer);
+        std::unique_ptr<WriteHandle> handle, MemRange buffer) WARN_UNUSED_RESULT;
 
     /// Wait for the in-flight I/Os to complete and destroy resources associated with
     /// 'handle'.
@@ -153,12 +153,13 @@ class TmpFileMgr {
     /// directory. Returns OK if at least one temporary file could be created.
     /// Returns an error if no temporary files were successfully created. Must only be
     /// called once. Must be called with 'lock_' held.
-    Status CreateFiles();
+    Status CreateFiles() WARN_UNUSED_RESULT;
 
     /// Allocate 'num_bytes' bytes in a temporary file. Try multiple disks if error
     /// occurs. Returns an error only if no temporary files are usable or the scratch
     /// limit is exceeded. Must be called without 'lock_' held.
-    Status AllocateSpace(int64_t num_bytes, File** tmp_file, int64_t* file_offset);
+    Status AllocateSpace(
+        int64_t num_bytes, File** tmp_file, int64_t* file_offset) WARN_UNUSED_RESULT;
 
     /// Add the scratch range from 'handle' to 'free_ranges_' and destroy handle. Must be
     /// called without 'lock_' held.
@@ -175,7 +176,8 @@ class TmpFileMgr {
     /// successfully reissued the write. Returns an error status if the original error
     /// was unrecoverable or an unrecoverable error is encountered when reissuing the
     /// write. The error status will include all previous I/O errors in its details.
-    Status RecoverWriteError(WriteHandle* handle, const Status& write_status);
+    Status RecoverWriteError(
+        WriteHandle* handle, const Status& write_status) WARN_UNUSED_RESULT;
 
     /// The TmpFileMgr it is associated with.
     TmpFileMgr* const tmp_file_mgr_;
@@ -281,12 +283,12 @@ class TmpFileMgr {
     /// Starts a write of 'buffer' to 'offset' of 'file'.
     Status Write(DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file,
         int64_t offset, MemRange buffer,
-        DiskIoMgr::WriteRange::WriteDoneCallback callback);
+        DiskIoMgr::WriteRange::WriteDoneCallback callback) WARN_UNUSED_RESULT;
 
     /// Retry the write after the initial write failed with an error, instead writing to
     /// 'offset' of 'file'.
-    Status RetryWrite(
-        DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file, int64_t offset);
+    Status RetryWrite(DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file,
+        int64_t offset) WARN_UNUSED_RESULT;
 
     /// Cancels the write asynchronously. After Cancel() is called, writes are not
     /// retried.
@@ -300,10 +302,10 @@ class TmpFileMgr {
     void WriteComplete(const Status& write_status);
 
     /// Encrypts the data in 'buffer' in-place and computes 'hash_'.
-    Status EncryptAndHash(MemRange buffer);
+    Status EncryptAndHash(MemRange buffer) WARN_UNUSED_RESULT;
 
     /// Verifies the integrity hash and decrypts the contents of 'buffer' in place.
-    Status CheckHashAndDecrypt(MemRange buffer);
+    Status CheckHashAndDecrypt(MemRange buffer) WARN_UNUSED_RESULT;
 
     /// Callback to be called when the write completes.
     WriteDoneCallback cb_;
@@ -346,13 +348,13 @@ class TmpFileMgr {
 
   /// Creates the configured tmp directories. If multiple directories are specified per
   /// disk, only one is created and used. Must be called after DiskInfo::Init().
-  Status Init(MetricGroup* metrics);
+  Status Init(MetricGroup* metrics) WARN_UNUSED_RESULT;
 
   /// Custom initialization - initializes with the provided list of directories.
   /// If one_dir_per_device is true, only use one temporary directory per device.
   /// This interface is intended for testing purposes.
   Status InitCustom(const std::vector<std::string>& tmp_dirs, bool one_dir_per_device,
-      MetricGroup* metrics);
+      MetricGroup* metrics) WARN_UNUSED_RESULT;
 
   /// Return the scratch directory path for the device.
   std::string GetTmpDirPath(DeviceId device_id) const;
@@ -373,8 +375,8 @@ class TmpFileMgr {
   /// directory on the specified device id. The caller owns the returned handle and is
   /// responsible for deleting it. The file is not created - creation is deferred until
   /// the file is written.
-  Status NewFile(
-      FileGroup* file_group, DeviceId device_id, std::unique_ptr<File>* new_file);
+  Status NewFile(FileGroup* file_group, DeviceId device_id,
+      std::unique_ptr<File>* new_file) WARN_UNUSED_RESULT;
 
   bool initialized_;
 

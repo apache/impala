@@ -238,8 +238,7 @@ void DiskIoMgrStress::NewClient(int i) {
   }
 
   client_mem_trackers_[i].reset(new MemTracker(-1, "", &mem_tracker_));
-  Status status = io_mgr_->RegisterContext(&client.reader, client_mem_trackers_[i].get());
-  CHECK(status.ok());
-  status = io_mgr_->AddScanRanges(client.reader, client.scan_ranges);
+  io_mgr_->RegisterContext(&client.reader, client_mem_trackers_[i].get());
+  Status status = io_mgr_->AddScanRanges(client.reader, client.scan_ranges);
   CHECK(status.ok());
 }

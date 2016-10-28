@@ -201,7 +201,7 @@ TEST_F(TmpFileMgrTest, TestOneDirPerDevice) {
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  tmp_file_mgr.InitCustom(tmp_dirs, true, metrics_.get());
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, metrics_.get()));
   TUniqueId id;
   TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
@@ -225,7 +225,7 @@ TEST_F(TmpFileMgrTest, TestMultiDirsPerDevice) {
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
   TUniqueId id;
   TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
@@ -253,7 +253,7 @@ TEST_F(TmpFileMgrTest, TestReportError) {
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
   TUniqueId id;
   TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
@@ -302,7 +302,7 @@ TEST_F(TmpFileMgrTest, TestAllocateNonWritable) {
   }
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
   TUniqueId id;
   TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
@@ -328,7 +328,7 @@ TEST_F(TmpFileMgrTest, TestScratchLimit) {
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
 
   const int64_t LIMIT = 128;
   // A power-of-two so that FileGroup allocates exactly this amount of scratch space.

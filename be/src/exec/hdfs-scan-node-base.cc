@@ -372,8 +372,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
         partition_desc->partition_key_value_ctxs(), scan_node_pool_.get(), state);
   }
 
-  RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterContext(
-      &reader_context_, mem_tracker()));
+  runtime_state_->io_mgr()->RegisterContext(&reader_context_, mem_tracker());
 
   // Initialize HdfsScanNode specific counters
   // TODO: Revisit counters and move the counters specific to multi-threaded scans
