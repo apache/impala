@@ -524,6 +524,22 @@ void ImpalaServer::QueryExecState::Done() {
   // Make sure we join on wait_thread_ before we finish (and especially before this object
   // is destroyed).
   BlockOnWait();
+
+  // Update latest observed Kudu timestamp stored in the session from the coordinator.
+  // Needs to take the session_ lock which must not be taken while holding lock_, so this
+  // must happen before taking lock_ below.
+  if (coord_.get() != NULL) {
+    // This is safe to access on coord_ after Wait() has been called.
+    uint64_t latest_kudu_ts = coord_->GetLatestKuduInsertTimestamp();
+    if (latest_kudu_ts > 0) {
+      VLOG_RPC << "Updating session (id=" << session_id()  << ") with latest "
+               << "observed Kudu timestamp: " << latest_kudu_ts;
+      lock_guard<mutex> session_lock(session_->lock);
+      session_->kudu_latest_observed_ts = std::max<uint64_t>(
+          session_->kudu_latest_observed_ts, latest_kudu_ts);
+    }
+  }
+
   unique_lock<mutex> l(lock_);
   end_time_ = TimestampValue::LocalTime();
   summary_profile_.AddInfoString("End Time", end_time().DebugString());
@@ -531,15 +547,6 @@ void ImpalaServer::QueryExecState::Done() {
   query_events_->MarkEvent("Unregister query");
 
   if (coord_.get() != NULL) {
-    // Update latest observed Kudu timestamp stored in the session.
-    uint64_t latest_kudu_ts = coord_->GetLatestKuduInsertTimestamp();
-    if (latest_kudu_ts > 0) {
-      VLOG_RPC << "Updating session latest observed Kudu timestamp: " << latest_kudu_ts;
-      lock_guard<mutex> session_lock(session_->lock);
-      session_->kudu_latest_observed_ts = std::max<uint64_t>(
-          session_->kudu_latest_observed_ts, latest_kudu_ts);
-    }
-
     // Release any reserved resources.
     Status status = exec_env_->scheduler()->Release(schedule_.get());
     if (!status.ok()) {
