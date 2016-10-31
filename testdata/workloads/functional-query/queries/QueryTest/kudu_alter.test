@@ -40,8 +40,3 @@ select count(*) from simple_new;
 ---- TYPES
 BIGINT
 ====
----- QUERY
-alter table simple_new set tblproperties ('storage_handler'='foo')
----- CATCH
-ImpalaRuntimeException: Table 'simple_new' does not represent a Kudu table. Expected storage_handler 'com.cloudera.kudu.hive.KuduStorageHandler' but found 'foo'
-====

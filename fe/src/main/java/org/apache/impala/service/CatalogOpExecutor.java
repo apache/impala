@@ -2082,9 +2082,8 @@ public class CatalogOpExecutor {
           tbl.getMetaStoreTable().deepCopy();
       switch (params.getTarget()) {
         case TBL_PROPERTY:
-          boolean isKuduTable = KuduTable.isKuduTable(msTbl);
           msTbl.getParameters().putAll(properties);
-          if (isKuduTable) {
+          if (KuduTable.isKuduTable(msTbl)) {
             KuduCatalogOpExecutor.validateKuduTblExists(msTbl);
           }
           break;

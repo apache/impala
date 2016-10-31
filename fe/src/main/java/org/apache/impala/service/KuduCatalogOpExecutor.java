@@ -221,21 +221,15 @@ public class KuduCatalogOpExecutor {
   }
 
   /**
-   * Validates the table properties of a Kudu table. It checks that the msTbl represents
-   * a Kudu table (indicated by the Kudu storage handler), that the master
-   * addresses point to valid Kudu masters, and that the table exists.
+   * Validates the table properties of a Kudu table. It checks that the master
+   * addresses point to valid Kudu masters and that the table exists.
    * Throws an ImpalaRuntimeException if this is not the case.
    */
   public static void validateKuduTblExists(
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws ImpalaRuntimeException {
-    Map<String, String> properties = msTbl.getParameters();
-    if (!KuduTable.isKuduTable(msTbl)) {
-      throw new ImpalaRuntimeException(String.format("Table '%s' does not represent a " +
-          "Kudu table. Expected storage_handler '%s' but found '%s'",
-          msTbl.getTableName(), KuduTable.KUDU_STORAGE_HANDLER,
-          properties.get(KuduTable.KEY_STORAGE_HANDLER)));
-    }
+    Preconditions.checkArgument(KuduTable.isKuduTable(msTbl));
 
+    Map<String, String> properties = msTbl.getParameters();
     String masterHosts = properties.get(KuduTable.KEY_MASTER_HOSTS);
     Preconditions.checkState(!Strings.isNullOrEmpty(masterHosts));
     String kuduTableName = properties.get(KuduTable.KEY_TABLE_NAME);

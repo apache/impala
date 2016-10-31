@@ -408,6 +408,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
               + "serdeproperties ('key'='" + long_property_value + "')",
           "Property value length must be <= " + MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH
               + ": " + (MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH + 1));
+
+      AnalysisError(
+          "alter table functional.alltypes set tblproperties('storage_handler'='1')",
+          "Changing the 'storage_handler' table property is not supported to protect " +
+          "against metadata corruption.");
     }
 
     // Arbitrary exprs as partition key values. Constant exprs are ok.
@@ -1360,6 +1365,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table t primary key (vc) distribute by hash into 3 buckets" +
         " stored as kudu as select vc from functional.chars_tiny",
         "Cannot create table 't': Type VARCHAR(32) is not supported in Kudu");
+    AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
+        " stored as kudu as select c1 as id from functional.decimal_tiny",
+        "Cannot create table 't': Type DECIMAL(10,4) is not supported in Kudu");
     AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
         " stored as kudu as select id, s from functional.complextypes_fileformat",
         "Expr 's' in select list returns a complex type 'STRUCT<f1:STRING,f2:INT>'.\n" +
