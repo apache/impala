@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.thrift.TTupleDescriptor;
@@ -59,9 +60,11 @@ import com.google.common.collect.Lists;
  *
  * Memory Layout
  * Slots are placed in descending order by size with trailing bytes to store null flags.
- * Null flags are omitted for non-nullable slots, except for Kudu scan slots which always
- * have a null flag to match Kudu's client row format. There is no padding between tuples
- * when stored back-to-back in a row batch.
+ * Null flags are omitted for non-nullable slots, with the following exceptions for Kudu
+ * scan tuples to match Kudu's client row format: If there is at least one nullable Kudu
+ * scan slot, then all slots (even non-nullable ones) get a null flag. If there are no
+ * nullable Kudu scan slots, then there are also no null flags.
+ * There is no padding between tuples when stored back-to-back in a row batch.
  *
  * Example: select bool_col, int_col, string_col, smallint_col from functional.alltypes
  * Slots:   string_col|int_col|smallint_col|bool_col|null_byte
@@ -232,6 +235,8 @@ public class TupleDescriptor {
     if (hasMemLayout_) return;
     hasMemLayout_ = true;
 
+    boolean alwaysAddNullBit = hasNullableKuduScanSlots();
+
     // maps from slot size to slot descriptors with that size
     Map<Integer, List<SlotDescriptor>> slotsBySize =
         new HashMap<Integer, List<SlotDescriptor>>();
@@ -253,7 +258,7 @@ public class TupleDescriptor {
       }
       totalSlotSize += d.getType().getSlotSize();
       slotsBySize.get(d.getType().getSlotSize()).add(d);
-      if (d.getIsNullable() || d.isKuduScanSlot()) ++numNullBits;
+      if (d.getIsNullable() || alwaysAddNullBit) ++numNullBits;
     }
     // we shouldn't have anything of size <= 0
     Preconditions.checkState(!slotsBySize.containsKey(0));
@@ -280,7 +285,7 @@ public class TupleDescriptor {
         slotOffset += slotSize;
 
         // assign null indicator
-        if (d.getIsNullable() || d.isKuduScanSlot()) {
+        if (d.getIsNullable() || alwaysAddNullBit) {
           d.setNullIndicatorByte(nullIndicatorByte);
           d.setNullIndicatorBit(nullIndicatorBit);
           nullIndicatorBit = (nullIndicatorBit + 1) % 8;
@@ -298,6 +303,17 @@ public class TupleDescriptor {
     Preconditions.checkState(slotOffset == totalSlotSize);
 
     byteSize_ = totalSlotSize + numNullBytes_;
+  }
+
+  /**
+   * Returns true if this tuple has at least one materialized nullable Kudu scan slot.
+   */
+  private boolean hasNullableKuduScanSlots() {
+    if (!(getTable() instanceof KuduTable)) return false;
+    for (SlotDescriptor d: slots_) {
+      if (d.isMaterialized() && d.getIsNullable()) return true;
+    }
+    return false;
   }
 
   /**

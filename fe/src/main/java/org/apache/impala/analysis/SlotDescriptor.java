@@ -142,7 +142,6 @@ public class SlotDescriptor {
 
   public Path getPath() { return path_; }
   public boolean isScanSlot() { return path_ != null && path_.isRootedAtTable(); }
-  public boolean isKuduScanSlot() { return getColumn() instanceof KuduColumn; }
   public Column getColumn() { return !isScanSlot() ? null : path_.destColumn(); }
 
   public ColumnStats getStats() {
