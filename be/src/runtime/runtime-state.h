@@ -62,8 +62,10 @@ typedef std::map<std::string, TInsertStats> PartitionInsertStats;
 /// deleted.
 typedef std::map<std::string, std::string> FileMoveMap;
 
-/// A collection of items that are part of the global state of a
-/// query and shared across all execution nodes of that query.
+/// A collection of items that are part of the global state of a query and shared across
+/// all execution nodes of that query. After initialisation, callers must call
+/// ReleaseResources() to ensure that all resources are correctly freed before
+/// destruction.
 class RuntimeState {
  public:
   RuntimeState(const TExecPlanFragmentParams& fragment_params, ExecEnv* exec_env);
@@ -311,6 +313,9 @@ class RuntimeState {
   /// TODO: Fix IMPALA-4233
   Status CodegenScalarFns();
 
+  /// Release resources and prepare this object for destruction.
+  void ReleaseResources();
+
  private:
   /// Allow TestEnv to set block_mgr manually for testing.
   friend class TestEnv;
@@ -325,7 +330,7 @@ class RuntimeState {
 
   static const int DEFAULT_BATCH_SIZE = 1024;
 
-  DescriptorTbl* desc_tbl_;
+  DescriptorTbl* desc_tbl_ = nullptr;
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
   /// Lock protecting error_log_
@@ -351,7 +356,7 @@ class RuntimeState {
 
   /// Thread resource management object for this fragment's execution.  The runtime
   /// state is responsible for returning this pool to the thread mgr.
-  ThreadResourceMgr::ResourcePool* resource_pool_;
+  ThreadResourceMgr::ResourcePool* resource_pool_ = nullptr;
 
   /// Temporary Hdfs files created, and where they should be moved to ultimately.
   /// Mapping a filename to a blank destination causes it to be deleted.

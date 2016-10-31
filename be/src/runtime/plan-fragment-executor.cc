@@ -534,10 +534,7 @@ void PlanFragmentExecutor::Close() {
   // Prepare should always have been called, and so runtime_state_ should be set
   DCHECK(prepared_promise_.IsSet());
   if (exec_tree_ != NULL) exec_tree_->Close(runtime_state_.get());
-  runtime_state_->UnregisterReaderContexts();
-  exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
-  runtime_state_->desc_tbl().ClosePartitionExprs(runtime_state_.get());
-  runtime_state_->filter_bank()->Close();
+  runtime_state_->ReleaseResources();
 
   if (mem_usage_sampled_counter_ != NULL) {
     PeriodicCounterUpdater::StopTimeSeriesCounter(mem_usage_sampled_counter_);

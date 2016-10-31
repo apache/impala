@@ -26,25 +26,26 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "exec/catalog-op-executor.h"
-#include "exprs/expr.h"
 #include "exprs/expr-context.h"
+#include "exprs/expr.h"
+#include "gen-cpp/Data_types.h"
+#include "gen-cpp/Frontend_types.h"
+#include "rpc/jni-thrift-util.h"
+#include "rpc/thrift-server.h"
+#include "runtime/client-cache.h"
 #include "runtime/exec-env.h"
-#include "runtime/runtime-state.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
-#include "runtime/client-cache.h"
+#include "runtime/runtime-state.h"
 #include "service/impala-server.h"
 #include "util/cpu-info.h"
+#include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/dynamic-util.h"
 #include "util/jni-util.h"
 #include "util/mem-info.h"
+#include "util/scope-exit-trigger.h"
 #include "util/symbols-util.h"
-#include "rpc/jni-thrift-util.h"
-#include "rpc/thrift-server.h"
-#include "util/debug-util.h"
-#include "gen-cpp/Data_types.h"
-#include "gen-cpp/Frontend_types.h"
 
 #include "common/names.h"
 
@@ -94,6 +95,8 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
   // Java exception.
   query_ctx.request.query_options.max_errors = 1;
   RuntimeState state(query_ctx);
+  // Make sure to close the runtime state no matter how this scope is exited.
+  ScopeExitTrigger close_runtime_state([&state]() { state.ReleaseResources(); });
 
   THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
       result_bytes);

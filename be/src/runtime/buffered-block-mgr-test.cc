@@ -142,7 +142,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
   BufferedBlockMgr* CreateMgr(int64_t query_id, int max_buffers, int block_size,
       RuntimeState** query_state = NULL, TQueryOptions* query_options = NULL) {
     RuntimeState* state;
-    EXPECT_OK(test_env_->CreateQueryState(
+    EXPECT_OK(test_env_->CreatePerQueryState(
         query_id, max_buffers, block_size, &state, query_options));
     if (query_state != NULL) *query_state = state;
     return state->block_mgr();
@@ -185,7 +185,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
   void TearDownMgrs() {
     // Tear down the query states, which DCHECKs that the memory consumption of
     // the query's trackers is zero.
-    test_env_->TearDownQueryStates();
+    test_env_->TearDownRuntimeStates();
   }
 
   void AllocateBlocks(BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
@@ -924,7 +924,7 @@ void BufferedBlockMgrTest::TestRuntimeStateTeardown(
   // scenario by holding onto a reference to the block mgr. This should be safe so
   // long as blocks are properly deleted before the runtime state is torn down.
   DeleteBlocks(blocks);
-  test_env_->TearDownQueryStates();
+  test_env_->TearDownRuntimeStates();
 
   // Optionally wait for writes to complete after cancellation.
   if (wait_for_writes) WaitForWrites(block_mgr.get());
