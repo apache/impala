@@ -822,17 +822,20 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
 }
 
 Status ImpalaServer::QueryExecState::Cancel(bool check_inflight, const Status* cause) {
+  if (check_inflight) {
+    // If the query is in 'inflight_queries' it means that the query has actually started
+    // executing. It is ok if the query is removed from 'inflight_queries' during
+    // cancellation, so we can release the session lock before starting the cancellation
+    // work.
+    lock_guard<mutex> session_lock(session_->lock);
+    if (session_->inflight_queries.find(query_id()) == session_->inflight_queries.end()) {
+      return Status("Query not yet running");
+    }
+  }
+
   Coordinator* coord;
   {
     lock_guard<mutex> lock(lock_);
-    if (check_inflight) {
-      lock_guard<mutex> session_lock(session_->lock);
-      if (session_->inflight_queries.find(query_id()) ==
-          session_->inflight_queries.end()) {
-        return Status("Query not yet running");
-      }
-    }
-
     // If the query is completed or cancelled, no need to update state.
     bool already_done = eos_ || query_state_ == QueryState::EXCEPTION;
     if (!already_done && cause != NULL) {

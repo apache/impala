@@ -49,9 +49,9 @@ class QueryExecStateCleaner;
 /// we can return to the client. It also captures all state required for
 /// servicing query-related requests from the client.
 /// Thread safety: this class is generally not thread-safe, callers need to
-/// synchronize access explicitly via lock().
-/// To avoid deadlocks, the caller must *not* acquire query_exec_state_map_lock_
-/// while holding the exec state's lock.
+/// synchronize access explicitly via lock(). See the ImpalaServer class comment for
+/// the required lock acquisition order.
+///
 /// TODO: Consider renaming to RequestExecState for consistency.
 /// TODO: Compute stats is the only stmt that requires child queries. Once the
 /// CatalogService performs background stats gathering the concept of child queries
@@ -207,11 +207,11 @@ class ImpalaServer::QueryExecState {
   /// responsible for acquiring this lock. To avoid deadlocks, callers must not hold lock_
   /// while acquiring this lock (since FetchRows() will release and re-acquire lock_ during
   /// its execution).
+  /// See "Locking" in the class comment for lock acquisition order.
   boost::mutex fetch_rows_lock_;
 
-  /// Protects last_active_time_ and ref_count_.
-  /// Must always be taken as the last lock, that is no other locks may be taken while
-  /// holding this lock.
+  /// Protects last_active_time_ and ref_count_. Only held during short function calls -
+  /// no other locks should be acquired while holding this lock.
   mutable boost::mutex expiration_data_lock_;
   int64_t last_active_time_;
 
@@ -223,11 +223,12 @@ class ImpalaServer::QueryExecState {
   /// Executor for any child queries (e.g. compute stats subqueries). Always non-NULL.
   const boost::scoped_ptr<ChildQueryExecutor> child_query_executor_;
 
-  // Protects all following fields. Acquirers should be careful not to hold it for too
-  // long, e.g. during RPCs because this lock is required to make progress on various
-  // ImpalaServer requests. If held for too long it can block progress of client
-  // requests for this query, e.g. query status and cancellation. Furthermore, until
-  // IMPALA-3882 is fixed, it can indirectly block progress on all other queries.
+  /// Protects all following fields. Acquirers should be careful not to hold it for too
+  /// long, e.g. during RPCs because this lock is required to make progress on various
+  /// ImpalaServer requests. If held for too long it can block progress of client
+  /// requests for this query, e.g. query status and cancellation. Furthermore, until
+  /// IMPALA-3882 is fixed, it can indirectly block progress on all other queries.
+  /// See "Locking" in the class comment for lock acquisition order.
   boost::mutex lock_;
 
   ExecEnv* exec_env_;

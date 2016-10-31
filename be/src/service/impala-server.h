@@ -72,9 +72,34 @@ class TGetExecSummaryReq;
 /// An ImpalaServer contains both frontend and backend functionality;
 /// it implements ImpalaService (Beeswax), ImpalaHiveServer2Service (HiveServer2)
 /// and ImpalaInternalService APIs.
-/// This class is partially thread-safe. To ensure freedom from deadlock,
-/// locks on the maps are obtained before locks on the items contained in the maps.
-//
+///
+/// Locking
+/// -------
+/// This class is partially thread-safe. To ensure freedom from deadlock, if multiple
+/// locks are acquired, lower-numbered locks must be acquired before higher-numbered
+/// locks:
+/// 1. connection_to_sessions_map_lock_
+/// 2. session_state_map_lock_
+/// 3. SessionState::lock
+/// 4. query_expiration_lock_
+/// 5. query_exec_state_map_lock_
+/// 6. QueryExecState::fetch_rows_lock
+/// 7. QueryExecState::lock
+/// 8. QueryExecState::expiration_data_lock_
+/// 9. Coordinator::exec_summary_lock
+///
+/// Coordinator::lock_ should not be acquired at the same time as the
+/// ImpalaServer/SessionState/QueryExecState locks. Aside from
+/// Coordinator::exec_summary_lock_ the Coordinator's lock ordering is independent of
+/// the above lock ordering.
+///
+/// The following locks are not held in conjunction with other locks:
+/// * query_log_lock_
+/// * session_timeout_lock_
+/// * query_locations_lock_
+/// * uuid_lock_
+/// * catalog_version_lock_
+///
 /// TODO: The state of a running query is currently not cleaned up if the
 /// query doesn't experience any errors at runtime and close() doesn't get called.
 /// The solution is to have a separate thread that cleans up orphaned
@@ -638,7 +663,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   typedef boost::unordered_map<TUniqueId, std::shared_ptr<QueryExecState>>
       QueryExecStateMap;
   QueryExecStateMap query_exec_state_map_;
-  boost::mutex query_exec_state_map_lock_;  // protects query_exec_state_map_
+
+  /// Protects query_exec_state_map_. See "Locking" in the class comment for lock
+  /// acquisition order.
+  boost::mutex query_exec_state_map_lock_;
 
   /// Default query options in the form of TQueryOptions and beeswax::ConfigVariable
   TQueryOptions default_query_options_;
@@ -671,8 +699,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// Client network address.
     TNetworkAddress network_address;
 
-    /// Protects all fields below.
-    /// If this lock has to be taken with query_exec_state_map_lock, take this lock first.
+    /// Protects all fields below. See "Locking" in the class comment for lock
+    /// acquisition order.
     boost::mutex lock;
 
     /// If true, the session has been closed.
@@ -765,16 +793,16 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// For access to GetSessionState() / MarkSessionInactive()
   friend class ScopedSessionState;
 
-  /// Protects session_state_map_. Should be taken before any query exec-state locks,
-  /// including query_exec_state_map_lock_. Should be taken before individual
-  /// session-state locks.
+  /// Protects session_state_map_. See "Locking" in the class comment for lock
+  /// acquisition order.
   boost::mutex session_state_map_lock_;
 
   /// A map from session identifier to a structure containing per-session information
   typedef boost::unordered_map<TUniqueId, std::shared_ptr<SessionState>> SessionStateMap;
   SessionStateMap session_state_map_;
 
-  /// Protects connection_to_sessions_map_. May be taken before session_state_map_lock_.
+  /// Protects connection_to_sessions_map_. See "Locking" in the class comment for lock
+  /// acquisition order.
   boost::mutex connection_to_sessions_map_lock_;
 
   /// Map from a connection ID to the associated list of sessions so that all can be
@@ -801,8 +829,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     session->last_accessed_ms = UnixMillis();
   }
 
-  /// protects query_locations_. Must always be taken after
-  /// query_exec_state_map_lock_ if both are required.
+  /// Protects query_locations_. Not held in conjunction with other locks.
   boost::mutex query_locations_lock_;
 
   /// A map from backend to the list of queries currently running there.
@@ -865,7 +892,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       ProxyUserMap;
   ProxyUserMap authorized_proxy_user_config_;
 
-  /// Guards queries_by_timestamp_.  Must not be acquired before a session state lock.
+  /// Guards queries_by_timestamp_. See "Locking" in the class comment for lock
+  /// acquisition order.
   boost::mutex query_expiration_lock_;
 
   /// Describes a query expiration event (t, q) where t is the expiration deadline in

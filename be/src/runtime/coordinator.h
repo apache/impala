@@ -199,6 +199,7 @@ class Coordinator {
     return exec_summary_;
   }
 
+  /// See the ImpalaServer class comment for the required lock acquisition order.
   SpinLock& GetExecSummaryLock() const { return exec_summary_lock_; }
 
   /// Receive a local filter update from a fragment instance. Aggregate that filter update
@@ -351,6 +352,7 @@ class Coordinator {
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
   /// Execution summary for this query.
+  /// See the ImpalaServer class comment for the required lock acquisition order.
   mutable SpinLock exec_summary_lock_;
   TExecSummary exec_summary_;
 
