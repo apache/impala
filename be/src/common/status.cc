@@ -17,10 +17,13 @@
 
 #include <boost/algorithm/string/join.hpp>
 
+#include <ostream>
+
 #include "common/status.h"
 #include "util/debug-util.h"
 
 #include "common/names.h"
+#include "gen-cpp/ErrorCodes_types.h"
 
 namespace impala {
 
@@ -231,6 +234,12 @@ void Status::FreeMessage() noexcept {
 void Status::CopyMessageFrom(const Status& status) noexcept {
   delete msg_;
   msg_ = status.msg_ == NULL ? NULL : new ErrorMsg(*status.msg_);
+}
+
+ostream& operator<<(ostream& os, const Status& status) {
+  os << _TErrorCode_VALUES_TO_NAMES.at(status.code());
+  if (!status.ok()) os << ": " << status.GetDetail();
+  return os;
 }
 
 }

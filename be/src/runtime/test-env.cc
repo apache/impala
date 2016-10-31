@@ -18,17 +18,15 @@
 #include "runtime/test-env.h"
 
 #include <limits>
+#include <memory>
 
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/tmp-file-mgr.h"
+#include "runtime/query-state.h"
 #include "util/disk-info.h"
 #include "util/impalad-metrics.h"
-
 #include "gutil/strings/substitute.h"
-
-#include <memory>
-
 #include "common/names.h"
 
 using boost::scoped_ptr;
@@ -40,8 +38,8 @@ scoped_ptr<MetricGroup> TestEnv::static_metrics_;
 
 TestEnv::TestEnv()
   : have_tmp_file_mgr_args_(false),
-    buffer_pool_min_buffer_len_(1024),
-    buffer_pool_capacity_(0) {}
+    buffer_pool_min_buffer_len_(-1),
+    buffer_pool_capacity_(-1) {}
 
 Status TestEnv::Init() {
   if (static_metrics_ == NULL) {
@@ -61,7 +59,9 @@ Status TestEnv::Init() {
   } else {
     RETURN_IF_ERROR(tmp_file_mgr()->Init(metrics()));
   }
-  exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_);
+  if (buffer_pool_min_buffer_len_ != -1 && buffer_pool_capacity_ != -1) {
+    exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_);
+  }
   return Status::OK();
 }
 
@@ -80,7 +80,7 @@ void TestEnv::SetBufferPoolArgs(int64_t min_buffer_len, int64_t capacity) {
 TestEnv::~TestEnv() {
   // Queries must be torn down first since they are dependent on global state.
   TearDownQueries();
-  exec_env_->disk_io_mgr_.reset();
+  // tear down exec env state to avoid leaks
   exec_env_.reset();
 }
 
@@ -113,13 +113,23 @@ Status TestEnv::CreateQueryState(
   if (query_options != nullptr) query_ctx.client_request.query_options = *query_options;
   query_ctx.query_id.hi = 0;
   query_ctx.query_id.lo = query_id;
+  query_ctx.request_pool = "test-pool";
 
   // CreateQueryState() enforces the invariant that 'query_id' must be unique.
-  QueryState* qs = exec_env_->query_exec_mgr()->CreateQueryState(query_ctx, "test-pool");
+  QueryState* qs = exec_env_->query_exec_mgr()->CreateQueryState(query_ctx);
   query_states_.push_back(qs);
-  RETURN_IF_ERROR(qs->Prepare());
-  FragmentInstanceState* fis = qs->obj_pool()->Add(new FragmentInstanceState(
-      qs, TPlanFragmentCtx(), TPlanFragmentInstanceCtx(), TDescriptorTable()));
+  // make sure to initialize data structures unrelated to the TExecQueryFInstancesParams
+  // param
+  TExecQueryFInstancesParams rpc_params;
+  // create dummy -Ctx fields, we need them for FragmentInstance-/RuntimeState
+  rpc_params.__set_coord_state_idx(0);
+  rpc_params.__set_query_ctx(TQueryCtx());
+  rpc_params.__set_fragment_ctxs(vector<TPlanFragmentCtx>({TPlanFragmentCtx()}));
+  rpc_params.__set_fragment_instance_ctxs(
+      vector<TPlanFragmentInstanceCtx>({TPlanFragmentInstanceCtx()}));
+  RETURN_IF_ERROR(qs->Init(rpc_params));
+  FragmentInstanceState* fis = qs->obj_pool()->Add(
+      new FragmentInstanceState(qs, qs->rpc_params().fragment_ctxs[0], qs->rpc_params().fragment_instance_ctxs[0]));
   RuntimeState* rs = qs->obj_pool()->Add(
       new RuntimeState(qs, fis->fragment_ctx(), fis->instance_ctx(), exec_env_.get()));
   runtime_states_.push_back(rs);

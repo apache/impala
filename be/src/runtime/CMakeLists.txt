@@ -29,9 +29,11 @@ add_library(Runtime
   buffered-tuple-stream-v2.cc
   client-cache.cc
   coordinator.cc
+  coordinator-backend-state.cc
   data-stream-mgr.cc
   data-stream-sender.cc
   data-stream-recvr.cc
+  debug-options.cc
   descriptors.cc
   disk-io-mgr.cc
   disk-io-mgr-reader-context.cc
@@ -48,7 +50,6 @@ add_library(Runtime
   mem-pool.cc
   multi-precision.cc
   parallel-executor.cc
-  plan-fragment-executor.cc
   query-exec-mgr.cc
   query-state.cc
   test-env.cc

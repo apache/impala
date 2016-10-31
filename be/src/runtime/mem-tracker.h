@@ -446,7 +446,7 @@ class PoolMemTrackerRegistry {
   /// All per-request pool MemTracker objects. It is assumed that request pools will live
   /// for the entire duration of the process lifetime so MemTrackers are never removed
   /// from this map. Protected by 'pool_to_mem_trackers_lock_'
-  typedef boost::unordered_map<std::string, MemTracker*> PoolTrackersMap;
+  typedef boost::unordered_map<std::string, std::unique_ptr<MemTracker>> PoolTrackersMap;
   PoolTrackersMap pool_to_mem_trackers_;
   /// IMPALA-3068: Use SpinLock instead of boost::mutex so that the lock won't
   /// automatically destroy itself as part of process teardown, which could cause races.

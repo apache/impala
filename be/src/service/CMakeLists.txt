@@ -30,7 +30,7 @@ add_library(Service
   impala-hs2-server.cc
   impala-beeswax-server.cc
   impala-internal-service.cc
-  query-exec-state.cc
+  client-request-state.cc
   query-options.cc
   query-result-set.cc
   child-query.cc

@@ -220,14 +220,6 @@ const TPlanFragment& FInstanceExecParams::fragment() const {
   return fragment_exec_params.fragment;
 }
 
-int QuerySchedule::GetNumFragmentInstances() const {
-  int result = 0;
-  for (const FragmentExecParams& fragment_exec_params : fragment_exec_params_) {
-    result += fragment_exec_params.instance_exec_params.size();
-  }
-  return result;
-}
-
 const TPlanFragment* QuerySchedule::GetCoordFragment() const {
   // Only have coordinator fragment for statements that return rows.
   if (request_.stmt_type != TStmtType::QUERY) return nullptr;
@@ -260,6 +252,14 @@ vector<int> FragmentExecParams::GetInstanceIdxs() const {
     result.push_back(GetInstanceIdx(instance_params.instance_id));
   }
   return result;
+}
+
+int QuerySchedule::GetNumFragmentInstances() const {
+  int total = 0;
+  for (const FragmentExecParams& p: fragment_exec_params_) {
+    total += p.instance_exec_params.size();
+  }
+  return total;
 }
 
 }

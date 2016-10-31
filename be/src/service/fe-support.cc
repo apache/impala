@@ -103,10 +103,11 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   // Allow logging of at least one error, so we can detect and convert it into a
   // Java exception.
   query_ctx.client_request.query_options.max_errors = 1;
-
   // Track memory against a dummy "fe-eval-exprs" resource pool - we don't
   // know what resource pool the query has been assigned to yet.
-  RuntimeState state(query_ctx, ExecEnv::GetInstance(), "fe-eval-exprs");
+  query_ctx.request_pool = "fe-eval-exprs";
+
+  RuntimeState state(query_ctx, ExecEnv::GetInstance());
   // Make sure to close the runtime state no matter how this scope is exited.
   const auto close_runtime_state =
       MakeScopeExitTrigger([&state]() { state.ReleaseResources(); });

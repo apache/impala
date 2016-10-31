@@ -139,11 +139,11 @@ private:
 /// Track log messages per error code.
 typedef std::map<TErrorCode::type, TErrorLogEntry> ErrorLogMap;
 
-/// Merge error maps. Merging of error maps occurs, when the errors from multiple backends
-/// are merged into a single error map.  General log messages are simply appended,
-/// specific errors are deduplicated by either appending a new instance or incrementing
-/// the count of an existing one.
-void MergeErrorMaps(ErrorLogMap* left, const ErrorLogMap& right);
+/// Merge error map m1 into m2. Merging of error maps occurs when the errors from
+/// multiple backends are merged into a single error map.  General log messages are
+/// simply appended, specific errors are deduplicated by either appending a new
+/// instance or incrementing the count of an existing one.
+void MergeErrorMaps(const ErrorLogMap& m1, ErrorLogMap* m2);
 
 /// Append an error to the error map. Performs the aggregation as follows: GENERAL errors
 /// are appended to the list of GENERAL errors, to keep one item each in the map, while

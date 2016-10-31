@@ -47,7 +47,7 @@ TEST(ErrorMsg, MergeMap) {
   right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.push_back("p");
   right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count = 3;
 
-  MergeErrorMaps(&left, right);
+  MergeErrorMaps(right, &left);
   ASSERT_EQ(2, left.size());
   ASSERT_EQ(2, left[TErrorCode::GENERAL].messages.size());
 
@@ -55,7 +55,7 @@ TEST(ErrorMsg, MergeMap) {
   right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.push_back("p");
   right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count = 3;
 
-  MergeErrorMaps(&left, right);
+  MergeErrorMaps(right, &left);
   ASSERT_EQ(2, left.size());
   ASSERT_EQ(2, left[TErrorCode::GENERAL].messages.size());
   ASSERT_EQ(6, left[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
@@ -74,7 +74,7 @@ TEST(ErrorMsg, MergeMap) {
   ASSERT_EQ(2, cleared.size());
   ASSERT_EQ(1, cleared.count(TErrorCode::RPC_RECV_TIMEOUT));
 
-  MergeErrorMaps(&dummy, cleared);
+  MergeErrorMaps(cleared, &dummy);
   ASSERT_EQ(3, dummy.size());
   ASSERT_EQ(3, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
   ASSERT_EQ(1, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.size());
@@ -84,7 +84,7 @@ TEST(ErrorMsg, MergeMap) {
   ASSERT_EQ(0, dummy[TErrorCode::GENERAL].count);
   ASSERT_EQ(1, dummy[TErrorCode::GENERAL].messages.size());
 
-  MergeErrorMaps(&cleared, dummy);
+  MergeErrorMaps(dummy, &cleared);
   ASSERT_EQ(3, cleared.size());
   ASSERT_EQ(3, cleared[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
   ASSERT_EQ(1, cleared[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.size());

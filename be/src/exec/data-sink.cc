@@ -48,11 +48,12 @@ DataSink::~DataSink() {
   DCHECK(closed_);
 }
 
-Status DataSink::CreateDataSink(ObjectPool* pool,
-    const TDataSink& thrift_sink, const vector<TExpr>& output_exprs,
+Status DataSink::Create(ObjectPool* pool,
+    const TPlanFragmentCtx& fragment_ctx,
     const TPlanFragmentInstanceCtx& fragment_instance_ctx,
-    const RowDescriptor& row_desc, scoped_ptr<DataSink>* sink) {
-  DataSink* tmp_sink = NULL;
+    const RowDescriptor& row_desc, DataSink** sink) {
+  const TDataSink& thrift_sink = fragment_ctx.fragment.output_sink;
+  const vector<TExpr>& output_exprs = fragment_ctx.fragment.output_exprs;
   switch (thrift_sink.type) {
     case TDataSinkType::DATA_STREAM_SINK:
       if (!thrift_sink.__isset.stream_sink) {
@@ -60,52 +61,45 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
       }
 
       // TODO: figure out good buffer size based on size of output row
-      tmp_sink = new DataStreamSender(pool,
-          fragment_instance_ctx.sender_id, row_desc, thrift_sink.stream_sink,
-          fragment_instance_ctx.destinations, 16 * 1024);
-      sink->reset(tmp_sink);
+      *sink = pool->Add(
+          new DataStreamSender(pool,
+            fragment_instance_ctx.sender_id, row_desc, thrift_sink.stream_sink,
+            fragment_ctx.destinations, 16 * 1024));
       break;
 
     case TDataSinkType::TABLE_SINK:
       if (!thrift_sink.__isset.table_sink) return Status("Missing table sink.");
       switch (thrift_sink.table_sink.type) {
         case TTableSinkType::HDFS:
-          tmp_sink = new HdfsTableSink(row_desc, output_exprs, thrift_sink);
-          sink->reset(tmp_sink);
+          *sink = pool->Add(new HdfsTableSink(row_desc, output_exprs, thrift_sink));
           break;
         case TTableSinkType::HBASE:
-          tmp_sink = new HBaseTableSink(row_desc, output_exprs, thrift_sink);
-          sink->reset(tmp_sink);
+          *sink = pool->Add(new HBaseTableSink(row_desc, output_exprs, thrift_sink));
           break;
         case TTableSinkType::KUDU:
           RETURN_IF_ERROR(CheckKuduAvailability());
-          tmp_sink = new KuduTableSink(row_desc, output_exprs, thrift_sink);
-          sink->reset(tmp_sink);
+          *sink = pool->Add(new KuduTableSink(row_desc, output_exprs, thrift_sink));
           break;
         default:
           stringstream error_msg;
           const char* str = "Unknown table sink";
           map<int, const char*>::const_iterator i =
               _TTableSinkType_VALUES_TO_NAMES.find(thrift_sink.table_sink.type);
-          if (i != _TTableSinkType_VALUES_TO_NAMES.end()) {
-            str = i->second;
-          }
+          if (i != _TTableSinkType_VALUES_TO_NAMES.end()) str = i->second;
           error_msg << str << " not implemented.";
           return Status(error_msg.str());
       }
 
       break;
     case TDataSinkType::PLAN_ROOT_SINK:
-      sink->reset(new PlanRootSink(row_desc, output_exprs, thrift_sink));
+      *sink = pool->Add(new PlanRootSink(row_desc, output_exprs, thrift_sink));
       break;
     default:
       stringstream error_msg;
       map<int, const char*>::const_iterator i =
           _TDataSinkType_VALUES_TO_NAMES.find(thrift_sink.type);
       const char* str = "Unknown data sink type ";
-      if (i != _TDataSinkType_VALUES_TO_NAMES.end()) {
-        str = i->second;
-      }
+      if (i != _TDataSinkType_VALUES_TO_NAMES.end()) str = i->second;
       error_msg << str << " not implemented.";
       return Status(error_msg.str());
   }

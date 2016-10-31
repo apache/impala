@@ -480,7 +480,7 @@ string RowDescriptor::DebugString() const {
 }
 
 Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
-                             DescriptorTbl** tbl) {
+    MemTracker* mem_tracker, DescriptorTbl** tbl) {
   *tbl = pool->Add(new DescriptorTbl());
   // deserialize table descriptors first, they are being referenced by tuple descriptors
   for (size_t i = 0; i < thrift_tbl.tableDescriptors.size(); ++i) {
@@ -489,6 +489,21 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
     switch (tdesc.tableType) {
       case TTableType::HDFS_TABLE:
         desc = pool->Add(new HdfsTableDescriptor(tdesc, pool));
+
+        if (mem_tracker != nullptr) {
+          // prepare and open partition exprs
+          const HdfsTableDescriptor* hdfs_tbl =
+              static_cast<const HdfsTableDescriptor*>(desc);
+          for (const auto& part_entry : hdfs_tbl->partition_descriptors()) {
+            // TODO: RowDescriptor should arguably be optional in Prepare for known
+            // literals Partition exprs are not used in the codegen case.  Don't codegen
+            // them.
+            RETURN_IF_ERROR(Expr::Prepare(part_entry.second->partition_key_value_ctxs(),
+                nullptr, RowDescriptor(), mem_tracker));
+            RETURN_IF_ERROR(Expr::Open(
+                part_entry.second->partition_key_value_ctxs(), nullptr));
+          }
+        }
         break;
       case TTableType::HBASE_TABLE:
         desc = pool->Add(new HBaseTableDescriptor(tdesc));
@@ -530,27 +545,14 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
   return Status::OK();
 }
 
-Status DescriptorTbl::PrepareAndOpenPartitionExprs(RuntimeState* state) const {
-  for (const auto& tbl_entry : tbl_desc_map_) {
-    if (tbl_entry.second->type() != TTableType::HDFS_TABLE) continue;
-    HdfsTableDescriptor* hdfs_tbl = static_cast<HdfsTableDescriptor*>(tbl_entry.second);
-    for (const auto& part_entry : hdfs_tbl->partition_descriptors()) {
-      // TODO: RowDescriptor should arguably be optional in Prepare for known literals
-      // Partition exprs are not used in the codegen case.  Don't codegen them.
-      RETURN_IF_ERROR(Expr::Prepare(part_entry.second->partition_key_value_ctxs(), state,
-          RowDescriptor(), state->instance_mem_tracker()));
-      RETURN_IF_ERROR(Expr::Open(part_entry.second->partition_key_value_ctxs(), state));
-    }
-  }
-  return Status::OK();
-}
-
-void DescriptorTbl::ClosePartitionExprs(RuntimeState* state) const {
-  for (const auto& tbl_entry: tbl_desc_map_) {
-    if (tbl_entry.second->type() != TTableType::HDFS_TABLE) continue;
-    HdfsTableDescriptor* hdfs_tbl = static_cast<HdfsTableDescriptor*>(tbl_entry.second);
+void DescriptorTbl::ReleaseResources() {
+  // close partition exprs of hdfs tables
+  for (auto entry: tbl_desc_map_) {
+    if (entry.second->type() != TTableType::HDFS_TABLE) continue;
+    const HdfsTableDescriptor* hdfs_tbl =
+        static_cast<const HdfsTableDescriptor*>(entry.second);
     for (const auto& part_entry: hdfs_tbl->partition_descriptors()) {
-      Expr::Close(part_entry.second->partition_key_value_ctxs(), state);
+      Expr::Close(part_entry.second->partition_key_value_ctxs(), nullptr);
     }
   }
 }
@@ -585,7 +587,6 @@ SlotDescriptor* DescriptorTbl::GetSlotDescriptor(SlotId id) const {
   }
 }
 
-// return all registered tuple descriptors
 void DescriptorTbl::GetTupleDescs(vector<TupleDescriptor*>* descs) const {
   descs->clear();
   for (TupleDescriptorMap::const_iterator i = tuple_desc_map_.begin();

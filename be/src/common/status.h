@@ -19,6 +19,7 @@
 #ifndef IMPALA_COMMON_STATUS_H
 #define IMPALA_COMMON_STATUS_H
 
+#include <iosfwd>
 #include <string>
 #include <vector>
 
@@ -259,6 +260,9 @@ class Status {
   /// the sizeof(ErrorMsg*). Every Status owns its ErrorMsg instance.
   ErrorMsg* msg_;
 };
+
+/// for debugging
+std::ostream& operator<<(std::ostream& os, const Status& status);
 
 /// some generally useful macros
 #define RETURN_IF_ERROR(stmt)                          \

@@ -88,9 +88,7 @@ class ExecEnv {
   ThreadResourceMgr* thread_mgr() { return thread_mgr_.get(); }
   HdfsOpThreadPool* hdfs_op_thread_pool() { return hdfs_op_thread_pool_.get(); }
   TmpFileMgr* tmp_file_mgr() { return tmp_file_mgr_.get(); }
-  CallableThreadPool* fragment_exec_thread_pool() {
-    return fragment_exec_thread_pool_.get();
-  }
+  CallableThreadPool* exec_rpc_thread_pool() { return exec_rpc_thread_pool_.get(); }
   ImpalaServer* impala_server() { return impala_server_; }
   Frontend* frontend() { return frontend_.get(); }
   RequestPoolService* request_pool_service() { return request_pool_service_.get(); }
@@ -141,7 +139,7 @@ class ExecEnv {
   boost::scoped_ptr<TmpFileMgr> tmp_file_mgr_;
   boost::scoped_ptr<RequestPoolService> request_pool_service_;
   boost::scoped_ptr<Frontend> frontend_;
-  boost::scoped_ptr<CallableThreadPool> fragment_exec_thread_pool_;
+  boost::scoped_ptr<CallableThreadPool> exec_rpc_thread_pool_;
   boost::scoped_ptr<CallableThreadPool> async_rpc_pool_;
   boost::scoped_ptr<QueryExecMgr> query_exec_mgr_;
 

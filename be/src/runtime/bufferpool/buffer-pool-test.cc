@@ -34,6 +34,7 @@
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/test-env.h"
+#include "runtime/query-state.h"
 #include "service/fe-support.h"
 #include "testutil/cpu-util.h"
 #include "testutil/death-test-util.h"

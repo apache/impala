@@ -16,6 +16,7 @@
 // under the License.
 
 #include "exec/hdfs-table-sink.h"
+#include "exec/hdfs-table-writer.h"
 #include "exec/hdfs-text-table-writer.h"
 #include "exec/hdfs-sequence-table-writer.h"
 #include "exec/hdfs-avro-table-writer.h"

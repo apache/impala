@@ -78,6 +78,10 @@ inline int32_t GetInstanceIdx(const TUniqueId& fragment_instance_id) {
   return fragment_instance_id.lo & FRAGMENT_IDX_MASK;
 }
 
+inline bool IsValidFInstanceId(const TUniqueId& fragment_instance_id) {
+  return fragment_instance_id.hi != 0L;
+}
+
 inline TUniqueId CreateInstanceId(
     const TUniqueId& query_id, int32_t instance_idx) {
   DCHECK_EQ(GetInstanceIdx(query_id), 0);  // well-formed query id

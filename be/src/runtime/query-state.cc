@@ -21,19 +21,26 @@
 #include <boost/thread/locks.hpp>
 #include <kudu/client/client.h>
 
+#include "exprs/expr.h"
 #include "exec/kudu-util.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
+#include "runtime/backend-client.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
+#include "runtime/runtime-state.h"
 #include "util/debug-util.h"
+#include "util/impalad-metrics.h"
+#include "util/thread.h"
 
 #include "common/names.h"
 
 using boost::algorithm::join;
 using namespace impala;
+
+#define RETRY_SLEEP_MS 100
 
 struct QueryState::KuduClientPtr {
   kudu::client::sp::shared_ptr<kudu::client::KuduClient> kudu_client;
@@ -49,14 +56,17 @@ QueryState::ScopedRef::~ScopedRef() {
   ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(query_state_);
 }
 
-QueryState::QueryState(const TQueryCtx& query_ctx, const std::string& pool)
+QueryState::QueryState(const TQueryCtx& query_ctx, const string& request_pool)
   : query_ctx_(query_ctx),
     refcnt_(0),
-    prepared_(false),
-    released_resources_(false),
-    buffer_reservation_(nullptr),
-    file_group_(nullptr) {
-  TQueryOptions& query_options = query_ctx_.client_request.query_options;
+    is_cancelled_(0) {
+  if (query_ctx_.request_pool.empty()) {
+    // fix up pool name for tests
+    DCHECK(!request_pool.empty());
+    const_cast<TQueryCtx&>(query_ctx_).request_pool = request_pool;
+  }
+  TQueryOptions& query_options =
+      const_cast<TQueryOptions&>(query_ctx_.client_request.query_options);
   // max_errors does not indicate how many errors in total have been recorded, but rather
   // how many are distinct. It is defined as the sum of the number of generic errors and
   // the number of distinct other errors.
@@ -66,59 +76,56 @@ QueryState::QueryState(const TQueryCtx& query_ctx, const std::string& pool)
   if (query_options.batch_size <= 0) {
     query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
   }
-  InitMemTrackers(pool);
+  InitMemTrackers();
 }
 
 void QueryState::ReleaseResources() {
+  DCHECK(!released_resources_);
   // Clean up temporary files.
   if (file_group_ != nullptr) file_group_->Close();
   // Release any remaining reservation.
   if (buffer_reservation_ != nullptr) buffer_reservation_->Close();
   // Avoid dangling reference from the parent of 'query_mem_tracker_'.
   if (query_mem_tracker_ != nullptr) query_mem_tracker_->UnregisterFromParent();
+  if (desc_tbl_ != nullptr) desc_tbl_->ReleaseResources();
   released_resources_ = true;
 }
 
 QueryState::~QueryState() {
   DCHECK(released_resources_);
+  DCHECK_EQ(refcnt_.Load(), 0);
 }
 
-Status QueryState::Prepare() {
-  lock_guard<SpinLock> l(prepare_lock_);
-  if (prepared_) {
-    DCHECK(prepare_status_.ok());
-    return Status::OK();
-  }
-  RETURN_IF_ERROR(prepare_status_);
-
-  Status status;
+Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
   // Starting a new query creates threads and consumes a non-trivial amount of memory.
   // If we are already starved for memory, fail as early as possible to avoid consuming
   // more resources.
   ExecEnv* exec_env = ExecEnv::GetInstance();
   MemTracker* process_mem_tracker = exec_env->process_mem_tracker();
   if (process_mem_tracker->LimitExceeded()) {
-    string msg = Substitute("Query $0 could not start because the backend Impala daemon "
-                            "is over its memory limit",
-        PrintId(query_id()));
-    status = process_mem_tracker->MemLimitExceeded(NULL, msg, 0);
-    goto error;
+    string msg = Substitute(
+        "Query $0 could not start because the backend Impala daemon "
+        "is over its memory limit", PrintId(query_id()));
+    RETURN_IF_ERROR(process_mem_tracker->MemLimitExceeded(NULL, msg, 0));
   }
   // Do buffer-pool-related setup if running in a backend test that explicitly created
   // the pool.
-  if (exec_env->buffer_pool() != nullptr) {
-    status = InitBufferPoolState();
-    if (!status.ok()) goto error;
-  }
-  prepared_ = true;
-  return Status::OK();
+  if (exec_env->buffer_pool() != nullptr) RETURN_IF_ERROR(InitBufferPoolState());
 
-error:
-  prepare_status_ = status;
-  return status;
+  // don't copy query_ctx, it's large and we already did that in the c'tor
+  rpc_params_.__set_coord_state_idx(rpc_params.coord_state_idx);
+  TExecQueryFInstancesParams& non_const_params =
+      const_cast<TExecQueryFInstancesParams&>(rpc_params);
+  rpc_params_.fragment_ctxs.swap(non_const_params.fragment_ctxs);
+  rpc_params_.__isset.fragment_ctxs = true;
+  rpc_params_.fragment_instance_ctxs.swap(non_const_params.fragment_instance_ctxs);
+  rpc_params_.__isset.fragment_instance_ctxs = true;
+
+  return Status::OK();
 }
 
-void QueryState::InitMemTrackers(const std::string& pool) {
+void QueryState::InitMemTrackers() {
+  const string& pool = query_ctx_.request_pool;
   int64_t bytes_limit = -1;
   if (query_options().__isset.mem_limit && query_options().mem_limit > 0) {
     bytes_limit = query_options().mem_limit;
@@ -160,23 +167,194 @@ Status QueryState::InitBufferPoolState() {
   return Status::OK();
 }
 
-void QueryState::RegisterFInstance(FragmentInstanceState* fis) {
-  VLOG_QUERY << "RegisterFInstance(): instance_id=" << PrintId(fis->instance_id());
-  lock_guard<SpinLock> l(fis_map_lock_);
-  DCHECK_EQ(fis_map_.count(fis->instance_id()), 0);
-  fis_map_.insert(make_pair(fis->instance_id(), fis));
-}
-
 FragmentInstanceState* QueryState::GetFInstanceState(const TUniqueId& instance_id) {
   VLOG_FILE << "GetFInstanceState(): instance_id=" << PrintId(instance_id);
-  lock_guard<SpinLock> l(fis_map_lock_);
+  if (!instances_prepared_promise_.Get().ok()) return nullptr;
   auto it = fis_map_.find(instance_id);
   return it != fis_map_.end() ? it->second : nullptr;
 }
 
-Status QueryState::GetKuduClient(const std::vector<std::string>& master_addresses,
-                                 kudu::client::KuduClient** client) {
-  std::string master_addr_concat = join(master_addresses, ",");
+void QueryState::ReportExecStatus(bool done, const Status& status,
+    FragmentInstanceState* fis) {
+  ReportExecStatusAux(done, status, fis, true);
+}
+
+void QueryState::ReportExecStatusAux(bool done, const Status& status,
+    FragmentInstanceState* fis, bool instances_started) {
+  // if we're reporting an error, we're done
+  DCHECK(status.ok() || done);
+  // if this is not for a specific fragment instance, we're reporting an error
+  DCHECK(fis != nullptr || !status.ok());
+  DCHECK(fis == nullptr || fis->IsPrepared());
+
+  // This will send a report even if we are cancelled.  If the query completed correctly
+  // but fragments still need to be cancelled (e.g. limit reached), the coordinator will
+  // be waiting for a final report and profile.
+
+  Status coord_status;
+  ImpalaBackendConnection coord(ExecEnv::GetInstance()->impalad_client_cache(),
+      query_ctx().coord_address, &coord_status);
+  if (!coord_status.ok()) {
+    // TODO: this might flood the log
+    LOG(WARNING) << "Couldn't get a client for " << query_ctx().coord_address
+        <<"\tReason: " << coord_status.GetDetail();
+    if (instances_started) Cancel();
+    return;
+  }
+
+  TReportExecStatusParams params;
+  params.protocol_version = ImpalaInternalServiceVersion::V1;
+  params.__set_query_id(query_ctx().query_id);
+  DCHECK(rpc_params().__isset.coord_state_idx);
+  params.__set_coord_state_idx(rpc_params().coord_state_idx);
+
+  if (fis != nullptr) {
+    // create status for 'fis'
+    params.instance_exec_status.emplace_back();
+    params.__isset.instance_exec_status = true;
+    TFragmentInstanceExecStatus& instance_status = params.instance_exec_status.back();
+    instance_status.__set_fragment_instance_id(fis->instance_id());
+    status.SetTStatus(&instance_status);
+    instance_status.__set_done(done);
+
+    if (fis->profile() != nullptr) {
+      fis->profile()->ToThrift(&instance_status.profile);
+      instance_status.__isset.profile = true;
+    }
+
+    // Only send updates to insert status if fragment is finished, the coordinator
+    // waits until query execution is done to use them anyhow.
+    if (done) {
+      TInsertExecStatus insert_status;
+      if (fis->runtime_state()->hdfs_files_to_move()->size() > 0) {
+        insert_status.__set_files_to_move(*fis->runtime_state()->hdfs_files_to_move());
+      }
+      if (fis->runtime_state()->per_partition_status()->size() > 0) {
+        insert_status.__set_per_partition_status(
+            *fis->runtime_state()->per_partition_status());
+      }
+      params.__set_insert_exec_status(insert_status);
+    }
+
+    // Send new errors to coordinator
+    fis->runtime_state()->GetUnreportedErrors(&params.error_log);
+    params.__isset.error_log = (params.error_log.size() > 0);
+  }
+
+  TReportExecStatusResult res;
+  Status rpc_status;
+  bool retry_is_safe;
+  // Try to send the RPC 3 times before failing.
+  for (int i = 0; i < 3; ++i) {
+    rpc_status = coord.DoRpc(
+        &ImpalaBackendClient::ReportExecStatus, params, &res, &retry_is_safe);
+    if (rpc_status.ok()) break;
+    if (!retry_is_safe) break;
+    if (i < 2) SleepForMs(RETRY_SLEEP_MS);
+  }
+  Status result_status(res.status);
+  if ((!rpc_status.ok() || !result_status.ok()) && instances_started) {
+    // TODO: should we try to keep rpc_status for the final report? (but the final
+    // report, following this Cancel(), may not succeed anyway.)
+    // TODO: not keeping an error status here means that all instances might
+    // abort with CANCELLED status, despite there being an error
+    Cancel();
+  }
+}
+
+Status QueryState::WaitForPrepare() {
+  return instances_prepared_promise_.Get();
+}
+
+void QueryState::StartFInstances() {
+  VLOG_QUERY << "StartFInstances(): query_id=" << PrintId(query_id())
+      << " #instances=" << rpc_params_.fragment_instance_ctxs.size();
+  DCHECK_GT(refcnt_.Load(), 0);
+
+  // set up desc tbl
+  DCHECK(query_ctx().__isset.desc_tbl);
+  Status status = DescriptorTbl::Create(
+      &obj_pool_, query_ctx().desc_tbl, query_mem_tracker_, &desc_tbl_);
+  if (!status.ok()) {
+    instances_prepared_promise_.Set(status);
+    ReportExecStatusAux(true, status, nullptr, false);
+    return;
+  }
+  VLOG_QUERY << "descriptor table for query=" << PrintId(query_id())
+             << "\n" << desc_tbl_->DebugString();
+
+  DCHECK_GT(rpc_params_.fragment_ctxs.size(), 0);
+  TPlanFragmentCtx* fragment_ctx = &rpc_params_.fragment_ctxs[0];
+  int fragment_ctx_idx = 0;
+  for (const TPlanFragmentInstanceCtx& instance_ctx: rpc_params_.fragment_instance_ctxs) {
+    // determine corresponding TPlanFragmentCtx
+    if (fragment_ctx->fragment.idx != instance_ctx.fragment_idx) {
+      ++fragment_ctx_idx;
+      DCHECK_LT(fragment_ctx_idx, rpc_params_.fragment_ctxs.size());
+      fragment_ctx = &rpc_params_.fragment_ctxs[fragment_ctx_idx];
+      // we expect fragment and instance contexts to follow the same order
+      DCHECK_EQ(fragment_ctx->fragment.idx, instance_ctx.fragment_idx);
+    }
+    FragmentInstanceState* fis = obj_pool_.Add(
+        new FragmentInstanceState(this, *fragment_ctx, instance_ctx));
+    fis_map_.emplace(fis->instance_id(), fis);
+
+    // update fragment_map_
+    vector<FragmentInstanceState*>& fis_list = fragment_map_[instance_ctx.fragment_idx];
+    fis_list.push_back(fis);
+
+    // start new thread to execute instance
+    refcnt_.Add(1);  // decremented in ExecFInstance()
+    Thread t("query-state",
+        Substitute(
+          "exec-query-finstance-$0", PrintId(instance_ctx.fragment_instance_id)),
+        &QueryState::ExecFInstance, this, fis);
+    t.Detach();
+  }
+
+  // don't return until every instance is prepared and record the first non-OK
+  // (non-CANCELLED if available) status
+  Status prepare_status;
+  for (auto entry: fis_map_) {
+    Status instance_status = entry.second->WaitForPrepare();
+    // don't wipe out an error in one instance with the resulting CANCELLED from
+    // the remaining instances
+    if (!instance_status.ok() && (prepare_status.ok() || prepare_status.IsCancelled())) {
+      prepare_status = instance_status;
+    }
+  }
+  instances_prepared_promise_.Set(prepare_status);
+}
+
+void QueryState::ExecFInstance(FragmentInstanceState* fis) {
+  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(1L);
+  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->Increment(1L);
+  VLOG_QUERY << "Executing instance. instance_id=" << PrintId(fis->instance_id())
+      << " fragment_idx=" << fis->instance_ctx().fragment_idx
+      << " per_fragment_instance_idx=" << fis->instance_ctx().per_fragment_instance_idx
+      << " coord_state_idx=" << rpc_params().coord_state_idx
+      << " #in-flight=" << ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->value();
+  Status status = fis->Exec();
+  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(-1L);
+  VLOG_QUERY << "Instance completed. instance_id=" << PrintId(fis->instance_id())
+      << " #in-flight=" << ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->value()
+      << " status=" << status;
+  // initiate cancellation if nobody has done so yet
+  if (!status.ok()) Cancel();
+  // decrement refcount taken in StartFInstances()
+  ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
+}
+
+void QueryState::Cancel() {
+  VLOG_QUERY << "Cancel: query_id=" << query_id();
+  (void) instances_prepared_promise_.Get();
+  if (!is_cancelled_.CompareAndSwap(0, 1)) return;
+  for (auto entry: fis_map_) entry.second->Cancel();
+}
+
+Status QueryState::GetKuduClient(
+    const vector<string>& master_addresses, kudu::client::KuduClient** client) {
+  string master_addr_concat = join(master_addresses, ",");
   lock_guard<SpinLock> l(kudu_client_map_lock_);
   auto kudu_client_map_it = kudu_client_map_.find(master_addr_concat);
   if (kudu_client_map_it == kudu_client_map_.end()) {
@@ -190,4 +368,13 @@ Status QueryState::GetKuduClient(const std::vector<std::string>& master_addresse
     *client = kudu_client_map_it->second->kudu_client.get();
   }
   return Status::OK();
+}
+
+void QueryState::PublishFilter(int32_t filter_id, int fragment_idx,
+    const TBloomFilter& thrift_bloom_filter) {
+  if (!instances_prepared_promise_.Get().ok()) return;
+  DCHECK_EQ(fragment_map_.count(fragment_idx), 1);
+  for (FragmentInstanceState* fis: fragment_map_[fragment_idx]) {
+    fis->PublishFilter(filter_id, thrift_bloom_filter);
+  }
 }

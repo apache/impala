@@ -46,6 +46,7 @@ class LlvmBuilder;
 class LlvmCodeGen;
 class ObjectPool;
 class RuntimeState;
+class MemTracker;
 class TDescriptorTable;
 class TSlotDescriptor;
 class TTable;
@@ -283,7 +284,6 @@ class HdfsPartitionDescriptor {
   /// The Prepare()/Open()/Close() cycle is controlled by the containing descriptor table
   /// because the same partition descriptor may be used by multiple exec nodes with
   /// different lifetimes.
-  /// TODO: Move these into the new query-wide state, indexed by partition id.
   std::vector<ExprContext*> partition_key_value_ctxs_;
 
   /// The format (e.g. text, sequence file etc.) of data in the files in this partition
@@ -461,15 +461,16 @@ class TupleDescriptor {
 class DescriptorTbl {
  public:
   /// Creates a descriptor tbl within 'pool' from thrift_tbl and returns it via 'tbl'.
+  /// If mem_tracker_ != nullptr, also opens partition exprs for hdfs tables (and does
+  /// memory allocation against that tracker).
   /// Returns OK on success, otherwise error (in which case 'tbl' will be unset).
+  /// TODO: when cleaning up ExprCtx, remove the need to pass in a memtracker for literal
+  /// exprs that don't require additional memory at runtime.
   static Status Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
-                       DescriptorTbl** tbl);
+      MemTracker* mem_tracker, DescriptorTbl** tbl);
 
-  /// Prepares and opens partition exprs of Hdfs tables.
-  Status PrepareAndOpenPartitionExprs(RuntimeState* state) const;
-
-  /// Closes partition exprs of Hdfs tables.
-  void ClosePartitionExprs(RuntimeState* state) const;
+  /// Free memory allocated in Create().
+  void ReleaseResources();
 
   TableDescriptor* GetTableDescriptor(TableId id) const;
   TupleDescriptor* GetTupleDescriptor(TupleId id) const;

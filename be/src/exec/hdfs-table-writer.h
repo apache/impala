@@ -19,15 +19,21 @@
 #ifndef IMPALA_EXEC_HDFS_TABLE_WRITER_H
 #define IMPALA_EXEC_HDFS_TABLE_WRITER_H
 
+#include <vector>
 #include <hdfs.h>
-#include <boost/scoped_ptr.hpp>
-#include <boost/unordered_map.hpp>
 
-#include "runtime/descriptors.h"
-#include "exec/hdfs-table-sink.h"
-#include "util/hdfs-util.h"
+#include "common/status.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 
 namespace impala {
+
+class RuntimeState;
+class OutputPartition;
+class ExprContext;
+class RowBatch;
+class HdfsPartitionDescriptor;
+class HdfsTableDescriptor;
+class HdfsTableSink;
 
 /// Pure virtual class for writing to hdfs table partition files.
 /// Subclasses implement the code needed to write to a specific file type.

@@ -37,30 +37,24 @@ class FragmentInstanceState;
 
 /// A daemon-wide registry and manager of QueryStates. This is the central
 /// entry point for gaining refcounted access to a QueryState. It also initiates
-/// fragment instance execution.
+/// query execution.
 /// Thread-safe.
-///
-/// TODO: as part of Impala-2550 (per-query exec rpc)
-/// replace Start-/CancelFInstance() with StartQuery()/CancelQuery()
 class QueryExecMgr {
  public:
-  /// Initiates execution of this fragment instance in a newly created thread.
-  /// Also creates a QueryState for this query, if none exists.
-  /// In both cases it increases the refcount prior to instance execution and decreases
-  /// it after execution finishes.
+  /// Creates QueryState if it doesn't exist and initiates execution of all fragment
+  /// instance for this query. All fragment instances hold a reference to their
+  /// QueryState for the duration of their execution.
   ///
-  /// Returns an error if there was some unrecoverable problem before the fragment
-  /// was started (like low memory). In that case, no QueryState is created or has its
-  /// refcount incremented. After this call returns, it is legal to call
-  /// FragmentInstanceState::Cancel() on this fragment instance, regardless of the
-  /// return value of this function.
-  Status StartFInstance(const TExecPlanFragmentParams& params);
+  /// Returns an error if there was some unrecoverable problem before any instance
+  /// was started (like low memory). In that case, no QueryState is created.
+  /// After this function returns, it is legal to call QueryState::Cancel(), regardless of
+  /// the return value of this function.
+  Status StartQuery(const TExecQueryFInstancesParams& params);
 
   /// Creates a QueryState for the given query with the provided parameters. Only valid
   /// to call if the QueryState does not already exist. The caller must call
   /// ReleaseQueryState() with the returned QueryState to decrement the refcount.
-  QueryState* CreateQueryState(
-      const TQueryCtx& query_ctx, const std::string& request_pool);
+  QueryState* CreateQueryState(const TQueryCtx& query_ctx);
 
   /// If a QueryState for the given query exists, increments that refcount and returns
   /// the QueryState, otherwise returns nullptr.
@@ -78,11 +72,11 @@ class QueryExecMgr {
 
   /// Gets the existing QueryState or creates a new one if not present.
   /// 'created' is set to true if it was created, false otherwise.
-  QueryState* GetOrCreateQueryState(
-      const TQueryCtx& query_ctx, const std::string& request_pool, bool* created);
+  /// Increments the refcount.
+  QueryState* GetOrCreateQueryState(const TQueryCtx& query_ctx, bool* created);
 
-  /// Execute instance.
-  void ExecFInstance(FragmentInstanceState* fis);
+  /// Execute instances and decrement refcount (acquire ownership of qs).
+  void StartQueryHelper(QueryState* qs);
 };
 }
 

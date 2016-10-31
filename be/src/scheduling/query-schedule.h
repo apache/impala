@@ -132,9 +132,6 @@ class QuerySchedule {
   /// Helper methods used by scheduler to populate this QuerySchedule.
   void IncNumScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
 
-  /// Returns the total number of fragment instances.
-  int GetNumFragmentInstances() const;
-
   /// Return the coordinator fragment, or nullptr if there isn't one.
   const TPlanFragment* GetCoordFragment() const;
 
@@ -147,6 +144,9 @@ class QuerySchedule {
   FragmentIdx GetFragmentIdx(PlanNodeId id) const {
     return plan_node_to_fragment_idx_[id];
   }
+
+  /// Return the total number of instances across all fragments.
+  int GetNumFragmentInstances() const;
 
   /// Returns next instance id. Instance ids are consecutive numbers generated from
   /// the query id.
@@ -213,7 +213,7 @@ class QuerySchedule {
   // (TPlanFragment.idx)
   std::vector<FragmentExecParams> fragment_exec_params_;
 
-  /// The set of hosts that the query will run on excluding the coordinator.
+  /// The set of hosts that the query will run on including the coordinator.
   boost::unordered_set<TNetworkAddress> unique_hosts_;
 
   /// Total number of scan ranges of this query.

@@ -17,8 +17,12 @@
 
 #include "exec/hdfs-table-writer.h"
 
+#include <sstream>
+
 #include "common/names.h"
 #include "runtime/mem-tracker.h"
+#include "exec/hdfs-table-sink.h"
+#include "util/hdfs-util.h"
 
 namespace impala {
 

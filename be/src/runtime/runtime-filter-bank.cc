@@ -151,9 +151,10 @@ void RuntimeFilterBank::UpdateFilterFromLocal(int32_t filter_id,
 
   if (has_remote_target
       && state_->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL) {
+    params.__set_filter_id(filter_id);
+    params.__set_query_id(state_->query_id());
     BloomFilter::ToThrift(bloom_filter, &params.bloom_filter);
-    params.filter_id = filter_id;
-    params.query_id = state_->query_id();
+    params.__isset.bloom_filter = true;
 
     ExecEnv::GetInstance()->rpc_pool()->Offer(bind<void>(
         SendFilterToCoordinator, state_->query_ctx().coord_address, params,

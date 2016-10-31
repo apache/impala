@@ -22,10 +22,11 @@
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/query-state.h"
 #include "runtime/runtime-state.h"
 
 namespace impala {
+
+class QueryState;
 
 /// Helper testing class that creates an environment with runtime memory management
 /// similar to the one used by the Impala runtime. Only one TestEnv can be active at a

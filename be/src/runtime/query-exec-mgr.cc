@@ -41,48 +41,51 @@ using namespace impala;
 DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory usage "
     "every log_mem_usage_interval'th fragment completion.");
 
-Status QueryExecMgr::StartFInstance(const TExecPlanFragmentParams& params) {
-  TUniqueId instance_id = params.fragment_instance_ctx.fragment_instance_id;
-  VLOG_QUERY << "StartFInstance() instance_id=" << PrintId(instance_id)
+Status QueryExecMgr::StartQuery(const TExecQueryFInstancesParams& params) {
+  TUniqueId query_id = params.query_ctx.query_id;
+  VLOG_QUERY << "StartQueryFInstances() query_id=" << PrintId(query_id)
              << " coord=" << params.query_ctx.coord_address;
 
   bool dummy;
-  QueryState* qs = GetOrCreateQueryState(
-      params.query_ctx, params.fragment_instance_ctx.request_pool, &dummy);
-  DCHECK(params.__isset.fragment_ctx);
-  DCHECK(params.__isset.fragment_instance_ctx);
-  Status status = qs->Prepare();
+  QueryState* qs = GetOrCreateQueryState(params.query_ctx, &dummy);
+  Status status = qs->Init(params);
   if (!status.ok()) {
     ReleaseQueryState(qs);
     return status;
   }
-
-  FragmentInstanceState* fis = qs->obj_pool()->Add(new FragmentInstanceState(
-      qs, params.fragment_ctx, params.fragment_instance_ctx, params.query_ctx.desc_tbl));
-  // register instance before returning so that async Cancel() calls can
-  // find the instance
-  qs->RegisterFInstance(fis);
-  // start new thread to execute instance
+  // avoid blocking the rpc handler thread for too long by starting a new thread for
+  // query startup (which takes ownership of the QueryState reference)
   Thread t("query-exec-mgr",
-      Substitute("exec-fragment-instance-$0", PrintId(instance_id)),
-      &QueryExecMgr::ExecFInstance, this, fis);
+      Substitute("start-query-finstances-$0", PrintId(query_id)),
+      &QueryExecMgr::StartQueryHelper, this, qs);
   t.Detach();
-
-  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(1L);
-  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->Increment(1L);
   return Status::OK();
 }
 
-QueryState* QueryExecMgr::CreateQueryState(
-    const TQueryCtx& query_ctx, const string& request_pool) {
+QueryState* QueryExecMgr::CreateQueryState(const TQueryCtx& query_ctx) {
   bool created;
-  QueryState* qs = GetOrCreateQueryState(query_ctx, request_pool, &created);
+  QueryState* qs = GetOrCreateQueryState(query_ctx, &created);
   DCHECK(created);
   return qs;
 }
 
+QueryState* QueryExecMgr::GetQueryState(const TUniqueId& query_id) {
+  QueryState* qs = nullptr;
+  int refcnt;
+  {
+    lock_guard<mutex> l(qs_map_lock_);
+    auto it = qs_map_.find(query_id);
+    if (it == qs_map_.end()) return nullptr;
+    qs = it->second;
+    refcnt = qs->refcnt_.Add(1);
+  }
+  DCHECK(qs != nullptr && refcnt > 0);
+  VLOG_QUERY << "QueryState: query_id=" << query_id << " refcnt=" << refcnt;
+  return qs;
+}
+
 QueryState* QueryExecMgr::GetOrCreateQueryState(
-    const TQueryCtx& query_ctx, const string& request_pool, bool* created) {
+    const TQueryCtx& query_ctx, bool* created) {
   QueryState* qs = nullptr;
   int refcnt;
   {
@@ -90,30 +93,26 @@ QueryState* QueryExecMgr::GetOrCreateQueryState(
     auto it = qs_map_.find(query_ctx.query_id);
     if (it == qs_map_.end()) {
       // register new QueryState
-      qs = new QueryState(query_ctx, request_pool);
+      qs = new QueryState(query_ctx);
       qs_map_.insert(make_pair(query_ctx.query_id, qs));
-      VLOG_QUERY << "new QueryState: query_id=" << query_ctx.query_id;
       *created = true;
     } else {
       qs = it->second;
       *created = false;
     }
-    // decremented at the end of ExecFInstance()
+    // decremented by ReleaseQueryState()
     refcnt = qs->refcnt_.Add(1);
   }
-  DCHECK(qs != nullptr && qs->refcnt_.Load() > 0);
-  VLOG_QUERY << "QueryState: query_id=" << query_ctx.query_id << " refcnt=" << refcnt;
+  DCHECK(qs != nullptr && refcnt > 0);
   return qs;
 }
 
-void QueryExecMgr::ExecFInstance(FragmentInstanceState* fis) {
-  fis->Exec();
 
-  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(-1L);
-  VLOG_QUERY << "Instance completed. instance_id=" << PrintId(fis->instance_id());
+void QueryExecMgr::StartQueryHelper(QueryState* qs) {
+  qs->StartFInstances();
 
 #ifndef ADDRESS_SANITIZER
-  // tcmalloc and address sanitizer can not be used together
+  // tcmalloc and address sanitizer cannot be used together
   if (FLAGS_log_mem_usage_interval > 0) {
     uint64_t num_complete = ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->value();
     if (num_complete % FLAGS_log_mem_usage_interval == 0) {
@@ -125,19 +124,8 @@ void QueryExecMgr::ExecFInstance(FragmentInstanceState* fis) {
   }
 #endif
 
-  // decrement refcount taken in StartFInstance()
-  ReleaseQueryState(fis->query_state());
-}
-
-QueryState* QueryExecMgr::GetQueryState(const TUniqueId& query_id) {
-  VLOG_QUERY << "GetQueryState(): query_id=" << PrintId(query_id);
-  lock_guard<mutex> l(qs_map_lock_);
-  auto it = qs_map_.find(query_id);
-  if (it == qs_map_.end()) return nullptr;
-  QueryState* qs = it->second;
-  int32_t cnt = qs->refcnt_.Add(1);
-  DCHECK_GT(cnt, 0);
-  return qs;
+  // decrement refcount taken in StartQuery()
+  ReleaseQueryState(qs);
 }
 
 void QueryExecMgr::ReleaseQueryState(QueryState* qs) {

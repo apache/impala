@@ -22,13 +22,16 @@
 #include <sstream>
 #include <string>
 
+#include "common/status.h"
 #include "exec/hdfs-table-writer.h"
+#include "runtime/mem-pool.h"
 #include "util/codec.h"
 #include "exec/write-stream.h"
 
 namespace impala {
 
 class Expr;
+struct ColumnType;
 class TupleDescriptor;
 class TupleRow;
 class RuntimeState;

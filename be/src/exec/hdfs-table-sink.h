@@ -26,6 +26,7 @@
 /// needed for scoped_ptr to work on ObjectPool
 #include "common/object-pool.h"
 #include "exec/data-sink.h"
+#include "exec/hdfs-table-writer.h"
 #include "runtime/descriptors.h"
 
 namespace impala {
@@ -34,7 +35,6 @@ class Expr;
 class TupleDescriptor;
 class TupleRow;
 class RuntimeState;
-class HdfsTableWriter;
 class MemTracker;
 
 /// Records the temporary and final Hdfs file name, the opened temporary Hdfs file, and

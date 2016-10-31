@@ -14,7 +14,8 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-#include "service/query-exec-state.h"
+
+#include "service/client-request-state.h"
 
 #include <limits>
 #include <gutil/strings/substitute.h>
@@ -63,9 +64,9 @@ static const string TABLES_MISSING_STATS_KEY = "Tables Missing Stats";
 static const string TABLES_WITH_CORRUPT_STATS_KEY = "Tables With Corrupt Table Stats";
 static const string TABLES_WITH_MISSING_DISK_IDS_KEY = "Tables With Missing Disk Ids";
 
-ImpalaServer::QueryExecState::QueryExecState(const TQueryCtx& query_ctx,
-    ExecEnv* exec_env, Frontend* frontend, ImpalaServer* server,
-    shared_ptr<SessionState> session)
+ClientRequestState::ClientRequestState(
+    const TQueryCtx& query_ctx, ExecEnv* exec_env, Frontend* frontend,
+    ImpalaServer* server, shared_ptr<ImpalaServer::SessionState> session)
   : query_ctx_(query_ctx),
     last_active_time_ms_(numeric_limits<int64_t>::max()),
     ref_count_(0L),
@@ -123,11 +124,11 @@ ImpalaServer::QueryExecState::QueryExecState(const TQueryCtx& query_ctx,
       TNetworkAddressToString(exec_env->backend_address()));
 }
 
-ImpalaServer::QueryExecState::~QueryExecState() {
+ClientRequestState::~ClientRequestState() {
   DCHECK(wait_thread_.get() == NULL) << "BlockOnWait() needs to be called!";
 }
 
-Status ImpalaServer::QueryExecState::SetResultCache(QueryResultSet* cache,
+Status ClientRequestState::SetResultCache(QueryResultSet* cache,
     int64_t max_size) {
   lock_guard<mutex> l(lock_);
   DCHECK(result_cache_ == NULL);
@@ -141,7 +142,7 @@ Status ImpalaServer::QueryExecState::SetResultCache(QueryResultSet* cache,
   return Status::OK();
 }
 
-Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
+Status ClientRequestState::Exec(TExecRequest* exec_request) {
   MarkActive();
   exec_request_ = *exec_request;
 
@@ -223,7 +224,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   }
 }
 
-Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
+Status ClientRequestState::ExecLocalCatalogOp(
     const TCatalogOpRequest& catalog_op) {
   switch (catalog_op.op_type) {
     case TCatalogOpType::USE: {
@@ -380,7 +381,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
   }
 }
 
-Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
+Status ClientRequestState::ExecQueryOrDmlRequest(
     const TQueryExecRequest& query_exec_request) {
   // we always need at least one plan fragment
   DCHECK(query_exec_request.plan_exec_info.size() > 0);
@@ -465,7 +466,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     }
   }
 
-  coord_.reset(new Coordinator(*schedule_, exec_env_, query_events_));
+  coord_.reset(new Coordinator(*schedule_, query_events_));
   status = coord_->Exec();
   {
     lock_guard<mutex> l(lock_);
@@ -476,7 +477,7 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
   return Status::OK();
 }
 
-Status ImpalaServer::QueryExecState::ExecDdlRequest() {
+Status ClientRequestState::ExecDdlRequest() {
   string op_type = catalog_op_type() == TCatalogOpType::DDL ?
       PrintTDdlType(ddl_type()) : PrintTCatalogOpType(catalog_op_type());
   summary_profile_.AddInfoString("DDL Type", op_type);
@@ -546,7 +547,7 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
   return Status::OK();
 }
 
-void ImpalaServer::QueryExecState::Done() {
+void ClientRequestState::Done() {
   MarkActive();
   // Make sure we join on wait_thread_ before we finish (and especially before this object
   // is destroyed).
@@ -590,7 +591,7 @@ void ImpalaServer::QueryExecState::Done() {
   }
 }
 
-Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
+Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
   TResultSet metadata_op_result;
   // Like the other Exec(), fill out as much profile information as we're able to.
   summary_profile_.AddInfoString("Query Type", PrintTStmtType(TStmtType::DDL));
@@ -602,12 +603,12 @@ Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request
   return Status::OK();
 }
 
-void ImpalaServer::QueryExecState::WaitAsync() {
+void ClientRequestState::WaitAsync() {
   wait_thread_.reset(new Thread(
-      "query-exec-state", "wait-thread", &ImpalaServer::QueryExecState::Wait, this));
+      "query-exec-state", "wait-thread", &ClientRequestState::Wait, this));
 }
 
-void ImpalaServer::QueryExecState::BlockOnWait() {
+void ClientRequestState::BlockOnWait() {
   unique_lock<mutex> l(lock_);
   if (wait_thread_.get() == NULL) return;
   if (!is_block_on_wait_joining_) {
@@ -629,7 +630,7 @@ void ImpalaServer::QueryExecState::BlockOnWait() {
   }
 }
 
-void ImpalaServer::QueryExecState::Wait() {
+void ClientRequestState::Wait() {
   // block until results are ready
   Status status = WaitInternal();
   {
@@ -639,14 +640,14 @@ void ImpalaServer::QueryExecState::Wait() {
     } else {
       query_events()->MarkEvent("Request finished");
     }
-    UpdateQueryStatus(status);
+    (void) UpdateQueryStatus(status);
   }
   if (status.ok()) {
     UpdateNonErrorQueryState(beeswax::QueryState::FINISHED);
   }
 }
 
-Status ImpalaServer::QueryExecState::WaitInternal() {
+Status ClientRequestState::WaitInternal() {
   // Explain requests have already populated the result set. Nothing to do here.
   if (exec_request_.stmt_type == TStmtType::EXPLAIN) {
     MarkInactive();
@@ -687,19 +688,19 @@ Status ImpalaServer::QueryExecState::WaitInternal() {
   return Status::OK();
 }
 
-Status ImpalaServer::QueryExecState::FetchRows(const int32_t max_rows,
+Status ClientRequestState::FetchRows(const int32_t max_rows,
     QueryResultSet* fetched_rows) {
   // Pause the wait timer, since the client has instructed us to do work on its behalf.
   MarkActive();
 
   // ImpalaServer::FetchInternal has already taken our lock_
-  UpdateQueryStatus(FetchRowsInternal(max_rows, fetched_rows));
+  (void) UpdateQueryStatus(FetchRowsInternal(max_rows, fetched_rows));
 
   MarkInactive();
   return query_status_;
 }
 
-Status ImpalaServer::QueryExecState::RestartFetch() {
+Status ClientRequestState::RestartFetch() {
   // No result caching for this query. Restart is invalid.
   if (result_cache_max_size_ <= 0) {
     return Status(ErrorMsg(TErrorCode::RECOVERABLE_ERROR,
@@ -718,14 +719,14 @@ Status ImpalaServer::QueryExecState::RestartFetch() {
   return Status::OK();
 }
 
-void ImpalaServer::QueryExecState::UpdateNonErrorQueryState(
+void ClientRequestState::UpdateNonErrorQueryState(
     beeswax::QueryState::type query_state) {
   lock_guard<mutex> l(lock_);
   DCHECK(query_state != beeswax::QueryState::EXCEPTION);
   if (query_state_ < query_state) query_state_ = query_state;
 }
 
-Status ImpalaServer::QueryExecState::UpdateQueryStatus(const Status& status) {
+Status ClientRequestState::UpdateQueryStatus(const Status& status) {
   // Preserve the first non-ok status
   if (!status.ok() && query_status_.ok()) {
     query_state_ = beeswax::QueryState::EXCEPTION;
@@ -736,7 +737,7 @@ Status ImpalaServer::QueryExecState::UpdateQueryStatus(const Status& status) {
   return status;
 }
 
-Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
+Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     QueryResultSet* fetched_rows) {
   DCHECK(query_state_ != beeswax::QueryState::EXCEPTION);
 
@@ -859,7 +860,7 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
   return Status::OK();
 }
 
-Status ImpalaServer::QueryExecState::Cancel(bool check_inflight, const Status* cause) {
+Status ClientRequestState::Cancel(bool check_inflight, const Status* cause) {
   if (check_inflight) {
     // If the query is in 'inflight_queries' it means that the query has actually started
     // executing. It is ok if the query is removed from 'inflight_queries' during
@@ -878,7 +879,7 @@ Status ImpalaServer::QueryExecState::Cancel(bool check_inflight, const Status* c
     bool already_done = eos_ || query_state_ == beeswax::QueryState::EXCEPTION;
     if (!already_done && cause != NULL) {
       DCHECK(!cause->ok());
-      UpdateQueryStatus(*cause);
+      (void) UpdateQueryStatus(*cause);
       query_events_->MarkEvent("Cancelled");
       DCHECK_EQ(query_state_, beeswax::QueryState::EXCEPTION);
     }
@@ -898,7 +899,7 @@ Status ImpalaServer::QueryExecState::Cancel(bool check_inflight, const Status* c
   return Status::OK();
 }
 
-Status ImpalaServer::QueryExecState::UpdateCatalog() {
+Status ClientRequestState::UpdateCatalog() {
   if (!exec_request().__isset.query_exec_request ||
       exec_request().query_exec_request.stmt_type != TStmtType::DML) {
     return Status::OK();
@@ -950,14 +951,14 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
   return Status::OK();
 }
 
-void ImpalaServer::QueryExecState::SetResultSet(const TDdlExecResponse* ddl_resp) {
+void ClientRequestState::SetResultSet(const TDdlExecResponse* ddl_resp) {
   if (ddl_resp != NULL && ddl_resp->__isset.result_set) {
     result_metadata_ = ddl_resp->result_set.schema;
     request_result_set_.reset(new vector<TResultRow>(ddl_resp->result_set.rows));
   }
 }
 
-void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& results) {
+void ClientRequestState::SetResultSet(const vector<string>& results) {
   request_result_set_.reset(new vector<TResultRow>);
   request_result_set_->resize(results.size());
   for (int i = 0; i < results.size(); ++i) {
@@ -967,7 +968,7 @@ void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& results) {
   }
 }
 
-void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& col1,
+void ClientRequestState::SetResultSet(const vector<string>& col1,
     const vector<string>& col2) {
   DCHECK_EQ(col1.size(), col2.size());
 
@@ -981,7 +982,7 @@ void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& col1,
   }
 }
 
-void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& col1,
+void ClientRequestState::SetResultSet(const vector<string>& col1,
     const vector<string>& col2, const vector<string>& col3, const vector<string>& col4) {
   DCHECK_EQ(col1.size(), col2.size());
   DCHECK_EQ(col1.size(), col3.size());
@@ -999,7 +1000,7 @@ void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& col1,
   }
 }
 
-void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
+void ClientRequestState::SetCreateTableAsSelectResultSet() {
   DCHECK(ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT);
   int64_t total_num_rows_inserted = 0;
   // There will only be rows inserted in the case a new table was created as part of this
@@ -1016,7 +1017,7 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
   SetResultSet(results);
 }
 
-void ImpalaServer::QueryExecState::MarkInactive() {
+void ClientRequestState::MarkInactive() {
   client_wait_sw_.Start();
   lock_guard<mutex> l(expiration_data_lock_);
   last_active_time_ms_ = UnixMillis();
@@ -1024,7 +1025,7 @@ void ImpalaServer::QueryExecState::MarkInactive() {
   --ref_count_;
 }
 
-void ImpalaServer::QueryExecState::MarkActive() {
+void ClientRequestState::MarkActive() {
   client_wait_sw_.Stop();
   int64_t elapsed_time = client_wait_sw_.ElapsedTime();
   client_wait_timer_->Set(elapsed_time);
@@ -1033,7 +1034,7 @@ void ImpalaServer::QueryExecState::MarkActive() {
   ++ref_count_;
 }
 
-Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats(
+Status ClientRequestState::UpdateTableAndColumnStats(
     const vector<ChildQuery*>& child_queries) {
   DCHECK_GE(child_queries.size(), 1);
   DCHECK_LE(child_queries.size(), 2);
@@ -1069,7 +1070,7 @@ Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats(
   return Status::OK();
 }
 
-void ImpalaServer::QueryExecState::ClearResultCache() {
+void ClientRequestState::ClearResultCache() {
   if (result_cache_ == NULL) return;
   // Update result set cache metrics and mem limit accounting.
   ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS->Increment(-result_cache_->size());

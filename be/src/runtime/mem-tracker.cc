@@ -151,7 +151,7 @@ MemTracker* PoolMemTrackerRegistry::GetRequestPoolMemTracker(
   lock_guard<SpinLock> l(pool_to_mem_trackers_lock_);
   PoolTrackersMap::iterator it = pool_to_mem_trackers_.find(pool_name);
   if (it != pool_to_mem_trackers_.end()) {
-    MemTracker* tracker = it->second;
+    MemTracker* tracker = it->second.get();
     DCHECK(pool_name == tracker->pool_name_);
     return tracker;
   }
@@ -161,7 +161,7 @@ MemTracker* PoolMemTrackerRegistry::GetRequestPoolMemTracker(
       new MemTracker(-1, Substitute(REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT, pool_name),
           ExecEnv::GetInstance()->process_mem_tracker());
   tracker->pool_name_ = pool_name;
-  pool_to_mem_trackers_[pool_name] = tracker;
+  pool_to_mem_trackers_.emplace(pool_name, unique_ptr<MemTracker>(tracker));
   return tracker;
 }
 

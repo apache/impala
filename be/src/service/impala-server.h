@@ -69,6 +69,7 @@ class TSessionState;
 class TQueryOptions;
 class TGetExecSummaryResp;
 class TGetExecSummaryReq;
+class ClientRequestState;
 
 /// An ImpalaServer contains both frontend and backend functionality;
 /// it implements ImpalaService (Beeswax), ImpalaHiveServer2Service (HiveServer2)
@@ -82,14 +83,14 @@ class TGetExecSummaryReq;
 /// 1. session_state_map_lock_
 /// 2. SessionState::lock
 /// 3. query_expiration_lock_
-/// 4. query_exec_state_map_lock_
-/// 5. QueryExecState::fetch_rows_lock
-/// 6. QueryExecState::lock
-/// 7. QueryExecState::expiration_data_lock_
+/// 4. client_request_state_map_lock_
+/// 5. ClientRequestState::fetch_rows_lock
+/// 6. ClientRequestState::lock
+/// 7. ClientRequestState::expiration_data_lock_
 /// 8. Coordinator::exec_summary_lock
 ///
 /// Coordinator::lock_ should not be acquired at the same time as the
-/// ImpalaServer/SessionState/QueryExecState locks. Aside from
+/// ImpalaServer/SessionState/ClientRequestState locks. Aside from
 /// Coordinator::exec_summary_lock_ the Coordinator's lock ordering is independent of
 /// the above lock ordering.
 ///
@@ -142,7 +143,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// These APIs will not be implemented because ODBC driver does not use them.
   virtual void dump_config(std::string& config);
 
-  /// ImpalaService rpcs: extensions over Beeswax (implemented in impala-beeswax-server.cc)
+  /// ImpalaService rpcs: extensions over Beeswax (implemented in
+  /// impala-beeswax-server.cc)
   virtual void Cancel(impala::TStatus& status, const beeswax::QueryHandle& query_id);
   virtual void CloseInsert(impala::TInsertResult& insert_result,
       const beeswax::QueryHandle& query_handle);
@@ -156,7 +158,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   virtual void GetExecSummary(impala::TExecSummary& result,
       const beeswax::QueryHandle& query_id);
 
-  /// Performs a full catalog metadata reset, invalidating all table and database metadata.
+  /// Performs a full catalog metadata reset, invalidating all table and database
+  /// metadata.
   virtual void ResetCatalog(impala::TStatus& status);
 
   /// Resets the specified table's catalog metadata, forcing a reload on the next access.
@@ -229,7 +232,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       apache::hive::service::cli::thrift::TRenewDelegationTokenResp& return_val,
       const apache::hive::service::cli::thrift::TRenewDelegationTokenReq& req);
 
-  /// ImpalaService common extensions (implemented in impala-server.cc)
   /// ImpalaInternalService rpcs
   void ReportExecStatus(TReportExecStatusResult& return_val,
       const TReportExecStatusParams& params);
@@ -247,8 +249,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// SessionHandlerIf methods
 
   /// Called when a Beeswax or HS2 connection starts. For Beeswax, registers a new
-  /// SessionState associated with the new connection. For HS2, this is a no-op (HS2 has an
-  /// explicit CreateSession RPC).
+  /// SessionState associated with the new connection. For HS2, this is a no-op (HS2
+  /// has an explicit CreateSession RPC).
   virtual void ConnectionStart(const ThriftServer::ConnectionContext& session_context);
 
   /// Called when a Beeswax or HS2 connection terminates. Unregisters all sessions
@@ -267,6 +269,22 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   void CatalogUpdateCallback(const StatestoreSubscriber::TopicDeltaMap& topic_deltas,
       std::vector<TTopicDelta>* topic_updates);
 
+  /// Processes a CatalogUpdateResult returned from the CatalogServer and ensures
+  /// the update has been applied to the local impalad's catalog cache. If
+  /// wait_for_all_subscribers is true, this function will also wait until all
+  /// catalog topic subscribers have processed the update. Called from ClientRequestState
+  /// after executing any statement that modifies the catalog.
+  /// If wait_for_all_subscribers is false AND if the TCatalogUpdateResult contains
+  /// TCatalogObject(s) to add and/or remove, this function will update the local cache
+  /// by directly calling UpdateCatalog() with the TCatalogObject results.
+  /// Otherwise this function will wait until the local impalad's catalog cache has been
+  /// updated from a statestore heartbeat that includes this catalog update's catalog
+  /// version. If wait_for_all_subscribers is true, this function also wait all other
+  /// catalog topic subscribers to process this update by checking the current
+  /// min_subscriber_topic_version included in each state store heartbeat.
+  Status ProcessCatalogUpdateResult(const TCatalogUpdateResult& catalog_update_result,
+      bool wait_for_all_subscribers) WARN_UNUSED_RESULT;
+
   /// Returns true if lineage logging is enabled, false otherwise.
   bool IsLineageLoggingEnabled();
 
@@ -281,418 +299,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   /// The prefix of audit event log filename.
   static const string AUDIT_EVENT_LOG_FILE_PREFIX;
-
- private:
-  friend class ChildQuery;
-  friend class ImpalaHttpHandler;
-
-  boost::scoped_ptr<ImpalaHttpHandler> http_handler_;
-
-  struct SessionState;
-
-  /// Execution state of a query.
-  class QueryExecState;
-
-  /// Relevant ODBC SQL State code; for more info,
-  /// goto http://msdn.microsoft.com/en-us/library/ms714687.aspx
-  static const char* SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION;
-  static const char* SQLSTATE_GENERAL_ERROR;
-  static const char* SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED;
-
-  /// Return exec state for given query_id, or NULL if not found.
-  /// If 'lock' is true, the returned exec state's lock() will be acquired before
-  /// the query_exec_state_map_lock_ is released.
-  std::shared_ptr<QueryExecState> GetQueryExecState(
-      const TUniqueId& query_id, bool lock);
-
-  /// Writes the session id, if found, for the given query to the output
-  /// parameter. Returns false if no query with the given ID is found.
-  bool GetSessionIdForQuery(const TUniqueId& query_id, TUniqueId* session_id);
-
-  /// Updates the number of databases / tables metrics from the FE catalog
-  Status UpdateCatalogMetrics();
-
-  /// Starts asynchronous execution of query. Creates QueryExecState (returned
-  /// in exec_state), registers it and calls Coordinator::Execute().
-  /// If it returns with an error status, exec_state will be NULL and nothing
-  /// will have been registered in query_exec_state_map_.
-  /// session_state is a ptr to the session running this query and must have
-  /// been checked out.
-  /// query_session_state is a snapshot of session state that changes when the
-  /// query was run. (e.g. default database).
-  Status Execute(TQueryCtx* query_ctx,
-                 std::shared_ptr<SessionState> session_state,
-                 std::shared_ptr<QueryExecState>* exec_state);
-
-  /// Implements Execute() logic, but doesn't unregister query on error.
-  Status ExecuteInternal(const TQueryCtx& query_ctx,
-                         std::shared_ptr<SessionState> session_state,
-                         bool* registered_exec_state,
-                         std::shared_ptr<QueryExecState>* exec_state);
-
-  /// Registers the query exec state with query_exec_state_map_ using the globally
-  /// unique query_id and add the query id to session state's open query list.
-  /// The caller must have checked out the session state.
-  Status RegisterQuery(std::shared_ptr<SessionState> session_state,
-      const std::shared_ptr<QueryExecState>& exec_state);
-
-  /// Adds the query to the set of in-flight queries for the session. The query remains
-  /// in-flight until the query is unregistered.  Until a query is in-flight, an attempt
-  /// to cancel or close the query by the user will return an error status.  If the
-  /// session is closed before a query is in-flight, then the query cancellation is
-  /// deferred until after the issuing path has completed initializing the query.  Once
-  /// a query is in-flight, it can be cancelled/closed asynchronously by the user
-  /// (e.g. via an RPC) and the session close path can close (cancel and unregister) it.
-  /// The query must have already been registered using RegisterQuery().  The caller
-  /// must have checked out the session state.
-  Status SetQueryInflight(std::shared_ptr<SessionState> session_state,
-      const std::shared_ptr<QueryExecState>& exec_state);
-
-  /// Unregister the query by cancelling it, removing exec_state from
-  /// query_exec_state_map_, and removing the query id from session state's in-flight
-  /// query list.  If check_inflight is true, then return an error if the query is not
-  /// yet in-flight.  Otherwise, proceed even if the query isn't yet in-flight (for
-  /// cleaning up after an error on the query issuing path).
-  Status UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
-      const Status* cause = NULL);
-
-  /// Initiates query cancellation reporting the given cause as the query status.
-  /// Assumes deliberate cancellation by the user if the cause is NULL.  Returns an
-  /// error if query_id is not found.  If check_inflight is true, then return an error
-  /// if the query is not yet in-flight.  Otherwise, returns OK.  Queries still need to
-  /// be unregistered, after cancellation.  Caller should not hold any locks when
-  /// calling this function.
-  Status CancelInternal(const TUniqueId& query_id, bool check_inflight,
-      const Status* cause = NULL);
-
-  /// Close the session and release all resource used by this session.
-  /// Caller should not hold any locks when calling this function.
-  /// If ignore_if_absent is true, returns OK even if a session with the supplied ID does
-  /// not exist.
-  Status CloseSessionInternal(const TUniqueId& session_id, bool ignore_if_absent);
-
-  /// Gets the runtime profile string for a given query_id and writes it to the output
-  /// stream. First searches for the query id in the map of in-flight queries. If no
-  /// match is found there, the query log is searched. Returns OK if the profile was
-  /// found, otherwise a Status object with an error message will be returned. The
-  /// output stream will not be modified on error.
-  /// If base64_encoded, outputs the base64 encoded profile output, otherwise the human
-  /// readable string.
-  Status GetRuntimeProfileStr(const TUniqueId& query_id, bool base64_encoded,
-      std::stringstream* output);
-
-  /// Returns the exec summary for this query.
-  Status GetExecSummary(const TUniqueId& query_id, TExecSummary* result);
-
-  /// Initialize "default_configs_" to show the default values for ImpalaQueryOptions and
-  /// "support_start_over/false" to indicate that Impala does not support start over
-  /// in the fetch call.
-  void InitializeConfigVariables();
-
-  /// Checks settings for profile logging, including whether the output
-  /// directory exists and is writeable, and initialises the first log file.
-  /// Returns OK unless there is some problem preventing profile log files
-  /// from being written. If an error is returned, the constructor will disable
-  /// profile logging.
-  Status InitProfileLogging();
-
-  /// Checks settings for audit event logging, including whether the output
-  /// directory exists and is writeable, and initialises the first log file.
-  /// Returns OK unless there is some problem preventing audit event log files
-  /// from being written. If an error is returned, impalad startup will be aborted.
-  Status InitAuditEventLogging();
-
-  /// Checks settings for lineage logging, including whether the output
-  /// directory exists and is writeable, and initialises the first log file.
-  /// Returns OK unless there is some problem preventing lineage log files
-  /// from being written. If an error is returned, impalad startup will be aborted.
-  Status InitLineageLogging();
-
-  /// Initializes a logging directory, creating the directory if it does not already
-  /// exist. If there is any error creating the directory an error will be returned.
-  static Status InitLoggingDir(const std::string& log_dir);
-
-  /// Returns true if audit event logging is enabled, false otherwise.
-  bool IsAuditEventLoggingEnabled();
-
-  Status LogAuditRecord(const QueryExecState& exec_state, const TExecRequest& request);
-
-  Status LogLineageRecord(const QueryExecState& exec_state);
-
-  /// Log audit and column lineage events
-  void LogQueryEvents(const QueryExecState& exec_state);
-
-  /// Runs once every 5s to flush the profile log file to disk.
-  [[noreturn]] void LogFileFlushThread();
-
-  /// Runs once every 5s to flush the audit log file to disk.
-  [[noreturn]] void AuditEventLoggerFlushThread();
-
-  /// Runs once every 5s to flush the lineage log file to disk.
-  [[noreturn]] void LineageLoggerFlushThread();
-
-  /// Copies a query's state into the query log. Called immediately prior to a
-  /// QueryExecState's deletion. Also writes the query profile to the profile log on disk.
-  /// Must be called with query_exec_state_map_lock_ held
-  void ArchiveQuery(const QueryExecState& query);
-
-  /// Checks whether the given user is allowed to delegate as the specified do_as_user.
-  /// Returns OK if the authorization suceeds, otherwise returns an status with details
-  /// on why the failure occurred.
-  Status AuthorizeProxyUser(const std::string& user, const std::string& do_as_user);
-
-  // Check if the local backend descriptor is in the list of known backends. If not, add
-  // it to the list of known backends and add it to the 'topic_updates'.
-  void AddLocalBackendToStatestore(std::vector<TTopicDelta>* topic_updates);
-
-  /// Snapshot of a query's state, archived in the query log.
-  struct QueryStateRecord {
-    /// Pretty-printed runtime profile. TODO: Copy actual profile object
-    std::string profile_str;
-
-    /// Base64 encoded runtime profile
-    std::string encoded_profile_str;
-
-    /// Query id
-    TUniqueId id;
-
-    /// Queries are run and authorized on behalf of the effective_user.
-    /// If there is no delegated user, this will be the connected user. Otherwise, it
-    /// will be set to the delegated user.
-    std::string effective_user;
-
-    /// default db for this query
-    std::string default_db;
-
-    /// SQL statement text
-    std::string stmt;
-
-    /// Text representation of plan
-    std::string plan;
-
-    /// DDL, DML etc.
-    TStmtType::type stmt_type;
-
-    /// True if the query required a coordinator fragment
-    bool has_coord;
-
-    /// The number of fragments that have completed
-    int64_t num_complete_fragments;
-
-    /// The total number of fragments
-    int64_t total_fragments;
-
-    /// The number of rows fetched by the client
-    int64_t num_rows_fetched;
-
-    /// The state of the query as of this snapshot
-    beeswax::QueryState::type query_state;
-
-    /// Start and end time of the query
-    TimestampValue start_time, end_time;
-
-    /// Summary of execution for this query.
-    TExecSummary exec_summary;
-
-    Status query_status;
-
-    /// Timeline of important query events
-    TEventSequence event_sequence;
-
-    /// Save the query plan fragments so that the plan tree can be rendered on the debug
-    /// webpages.
-    vector<TPlanFragment> fragments;
-
-    // If true, this query has no more rows to return
-    bool all_rows_returned;
-
-    // The most recent time this query was actively being processed, in Unix milliseconds.
-    int64_t last_active_time_ms;
-
-    /// Request pool to which the request was submitted for admission, or an empty string
-    /// if this request doesn't have a pool.
-    std::string request_pool;
-
-    /// Initialise from an exec_state. If copy_profile is true, print the query
-    /// profile to a string and copy that into this.profile (which is expensive),
-    /// otherwise leave this.profile empty.
-    /// If encoded_str is non-empty, it is the base64 encoded string for
-    /// exec_state->profile.
-    QueryStateRecord(const QueryExecState& exec_state, bool copy_profile = false,
-        const std::string& encoded_str = "");
-
-    /// Default constructor used only when participating in collections
-    QueryStateRecord() { }
-  };
-
-  struct QueryStateRecordLessThan {
-    /// Comparator that sorts by start time.
-    bool operator() (const QueryStateRecord& lhs, const QueryStateRecord& rhs) const;
-  };
-
-  /// Beeswax private methods
-
-  /// Helper functions to translate between Beeswax and Impala structs
-  Status QueryToTQueryContext(const beeswax::Query& query, TQueryCtx* query_ctx);
-  void TUniqueIdToQueryHandle(const TUniqueId& query_id, beeswax::QueryHandle* handle);
-  void QueryHandleToTUniqueId(const beeswax::QueryHandle& handle, TUniqueId* query_id);
-
-  /// Helper function to raise BeeswaxException
-  [[noreturn]] void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
-
-  /// Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
-  Status FetchInternal(const TUniqueId& query_id, bool start_over,
-      int32_t fetch_size, beeswax::Results* query_results);
-
-  /// Populate insert_result and clean up exec state. If the query
-  /// status is an error, insert_result is not populated and the status is returned.
-  Status CloseInsertInternal(const TUniqueId& query_id, TInsertResult* insert_result);
-
-  /// HiveServer2 private methods (implemented in impala-hs2-server.cc)
-
-  /// Starts the synchronous execution of a HiverServer2 metadata operation.
-  /// If the execution succeeds, an QueryExecState will be created and registered in
-  /// query_exec_state_map_. Otherwise, nothing will be registered in query_exec_state_map_
-  /// and an error status will be returned. As part of this call, the TMetadataOpRequest
-  /// struct will be populated with the requesting user's session state.
-  /// Returns a TOperationHandle and TStatus.
-  void ExecuteMetadataOp(
-      const apache::hive::service::cli::thrift::THandleIdentifier& session_handle,
-      TMetadataOpRequest* request,
-      apache::hive::service::cli::thrift::TOperationHandle* handle,
-      apache::hive::service::cli::thrift::TStatus* status);
-
-  /// Executes the fetch logic for HiveServer2 FetchResults. If fetch_first is true, then
-  /// the query's state should be reset to fetch from the beginning of the result set.
-  /// Doesn't clean up the exec state if an error occurs.
-  Status FetchInternal(const TUniqueId& query_id, int32_t fetch_size, bool fetch_first,
-      apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results);
-
-  /// Helper functions to translate between HiveServer2 and Impala structs
-
-  /// Returns !ok() if handle.guid.size() or handle.secret.size() != 16
-  static Status THandleIdentifierToTUniqueId(
-      const apache::hive::service::cli::thrift::THandleIdentifier& handle,
-      TUniqueId* unique_id, TUniqueId* secret);
-  static void TUniqueIdToTHandleIdentifier(
-      const TUniqueId& unique_id, const TUniqueId& secret,
-      apache::hive::service::cli::thrift::THandleIdentifier* handle);
-  Status TExecuteStatementReqToTQueryContext(
-      const apache::hive::service::cli::thrift::TExecuteStatementReq execute_request,
-      TQueryCtx* query_ctx);
-
-  /// Helper method to process cancellations that result from failed backends, called from
-  /// the cancellation thread pool. The cancellation_work contains the query id to cancel
-  /// and a cause listing the failed backends that led to cancellation. Calls
-  /// CancelInternal directly, but has a signature compatible with the thread pool.
-  void CancelFromThreadPool(uint32_t thread_id,
-      const CancellationWork& cancellation_work);
-
-  /// Helper method to add any pool query options to the query_ctx. Must be called before
-  /// ExecuteInternal() at which point the TQueryCtx is const and cannot be mutated.
-  /// override_options_mask indicates which query options can be overridden by the pool
-  /// default query options.
-  void AddPoolQueryOptions(TQueryCtx* query_ctx,
-      const QueryOptionsMask& override_options_mask);
-
-  /// Processes a CatalogUpdateResult returned from the CatalogServer and ensures
-  /// the update has been applied to the local impalad's catalog cache. If
-  /// wait_for_all_subscribers is true, this function will also wait until all
-  /// catalog topic subscribers have processed the update. Called from QueryExecState
-  /// after executing any statement that modifies the catalog.
-  /// If wait_for_all_subscribers is false AND if the TCatalogUpdateResult contains
-  /// TCatalogObject(s) to add and/or remove, this function will update the local cache
-  /// by directly calling UpdateCatalog() with the TCatalogObject results.
-  /// Otherwise this function will wait until the local impalad's catalog cache has been
-  /// updated from a statestore heartbeat that includes this catalog update's catalog
-  /// version. If wait_for_all_subscribers is true, this function also wait all other
-  /// catalog topic subscribers to process this update by checking the current
-  /// min_subscriber_topic_version included in each state store heartbeat.
-  Status ProcessCatalogUpdateResult(const TCatalogUpdateResult& catalog_update_result,
-      bool wait_for_all_subscribers);
-
-  /// Register timeout value upon opening a new session. This will wake up
-  /// session_timeout_thread_ to update its poll period.
-  void RegisterSessionTimeout(int32_t timeout);
-
-  /// To be run in a thread which wakes up every x / 2 seconds in which x is the minimum
-  /// non-zero idle session timeout value of all sessions. This function checks all
-  /// sessions for their last-idle times. Those that have been idle for longer than
-  /// their configured timeout values are 'expired': they will no longer accept queries
-  /// and any running queries associated with those sessions are unregistered.
-  [[noreturn]] void ExpireSessions();
-
-  /// Runs forever, walking queries_by_timestamp_ and expiring any queries that have been
-  /// idle (i.e. no client input and no time spent processing locally) for
-  /// FLAGS_idle_query_timeout seconds.
-  [[noreturn]] void ExpireQueries();
-
-  /// Guards query_log_ and query_log_index_
-  boost::mutex query_log_lock_;
-
-  /// FIFO list of query records, which are written after the query finishes executing
-  typedef std::list<QueryStateRecord> QueryLog;
-  QueryLog query_log_;
-
-  /// Index that allows lookup via TUniqueId into the query log
-  typedef boost::unordered_map<TUniqueId, QueryLog::iterator> QueryLogIndex;
-  QueryLogIndex query_log_index_;
-
-  /// Logger for writing encoded query profiles, one per line with the following format:
-  /// <ms-since-epoch> <query-id> <thrift query profile URL encoded and gzipped>
-  boost::scoped_ptr<SimpleLogger> profile_logger_;
-
-  /// Logger for writing audit events, one per line with the format:
-  /// "<current timestamp>" : { JSON object }
-  boost::scoped_ptr<SimpleLogger> audit_event_logger_;
-
-  /// Logger for writing lineage events, one per line with the format:
-  /// { JSON object }
-  boost::scoped_ptr<SimpleLogger> lineage_logger_;
-
-  /// If profile logging is enabled, wakes once every 5s to flush query profiles to disk
-  boost::scoped_ptr<Thread> profile_log_file_flush_thread_;
-
-  /// If audit event logging is enabled, wakes once every 5s to flush audit events to disk
-  boost::scoped_ptr<Thread> audit_event_logger_flush_thread_;
-
-  /// If lineage logging is enabled, wakes once every 5s to flush lineage events to disk
-  boost::scoped_ptr<Thread> lineage_logger_flush_thread_;
-
-  /// global, per-server state
-  ExecEnv* exec_env_;  // not owned
-
-  /// Thread pool to process cancellation requests that come from failed Impala demons to
-  /// avoid blocking the statestore callback.
-  boost::scoped_ptr<ThreadPool<CancellationWork>> cancellation_thread_pool_;
-
-  /// Thread that runs ExpireSessions. It will wake up periodically to check for sessions
-  /// which are idle for more their timeout values.
-  boost::scoped_ptr<Thread> session_timeout_thread_;
-
-  /// Contains all the non-zero idle session timeout values.
-  std::multiset<int32_t> session_timeout_set_;
-
-  /// The lock for protecting the session_timeout_set_.
-  boost::mutex session_timeout_lock_;
-
-  /// session_timeout_thread_ relies on the following conditional variable to wake up
-  /// on every poll period expiration or when the poll period changes.
-  boost::condition_variable session_timeout_cv_;
-
-  /// map from query id to exec state; QueryExecState is owned by us and referenced
-  /// as a shared_ptr to allow asynchronous deletion
-  typedef boost::unordered_map<TUniqueId, std::shared_ptr<QueryExecState>>
-      QueryExecStateMap;
-  QueryExecStateMap query_exec_state_map_;
-
-  /// Protects query_exec_state_map_. See "Locking" in the class comment for lock
-  /// acquisition order.
-  boost::mutex query_exec_state_map_lock_;
-
-  /// Default query options in the form of TQueryOptions and beeswax::ConfigVariable
-  TQueryOptions default_query_options_;
-  std::vector<beeswax::ConfigVariable> default_configs_;
 
   /// Per-session state.  This object is reference counted using shared_ptrs.  There
   /// is one ref count in the SessionStateMap for as long as the session is active.
@@ -778,6 +384,405 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     void ToThrift(const TUniqueId& session_id, TSessionState* session_state);
   };
 
+ private:
+  friend class ChildQuery;
+  friend class ImpalaHttpHandler;
+
+  boost::scoped_ptr<ImpalaHttpHandler> http_handler_;
+
+  /// Relevant ODBC SQL State code; for more info,
+  /// goto http://msdn.microsoft.com/en-us/library/ms714687.aspx
+  static const char* SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION;
+  static const char* SQLSTATE_GENERAL_ERROR;
+  static const char* SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED;
+
+  /// Return exec state for given query_id, or NULL if not found.
+  /// If 'lock' is true, the returned exec state's lock() will be acquired before
+  /// the client_request_state_map_lock_ is released.
+  std::shared_ptr<ClientRequestState> GetClientRequestState(
+      const TUniqueId& query_id, bool lock);
+
+  /// Writes the session id, if found, for the given query to the output
+  /// parameter. Returns false if no query with the given ID is found.
+  bool GetSessionIdForQuery(const TUniqueId& query_id, TUniqueId* session_id);
+
+  /// Updates the number of databases / tables metrics from the FE catalog
+  Status UpdateCatalogMetrics() WARN_UNUSED_RESULT;
+
+  /// Starts asynchronous execution of query. Creates ClientRequestState (returned
+  /// in exec_state), registers it and calls Coordinator::Execute().
+  /// If it returns with an error status, exec_state will be NULL and nothing
+  /// will have been registered in client_request_state_map_.
+  /// session_state is a ptr to the session running this query and must have
+  /// been checked out.
+  /// query_session_state is a snapshot of session state that changes when the
+  /// query was run. (e.g. default database).
+  Status Execute(TQueryCtx* query_ctx,
+      std::shared_ptr<SessionState> session_state,
+      std::shared_ptr<ClientRequestState>* exec_state) WARN_UNUSED_RESULT;
+
+  /// Implements Execute() logic, but doesn't unregister query on error.
+  Status ExecuteInternal(const TQueryCtx& query_ctx,
+      std::shared_ptr<SessionState> session_state, bool* registered_exec_state,
+      std::shared_ptr<ClientRequestState>* exec_state) WARN_UNUSED_RESULT;
+
+  /// Registers the query exec state with client_request_state_map_ using the globally
+  /// unique query_id and add the query id to session state's open query list.
+  /// The caller must have checked out the session state.
+  Status RegisterQuery(std::shared_ptr<SessionState> session_state,
+      const std::shared_ptr<ClientRequestState>& exec_state) WARN_UNUSED_RESULT;
+
+  /// Adds the query to the set of in-flight queries for the session. The query remains
+  /// in-flight until the query is unregistered.  Until a query is in-flight, an attempt
+  /// to cancel or close the query by the user will return an error status.  If the
+  /// session is closed before a query is in-flight, then the query cancellation is
+  /// deferred until after the issuing path has completed initializing the query.  Once
+  /// a query is in-flight, it can be cancelled/closed asynchronously by the user
+  /// (e.g. via an RPC) and the session close path can close (cancel and unregister) it.
+  /// The query must have already been registered using RegisterQuery().  The caller
+  /// must have checked out the session state.
+  Status SetQueryInflight(std::shared_ptr<SessionState> session_state,
+      const std::shared_ptr<ClientRequestState>& exec_state) WARN_UNUSED_RESULT;
+
+  /// Unregister the query by cancelling it, removing exec_state from
+  /// client_request_state_map_, and removing the query id from session state's in-flight
+  /// query list.  If check_inflight is true, then return an error if the query is not
+  /// yet in-flight.  Otherwise, proceed even if the query isn't yet in-flight (for
+  /// cleaning up after an error on the query issuing path).
+  Status UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
+      const Status* cause = NULL) WARN_UNUSED_RESULT;
+
+  /// Initiates query cancellation reporting the given cause as the query status.
+  /// Assumes deliberate cancellation by the user if the cause is NULL.  Returns an
+  /// error if query_id is not found.  If check_inflight is true, then return an error
+  /// if the query is not yet in-flight.  Otherwise, returns OK.  Queries still need to
+  /// be unregistered, after cancellation.  Caller should not hold any locks when
+  /// calling this function.
+  Status CancelInternal(const TUniqueId& query_id, bool check_inflight,
+      const Status* cause = NULL) WARN_UNUSED_RESULT;
+
+  /// Close the session and release all resource used by this session.
+  /// Caller should not hold any locks when calling this function.
+  /// If ignore_if_absent is true, returns OK even if a session with the supplied ID does
+  /// not exist.
+  Status CloseSessionInternal(const TUniqueId& session_id, bool ignore_if_absent)
+      WARN_UNUSED_RESULT;
+
+  /// Gets the runtime profile string for a given query_id and writes it to the output
+  /// stream. First searches for the query id in the map of in-flight queries. If no
+  /// match is found there, the query log is searched. Returns OK if the profile was
+  /// found, otherwise a Status object with an error message will be returned. The
+  /// output stream will not be modified on error.
+  /// If base64_encoded, outputs the base64 encoded profile output, otherwise the human
+  /// readable string.
+  Status GetRuntimeProfileStr(const TUniqueId& query_id, bool base64_encoded,
+      std::stringstream* output) WARN_UNUSED_RESULT;
+
+  /// Returns the exec summary for this query.
+  Status GetExecSummary(const TUniqueId& query_id, TExecSummary* result)
+      WARN_UNUSED_RESULT;
+
+  /// Initialize "default_configs_" to show the default values for ImpalaQueryOptions and
+  /// "support_start_over/false" to indicate that Impala does not support start over
+  /// in the fetch call.
+  void InitializeConfigVariables();
+
+  /// Checks settings for profile logging, including whether the output
+  /// directory exists and is writeable, and initialises the first log file.
+  /// Returns OK unless there is some problem preventing profile log files
+  /// from being written. If an error is returned, the constructor will disable
+  /// profile logging.
+  Status InitProfileLogging() WARN_UNUSED_RESULT;
+
+  /// Checks settings for audit event logging, including whether the output
+  /// directory exists and is writeable, and initialises the first log file.
+  /// Returns OK unless there is some problem preventing audit event log files
+  /// from being written. If an error is returned, impalad startup will be aborted.
+  Status InitAuditEventLogging() WARN_UNUSED_RESULT;
+
+  /// Checks settings for lineage logging, including whether the output
+  /// directory exists and is writeable, and initialises the first log file.
+  /// Returns OK unless there is some problem preventing lineage log files
+  /// from being written. If an error is returned, impalad startup will be aborted.
+  Status InitLineageLogging() WARN_UNUSED_RESULT;
+
+  /// Initializes a logging directory, creating the directory if it does not already
+  /// exist. If there is any error creating the directory an error will be returned.
+  static Status InitLoggingDir(const std::string& log_dir) WARN_UNUSED_RESULT;
+
+  /// Returns true if audit event logging is enabled, false otherwise.
+  bool IsAuditEventLoggingEnabled();
+
+  Status LogAuditRecord(
+      const ClientRequestState& exec_state, const TExecRequest& request)
+      WARN_UNUSED_RESULT;
+
+  Status LogLineageRecord(const ClientRequestState& exec_state) WARN_UNUSED_RESULT;
+
+  /// Log audit and column lineage events
+  void LogQueryEvents(const ClientRequestState& exec_state);
+
+  /// Runs once every 5s to flush the profile log file to disk.
+  [[noreturn]] void LogFileFlushThread();
+
+  /// Runs once every 5s to flush the audit log file to disk.
+  [[noreturn]] void AuditEventLoggerFlushThread();
+
+  /// Runs once every 5s to flush the lineage log file to disk.
+  [[noreturn]] void LineageLoggerFlushThread();
+
+  /// Copies a query's state into the query log. Called immediately prior to a
+  /// ClientRequestState's deletion. Also writes the query profile to the profile log
+  /// on disk. Must be called with client_request_state_map_lock_ held
+  void ArchiveQuery(const ClientRequestState& query);
+
+  /// Checks whether the given user is allowed to delegate as the specified do_as_user.
+  /// Returns OK if the authorization suceeds, otherwise returns an status with details
+  /// on why the failure occurred.
+  Status AuthorizeProxyUser(const std::string& user, const std::string& do_as_user)
+      WARN_UNUSED_RESULT;
+
+  // Check if the local backend descriptor is in the list of known backends. If not, add
+  // it to the list of known backends and add it to the 'topic_updates'.
+  void AddLocalBackendToStatestore(std::vector<TTopicDelta>* topic_updates);
+
+  /// Snapshot of a query's state, archived in the query log.
+  struct QueryStateRecord {
+    /// Pretty-printed runtime profile. TODO: Copy actual profile object
+    std::string profile_str;
+
+    /// Base64 encoded runtime profile
+    std::string encoded_profile_str;
+
+    /// Query id
+    TUniqueId id;
+
+    /// Queries are run and authorized on behalf of the effective_user.
+    /// If there is no delegated user, this will be the connected user. Otherwise, it
+    /// will be set to the delegated user.
+    std::string effective_user;
+
+    /// default db for this query
+    std::string default_db;
+
+    /// SQL statement text
+    std::string stmt;
+
+    /// Text representation of plan
+    std::string plan;
+
+    /// DDL, DML etc.
+    TStmtType::type stmt_type;
+
+    /// True if the query required a coordinator fragment
+    bool has_coord;
+
+    /// The number of fragments that have completed
+    int64_t num_complete_fragments;
+
+    /// The total number of fragments
+    int64_t total_fragments;
+
+    /// The number of rows fetched by the client
+    int64_t num_rows_fetched;
+
+    /// The state of the query as of this snapshot
+    beeswax::QueryState::type query_state;
+
+    /// Start and end time of the query
+    TimestampValue start_time, end_time;
+
+    /// Summary of execution for this query.
+    TExecSummary exec_summary;
+
+    Status query_status;
+
+    /// Timeline of important query events
+    TEventSequence event_sequence;
+
+    /// Save the query plan fragments so that the plan tree can be rendered on the debug
+    /// webpages.
+    vector<TPlanFragment> fragments;
+
+    // If true, this query has no more rows to return
+    bool all_rows_returned;
+
+    // The most recent time this query was actively being processed, in Unix milliseconds.
+    int64_t last_active_time_ms;
+
+    /// Request pool to which the request was submitted for admission, or an empty string
+    /// if this request doesn't have a pool.
+    std::string request_pool;
+
+    /// Initialise from an exec_state. If copy_profile is true, print the query
+    /// profile to a string and copy that into this.profile (which is expensive),
+    /// otherwise leave this.profile empty.
+    /// If encoded_str is non-empty, it is the base64 encoded string for
+    /// exec_state->profile.
+    QueryStateRecord(const ClientRequestState& exec_state, bool copy_profile = false,
+        const std::string& encoded_str = "");
+
+    /// Default constructor used only when participating in collections
+    QueryStateRecord() { }
+  };
+
+  struct QueryStateRecordLessThan {
+    /// Comparator that sorts by start time.
+    bool operator() (const QueryStateRecord& lhs, const QueryStateRecord& rhs) const;
+  };
+
+  /// Beeswax private methods
+
+  /// Helper functions to translate between Beeswax and Impala structs
+  Status QueryToTQueryContext(const beeswax::Query& query, TQueryCtx* query_ctx)
+      WARN_UNUSED_RESULT;
+  void TUniqueIdToQueryHandle(const TUniqueId& query_id, beeswax::QueryHandle* handle);
+  void QueryHandleToTUniqueId(const beeswax::QueryHandle& handle, TUniqueId* query_id);
+
+  /// Helper function to raise BeeswaxException
+  [[noreturn]] void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
+
+  /// Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
+  Status FetchInternal(const TUniqueId& query_id, bool start_over,
+      int32_t fetch_size, beeswax::Results* query_results) WARN_UNUSED_RESULT;
+
+  /// Populate insert_result and clean up exec state. If the query
+  /// status is an error, insert_result is not populated and the status is returned.
+  Status CloseInsertInternal(const TUniqueId& query_id, TInsertResult* insert_result)
+      WARN_UNUSED_RESULT;
+
+  /// HiveServer2 private methods (implemented in impala-hs2-server.cc)
+
+  /// Starts the synchronous execution of a HiverServer2 metadata operation.
+  /// If the execution succeeds, an ClientRequestState will be created and registered in
+  /// client_request_state_map_. Otherwise, nothing will be registered in
+  /// client_request_state_map_ and an error status will be returned. As part of this
+  /// call, the TMetadataOpRequest struct will be populated with the requesting user's
+  /// session state.
+  /// Returns a TOperationHandle and TStatus.
+  void ExecuteMetadataOp(
+      const apache::hive::service::cli::thrift::THandleIdentifier& session_handle,
+      TMetadataOpRequest* request,
+      apache::hive::service::cli::thrift::TOperationHandle* handle,
+      apache::hive::service::cli::thrift::TStatus* status);
+
+  /// Executes the fetch logic for HiveServer2 FetchResults. If fetch_first is true, then
+  /// the query's state should be reset to fetch from the beginning of the result set.
+  /// Doesn't clean up the exec state if an error occurs.
+  Status FetchInternal(const TUniqueId& query_id, int32_t fetch_size, bool fetch_first,
+      apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results)
+      WARN_UNUSED_RESULT;
+
+  /// Helper functions to translate between HiveServer2 and Impala structs
+
+  /// Returns !ok() if handle.guid.size() or handle.secret.size() != 16
+  static Status THandleIdentifierToTUniqueId(
+      const apache::hive::service::cli::thrift::THandleIdentifier& handle,
+      TUniqueId* unique_id, TUniqueId* secret) WARN_UNUSED_RESULT;
+  static void TUniqueIdToTHandleIdentifier(
+      const TUniqueId& unique_id, const TUniqueId& secret,
+      apache::hive::service::cli::thrift::THandleIdentifier* handle);
+  Status TExecuteStatementReqToTQueryContext(
+      const apache::hive::service::cli::thrift::TExecuteStatementReq execute_request,
+      TQueryCtx* query_ctx) WARN_UNUSED_RESULT;
+
+  /// Helper method to process cancellations that result from failed backends, called from
+  /// the cancellation thread pool. The cancellation_work contains the query id to cancel
+  /// and a cause listing the failed backends that led to cancellation. Calls
+  /// CancelInternal directly, but has a signature compatible with the thread pool.
+  void CancelFromThreadPool(uint32_t thread_id,
+      const CancellationWork& cancellation_work);
+
+  /// Helper method to add any pool query options to the query_ctx. Must be called before
+  /// ExecuteInternal() at which point the TQueryCtx is const and cannot be mutated.
+  /// override_options_mask indicates which query options can be overridden by the pool
+  /// default query options.
+  void AddPoolQueryOptions(TQueryCtx* query_ctx,
+      const QueryOptionsMask& override_options_mask);
+
+  /// Register timeout value upon opening a new session. This will wake up
+  /// session_timeout_thread_ to update its poll period.
+  void RegisterSessionTimeout(int32_t timeout);
+
+  /// To be run in a thread which wakes up every x / 2 seconds in which x is the minimum
+  /// non-zero idle session timeout value of all sessions. This function checks all
+  /// sessions for their last-idle times. Those that have been idle for longer than
+  /// their configured timeout values are 'expired': they will no longer accept queries
+  /// and any running queries associated with those sessions are unregistered.
+  [[noreturn]] void ExpireSessions();
+
+  /// Runs forever, walking queries_by_timestamp_ and expiring any queries that have been
+  /// idle (i.e. no client input and no time spent processing locally) for
+  /// FLAGS_idle_query_timeout seconds.
+  [[noreturn]] void ExpireQueries();
+
+  /// Guards query_log_ and query_log_index_
+  boost::mutex query_log_lock_;
+
+  /// FIFO list of query records, which are written after the query finishes executing
+  typedef std::list<QueryStateRecord> QueryLog;
+  QueryLog query_log_;
+
+  /// Index that allows lookup via TUniqueId into the query log
+  typedef boost::unordered_map<TUniqueId, QueryLog::iterator> QueryLogIndex;
+  QueryLogIndex query_log_index_;
+
+  /// Logger for writing encoded query profiles, one per line with the following format:
+  /// <ms-since-epoch> <query-id> <thrift query profile URL encoded and gzipped>
+  boost::scoped_ptr<SimpleLogger> profile_logger_;
+
+  /// Logger for writing audit events, one per line with the format:
+  /// "<current timestamp>" : { JSON object }
+  boost::scoped_ptr<SimpleLogger> audit_event_logger_;
+
+  /// Logger for writing lineage events, one per line with the format:
+  /// { JSON object }
+  boost::scoped_ptr<SimpleLogger> lineage_logger_;
+
+  /// If profile logging is enabled, wakes once every 5s to flush query profiles to disk
+  boost::scoped_ptr<Thread> profile_log_file_flush_thread_;
+
+  /// If audit event logging is enabled, wakes once every 5s to flush audit events to disk
+  boost::scoped_ptr<Thread> audit_event_logger_flush_thread_;
+
+  /// If lineage logging is enabled, wakes once every 5s to flush lineage events to disk
+  boost::scoped_ptr<Thread> lineage_logger_flush_thread_;
+
+  /// global, per-server state
+  ExecEnv* exec_env_;  // not owned
+
+  /// Thread pool to process cancellation requests that come from failed Impala demons to
+  /// avoid blocking the statestore callback.
+  boost::scoped_ptr<ThreadPool<CancellationWork>> cancellation_thread_pool_;
+
+  /// Thread that runs ExpireSessions. It will wake up periodically to check for sessions
+  /// which are idle for more their timeout values.
+  boost::scoped_ptr<Thread> session_timeout_thread_;
+
+  /// Contains all the non-zero idle session timeout values.
+  std::multiset<int32_t> session_timeout_set_;
+
+  /// The lock for protecting the session_timeout_set_.
+  boost::mutex session_timeout_lock_;
+
+  /// session_timeout_thread_ relies on the following conditional variable to wake up
+  /// on every poll period expiration or when the poll period changes.
+  boost::condition_variable session_timeout_cv_;
+
+  /// map from query id to exec state; ClientRequestState is owned by us and referenced
+  /// as a shared_ptr to allow asynchronous deletion
+  typedef boost::unordered_map<TUniqueId, std::shared_ptr<ClientRequestState>>
+      ClientRequestStateMap;
+  ClientRequestStateMap client_request_state_map_;
+
+  /// Protects client_request_state_map_. See "Locking" in the class comment for lock
+  /// acquisition order.
+  boost::mutex client_request_state_map_lock_;
+
+  /// Default query options in the form of TQueryOptions and beeswax::ConfigVariable
+  TQueryOptions default_query_options_;
+  std::vector<beeswax::ConfigVariable> default_configs_;
+
   /// Class that allows users of SessionState to mark a session as in-use, and therefore
   /// immune to expiration. The marking is done in WithSession() and undone in the
   /// destructor, so this class can be used to 'check-out' a session for the duration of a
@@ -790,7 +795,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// object goes out of scope. Returns OK unless there is an error in GetSessionState.
     /// Must only be called once per ScopedSessionState.
     Status WithSession(const TUniqueId& session_id,
-        std::shared_ptr<SessionState>* session = NULL) {
+        std::shared_ptr<SessionState>* session = NULL) WARN_UNUSED_RESULT {
       DCHECK(session_.get() == NULL);
       RETURN_IF_ERROR(impala_->GetSessionState(session_id, &session_, true));
       if (session != NULL) (*session) = session_;
@@ -840,7 +845,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// If mark_active is true, also checks if the session is expired or closed and
   /// increments the session's reference counter if it is still alive.
   Status GetSessionState(const TUniqueId& session_id,
-      std::shared_ptr<SessionState>* session_state, bool mark_active = false);
+      std::shared_ptr<SessionState>* session_state, bool mark_active = false)
+      WARN_UNUSED_RESULT;
 
   /// Decrement the session's reference counter and mark last_accessed_ms so that state
   /// expiration can proceed.

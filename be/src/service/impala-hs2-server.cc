@@ -38,7 +38,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/exec-env.h"
 #include "service/hs2-util.h"
-#include "service/query-exec-state.h"
+#include "service/client-request-state.h"
 #include "service/query-options.h"
 #include "service/query-result-set.h"
 #include "util/debug-util.h"
@@ -133,7 +133,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   session->ToThrift(session_id, &query_ctx.session);
   request->__set_session(query_ctx.session);
 
-  shared_ptr<QueryExecState> exec_state;
+  shared_ptr<ClientRequestState> request_state;
   // There is no user-supplied query text available because this metadata operation comes
   // from an RPC. As a best effort, we use the type of the operation.
   map<int, const char*>::const_iterator query_text_it =
@@ -141,9 +141,9 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   const string& query_text = query_text_it == _TMetadataOpcode_VALUES_TO_NAMES.end() ?
       "N/A" : query_text_it->second;
   query_ctx.client_request.stmt = query_text;
-  exec_state.reset(new QueryExecState(query_ctx, exec_env_,
+  request_state.reset(new ClientRequestState(query_ctx, exec_env_,
       exec_env_->frontend(), this, session));
-  Status register_status = RegisterQuery(session, exec_state);
+  Status register_status = RegisterQuery(session, request_state);
   if (!register_status.ok()) {
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(register_status.GetDetail());
@@ -151,20 +151,20 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     return;
   }
 
-  Status exec_status = exec_state->Exec(*request);
+  Status exec_status = request_state->Exec(*request);
   if (!exec_status.ok()) {
-    UnregisterQuery(exec_state->query_id(), false, &exec_status);
+    (void) UnregisterQuery(request_state->query_id(), false, &exec_status);
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(exec_status.GetDetail());
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
     return;
   }
 
-  exec_state->UpdateNonErrorQueryState(beeswax::QueryState::FINISHED);
+  request_state->UpdateNonErrorQueryState(beeswax::QueryState::FINISHED);
 
-  Status inflight_status = SetQueryInflight(session, exec_state);
+  Status inflight_status = SetQueryInflight(session, request_state);
   if (!inflight_status.ok()) {
-    UnregisterQuery(exec_state->query_id(), false, &inflight_status);
+    (void) UnregisterQuery(request_state->query_id(), false, &inflight_status);
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(inflight_status.GetDetail());
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
@@ -172,55 +172,56 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   }
   handle->__set_hasResultSet(true);
   // TODO: create secret for operationId
-  TUniqueId operation_id = exec_state->query_id();
+  TUniqueId operation_id = request_state->query_id();
   TUniqueIdToTHandleIdentifier(operation_id, operation_id, &(handle->operationId));
   status->__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size,
     bool fetch_first, TFetchResultsResp* fetch_results) {
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (UNLIKELY(exec_state == nullptr)) {
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  if (UNLIKELY(request_state == nullptr)) {
     return Status(Substitute("Invalid query handle: $0", PrintId(query_id)));
   }
 
   // FetchResults doesn't have an associated session handle, so we presume that this
   // request should keep alive the same session that orignated the query.
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = exec_state->session_id();
+  const TUniqueId session_id = request_state->session_id();
   shared_ptr<SessionState> session;
   RETURN_IF_ERROR(session_handle.WithSession(session_id, &session));
 
-  // Make sure QueryExecState::Wait() has completed before fetching rows. Wait() ensures
-  // that rows are ready to be fetched (e.g., Wait() opens QueryExecState::output_exprs_,
-  // which are evaluated in QueryExecState::FetchRows() below).
-  exec_state->BlockOnWait();
+  // Make sure ClientRequestState::Wait() has completed before fetching rows. Wait()
+  // ensures that rows are ready to be fetched (e.g., Wait() opens
+  // ClientRequestState::output_exprs_, which are evaluated in
+  // ClientRequestState::FetchRows() below).
+  request_state->BlockOnWait();
 
-  lock_guard<mutex> frl(*exec_state->fetch_rows_lock());
-  lock_guard<mutex> l(*exec_state->lock());
+  lock_guard<mutex> frl(*request_state->fetch_rows_lock());
+  lock_guard<mutex> l(*request_state->lock());
 
   // Check for cancellation or an error.
-  RETURN_IF_ERROR(exec_state->query_status());
+  RETURN_IF_ERROR(request_state->query_status());
 
-  if (exec_state->num_rows_fetched() == 0) {
-    exec_state->query_events()->MarkEvent("First row fetched");
-    exec_state->set_fetched_rows();
+  if (request_state->num_rows_fetched() == 0) {
+    request_state->query_events()->MarkEvent("First row fetched");
+    request_state->set_fetched_rows();
   }
 
-  if (fetch_first) RETURN_IF_ERROR(exec_state->RestartFetch());
+  if (fetch_first) RETURN_IF_ERROR(request_state->RestartFetch());
 
-  fetch_results->results.__set_startRowOffset(exec_state->num_rows_fetched());
+  fetch_results->results.__set_startRowOffset(request_state->num_rows_fetched());
 
   // Child queries should always return their results in row-major format, rather than
   // inheriting the parent session's setting.
-  bool is_child_query = exec_state->parent_query_id() != TUniqueId();
+  bool is_child_query = request_state->parent_query_id() != TUniqueId();
   TProtocolVersion::type version = is_child_query ?
       TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1 : session->hs2_version;
   scoped_ptr<QueryResultSet> result_set(QueryResultSet::CreateHS2ResultSet(
-      version, *(exec_state->result_metadata()), &(fetch_results->results)));
-  RETURN_IF_ERROR(exec_state->FetchRows(fetch_size, result_set.get()));
+      version, *(request_state->result_metadata()), &(fetch_results->results)));
+  RETURN_IF_ERROR(request_state->FetchRows(fetch_size, result_set.get()));
   fetch_results->__isset.results = true;
-  fetch_results->__set_hasMoreRows(!exec_state->eos());
+  fetch_results->__set_hasMoreRows(!request_state->eos());
   return Status::OK();
 }
 
@@ -451,36 +452,36 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
     }
   }
 
-  shared_ptr<QueryExecState> exec_state;
-  status = Execute(&query_ctx, session, &exec_state);
+  shared_ptr<ClientRequestState> request_state;
+  status = Execute(&query_ctx, session, &request_state);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
-  // Optionally enable result caching on the QueryExecState.
+  // Optionally enable result caching on the ClientRequestState.
   if (cache_num_rows > 0) {
-    status = exec_state->SetResultCache(
+    status = request_state->SetResultCache(
         QueryResultSet::CreateHS2ResultSet(
-            session->hs2_version, *exec_state->result_metadata(), nullptr),
+            session->hs2_version, *request_state->result_metadata(), nullptr),
         cache_num_rows);
     if (!status.ok()) {
-      UnregisterQuery(exec_state->query_id(), false, &status);
+      (void) UnregisterQuery(request_state->query_id(), false, &status);
       HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
     }
   }
-  exec_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
+  request_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
   // Start thread to wait for results to become available.
-  exec_state->WaitAsync();
+  request_state->WaitAsync();
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
-  status = SetQueryInflight(session, exec_state);
+  status = SetQueryInflight(session, request_state);
   if (!status.ok()) {
-    UnregisterQuery(exec_state->query_id(), false, &status);
+    (void) UnregisterQuery(request_state->query_id(), false, &status);
     HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   return_val.__isset.operationHandle = true;
   return_val.operationHandle.__set_operationType(TOperationType::EXECUTE_STATEMENT);
-  return_val.operationHandle.__set_hasResultSet(exec_state->returns_result_set());
-  // TODO: create secret for operationId and store the secret in exec_state
-  TUniqueIdToTHandleIdentifier(exec_state->query_id(), exec_state->query_id(),
+  return_val.operationHandle.__set_hasResultSet(request_state->returns_result_set());
+  // TODO: create secret for operationId and store the secret in request_state
+  TUniqueIdToTHandleIdentifier(request_state->query_id(), request_state->query_id(),
                                &return_val.operationHandle.operationId);
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
@@ -633,30 +634,30 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_ROW << "GetOperationStatus(): query_id=" << PrintId(query_id);
 
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (UNLIKELY(exec_state.get() == nullptr)) {
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  if (UNLIKELY(request_state.get() == nullptr)) {
     // No handle was found
     HS2_RETURN_ERROR(return_val,
       Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
 
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = exec_state->session_id();
+  const TUniqueId session_id = request_state->session_id();
   shared_ptr<SessionState> session;
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
       SQLSTATE_GENERAL_ERROR);
 
   {
-    lock_guard<mutex> l(*exec_state->lock());
+    lock_guard<mutex> l(*request_state->lock());
     TOperationState::type operation_state = QueryStateToTOperationState(
-        exec_state->query_state());
+        request_state->query_state());
     return_val.__set_operationState(operation_state);
     if (operation_state == TOperationState::ERROR_STATE) {
-      DCHECK(!exec_state->query_status().ok());
-      return_val.__set_errorMessage(exec_state->query_status().GetDetail());
+      DCHECK(!request_state->query_status().ok());
+      return_val.__set_errorMessage(request_state->query_status().GetDetail());
       return_val.__set_sqlState(SQLSTATE_GENERAL_ERROR);
     } else {
-      DCHECK(exec_state->query_status().ok());
+      DCHECK(request_state->query_status().ok());
     }
   }
 }
@@ -669,14 +670,14 @@ void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "CancelOperation(): query_id=" << PrintId(query_id);
 
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (UNLIKELY(exec_state.get() == nullptr)) {
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  if (UNLIKELY(request_state.get() == nullptr)) {
     // No handle was found
     HS2_RETURN_ERROR(return_val,
       Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = exec_state->session_id();
+  const TUniqueId session_id = request_state->session_id();
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
       SQLSTATE_GENERAL_ERROR);
   HS2_RETURN_IF_ERROR(return_val, CancelInternal(query_id, true), SQLSTATE_GENERAL_ERROR);
@@ -691,17 +692,17 @@ void ImpalaServer::CloseOperation(TCloseOperationResp& return_val,
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "CloseOperation(): query_id=" << PrintId(query_id);
 
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (UNLIKELY(exec_state.get() == nullptr)) {
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  if (UNLIKELY(request_state.get() == nullptr)) {
     // No handle was found
     HS2_RETURN_ERROR(return_val,
       Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = exec_state->session_id();
+  const TUniqueId session_id = request_state->session_id();
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
       SQLSTATE_GENERAL_ERROR);
-  // TODO: use timeout to get rid of unwanted exec_state.
+  // TODO: use timeout to get rid of unwanted request_state.
   HS2_RETURN_IF_ERROR(return_val, UnregisterQuery(query_id, true),
       SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
@@ -730,19 +731,19 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
       SQLSTATE_GENERAL_ERROR);
 
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
-  if (UNLIKELY(exec_state.get() == nullptr)) {
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, true);
+  if (UNLIKELY(request_state.get() == nullptr)) {
     VLOG_QUERY << "GetResultSetMetadata(): invalid query handle";
     // No handle was found
     HS2_RETURN_ERROR(return_val,
       Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
   {
-    // make sure we release the lock on exec_state if we see any error
-    lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
+    // make sure we release the lock on request_state if we see any error
+    lock_guard<mutex> l(*request_state->lock(), adopt_lock_t());
 
     // Convert TResultSetMetadata to TGetResultSetMetadataResp
-    const TResultSetMetadata* result_set_md = exec_state->result_metadata();
+    const TResultSetMetadata* result_set_md = request_state->result_metadata();
     DCHECK(result_set_md != NULL);
     if (result_set_md->columns.size() > 0) {
       return_val.__isset.schema = true;
@@ -793,7 +794,7 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
     if (status.IsRecoverableError()) {
       DCHECK(fetch_first);
     } else {
-      UnregisterQuery(query_id, false, &status);
+      (void) UnregisterQuery(query_id, false, &status);
     }
     HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
@@ -806,8 +807,8 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
 
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (UNLIKELY(exec_state.get() == nullptr)) {
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  if (UNLIKELY(request_state.get() == nullptr)) {
     // No handle was found
     HS2_RETURN_ERROR(return_val,
       Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
@@ -816,20 +817,20 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   // GetLog doesn't have an associated session handle, so we presume that this request
   // should keep alive the same session that orignated the query.
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = exec_state->session_id();
+  const TUniqueId session_id = request_state->session_id();
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
                       SQLSTATE_GENERAL_ERROR);
 
   stringstream ss;
-  if (exec_state->coord() != NULL) {
+  if (request_state->coord() != NULL) {
     // Report progress
-    ss << exec_state->coord()->progress().ToString() << "\n";
+    ss << request_state->coord()->progress().ToString() << "\n";
   }
   // Report analysis errors
-  ss << join(exec_state->GetAnalysisWarnings(), "\n");
-  if (exec_state->coord() != NULL) {
+  ss << join(request_state->GetAnalysisWarnings(), "\n");
+  if (request_state->coord() != NULL) {
     // Report execution errors
-    ss << exec_state->coord()->GetErrorLog();
+    ss << request_state->coord()->GetErrorLog();
   }
   return_val.log = ss.str();
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);

@@ -74,16 +74,13 @@ namespace impala {
 
 RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
     const TPlanFragmentInstanceCtx& instance_ctx, ExecEnv* exec_env)
-  : desc_tbl_(nullptr),
-    obj_pool_(new ObjectPool()),
-    query_state_(query_state),
+  : query_state_(query_state),
     fragment_ctx_(&fragment_ctx),
     instance_ctx_(&instance_ctx),
     now_(new TimestampValue(query_state->query_ctx().now_string.c_str(),
         query_state->query_ctx().now_string.size())),
     exec_env_(exec_env),
-    profile_(obj_pool_.get(), "Fragment " + PrintId(instance_ctx.fragment_instance_id)),
-    query_mem_tracker_(query_state_->query_mem_tracker()),
+    profile_(obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id)),
     instance_buffer_reservation_(nullptr),
     is_cancelled_(false),
     root_node_id_(-1) {
@@ -91,20 +88,21 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
 }
 
 RuntimeState::RuntimeState(
-    const TQueryCtx& query_ctx, ExecEnv* exec_env, const std::string& request_pool)
-  : obj_pool_(new ObjectPool()),
-    query_state_(nullptr),
+    const TQueryCtx& qctx, ExecEnv* exec_env, DescriptorTbl* desc_tbl)
+  : query_state_(new QueryState(qctx, "test-pool")),
     fragment_ctx_(nullptr),
     instance_ctx_(nullptr),
-    local_query_ctx_(query_ctx),
-    now_(new TimestampValue(query_ctx.now_string.c_str(), query_ctx.now_string.size())),
+    local_query_state_(query_state_),
+    now_(new TimestampValue(qctx.now_string.c_str(), qctx.now_string.size())),
     exec_env_(exec_env),
-    profile_(obj_pool_.get(), "<unnamed>"),
-    query_mem_tracker_(MemTracker::CreateQueryMemTracker(
-        query_id(), query_options(), request_pool, obj_pool_.get())),
+    profile_(obj_pool(), "<unnamed>"),
     instance_buffer_reservation_(nullptr),
     is_cancelled_(false),
     root_node_id_(-1) {
+  if (query_ctx().request_pool.empty()) {
+    const_cast<TQueryCtx&>(query_ctx()).request_pool = "test-pool";
+  }
+  if (desc_tbl != nullptr) query_state_->desc_tbl_ = desc_tbl;
   Init();
 }
 
@@ -125,10 +123,10 @@ void RuntimeState::Init() {
   total_network_receive_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkReceiveTime");
 
   instance_mem_tracker_.reset(new MemTracker(
-      runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker_));
+      runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker()));
 
   if (query_state_ != nullptr && exec_env_->buffer_pool() != nullptr) {
-    instance_buffer_reservation_ = obj_pool_->Add(new ReservationTracker);
+    instance_buffer_reservation_ = obj_pool()->Add(new ReservationTracker);
     instance_buffer_reservation_->InitChildTracker(&profile_,
         query_state_->buffer_reservation(), instance_mem_tracker_.get(),
         numeric_limits<int64_t>::max());
@@ -143,7 +141,7 @@ Status RuntimeState::CreateBlockMgr() {
   DCHECK(block_mgr_.get() == NULL);
 
   // Compute the max memory the block mgr will use.
-  int64_t block_mgr_limit = query_mem_tracker_->lowest_limit();
+  int64_t block_mgr_limit = query_mem_tracker()->lowest_limit();
   if (block_mgr_limit < 0) block_mgr_limit = numeric_limits<int64_t>::max();
   block_mgr_limit = min(static_cast<int64_t>(block_mgr_limit * BLOCK_MGR_MEM_FRACTION),
       block_mgr_limit - BLOCK_MGR_MEM_MIN_REMAINING);
@@ -266,7 +264,6 @@ void RuntimeState::UnregisterReaderContexts() {
 
 void RuntimeState::ReleaseResources() {
   UnregisterReaderContexts();
-  if (desc_tbl_ != nullptr) desc_tbl_->ClosePartitionExprs(this);
   if (filter_bank_ != nullptr) filter_bank_->Close();
   if (resource_pool_ != nullptr) {
     exec_env_->thread_mgr()->UnregisterPool(resource_pool_);
@@ -277,17 +274,22 @@ void RuntimeState::ReleaseResources() {
   // Release the reservation, which should be unused at the point.
   if (instance_buffer_reservation_ != nullptr) instance_buffer_reservation_->Close();
 
-  // 'query_mem_tracker_' must be valid as long as 'instance_mem_tracker_' is so
+  // 'query_mem_tracker()' must be valid as long as 'instance_mem_tracker_' is so
   // delete 'instance_mem_tracker_' first.
   // LogUsage() walks the MemTracker tree top-down when the memory limit is exceeded, so
   // break the link between 'instance_mem_tracker_' and its parent before
   // 'instance_mem_tracker_' and its children are destroyed.
   instance_mem_tracker_->UnregisterFromParent();
+  if (instance_mem_tracker_->consumption() != 0) {
+    LOG(WARNING) << "Query " << query_id() << " may have leaked memory." << endl
+                 << instance_mem_tracker_->LogUsage();
+  }
   instance_mem_tracker_.reset();
 
-  // If this RuntimeState owns 'query_mem_tracker_' it must deregister it.
-  if (query_state_ == nullptr) query_mem_tracker_->UnregisterFromParent();
-  query_mem_tracker_ = nullptr;
+  if (local_query_state_.get() != nullptr) {
+    // if we created this QueryState, we must call ReleaseResources()
+    local_query_state_->ReleaseResources();
+  }
 }
 
 const std::string& RuntimeState::GetEffectiveUser() const {
@@ -314,14 +316,28 @@ HBaseTableFactory* RuntimeState::htable_factory() {
   return exec_env_->htable_factory();
 }
 
+ObjectPool* RuntimeState::obj_pool() const {
+  DCHECK(query_state_ != nullptr);
+  return query_state_->obj_pool();
+}
+
 const TQueryCtx& RuntimeState::query_ctx() const {
-  return query_state_ != nullptr ? query_state_->query_ctx() : local_query_ctx_;
+  DCHECK(query_state_ != nullptr);
+  return query_state_->query_ctx();
+}
+
+const DescriptorTbl& RuntimeState::desc_tbl() const {
+  DCHECK(query_state_ != nullptr);
+  return query_state_->desc_tbl();
 }
 
 const TQueryOptions& RuntimeState::query_options() const {
-  const TQueryCtx& query_ctx =
-      query_state_ != nullptr ? query_state_->query_ctx() : local_query_ctx_;
-  return query_ctx.client_request.query_options;
+  return query_ctx().client_request.query_options;
+}
+
+MemTracker* RuntimeState::query_mem_tracker() {
+  DCHECK(query_state_ != nullptr);
+  return query_state_->query_mem_tracker();
 }
 
 }

@@ -490,7 +490,6 @@ def compute_aggregation(function, field, runtime_profile):
   field_regex_re = re.compile(field_regex)
   inside_avg_fragment = False
   avg_fragment_indent = None
-  past_avg_fragment = False
   match_list = []
   for line in runtime_profile.splitlines():
     # Detect the boundaries of the averaged fragment by looking at indentation.
@@ -498,18 +497,17 @@ def compute_aggregation(function, field, runtime_profile):
     # its children are at a greater indent. When the indentation gets back to
     # the level of the the averaged fragment start, then the averaged fragment
     # is done.
+    if start_avg_fragment_re.match(line):
+      inside_avg_fragment = True
+      avg_fragment_indent = len(line) - len(line.lstrip())
+      continue
+
     if inside_avg_fragment:
       indentation = len(line) - len(line.lstrip())
       if indentation > avg_fragment_indent:
         continue
       else:
         inside_avg_fragment = False
-        past_avg_fragment = True
-
-    if not past_avg_fragment and start_avg_fragment_re.match(line):
-      inside_avg_fragment = True
-      avg_fragment_indent = len(line) - len(line.lstrip())
-      continue
 
     if (field_regex_re.search(line)):
       match_list.extend(re.findall(field_regex, line))

@@ -26,6 +26,7 @@
 #include "codegen/llvm-codegen.h"
 #include "gutil/gscoped_ptr.h"
 #include "runtime/buffered-tuple-stream-v2.inline.h"
+#include "runtime/query-state.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/collection-value.h"

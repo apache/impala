@@ -105,6 +105,7 @@ DEFINE_int32(resource_broker_cnxn_retry_interval_ms, 3000, "Deprecated");
 DEFINE_int32(resource_broker_send_timeout, 0, "Deprecated");
 DEFINE_int32(resource_broker_recv_timeout, 0, "Deprecated");
 
+// TODO-MT: rename or retire
 DEFINE_int32(coordinator_rpc_threads, 12, "(Advanced) Number of threads available to "
     "start fragments on remote Impala daemons.");
 
@@ -150,7 +151,7 @@ ExecEnv::ExecEnv()
     tmp_file_mgr_(new TmpFileMgr),
     request_pool_service_(new RequestPoolService(metrics_.get())),
     frontend_(new Frontend()),
-    fragment_exec_thread_pool_(new CallableThreadPool("coordinator-fragment-rpc",
+    exec_rpc_thread_pool_(new CallableThreadPool("exec-rpc-pool",
         "worker", FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
@@ -215,7 +216,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
     tmp_file_mgr_(new TmpFileMgr),
     frontend_(new Frontend()),
-    fragment_exec_thread_pool_(new CallableThreadPool("coordinator-fragment-rpc",
+    exec_rpc_thread_pool_(new CallableThreadPool("exec-rpc-pool",
         "worker", FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),

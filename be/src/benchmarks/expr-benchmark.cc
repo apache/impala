@@ -74,7 +74,7 @@ class Planner {
     query_ctx.client_request.query_options = query_options_;
     query_ctx.__set_session(session_state_);
     ImpalaServer::PrepareQueryContext(&query_ctx);
-    runtime_state_.reset(new RuntimeState(query_ctx, &exec_env_, ""));
+    runtime_state_.reset(new RuntimeState(query_ctx, &exec_env_));
 
     return frontend_.GetExecRequest(query_ctx, result);
   }

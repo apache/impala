@@ -24,6 +24,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "exec/exec-node.h"
+#include "exec/hdfs-table-sink.h"
 #include "util/compress.h"
 #include "util/hdfs-util.h"
 #include "util/uid-util.h"
@@ -35,6 +36,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "runtime/types.h"
 #include "util/runtime-profile-counters.h"
 #include "write-stream.inline.h"
 

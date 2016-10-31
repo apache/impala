@@ -1057,7 +1057,7 @@ void TestSingleLiteralConstruction(
     const ColumnType& type, const T& value, const string& string_val) {
   ObjectPool pool;
   RowDescriptor desc;
-  RuntimeState state{TQueryCtx(), ExecEnv::GetInstance(), "test-pool"};
+  RuntimeState state(TQueryCtx(), ExecEnv::GetInstance());
   MemTracker tracker;
 
   Expr* expr = pool.Add(new Literal(type, value));
@@ -1074,7 +1074,7 @@ TEST_F(ExprTest, NullLiteral) {
   for (int type = TYPE_BOOLEAN; type != TYPE_DATE; ++type) {
     NullLiteral expr(static_cast<PrimitiveType>(type));
     ExprContext ctx(&expr);
-    RuntimeState state{TQueryCtx(), ExecEnv::GetInstance(), "test-pool"};
+    RuntimeState state(TQueryCtx(), ExecEnv::GetInstance());
     MemTracker tracker;
     EXPECT_OK(ctx.Prepare(&state, RowDescriptor(), &tracker));
     EXPECT_OK(ctx.Open(&state));

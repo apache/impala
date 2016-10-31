@@ -159,9 +159,9 @@ string PrintErrorMapToString(const ErrorLogMap& errors) {
   return stream.str();
 }
 
-void MergeErrorMaps(ErrorLogMap* left, const ErrorLogMap& right) {
-  for (const ErrorLogMap::value_type& v: right) {
-    TErrorLogEntry& target = (*left)[v.first];
+void MergeErrorMaps(const ErrorLogMap& m1, ErrorLogMap* m2) {
+  for (const ErrorLogMap::value_type& v: m1) {
+    TErrorLogEntry& target = (*m2)[v.first];
     const TErrorLogEntry& source = v.second;
     // Append generic message, append specific codes or increment count if exists
     if (v.first == TErrorCode::GENERAL) {

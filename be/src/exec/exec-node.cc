@@ -372,16 +372,17 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
   return Status::OK();
 }
 
-void ExecNode::SetDebugOptions(
-    int node_id, TExecNodePhase::type phase, TDebugAction::type action,
-    ExecNode* root) {
-  if (root->id_ == node_id) {
-    root->debug_phase_ = phase;
-    root->debug_action_ = action;
+void ExecNode::SetDebugOptions(const TDebugOptions& debug_options, ExecNode* root) {
+  DCHECK(debug_options.__isset.node_id);
+  DCHECK(debug_options.__isset.phase);
+  DCHECK(debug_options.__isset.action);
+  if (root->id_ == debug_options.node_id) {
+    root->debug_phase_ = debug_options.phase;
+    root->debug_action_ = debug_options.action;
     return;
   }
   for (int i = 0; i < root->children_.size(); ++i) {
-    SetDebugOptions(node_id, phase, action, root->children_[i]);
+    SetDebugOptions(debug_options, root->children_[i]);
   }
 }
 

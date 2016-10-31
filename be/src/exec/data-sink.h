@@ -23,22 +23,21 @@
 #include <vector>
 
 #include "common/status.h"
-#include "runtime/runtime-state.h"
-#include "util/runtime-profile.h"
-#include "gen-cpp/DataSinks_types.h"
+#include "runtime/runtime-state.h"  // for PartitionStatusMap
+#include "runtime/mem-tracker.h"
 #include "gen-cpp/Exprs_types.h"
 
 namespace impala {
 
-class MemTracker;
 class ObjectPool;
 class RowBatch;
 class RuntimeProfile;
-class RuntimeState;
+class RowDescriptor;
+class TDataSink;
 class TPlanExecRequest;
 class TPlanExecParams;
 class TPlanFragmentInstanceCtx;
-class RowDescriptor;
+class TInsertStats;
 
 /// A data sink is an abstract interface for data sinks that consume RowBatches. E.g.
 /// a sink may write a HDFS table, send data across the network, or build hash tables
@@ -58,8 +57,8 @@ class DataSink {
   virtual std::string GetName() = 0;
 
   /// Setup. Call before Send(), Open(), or Close() during the prepare phase of the query
-  /// fragment. Creates a MemTracker for the sink that is a child of 'parent_mem_tracker'.
-  /// Subclasses must call DataSink::Prepare().
+  /// fragment. Creates a MemTracker (in obj_pool) for the sink that is a child of
+  /// 'parent_mem_tracker'. Subclasses must call DataSink::Prepare().
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
 
   /// Call before Send() to open the sink.
@@ -78,12 +77,12 @@ class DataSink {
   /// Must be idempotent.
   virtual void Close(RuntimeState* state);
 
-  /// Creates a new data sink from thrift_sink. A pointer to the
-  /// new sink is written to *sink, and is owned by the caller.
-  static Status CreateDataSink(ObjectPool* pool,
-    const TDataSink& thrift_sink, const std::vector<TExpr>& output_exprs,
+  /// Creates a new data sink, allocated in pool and returned through *sink, from
+  /// thrift_sink.
+  static Status Create(ObjectPool* pool,
+    const TPlanFragmentCtx& fragment_ctx,
     const TPlanFragmentInstanceCtx& fragment_instance_ctx,
-    const RowDescriptor& row_desc, boost::scoped_ptr<DataSink>* sink);
+    const RowDescriptor& row_desc, DataSink** sink);
 
   /// Merges one update to the DML stats for a partition. dst_stats will have the
   /// combined stats of src_stats and dst_stats after this method returns.

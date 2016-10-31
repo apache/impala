@@ -312,7 +312,7 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID->Increment(num_ranges_missing_volume_id);
 
   // Add per volume stats to the runtime profile
-  PerVolumnStats per_volume_stats;
+  PerVolumeStats per_volume_stats;
   stringstream str;
   UpdateHdfsSplitStats(*scan_range_params_, &per_volume_stats);
   PrintHdfsSplitStats(per_volume_stats, &str);
@@ -808,7 +808,7 @@ void HdfsScanNodeBase::ComputeSlotMaterializationOrder(vector<int>* order) const
 
 void HdfsScanNodeBase::UpdateHdfsSplitStats(
     const vector<TScanRangeParams>& scan_range_params_list,
-    PerVolumnStats* per_volume_stats) {
+    PerVolumeStats* per_volume_stats) {
   pair<int, int64_t> init_value(0, 0);
   for (const TScanRangeParams& scan_range_params: scan_range_params_list) {
     const TScanRange& scan_range = scan_range_params.scan_range;
@@ -821,9 +821,9 @@ void HdfsScanNodeBase::UpdateHdfsSplitStats(
   }
 }
 
-void HdfsScanNodeBase::PrintHdfsSplitStats(const PerVolumnStats& per_volume_stats,
+void HdfsScanNodeBase::PrintHdfsSplitStats(const PerVolumeStats& per_volume_stats,
     stringstream* ss) {
-  for (PerVolumnStats::const_iterator i = per_volume_stats.begin();
+  for (PerVolumeStats::const_iterator i = per_volume_stats.begin();
        i != per_volume_stats.end(); ++i) {
      (*ss) << i->first << ":" << i->second.first << "/"
          << PrettyPrinter::Print(i->second.second, TUnit::BYTES) << " ";

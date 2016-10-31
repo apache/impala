@@ -573,7 +573,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     const int num_threads = 8;
     thread_group workers;
     // Create a shared RuntimeState with no BufferedBlockMgr.
-    RuntimeState shared_state(TQueryCtx(), test_env_->exec_env(), "test-pool");
+    RuntimeState shared_state(TQueryCtx(), test_env_->exec_env());
 
     for (int i = 0; i < num_threads; ++i) {
       thread* t = new thread(
@@ -978,7 +978,7 @@ TEST_F(BufferedBlockMgrTest, WriteCompleteWithCancelledRuntimeState) {
 
   // Cancel the runtime state and re-pin the blocks while writes are in flight to check
   // that WriteComplete() handles the case ok.
-  state->set_is_cancelled(true);
+  state->set_is_cancelled();
   PinBlocks(blocks);
 
   WaitForWrites(block_mgr);

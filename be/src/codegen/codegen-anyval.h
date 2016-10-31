@@ -259,6 +259,8 @@ class CodegenAnyVal {
     : type_(INVALID_TYPE), value_(nullptr), name_(nullptr),
       codegen_(nullptr), builder_(nullptr) {}
 
+  LlvmCodeGen* codegen() const { return codegen_; }
+
  private:
   ColumnType type_;
   llvm::Value* value_;

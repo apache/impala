@@ -39,25 +39,25 @@ class ImpalaServer;
 //
 /// Parent queries are expected to call ExecAndWait() of a child query in a
 /// separate thread, and then join that thread to wait for child-query completion.
-/// The parent QueryExecState is independent of the child query's QueryExecState,
+/// The parent ClientRequestState is independent of the child query's ClientRequestState,
 /// with the exception that the child query selectively checks the parent's status
 /// for failure/cancellation detection. Child queries should never call into their
-/// parent's QueryExecState to avoid deadlock.
+/// parent's ClientRequestState to avoid deadlock.
 //
 /// TODO: Compute stats is the only stmt that requires child queries. Once the
 /// CatalogService performs background stats gathering the concept of child queries
 /// will likely become obsolete. Remove this class and all child-query related code.
 class ChildQuery {
  public:
-  ChildQuery(const std::string& query, ImpalaServer::QueryExecState* parent_exec_state,
+  ChildQuery(const std::string& query, ClientRequestState* parent_request_state,
       ImpalaServer* parent_server)
     : query_(query),
-      parent_exec_state_(parent_exec_state),
+      parent_request_state_(parent_request_state),
       parent_server_(parent_server),
       is_running_(false),
       is_cancelled_(false) {
     DCHECK(!query_.empty());
-    DCHECK(parent_exec_state_ != NULL);
+    DCHECK(parent_request_state_ != NULL);
     DCHECK(parent_server_ != NULL);
   }
 
@@ -65,7 +65,7 @@ class ChildQuery {
   /// (boost::mutex's operator= and copy c'tor are private)
   ChildQuery(const ChildQuery& other)
     : query_(other.query_),
-      parent_exec_state_(other.parent_exec_state_),
+      parent_request_state_(other.parent_request_state_),
       parent_server_(other.parent_server_),
       is_running_(other.is_running_),
       is_cancelled_(other.is_cancelled_) {}
@@ -74,7 +74,7 @@ class ChildQuery {
   /// (boost::mutex's operator= and copy c'tor are private)
   ChildQuery& operator=(const ChildQuery& other) {
     query_ = other.query_;
-    parent_exec_state_ = other.parent_exec_state_;
+    parent_request_state_ = other.parent_request_state_;
     parent_server_ = other.parent_server_;
     is_running_ = other.is_running_;
     is_cancelled_ = other.is_cancelled_;
@@ -85,11 +85,11 @@ class ChildQuery {
   Status ExecAndFetch();
 
   /// Cancels and closes the given child query if it is running. Sets is_cancelled_.
-  /// Child queries can be cancelled by the parent query through QueryExecState::Cancel().
+  /// Child queries can be cancelled by the parent query through ClientRequestState::Cancel().
   /// Child queries should never cancel their parent to avoid deadlock (but the parent
   /// query may decide to cancel itself based on a non-OK status from a child query).
-  /// Note that child queries have a different QueryExecState than their parent query,
-  /// so cancellation of a child query does not call into the parent's QueryExecState.
+  /// Note that child queries have a different ClientRequestState than their parent query,
+  /// so cancellation of a child query does not call into the parent's ClientRequestState.
   void Cancel();
 
   const apache::hive::service::cli::thrift::TTableSchema& result_schema() {
@@ -119,7 +119,7 @@ class ChildQuery {
 
   /// Execution state of parent query. Used to synchronize and propagate parent
   /// cancellations/failures to this child query. Not owned.
-  ImpalaServer::QueryExecState* parent_exec_state_;
+  ClientRequestState* parent_request_state_;
 
   /// Parent Impala server used for executing this child query. Not owned.
   ImpalaServer* parent_server_;

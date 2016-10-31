@@ -43,6 +43,7 @@ struct TExecStats {
 
   // Total CPU time spent across all threads. For operators that have an async
   // component (e.g. multi-threaded) this will be >= latency_ns.
+  // TODO-MT: remove this or latency_ns
   2: optional i64 cpu_time_ns
 
   // Number of rows returned.

@@ -268,16 +268,18 @@ class HdfsScanNodeBase : public ScanNode {
   }
 
   /// map from volume id to <number of split, per volume split lengths>
-  typedef boost::unordered_map<int32_t, std::pair<int, int64_t>> PerVolumnStats;
+  /// TODO: move this into some global .h, no need to include this file just for this
+  /// typedef
+  typedef boost::unordered_map<int32_t, std::pair<int, int64_t>> PerVolumeStats;
 
   /// Update the per volume stats with the given scan range params list
   static void UpdateHdfsSplitStats(
       const std::vector<TScanRangeParams>& scan_range_params_list,
-      PerVolumnStats* per_volume_stats);
+      PerVolumeStats* per_volume_stats);
 
   /// Output the per_volume_stats to stringstream. The output format is a list of:
   /// <volume id>:<# splits>/<per volume split lengths>
-  static void PrintHdfsSplitStats(const PerVolumnStats& per_volume_stats,
+  static void PrintHdfsSplitStats(const PerVolumeStats& per_volume_stats,
       std::stringstream* ss);
 
   /// Description string for the per volume stats output.

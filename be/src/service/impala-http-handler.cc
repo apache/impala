@@ -28,7 +28,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
 #include "service/impala-server.h"
-#include "service/query-exec-state.h"
+#include "service/client-request-state.h"
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/coding-util.h"
 #include "util/logging-support.h"
@@ -237,11 +237,11 @@ void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::ArgumentMap&
 
 void ImpalaHttpHandler::InflightQueryIdsHandler(const Webserver::ArgumentMap& args,
     Document* document) {
-  lock_guard<mutex> l(server_->query_exec_state_map_lock_);
+  lock_guard<mutex> l(server_->client_request_state_map_lock_);
   stringstream ss;
-  for (const ImpalaServer::QueryExecStateMap::value_type& exec_state:
-       server_->query_exec_state_map_) {
-    ss << exec_state.second->query_id() << "\n";
+  for (const ImpalaServer::ClientRequestStateMap::value_type& request_state:
+       server_->client_request_state_map_) {
+    ss << request_state.second->query_id() << "\n";
   }
   document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
   Value query_ids(ss.str().c_str(), document->GetAllocator());
@@ -361,11 +361,11 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::ArgumentMap& args,
   set<ImpalaServer::QueryStateRecord, ImpalaServer::QueryStateRecordLessThan>
       sorted_query_records;
   {
-    lock_guard<mutex> l(server_->query_exec_state_map_lock_);
-    for (const ImpalaServer::QueryExecStateMap::value_type& exec_state:
-         server_->query_exec_state_map_) {
+    lock_guard<mutex> l(server_->client_request_state_map_lock_);
+    for (const ImpalaServer::ClientRequestStateMap::value_type& request_state:
+         server_->client_request_state_map_) {
       // TODO: Do this in the browser so that sorts on other keys are possible.
-      sorted_query_records.insert(ImpalaServer::QueryStateRecord(*exec_state.second));
+      sorted_query_records.insert(ImpalaServer::QueryStateRecord(*request_state.second));
     }
   }
 
@@ -708,27 +708,26 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
 
   // Search the in-flight queries first, followed by the archived ones.
   {
-    shared_ptr<ImpalaServer::QueryExecState> exec_state =
-        server_->GetQueryExecState(query_id, true);
-    if (exec_state != NULL) {
+    shared_ptr<ClientRequestState> request_state =
+        server_->GetClientRequestState(query_id, true);
+    if (request_state != NULL) {
       found = true;
-      lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
-      if (exec_state->coord() == NULL) {
+      lock_guard<mutex> l(*request_state->lock(), adopt_lock_t());
+      if (request_state->coord() == NULL) {
         const string& err = Substitute("Invalid query id: $0", PrintId(query_id));
         Value json_error(err.c_str(), document->GetAllocator());
         document->AddMember("error", json_error, document->GetAllocator());
         return;
       }
-      query_status = exec_state->query_status();
-      stmt = exec_state->sql_stmt();
-      plan = exec_state->exec_request().query_exec_request.query_plan;
+      query_status = request_state->query_status();
+      stmt = request_state->sql_stmt();
+      plan = request_state->exec_request().query_exec_request.query_plan;
       if (include_json_plan || include_summary) {
-        lock_guard<SpinLock> lock(exec_state->coord()->GetExecSummaryLock());
-        summary = exec_state->coord()->exec_summary();
+        request_state->coord()->GetTExecSummary(&summary);
       }
       if (include_json_plan) {
         for (const TPlanExecInfo& plan_exec_info:
-            exec_state->exec_request().query_exec_request.plan_exec_info) {
+            request_state->exec_request().query_exec_request.plan_exec_info) {
           for (const TPlanFragment& fragment: plan_exec_info.fragments) {
             fragments.push_back(fragment);
           }

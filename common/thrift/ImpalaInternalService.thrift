@@ -280,8 +280,17 @@ struct TClientRequest {
   3: optional string redacted_stmt
 }
 
+// Debug options: perform some action in a particular phase of a particular node
+// TODO: find a better name
+struct TDebugOptions {
+  1: optional Types.TPlanNodeId node_id
+  2: optional PlanNodes.TExecNodePhase phase
+  3: optional PlanNodes.TDebugAction action
+}
+
 // Context of this query, including the client request, session state and
 // global query parameters needed for consistent expr evaluation (e.g., now()).
+//
 // TODO: Separate into FE/BE initialized vars.
 struct TQueryCtx {
   // Client request containing stmt to execute and query options.
@@ -326,8 +335,7 @@ struct TQueryCtx {
   // This defaults to -1 when no timestamp is specified.
   11: optional i64 snapshot_timestamp = -1;
 
-  // Contains only the union of those descriptors referenced by list of fragments destined
-  // for a single host. Optional for frontend tests.
+  // Optional for frontend tests.
   12: optional Descriptors.TDescriptorTable desc_tbl
 
   // Milliseconds since UNIX epoch at the start of query execution.
@@ -340,20 +348,10 @@ struct TQueryCtx {
 
   // List of tables with scan ranges that map to blocks with missing disk IDs.
   15: optional list<CatalogObjects.TTableName> tables_missing_diskids
-}
 
-// Context to collect information, which is shared among all instances of that plan
-// fragment.
-struct TPlanFragmentCtx {
-  1: required Planner.TPlanFragment fragment
-}
-
-// A scan range plus the parameters needed to execute that scan.
-struct TScanRangeParams {
-  1: required PlanNodes.TScanRange scan_range
-  2: optional i32 volume_id = -1
-  3: optional bool is_cached = false
-  4: optional bool is_remote
+  // The pool to which this request has been submitted. Used to update pool statistics
+  // for admission control.
+  16: optional string request_pool
 }
 
 // Specification of one output destination of a plan fragment
@@ -365,47 +363,57 @@ struct TPlanFragmentDestination {
   2: required Types.TNetworkAddress server
 }
 
-// Execution parameters of a fragment instance, including its unique id, the total number
-// of fragment instances, the query context, the coordinator address, etc.
-// TODO: for range partitioning, we also need to specify the range boundaries
-struct TPlanFragmentInstanceCtx {
-  // The globally unique fragment instance id.
-  // Format: query id + query-wide fragment instance index
-  // The query-wide fragment instance index starts at 0, so that the query id
-  // and the id of the first fragment instance are identical.
-  // If there is a coordinator instance, it is the first one, with index 0.
-  1: required Types.TUniqueId fragment_instance_id
-
-  // Index of this fragment instance accross all instances of its parent fragment,
-  // range [0, TPlanFragmentCtx.num_fragment_instances).
-  2: required i32 per_fragment_instance_idx
-
-  // Initial scan ranges for each scan node in TPlanFragment.plan_tree
-  3: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
-
-  // Number of senders for ExchangeNodes contained in TPlanFragment.plan_tree;
-  // needed to create a DataStreamRecvr
-  // TODO for per-query exec rpc: move these to TPlanFragmentCtx
-  4: required map<Types.TPlanNodeId, i32> per_exch_num_senders
+// Context to collect information, which is shared among all instances of that plan
+// fragment.
+struct TPlanFragmentCtx {
+  1: required Planner.TPlanFragment fragment
 
   // Output destinations, one per output partition.
   // The partitioning of the output is specified by
   // TPlanFragment.output_sink.output_partition.
   // The number of output partitions is destinations.size().
+  2: list<TPlanFragmentDestination> destinations
+}
+
+// A scan range plus the parameters needed to execute that scan.
+struct TScanRangeParams {
+  1: required PlanNodes.TScanRange scan_range
+  2: optional i32 volume_id = -1
+  3: optional bool is_cached = false
+  4: optional bool is_remote
+}
+
+// Execution parameters of a single fragment instance.
+struct TPlanFragmentInstanceCtx {
+  // TPlanFragment.idx
+  1: required Types.TFragmentIdx fragment_idx
+
+  // The globally unique fragment instance id.
+  // Format: query id + query-wide fragment instance index
+  // The query-wide fragment instance index enumerates all fragment instances of a
+  // particular query. It starts at 0, so that the query id and the id of the first
+  // fragment instance are identical.
+  // If there is a coordinator instance, it is the first one, with index 0.
+  // Range: [0, TExecQueryFInstancesParams.fragment_instance_ctxs.size()-1]
+  2: required Types.TUniqueId fragment_instance_id
+
+  // Index of this fragment instance across all instances of its parent fragment
+  // (TPlanFragment with idx = TPlanFragmentInstanceCtx.fragment_idx).
+  // Range: [0, <# of instances of parent fragment> - 1]
+  3: required i32 per_fragment_instance_idx
+
+  // Initial scan ranges for each scan node in TPlanFragment.plan_tree
+  4: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
+
+  // Number of senders for ExchangeNodes contained in TPlanFragment.plan_tree;
+  // needed to create a DataStreamRecvr
   // TODO for per-query exec rpc: move these to TPlanFragmentCtx
-  5: list<TPlanFragmentDestination> destinations
+  5: required map<Types.TPlanNodeId, i32> per_exch_num_senders
 
-  // Debug options: perform some action in a particular phase of a particular node
-  6: optional Types.TPlanNodeId debug_node_id
-  7: optional PlanNodes.TExecNodePhase debug_phase
-  8: optional PlanNodes.TDebugAction debug_action
+  // Id of this instance in its role as a sender.
+  6: optional i32 sender_id
 
-  // The pool to which this request has been submitted. Used to update pool statistics
-  // for admission control.
-  9: optional string request_pool
-
-  // Id of this fragment in its role as a sender.
-  10: optional i32 sender_id
+  7: optional TDebugOptions debug_options
 }
 
 
@@ -415,29 +423,37 @@ enum ImpalaInternalServiceVersion {
   V1
 }
 
+// The following contains the per-rpc structs for the parameters and the result.
 
-// ExecPlanFragment
+// ExecQueryFInstances
 
-struct TExecPlanFragmentParams {
+struct TExecQueryFInstancesParams {
   1: required ImpalaInternalServiceVersion protocol_version
 
-  // Context of the query, which this fragment is part of.
-  2: optional TQueryCtx query_ctx
+  // this backend's index into Coordinator::backend_states_,
+  // needed for subsequent rpcs to the coordinator
+  // required in V1
+  2: optional i32 coord_state_idx
 
-  // Context of this fragment.
-  3: optional TPlanFragmentCtx fragment_ctx
+  // required in V1
+  3: optional TQueryCtx query_ctx
 
-  // Context of this fragment instance, including its instance id, the total number
-  // fragment instances, the query context, etc.
-  4: optional TPlanFragmentInstanceCtx fragment_instance_ctx
+  // required in V1
+  4: list<TPlanFragmentCtx> fragment_ctxs
+
+  // the order corresponds to the order of fragments in fragment_ctxs
+  // required in V1
+  5: list<TPlanFragmentInstanceCtx> fragment_instance_ctxs
 }
 
-struct TExecPlanFragmentResult {
+struct TExecQueryFInstancesResult {
   // required in V1
   1: optional Status.TStatus status
 }
 
+
 // ReportExecStatus
+
 struct TParquetInsertStats {
   // For each column, the on disk byte size
   1: required map<string, i64> per_column_size
@@ -509,33 +525,43 @@ struct TErrorLogEntry {
   2: list<string> messages
 }
 
+struct TFragmentInstanceExecStatus {
+  // required in V1
+  1: optional Types.TUniqueId fragment_instance_id
+
+  // Status of fragment execution; any error status means it's done.
+  // required in V1
+  2: optional Status.TStatus status
+
+  // If true, fragment finished executing.
+  // required in V1
+  3: optional bool done
+
+  // cumulative profile
+  // required in V1
+  4: optional RuntimeProfile.TRuntimeProfileTree profile
+}
+
 struct TReportExecStatusParams {
   1: required ImpalaInternalServiceVersion protocol_version
 
   // required in V1
   2: optional Types.TUniqueId query_id
 
+  // same as TExecQueryFInstancesParams.coord_state_idx
   // required in V1
-  3: optional Types.TUniqueId fragment_instance_id
+  3: optional i32 coord_state_idx
 
-  // Status of fragment execution; any error status means it's done.
-  // required in V1
-  4: optional Status.TStatus status
+  4: list<TFragmentInstanceExecStatus> instance_exec_status
 
-  // If true, fragment finished executing.
-  // required in V1
-  5: optional bool done
-
-  // cumulative profile
-  // required in V1
-  6: optional RuntimeProfile.TRuntimeProfileTree profile
-
-  // Cumulative structural changes made by a table sink
+  // Cumulative structural changes made by the table sink of any instance
+  // included in instance_exec_status
   // optional in V1
-  7: optional TInsertExecStatus insert_exec_status;
+  5: optional TInsertExecStatus insert_exec_status;
 
-  // New errors that have not been reported to the coordinator
-  8: optional map<ErrorCodes.TErrorCode, TErrorLogEntry> error_log;
+  // New errors that have not been reported to the coordinator by any of the
+  // instances included in instance_exec_status
+  6: optional map<ErrorCodes.TErrorCode, TErrorLogEntry> error_log;
 }
 
 struct TReportExecStatusResult {
@@ -544,16 +570,16 @@ struct TReportExecStatusResult {
 }
 
 
-// CancelPlanFragment
+// CancelQueryFInstances
 
-struct TCancelPlanFragmentParams {
+struct TCancelQueryFInstancesParams {
   1: required ImpalaInternalServiceVersion protocol_version
 
   // required in V1
-  2: optional Types.TUniqueId fragment_instance_id
+  2: optional Types.TUniqueId query_id
 }
 
-struct TCancelPlanFragmentResult {
+struct TCancelQueryFInstancesResult {
   // required in V1
   1: optional Status.TStatus status
 }
@@ -573,7 +599,7 @@ struct TTransmitDataParams {
   // required in V1
   4: optional Types.TPlanNodeId dest_node_id
 
-  // required in V1
+  // optional in V1
   5: optional Results.TRowBatch row_batch
 
   // if set to true, indicates that no more row batches will be sent
@@ -587,6 +613,7 @@ struct TTransmitDataResult {
 }
 
 // Parameters for RequestPoolService.resolveRequestPool()
+// TODO: why is this here?
 struct TResolveRequestPoolParams {
   // User to resolve to a pool via the allocation placement policy and
   // authorize for pool access.
@@ -611,6 +638,7 @@ struct TResolveRequestPoolResult {
 }
 
 // Parameters for RequestPoolService.getPoolConfig()
+// TODO: why is this here?
 struct TPoolConfigParams {
   // Pool name
   1: required string pool
@@ -655,48 +683,68 @@ struct TBloomFilter {
   4: required bool always_true
 }
 
-struct TUpdateFilterResult {
 
-}
+// UpdateFilter
 
 struct TUpdateFilterParams {
+  1: required ImpalaInternalServiceVersion protocol_version
+
   // Filter ID, unique within a query.
-  1: required i32 filter_id
+  // required in V1
+  2: optional i32 filter_id
 
   // Query that this filter is for.
-  2: required Types.TUniqueId query_id
+  // required in V1
+  3: optional Types.TUniqueId query_id
 
-  3: required TBloomFilter bloom_filter
+  // required in V1
+  4: optional TBloomFilter bloom_filter
+}
+
+struct TUpdateFilterResult {
+}
+
+
+// PublishFilter
+
+struct TPublishFilterParams {
+  1: required ImpalaInternalServiceVersion protocol_version
+
+  // Filter ID to update
+  // required in V1
+  2: optional i32 filter_id
+
+  // required in V1
+  3: optional Types.TUniqueId dst_query_id
+
+  // Index of fragment to receive this filter
+  // required in V1
+  4: optional Types.TFragmentIdx dst_fragment_idx
+
+  // Actual bloom_filter payload
+  // required in V1
+  5: optional TBloomFilter bloom_filter
 }
 
 struct TPublishFilterResult {
-
 }
 
-struct TPublishFilterParams {
-  // Filter ID to update
-  1: required i32 filter_id
-
-  // ID of fragment to receive this filter
-  2: required Types.TUniqueId dst_instance_id
-
-  // Actual bloom_filter payload
-  3: required TBloomFilter bloom_filter
-}
 
 service ImpalaInternalService {
-  // Called by coord to start asynchronous execution of plan fragment in backend.
+  // Called by coord to start asynchronous execution of a query's fragment instances in
+  // backend.
   // Returns as soon as all incoming data streams have been set up.
-  TExecPlanFragmentResult ExecPlanFragment(1:TExecPlanFragmentParams params);
+  TExecQueryFInstancesResult ExecQueryFInstances(1:TExecQueryFInstancesParams params);
 
-  // Periodically called by backend to report status of plan fragment execution
+  // Periodically called by backend to report status of fragment instance execution
   // back to coord; also called when execution is finished, for whatever reason.
   TReportExecStatusResult ReportExecStatus(1:TReportExecStatusParams params);
 
-  // Called by coord to cancel execution of a single plan fragment, which this
-  // coordinator initiated with a prior call to ExecPlanFragment.
+  // Called by coord to cancel execution of a single query's fragment instances, which
+  // the coordinator initiated with a prior call to ExecQueryFInstances.
   // Cancellation is asynchronous.
-  TCancelPlanFragmentResult CancelPlanFragment(1:TCancelPlanFragmentParams params);
+  TCancelQueryFInstancesResult CancelQueryFInstances(
+      1:TCancelQueryFInstancesParams params);
 
   // Called by sender to transmit single row batch. Returns error indication
   // if params.fragmentId or params.destNodeId are unknown or if data couldn't be read.
@@ -706,7 +754,7 @@ service ImpalaInternalService {
   // the coordinator for aggregation and broadcast.
   TUpdateFilterResult UpdateFilter(1:TUpdateFilterParams params);
 
-  // Called by the coordinator to deliver global runtime filters to fragment instances for
+  // Called by the coordinator to deliver global runtime filters to fragments for
   // application at plan nodes.
   TPublishFilterResult PublishFilter(1:TPublishFilterParams params);
 }

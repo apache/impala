@@ -81,20 +81,16 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
   ImpalaTestBackend(DataStreamMgr* stream_mgr): mgr_(stream_mgr) {}
   virtual ~ImpalaTestBackend() {}
 
-  virtual void ExecPlanFragment(
-      TExecPlanFragmentResult& return_val, const TExecPlanFragmentParams& params) {}
-
-  virtual void ReportExecStatus(
-      TReportExecStatusResult& return_val, const TReportExecStatusParams& params) {}
-
-  virtual void CancelPlanFragment(
-      TCancelPlanFragmentResult& return_val, const TCancelPlanFragmentParams& params) {}
-
-  virtual void UpdateFilter(
-      TUpdateFilterResult& return_val, const TUpdateFilterParams& params) {}
-
-  virtual void PublishFilter(
-      TPublishFilterResult& return_val, const TPublishFilterParams& params) {}
+  virtual void ExecQueryFInstances(TExecQueryFInstancesResult& return_val,
+      const TExecQueryFInstancesParams& params) {}
+  virtual void CancelQueryFInstances(TCancelQueryFInstancesResult& return_val,
+      const TCancelQueryFInstancesParams& params) {}
+  virtual void ReportExecStatus(TReportExecStatusResult& return_val,
+      const TReportExecStatusParams& params) {}
+  virtual void UpdateFilter(TUpdateFilterResult& return_val,
+      const TUpdateFilterParams& params) {}
+  virtual void PublishFilter(TPublishFilterResult& return_val,
+      const TPublishFilterParams& params) {}
 
   virtual void TransmitData(
       TTransmitDataResult& return_val, const TTransmitDataParams& params) {
@@ -116,7 +112,7 @@ class DataStreamTest : public testing::Test {
   DataStreamTest() : next_val_(0) {
     // Initialize MemTrackers and RuntimeState for use by the data stream receiver.
     exec_env_.InitForFeTests();
-    runtime_state_.reset(new RuntimeState(TQueryCtx(), &exec_env_, "test-pool"));
+    runtime_state_.reset(new RuntimeState(TQueryCtx(), &exec_env_));
 
     // Stop tests that rely on mismatched sender / receiver pairs timing out from failing.
     FLAGS_datastream_sender_timeout_ms = 250;
@@ -275,8 +271,7 @@ class DataStreamTest : public testing::Test {
     slot_desc.__set_nullIndicatorBit(-1);
     slot_desc.__set_slotIdx(0);
     thrift_desc_tbl.slotDescriptors.push_back(slot_desc);
-    EXPECT_OK(DescriptorTbl::Create(&obj_pool_, thrift_desc_tbl, &desc_tbl_));
-    runtime_state_->set_desc_tbl(desc_tbl_);
+    EXPECT_OK(DescriptorTbl::Create(&obj_pool_, thrift_desc_tbl, nullptr, &desc_tbl_));
 
     vector<TTupleId> row_tids;
     row_tids.push_back(0);
@@ -480,8 +475,7 @@ class DataStreamTest : public testing::Test {
 
   void Sender(
       int sender_num, int channel_buffer_size, TPartitionType::type partition_type) {
-    RuntimeState state(TQueryCtx(), &exec_env_, "test-pool");
-    state.set_desc_tbl(desc_tbl_);
+    RuntimeState state(TQueryCtx(), &exec_env_, desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataStreamSink& sink = GetSink(partition_type);
     DataStreamSender sender(
@@ -593,8 +587,7 @@ TEST_F(DataStreamTest, BasicTest) {
 //
 // TODO: Make lifecycle requirements more explicit.
 TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
-  scoped_ptr<RuntimeState> runtime_state(
-      new RuntimeState(TQueryCtx(), &exec_env_, "test-pool"));
+  scoped_ptr<RuntimeState> runtime_state(new RuntimeState(TQueryCtx(), &exec_env_));
   scoped_ptr<RuntimeProfile> profile(new RuntimeProfile(&obj_pool_, "TestReceiver"));
 
   // Start just one receiver.

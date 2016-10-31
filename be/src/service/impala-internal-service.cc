@@ -39,12 +39,15 @@ ImpalaInternalService::ImpalaInternalService() {
   DCHECK(query_exec_mgr_ != nullptr);
 }
 
-void ImpalaInternalService::ExecPlanFragment(TExecPlanFragmentResult& return_val,
-    const TExecPlanFragmentParams& params) {
-  VLOG_QUERY << "ExecPlanFragment():"
-            << " instance_id=" << params.fragment_instance_ctx.fragment_instance_id;
-  FAULT_INJECTION_RPC_DELAY(RPC_EXECPLANFRAGMENT);
-  query_exec_mgr_->StartFInstance(params).SetTStatus(&return_val);
+void ImpalaInternalService::ExecQueryFInstances(TExecQueryFInstancesResult& return_val,
+    const TExecQueryFInstancesParams& params) {
+  VLOG_QUERY << "ExecQueryFInstances():" << " query_id=" << params.query_ctx.query_id;
+  FAULT_INJECTION_RPC_DELAY(RPC_EXECQUERYFINSTANCES);
+  DCHECK(params.__isset.coord_state_idx);
+  DCHECK(params.__isset.query_ctx);
+  DCHECK(params.__isset.fragment_ctxs);
+  DCHECK(params.__isset.fragment_instance_ctxs);
+  query_exec_mgr_->StartQuery(params).SetTStatus(&return_val);
 }
 
 template <typename T> void SetUnknownIdError(
@@ -54,53 +57,54 @@ template <typename T> void SetUnknownIdError(
   status.SetTStatus(status_container);
 }
 
-void ImpalaInternalService::CancelPlanFragment(TCancelPlanFragmentResult& return_val,
-    const TCancelPlanFragmentParams& params) {
-  VLOG_QUERY << "CancelPlanFragment(): instance_id=" << params.fragment_instance_id;
-  FAULT_INJECTION_RPC_DELAY(RPC_CANCELPLANFRAGMENT);
-  QueryState::ScopedRef qs(GetQueryId(params.fragment_instance_id));
+void ImpalaInternalService::CancelQueryFInstances(
+    TCancelQueryFInstancesResult& return_val,
+    const TCancelQueryFInstancesParams& params) {
+  VLOG_QUERY << "CancelQueryFInstances(): query_id=" << params.query_id;
+  FAULT_INJECTION_RPC_DELAY(RPC_CANCELQUERYFINSTANCES);
+  DCHECK(params.__isset.query_id);
+  QueryState::ScopedRef qs(params.query_id);
   if (qs.get() == nullptr) {
-    SetUnknownIdError("query", GetQueryId(params.fragment_instance_id), &return_val);
+    SetUnknownIdError("query", params.query_id, &return_val);
     return;
   }
-  FragmentInstanceState* fis = qs->GetFInstanceState(params.fragment_instance_id);
-  if (fis == nullptr) {
-    SetUnknownIdError("instance", params.fragment_instance_id, &return_val);
-    return;
-  }
-  Status status = fis->Cancel();
-  status.SetTStatus(&return_val);
+  qs->Cancel();
 }
 
 void ImpalaInternalService::ReportExecStatus(TReportExecStatusResult& return_val,
     const TReportExecStatusParams& params) {
-  VLOG_QUERY << "ReportExecStatus(): instance_id=" << params.fragment_instance_id;
   FAULT_INJECTION_RPC_DELAY(RPC_REPORTEXECSTATUS);
+  DCHECK(params.__isset.query_id);
+  DCHECK(params.__isset.coord_state_idx);
   impala_server_->ReportExecStatus(return_val, params);
 }
 
 void ImpalaInternalService::TransmitData(TTransmitDataResult& return_val,
     const TTransmitDataParams& params) {
   FAULT_INJECTION_RPC_DELAY(RPC_TRANSMITDATA);
+  DCHECK(params.__isset.dest_fragment_instance_id);
+  DCHECK(params.__isset.sender_id);
+  DCHECK(params.__isset.dest_node_id);
   impala_server_->TransmitData(return_val, params);
 }
 
 void ImpalaInternalService::UpdateFilter(TUpdateFilterResult& return_val,
     const TUpdateFilterParams& params) {
-  VLOG_QUERY << "UpdateFilter(): filter=" << params.filter_id
-            << " query_id=" << PrintId(params.query_id);
   FAULT_INJECTION_RPC_DELAY(RPC_UPDATEFILTER);
+  DCHECK(params.__isset.filter_id);
+  DCHECK(params.__isset.query_id);
+  DCHECK(params.__isset.bloom_filter);
   impala_server_->UpdateFilter(return_val, params);
 }
 
 void ImpalaInternalService::PublishFilter(TPublishFilterResult& return_val,
     const TPublishFilterParams& params) {
-  VLOG_QUERY << "PublishFilter(): filter=" << params.filter_id
-            << " instance_id=" << PrintId(params.dst_instance_id);
   FAULT_INJECTION_RPC_DELAY(RPC_PUBLISHFILTER);
-  QueryState::ScopedRef qs(GetQueryId(params.dst_instance_id));
+  DCHECK(params.__isset.filter_id);
+  DCHECK(params.__isset.dst_query_id);
+  DCHECK(params.__isset.dst_fragment_idx);
+  DCHECK(params.__isset.bloom_filter);
+  QueryState::ScopedRef qs(params.dst_query_id);
   if (qs.get() == nullptr) return;
-  FragmentInstanceState* fis = qs->GetFInstanceState(params.dst_instance_id);
-  if (fis == nullptr) return;
-  fis->PublishFilter(params.filter_id, params.bloom_filter);
+  qs->PublishFilter(params.filter_id, params.dst_fragment_idx, params.bloom_filter);
 }

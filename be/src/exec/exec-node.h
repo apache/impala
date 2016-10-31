@@ -43,6 +43,7 @@ class TupleRow;
 class DataSink;
 class MemTracker;
 class SubplanNode;
+class TDebugOptions;
 
 /// Superclass of all executor nodes.
 /// All subclasses need to make sure to check RuntimeState::is_cancelled()
@@ -133,9 +134,8 @@ class ExecNode {
   static Status CreateTree(RuntimeState* state, const TPlan& plan,
       const DescriptorTbl& descs, ExecNode** root) WARN_UNUSED_RESULT;
 
-  /// Set debug action for node with given id in 'tree'
-  static void SetDebugOptions(
-      int node_id, TExecNodePhase::type phase, TDebugAction::type action, ExecNode* tree);
+  /// Set debug action in 'tree' according to debug_options.
+  static void SetDebugOptions(const TDebugOptions& debug_options, ExecNode* tree);
 
   /// Collect all nodes of given 'node_type' that are part of this subtree, and return in
   /// 'nodes'.
