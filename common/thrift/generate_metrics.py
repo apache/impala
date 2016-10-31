@@ -165,7 +165,7 @@ MDL_BASE = """
     {
       "name" : "CATALOGSERVER",
       "nameForCrossEntityAggregateMetrics" : "catalogservers"
-    },
+    }
   ],
   "metricEntityTypeDefinitions" : [
       {
