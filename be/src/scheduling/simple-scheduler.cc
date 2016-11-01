@@ -511,14 +511,12 @@ void SimpleScheduler::CreateScanInstances(
           schedule->GetNextInstanceId(), host, i, *fragment_params);
       FInstanceExecParams& instance_params = fragment_params->instance_exec_params.back();
 
-      // threshold beyond which we want to assign to the next instance
+      // Threshold beyond which we want to assign to the next instance.
       int64_t threshold_total_bytes = avg_bytes_per_instance * (i + 1);
 
-      // this will have assigned all scan ranges by the last instance:
-      // for the last instance, threshold_total_bytes == total_size and
-      // total_assigned_bytes won't hit total_size until everything is assigned
-      while (params_idx < params_list.size()
-          && total_assigned_bytes < threshold_total_bytes) {
+      // Assign each scan range in params_list. When the per-instance threshold is
+      // reached, move on to the next instance.
+      while (params_idx < params_list.size()) {
         const TScanRangeParams& scan_range_params = params_list[params_idx];
         instance_params.per_node_scan_ranges[leftmost_scan_id].push_back(
             scan_range_params);
@@ -529,10 +527,19 @@ void SimpleScheduler::CreateScanInstances(
           ++total_assigned_bytes;
         }
         ++params_idx;
+        // If this assignment pushes this instance past the threshold, move on to the next
+        // instance. However, if this is the last instance, assign any remaining scan
+        // ranges here since there are no further instances to load-balance across. There
+        // may be leftover scan ranges because threshold_total_bytes only approximates the
+        // per-node byte threshold.
+        if (total_assigned_bytes >= threshold_total_bytes && i != num_instances - 1) {
+          break;
+        }
       }
-      if (params_idx >= params_list.size()) break;  // nothing left to assign
+      if (params_idx == params_list.size()) break; // nothing left to assign
     }
     DCHECK_EQ(params_idx, params_list.size());  // everything got assigned
+    DCHECK_EQ(total_assigned_bytes, total_size);
   }
 }
 
