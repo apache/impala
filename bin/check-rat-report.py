@@ -25,16 +25,13 @@
 #
 # I tested this with
 #
-#    pushd "${IMPALA_HOME}"
-#    export SANDBOX=$(mktemp -d) # Just a place to put files for testing
-#    echo "${SANDBOX}"
-#    git --prefix=foo/ archive -o "${SANDBOX}/test-impala.tar.gz" HEAD # Make tarball
-#    java -jar ~/Downloads/apache-rat-0.12/apache-rat-0.12.jar -x \
-#        "${SANDBOX}/test-impala.tar.gz" >"${SANDBOX}/rat.xml"
-#    bin/check-rat-report.py bin/rat_exclude_files.txt "${SANDBOX}/rat.xml"
+#    git archive --prefix=foo/ -o test-impala.zip HEAD
+#    java -jar apache-rat-0.12.jar -x test-impala.zip >rat.xml
+#    bin/check-rat-report.py bin/rat_exclude_files.txt rat.xml
 #
 # This is copied from a similar file in Apache Kudu. Only RAT 0.12 is supported at this
-# time.
+# time, and the RAT JAR is not included in the Impala repo; it must be downloaded
+# separately.
 
 import fnmatch
 import re
