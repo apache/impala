@@ -81,7 +81,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
       }
     }
     insertStmt_ = InsertStmt.createInsert(
-        null, createStmt.getTblName(), false, pkvs, null, queryStmt, null, false);
+        null, createStmt.getTblName(), false, pkvs, null, queryStmt, null);
   }
 
   public QueryStmt getQueryStmt() { return insertStmt_.getQueryStmt(); }

@@ -17,17 +17,17 @@
 
 package org.apache.impala.analysis;
 
+import static java.lang.String.format;
+
 import java.util.List;
 
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
-import org.apache.impala.planner.KuduTableSink;
 import org.apache.impala.planner.TableSink;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-
-import static java.lang.String.format;
 
 /**
  * Representation of an Update statement.
@@ -47,26 +47,25 @@ import static java.lang.String.format;
  * Currently, only Kudu tables can be updated.
  */
 public class UpdateStmt extends ModifyStmt {
-  public UpdateStmt(List<String> targetTablePath,  FromClause tableRefs,
-      List<Pair<SlotRef, Expr>> assignmentExprs,  Expr wherePredicate,
-      boolean ignoreNotFound) {
-    super(targetTablePath, tableRefs, assignmentExprs, wherePredicate, ignoreNotFound);
+  public UpdateStmt(List<String> targetTablePath, FromClause tableRefs,
+      List<Pair<SlotRef, Expr>> assignmentExprs, Expr wherePredicate) {
+    super(targetTablePath, tableRefs, assignmentExprs, wherePredicate);
   }
 
   public UpdateStmt(UpdateStmt other) {
     super(other.targetTablePath_, other.fromClause_.clone(),
-        Lists.<Pair<SlotRef, Expr>>newArrayList(), other.wherePredicate_,
-        other.ignoreNotFound_);
+        Lists.<Pair<SlotRef, Expr>>newArrayList(), other.wherePredicate_);
   }
 
   /**
    * Return an instance of a KuduTableSink specialized as an Update operation.
    */
+  @Override
   public DataSink createDataSink() {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
     DataSink dataSink = TableSink.create(table_, TableSink.Op.UPDATE,
-        ImmutableList.<Expr>of(), referencedColumns_, false, ignoreNotFound_);
+        ImmutableList.<Expr>of(), referencedColumns_, false);
     Preconditions.checkState(!referencedColumns_.isEmpty());
     return dataSink;
   }
@@ -80,8 +79,6 @@ public class UpdateStmt extends ModifyStmt {
   public String toSql() {
     StringBuilder b = new StringBuilder();
     b.append("UPDATE ");
-
-    if (ignoreNotFound_) b.append("IGNORE ");
 
     if (fromClause_ == null) {
       b.append(targetTableRef_.toSql());

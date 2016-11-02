@@ -17,15 +17,16 @@
 
 package org.apache.impala.planner;
 
+import java.util.List;
+
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.thrift.TSinkAction;
-import com.google.common.base.Preconditions;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
 
 /**
  * A DataSink that writes into a table.
@@ -89,7 +90,7 @@ public abstract class TableSink extends DataSink {
    */
   public static TableSink create(Table table, Op sinkAction,
       List<Expr> partitionKeyExprs,  List<Integer> referencedColumns,
-      boolean overwrite, boolean ignoreDuplicates) {
+      boolean overwrite) {
     if (table instanceof HdfsTable) {
       // Hdfs only supports inserts.
       Preconditions.checkState(sinkAction == Op.INSERT);
@@ -112,9 +113,7 @@ public abstract class TableSink extends DataSink {
       Preconditions.checkState(overwrite == false);
       // Partition clauses don't make sense for Kudu inserts.
       Preconditions.checkState(partitionKeyExprs.isEmpty());
-      // UPSERT is incompatible with ignoreDuplicates.
-      Preconditions.checkState(sinkAction != Op.UPSERT || !ignoreDuplicates);
-      return new KuduTableSink(table, sinkAction, referencedColumns, ignoreDuplicates);
+      return new KuduTableSink(table, sinkAction, referencedColumns);
     } else {
       throw new UnsupportedOperationException(
           "Cannot create data sink into table of type: " + table.getClass().getName());

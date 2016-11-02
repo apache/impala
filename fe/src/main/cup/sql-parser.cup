@@ -479,7 +479,6 @@ nonterminal CreateUdaStmt create_uda_stmt;
 nonterminal ShowFunctionsStmt show_functions_stmt;
 nonterminal DropFunctionStmt drop_function_stmt;
 nonterminal TFunctionCategory opt_function_category;
-nonterminal Boolean opt_ignore;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -677,47 +676,44 @@ explain_stmt ::=
 // tbl(col1,...) etc) and the PARTITION clause. If the column permutation is present, the
 // query statement clause is optional as well.
 insert_stmt ::=
-  opt_with_clause:w KW_INSERT KW_OVERWRITE opt_ignore:ignore opt_kw_table table_name:table
+  opt_with_clause:w KW_INSERT KW_OVERWRITE opt_kw_table table_name:table
   LPAREN opt_ident_list:col_perm RPAREN partition_clause:list opt_plan_hints:hints
   opt_query_stmt:query
   {:
-    RESULT = InsertStmt.createInsert(w, table, true, list, hints, query, col_perm,
-        ignore);
+    RESULT = InsertStmt.createInsert(w, table, true, list, hints, query, col_perm);
   :}
   | opt_with_clause:w KW_INSERT KW_OVERWRITE
-  opt_ignore:ignore opt_kw_table table_name:table
+  opt_kw_table table_name:table
   partition_clause:list opt_plan_hints:hints query_stmt:query
   {:
-    RESULT = InsertStmt.createInsert(w, table, true, list, hints, query, null, ignore);
+    RESULT = InsertStmt.createInsert(w, table, true, list, hints, query, null);
   :}
-  | opt_with_clause:w KW_INSERT opt_ignore:ignore KW_INTO
-  opt_kw_table table_name:table LPAREN opt_ident_list:col_perm RPAREN
+  | opt_with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table
+  LPAREN opt_ident_list:col_perm RPAREN
   partition_clause:list opt_plan_hints:hints opt_query_stmt:query
   {:
-    RESULT = InsertStmt.createInsert(w, table, false, list, hints, query, col_perm,
-        ignore);
+    RESULT = InsertStmt.createInsert(w, table, false, list, hints, query, col_perm);
   :}
-  | opt_with_clause:w KW_INSERT
-  opt_ignore:ignore KW_INTO opt_kw_table table_name:table partition_clause:list
-  opt_plan_hints:hints query_stmt:query
+  | opt_with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table
+  partition_clause:list opt_plan_hints:hints query_stmt:query
   {:
-    RESULT = InsertStmt.createInsert(w, table, false, list, hints, query, null, ignore);
+    RESULT = InsertStmt.createInsert(w, table, false, list, hints, query, null);
   :}
   ;
 
 // Update statements have an optional WHERE and optional FROM clause.
 update_stmt ::=
-  KW_UPDATE opt_ignore:ignore dotted_path:target_table KW_SET update_set_expr_list:values
+  KW_UPDATE dotted_path:target_table KW_SET update_set_expr_list:values
   where_clause:where_predicate
   {:
     FromClause from_clause = new FromClause(
         Lists.newArrayList(new TableRef(target_table, null)));
-    RESULT = new UpdateStmt(target_table, from_clause, values, where_predicate, ignore);
+    RESULT = new UpdateStmt(target_table, from_clause, values, where_predicate);
   :}
-  | KW_UPDATE opt_ignore:ignore dotted_path:target_table
+  | KW_UPDATE dotted_path:target_table
   KW_SET update_set_expr_list:values
     from_clause:tables where_clause:where_predicate
-  {: RESULT = new UpdateStmt(target_table, tables, values, where_predicate, ignore); :}
+  {: RESULT = new UpdateStmt(target_table, tables, values, where_predicate); :}
   ;
 
 update_set_expr_list ::=
@@ -750,21 +746,21 @@ upsert_stmt ::=
 // keyword followed by a table alias or reference and a full FROM clause. In all cases
 // a WHERE clause may be present.
 delete_stmt ::=
-  KW_DELETE opt_ignore:ignore dotted_path:target_table  where_clause:where
+  KW_DELETE dotted_path:target_table  where_clause:where
   {:
     FromClause from_clause = new FromClause(
         Lists.newArrayList(new TableRef(target_table, null)));
-    RESULT = new DeleteStmt(target_table, from_clause, where, ignore);
+    RESULT = new DeleteStmt(target_table, from_clause, where);
   :}
-  | KW_DELETE opt_ignore:ignore KW_FROM dotted_path:target_table  where_clause:where
+  | KW_DELETE KW_FROM dotted_path:target_table  where_clause:where
   {:
     FromClause from_clause = new FromClause(
         Lists.newArrayList(new TableRef(target_table, null)));
-    RESULT = new DeleteStmt(target_table, from_clause, where, ignore);
+    RESULT = new DeleteStmt(target_table, from_clause, where);
   :}
-  | KW_DELETE opt_ignore:ignore dotted_path:target_table from_clause:from
+  | KW_DELETE dotted_path:target_table from_clause:from
   where_clause:where
-  {: RESULT = new DeleteStmt(target_table, from, where, ignore); :}
+  {: RESULT = new DeleteStmt(target_table, from, where); :}
   ;
 
 opt_query_stmt ::=
@@ -784,13 +780,6 @@ opt_ident_list ::=
 opt_kw_table ::=
   KW_TABLE
   | /* empty */
-  ;
-
-opt_ignore ::=
-  KW_IGNORE
-  {: RESULT = true; :}
-  | /* empty */
-  {: RESULT = false; :}
   ;
 
 show_roles_stmt ::=

@@ -213,13 +213,7 @@ row_regex: .*NumModifiedRows: 1.*
 ====
 ---- QUERY
 insert into tdata values
-(666, "The Devil", cast(1.2 as float), 43, cast('z' as string), true)
----- CATCH
-Kudu error(s) reported, first error: Already present
-====
----- QUERY
-insert ignore into tdata values
-(666, "The Devil", cast(1.2 as float), 43, cast('z' as string), true)
+(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
 ---- RESULTS
 : 0
 ---- RUNTIME_PROFILE
@@ -234,28 +228,14 @@ row_regex: .*NumModifiedRows: 7.*
 ====
 ---- QUERY
 -- Does not exercise any error path in the sink because updating the same record multiple
--- times is valid. Makes sure IGNORE works.
-update ignore a set a.name='Satan' from tdata a, tdata b where a.id = 666
+-- times is valid.
+update a set a.name='Satan' from tdata a, tdata b where a.id = 666
 ---- RESULTS
 ---- RUNTIME_PROFILE
 row_regex: .*NumModifiedRows: 7.*
 ====
 ---- QUERY
--- Using a cross join to generate the same delete twice. After the first delete succeeded,
--- trying to execute the second delete will fail because the record does not exist.
 delete a from tdata a, tdata b where a.id = 666
----- CATCH
-Kudu error(s) reported, first error: Not found: key not found
-====
----- QUERY
--- Re-insert the data
-insert into tdata values
-(666, "The Devil", cast(1.2 as float), 43, cast('z' as string), true)
----- RESULTS
-: 1
-====
----- QUERY
-delete ignore a from tdata a, tdata b where a.id = 666
 ---- RESULTS
 ---- RUNTIME_PROFILE
 row_regex: .*NumModifiedRows: 1.*
@@ -368,7 +348,7 @@ SELECT * FROM functional_kudu.alltypes WHERE id < 100;
 row_regex: .*NumModifiedRows: 100.*
 ====
 ---- QUERY
-INSERT IGNORE INTO kudu_test_tbl
+INSERT INTO kudu_test_tbl
 SELECT * FROM functional_kudu.alltypes WHERE id < 100;
 ---- RESULTS
 : 0
@@ -377,12 +357,6 @@ row_regex: .*NumModifiedRows: 0.*
 ====
 ---- QUERY
 INSERT INTO kudu_test_tbl
-SELECT * FROM functional_kudu.alltypes WHERE id < 100;
----- CATCH
-Kudu error(s) reported, first error: Already present: key already present
-====
----- QUERY
-INSERT IGNORE INTO kudu_test_tbl
 SELECT * FROM functional_kudu.alltypes;
 ---- RESULTS
 : 7200
@@ -408,15 +382,6 @@ row_regex: .*NumModifiedRows: 7300.*
 INSERT INTO kudu_test_tbl SELECT cast(id + 10000 as int), bool_col, tinyint_col,
   smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
   timestamp_col, year, month
-FROM functional_kudu.alltypes
----- CATCH
-Kudu error(s) reported, first error: Not found: No tablet covering the requested range partition: NonCoveredRange { lower_bound: (int32 id=10001), upper_bound: (<end>)
-====
----- QUERY
-# Insert rows that are not covered by any of the existing range partitions
-INSERT IGNORE INTO kudu_test_tbl SELECT cast(id + 10000 as int), bool_col, tinyint_col,
-  smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
-  timestamp_col,year, month
 FROM functional_kudu.alltypes
 ---- CATCH
 Kudu error(s) reported, first error: Not found: No tablet covering the requested range partition: NonCoveredRange { lower_bound: (int32 id=10001), upper_bound: (<end>)

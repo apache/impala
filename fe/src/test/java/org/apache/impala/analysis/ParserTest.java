@@ -1615,8 +1615,6 @@ public class ParserTest extends FrontendTestBase {
         "select a from src where b > 5");
     ParserError("insert into table t partition [shuffle] (pk1=10 pk2=20) " +
         "select a from src where b > 5");
-
-    ParsesOk("insert ignore into table t values (1,2,3)");
   }
 
   @Test
@@ -1666,8 +1664,6 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("update t set x = (3 + length(\"hallo\")) where a < 'adasas'");
     ParsesOk("update t set x = 3");
     ParsesOk("update t set x=3, x=4 from a.b t where b = 10");
-    ParsesOk("update ignore t set x = 3");
-    ParsesOk("update ignore t set x=3, x=4 from a.b t where b = 10");
     ParserError("update t");
     ParserError("update t set x < 3");
     ParserError("update t set x");
@@ -1687,11 +1683,9 @@ public class ParserTest extends FrontendTestBase {
   @Test
   public void TestDelete() {
     ParsesOk("delete from t");
-    ParsesOk("delete ignore from t");
     ParsesOk("delete a from t a");
     ParsesOk("delete a from t a join b on a.id = b.id where true");
     ParsesOk("delete a from t a join b where true");
-    ParsesOk("delete ignore a from t a join b where true");
     ParsesOk("delete t from t");
     ParsesOk("delete t from t where a < b");
     ParsesOk("delete a from t a where a < b");

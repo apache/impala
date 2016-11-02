@@ -146,32 +146,26 @@ public class InsertStmt extends StatementBase {
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
-  // For tables with primary keys, indicates if duplicate key errors are ignored.
-  private final boolean ignoreDuplicates_;
-
   // True iff this is an UPSERT operation. Only supported for Kudu tables.
   private final boolean isUpsert_;
 
   public static InsertStmt createInsert(WithClause withClause, TableName targetTable,
       boolean overwrite, List<PartitionKeyValue> partitionKeyValues,
-      List<String> planHints, QueryStmt queryStmt, List<String> columnPermutation,
-      boolean ignoreDuplicates) {
+      List<String> planHints, QueryStmt queryStmt, List<String> columnPermutation) {
     return new InsertStmt(withClause, targetTable, overwrite, partitionKeyValues,
-        planHints, queryStmt, columnPermutation, ignoreDuplicates, false);
+        planHints, queryStmt, columnPermutation, false);
   }
 
   public static InsertStmt createUpsert(WithClause withClause, TableName targetTable,
       List<String> planHints, QueryStmt queryStmt, List<String> columnPermutation) {
     return new InsertStmt(withClause, targetTable, false, null, planHints, queryStmt,
-        columnPermutation, false, true);
+        columnPermutation, true);
   }
 
   protected InsertStmt(WithClause withClause, TableName targetTable, boolean overwrite,
       List<PartitionKeyValue> partitionKeyValues, List<String> planHints,
-      QueryStmt queryStmt, List<String> columnPermutation, boolean ignoreDuplicates,
-      boolean isUpsert) {
-    Preconditions.checkState(!isUpsert || (!overwrite && !ignoreDuplicates &&
-        partitionKeyValues == null));
+      QueryStmt queryStmt, List<String> columnPermutation, boolean isUpsert) {
+    Preconditions.checkState(!isUpsert || (!overwrite && partitionKeyValues == null));
     withClause_ = withClause;
     targetTableName_ = targetTable;
     originalTableName_ = targetTableName_;
@@ -182,7 +176,6 @@ public class InsertStmt extends StatementBase {
     needsGeneratedQueryStatement_ = (queryStmt == null);
     columnPermutation_ = columnPermutation;
     table_ = null;
-    ignoreDuplicates_ = ignoreDuplicates;
     isUpsert_ = isUpsert;
   }
 
@@ -201,7 +194,6 @@ public class InsertStmt extends StatementBase {
     needsGeneratedQueryStatement_ = other.needsGeneratedQueryStatement_;
     columnPermutation_ = other.columnPermutation_;
     table_ = other.table_;
-    ignoreDuplicates_ = other.ignoreDuplicates_;
     isUpsert_ = other.isUpsert_;
   }
 
@@ -789,7 +781,7 @@ public class InsertStmt extends StatementBase {
     Preconditions.checkState(table_ != null);
     Preconditions.checkState(isUpsert_ || mentionedUpsertColumns_.isEmpty());
     return TableSink.create(table_, isUpsert_ ? TableSink.Op.UPSERT : TableSink.Op.INSERT,
-        partitionKeyExprs_, mentionedUpsertColumns_, overwrite_, ignoreDuplicates_);
+        partitionKeyExprs_, mentionedUpsertColumns_, overwrite_);
   }
 
   /**
@@ -813,7 +805,6 @@ public class InsertStmt extends StatementBase {
     if (overwrite_) {
       strBuilder.append("OVERWRITE ");
     } else {
-      if (ignoreDuplicates_) strBuilder.append("IGNORE ");
       strBuilder.append("INTO ");
     }
     strBuilder.append("TABLE " + originalTableName_);

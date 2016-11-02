@@ -292,13 +292,10 @@ Status KuduTableSink::CheckForErrors(RuntimeState* state) {
   // them accordingly.
   for (int i = 0; i < errors.size(); ++i) {
     kudu::Status e = errors[i]->status();
-    // If the sink has the option "ignore_not_found_or_duplicate" set, duplicate key or
-    // key already present errors from Kudu in INSERT, UPDATE, or DELETE operations will
-    // be ignored.
-    if (!kudu_table_sink_.ignore_not_found_or_duplicate ||
-        ((sink_action_ == TSinkAction::DELETE && !e.IsNotFound()) ||
-            (sink_action_ == TSinkAction::UPDATE && !e.IsNotFound()) ||
-            (sink_action_ == TSinkAction::INSERT && !e.IsAlreadyPresent()))) {
+    // 'Duplicate key' or 'key already present' errors from Kudu do not fail the query.
+    if ((sink_action_ == TSinkAction::DELETE && !e.IsNotFound()) ||
+        (sink_action_ == TSinkAction::UPDATE && !e.IsNotFound()) ||
+        (sink_action_ == TSinkAction::INSERT && !e.IsAlreadyPresent())) {
       if (status.ok()) {
         status = Status(strings::Substitute(
             "Kudu error(s) reported, first error: $0", e.ToString()));

@@ -21,12 +21,11 @@ import java.util.List;
 
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
-import org.apache.impala.planner.KuduTableSink;
 import org.apache.impala.planner.TableSink;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import org.apache.hadoop.hbase.client.Delete;
 
 /**
  * Representation of a DELETE statement.
@@ -42,22 +41,22 @@ import org.apache.hadoop.hbase.client.Delete;
 public class DeleteStmt extends ModifyStmt {
 
   public DeleteStmt(List<String> targetTablePath, FromClause tableRefs,
-      Expr wherePredicate, boolean ignoreNotFound) {
+      Expr wherePredicate) {
     super(targetTablePath, tableRefs, Lists.<Pair<SlotRef, Expr>>newArrayList(),
-        wherePredicate, ignoreNotFound);
+        wherePredicate);
   }
 
   public DeleteStmt(DeleteStmt other) {
     super(other.targetTablePath_, other.fromClause_.clone(),
-        Lists.<Pair<SlotRef, Expr>>newArrayList(), other.wherePredicate_.clone(),
-        other.ignoreNotFound_);
+        Lists.<Pair<SlotRef, Expr>>newArrayList(), other.wherePredicate_.clone());
   }
 
+  @Override
   public DataSink createDataSink() {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
     TableSink tableSink = TableSink.create(table_, TableSink.Op.DELETE,
-        ImmutableList.<Expr>of(), referencedColumns_, false, ignoreNotFound_);
+        ImmutableList.<Expr>of(), referencedColumns_, false);
     Preconditions.checkState(!referencedColumns_.isEmpty());
     return tableSink;
   }
@@ -71,7 +70,6 @@ public class DeleteStmt extends ModifyStmt {
   public String toSql() {
     StringBuilder b = new StringBuilder();
     b.append("DELETE");
-    if (ignoreNotFound_) b.append(" IGNORE");
     if (fromClause_.size() > 1 || targetTableRef_.hasExplicitAlias()) {
       b.append(" ");
       if (targetTableRef_.hasExplicitAlias()) {

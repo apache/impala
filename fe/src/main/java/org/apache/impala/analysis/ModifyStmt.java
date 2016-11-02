@@ -92,17 +92,12 @@ public abstract class ModifyStmt extends StatementBase {
   // position in the target table. Set in createSourceStmt() during analysis.
   protected ArrayList<Integer> referencedColumns_;
 
-  // On tables with a primary key, ignore key not found errors.
-  protected final boolean ignoreNotFound_;
-
   public ModifyStmt(List<String> targetTablePath, FromClause fromClause,
-      List<Pair<SlotRef, Expr>> assignmentExprs,
-      Expr wherePredicate, boolean ignoreNotFound) {
+      List<Pair<SlotRef, Expr>> assignmentExprs, Expr wherePredicate) {
     targetTablePath_ = Preconditions.checkNotNull(targetTablePath);
     fromClause_ = Preconditions.checkNotNull(fromClause);
     assignments_ = Preconditions.checkNotNull(assignmentExprs);
     wherePredicate_ = wherePredicate;
-    ignoreNotFound_ = ignoreNotFound;
   }
 
   /**

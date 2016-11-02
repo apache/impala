@@ -76,7 +76,6 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
         ".testtbl a on a.id = b.id where a.id = 10");
 
     AnalyzesOk("delete from functional_kudu.testtbl");
-    AnalyzesOk("delete ignore from functional_kudu.testtbl");
     AnalyzesOk("delete functional_kudu.testtbl from functional_kudu.testtbl");
     AnalyzesOk("delete a from functional_kudu.testtbl a");
     AnalyzesOk("delete a from functional_kudu.testtbl a join functional.testtbl b " +
@@ -87,7 +86,6 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
   public void TestUpdate() {
     TestUtils.assumeKuduIsSupported();
     AnalyzesOk("update functional_kudu.dimtbl set name = 'Oskar'");
-    AnalyzesOk("update ignore functional_kudu.dimtbl set name = 'Oskar'");
     // Correct default database resolution
     AnalyzesOk("update dimtbl set name = 'Oskar'", createAnalyzer("functional_kudu"));
     // Correct table alias resolution

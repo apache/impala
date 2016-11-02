@@ -1,13 +1,11 @@
 update functional_kudu.testtbl set name = 'peter' where zip > 94549
 ---- PLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: zip > 94549
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: zip > 94549
@@ -16,13 +14,11 @@ UPDATE KUDU [functional_kudu.testtbl]
 update functional_kudu.testtbl set name = 'peter' where zip > 94549 and id = 5
 ---- PLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: id = 5, zip > 94549
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: id = 5, zip > 94549
@@ -31,13 +27,11 @@ UPDATE KUDU [functional_kudu.testtbl]
 update functional_kudu.testtbl set zip = 94546 where zip > 94549
 ---- PLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: zip > 94549
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: zip > 94549
@@ -48,7 +42,6 @@ from functional_kudu.testtbl a join functional.testtbl b on a.id = b.id
 where a.id = 10
 ---- PLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
@@ -61,7 +54,6 @@ UPDATE KUDU [functional_kudu.testtbl]
    kudu predicates: a.id = 10
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.id = b.id
@@ -80,7 +72,6 @@ set a.name = 'values'
 from functional_kudu.testtbl a join (values(1 as ids, 2, 3) ) b on a.id = b.ids
 ---- PLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ids = a.id
@@ -91,7 +82,6 @@ UPDATE KUDU [functional_kudu.testtbl]
    constant-operands=1
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ids = a.id
@@ -109,7 +99,6 @@ from functional_kudu.testtbl a
 where a.zip in (select zip from functional.testtbl limit 10)
 ---- PLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: a.zip = zip
@@ -121,7 +110,6 @@ UPDATE KUDU [functional_kudu.testtbl]
 00:SCAN KUDU [functional_kudu.testtbl a]
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: a.zip = zip
@@ -140,12 +128,10 @@ UPDATE KUDU [functional_kudu.testtbl]
 update functional_kudu.testtbl set zip = 94546 where false
 ---- PLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 00:EMPTYSET
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
-|  check keys exist: false
 |
 00:EMPTYSET
 ====

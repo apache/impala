@@ -45,12 +45,13 @@ namespace impala {
 ///
 /// Kudu doesn't have transactions yet, so some rows may fail to write while others are
 /// successful. The Kudu client reports errors, some of which may be considered to be
-/// expected: rows that fail to be written/updated/deleted due to a key conflict while
-/// the IGNORE option is specified, and these will not result in the sink returning an
-/// error. These errors when IGNORE is not specified, or any other kind of error
-/// reported by Kudu result in the sink returning an error status. The first non-ignored
-/// error is returned in the sink's Status. All reported errors (ignored or not) will be
-/// logged via the RuntimeState.
+/// expected: rows that fail to be written/updated/deleted due to a key conflict will not
+/// result in the sink returning an error. Any other kind of error reported by Kudu
+/// results in the sink returning an error status. The first non-ignored error is
+/// returned in the sink's Status. All reported errors (ignored or not) will be logged
+/// via the RuntimeState.
+/// TODO: Handle other data/constraint-violation errors as ignored, e.g. null in
+/// non-nullable col
 class KuduTableSink : public DataSink {
  public:
   KuduTableSink(const RowDescriptor& row_desc,
