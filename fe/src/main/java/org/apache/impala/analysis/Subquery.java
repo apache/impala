@@ -20,14 +20,14 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -147,6 +147,17 @@ public class Subquery extends Expr {
     }
     Preconditions.checkState(structFields.size() != 0);
     return new StructType(structFields);
+  }
+
+  /**
+   * Returns true if the toSql() of the Subqueries is identical. May return false for
+   * equivalent statements even due to minor syntactic differences like parenthesis.
+   * TODO: Switch to a less restrictive implementation.
+   */
+  @Override
+  public boolean equals(Object o) {
+    if (!super.equals(o)) return false;
+    return stmt_.toSql().equals(((Subquery)o).stmt_.toSql());
   }
 
   @Override
