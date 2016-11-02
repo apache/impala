@@ -41,6 +41,7 @@ from pyparsing import (
     Suppress,
     Word)
 from tempfile import gettempdir
+from textwrap import dedent
 from threading import Lock
 from time import time
 
@@ -111,6 +112,14 @@ class DbCursor(object):
         if len(common_table.cols) != len(table.cols):
           LOG.debug('Ignoring table %s.'
               ' It has a different number of columns across databases.', table_name)
+          mismatch = True
+          break
+        if common_table.primary_key_names != table.primary_key_names:
+          LOG.debug(
+              'Ignoring table {name} because of differing primary keys: '
+              '{common_table_keys} vs. {table_keys}'.format(
+                  name=table_name, common_table_keys=common_table.primary_key_names,
+                  table_keys=table.primary_key_names))
           mismatch = True
           break
         for left, right in izip(common_table.cols, table.cols):
@@ -438,13 +447,34 @@ class DbCursor(object):
     LOG.debug('Created table %s', table.name)
 
   def make_create_table_sql(self, table):
-    sql = 'CREATE TABLE %s (%s)' % (
-        table.name,
-        ', '.join('%s %s' %
-            (col.name, self.get_sql_for_data_type(col.exact_type)) +
-            ('' if self.conn.data_types_are_implictly_nullable else ' NULL')
-            for col in table.cols))
-    return sql
+    column_declarations = []
+    primary_key_names = []
+    for col in table.cols:
+      if col.is_primary_key:
+        null_constraint = ''
+        primary_key_names.append(col.name)
+      elif self.conn.data_types_are_implictly_nullable:
+        null_constraint = ''
+      else:
+        null_constraint = ' NULL'
+      column_declaration = '{name} {col_type}{null_constraint}'.format(
+          name=col.name, col_type=self.get_sql_for_data_type(col.exact_type),
+          null_constraint=null_constraint)
+      column_declarations.append(column_declaration)
+
+    if primary_key_names:
+      primary_key_constraint = ', PRIMARY KEY ({keys})'.format(
+          keys=', '.join(primary_key_names))
+    else:
+      primary_key_constraint = ''
+
+    create_table = ('CREATE TABLE {table_name} ('
+                    '{all_columns}'
+                    '{primary_key_constraint}'
+                    ')'.format(
+                        table_name=table.name, all_columns=', '.join(column_declarations),
+                        primary_key_constraint=primary_key_constraint))
+    return create_table
 
   def get_sql_for_data_type(self, data_type):
     if issubclass(data_type, VarChar):
@@ -655,6 +685,7 @@ class DbConnection(object):
 class ImpalaCursor(DbCursor):
 
   PK_SEARCH_PATTERN = re.compile('PRIMARY KEY \((?P<keys>.*?)\)')
+  STORAGE_FORMATS_WITH_PRIMARY_KEYS = ('KUDU',)
 
   @classmethod
   def make_insert_sql_from_data(cls, table, rows):
@@ -757,6 +788,28 @@ class ImpalaCursor(DbCursor):
 
   def make_create_table_sql(self, table):
     sql = super(ImpalaCursor, self).make_create_table_sql(table)
+
+    if table.primary_keys:
+      if table.storage_format in ImpalaCursor.STORAGE_FORMATS_WITH_PRIMARY_KEYS:
+        # IMPALA-4424 adds support for parametrizing the partitions; for now, on our
+        # small scale, this is ok, especially since the model is to migrate tables from
+        # Impala into Postgres anyway. 3 was chosen for the buckets because our
+        # minicluster tends to have 3 tablet servers, but otherwise it's arbitrary and
+        # provides valid syntax for creating Kudu tables in Impala.
+        sql += '\nDISTRIBUTE BY HASH ({col}) INTO 3 BUCKETS'.format(
+            col=table.primary_key_names[0])
+      else:
+        raise Exception(
+            'table representation has primary keys {keys} but is not in a format that '
+            'supports them: {storage_format}'.format(
+                keys=str(table.primary_key_names),
+                storage_format=table.storage_format))
+    elif table.storage_format in ImpalaCursor.STORAGE_FORMATS_WITH_PRIMARY_KEYS:
+      raise Exception(
+          'table representation has storage format {storage_format} '
+          'but does not have any primary keys'.format(
+              storage_format=table.storage_format))
+
     if table.storage_format != 'TEXTFILE':
       sql += "\nSTORED AS " + table.storage_format
     if table.storage_location:
@@ -946,6 +999,27 @@ class PostgresqlCursor(DbCursor):
     if issubclass(data_type, String):
       return 'VARCHAR(%s)' % String.MAX
     return super(PostgresqlCursor, self).get_sql_for_data_type(data_type)
+
+  def _fetch_primary_key_names(self, table_name):
+    # see:
+    # https://www.postgresql.org/docs/9.5/static/infoschema-key-column-usage.html
+    # https://www.postgresql.org/docs/9.5/static/infoschema-table-constraints.html
+    sql = dedent('''
+        SELECT
+          key_cols.column_name AS column_name
+        FROM
+          information_schema.key_column_usage key_cols,
+          information_schema.table_constraints table_constraints
+        WHERE
+          key_cols.constraint_catalog = table_constraints.constraint_catalog AND
+          key_cols.table_name = table_constraints.table_name AND
+          key_cols.constraint_name = table_constraints.constraint_name AND
+          table_constraints.constraint_type = 'PRIMARY KEY' AND
+          key_cols.table_name = '{table_name}'
+        ORDER BY key_cols.ordinal_position'''.format(table_name=table_name))
+    self.execute(sql)
+    rows = self.fetchall()
+    return tuple(row[0] for row in rows)
 
 
 class PostgresqlConnection(DbConnection):
