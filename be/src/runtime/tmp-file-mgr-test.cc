@@ -24,7 +24,7 @@
 #include "common/init.h"
 #include "runtime/tmp-file-mgr.h"
 #include "service/fe-support.h"
-#include "testutil/test-macros.h"
+#include "testutil/gtest-util.h"
 #include "util/filesystem-util.h"
 #include "util/metrics.h"
 
