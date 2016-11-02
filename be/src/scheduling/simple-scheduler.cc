@@ -478,6 +478,7 @@ void SimpleScheduler::CreateScanInstances(
     return;
   }
 
+  int per_fragment_instance_idx = 0;
   for (const auto& assignment_entry: fragment_params->scan_range_assignment) {
     // evenly divide up the scan ranges of the leftmost scan between at most
     // <dop> instances
@@ -507,8 +508,8 @@ void SimpleScheduler::CreateScanInstances(
     int64_t total_assigned_bytes = 0;
     int params_idx = 0;  // into params_list
     for (int i = 0; i < num_instances; ++i) {
-      fragment_params->instance_exec_params.emplace_back(
-          schedule->GetNextInstanceId(), host, i, *fragment_params);
+      fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
+          host, per_fragment_instance_idx++, *fragment_params);
       FInstanceExecParams& instance_params = fragment_params->instance_exec_params.back();
 
       // Threshold beyond which we want to assign to the next instance.
