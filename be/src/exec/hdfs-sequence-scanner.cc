@@ -456,7 +456,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   // We are reading a new compressed block.  Pass the previous buffer pool
   // bytes to the batch.  We don't need them anymore.
   if (!decompressor_->reuse_output_buffer()) {
-    AttachPool(data_buffer_pool_.get(), true);
+    RETURN_IF_ERROR(AttachPool(data_buffer_pool_.get(), true));
   }
 
   RETURN_IF_FALSE(stream_->ReadVLong(

@@ -327,16 +327,19 @@ class HdfsScanner {
   /// Only valid to call if the parent scan node is multi-threaded.
   Status CommitRows(int num_rows);
 
-  /// Release all memory in 'pool' to batch_. If commit_batch is true, the row batch
-  /// will be committed. commit_batch should be true if the attached pool is expected
+  /// Release all memory in 'pool' to batch_. If 'commit_batch' is true, the row batch
+  /// will be committed. 'commit_batch' should be true if the attached pool is expected
   /// to be non-trivial (i.e. a decompression buffer) to minimize scanner mem usage.
-  /// Only valid to call if the parent scan node is multi-threaded.
-  void AttachPool(MemPool* pool, bool commit_batch) {
+  /// Can return an error status if 'commit_batch' is true and allocating the next
+  /// batch fails, or if the query hit an error or is cancelled. Only valid to call if
+  /// the parent scan node is multi-threaded.
+  Status AttachPool(MemPool* pool, bool commit_batch) {
     DCHECK(scan_node_->HasRowBatchQueue());
     DCHECK(batch_ != NULL);
     DCHECK(pool != NULL);
     batch_->tuple_data_pool()->AcquireData(pool, false);
-    if (commit_batch) CommitRows(0);
+    if (commit_batch) RETURN_IF_ERROR(CommitRows(0));
+    return Status::OK();
   }
 
   /// Convenience function for evaluating conjuncts using this scanner's ExprContexts.

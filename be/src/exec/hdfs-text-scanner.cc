@@ -517,7 +517,7 @@ Status HdfsTextScanner::FillByteBufferCompressedStream(bool* eosr) {
   // safe to attach the current decompression buffer to batch_ because we know that
   // it's the last row-batch that can possibly reference this buffer.
   if (!decompressor_->reuse_output_buffer()) {
-    AttachPool(data_buffer_pool_.get(), false);
+    RETURN_IF_ERROR(AttachPool(data_buffer_pool_.get(), false));
   }
 
   uint8_t* decompressed_buffer = NULL;

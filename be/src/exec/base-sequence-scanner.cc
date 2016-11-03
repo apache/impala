@@ -152,7 +152,7 @@ Status BaseSequenceScanner::ProcessSplit() {
     static_cast<HdfsScanNode*>(scan_node_)->SetFileMetadata(
         stream_->filename(), header_);
     HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
-    scan_node_->AddDiskIoRanges(desc);
+    RETURN_IF_ERROR(scan_node_->AddDiskIoRanges(desc));
     return Status::OK();
   }
 

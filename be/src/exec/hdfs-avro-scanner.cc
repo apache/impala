@@ -562,7 +562,7 @@ Status HdfsAvroScanner::ProcessRange() {
     }
 
     if (decompressor_.get() != NULL && !decompressor_->reuse_output_buffer()) {
-      AttachPool(data_buffer_pool_.get(), true);
+      RETURN_IF_ERROR(AttachPool(data_buffer_pool_.get(), true));
     }
     RETURN_IF_ERROR(ReadSync());
   }
