@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.lineitem (
   PRIMARY KEY (L_ORDERKEY, L_LINENUMBER)
 )
 distribute by hash (l_orderkey) into {buckets} buckets
+STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.lineitem
@@ -61,6 +62,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.part (
   P_COMMENT STRING
 )
 distribute by hash (p_partkey) into {buckets} buckets
+STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.part SELECT * FROM {source_db_name}.part;
@@ -75,6 +77,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.partsupp (
   PRIMARY KEY (PS_PARTKEY, PS_SUPPKEY)
 )
 distribute by hash (ps_partkey, ps_suppkey) into {buckets} buckets
+STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.partsupp SELECT * FROM {source_db_name}.partsupp;
@@ -90,6 +93,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.supplier (
   S_COMMENT STRING
 )
 distribute by hash (s_suppkey) into {buckets} buckets
+STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.supplier SELECT * FROM {source_db_name}.supplier;
@@ -102,6 +106,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.nation (
   N_COMMENT STRING
 )
 distribute by hash (n_nationkey) into {buckets} buckets
+STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.nation SELECT * FROM {source_db_name}.nation;
@@ -113,6 +118,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.region (
   R_COMMENT STRING
 )
 distribute by hash (r_regionkey) into {buckets} buckets
+STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.region SELECT * FROM {source_db_name}.region;
@@ -130,6 +136,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.orders (
   O_COMMENT STRING
 )
 distribute by hash (o_orderkey) into {buckets} buckets
+STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.orders SELECT * FROM {source_db_name}.orders;
@@ -146,6 +153,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.customer (
   C_COMMENT STRING
 )
 distribute by hash (c_custkey) into {buckets} buckets
+STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.customer SELECT * FROM {source_db_name}.customer;
