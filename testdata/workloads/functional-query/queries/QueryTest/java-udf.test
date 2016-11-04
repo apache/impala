@@ -290,3 +290,26 @@ INT
 999
 999
 ====
+---- QUERY
+drop table if exists replace_string_input
+====
+---- QUERY
+create table replace_string_input as
+values('toast'), ('scone'), ('stuff'), ('sssss'), ('yes'), ('scone'), ('stuff');
+====
+---- QUERY
+# Regression test for IMPALA-4266: memory management bugs with output strings from
+# Java UDFS, exposed by using the UDF as a grouping key in an aggregation.
+# The UDF replaces "s" with "ss" in the strings.
+select distinct udf_test.replace_string(_c0) as es
+from replace_string_input
+order by 1;
+---- TYPES
+string
+---- RESULTS
+'sscone'
+'ssssssssss'
+'sstuff'
+'toasst'
+'yess'
+====

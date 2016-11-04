@@ -29,6 +29,8 @@ drop function if exists udf_test.throws_exception();
 
 drop function if exists java_udfs_test.identity;
 
+drop function if exists udf_test.replace_string(string);
+
 create function udf_test.hive_pi() returns double
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFPI';
@@ -121,4 +123,8 @@ symbol='org.apache.impala.TestUdf';
 create function udf_test.throws_exception() returns boolean
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestUdfException';
+
+create function udf_test.replace_string(string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.ReplaceStringUdf';
 ====
