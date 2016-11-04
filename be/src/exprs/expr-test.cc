@@ -73,6 +73,7 @@ using namespace llvm;
 namespace impala {
 ImpaladQueryExecutor* executor_;
 bool disable_codegen_;
+bool enable_expr_rewrites_;
 
 template <typename ORIGINAL_TYPE, typename VAL_TYPE>
 string LiteralToString(VAL_TYPE val) {
@@ -972,7 +973,7 @@ bool ExprTest::ConvertValue<bool>(const string& value) {
   if (value.compare("false") == 0) {
     return false;
   } else {
-    DCHECK(value.compare("true") == 0);
+    DCHECK(value.compare("true") == 0) << value;
     return true;
   }
 }
@@ -5048,7 +5049,11 @@ TEST_F(ExprTest, ResultsLayoutTest) {
     expected_offsets.clear();
     // With one expr, all offsets should be 0.
     expected_offsets[t.GetByteSize()] = set<int>({0});
-    exprs.push_back(pool.Add(Literal::CreateLiteral(t, "0")));
+    if (t.type != TYPE_TIMESTAMP) {
+      exprs.push_back(pool.Add(Literal::CreateLiteral(t, "0")));
+    } else {
+      exprs.push_back(pool.Add(Literal::CreateLiteral(t, "2016-11-09")));
+    }
     if (t.IsVarLenStringType()) {
       ValidateLayout(exprs, 16, 0, expected_offsets);
     } else {
@@ -5106,8 +5111,8 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_byte_size += 5 * 8;      // No more padding
   ASSERT_EQ(expected_byte_size % 8, 0);
 
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "2016-11-09")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "2016-11-09")));
   exprs.push_back(pool.Add(
       Literal::CreateLiteral(ColumnType::CreateDecimalType(20, 0), "0")));
   expected_offsets[16].insert(expected_byte_size);
@@ -6123,21 +6128,35 @@ int main(int argc, char **argv) {
       impala_server->beeswax_port());
   ABORT_IF_ERROR(executor_->Setup());
 
-  vector<string> options;
-  // Disable FE Expr rewrites to make sure the Exprs get executed exactly as specified
+  // Disable FE expr rewrites to make sure the Exprs get executed exactly as specified
   // in the tests here.
+  vector<string> options;
   options.push_back("ENABLE_EXPR_REWRITES=0");
   options.push_back("DISABLE_CODEGEN=1");
   disable_codegen_ = true;
+  enable_expr_rewrites_ = false;
   executor_->setExecOptions(options);
-
   cout << "Running without codegen" << endl;
   int ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;
 
+  options.clear();
+  options.push_back("ENABLE_EXPR_REWRITES=0");
   options.push_back("DISABLE_CODEGEN=0");
   disable_codegen_ = false;
+  enable_expr_rewrites_ = false;
   executor_->setExecOptions(options);
   cout << endl << "Running with codegen" << endl;
+  ret = RUN_ALL_TESTS();
+  if (ret != 0) return ret;
+
+  // Enable FE expr rewrites to get test for constant folding over all exprs.
+  options.clear();
+  options.push_back("ENABLE_EXPR_REWRITES=1");
+  options.push_back("DISABLE_CODEGEN=1");
+  disable_codegen_ = true;
+  enable_expr_rewrites_ = true;
+  executor_->setExecOptions(options);
+  cout << endl << "Running without codegen and expr rewrites" << endl;
   return RUN_ALL_TESTS();
 }

@@ -122,7 +122,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
-   kudu predicates: id <= 60, id < 40, id < 103
+   kudu predicates: id < 103, id <= 60, id < 40
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
@@ -133,7 +133,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
-   kudu predicates: id <= 60, id < 40, id < 103
+   kudu predicates: id < 103, id <= 60, id < 40
 ====
 # Some predicates can be pushed down but others can't (predicate on an non-const value).
 select * from functional_kudu.testtbl
@@ -202,7 +202,7 @@ PLAN-ROOT SINK
 |  order by: c ASC
 |
 00:SCAN KUDU [tpch_kudu.orders]
-   predicates: CAST(o_orderdate AS TIMESTAMP) <= CAST('1995-01-01 00:00:00' AS TIMESTAMP)
+   predicates: CAST(o_orderdate AS TIMESTAMP) <= TIMESTAMP '1995-01-01 00:00:00'
    kudu predicates: o_orderkey < 10
 ====
 # IMPALA-4213: Planner not pushing some predicates with constant exprs to Kudu

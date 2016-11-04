@@ -1209,7 +1209,7 @@ PLAN-ROOT SINK
 |  |
 |  |--01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
+|  |     predicates: date_dim.d_year IN (1998, 1999, 2000), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
 |  |
 |  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -1271,7 +1271,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
+|  |     predicates: date_dim.d_year IN (1998, 1999, 2000), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -1347,7 +1347,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
+|  |     predicates: date_dim.d_year IN (1998, 1999, 2000), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -1798,7 +1798,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--01:SCAN HDFS [tpcds.date_dim]
 |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: date_dim.d_year IN (1999, 1999 + 1, 1999 + 2), date_dim.d_dow IN (6, 0), tpcds.date_dim.d_date_sk IN (2451181, 2451182, 2451188, 2451189, 2451195, 2451196, 2451202, 2451203, 2451209, 2451210, 2451216, 2451217, 2451223, 2451224, 2451230, 2451231, 2451237, 2451238, 2451244, 2451245, 2451251, 2451252, 2451258, 2451259, 2451265, 2451266, 2451272, 2451273, 2451279, 2451280, 2451286, 2451287, 2451293, 2451294, 2451300, 2451301, 2451307, 2451308, 2451314, 2451315, 2451321, 2451322, 2451328, 2451329, 2451335, 2451336, 2451342, 2451343, 2451349, 2451350, 2451356, 2451357, 2451363, 2451364, 2451370, 2451371, 2451377, 2451378, 2451384, 2451385, 2451391, 2451392, 2451398, 2451399, 2451405, 2451406, 2451412, 2451413, 2451419, 2451420, 2451426, 2451427, 2451433, 2451434, 2451440, 2451441, 2451447, 2451448, 2451454, 2451455, 2451461, 2451462, 2451468, 2451469, 2451475, 2451476, 2451482, 2451483, 2451489, 2451490, 2451496, 2451497, 2451503, 2451504, 2451510, 2451511, 2451517, 2451518, 2451524, 2451525, 2451531, 2451532, 2451538, 2451539, 2451545, 2451546, 2451552, 2451553, 2451559, 2451560, 2451566, 2451567, 2451573, 2451574, 2451580, 2451581, 2451587, 2451588, 2451594, 2451595, 2451601, 2451602, 2451608, 2451609, 2451615, 2451616, 2451622, 2451623, 2451629, 2451630, 2451636, 2451637, 2451643, 2451644, 2451650, 2451651, 2451657, 2451658, 2451664, 2451665, 2451671, 2451672, 2451678, 2451679, 2451685, 2451686, 2451692, 2451693, 2451699, 2451700, 2451706, 2451707, 2451713, 2451714, 2451720, 2451721, 2451727, 2451728, 2451734, 2451735, 2451741, 2451742, 2451748, 2451749, 2451755, 2451756, 2451762, 2451763, 2451769, 2451770, 2451776, 2451777, 2451783, 2451784, 2451790, 2451791, 2451797, 2451798, 2451804, 2451805, 2451811, 2451812, 2451818, 2451819, 2451825, 2451826, 2451832, 2451833, 2451839, 2451840, 2451846, 2451847, 2451853, 2451854, 2451860, 2451861, 2451867, 2451868, 2451874, 2451875, 2451881, 2451882, 2451888, 2451889, 2451895, 2451896, 2451902, 2451903, 2451909, 2451910, 2451916, 2451917, 2451923, 2451924, 2451930, 2451931, 2451937, 2451938, 2451944, 2451945, 2451951, 2451952, 2451958, 2451959, 2451965, 2451966, 2451972, 2451973, 2451979, 2451980, 2451986, 2451987, 2451993, 2451994, 2452000, 2452001, 2452007, 2452008, 2452014, 2452015, 2452021, 2452022, 2452028, 2452029, 2452035, 2452036, 2452042, 2452043, 2452049, 2452050, 2452056, 2452057, 2452063, 2452064, 2452070, 2452071, 2452077, 2452078, 2452084, 2452085, 2452091, 2452092, 2452098, 2452099, 2452105, 2452106, 2452112, 2452113, 2452119, 2452120, 2452126, 2452127, 2452133, 2452134, 2452140, 2452141, 2452147, 2452148, 2452154, 2452155, 2452161, 2452162, 2452168, 2452169, 2452175, 2452176, 2452182, 2452183, 2452189, 2452190, 2452196, 2452197, 2452203, 2452204, 2452210, 2452211, 2452217, 2452218, 2452224, 2452225, 2452231, 2452232, 2452238, 2452239, 2452245, 2452246, 2452252, 2452253, 2452259, 2452260, 2452266, 2452267, 2452273, 2452274)
+|  |  |     predicates: date_dim.d_year IN (1999, 2000, 2001), date_dim.d_dow IN (6, 0), tpcds.date_dim.d_date_sk IN (2451181, 2451182, 2451188, 2451189, 2451195, 2451196, 2451202, 2451203, 2451209, 2451210, 2451216, 2451217, 2451223, 2451224, 2451230, 2451231, 2451237, 2451238, 2451244, 2451245, 2451251, 2451252, 2451258, 2451259, 2451265, 2451266, 2451272, 2451273, 2451279, 2451280, 2451286, 2451287, 2451293, 2451294, 2451300, 2451301, 2451307, 2451308, 2451314, 2451315, 2451321, 2451322, 2451328, 2451329, 2451335, 2451336, 2451342, 2451343, 2451349, 2451350, 2451356, 2451357, 2451363, 2451364, 2451370, 2451371, 2451377, 2451378, 2451384, 2451385, 2451391, 2451392, 2451398, 2451399, 2451405, 2451406, 2451412, 2451413, 2451419, 2451420, 2451426, 2451427, 2451433, 2451434, 2451440, 2451441, 2451447, 2451448, 2451454, 2451455, 2451461, 2451462, 2451468, 2451469, 2451475, 2451476, 2451482, 2451483, 2451489, 2451490, 2451496, 2451497, 2451503, 2451504, 2451510, 2451511, 2451517, 2451518, 2451524, 2451525, 2451531, 2451532, 2451538, 2451539, 2451545, 2451546, 2451552, 2451553, 2451559, 2451560, 2451566, 2451567, 2451573, 2451574, 2451580, 2451581, 2451587, 2451588, 2451594, 2451595, 2451601, 2451602, 2451608, 2451609, 2451615, 2451616, 2451622, 2451623, 2451629, 2451630, 2451636, 2451637, 2451643, 2451644, 2451650, 2451651, 2451657, 2451658, 2451664, 2451665, 2451671, 2451672, 2451678, 2451679, 2451685, 2451686, 2451692, 2451693, 2451699, 2451700, 2451706, 2451707, 2451713, 2451714, 2451720, 2451721, 2451727, 2451728, 2451734, 2451735, 2451741, 2451742, 2451748, 2451749, 2451755, 2451756, 2451762, 2451763, 2451769, 2451770, 2451776, 2451777, 2451783, 2451784, 2451790, 2451791, 2451797, 2451798, 2451804, 2451805, 2451811, 2451812, 2451818, 2451819, 2451825, 2451826, 2451832, 2451833, 2451839, 2451840, 2451846, 2451847, 2451853, 2451854, 2451860, 2451861, 2451867, 2451868, 2451874, 2451875, 2451881, 2451882, 2451888, 2451889, 2451895, 2451896, 2451902, 2451903, 2451909, 2451910, 2451916, 2451917, 2451923, 2451924, 2451930, 2451931, 2451937, 2451938, 2451944, 2451945, 2451951, 2451952, 2451958, 2451959, 2451965, 2451966, 2451972, 2451973, 2451979, 2451980, 2451986, 2451987, 2451993, 2451994, 2452000, 2452001, 2452007, 2452008, 2452014, 2452015, 2452021, 2452022, 2452028, 2452029, 2452035, 2452036, 2452042, 2452043, 2452049, 2452050, 2452056, 2452057, 2452063, 2452064, 2452070, 2452071, 2452077, 2452078, 2452084, 2452085, 2452091, 2452092, 2452098, 2452099, 2452105, 2452106, 2452112, 2452113, 2452119, 2452120, 2452126, 2452127, 2452133, 2452134, 2452140, 2452141, 2452147, 2452148, 2452154, 2452155, 2452161, 2452162, 2452168, 2452169, 2452175, 2452176, 2452182, 2452183, 2452189, 2452190, 2452196, 2452197, 2452203, 2452204, 2452210, 2452211, 2452217, 2452218, 2452224, 2452225, 2452231, 2452232, 2452238, 2452239, 2452245, 2452246, 2452252, 2452253, 2452259, 2452260, 2452266, 2452267, 2452273, 2452274)
 |  |  |
 |  |  05:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: customer_address.ca_address_sk = store_sales.ss_addr_sk
@@ -1880,7 +1880,7 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  01:SCAN HDFS [tpcds.date_dim]
 |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: date_dim.d_year IN (1999, 1999 + 1, 1999 + 2), date_dim.d_dow IN (6, 0), tpcds.date_dim.d_date_sk IN (2451181, 2451182, 2451188, 2451189, 2451195, 2451196, 2451202, 2451203, 2451209, 2451210, 2451216, 2451217, 2451223, 2451224, 2451230, 2451231, 2451237, 2451238, 2451244, 2451245, 2451251, 2451252, 2451258, 2451259, 2451265, 2451266, 2451272, 2451273, 2451279, 2451280, 2451286, 2451287, 2451293, 2451294, 2451300, 2451301, 2451307, 2451308, 2451314, 2451315, 2451321, 2451322, 2451328, 2451329, 2451335, 2451336, 2451342, 2451343, 2451349, 2451350, 2451356, 2451357, 2451363, 2451364, 2451370, 2451371, 2451377, 2451378, 2451384, 2451385, 2451391, 2451392, 2451398, 2451399, 2451405, 2451406, 2451412, 2451413, 2451419, 2451420, 2451426, 2451427, 2451433, 2451434, 2451440, 2451441, 2451447, 2451448, 2451454, 2451455, 2451461, 2451462, 2451468, 2451469, 2451475, 2451476, 2451482, 2451483, 2451489, 2451490, 2451496, 2451497, 2451503, 2451504, 2451510, 2451511, 2451517, 2451518, 2451524, 2451525, 2451531, 2451532, 2451538, 2451539, 2451545, 2451546, 2451552, 2451553, 2451559, 2451560, 2451566, 2451567, 2451573, 2451574, 2451580, 2451581, 2451587, 2451588, 2451594, 2451595, 2451601, 2451602, 2451608, 2451609, 2451615, 2451616, 2451622, 2451623, 2451629, 2451630, 2451636, 2451637, 2451643, 2451644, 2451650, 2451651, 2451657, 2451658, 2451664, 2451665, 2451671, 2451672, 2451678, 2451679, 2451685, 2451686, 2451692, 2451693, 2451699, 2451700, 2451706, 2451707, 2451713, 2451714, 2451720, 2451721, 2451727, 2451728, 2451734, 2451735, 2451741, 2451742, 2451748, 2451749, 2451755, 2451756, 2451762, 2451763, 2451769, 2451770, 2451776, 2451777, 2451783, 2451784, 2451790, 2451791, 2451797, 2451798, 2451804, 2451805, 2451811, 2451812, 2451818, 2451819, 2451825, 2451826, 2451832, 2451833, 2451839, 2451840, 2451846, 2451847, 2451853, 2451854, 2451860, 2451861, 2451867, 2451868, 2451874, 2451875, 2451881, 2451882, 2451888, 2451889, 2451895, 2451896, 2451902, 2451903, 2451909, 2451910, 2451916, 2451917, 2451923, 2451924, 2451930, 2451931, 2451937, 2451938, 2451944, 2451945, 2451951, 2451952, 2451958, 2451959, 2451965, 2451966, 2451972, 2451973, 2451979, 2451980, 2451986, 2451987, 2451993, 2451994, 2452000, 2452001, 2452007, 2452008, 2452014, 2452015, 2452021, 2452022, 2452028, 2452029, 2452035, 2452036, 2452042, 2452043, 2452049, 2452050, 2452056, 2452057, 2452063, 2452064, 2452070, 2452071, 2452077, 2452078, 2452084, 2452085, 2452091, 2452092, 2452098, 2452099, 2452105, 2452106, 2452112, 2452113, 2452119, 2452120, 2452126, 2452127, 2452133, 2452134, 2452140, 2452141, 2452147, 2452148, 2452154, 2452155, 2452161, 2452162, 2452168, 2452169, 2452175, 2452176, 2452182, 2452183, 2452189, 2452190, 2452196, 2452197, 2452203, 2452204, 2452210, 2452211, 2452217, 2452218, 2452224, 2452225, 2452231, 2452232, 2452238, 2452239, 2452245, 2452246, 2452252, 2452253, 2452259, 2452260, 2452266, 2452267, 2452273, 2452274)
+|  |  |     predicates: date_dim.d_year IN (1999, 2000, 2001), date_dim.d_dow IN (6, 0), tpcds.date_dim.d_date_sk IN (2451181, 2451182, 2451188, 2451189, 2451195, 2451196, 2451202, 2451203, 2451209, 2451210, 2451216, 2451217, 2451223, 2451224, 2451230, 2451231, 2451237, 2451238, 2451244, 2451245, 2451251, 2451252, 2451258, 2451259, 2451265, 2451266, 2451272, 2451273, 2451279, 2451280, 2451286, 2451287, 2451293, 2451294, 2451300, 2451301, 2451307, 2451308, 2451314, 2451315, 2451321, 2451322, 2451328, 2451329, 2451335, 2451336, 2451342, 2451343, 2451349, 2451350, 2451356, 2451357, 2451363, 2451364, 2451370, 2451371, 2451377, 2451378, 2451384, 2451385, 2451391, 2451392, 2451398, 2451399, 2451405, 2451406, 2451412, 2451413, 2451419, 2451420, 2451426, 2451427, 2451433, 2451434, 2451440, 2451441, 2451447, 2451448, 2451454, 2451455, 2451461, 2451462, 2451468, 2451469, 2451475, 2451476, 2451482, 2451483, 2451489, 2451490, 2451496, 2451497, 2451503, 2451504, 2451510, 2451511, 2451517, 2451518, 2451524, 2451525, 2451531, 2451532, 2451538, 2451539, 2451545, 2451546, 2451552, 2451553, 2451559, 2451560, 2451566, 2451567, 2451573, 2451574, 2451580, 2451581, 2451587, 2451588, 2451594, 2451595, 2451601, 2451602, 2451608, 2451609, 2451615, 2451616, 2451622, 2451623, 2451629, 2451630, 2451636, 2451637, 2451643, 2451644, 2451650, 2451651, 2451657, 2451658, 2451664, 2451665, 2451671, 2451672, 2451678, 2451679, 2451685, 2451686, 2451692, 2451693, 2451699, 2451700, 2451706, 2451707, 2451713, 2451714, 2451720, 2451721, 2451727, 2451728, 2451734, 2451735, 2451741, 2451742, 2451748, 2451749, 2451755, 2451756, 2451762, 2451763, 2451769, 2451770, 2451776, 2451777, 2451783, 2451784, 2451790, 2451791, 2451797, 2451798, 2451804, 2451805, 2451811, 2451812, 2451818, 2451819, 2451825, 2451826, 2451832, 2451833, 2451839, 2451840, 2451846, 2451847, 2451853, 2451854, 2451860, 2451861, 2451867, 2451868, 2451874, 2451875, 2451881, 2451882, 2451888, 2451889, 2451895, 2451896, 2451902, 2451903, 2451909, 2451910, 2451916, 2451917, 2451923, 2451924, 2451930, 2451931, 2451937, 2451938, 2451944, 2451945, 2451951, 2451952, 2451958, 2451959, 2451965, 2451966, 2451972, 2451973, 2451979, 2451980, 2451986, 2451987, 2451993, 2451994, 2452000, 2452001, 2452007, 2452008, 2452014, 2452015, 2452021, 2452022, 2452028, 2452029, 2452035, 2452036, 2452042, 2452043, 2452049, 2452050, 2452056, 2452057, 2452063, 2452064, 2452070, 2452071, 2452077, 2452078, 2452084, 2452085, 2452091, 2452092, 2452098, 2452099, 2452105, 2452106, 2452112, 2452113, 2452119, 2452120, 2452126, 2452127, 2452133, 2452134, 2452140, 2452141, 2452147, 2452148, 2452154, 2452155, 2452161, 2452162, 2452168, 2452169, 2452175, 2452176, 2452182, 2452183, 2452189, 2452190, 2452196, 2452197, 2452203, 2452204, 2452210, 2452211, 2452217, 2452218, 2452224, 2452225, 2452231, 2452232, 2452238, 2452239, 2452245, 2452246, 2452252, 2452253, 2452259, 2452260, 2452266, 2452267, 2452273, 2452274)
 |  |  |
 |  |  05:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: customer_address.ca_address_sk = store_sales.ss_addr_sk
@@ -1984,7 +1984,7 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  01:SCAN HDFS [tpcds.date_dim]
 |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: date_dim.d_year IN (1999, 1999 + 1, 1999 + 2), date_dim.d_dow IN (6, 0), tpcds.date_dim.d_date_sk IN (2451181, 2451182, 2451188, 2451189, 2451195, 2451196, 2451202, 2451203, 2451209, 2451210, 2451216, 2451217, 2451223, 2451224, 2451230, 2451231, 2451237, 2451238, 2451244, 2451245, 2451251, 2451252, 2451258, 2451259, 2451265, 2451266, 2451272, 2451273, 2451279, 2451280, 2451286, 2451287, 2451293, 2451294, 2451300, 2451301, 2451307, 2451308, 2451314, 2451315, 2451321, 2451322, 2451328, 2451329, 2451335, 2451336, 2451342, 2451343, 2451349, 2451350, 2451356, 2451357, 2451363, 2451364, 2451370, 2451371, 2451377, 2451378, 2451384, 2451385, 2451391, 2451392, 2451398, 2451399, 2451405, 2451406, 2451412, 2451413, 2451419, 2451420, 2451426, 2451427, 2451433, 2451434, 2451440, 2451441, 2451447, 2451448, 2451454, 2451455, 2451461, 2451462, 2451468, 2451469, 2451475, 2451476, 2451482, 2451483, 2451489, 2451490, 2451496, 2451497, 2451503, 2451504, 2451510, 2451511, 2451517, 2451518, 2451524, 2451525, 2451531, 2451532, 2451538, 2451539, 2451545, 2451546, 2451552, 2451553, 2451559, 2451560, 2451566, 2451567, 2451573, 2451574, 2451580, 2451581, 2451587, 2451588, 2451594, 2451595, 2451601, 2451602, 2451608, 2451609, 2451615, 2451616, 2451622, 2451623, 2451629, 2451630, 2451636, 2451637, 2451643, 2451644, 2451650, 2451651, 2451657, 2451658, 2451664, 2451665, 2451671, 2451672, 2451678, 2451679, 2451685, 2451686, 2451692, 2451693, 2451699, 2451700, 2451706, 2451707, 2451713, 2451714, 2451720, 2451721, 2451727, 2451728, 2451734, 2451735, 2451741, 2451742, 2451748, 2451749, 2451755, 2451756, 2451762, 2451763, 2451769, 2451770, 2451776, 2451777, 2451783, 2451784, 2451790, 2451791, 2451797, 2451798, 2451804, 2451805, 2451811, 2451812, 2451818, 2451819, 2451825, 2451826, 2451832, 2451833, 2451839, 2451840, 2451846, 2451847, 2451853, 2451854, 2451860, 2451861, 2451867, 2451868, 2451874, 2451875, 2451881, 2451882, 2451888, 2451889, 2451895, 2451896, 2451902, 2451903, 2451909, 2451910, 2451916, 2451917, 2451923, 2451924, 2451930, 2451931, 2451937, 2451938, 2451944, 2451945, 2451951, 2451952, 2451958, 2451959, 2451965, 2451966, 2451972, 2451973, 2451979, 2451980, 2451986, 2451987, 2451993, 2451994, 2452000, 2452001, 2452007, 2452008, 2452014, 2452015, 2452021, 2452022, 2452028, 2452029, 2452035, 2452036, 2452042, 2452043, 2452049, 2452050, 2452056, 2452057, 2452063, 2452064, 2452070, 2452071, 2452077, 2452078, 2452084, 2452085, 2452091, 2452092, 2452098, 2452099, 2452105, 2452106, 2452112, 2452113, 2452119, 2452120, 2452126, 2452127, 2452133, 2452134, 2452140, 2452141, 2452147, 2452148, 2452154, 2452155, 2452161, 2452162, 2452168, 2452169, 2452175, 2452176, 2452182, 2452183, 2452189, 2452190, 2452196, 2452197, 2452203, 2452204, 2452210, 2452211, 2452217, 2452218, 2452224, 2452225, 2452231, 2452232, 2452238, 2452239, 2452245, 2452246, 2452252, 2452253, 2452259, 2452260, 2452266, 2452267, 2452273, 2452274)
+|  |  |     predicates: date_dim.d_year IN (1999, 2000, 2001), date_dim.d_dow IN (6, 0), tpcds.date_dim.d_date_sk IN (2451181, 2451182, 2451188, 2451189, 2451195, 2451196, 2451202, 2451203, 2451209, 2451210, 2451216, 2451217, 2451223, 2451224, 2451230, 2451231, 2451237, 2451238, 2451244, 2451245, 2451251, 2451252, 2451258, 2451259, 2451265, 2451266, 2451272, 2451273, 2451279, 2451280, 2451286, 2451287, 2451293, 2451294, 2451300, 2451301, 2451307, 2451308, 2451314, 2451315, 2451321, 2451322, 2451328, 2451329, 2451335, 2451336, 2451342, 2451343, 2451349, 2451350, 2451356, 2451357, 2451363, 2451364, 2451370, 2451371, 2451377, 2451378, 2451384, 2451385, 2451391, 2451392, 2451398, 2451399, 2451405, 2451406, 2451412, 2451413, 2451419, 2451420, 2451426, 2451427, 2451433, 2451434, 2451440, 2451441, 2451447, 2451448, 2451454, 2451455, 2451461, 2451462, 2451468, 2451469, 2451475, 2451476, 2451482, 2451483, 2451489, 2451490, 2451496, 2451497, 2451503, 2451504, 2451510, 2451511, 2451517, 2451518, 2451524, 2451525, 2451531, 2451532, 2451538, 2451539, 2451545, 2451546, 2451552, 2451553, 2451559, 2451560, 2451566, 2451567, 2451573, 2451574, 2451580, 2451581, 2451587, 2451588, 2451594, 2451595, 2451601, 2451602, 2451608, 2451609, 2451615, 2451616, 2451622, 2451623, 2451629, 2451630, 2451636, 2451637, 2451643, 2451644, 2451650, 2451651, 2451657, 2451658, 2451664, 2451665, 2451671, 2451672, 2451678, 2451679, 2451685, 2451686, 2451692, 2451693, 2451699, 2451700, 2451706, 2451707, 2451713, 2451714, 2451720, 2451721, 2451727, 2451728, 2451734, 2451735, 2451741, 2451742, 2451748, 2451749, 2451755, 2451756, 2451762, 2451763, 2451769, 2451770, 2451776, 2451777, 2451783, 2451784, 2451790, 2451791, 2451797, 2451798, 2451804, 2451805, 2451811, 2451812, 2451818, 2451819, 2451825, 2451826, 2451832, 2451833, 2451839, 2451840, 2451846, 2451847, 2451853, 2451854, 2451860, 2451861, 2451867, 2451868, 2451874, 2451875, 2451881, 2451882, 2451888, 2451889, 2451895, 2451896, 2451902, 2451903, 2451909, 2451910, 2451916, 2451917, 2451923, 2451924, 2451930, 2451931, 2451937, 2451938, 2451944, 2451945, 2451951, 2451952, 2451958, 2451959, 2451965, 2451966, 2451972, 2451973, 2451979, 2451980, 2451986, 2451987, 2451993, 2451994, 2452000, 2452001, 2452007, 2452008, 2452014, 2452015, 2452021, 2452022, 2452028, 2452029, 2452035, 2452036, 2452042, 2452043, 2452049, 2452050, 2452056, 2452057, 2452063, 2452064, 2452070, 2452071, 2452077, 2452078, 2452084, 2452085, 2452091, 2452092, 2452098, 2452099, 2452105, 2452106, 2452112, 2452113, 2452119, 2452120, 2452126, 2452127, 2452133, 2452134, 2452140, 2452141, 2452147, 2452148, 2452154, 2452155, 2452161, 2452162, 2452168, 2452169, 2452175, 2452176, 2452182, 2452183, 2452189, 2452190, 2452196, 2452197, 2452203, 2452204, 2452210, 2452211, 2452217, 2452218, 2452224, 2452225, 2452231, 2452232, 2452238, 2452239, 2452245, 2452246, 2452252, 2452253, 2452259, 2452260, 2452266, 2452267, 2452273, 2452274)
 |  |  |
 |  |  05:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: customer_address.ca_address_sk = store_sales.ss_addr_sk
@@ -2227,7 +2227,7 @@ PLAN-ROOT SINK
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
+   predicates: d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
    runtime filters: RF001 -> d_date_sk
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -2280,7 +2280,7 @@ PLAN-ROOT SINK
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
+   predicates: d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
    runtime filters: RF001 -> d_date_sk
 ---- PARALLELPLANS
 PLAN-ROOT SINK
@@ -2345,7 +2345,7 @@ PLAN-ROOT SINK
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
+   predicates: d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
    runtime filters: RF001 -> d_date_sk
 ====
 # TPCDS-Q55
@@ -2599,7 +2599,7 @@ PLAN-ROOT SINK
 |  |
 |  |--13:SCAN HDFS [tpcds.date_dim d]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_month_seq <= 1185 + 23, d_month_seq >= 1185 + 12
+|  |     predicates: d_month_seq <= 1208, d_month_seq >= 1197
 |  |
 |  11:AGGREGATE [FINALIZE]
 |  |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
@@ -2631,7 +2631,7 @@ PLAN-ROOT SINK
 |
 |--05:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: d_month_seq >= 1185, d_month_seq <= 1185 + 11
+|     predicates: d_month_seq <= 1196, d_month_seq >= 1185
 |     runtime filters: RF000 -> d.d_week_seq
 |
 03:AGGREGATE [FINALIZE]
@@ -2682,7 +2682,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  13:SCAN HDFS [tpcds.date_dim d]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_month_seq <= 1185 + 23, d_month_seq >= 1185 + 12
+|  |     predicates: d_month_seq <= 1208, d_month_seq >= 1197
 |  |
 |  27:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
@@ -2730,7 +2730,7 @@ PLAN-ROOT SINK
 |  |
 |  05:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: d_month_seq >= 1185, d_month_seq <= 1185 + 11
+|     predicates: d_month_seq <= 1196, d_month_seq >= 1185
 |     runtime filters: RF000 -> d.d_week_seq
 |
 21:AGGREGATE [FINALIZE]
@@ -2803,7 +2803,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  13:SCAN HDFS [tpcds.date_dim d]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_month_seq <= 1185 + 23, d_month_seq >= 1185 + 12
+|  |     predicates: d_month_seq <= 1208, d_month_seq >= 1197
 |  |
 |  27:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
@@ -2863,7 +2863,7 @@ PLAN-ROOT SINK
 |  |
 |  05:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: d_month_seq >= 1185, d_month_seq <= 1185 + 11
+|     predicates: d_month_seq <= 1196, d_month_seq >= 1185
 |     runtime filters: RF000 -> d.d_week_seq
 |
 21:AGGREGATE [FINALIZE]
@@ -2977,7 +2977,7 @@ PLAN-ROOT SINK
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
+   predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
    runtime filters: RF001 -> d_date_sk
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -3040,7 +3040,7 @@ PLAN-ROOT SINK
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
+   predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
    runtime filters: RF001 -> d_date_sk
 ---- PARALLELPLANS
 PLAN-ROOT SINK
@@ -3115,7 +3115,7 @@ PLAN-ROOT SINK
 |
 02:SCAN HDFS [tpcds.date_dim]
    partitions=1/1 files=1 size=9.84MB
-   predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
+   predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
    runtime filters: RF001 -> d_date_sk
 ====
 # TPCDS-Q65
@@ -3206,7 +3206,7 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  |--03:SCAN HDFS [tpcds.date_dim]
 |  |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |  |     predicates: d_month_seq >= 1212, d_month_seq <= 1212 + 11
+|  |  |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |  |  |
 |  |  |  02:SCAN HDFS [tpcds.store_sales]
 |  |  |     partitions=120/120 files=120 size=21.31MB
@@ -3222,7 +3222,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--08:SCAN HDFS [tpcds.date_dim]
 |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: d_month_seq >= 1212, d_month_seq <= 1212 + 11
+|  |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |  |
 |  |  07:SCAN HDFS [tpcds.store_sales]
 |  |     partitions=120/120 files=120 size=21.31MB
@@ -3292,7 +3292,7 @@ PLAN-ROOT SINK
 |  |  |  |  |
 |  |  |  |  03:SCAN HDFS [tpcds.date_dim]
 |  |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |  |     predicates: d_month_seq >= 1212, d_month_seq <= 1212 + 11
+|  |  |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |  |  |
 |  |  |  02:SCAN HDFS [tpcds.store_sales]
 |  |  |     partitions=120/120 files=120 size=21.31MB
@@ -3316,7 +3316,7 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  08:SCAN HDFS [tpcds.date_dim]
 |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: d_month_seq >= 1212, d_month_seq <= 1212 + 11
+|  |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |  |
 |  |  07:SCAN HDFS [tpcds.store_sales]
 |  |     partitions=120/120 files=120 size=21.31MB
@@ -3402,7 +3402,7 @@ PLAN-ROOT SINK
 |  |  |  |  |
 |  |  |  |  03:SCAN HDFS [tpcds.date_dim]
 |  |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |  |     predicates: d_month_seq >= 1212, d_month_seq <= 1212 + 11
+|  |  |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |  |  |
 |  |  |  02:SCAN HDFS [tpcds.store_sales]
 |  |  |     partitions=120/120 files=120 size=21.31MB
@@ -3430,7 +3430,7 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  08:SCAN HDFS [tpcds.date_dim]
 |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: d_month_seq >= 1212, d_month_seq <= 1212 + 11
+|  |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |  |
 |  |  07:SCAN HDFS [tpcds.store_sales]
 |  |     partitions=120/120 files=120 size=21.31MB
@@ -5179,7 +5179,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--02:SCAN HDFS [tpcds.date_dim]
 |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|  |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |  |
 |  |  04:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: ss_item_sk = i_item_sk
@@ -5218,7 +5218,7 @@ PLAN-ROOT SINK
 |  |
 |  |--15:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |
 |  17:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_item_sk = i_item_sk
@@ -5257,7 +5257,7 @@ PLAN-ROOT SINK
 |
 |--25:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |
 27:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -5335,7 +5335,7 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  02:SCAN HDFS [tpcds.date_dim]
 |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|  |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |  |
 |  |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: ss_item_sk = i_item_sk
@@ -5386,7 +5386,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  15:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |
 |  17:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_item_sk = i_item_sk
@@ -5437,7 +5437,7 @@ PLAN-ROOT SINK
 |  |
 |  25:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |
 27:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -5533,7 +5533,7 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  02:SCAN HDFS [tpcds.date_dim]
 |  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|  |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |  |
 |  |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: ss_item_sk = i_item_sk
@@ -5596,7 +5596,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  15:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |
 |  17:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_item_sk = i_item_sk
@@ -5659,7 +5659,7 @@ PLAN-ROOT SINK
 |  |
 |  25:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
-|     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
+|     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |
 27:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -6133,7 +6133,7 @@ PLAN-ROOT SINK
 |  |
 |  |--57:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  60:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6164,7 +6164,7 @@ PLAN-ROOT SINK
 |  |
 |  |--49:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  52:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6195,7 +6195,7 @@ PLAN-ROOT SINK
 |  |
 |  |--41:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  44:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6226,7 +6226,7 @@ PLAN-ROOT SINK
 |  |
 |  |--33:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  36:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6257,7 +6257,7 @@ PLAN-ROOT SINK
 |  |
 |  |--25:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  28:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6288,7 +6288,7 @@ PLAN-ROOT SINK
 |  |
 |  |--17:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  20:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6320,7 +6320,7 @@ PLAN-ROOT SINK
 |  |
 |  |--09:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  12:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6350,7 +6350,7 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [tpcds.household_demographics]
 |     partitions=1/1 files=1 size=148.10KB
-|     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6406,7 +6406,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  57:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  60:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6466,7 +6466,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  49:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  52:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6526,7 +6526,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  41:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  44:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6586,7 +6586,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  33:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  36:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6646,7 +6646,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  25:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  28:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6706,7 +6706,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  17:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  20:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6767,7 +6767,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  09:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |  |
 |  12:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
@@ -6820,7 +6820,7 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN HDFS [tpcds.household_demographics]
 |     partitions=1/1 files=1 size=148.10KB
-|     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 3) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 4))
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk

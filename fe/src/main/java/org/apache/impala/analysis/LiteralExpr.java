@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
@@ -29,6 +30,9 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TQueryCtx;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -36,6 +40,7 @@ import com.google.common.base.Preconditions;
  * ordering of HdfsPartitions whose partition-key values are represented as literals.
  */
 public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr> {
+  private final static Logger LOG = LoggerFactory.getLogger(LiteralExpr.class);
 
   public LiteralExpr() {
     numDistinctValues_ = 1;
@@ -153,7 +158,8 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
    * Assumes expr has been analyzed. Returns constExpr if is it already a LiteralExpr.
    * Returns null for types that do not have a LiteralExpr subclass, e.g. TIMESTAMP, or
    * in cases where the corresponding LiteralExpr is not able to represent the evaluation
-   * result, e.g., NaN or infinity.
+   * result, e.g., NaN or infinity. Returns null if the expr evaluation encountered errors
+   * or warnings in the BE.
    * TODO: Support non-scalar types.
    */
   public static LiteralExpr create(Expr constExpr, TQueryCtx queryCtx)
@@ -166,8 +172,9 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
     try {
       val = FeSupport.EvalConstExpr(constExpr, queryCtx);
     } catch (InternalException e) {
-      throw new AnalysisException(String.format("Failed to evaluate expr '%s'",
-          constExpr.toSql()), e);
+      LOG.debug(String.format("Failed to evaluate expr '%s'",
+          constExpr.toSql(), e.getMessage()));
+      return null;
     }
 
     LiteralExpr result = null;
@@ -215,11 +222,32 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
       case STRING:
       case VARCHAR:
       case CHAR:
-        if (val.isSetString_val()) result = new StringLiteral(val.string_val);
+        if (val.isSetBinary_val()) {
+          byte[] bytes = new byte[val.binary_val.remaining()];
+          val.binary_val.get(bytes);
+          // Converting strings between the BE/FE does not work properly for the
+          // extended ASCII characters above 127. Bail in such cases to avoid
+          // producing incorrect results.
+          for (byte b: bytes) if (b < 0) return null;
+          try {
+            // US-ASCII is 7-bit ASCII.
+            String strVal = new String(bytes, "US-ASCII");
+            // The evaluation result is a raw string that must not be unescaped.
+            result = new StringLiteral(strVal, constExpr.getType(), false);
+          } catch (UnsupportedEncodingException e) {
+            return null;
+          }
+        }
+        break;
+      case TIMESTAMP:
+        // Expects both the binary and string fields to be set, so we get the raw
+        // representation as well as the string representation.
+        if (val.isSetBinary_val() && val.isSetString_val()) {
+          result = new TimestampLiteral(val.getBinary_val(), val.getString_val());
+        }
         break;
       case DATE:
       case DATETIME:
-      case TIMESTAMP:
         return null;
       default:
         Preconditions.checkState(false,
@@ -229,7 +257,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
     // None of the fields in the thrift struct were set indicating a NULL.
     if (result == null) result = new NullLiteral();
 
-    result.analyze(null);
+    result.analyzeNoThrow(null);
     return (LiteralExpr)result;
   }
 

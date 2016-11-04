@@ -74,22 +74,19 @@ class ExprContext {
   /// result in result_.
   void* GetValue(const TupleRow* row);
 
-  /// Convenience function: extract value into col_val and sets the
-  /// appropriate __isset flag.
-  /// If the value is NULL and as_ascii is false, nothing is set.
-  /// If 'as_ascii' is true, writes the value in ascii into stringVal
-  /// (nulls turn into "NULL");
-  /// if it is false, the specific field in col_val that receives the value is
-  /// based on the type of the expr:
+  /// Convenience function for evaluating constant Exprs from the FE. Extracts value into
+  /// col_val and sets the appropriate __isset flag. No fields are set for NULL values.
+  /// The specific field in col_val that receives the value is based on the expr type:
   /// TYPE_BOOLEAN: boolVal
   /// TYPE_TINYINT/SMALLINT/INT: intVal
   /// TYPE_BIGINT: longVal
   /// TYPE_FLOAT/DOUBLE: doubleVal
-  /// TYPE_STRING: stringVal
-  /// TYPE_TIMESTAMP: stringVal
-  /// Note: timestamp is converted to string via RawValue::PrintValue because HiveServer2
-  /// requires timestamp in a string format.
-  void GetValue(const TupleRow* row, bool as_ascii, TColumnValue* col_val);
+  /// TYPE_STRING: binaryVal. Do not populate stringVal directly because BE/FE
+  ///              conversions do not work properly for strings with ASCII chars
+  ///              above 127. Pass the raw bytes so the caller can decide what to
+  ///              do with the result (e.g., bail constant folding).
+  /// TYPE_TIMESTAMP: binaryVal has the raw data, stringVal its string representation.
+  void GetConstantValue(TColumnValue* col_val);
 
   /// Convenience functions: print value into 'str' or 'stream'.  NULL turns into "NULL".
   void PrintValue(const TupleRow* row, std::string* str);

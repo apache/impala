@@ -28,15 +28,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionLocation;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
@@ -45,10 +42,7 @@ import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
-import org.apache.impala.service.FeSupport;
-import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.THBaseFilter;
 import org.apache.impala.thrift.THBaseKeyRange;
@@ -60,6 +54,9 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -144,7 +141,7 @@ public class HBaseScanNode extends ScanNode {
    * are always encded as ascii.
    * ValueRange is null if there is no predicate on the row-key.
    */
-  private void setStartStopKey(Analyzer analyzer) throws InternalException {
+  private void setStartStopKey(Analyzer analyzer) throws ImpalaException {
     Preconditions.checkNotNull(keyRanges_);
     Preconditions.checkState(keyRanges_.size() == 1);
 
@@ -154,30 +151,32 @@ public class HBaseScanNode extends ScanNode {
         Preconditions.checkState(rowRange.getLowerBound().isConstant());
         Preconditions.checkState(
             rowRange.getLowerBound().getType().equals(Type.STRING));
-        TColumnValue val = FeSupport.EvalConstExpr(rowRange.getLowerBound(),
+        LiteralExpr val = LiteralExpr.create(rowRange.getLowerBound(),
             analyzer.getQueryCtx());
-        if (!val.isSetString_val()) {
+        if (val instanceof StringLiteral) {
+          StringLiteral litVal = (StringLiteral) val;
+          startKey_ = convertToBytes(litVal.getStringValue(),
+              !rowRange.getLowerBoundInclusive());
+        } else {
           // lower bound is null.
           isEmpty_ = true;
           return;
-        } else {
-          startKey_ = convertToBytes(val.getString_val(),
-              !rowRange.getLowerBoundInclusive());
         }
       }
       if (rowRange.getUpperBound() != null) {
         Preconditions.checkState(rowRange.getUpperBound().isConstant());
         Preconditions.checkState(
             rowRange.getUpperBound().getType().equals(Type.STRING));
-        TColumnValue val = FeSupport.EvalConstExpr(rowRange.getUpperBound(),
+        LiteralExpr val = LiteralExpr.create(rowRange.getUpperBound(),
             analyzer.getQueryCtx());
-        if (!val.isSetString_val()) {
-          // upper bound is null.
+        if (val instanceof StringLiteral) {
+          StringLiteral litVal = (StringLiteral) val;
+          stopKey_ = convertToBytes(litVal.getStringValue(),
+              rowRange.getUpperBoundInclusive());
+        } else {
+          // lower bound is null.
           isEmpty_ = true;
           return;
-        } else {
-          stopKey_ = convertToBytes(val.getString_val(),
-              rowRange.getUpperBoundInclusive());
         }
       }
     }

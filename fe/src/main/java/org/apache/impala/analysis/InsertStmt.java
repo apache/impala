@@ -237,8 +237,6 @@ public class InsertStmt extends StatementBase {
         // views and to ignore irrelevant ORDER BYs.
         Analyzer queryStmtAnalyzer = new Analyzer(analyzer);
         queryStmt_.analyze(queryStmtAnalyzer);
-        // Subqueries need to be rewritten by the StmtRewriter first.
-        if (analyzer.containsSubquery()) return;
         // Use getResultExprs() and not getBaseTblResultExprs() here because the final
         // substitution with TupleIsNullPredicate() wrapping happens in planning.
         selectListExprs = Expr.cloneList(queryStmt_.getResultExprs());
@@ -645,7 +643,7 @@ public class InsertStmt extends StatementBase {
           // tableColumns is guaranteed to exist after the earlier analysis checks
           Column tableColumn = table_.getColumn(pkv.getColName());
           Expr compatibleExpr = checkTypeCompatibility(
-              targetTableName_.toString(), tableColumn, pkv.getValue());
+              targetTableName_.toString(), tableColumn, pkv.getLiteralValue());
           tmpPartitionKeyExprs.add(compatibleExpr);
           tmpPartitionKeyNames.add(pkv.getColName());
         }
@@ -764,6 +762,9 @@ public class InsertStmt extends StatementBase {
   }
 
   @Override
+  public ArrayList<Expr> getResultExprs() { return resultExprs_; }
+
+  @Override
   public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
     Preconditions.checkState(isAnalyzed());
     queryStmt_.rewriteExprs(rewriter);
@@ -786,7 +787,6 @@ public class InsertStmt extends StatementBase {
   public boolean hasShuffleHint() { return hasShuffleHint_; }
   public boolean hasNoShuffleHint() { return hasNoShuffleHint_; }
   public boolean hasClusteredHint() { return hasClusteredHint_; }
-  public ArrayList<Expr> getResultExprs() { return resultExprs_; }
   public ArrayList<Expr> getPrimaryKeyExprs() { return primaryKeyExprs_; }
 
   public DataSink createDataSink() {

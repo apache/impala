@@ -232,6 +232,12 @@ class RuntimeState {
     return error_log_.size() < query_options().max_errors;
   }
 
+  /// Returns true if there are entries in the error log.
+  bool HasErrors() {
+    boost::lock_guard<SpinLock> l(error_log_lock_);
+    return !error_log_.empty();
+  }
+
   /// Returns the error log lines as a string joined with '\n'.
   std::string ErrorLog();
 

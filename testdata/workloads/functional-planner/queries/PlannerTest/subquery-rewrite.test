@@ -1267,7 +1267,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg g]
    partitions=11/11 files=11 size=814.73KB
-   predicates: g.bigint_col < 1000, g.bigint_col = TRUE
+   predicates: g.bigint_col = 1, g.bigint_col < 1000
 ====
 # Aggregate subquery in an IS NULL predicate
 select *

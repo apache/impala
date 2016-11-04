@@ -60,6 +60,7 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.ExprRewriter;
+import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -297,6 +298,10 @@ public class Analyzer {
     // same version of a table in a single query, we cache all referenced tables here.
     // TODO: Investigate what to do with other catalog objects.
     private final HashMap<TableName, Table> referencedTables_ = Maps.newHashMap();
+
+    // Expr rewriter for foldinc constants.
+    private final ExprRewriter constantFolder_ =
+        new ExprRewriter(FoldConstantsRule.INSTANCE);
 
     // Timeline of important events in the planning process, used for debugging /
     // profiling
@@ -655,6 +660,7 @@ public class Analyzer {
   }
 
   public TableRef getTableRef(TupleId tid) { return tableRefMap_.get(tid); }
+  public ExprRewriter getConstantFolder() { return globalState_.constantFolder_; }
 
   /**
    * Given a "table alias"."column alias", return the SlotDescriptor

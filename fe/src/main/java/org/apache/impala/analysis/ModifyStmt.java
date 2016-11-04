@@ -29,6 +29,7 @@ import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
@@ -281,6 +282,14 @@ public abstract class ModifyStmt extends StatementBase {
       selectList.add(new SelectListItem(rhsExpr, null));
       referencedColumns.add(colIndexMap.get(c.getName()));
     }
+  }
+
+  @Override
+  public List<Expr> getResultExprs() { return sourceStmt_.getResultExprs(); }
+
+  @Override
+  public void castResultExprs(List<Type> types) throws AnalysisException {
+    sourceStmt_.castResultExprs(types);
   }
 
   @Override

@@ -22,6 +22,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TBoolLiteral;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
+
 import com.google.common.base.Objects;
 
 public class BoolLiteral extends LiteralExpr {

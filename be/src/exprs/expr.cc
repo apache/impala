@@ -205,6 +205,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
     case TExprNodeType::INT_LITERAL:
     case TExprNodeType::STRING_LITERAL:
     case TExprNodeType::DECIMAL_LITERAL:
+    case TExprNodeType::TIMESTAMP_LITERAL:
       *expr = pool->Add(new Literal(texpr_node));
       return Status::OK();
     case TExprNodeType::CASE_EXPR:

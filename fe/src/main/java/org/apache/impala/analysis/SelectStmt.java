@@ -110,6 +110,9 @@ public class SelectStmt extends QueryStmt {
    */
   public Expr getHavingPred() { return havingPred_; }
 
+  @Override
+  public List<String> getColLabels() { return colLabels_; }
+
   public List<TableRef> getTableRefs() { return fromClause_.getTableRefs(); }
   public boolean hasWhereClause() { return whereClause_ != null; }
   public boolean hasGroupByClause() { return groupingExprs_ != null; }
@@ -120,8 +123,6 @@ public class SelectStmt extends QueryStmt {
   public AnalyticInfo getAnalyticInfo() { return analyticInfo_; }
   public boolean hasAnalyticInfo() { return analyticInfo_ != null; }
   public boolean hasHavingClause() { return havingClause_ != null; }
-  @Override
-  public ArrayList<String> getColLabels() { return colLabels_; }
   public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
 
   // Column alias generator used during query rewriting.
@@ -879,7 +880,7 @@ public class SelectStmt extends QueryStmt {
     if (havingClause_ != null) {
       havingClause_ = rewriter.rewrite(havingClause_, analyzer_);
     }
-    if (groupingExprs_ != null) rewriter.applyList(groupingExprs_, analyzer_);
+    if (groupingExprs_ != null) rewriter.rewriteList(groupingExprs_, analyzer_);
     if (orderByElements_ != null) {
       for (OrderByElement orderByElem: orderByElements_) {
         orderByElem.setExpr(rewriter.rewrite(orderByElem.getExpr(), analyzer_));

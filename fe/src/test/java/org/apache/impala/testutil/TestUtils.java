@@ -32,10 +32,6 @@ import javax.json.JsonWriter;
 import javax.json.JsonWriterFactory;
 import javax.json.stream.JsonGenerator;
 
-import org.junit.Assume;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TClientRequest;
@@ -45,6 +41,10 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.thrift.TSessionType;
 import org.apache.impala.thrift.TUniqueId;
+import org.junit.Assume;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.collect.Maps;
 
 public class TestUtils {
@@ -247,6 +247,8 @@ public class TestUtils {
 
   /**
    * Create a TQueryCtx for executing FE tests using the given default DB and user.
+   * Expr rewrites are disabled by default and should be enabled by the caller
+   * if so desired.
    */
   public static TQueryCtx createQueryContext(String defaultDb, String user) {
     TQueryCtx queryCtx = new TQueryCtx();
@@ -258,6 +260,9 @@ public class TestUtils {
     queryCtx.setNow_string(formatter.format(Calendar.getInstance().getTime()));
     queryCtx.setStart_unix_millis(System.currentTimeMillis());
     queryCtx.setPid(1000);
+    // Disable rewrites by default because some analyzer tests have non-executable
+    // constant exprs (e.g. dummy UDFs) that do not work with constant folding.
+    queryCtx.request.query_options.setEnable_expr_rewrites(false);
     return queryCtx;
   }
 

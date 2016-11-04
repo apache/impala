@@ -18,8 +18,8 @@
 package org.apache.impala.analysis;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.EnumSet;
+import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Db;
@@ -27,6 +27,7 @@ import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.service.CatalogOpExecutor;
@@ -209,6 +210,18 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
     // Finally, run analysis on the insert statement.
     insertStmt_.analyze(analyzer);
+  }
+
+  @Override
+  public List<Expr> getResultExprs() { return insertStmt_.getResultExprs(); }
+
+  @Override
+  public void castResultExprs(List<Type> types) throws AnalysisException {
+    super.castResultExprs(types);
+    // Set types of column definitions.
+    List<ColumnDef> colDefs = createStmt_.getColumnDefs();
+    Preconditions.checkState(colDefs.size() == types.size());
+    for (int i = 0; i < types.size(); ++i) colDefs.get(i).setType(types.get(i));
   }
 
   @Override

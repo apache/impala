@@ -898,7 +898,7 @@ public class SingleNodePlanner {
   private PlanNode createConstantSelectPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws InternalException {
     Preconditions.checkState(selectStmt.getTableRefs().isEmpty());
-    ArrayList<Expr> resultExprs = selectStmt.getResultExprs();
+    List<Expr> resultExprs = selectStmt.getResultExprs();
     // Create tuple descriptor for materialized tuple.
     TupleDescriptor tupleDesc = createResultTupleDescriptor(selectStmt, "union", analyzer);
     UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), tupleDesc.getId());
@@ -925,8 +925,8 @@ public class SingleNodePlanner {
         debugName);
     tupleDesc.setIsMaterialized(true);
 
-    ArrayList<Expr> resultExprs = selectStmt.getResultExprs();
-    ArrayList<String> colLabels = selectStmt.getColLabels();
+    List<Expr> resultExprs = selectStmt.getResultExprs();
+    List<String> colLabels = selectStmt.getColLabels();
     for (int i = 0; i < resultExprs.size(); ++i) {
       Expr resultExpr = resultExprs.get(i);
       String colLabel = colLabels.get(i);

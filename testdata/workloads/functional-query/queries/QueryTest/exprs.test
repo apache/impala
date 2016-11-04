@@ -2531,3 +2531,35 @@ select count(shiftleft(int_col, 1)) from functional_parquet.alltypes
 ---- TYPES
 bigint
 ====
+---- QUERY
+# Test constant timestamp expressions in various query clauses. Exercises
+# timestamp literals when run with expr rewrites enabled.
+select count(now()) c, avg(cast('2016-11-22 16:40:00.00' as timestamp)) a,
+  cast('2016-11-22 16:40:00.00' as timestamp) as g
+from functional_parquet.alltypes
+where timestamp_col < cast('2013-02-18 20:46:00.01' as timestamp)
+group by g
+having a = cast('2016-11-22 16:40:00.00' as timestamp)
+order by c, cast('2016-11-22 16:40:00.00' as timestamp)
+---- RESULTS
+7300,2016-11-22 16:40:00,2016-11-22 16:40:00
+---- TYPES
+BIGINT, TIMESTAMP, TIMESTAMP
+====
+---- QUERY
+# Constant timestamp expresisons in a join condition / runtime filter as well
+# as a select node.
+select count(*) from (
+  select a.timestamp_col from
+  functional_parquet.alltypessmall a
+  inner join functional_parquet.alltypestiny b
+  on cast('2013-02-18 20:46:00.01' as timestamp) + interval a.id years =
+     cast('2013-02-18 20:46:00.01' as timestamp) + interval b.id years
+  order by a.timestamp_col limit 10
+) v
+where timestamp_col < cast('2013-02-18 20:46:00.01' as timestamp)
+---- RESULTS
+8
+---- TYPES
+BIGINT
+====

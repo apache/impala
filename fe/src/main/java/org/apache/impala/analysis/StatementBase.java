@@ -17,11 +17,16 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Collections;
+import java.util.List;
+
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.rewrite.ExprRewriter;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Base class for all Impala SQL statements.
@@ -61,6 +66,47 @@ abstract class StatementBase implements ParseNode {
     if (isAnalyzed()) return;
     if (isExplain_) analyzer.setIsExplain();
     analyzer_ = analyzer;
+  }
+
+  /**
+   * Returns the output column labels of this statement, if applicable, or an empty list
+   * if not applicable (not all statements produce an output result set).
+   * Subclasses must override this as necessary.
+   */
+  public List<String> getColLabels() { return Collections.<String>emptyList();  }
+
+  /**
+   * Sets the column labels of this statement, if applicable. No-op of the statement does
+   * not produce an output result set.
+   */
+  public void setColLabels(List<String> colLabels) {
+    List<String> oldLabels = getColLabels();
+    if (oldLabels == colLabels) return;
+    oldLabels.clear();
+    oldLabels.addAll(colLabels);
+  }
+
+  /**
+   * Returns the unresolved result expressions of this statement, if applicable, or an
+   * empty list if not applicable (not all statements produce an output result set).
+   * Subclasses must override this as necessary.
+   */
+  public List<Expr> getResultExprs() { return Collections.<Expr>emptyList(); }
+
+  /**
+   * Casts the result expressions and derived members (e.g., destination column types for
+   * CTAS) to the given types. No-op if this statement does not have result expressions.
+   * Throws when casting fails. Subclasses may override this as necessary.
+   */
+  public void castResultExprs(List<Type> types) throws AnalysisException {
+    List<Expr> resultExprs = getResultExprs();
+    Preconditions.checkNotNull(resultExprs);
+    Preconditions.checkState(resultExprs.size() == types.size());
+    for (int i = 0; i < types.size(); ++i) {
+      if (!resultExprs.get(i).getType().equals(types.get(i))) {
+        resultExprs.set(i, resultExprs.get(i).castTo(types.get(i)));
+      }
+    }
   }
 
   /**

@@ -20,7 +20,6 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.Analyzer;
@@ -30,7 +29,6 @@ import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.QueryStmt;
-import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.KuduTable;
@@ -38,7 +36,6 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.common.TreeNode;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryCtx;
@@ -51,9 +48,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Creates an executable plan from an analyzed parse tree and query options.

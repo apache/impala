@@ -40,6 +40,7 @@ class Literal: public Expr {
   Literal(ColumnType type, double v);
   Literal(ColumnType type, const std::string& v);
   Literal(ColumnType type, const StringValue& v);
+  Literal(ColumnType type, const TimestampValue& v);
 
   /// Test function that parses 'str' according to 'type'. The caller owns the returned
   /// Literal.
@@ -56,6 +57,7 @@ class Literal: public Expr {
   virtual impala_udf::DoubleVal GetDoubleVal(ExprContext*, const TupleRow*);
   virtual impala_udf::StringVal GetStringVal(ExprContext*, const TupleRow*);
   virtual impala_udf::DecimalVal GetDecimalVal(ExprContext*, const TupleRow*);
+  virtual impala_udf::TimestampVal GetTimestampVal(ExprContext*, const TupleRow*);
 
  protected:
   friend class Expr;

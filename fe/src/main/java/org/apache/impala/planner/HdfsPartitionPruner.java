@@ -36,7 +36,6 @@ import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
-import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
@@ -174,7 +173,7 @@ public class HdfsPartitionPruner {
     if (expr instanceof BinaryPredicate) {
       // Evaluate any constant expression in the BE
       try {
-        expr.foldConstantChildren(analyzer);
+        analyzer.getConstantFolder().rewrite(expr, analyzer);
       } catch (AnalysisException e) {
         LOG.error("Error evaluating constant expressions in the BE: " + e.getMessage());
         return false;
@@ -198,7 +197,7 @@ public class HdfsPartitionPruner {
     } else if (expr instanceof InPredicate) {
       // Evaluate any constant expressions in the BE
       try {
-        expr.foldConstantChildren(analyzer);
+        analyzer.getConstantFolder().rewrite(expr, analyzer);
       } catch (AnalysisException e) {
         LOG.error("Error evaluating constant expressions in the BE: " + e.getMessage());
         return false;

@@ -749,7 +749,7 @@ PLAN-ROOT SINK
 |
 |--00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: (CASE WHEN a.id > 100 THEN a.timestamp_col ELSE a.timestamp_col END) >= CAST('2001-01-01 00:00:00' AS TIMESTAMP)
+|     predicates: (CASE WHEN a.id > 100 THEN a.timestamp_col ELSE a.timestamp_col END) >= TIMESTAMP '2001-01-01 00:00:00'
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB

@@ -21,9 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
@@ -32,6 +29,9 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TSlotRef;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;

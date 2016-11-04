@@ -31,6 +31,7 @@ import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.catalog.AuthorizationException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
@@ -38,6 +39,7 @@ import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
+import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TQueryCtx;
@@ -71,6 +73,7 @@ public class AnalysisContext {
     // BetweenPredicates should be rewritten first to help trigger other rules.
     List<ExprRewriteRule> rules = Lists.newArrayList(BetweenToCompoundRule.INSTANCE);
     if (queryCtx.getRequest().getQuery_options().enable_expr_rewrites) {
+      rules.add(FoldConstantsRule.INSTANCE);
       rules.add(ExtractCommonConjunctRule.INSTANCE);
     }
     rewriter_ = new ExprRewriter(rules);
@@ -390,9 +393,24 @@ public class AnalysisContext {
         reAnalyze = true;
       }
       if (reAnalyze) {
+        // The rewrites should have no user-visible effect. Remember the original result
+        // types and column labels to restore them after the rewritten stmt has been
+        // reset() and re-analyzed.
+        List<Type> origResultTypes = Lists.newArrayList();
+        for (Expr e: analysisResult_.stmt_.getResultExprs()) {
+          origResultTypes.add(e.getType());
+        }
+        List<String> origColLabels =
+            Lists.newArrayList(analysisResult_.stmt_.getColLabels());
+
+        // Re-analyze the stmt with a new analyzer.
         analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_, authzConfig_);
         analysisResult_.stmt_.reset();
         analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
+
+        // Restore the original result types and column labels.
+        analysisResult_.stmt_.castResultExprs(origResultTypes);
+        analysisResult_.stmt_.setColLabels(origColLabels);
         LOG.trace("rewrittenStmt: " + analysisResult_.stmt_.toSql());
         if (isExplain) analysisResult_.stmt_.setIsExplain();
         Preconditions.checkState(!analysisResult_.requiresSubqueryRewrite());

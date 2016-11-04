@@ -34,7 +34,6 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TKuduScanNode;
@@ -363,19 +362,11 @@ public class KuduScanNode extends ScanNode {
 
   /**
    * Normalizes and returns a copy of 'predicate' consisting of an uncast SlotRef and a
-   * constant Expr into the following form: <SlotRef> <Op> <LiteralExpr>
-   * If 'predicate' cannot be expressed in this way, null is returned.
+   * constant Expr into the following form: <SlotRef> <Op> <LiteralExpr>.
+   * Assumes that constant expressions have already been folded.
    */
   private static BinaryPredicate normalizeSlotRefComparison(BinaryPredicate predicate,
       Analyzer analyzer) {
-    try {
-      predicate = (BinaryPredicate) predicate.clone();
-      predicate.foldConstantChildren(analyzer);
-    } catch (AnalysisException ex) {
-      // Throws if the expression cannot be evaluated by the BE.
-      return null;
-    }
-
     SlotRef ref = null;
     if (predicate.getChild(0) instanceof SlotRef) {
       ref = (SlotRef) predicate.getChild(0);

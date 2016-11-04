@@ -15,13 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Validates limit on scan nodes
-
 import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.test_vector import TestDimension
 from tests.util.test_file_parser import QueryTestSectionReader
 
 class TestExprs(ImpalaTestSuite):
@@ -32,6 +31,9 @@ class TestExprs(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestExprs, cls).add_test_dimensions()
+    # Test with and without expr rewrites to cover regular expr evaluations
+    # as well as constant folding, in particular, timestamp literals.
+    cls.TestMatrix.add_dimension(TestDimension('enable_expr_rewrites', *[0,1]))
     if cls.exploration_strategy() == 'core':
       # Test with file format that supports codegen
       cls.TestMatrix.add_constraint(lambda v:\
@@ -39,6 +41,8 @@ class TestExprs(ImpalaTestSuite):
           v.get_value('table_format').compression_codec == 'none')
 
   def test_exprs(self, vector):
+    vector.get_value('exec_option')['enable_expr_rewrites'] = \
+        vector.get_value('enable_expr_rewrites')
     # TODO: Enable some of these tests for Avro if possible
     # Don't attempt to evaluate timestamp expressions with Avro tables (which don't
     # support a timestamp type)"

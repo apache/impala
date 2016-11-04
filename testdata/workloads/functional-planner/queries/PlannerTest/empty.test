@@ -149,7 +149,7 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: a.id = b.id
-|  other join predicates: 1 + 1 > 10
+|  other join predicates: FALSE
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     partitions=4/4 files=4 size=460B
@@ -168,7 +168,7 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: a.id = b.id
-|  other join predicates: NOT TRUE
+|  other join predicates: FALSE
 |  runtime filters: RF000 <- b.id
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
@@ -189,7 +189,7 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = b.id
-|  other join predicates: NULL = 'abc'
+|  other join predicates: NULL
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     partitions=4/4 files=4 size=460B

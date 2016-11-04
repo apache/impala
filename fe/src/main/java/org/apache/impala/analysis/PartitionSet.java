@@ -29,6 +29,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.thrift.TPartitionKeyValue;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -66,7 +67,7 @@ public class PartitionSet extends PartitionSpecBase {
     TupleDescriptor desc = analyzer.getDescriptor(tableName_.toString());
     List<SlotId> partitionSlots = desc.getPartitionSlots();
     for (Expr e: conjuncts) {
-      e.foldConstantChildren(analyzer);
+      analyzer.getConstantFolder().rewrite(e, analyzer);
       // Make sure there are no constant predicates in the partition exprs.
       if (e.isConstant()) {
         throw new AnalysisException(String.format("Invalid partition expr %s. A " +

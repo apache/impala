@@ -60,7 +60,9 @@ Java_org_apache_impala_service_FeSupport_NativeFeTestInit(
     JNIEnv* env, jclass caller_class) {
   DCHECK(ExecEnv::GetInstance() == NULL) << "This should only be called once from the FE";
   char* name = const_cast<char*>("FeSupport");
-  InitCommonRuntime(1, &name, false, TestInfo::FE_TEST);
+  // Init the JVM to load the classes in JniUtil that are needed for returning
+  // exceptions to the FE.
+  InitCommonRuntime(1, &name, true, TestInfo::FE_TEST);
   LlvmCodeGen::InitializeLlvm(true);
   ExecEnv* exec_env = new ExecEnv(); // This also caches it from the process.
   exec_env->InitForFeTests();
@@ -69,7 +71,8 @@ Java_org_apache_impala_service_FeSupport_NativeFeTestInit(
 // Evaluates a batch of const exprs and returns the results in a serialized
 // TResultRow, where each TColumnValue in the TResultRow stores the result of
 // a predicate evaluation. It requires JniUtil::Init() to have been
-// called.
+// called. Throws a Java exception if an error or warning is encountered during
+// the expr evaluation.
 extern "C"
 JNIEXPORT jbyteArray JNICALL
 Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
@@ -85,24 +88,38 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
   DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch);
   DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx);
   vector<TExpr>& texprs = expr_batch.exprs;
-  // Disable codegen advisorily to avoid unnecessary latency.
+  // Disable codegen advisory to avoid unnecessary latency.
   query_ctx.disable_codegen_hint = true;
+  // Allow logging of at least one error, so we can detect and convert it into a
+  // Java exception.
+  query_ctx.request.query_options.max_errors = 1;
   RuntimeState state(query_ctx);
 
   THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
       result_bytes);
   // Exprs can allocate memory so we need to set up the mem trackers before
   // preparing/running the exprs.
-  state.InitMemTrackers(TUniqueId(), NULL, -1);
+  int64_t mem_limit = -1;
+  if (query_ctx.request.query_options.__isset.mem_limit
+      && query_ctx.request.query_options.mem_limit > 0) {
+    mem_limit = query_ctx.request.query_options.mem_limit;
+  }
+  state.InitMemTrackers(state.query_id(), NULL, mem_limit);
 
+  // Prepare() the exprs. Always Close() the exprs even in case of errors.
   vector<ExprContext*> expr_ctxs;
   for (const TExpr& texpr : texprs) {
     ExprContext* ctx;
     THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, texpr, &ctx), env,
         JniUtil::internal_exc_class(), result_bytes);
-    THROW_IF_ERROR_RET(ctx->Prepare(&state, RowDescriptor(), state.query_mem_tracker()),
-        env, JniUtil::internal_exc_class(), result_bytes);
+    Status prepare_status =
+        ctx->Prepare(&state, RowDescriptor(), state.query_mem_tracker());
     expr_ctxs.push_back(ctx);
+    if (!prepare_status.ok()) {
+      for (ExprContext* ctx: expr_ctxs) ctx->Close(&state);
+      (env)->ThrowNew(JniUtil::internal_exc_class(), prepare_status.GetDetail().c_str());
+      return result_bytes;
+    }
   }
 
   // UDFs which cannot be interpreted need to be handled by codegen.
@@ -116,32 +133,36 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
     codegen->FinalizeModule();
   }
 
+  // Open() and evaluate the exprs. Always Close() the exprs even in case of errors.
   vector<TColumnValue> results;
-  // Open and evaluate the exprs. Also, always Close() the exprs even in case of errors.
-  for (int i = 0; i < expr_ctxs.size(); ++i) {
-    Status open_status = expr_ctxs[i]->Open(&state);
-    if (!open_status.ok()) {
-      for (int j = i; j < expr_ctxs.size(); ++j) {
-        expr_ctxs[j]->Close(&state);
-      }
-      (env)->ThrowNew(JniUtil::internal_exc_class(), open_status.GetDetail().c_str());
-      return result_bytes;
-    }
+  Status status;
+  int i;
+  for (i = 0; i < expr_ctxs.size(); ++i) {
+    status = expr_ctxs[i]->Open(&state);
+    if (!status.ok()) break;
+
     TColumnValue val;
-    expr_ctxs[i]->GetValue(NULL, false, &val);
-    // We check here if an error was set in the expression evaluated through GetValue()
-    // and throw an exception accordingly
-    Status getvalue_status = expr_ctxs[i]->root()->GetFnContextError(expr_ctxs[i]);
-    if (!getvalue_status.ok()) {
-      for (int j = i; j < expr_ctxs.size(); ++j) {
-        expr_ctxs[j]->Close(&state);
-      }
-      (env)->ThrowNew(JniUtil::internal_exc_class(), getvalue_status.GetDetail().c_str());
-      return result_bytes;
+    expr_ctxs[i]->GetConstantValue(&val);
+    status = expr_ctxs[i]->root()->GetFnContextError(expr_ctxs[i]);
+    if (!status.ok()) break;
+
+    // Check for mem limit exceeded.
+    status = state.CheckQueryState();
+    if (!status.ok()) break;
+    // Check for warnings registered in the runtime state.
+    if (state.HasErrors()) {
+      status = Status(state.ErrorLog());
+      break;
     }
 
     expr_ctxs[i]->Close(&state);
     results.push_back(val);
+  }
+  // Convert status to exception. Close all remaining expr contexts.
+  if (!status.ok()) {
+    for (int j = i; j < expr_ctxs.size(); ++j) expr_ctxs[j]->Close(&state);
+    (env)->ThrowNew(JniUtil::internal_exc_class(), status.GetDetail().c_str());
+    return result_bytes;
   }
 
   expr_results.__set_colVals(results);

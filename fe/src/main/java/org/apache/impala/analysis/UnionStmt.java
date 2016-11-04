@@ -598,7 +598,7 @@ public class UnionStmt extends QueryStmt {
   }
 
   @Override
-  public ArrayList<String> getColLabels() {
+  public List<String> getColLabels() {
     Preconditions.checkState(operands_.size() > 0);
     return operands_.get(0).getQueryStmt().getColLabels();
   }
