@@ -1223,10 +1223,11 @@ public class Analyzer {
   }
 
   /**
-   * Returns true if e must be evaluated by a join node. Note that it may still be
-   * safe to evaluate e elsewhere as well, but in any case the join must evaluate e.
+   * Returns true if 'e' must be evaluated after or by a join node. Note that it may
+   * still be safe to evaluate 'e' elsewhere as well, but in any case 'e' must be
+   * evaluated again by or after a join.
    */
-  public boolean evalByJoin(Expr e) {
+  public boolean evalAfterJoin(Expr e) {
     List<TupleId> tids = Lists.newArrayList();
     e.getIds(tids, null);
     if (tids.isEmpty()) return false;
@@ -1555,18 +1556,22 @@ public class Analyzer {
             }
           }
 
-          // Check if either srcConjunct or the generated predicate needs to be evaluated
-          // at a join node (IMPALA-2018).
-          boolean evalByJoin =
-              (evalByJoin(srcConjunct)
-               && (globalState_.ojClauseByConjunct.get(srcConjunct.getId())
-                != globalState_.outerJoinedTupleIds.get(srcTid)))
-              || (evalByJoin(p)
+          // IMPALA-2018/4379: Check if srcConjunct or the generated predicate need to
+          // be evaluated again at a later point in the plan, e.g., by a join that makes
+          // referenced tuples nullable. The first condition is conservative but takes
+          // into account that On-clause conjuncts can sometimes be legitimately assigned
+          // below their originating join.
+          boolean evalAfterJoin =
+              (hasOuterJoinedTuple && !srcConjunct.isOnClauseConjunct_)
+              || (evalAfterJoin(srcConjunct)
+                  && (globalState_.ojClauseByConjunct.get(srcConjunct.getId())
+                    != globalState_.outerJoinedTupleIds.get(srcTid)))
+              || (evalAfterJoin(p)
                   && (globalState_.ojClauseByConjunct.get(p.getId())
-                   != globalState_.outerJoinedTupleIds.get(destTid)));
+                    != globalState_.outerJoinedTupleIds.get(destTid)));
 
           // mark all bound predicates including duplicate ones
-          if (reverseValueTransfer && !evalByJoin) markConjunctAssigned(srcConjunct);
+          if (reverseValueTransfer && !evalAfterJoin) markConjunctAssigned(srcConjunct);
         }
 
         // check if we already created this predicate

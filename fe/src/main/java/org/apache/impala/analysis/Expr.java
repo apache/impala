@@ -851,22 +851,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static <C extends Expr> void removeDuplicates(List<C> l) {
     if (l == null) return;
-    ListIterator<C> it1 = l.listIterator();
-    while (it1.hasNext()) {
-      C e1 = it1.next();
-      ListIterator<C> it2 = l.listIterator();
-      boolean duplicate = false;
-      while (it2.hasNext()) {
-        C e2 = it2.next();
-          // only check up to but excluding e1
-        if (e1 == e2) break;
-        if (e1.equals(e2)) {
-          duplicate = true;
-          break;
-        }
-      }
-      if (duplicate) it1.remove();
-    }
+    List<C> origList = Lists.newArrayList(l);
+    l.clear();
+    for (C expr: origList) if (!l.contains(expr)) l.add(expr);
   }
 
   /**

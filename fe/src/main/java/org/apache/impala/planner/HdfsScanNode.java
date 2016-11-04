@@ -292,7 +292,7 @@ public class HdfsScanNode extends ScanNode {
       // Mark those conjuncts as assigned that do not also need to be evaluated by a
       // subsequent semi or outer join.
       for (Expr conjunct: collectionConjuncts) {
-        if (!analyzer.evalByJoin(conjunct)) analyzer.markConjunctAssigned(conjunct);
+        if (!analyzer.evalAfterJoin(conjunct)) analyzer.markConjunctAssigned(conjunct);
       }
       if (!collectionConjuncts.isEmpty()) {
         analyzer.materializeSlots(collectionConjuncts);

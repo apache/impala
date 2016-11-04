@@ -333,7 +333,7 @@ public class SelectStmt extends QueryStmt {
         analyzer.getUnassignedConjuncts(getTableRefIds(), true);
     List<Expr> unassignedJoinConjuncts = Lists.newArrayList();
     for (Expr e: unassigned) {
-      if (analyzer.evalByJoin(e)) unassignedJoinConjuncts.add(e);
+      if (analyzer.evalAfterJoin(e)) unassignedJoinConjuncts.add(e);
     }
     List<Expr> baseTblJoinConjuncts =
         Expr.substituteList(unassignedJoinConjuncts, baseTblSmap_, analyzer, false);

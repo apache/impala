@@ -919,3 +919,32 @@ PLAN-ROOT SINK
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> b.int_col
 ====
+# IMPALA-3167: Test correct assignment of a WHERE-clause predicate through an inline view
+# that has a grouping aggregation and an outer join. The predicate can be assigned at the
+# scan on the nullable side of the outer join, but it must also be evaluated after the join.
+select v2.id, v2.s
+from (select v1.id, sum(bigint_col) s
+      from functional.alltypes t1
+      left outer join (select t2.int_col, t2.id
+                       from functional.alltypessmall t2) v1
+      on t1.int_col = v1.int_col
+      group by v1.id) v2
+where v2.id < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: sum(bigint_col)
+|  group by: t2.id
+|  having: v1.id < 10
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 files=4 size=6.32KB
+|     predicates: t2.id < 10
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
