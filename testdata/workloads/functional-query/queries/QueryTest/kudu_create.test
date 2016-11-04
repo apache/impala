@@ -84,3 +84,42 @@ create table tab (a int primary key) distribute by range (a) (partition value = 
 stored as kudu
 ---- RESULTS
 ====
+---- QUERY
+# Invalid hostname
+create table tdata_bogus_host (id int primary key, name string, valf float, vali bigint)
+  DISTRIBUTE BY RANGE (PARTITION 10 <= VALUES <= 30) STORED AS KUDU
+  TBLPROPERTIES('kudu.master_addresses' = 'bogus host name')
+---- CATCH
+Couldn't resolve this master's address bogus host name:7051
+====
+---- QUERY
+# Non-existing host
+create table tdata_non_existing_host
+(id int primary key, name string, valf float, vali bigint)
+  DISTRIBUTE BY RANGE (PARTITION 10 <= VALUES <= 30) STORED AS KUDU
+  TBLPROPERTIES('kudu.master_addresses' = 'bogus.host.name')
+---- CATCH
+Couldn't resolve this master's address bogus.host.name:7051
+====
+---- QUERY
+# Test that string case is ignored
+create table ignore_column_case (Id int, NAME string, vAlf float, vali bigint,
+  primary key (Id, NAME)) DISTRIBUTE BY RANGE (PARTITION VALUE = (1, 'Martin'))
+  STORED AS KUDU
+---- RESULTS
+====
+---- QUERY
+insert into ignore_column_case values (1, 'Martin', 1.0, 10);
+---- RESULTS
+: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+====
+---- QUERY
+select ID, nAmE, VALF, VALI from ignore_column_case where NaMe = 'Martin';
+---- RESULTS
+1,'Martin',1.0,10
+---- TYPES
+INT,STRING,FLOAT,BIGINT
+====

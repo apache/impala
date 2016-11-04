@@ -338,6 +338,11 @@ class ImpalaTestSuite(BaseTestSuite):
       if encoding: result.data = [row.decode(encoding) for row in result.data]
       # Replace $NAMENODE in the expected results with the actual namenode URI.
       if 'RESULTS' in test_section:
+        # Combining 'RESULTS' with 'DML_RESULTS" is currently unsupported because
+        # __verify_results_and_errors calls verify_raw_results which always checks
+        # ERRORS, TYPES, LABELS, etc. which doesn't make sense if there are two
+        # different result sets to consider (IMPALA-4471).
+        assert 'DML_RESULTS' not in test_section
         self.__verify_results_and_errors(vector, test_section, result, use_db)
       else:
         # TODO: Can't validate errors without expected results for now.
@@ -350,6 +355,17 @@ class ImpalaTestSuite(BaseTestSuite):
             .replace('$IMPALA_HOME', IMPALA_HOME)
       if 'RUNTIME_PROFILE' in test_section:
         verify_runtime_profile(test_section['RUNTIME_PROFILE'], result.runtime_profile)
+
+      if 'DML_RESULTS' in test_section:
+        assert 'ERRORS' not in test_section
+        # The limit is specified to ensure the queries aren't unbounded. We shouldn't have
+        # test files that are checking the contents of tables larger than that anyways.
+        dml_results_query = "select * from %s limit 1000" % \
+            test_section['DML_RESULTS_TABLE']
+        dml_result = self.__execute_query(target_impalad_client, dml_results_query)
+        verify_raw_results(test_section, dml_result,
+            vector.get_value('table_format').file_format,
+            pytest.config.option.update_results, result_section='DML_RESULTS')
     if pytest.config.option.update_results:
       output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")
       write_test_file(output_file, sections, encoding=encoding)

@@ -43,8 +43,17 @@ class TestKuduOperations(KuduTestSuite):
   def test_kudu_scan_node(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database)
 
-  def test_kudu_crud(self, vector, unique_database):
-    self.run_test_case('QueryTest/kudu_crud', vector, use_db=unique_database)
+  def test_kudu_insert(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_insert', vector, use_db=unique_database)
+
+  def test_kudu_update(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_update', vector, use_db=unique_database)
+
+  def test_kudu_upsert(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_upsert', vector, use_db=unique_database)
+
+  def test_kudu_delete(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_delete', vector, use_db=unique_database)
 
   def test_kudu_partition_ddl(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_partition_ddl', vector, use_db=unique_database)
