@@ -123,3 +123,9 @@ DEFINE_bool(enable_accept_queue_server, true,
     "TThreadedServer that accepts connections as quickly as possible and hands them off "
     "to a thread pool to finish setup, reducing the chances that connections time out "
     "waiting to be accepted.");
+
+DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
+    "incremental stats the catalog is allowed to serialize per table. "
+    "This limit is set as a safety check, to prevent the JVM from "
+    "hitting a maximum array limit of 1GB (or OOM) while building "
+    "the thrift objects to send to impalads. By default, it's set to 200MB");

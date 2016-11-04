@@ -54,8 +54,8 @@ public class KuduUtil {
    */
   public static KuduClient createKuduClient(String kuduMasters) {
     KuduClientBuilder b = new KuduClient.KuduClientBuilder(kuduMasters);
-    b.defaultAdminOperationTimeoutMs(BackendConfig.getKuduClientTimeoutMs());
-    b.defaultOperationTimeoutMs(BackendConfig.getKuduClientTimeoutMs());
+    b.defaultAdminOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
+    b.defaultOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
     return b.build();
   }
 

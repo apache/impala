@@ -19,42 +19,24 @@ package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
 import com.google.common.annotations.VisibleForTesting;
+
+import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTH_TO_LOCAL;
-import org.apache.hadoop.security.authentication.util.KerberosName;
 
 /*
  * Class that represents a User of an Impala session.
  */
 public class User {
 
-  static {
-    // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local
-    // from core-site.xml and use it for principal to short name conversion. If it is not,
-    // we use the defaultRule ("RULE:[1:$1] RULE:[2:$1]"), which just extracts the user
-    // name from any principal of form a@REALM or a/b@REALM. If auth_to_local is enabled
-    // and hadoop.security.auth_to_local is not specified in the hadoop configs, we use
-    // the "DEFAULT" rule that just extracts the username from any principal in the
-    // cluster's local realm. For more details on principal to short name translation,
-    // refer to org.apache.hadoop.security.KerberosName.
-    final String defaultRule = "RULE:[1:$1] RULE:[2:$1]";
-    final Configuration conf = new Configuration();
-    if (BackendConfig.isAuthToLocalEnabled()) {
-      KerberosName.setRules(conf.get(HADOOP_SECURITY_AUTH_TO_LOCAL, "DEFAULT"));
-    } else {
-      // just extract the simple user name
-      KerberosName.setRules(defaultRule);
-    }
-  }
-
   private final String name_;
 
+  // Refer to BackendConfig.initAuthToLocal() for initialization
+  // of static auth_to_local configs in KerberosName class.
   private KerberosName kerberosName_;
 
   public User(String name) {

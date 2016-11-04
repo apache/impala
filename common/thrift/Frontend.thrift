@@ -721,11 +721,6 @@ struct TGetAllHadoopConfigsResponse {
   1: optional map<string, string> configs;
 }
 
-// BE startup options
-struct TStartupOptions {
-  1: optional bool compute_lineage
-}
-
 // For creating a test descriptor table. The tuples and their memory layout are computed
 // in the FE.
 struct TBuildTestDescriptorTableParams {

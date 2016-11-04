@@ -63,6 +63,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -168,12 +169,6 @@ public class HdfsTable extends Table {
 
   // Store all the partition ids of an HdfsTable.
   private HashSet<Long> partitionIds_ = Sets.newHashSet();
-
-  // Maximum size (in bytes) of incremental stats the catalog is allowed to serialize per
-  // table. This limit is set as a safety check, to prevent the JVM from hitting a
-  // maximum array limit of 1GB (or OOM) while building the thrift objects to send to
-  // impalads.
-  public static final long MAX_INCREMENTAL_STATS_SIZE_BYTES = 200 * 1024 * 1024;
 
   // Estimate (in bytes) of the incremental stats size per column per partition
   public static final long STATS_SIZE_PER_COLUMN_BYTES = 400;
@@ -1593,7 +1588,7 @@ public class HdfsTable extends Table {
    * partitions). To prevent the catalog from hitting an OOM error while trying to
    * serialize large partition incremental stats, we estimate the stats size and filter
    * the incremental stats data from partition objects if the estimate exceeds
-   * MAX_INCREMENTAL_STATS_SIZE_BYTES.
+   * --inc_stats_size_limit_bytes
    */
   private THdfsTable getTHdfsTable(boolean includeFileDesc, Set<Long> refPartitions) {
     // includeFileDesc implies all partitions should be included (refPartitions == null).
@@ -1603,7 +1598,7 @@ public class HdfsTable extends Table {
     long statsSizeEstimate =
         numPartitions * getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
     boolean includeIncrementalStats =
-        (statsSizeEstimate < MAX_INCREMENTAL_STATS_SIZE_BYTES);
+        (statsSizeEstimate < BackendConfig.INSTANCE.getIncStatsMaxSize());
     Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
     for (HdfsPartition partition: partitionMap_.values()) {
       long id = partition.getId();

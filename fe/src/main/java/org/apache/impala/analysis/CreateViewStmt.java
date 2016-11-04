@@ -24,6 +24,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.service.BackendConfig;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -60,7 +61,7 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
         TCatalogObjectType.VIEW, Privilege.CREATE.toString()));
 
     createColumnAndViewDefs(analyzer);
-    if (RuntimeEnv.INSTANCE.computeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
+    if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
       computeLineageGraph(analyzer);
     }
   }

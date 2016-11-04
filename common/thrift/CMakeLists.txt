@@ -144,6 +144,7 @@ set (EXT_DATA_SRC_FILES
 set (SRC_FILES
   ErrorCodes.thrift
   beeswax.thrift
+  BackendGflags.thrift
   CatalogInternalService.thrift
   CatalogObjects.thrift
   CatalogService.thrift

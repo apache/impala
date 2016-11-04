@@ -47,6 +47,7 @@ import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TSentryAdminCheckRequest;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.thrift.TException;
@@ -78,29 +79,30 @@ public class JniCatalog {
     return new TUniqueId(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
   }
 
-  public JniCatalog(boolean loadInBackground, int numMetadataLoadingThreads,
-      String sentryServiceConfig, int impalaLogLevel, int otherLogLevel,
-      boolean allowAuthToLocal, String kerberosPrincipal, String localLibraryPath,
-      int kuduOperationTimeoutMs) throws InternalException {
-    BackendConfig.setAuthToLocal(allowAuthToLocal);
-    BackendConfig.setKuduClientTimeoutMs(kuduOperationTimeoutMs);
-    Preconditions.checkArgument(numMetadataLoadingThreads > 0);
+  public JniCatalog(byte[] thriftBackendConfig) throws InternalException,
+      ImpalaException, TException {
+    TBackendGflags cfg = new TBackendGflags();
+    JniUtil.deserializeThrift(protocolFactory_, cfg, thriftBackendConfig);
+
+    BackendConfig.create(cfg);
+
+    Preconditions.checkArgument(cfg.num_metadata_loading_threads > 0);
     // This trick saves having to pass a TLogLevel enum, which is an object and more
     // complex to pass through JNI.
-    GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
-        TLogLevel.values()[otherLogLevel]);
+    GlogAppender.Install(TLogLevel.values()[cfg.impala_log_lvl],
+        TLogLevel.values()[cfg.non_impala_java_vlog]);
 
     // Check if the Sentry Service is configured. If so, create a configuration object.
     SentryConfig sentryConfig = null;
-    if (!Strings.isNullOrEmpty(sentryServiceConfig)) {
-      sentryConfig = new SentryConfig(sentryServiceConfig);
+    if (!Strings.isNullOrEmpty(cfg.sentry_config)) {
+      sentryConfig = new SentryConfig(cfg.sentry_config);
       sentryConfig.loadConfig();
     }
     LOG.info(JniUtil.getJavaVersion());
 
-    catalog_ = new CatalogServiceCatalog(loadInBackground,
-        numMetadataLoadingThreads, sentryConfig, getServiceId(), kerberosPrincipal,
-        localLibraryPath);
+    catalog_ = new CatalogServiceCatalog(cfg.load_catalog_in_background,
+        cfg.num_metadata_loading_threads, sentryConfig, getServiceId(), cfg.principal,
+        cfg.local_library_path);
     try {
       catalog_.reset();
     } catch (CatalogException e) {

@@ -33,6 +33,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.PrintUtils;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TComputeStatsParams;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TTableName;
@@ -284,16 +285,17 @@ public class ComputeStatsStmt extends StatementBase {
           }
       }
       // For incremental stats, estimate the size of intermediate stats and report an
-      // error if the estimate is greater than MAX_INCREMENTAL_STATS_SIZE_BYTES.
+      // error if the estimate is greater than --inc_stats_size_limit_bytes in bytes
       if (isIncremental_) {
+        long incStatMaxSize = BackendConfig.INSTANCE.getIncStatsMaxSize();
         long statsSizeEstimate = hdfsTable.getColumns().size() *
             hdfsTable.getPartitions().size() * HdfsTable.STATS_SIZE_PER_COLUMN_BYTES;
-        if (statsSizeEstimate > HdfsTable.MAX_INCREMENTAL_STATS_SIZE_BYTES) {
+        if (statsSizeEstimate > incStatMaxSize) {
           LOG.error("Incremental stats size estimate for table " + hdfsTable.getName() +
-              " exceeded " + HdfsTable.MAX_INCREMENTAL_STATS_SIZE_BYTES + ", estimate = "
+              " exceeded " + incStatMaxSize + ", estimate = "
               + statsSizeEstimate);
           throw new AnalysisException("Incremental stats size estimate exceeds "
-              + PrintUtils.printBytes(HdfsTable.MAX_INCREMENTAL_STATS_SIZE_BYTES)
+              + PrintUtils.printBytes(incStatMaxSize)
               + ". Please try COMPUTE STATS instead.");
         }
       }

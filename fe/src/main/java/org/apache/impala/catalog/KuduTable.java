@@ -340,7 +340,7 @@ public class KuduTable extends Table {
     try (KuduClient client = KuduUtil.createKuduClient(getKuduMasterHosts())) {
       org.apache.kudu.client.KuduTable kuduTable = client.openTable(kuduTableName_);
       List<LocatedTablet> tablets =
-          kuduTable.getTabletsLocations(BackendConfig.getKuduClientTimeoutMs());
+          kuduTable.getTabletsLocations(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
       for (LocatedTablet tab: tablets) {
         TResultRowBuilder builder = new TResultRowBuilder();
         builder.add("-1");   // The Kudu client API doesn't expose tablet row counts.

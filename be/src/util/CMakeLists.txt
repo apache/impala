@@ -32,6 +32,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 add_library(Util
   auth-util.cc
   avro-util.cc
+  backend-gflag-util.cc
   benchmark.cc
   bitmap.cc
   bit-util.cc
