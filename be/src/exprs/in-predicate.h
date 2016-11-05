@@ -21,6 +21,9 @@
 
 #include <string>
 #include "exprs/predicate.h"
+#include "exprs/anyval-util.h"
+#include "runtime/decimal-value.h"
+#include "runtime/string-value.inline.h"
 #include "udf/udf.h"
 
 namespace impala {
@@ -293,7 +296,7 @@ class InPredicate : public Predicate {
   /// functions.
   template<typename T, typename SetType, bool not_in, Strategy strategy>
   static inline impala_udf::BooleanVal TemplatedIn(
-      impala_udf::FunctionContext* context, const T& val, int num_args, const T* args);
+      impala_udf::FunctionContext* ctx, const T& val, int num_args, const T* args);
 
   /// Initializes an SetLookupState in ctx.
   template<typename T, typename SetType>
@@ -308,12 +311,120 @@ class InPredicate : public Predicate {
   template<typename T, typename SetType>
   static BooleanVal SetLookup(SetLookupState<SetType>* state, const T& v);
 
-  /// Iterates through each vararg looking for val. 'type' is the type of 'val' and 'args'.
-  template<typename T>
+  /// Iterates through each vararg looking for val. 'type' is the type of 'val' and
+  /// 'args'.
+  template <typename T>
   static BooleanVal Iterate(
       const FunctionContext::TypeDesc* type, const T& val, int num_args, const T* args);
+
+  // Templated getter functions for extracting 'SetType' values from AnyVals
+  template <typename T, typename SetType>
+  static inline SetType GetVal(const FunctionContext::TypeDesc* type, const T& x);
 };
 
+template <typename T, typename SetType, bool not_in, InPredicate::Strategy strategy>
+inline impala_udf::BooleanVal InPredicate::TemplatedIn(
+    impala_udf::FunctionContext* ctx, const T& val, int num_args, const T* args) {
+  if (val.is_null) return BooleanVal::null();
+
+  BooleanVal found;
+  if (strategy == SET_LOOKUP) {
+    SetLookupState<SetType>* state = reinterpret_cast<SetLookupState<SetType>*>(
+        ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+    DCHECK(state != NULL);
+    found = SetLookup(state, val);
+  } else {
+    DCHECK_EQ(strategy, ITERATE);
+    found = Iterate(ctx->GetArgType(0), val, num_args, args);
+  }
+  if (found.is_null) return BooleanVal::null();
+  return BooleanVal(found.val ^ not_in);
+}
+
+template <typename T, typename SetType>
+void InPredicate::SetLookupPrepare(
+    FunctionContext* ctx, FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+
+  SetLookupState<SetType>* state = new SetLookupState<SetType>;
+  state->type = ctx->GetArgType(0);
+  state->contains_null = false;
+  for (int i = 1; i < ctx->GetNumArgs(); ++i) {
+    DCHECK(ctx->IsArgConstant(i));
+    T* arg = reinterpret_cast<T*>(ctx->GetConstantArg(i));
+    if (arg->is_null) {
+      state->contains_null = true;
+    } else {
+      state->val_set.insert(GetVal<T, SetType>(state->type, *arg));
+    }
+  }
+  ctx->SetFunctionState(scope, state);
+}
+
+template <typename SetType>
+void InPredicate::SetLookupClose(
+    FunctionContext* ctx, FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  SetLookupState<SetType>* state =
+      reinterpret_cast<SetLookupState<SetType>*>(ctx->GetFunctionState(scope));
+  delete state;
+}
+
+template <typename T, typename SetType>
+BooleanVal InPredicate::SetLookup(SetLookupState<SetType>* state, const T& v) {
+  DCHECK(state != NULL);
+  SetType val = GetVal<T, SetType>(state->type, v);
+  bool found = state->val_set.find(val) != state->val_set.end();
+  if (found) return BooleanVal(true);
+  if (state->contains_null) return BooleanVal::null();
+  return BooleanVal(false);
+}
+
+template <typename T>
+BooleanVal InPredicate::Iterate(
+    const FunctionContext::TypeDesc* type, const T& val, int num_args, const T* args) {
+  bool found_null = false;
+  for (int i = 0; i < num_args; ++i) {
+    if (args[i].is_null) {
+      found_null = true;
+    } else if (AnyValUtil::Equals(*type, val, args[i])) {
+      return BooleanVal(true);
+    }
+  }
+  if (found_null) return BooleanVal::null();
+  return BooleanVal(false);
+}
+
+template <typename T, typename SetType>
+inline SetType InPredicate::GetVal(const FunctionContext::TypeDesc* type, const T& x) {
+  DCHECK(!x.is_null);
+  return x.val;
+}
+
+template <>
+inline StringValue InPredicate::GetVal(
+    const FunctionContext::TypeDesc* type, const StringVal& x) {
+  DCHECK(!x.is_null);
+  return StringValue::FromStringVal(x);
+}
+
+template <>
+inline TimestampValue InPredicate::GetVal(
+    const FunctionContext::TypeDesc* type, const TimestampVal& x) {
+  return TimestampValue::FromTimestampVal(x);
+}
+
+template <>
+inline Decimal16Value InPredicate::GetVal(
+    const FunctionContext::TypeDesc* type, const DecimalVal& x) {
+  if (type->precision <= ColumnType::MAX_DECIMAL4_PRECISION) {
+    return Decimal16Value(x.val4);
+  } else if (type->precision <= ColumnType::MAX_DECIMAL8_PRECISION) {
+    return Decimal16Value(x.val8);
+  } else {
+    return Decimal16Value(x.val16);
+  }
+}
 }
 
 #endif
