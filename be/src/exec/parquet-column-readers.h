@@ -440,15 +440,6 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// 'size' bytes remaining.
   virtual Status InitDataPage(uint8_t* data, int size) = 0;
 
- private:
-  /// Writes the next value into *slot using pool if necessary. Also advances rep_level_
-  /// and def_level_ via NextLevels().
-  ///
-  /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
-  /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
-  /// true.
-  template <bool IN_COLLECTION>
-  inline bool ReadSlot(void* slot, MemPool* pool);
 };
 
 /// Collections are not materialized directly in parquet files; only scalar values appear
@@ -511,12 +502,13 @@ class CollectionColumnReader : public ParquetColumnReader {
   void UpdateDerivedState();
 
   /// Recursively reads from children_ to assemble a single CollectionValue into
-  /// *slot. Also advances rep_level_ and def_level_ via NextLevels().
+  /// the appropriate destination slot in 'tuple'. Also advances rep_level_ and
+  /// def_level_ via NextLevels().
   ///
   /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
-  inline bool ReadSlot(void* slot, MemPool* pool);
+  inline bool ReadSlot(Tuple* tuple, MemPool* pool);
 };
 
 }

@@ -43,7 +43,10 @@ from tests.common.test_dimensions import (
     create_exec_option_dimension,
     get_dataset_from_workload,
     load_table_info_dimension)
-from tests.common.test_result_verifier import verify_raw_results, verify_runtime_profile
+from tests.common.test_result_verifier import (
+    apply_error_match_filter,
+    verify_raw_results,
+    verify_runtime_profile)
 from tests.common.test_vector import TestDimension
 from tests.performance.query import Query
 from tests.performance.query_exec_functions import execute_using_jdbc
@@ -199,7 +202,7 @@ class ImpalaTestSuite(BaseTestSuite):
     Verifies that at least one of the strings in 'expected_str' is a substring of the
     actual exception string 'actual_str'.
     """
-    actual_str = actual_str.replace('\n', '')
+    actual_str = ''.join(apply_error_match_filter([actual_str.replace('\n', '')]))
     for expected_str in expected_strs:
       # In error messages, some paths are always qualified and some are not.
       # So, allow both $NAMENODE and $FILESYSTEM_PREFIX to be used in CATCH.

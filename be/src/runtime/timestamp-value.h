@@ -20,6 +20,7 @@
 #define IMPALA_RUNTIME_TIMESTAMP_VALUE_H
 
 #include <boost/date_time/compiler_config.hpp>
+#include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/conversion.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <ctime>
@@ -137,6 +138,19 @@ class TimestampValue {
   bool HasDateAndTime() const { return HasDate() && HasTime(); }
 
   std::string DebugString() const;
+
+  /// Verifies that the timestamp date falls into a valid range (years 1400..9999).
+  inline bool IsValidDate() const {
+    // Smallest valid day number.
+    const static int64_t MIN_DAY_NUMBER = static_cast<int64_t>(
+        boost::gregorian::date(boost::date_time::min_date_time).day_number());
+    // Largest valid day number.
+    const static int64_t MAX_DAY_NUMBER = static_cast<int64_t>(
+        boost::gregorian::date(boost::date_time::max_date_time).day_number());
+
+    return date_.day_number() >= MIN_DAY_NUMBER
+        && date_.day_number() <= MAX_DAY_NUMBER;
+  }
 
   /// Formats the timestamp using the given date/time context and places the result in the
   /// string buffer. The size of the buffer should be at least dt_ctx.fmt_out_len + 1. A
