@@ -65,6 +65,10 @@ DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per sever
     "level. The most recent log files are retained. If set to 0, all log files are "
     "retained.");
 
+DEFINE_int32(max_audit_event_log_files, 0, "Maximum number of audit event log files "
+    "to retain. The most recent audit event log files are retained. If set to 0, "
+    "all audit event log files are retained.");
+
 DEFINE_int64(pause_monitor_sleep_time_ms, 500, "Sleep time in milliseconds for "
     "pause monitor thread.");
 
@@ -142,6 +146,8 @@ static scoped_ptr<impala::Thread> pause_monitor;
 
     // Check for log rotation in every interval of the maintenance thread
     impala::CheckAndRotateLogFiles(FLAGS_max_log_files);
+    // Check for audit event log rotation in every interval of the maintenance thread
+    impala::CheckAndRotateAuditEventLogFiles(FLAGS_max_audit_event_log_files);
   }
 }
 

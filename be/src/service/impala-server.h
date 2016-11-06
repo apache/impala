@@ -270,6 +270,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// Returns true if lineage logging is enabled, false otherwise.
   bool IsLineageLoggingEnabled();
 
+  /// The prefix of audit event log filename.
+  static const string AUDIT_EVENT_LOG_FILE_PREFIX;
+
  private:
   friend class ChildQuery;
   friend class ImpalaHttpHandler;

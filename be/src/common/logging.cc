@@ -32,6 +32,7 @@
 #include <stdio.h>
 
 #include "common/logging.h"
+#include "service/impala-server.h"
 #include "util/error-util.h"
 #include "util/logging-support.h"
 #include "util/redactor.h"
@@ -46,6 +47,8 @@ DEFINE_bool(redirect_stdout_stderr, true,
     "If true, redirects stdout/stderr to INFO/ERROR log.");
 
 DECLARE_string(redaction_rules_file);
+
+DECLARE_string(audit_event_log_dir);
 
 using boost::uuids::random_generator;
 
@@ -169,4 +172,17 @@ void impala::CheckAndRotateLogFiles(int max_log_files) {
 
     impala::LoggingSupport::DeleteOldLogs(fname, max_log_files);
   }
+}
+
+void impala::CheckAndRotateAuditEventLogFiles(int max_log_files) {
+  // Return if audit event logging is disabled
+  if (FLAGS_audit_event_log_dir.empty()) return;
+  // Ignore bad input or disable log rotation
+  if (max_log_files <= 0) return;
+  // Check audit event log files
+  // Build glob pattern for input e.g. /tmp/impala_audit_event_log_1.0-*
+  string fname = strings::Substitute(
+      "$0/$1*", FLAGS_audit_event_log_dir, ImpalaServer::AUDIT_EVENT_LOG_FILE_PREFIX);
+
+  impala::LoggingSupport::DeleteOldLogs(fname, max_log_files);
 }

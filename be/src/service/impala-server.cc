@@ -193,7 +193,7 @@ namespace impala {
 // relative to UTC. The same time zone change was made for the audit log, but the
 // version was kept at 1.0 because there is no known consumer of the timestamp.
 const string PROFILE_LOG_FILE_PREFIX = "impala_profile_log_1.1-";
-const string AUDIT_EVENT_LOG_FILE_PREFIX = "impala_audit_event_log_1.0-";
+const string ImpalaServer::AUDIT_EVENT_LOG_FILE_PREFIX = "impala_audit_event_log_1.0-";
 const string LINEAGE_LOG_FILE_PREFIX = "impala_lineage_log_1.0-";
 
 const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
