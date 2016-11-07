@@ -1037,6 +1037,8 @@ void RuntimeProfile::SummaryStatsCounter::UpdateCounter(int64_t new_value) {
 }
 
 void RuntimeProfile::SummaryStatsCounter::SetStats(const TSummaryStatsCounter& counter) {
+  // We drop this input if it looks malformed.
+  if (counter.total_num_values < 0) return;
   lock_guard<SpinLock> l(lock_);
   unit_ = counter.unit;
   sum_ = counter.sum;
@@ -1044,7 +1046,7 @@ void RuntimeProfile::SummaryStatsCounter::SetStats(const TSummaryStatsCounter& c
   min_ = counter.min_value;
   max_ = counter.max_value;
 
-  value_.Store(sum_ / total_num_values_);
+  value_.Store(total_num_values_ == 0 ? 0 : sum_ / total_num_values_);
 }
 
 int64_t RuntimeProfile::SummaryStatsCounter::MinValue() {
