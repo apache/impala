@@ -410,16 +410,28 @@ struct TParquetInsertStats {
   1: required map<string, i64> per_column_size
 }
 
-// Per partition insert stats
+struct TKuduDmlStats {
+  // The number of reported per-row errors, i.e. this many rows were not modified.
+  // Note that this aggregate is less useful than a breakdown of the number of errors by
+  // error type, e.g. number of rows with duplicate key conflicts, number of rows
+  // violating nullability constraints, etc., but it isn't possible yet to differentiate
+  // all error types in the KuduTableSink yet.
+  1: optional i64 num_row_errors
+}
+
+// Per partition DML stats
 // TODO: this should include the table stats that we update the metastore with.
+// TODO: Refactor to reflect usage by other DML statements.
 struct TInsertStats {
   1: required i64 bytes_written
   2: optional TParquetInsertStats parquet_stats
+  3: optional TKuduDmlStats kudu_stats
 }
 
 const string ROOT_PARTITION_KEY = ''
 
-// Per-partition statistics and metadata resulting from INSERT queries.
+// Per-partition statistics and metadata resulting from DML statements.
+// TODO: Refactor to reflect usage by other DML statements.
 struct TInsertPartitionStatus {
   // The id of the partition written to (may be -1 if the partition is created by this
   // query). See THdfsTable.partitions.
@@ -434,13 +446,14 @@ struct TInsertPartitionStatus {
   // Fully qualified URI to the base directory for this partition.
   4: required string partition_base_dir
 
-  // The latest observed Kudu timestamp reported by the KuduSession at this partition.
+  // The latest observed Kudu timestamp reported by the local KuduSession.
   // This value is an unsigned int64.
   5: optional i64 kudu_latest_observed_ts
 }
 
-// The results of an INSERT query, sent to the coordinator as part of
+// The results of a DML statement, sent to the coordinator as part of
 // TReportExecStatusParams
+// TODO: Refactor to reflect usage by other DML statements.
 struct TInsertExecStatus {
   // A map from temporary absolute file path to final absolute destination. The
   // coordinator performs these updates after the query completes.

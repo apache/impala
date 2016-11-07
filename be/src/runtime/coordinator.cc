@@ -1090,7 +1090,7 @@ Status Coordinator::Wait() {
   if (needs_finalization_) RETURN_IF_ERROR(FinalizeQuery());
 
   query_profile_->AddInfoString(
-      "Insert Stats", DataSink::OutputInsertStats(per_partition_status_, "\n"));
+      "DML Stats", DataSink::OutputDmlStats(per_partition_status_, "\n"));
   // For DML queries, when Wait is done, the query is complete.  Report aggregate
   // query profiles at this point.
   // TODO: make sure ReportQuerySummary gets called on error
@@ -1489,7 +1489,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
 
       if (partition.second.__isset.stats) {
         if (!status->__isset.stats) status->__set_stats(TInsertStats());
-        DataSink::MergeInsertStats(partition.second.stats, &status->stats);
+        DataSink::MergeDmlStats(partition.second.stats, &status->stats);
       }
     }
     files_to_move_.insert(

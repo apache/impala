@@ -595,7 +595,7 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
     // initialised.
     DCHECK(it != state->per_partition_status()->end());
     it->second.num_modified_rows += partition->num_rows;
-    DataSink::MergeInsertStats(partition->writer->stats(), &it->second.stats);
+    DataSink::MergeDmlStats(partition->writer->stats(), &it->second.stats);
   }
 
   RETURN_IF_ERROR(ClosePartitionFile(state, partition));

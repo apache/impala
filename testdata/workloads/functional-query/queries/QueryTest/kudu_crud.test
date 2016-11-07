@@ -31,14 +31,16 @@ insert into tdata values
 ---- RESULTS
 : 3
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 3.*
+NumModifiedRows: 3
+NumRowErrors: 0
 ====
 ---- QUERY
 update tdata set vali=43 where id = 1
 ---- RESULTS
 # TODO: Verify row count after fixing IMPALA-3713 (Here and UPDATE/DELETE below)
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -56,7 +58,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 update tdata set valv=cast('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as varchar(20)) where id = 1
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -71,7 +74,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 update tdata set valb=false where id = 1
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -86,7 +90,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 update tdata set vali=43 where id > 1
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 2.*
+NumModifiedRows: 2
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -101,7 +106,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 update tdata set name='unknown' where name = 'martin'
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -119,7 +125,8 @@ insert into tdata values
 ---- RESULTS
 : 2
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 2.*
+NumModifiedRows: 2
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -136,7 +143,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 update tdata set name=null where id = 40
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -152,7 +160,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ---- QUERY
 update tdata set name='he' where id = 40
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ---- RESULTS
 ====
 ---- QUERY
@@ -173,7 +182,8 @@ insert into tdata values (320, '', 2.0, 932, cast('' as string), false)
 ---- RESULTS
 : 1
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select id, name, valv, valb from tdata where id = 320;
@@ -194,7 +204,8 @@ insert into ignore_column_case values (1, 'Martin', 1.0, 10);
 ---- RESULTS
 : 1
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select ID, nAmE, VALF, VALI from ignore_column_case where NaMe = 'Martin';
@@ -209,7 +220,8 @@ insert into tdata values
 ---- RESULTS
 : 1
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 insert into tdata values
@@ -217,28 +229,23 @@ insert into tdata values
 ---- RESULTS
 : 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 0.*
+NumModifiedRows: 0
+NumRowErrors: 1
 ====
 ---- QUERY
 -- Updating the same record many times: cross join produces 7 identical updates
 update a set a.name='Satan' from tdata a, tdata b where a.id = 666
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 7.*
-====
----- QUERY
--- Does not exercise any error path in the sink because updating the same record multiple
--- times is valid.
-update a set a.name='Satan' from tdata a, tdata b where a.id = 666
----- RESULTS
----- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 7.*
+NumModifiedRows: 7
+NumRowErrors: 0
 ====
 ---- QUERY
 delete a from tdata a, tdata b where a.id = 666
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 6
 ====
 ---- QUERY
 select * from tdata
@@ -256,6 +263,9 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 upsert into table tdata values (40, 'they', 1, 43, cast('e' as VARCHAR(20)), false),
 (1, NULL, 1, 0, cast('a' as VARCHAR(20)), true)
 ---- RESULTS
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -306,8 +316,9 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ====
 ---- QUERY
 upsert into table tdata (id, name) values (null, '')
----- CATCH
-Could not add Kudu WriteOp.: Invalid argument: column not nullable: id[int32 NOT NULL]
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 1
 ====
 ---- QUERY
 # IMPALA-3454: A delete that requires a rewrite may not get the Kudu column order correct
@@ -328,7 +339,8 @@ insert into impala_3454 values
 delete from impala_3454 where key_1 < (select max(key_2) from impala_3454)
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 2.*
+NumModifiedRows: 2
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from impala_3454
@@ -345,7 +357,8 @@ SELECT * FROM functional_kudu.alltypes WHERE id < 100;
 ---- RESULTS
 'Inserted 100 row(s)'
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 100.*
+NumModifiedRows: 100
+NumRowErrors: 0
 ====
 ---- QUERY
 INSERT INTO kudu_test_tbl
@@ -353,7 +366,8 @@ SELECT * FROM functional_kudu.alltypes WHERE id < 100;
 ---- RESULTS
 : 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 0.*
+NumModifiedRows: 0
+NumRowErrors: 100
 ====
 ---- QUERY
 INSERT INTO kudu_test_tbl
@@ -361,42 +375,53 @@ SELECT * FROM functional_kudu.alltypes;
 ---- RESULTS
 : 7200
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 7200.*
+NumModifiedRows: 7200
+NumRowErrors: 100
 ====
 ---- QUERY
 # Test a larger UPDATE
 UPDATE kudu_test_tbl SET int_col = -1;
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 7300.*
+NumModifiedRows: 7300
+NumRowErrors: 0
 ====
 ---- QUERY
 # Test a larger DELETE
 DELETE FROM kudu_test_tbl WHERE id > -1;
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 7300.*
+NumModifiedRows: 7300
+NumRowErrors: 0
 ====
 ---- QUERY
 # Insert rows that are not covered by any of the existing range partitions
+# Only the row at 10000 is inserted.
 INSERT INTO kudu_test_tbl SELECT cast(id + 10000 as int), bool_col, tinyint_col,
   smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
   timestamp_col, year, month
 FROM functional_kudu.alltypes
----- CATCH
-Kudu error(s) reported, first error: Not found: No tablet covering the requested range partition: NonCoveredRange { lower_bound: (int32 id=10001), upper_bound: (<end>)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 7299
 ====
 ---- QUERY
 # Try to delete a row with a primary key value that is not covered by the existing range
-# partitions
+# partitions. This doesn't actually end up selecting any rows to modify.
 DELETE FROM kudu_test_tbl WHERE id = 10001
 ---- RESULTS
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
 ====
 ---- QUERY
 # Try to update a row with a primary key value that is not covered by the existing range
-# partitions
+# partitions. This doesn't actually end up selecting any rows to modify.
 UPDATE kudu_test_tbl SET int_col = 10 WHERE id = 10001
 ---- RESULTS
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
 ====
 ---- QUERY
 # IMPALA-2521: clustered insert into table.
@@ -414,6 +439,9 @@ from functional_kudu.alltypessmall group by id, name
 ) as sub;
 ---- RESULTS
 : 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 10
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from impala_2521
@@ -442,7 +470,10 @@ create table allkeytypes (i1 tinyint, i2 smallint, i3 int, i4 bigint, name strin
 ---- QUERY
 insert into allkeytypes select cast(id as tinyint), smallint_col, int_col,
   cast (bigint_col/10 as bigint), string_col, float_col, double_col
-  from functional.alltypes where id > 0 and id < 4
+  from functional.alltypes where id > 0 and id < 10
 ---- RESULTS
 : 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumRowErrors: 6
 ====
