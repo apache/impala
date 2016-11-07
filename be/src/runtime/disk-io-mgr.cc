@@ -980,7 +980,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, DiskIoRequestContext* 
   if (reader->state_ == DiskIoRequestContext::Cancelled) {
     state.DecrementRequestThreadAndCheckDone(reader);
     DCHECK(reader->Validate()) << endl << reader->DebugString();
-    FreeBufferMemory(buffer);
+    if (!buffer->is_client_buffer()) FreeBufferMemory(buffer);
     buffer->scan_range_->Cancel(reader->status_);
     // Enqueue the buffer to use the scan range's buffer cleanup path.
     buffer->scan_range_->EnqueueBuffer(buffer);
@@ -996,7 +996,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, DiskIoRequestContext* 
   //  3. Middle of scan range
   if (!buffer->status_.ok()) {
     // Error case
-    FreeBufferMemory(buffer);
+    if (!buffer->is_client_buffer()) FreeBufferMemory(buffer);
     buffer->eosr_ = true;
     --state.num_remaining_ranges();
     buffer->scan_range_->Cancel(buffer->status_);
