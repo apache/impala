@@ -1090,6 +1090,44 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
   io_mgr.reset();
   EXPECT_EQ(mem_tracker.consumption(), 0);
 }
+
+// Test reading into a client-allocated buffer where the read fails.
+TEST_F(DiskIoMgrTest, ReadIntoClientBufferError) {
+  MemTracker mem_tracker(LARGE_MEM_LIMIT);
+  const char* tmp_file = "/file/that/does/not/exist";
+  const int SCAN_LEN = 128;
+
+  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, SCAN_LEN, SCAN_LEN));
+
+  ASSERT_OK(io_mgr->Init(&mem_tracker));
+  // Reader doesn't need to provide mem tracker if it's providing buffers.
+  MemTracker* reader_mem_tracker = NULL;
+  DiskIoRequestContext* reader;
+  vector<uint8_t> client_buffer(SCAN_LEN);
+  for (int i = 0; i < 1000; ++i) {
+    ASSERT_OK(io_mgr->RegisterContext(&reader, reader_mem_tracker));
+    DiskIoMgr::ScanRange* range = AllocateRange(1);
+    range->Reset(NULL, tmp_file, SCAN_LEN, 0, 0, true,
+        DiskIoMgr::BufferOpts::ReadInto(&client_buffer[0], SCAN_LEN));
+    ASSERT_OK(io_mgr->AddScanRange(reader, range, true));
+
+    /// Also test the cancellation path. Run multiple iterations since it is racy whether
+    /// the read fails before the cancellation.
+    if (i >= 1) io_mgr->CancelContext(reader);
+
+    DiskIoMgr::BufferDescriptor* io_buffer;
+    ASSERT_FALSE(range->GetNext(&io_buffer).ok());
+
+    // DiskIoMgr should not have allocated memory.
+    EXPECT_EQ(mem_tracker.consumption(), 0);
+
+    io_mgr->UnregisterContext(reader);
+  }
+
+  pool_.reset();
+  io_mgr.reset();
+  EXPECT_EQ(mem_tracker.consumption(), 0);
+}
 }
 
 int main(int argc, char** argv) {
