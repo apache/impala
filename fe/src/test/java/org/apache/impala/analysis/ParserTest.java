@@ -18,7 +18,6 @@
 package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -30,35 +29,18 @@ import java.util.List;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.testutil.TestUtils;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
-public class ParserTest {
+public class ParserTest extends FrontendTestBase {
 
   // Representative operands for testing.
   private final static String[] operands_ =
       new String[] {"i", "5", "true", "NULL", "'a'", "(1.5 * 8)" };
-
-  /**
-   * Asserts in case of parser error.
-   */
-  public Object ParsesOk(String stmt) {
-    SqlScanner input = new SqlScanner(new StringReader(stmt));
-    SqlParser parser = new SqlParser(input);
-    Object result = null;
-    try {
-      result = parser.parse().value;
-    } catch (Exception e) {
-      System.err.println(parser.getErrorMsg(stmt));
-      e.printStackTrace();
-      fail("\n" + parser.getErrorMsg(stmt));
-    }
-    assertNotNull(result);
-    return result;
-  }
 
   /**
    * Attempts to parse the given select statement, and asserts in case of parser error.
