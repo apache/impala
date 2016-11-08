@@ -17,6 +17,11 @@
 
 cmake_minimum_required(VERSION 3.2.3)
 
+# This is a Kudu-specific flag that disables Kudu targets that are test-only.
+set(NO_TESTS 1)
+# Kudu-specific, disable NVM support so that libvmem is not a dependency.
+set(NO_NVM_SUPPORT 1)
+
 # Explicitly define project() to allow modifying the compiler before the project is
 # initialized.
 project(Impala)
@@ -273,7 +278,8 @@ IMPALA_ADD_THIRDPARTY_LIB(java_jvm "${JNI_INCLUDE_DIRS}" ${JAVA_JVM_LIBRARY} "")
 
 # find breakpad headers and libs
 find_package(Breakpad REQUIRED)
-IMPALA_ADD_THIRDPARTY_LIB(breakpad ${BREAKPAD_INCLUDE_DIR} ${BREAKPAD_STATIC_LIB} "")
+IMPALA_ADD_THIRDPARTY_LIB(breakpad_client ${BREAKPAD_INCLUDE_DIR} ${BREAKPAD_STATIC_LIB}
+  "")
 
 # System dependencies
 if (NOT APPLE)

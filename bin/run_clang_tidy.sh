@@ -17,8 +17,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# This script runs clang-tidy on the backend, excluding gutil. clang-tidy finds bugs and
-# likely bugs.
+# This script runs clang-tidy on the backend, excluding gutil and kudu/. clang-tidy finds
+# bugs and likely bugs.
 #
 # To use this script, the toolchain must be installed and the toolchain environment
 # variables must be set.
@@ -35,7 +35,7 @@ then
   echo "WARNING: compile failed" >&2
 fi
 
-DIRS=$(ls -d "${IMPALA_HOME}/be/src/"*/ | grep -v gutil | tr '\n' ' ')
+DIRS=$(ls -d "${IMPALA_HOME}/be/src/"*/ | grep -v gutil | grep -v kudu | tr '\n' ' ')
 PIPE_DIRS=$(echo "${DIRS}" | tr ' ' '|')
 
 # Reduce the concurrency to one less than the number of cores in the system. Note than

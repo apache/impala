@@ -52,7 +52,9 @@ DECLARE_string(audit_event_log_dir);
 
 using boost::uuids::random_generator;
 
+namespace {
 bool logging_initialized = false;
+}
 
 mutex logging_mutex;
 

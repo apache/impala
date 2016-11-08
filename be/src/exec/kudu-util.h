@@ -18,6 +18,9 @@
 #ifndef IMPALA_UTIL_KUDU_UTIL_H_
 #define IMPALA_UTIL_KUDU_UTIL_H_
 
+// TODO: Remove when toolchain callbacks.h properly defines ::tm.
+struct tm;
+
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
 

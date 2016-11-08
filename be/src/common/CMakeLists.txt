@@ -31,6 +31,7 @@ add_library(Common
   init.cc
   logging.cc
   status.cc
+  kudu_version.cc
   ${VERSION_CC_GEN_OUTPUT}
 )
 

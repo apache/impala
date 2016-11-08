@@ -60,10 +60,7 @@ DEFINE_bool(dump_metrics_json, false,
             "by this binary.");
 TAG_FLAG(dump_metrics_json, hidden);
 
-DEFINE_bool(enable_process_lifetime_heap_profiling, false, "Enables heap "
-    "profiling for the lifetime of the process. Profile output will be stored in the "
-    "directory specified by -heap_profile_path. Enabling this option will disable the "
-    "on-demand/remote server profile handlers.");
+DECLARE_bool(enable_process_lifetime_heap_profiling);
 TAG_FLAG(enable_process_lifetime_heap_profiling, stable);
 TAG_FLAG(enable_process_lifetime_heap_profiling, advanced);
 

@@ -15,17 +15,20 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "kudu/util/version_info.h"
 
-#ifndef IMPALA_COMMON_CONFIG_H
-#define IMPALA_COMMON_CONFIG_H
+#include "common/status.h"
 
-/// This is a template that is populated by CMake with config information.
-/// See be/CMakeLists.txt for the definition of the CMake symbols.
+// Stubs to replace Kudu's VersionInfo implementation, which relies on generated version
+// files which are not part of our build process.
 
-#cmakedefine HAVE_SCHED_GETCPU
-#cmakedefine IMPALA_HAVE_FALLOCATE
-#cmakedefine HAVE_PREADV
-#cmakedefine HAVE_PIPE2
-#cmakedefine HAVE_MAGIC_H
+namespace kudu {
+void VersionInfo::GetVersionInfoPB(VersionInfoPB* pb) {
+  DCHECK(false);
+}
 
-#endif
+std::string VersionInfo::GetAllVersionInfo() {
+  DCHECK(false);
+  return "";
+}
+}

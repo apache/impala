@@ -53,14 +53,27 @@
 #include "kudu/util/thread_restrictions.h"
 #include "kudu/util/trace.h"
 
+// Compile-time checks for fallocate(), pread(), pwritev() etc.
+#include "common/config.h"
+
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <sys/sysctl.h>
 #else
 #include <linux/falloc.h>
+
+// On RHEL5 this header causes compilation errors, due to issues with linux/types.h. There
+// is not an obvious good way to detect this issue at compile time, so instead use
+// IMPALA_HAVE_FALLOCATE as a proxy for RHEL5, and disable fiemap.h usage if fallocate()
+// is not available.
+#if defined(IMPALA_HAVE_FALLOCATE)
 #include <linux/fiemap.h>
+#endif
+
 #include <linux/fs.h>
+#if defined HAVE_MAGIC_H
 #include <linux/magic.h>
+#endif
 #include <sys/ioctl.h>
 #include <sys/sysinfo.h>
 #include <sys/vfs.h>
@@ -179,7 +192,13 @@ int fallocate(int fd, int mode, off_t offset, off_t len) {
   }
   return 0;
 }
+#elif !defined(IMPALA_HAVE_FALLOCATE)
+int fallocate(int fd, int mode, off_t offset, off_t len) {
+  return EOPNOTSUPP;
+}
+#endif
 
+#if !defined(HAVE_PREADV)
 // Simulates Linux's preadv API on OS X.
 ssize_t preadv(int fd, const struct iovec* iovec, int count, off_t offset) {
   ssize_t total_read_bytes = 0;
@@ -811,7 +830,7 @@ class PosixRWFile : public RWFile {
   }
 
   virtual Status GetExtentMap(ExtentMap* out) const OVERRIDE {
-#if !defined(__linux__)
+#if !defined(__linux__) || !defined(IMPALA_HAVE_FALLOCATE)
     return Status::NotSupported("GetExtentMap not supported on this platform");
 #else
     TRACE_EVENT1("io", "PosixRWFile::GetExtentMap", "path", filename_);
@@ -1466,7 +1485,7 @@ class PosixEnv : public Env {
     TRACE_EVENT0("io", "PosixEnv::IsOnExtFilesystem");
     ThreadRestrictions::AssertIOAllowed();
 
-#ifdef __APPLE__
+#if defined __APPLE__ || !defined HAVE_MAGIC_H
     *result = false;
 #else
     struct statfs buf;

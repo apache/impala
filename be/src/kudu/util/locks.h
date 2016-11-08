@@ -178,7 +178,7 @@ class percpu_rwlock {
   }
 
   rw_spinlock &get_lock() {
-#if defined(__APPLE__) || defined(THREAD_SANITIZER)
+#if defined(__APPLE__) || defined(THREAD_SANITIZER) || !defined(HAVE_SCHED_GETCPU)
     int cpu = 0;
 #else
     int cpu = sched_getcpu();

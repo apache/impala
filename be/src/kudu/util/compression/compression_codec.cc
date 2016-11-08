@@ -21,8 +21,14 @@
 #include <vector>
 
 #include <glog/logging.h>
+#define LZ4_DISABLE_DEPRECATE_WARNINGS
 #include <lz4.h>
 #include <snappy-sinksource.h>
+
+// snappy.h redefines DISALLOW_COPY_AND_ASSIGN.
+#ifdef DISALLOW_COPY_AND_ASSIGN
+#undef DISALLOW_COPY_AND_ASSIGN
+#endif
 #include <snappy.h>
 #include <zlib.h>
 

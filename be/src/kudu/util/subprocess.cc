@@ -83,6 +83,11 @@ static const char* kProcSelfFd =
 #define DIRENT dirent
 #endif
 
+// Disable O_CLOEXEC if not available on very old kernels.
+#if !defined(O_CLOEXEC)
+#define O_CLOEXEC 0
+#endif
+
 // Since opendir() calls malloc(), this must be called before fork().
 // This function is not async-signal-safe.
 Status OpenProcFdDir(DIR** dir) {
@@ -285,7 +290,7 @@ void Subprocess::DisableStdout() {
   fd_state_[STDOUT_FILENO] = DISABLED;
 }
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || !defined(HAVE_PIPE2)
 static int pipe2(int pipefd[2], int flags) {
   DCHECK_EQ(O_CLOEXEC, flags);
 
