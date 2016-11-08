@@ -161,3 +161,12 @@ DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
 DEFINE_bool(enable_stats_extrapolation, false,
     "If true, uses table statistics computed with COMPUTE STATS "
     "to extrapolate the row counts of partitions.");
+
+DEFINE_string(log_filename, "",
+    "Prefix of log filename - "
+    "full path is <log_dir>/<log_filename>.[INFO|WARN|ERROR|FATAL]");
+DEFINE_bool(redirect_stdout_stderr, true,
+    "If true, redirects stdout/stderr to INFO/ERROR log.");
+DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per severity "
+    "level. The most recent log files are retained. If set to 0, all log files are "
+    "retained.");

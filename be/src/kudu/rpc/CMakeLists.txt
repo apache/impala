@@ -86,14 +86,21 @@ ADD_EXPORTABLE_LIBRARY(krpc
   DEPS ${KRPC_LIBS})
 
 ### RPC generator tool
-add_executable(protoc-gen-krpc protoc-gen-krpc.cc)
+add_executable(protoc-gen-krpc protoc-gen-krpc.cc
+  # Impala - add stub for kudu::VersionInfo
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../common/kudu_version.cc
+  # Impala - add definition for any flag names shared between Impala / Kudu.
+  # TODO: Consider either removing code that depends on these flags, or namespacing them
+  # somehow.
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../common/global-flags.cc)
 target_link_libraries(protoc-gen-krpc
-    ${KUDU_BASE_LIBS}
+  ${KUDU_BASE_LIBS}
     rpc_header_proto
     protoc
     protobuf
     gutil
-    kudu_util)
+    kudu_util
+    )
 
 #### RPC test
 PROTOBUF_GENERATE_CPP(

@@ -62,10 +62,7 @@ DECLARE_string(hostname);
 DECLARE_int32(logbufsecs);
 DECLARE_int32(max_minidumps);
 DECLARE_string(redaction_rules_file);
-
-DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per severity "
-    "level. The most recent log files are retained. If set to 0, all log files are "
-    "retained.");
+DECLARE_int32(max_log_files);
 
 DEFINE_int32(max_audit_event_log_files, 0, "Maximum number of audit event log files "
     "to retain. The most recent audit event log files are retained. If set to 0, "
