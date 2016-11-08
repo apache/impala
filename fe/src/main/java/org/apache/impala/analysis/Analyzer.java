@@ -1316,9 +1316,11 @@ public class Analyzer {
       Expr e = globalState_.conjuncts.get(conjunctId);
       Preconditions.checkState(e != null);
       if (!canEvalFullOuterJoinedConjunct(e, nodeTblRefIds) ||
-          !canEvalAntiJoinedConjunct(e, nodeTblRefIds)) {
+          !canEvalAntiJoinedConjunct(e, nodeTblRefIds) ||
+          !canEvalOuterJoinedConjunct(e, nodeTblRefIds)) {
         continue;
       }
+
       if (ojClauseConjuncts != null && !ojClauseConjuncts.contains(conjunctId)) continue;
       result.add(e);
     }
@@ -1326,13 +1328,23 @@ public class Analyzer {
   }
 
   /**
-   * Checks if a conjunct can be evaluated at a node materializing a list of tuple ids
-   * 'tids'.
+   * Returns false if 'e' references a full outer joined tuple and it is incorrect to
+   * evaluate 'e' at a node materializing 'tids'. Returns true otherwise.
    */
   public boolean canEvalFullOuterJoinedConjunct(Expr e, List<TupleId> tids) {
     TableRef fullOuterJoin = getFullOuterJoinRef(e);
     if (fullOuterJoin == null) return true;
     return tids.containsAll(fullOuterJoin.getAllTableRefIds());
+  }
+
+  /**
+   * Returns false if 'e' originates from an outer-join On-clause and it is incorrect to
+   * evaluate 'e' at a node materializing 'tids'. Returns true otherwise.
+   */
+  public boolean canEvalOuterJoinedConjunct(Expr e, List<TupleId> tids) {
+    TableRef outerJoin = globalState_.ojClauseByConjunct.get(e.getId());
+    if (outerJoin == null) return true;
+    return tids.containsAll(outerJoin.getAllTableRefIds());
   }
 
   /**

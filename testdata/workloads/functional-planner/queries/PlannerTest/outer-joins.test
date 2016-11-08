@@ -890,3 +890,32 @@ PLAN-ROOT SINK
 04:SCAN HDFS [functional.alltypestiny e]
    partitions=4/4 files=4 size=460B
 ====
+# IMPALA-3125: Test that the On-clause predicates from an outer join are assigned to the
+# corresponding outer-join node, even if the predicates do not reference the join rhs.
+select a.id aid, b.id bid, a.int_col aint, b.int_col bint
+from functional.alltypes a
+inner join functional.alltypes b
+  on a.int_col = b.int_col
+left outer join functional.alltypes c
+  on a.id = b.id and b.bigint_col = c.bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: b.bigint_col = c.bigint_col
+|  other join predicates: a.id = b.id
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: b.int_col = a.int_col
+|  runtime filters: RF000 <- a.int_col
+|
+|--00:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|
+01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> b.int_col
+====
