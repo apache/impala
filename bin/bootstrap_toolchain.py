@@ -349,8 +349,8 @@ if __name__ == "__main__":
   if not os.path.exists(toolchain_root):
     os.makedirs(toolchain_root)
 
-  packages = ["avro", "binutils", "boost", "breakpad", "bzip2", "cmake", "gcc", "gflags",
-      "glog", "gperftools", "gtest", "kudu", "libev", "llvm",
+  packages = ["avro", "binutils", "boost", "breakpad", "bzip2", "cmake", "crcutil", "gcc",
+      "gflags", "glog", "gperftools", "gtest", "kudu", "libev", "llvm",
       ("llvm", "3.8.0-asserts-p1"), "lz4", "openldap", "protobuf", "rapidjson", "re2",
       "snappy", "thrift", "tpc-h", "tpc-ds", "zlib"]
   bootstrap(toolchain_root, packages)

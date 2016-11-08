@@ -72,6 +72,7 @@ set_dep_root(AVRO)
 set_dep_root(BOOST)
 set_dep_root(BREAKPAD)
 set_dep_root(BZIP2)
+set_dep_root(CRCUTIL)
 set_dep_root(GCC)
 set_dep_root(GFLAGS)
 set_dep_root(GLOG)
@@ -315,6 +316,11 @@ find_package(LibEv REQUIRED)
 include_directories(SYSTEM ${LIBEV_INCLUDE_DIR})
 ADD_THIRDPARTY_LIB(libev
   STATIC_LIB "${LIBEV_STATIC_LIB}")
+
+find_package(Crcutil REQUIRED)
+include_directories(SYSTEM ${CRCUTIL_INCLUDE_DIR})
+ADD_THIRDPARTY_LIB(crcutil
+  STATIC_LIB "${CRCUTIL_STATIC_LIB}")
 
 ###################################################################
 
