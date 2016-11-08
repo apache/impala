@@ -27,13 +27,11 @@
 
 using namespace impala;
 
-NljBuilder::NljBuilder(const RowDescriptor& row_desc, RuntimeState* state,
-    MemTracker* mem_tracker)
-    : DataSink(row_desc), build_batch_cache_(row_desc, state->batch_size(),
-      mem_tracker) {}
+NljBuilder::NljBuilder(const RowDescriptor& row_desc, RuntimeState* state)
+  : DataSink(row_desc), build_batch_cache_(row_desc, state->batch_size()) {}
 
-Status NljBuilder::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
-  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
+Status NljBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   return Status::OK();
 }
 
@@ -89,7 +87,7 @@ Status NljBuilder::DeepCopyBuildBatches(RuntimeState* state) {
     RowBatch* input_batch = *it;
     // TODO: it would be more efficient to do the deep copy within the same batch, rather
     // than to a new batch.
-    RowBatch* copied_batch = build_batch_cache_.GetNextBatch();
+    RowBatch* copied_batch = build_batch_cache_.GetNextBatch(mem_tracker());
     input_batch->DeepCopyTo(copied_batch);
     copied_build_batches_.AddRowBatch(copied_batch);
     // Reset input batches as we go to free up memory if possible.

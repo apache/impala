@@ -67,7 +67,7 @@ class DataStreamSender : public DataSink {
 
   /// Must be called before other API calls, and before the codegen'd IR module is
   /// compiled (i.e. in an ExecNode's Prepare() function).
-  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
+  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
 
   /// Must be called before Send() or Close(), and after the codegen'd IR module is
   /// compiled (i.e. in an ExecNode's Open() function).

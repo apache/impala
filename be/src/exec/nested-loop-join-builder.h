@@ -37,11 +37,11 @@ namespace impala {
 /// is used and all data is deep copied into memory owned by the builder.
 class NljBuilder : public DataSink {
  public:
-  NljBuilder(const RowDescriptor& row_desc, RuntimeState* state, MemTracker* mem_tracker);
+  NljBuilder(const RowDescriptor& row_desc, RuntimeState* state);
 
   /// Implementations of DataSink interface methods.
   virtual std::string GetName() override { return "Nested Loop Join Builder"; }
-  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker) override;
+  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status Send(RuntimeState* state, RowBatch* batch) override;
   virtual Status FlushFinal(RuntimeState* state) override;
@@ -52,7 +52,9 @@ class NljBuilder : public DataSink {
 
   /// Returns the next build batch that should be filled and passed to AddBuildBatch().
   /// Exposed so that NestedLoopJoinNode can bypass the DataSink interface for efficiency.
-  inline RowBatch* GetNextEmptyBatch() { return build_batch_cache_.GetNextBatch(); }
+  inline RowBatch* GetNextEmptyBatch() {
+    return build_batch_cache_.GetNextBatch(mem_tracker_.get());
+  }
 
   /// Add a batch to the build side. Does not copy the data, so either resources must
   /// be owned by the batch (or a later batch), or DeepCopyBuildBatches() must be called

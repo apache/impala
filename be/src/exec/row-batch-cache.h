@@ -34,23 +34,18 @@ class MemTracker;
 /// Simple cache of row batches.
 class RowBatchCache {
  public:
-  RowBatchCache(const RowDescriptor& row_desc, int batch_size, MemTracker* mem_tracker)
-    : row_desc_(row_desc),
-      batch_size_(batch_size),
-      mem_tracker_(mem_tracker),
-      next_row_batch_idx_(0) {
-  }
+  RowBatchCache(const RowDescriptor& row_desc, int batch_size)
+    : row_desc_(row_desc), batch_size_(batch_size), next_row_batch_idx_(0) {}
 
-  ~RowBatchCache() {
-    DCHECK_EQ(0, row_batches_.size());
-  }
+  ~RowBatchCache() { DCHECK_EQ(0, row_batches_.size()); }
 
   /// Returns the next batch from the cache. Expands the cache if necessary.
-  RowBatch* GetNextBatch() {
+  /// If a new batch is created, its memory is tracked against 'mem_tracker'.
+  RowBatch* GetNextBatch(MemTracker* mem_tracker) {
     if (next_row_batch_idx_ >= row_batches_.size()) {
       // Expand the cache with a new row batch.
       row_batches_.push_back(
-          std::make_unique<RowBatch>(row_desc_, batch_size_, mem_tracker_));
+          std::make_unique<RowBatch>(row_desc_, batch_size_, mem_tracker));
     } else {
       // Reset batch from the cache before returning it.
       row_batches_[next_row_batch_idx_]->Reset();
@@ -79,7 +74,6 @@ class RowBatchCache {
   /// Parameters needed for creating row batches.
   const RowDescriptor& row_desc_;
   int batch_size_;
-  MemTracker* mem_tracker_; // not owned
 
   /// List of cached row-batch objects. The row-batch objects are owned by this cache.
   std::vector<std::unique_ptr<RowBatch>> row_batches_;

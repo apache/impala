@@ -60,7 +60,7 @@ class KuduTableSink : public DataSink {
 
   /// Prepares the expressions to be applied and creates a KuduSchema based on the
   /// expressions and KuduTableDescriptor.
-  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
+  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
 
   /// Connects to Kudu and creates the KuduSession to be used for the writes.
   virtual Status Open(RuntimeState* state);

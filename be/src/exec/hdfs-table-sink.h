@@ -133,7 +133,7 @@ class HdfsTableSink : public DataSink {
   virtual std::string GetName() { return "HdfsTableSink"; }
 
   /// Prepares output_exprs and partition_key_exprs, and connects to HDFS.
-  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
+  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
 
   /// Opens output_exprs and partition_key_exprs, prepares the single output partition for
   /// static inserts, and populates partition_descriptor_map_.

@@ -225,9 +225,8 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
       DataSink::CreateDataSink(obj_pool(), request.fragment_ctx.fragment.output_sink,
           request.fragment_ctx.fragment.output_exprs, fragment_instance_ctx,
           exec_tree_->row_desc(), &sink_));
-  sink_mem_tracker_.reset(
-      new MemTracker(-1, sink_->GetName(), runtime_state_->instance_mem_tracker(), true));
-  RETURN_IF_ERROR(sink_->Prepare(runtime_state(), sink_mem_tracker_.get()));
+  RETURN_IF_ERROR(
+      sink_->Prepare(runtime_state(), runtime_state_->instance_mem_tracker()));
 
   RuntimeProfile* sink_profile = sink_->profile();
   if (sink_profile != NULL) {
@@ -536,10 +535,6 @@ void PlanFragmentExecutor::Close() {
   if (sink_.get() != nullptr) sink_->Close(runtime_state());
 
   row_batch_.reset();
-  if (sink_mem_tracker_ != NULL) {
-    sink_mem_tracker_->UnregisterFromParent();
-    sink_mem_tracker_.reset();
-  }
 
   // Prepare should always have been called, and so runtime_state_ should be set
   DCHECK(prepared_promise_.IsSet());

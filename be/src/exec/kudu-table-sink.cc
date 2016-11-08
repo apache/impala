@@ -77,8 +77,8 @@ Status KuduTableSink::PrepareExprs(RuntimeState* state) {
   return Status::OK();
 }
 
-Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
-  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
+Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   SCOPED_TIMER(profile()->total_time_counter());
   RETURN_IF_ERROR(PrepareExprs(state));
 

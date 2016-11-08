@@ -200,7 +200,6 @@ class PlanFragmentExecutor {
   /// Output sink for rows sent to this fragment. Created in Prepare(), owned by this
   /// object.
   boost::scoped_ptr<DataSink> sink_;
-  boost::scoped_ptr<MemTracker> sink_mem_tracker_;
 
   /// Set if this fragment instance is the root of the entire plan, so that a consumer can
   /// pull results by calling root_sink_->GetNext(). Same object as sink_.

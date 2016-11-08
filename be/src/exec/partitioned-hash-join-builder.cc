@@ -108,8 +108,8 @@ string PhjBuilder::GetName() {
   return Substitute("Hash Join Builder (join_node_id=$0)", join_node_id_);
 }
 
-Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
-  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
+Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   RETURN_IF_ERROR(
       Expr::Prepare(build_expr_ctxs_, state, row_desc_, expr_mem_tracker_.get()));
   expr_ctxs_to_free_.insert(
@@ -121,10 +121,11 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
   }
   RETURN_IF_ERROR(HashTableCtx::Create(state, build_expr_ctxs_, build_expr_ctxs_,
       HashTableStoresNulls(), is_not_distinct_from_, state->fragment_hash_seed(),
-      MAX_PARTITION_DEPTH, row_desc_.tuple_descriptors().size(), mem_tracker_, &ht_ctx_));
+      MAX_PARTITION_DEPTH, row_desc_.tuple_descriptors().size(), mem_tracker_.get(),
+      &ht_ctx_));
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
       Substitute("PartitionedHashJoin id=$0 builder=$1", join_node_id_, this),
-      MinRequiredBuffers(), true, mem_tracker, state, &block_mgr_client_));
+      MinRequiredBuffers(), true, mem_tracker_.get(), state, &block_mgr_client_));
 
   partitions_created_ = ADD_COUNTER(profile(), "PartitionsCreated", TUnit::UNIT);
   largest_partition_percent_ =
