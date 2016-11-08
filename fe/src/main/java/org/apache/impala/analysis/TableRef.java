@@ -82,10 +82,10 @@ public class TableRef implements ParseNode {
   protected final Privilege priv_;
 
   protected JoinOperator joinOp_;
-  protected ArrayList<String> joinHints_;
+  protected List<PlanHint> joinHints_ = Lists.newArrayList();
   protected List<String> usingColNames_;
 
-  protected ArrayList<String> tableHints_;
+  protected List<PlanHint> tableHints_ = Lists.newArrayList();
   protected TReplicaPreference replicaPreference_;
   protected boolean randomReplica_;
 
@@ -156,13 +156,11 @@ public class TableRef implements ParseNode {
     hasExplicitAlias_ = other.hasExplicitAlias_;
     priv_ = other.priv_;
     joinOp_ = other.joinOp_;
-    joinHints_ =
-        (other.joinHints_ != null) ? Lists.newArrayList(other.joinHints_) : null;
+    joinHints_ = Lists.newArrayList(other.joinHints_);
     onClause_ = (other.onClause_ != null) ? other.onClause_.clone() : null;
     usingColNames_ =
         (other.usingColNames_ != null) ? Lists.newArrayList(other.usingColNames_) : null;
-    tableHints_ =
-        (other.tableHints_ != null) ? Lists.newArrayList(other.tableHints_) : null;
+    tableHints_ = Lists.newArrayList(other.tableHints_);
     replicaPreference_ = other.replicaPreference_;
     randomReplica_ = other.randomReplica_;
     distrMode_ = other.distrMode_;
@@ -262,8 +260,8 @@ public class TableRef implements ParseNode {
     return resolvedPath_.getRootTable();
   }
   public Privilege getPrivilege() { return priv_; }
-  public ArrayList<String> getJoinHints() { return joinHints_; }
-  public ArrayList<String> getTableHints() { return tableHints_; }
+  public List<PlanHint> getJoinHints() { return joinHints_; }
+  public List<PlanHint> getTableHints() { return tableHints_; }
   public Expr getOnClause() { return onClause_; }
   public List<String> getUsingClause() { return usingColNames_; }
   public void setJoinOp(JoinOperator op) { this.joinOp_ = op; }
@@ -271,12 +269,23 @@ public class TableRef implements ParseNode {
   public void setUsingClause(List<String> colNames) { this.usingColNames_ = colNames; }
   public TableRef getLeftTblRef() { return leftTblRef_; }
   public void setLeftTblRef(TableRef leftTblRef) { this.leftTblRef_ = leftTblRef; }
-  public void setJoinHints(ArrayList<String> hints) { this.joinHints_ = hints; }
-  public void setTableHints(ArrayList<String> hints) { this.tableHints_ = hints; }
+
+  public void setJoinHints(List<PlanHint> hints) {
+    Preconditions.checkNotNull(hints);
+    joinHints_ = hints;
+  }
+
+  public void setTableHints(List<PlanHint> hints) {
+    Preconditions.checkNotNull(hints);
+    tableHints_ = hints;
+  }
+
   public boolean isBroadcastJoin() { return distrMode_ == DistributionMode.BROADCAST; }
+
   public boolean isPartitionedJoin() {
     return distrMode_ == DistributionMode.PARTITIONED;
   }
+
   public DistributionMode getDistributionMode() { return distrMode_; }
   public List<TupleId> getCorrelatedTupleIds() { return correlatedTupleIds_; }
   public boolean isAnalyzed() { return isAnalyzed_; }
@@ -336,7 +345,7 @@ public class TableRef implements ParseNode {
   }
 
   private void analyzeTableHints(Analyzer analyzer) {
-    if (tableHints_ == null) return;
+    if (tableHints_.isEmpty()) return;
     if (!(this instanceof BaseTableRef)) {
       analyzer.addWarning("Table hints not supported for inline view and collections");
       return;
@@ -347,17 +356,17 @@ public class TableRef implements ParseNode {
         !(getResolvedPath().destTable() instanceof HdfsTable)) {
       analyzer.addWarning("Table hints only supported for Hdfs tables");
     }
-    for (String hint: tableHints_) {
-      if (hint.equalsIgnoreCase("SCHEDULE_CACHE_LOCAL")) {
+    for (PlanHint hint: tableHints_) {
+      if (hint.is("SCHEDULE_CACHE_LOCAL")) {
         analyzer.setHasPlanHints();
         replicaPreference_ = TReplicaPreference.CACHE_LOCAL;
-      } else if (hint.equalsIgnoreCase("SCHEDULE_DISK_LOCAL")) {
+      } else if (hint.is("SCHEDULE_DISK_LOCAL")) {
         analyzer.setHasPlanHints();
         replicaPreference_ = TReplicaPreference.DISK_LOCAL;
-      } else if (hint.equalsIgnoreCase("SCHEDULE_REMOTE")) {
+      } else if (hint.is("SCHEDULE_REMOTE")) {
         analyzer.setHasPlanHints();
         replicaPreference_ = TReplicaPreference.REMOTE;
-      } else if (hint.equalsIgnoreCase("SCHEDULE_RANDOM_REPLICA")) {
+      } else if (hint.is("SCHEDULE_RANDOM_REPLICA")) {
         analyzer.setHasPlanHints();
         randomReplica_ = true;
       } else {
@@ -369,9 +378,9 @@ public class TableRef implements ParseNode {
   }
 
   private void analyzeJoinHints(Analyzer analyzer) throws AnalysisException {
-    if (joinHints_ == null) return;
-    for (String hint: joinHints_) {
-      if (hint.equalsIgnoreCase("BROADCAST")) {
+    if (joinHints_.isEmpty()) return;
+    for (PlanHint hint: joinHints_) {
+      if (hint.is("BROADCAST")) {
         if (joinOp_ == JoinOperator.RIGHT_OUTER_JOIN
             || joinOp_ == JoinOperator.FULL_OUTER_JOIN
             || joinOp_ == JoinOperator.RIGHT_SEMI_JOIN
@@ -384,7 +393,7 @@ public class TableRef implements ParseNode {
         }
         distrMode_ = DistributionMode.BROADCAST;
         analyzer.setHasPlanHints();
-      } else if (hint.equalsIgnoreCase("SHUFFLE")) {
+      } else if (hint.is("SHUFFLE")) {
         if (joinOp_ == JoinOperator.CROSS_JOIN) {
           throw new AnalysisException("CROSS JOIN does not support SHUFFLE.");
         }
@@ -545,7 +554,7 @@ public class TableRef implements ParseNode {
     }
 
     StringBuilder output = new StringBuilder(" " + joinOp_.toString() + " ");
-    if(joinHints_ != null) output.append(ToSqlUtils.getPlanHintsSql(joinHints_) + " ");
+    if(!joinHints_.isEmpty()) output.append(ToSqlUtils.getPlanHintsSql(joinHints_) + " ");
     output.append(tableRefToSql());
     if (usingColNames_ != null) {
       output.append(" USING (").append(Joiner.on(", ").join(usingColNames_)).append(")");

@@ -209,6 +209,13 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("/* select 1; */ select 1");
     ParsesOk("/** select 1; */ select 1");
     ParsesOk("/* select */ select 1 /* 1 */");
+    ParsesOk("select 1 /* sortby(() */");
+    // Empty columns list in sortby hint
+    ParserError("select 1 /*+ sortby() */");
+    // Mismatching parentheses
+    ParserError("select 1 /*+ sortby(() */");
+    ParserError("select 1 /*+ sortby(a) \n");
+    ParserError("select 1 --+ sortby(a) */\n from t");
   }
 
   /**
@@ -230,6 +237,9 @@ public class ParserTest extends FrontendTestBase {
     ParserError("-- baz /*\nselect 1*/");
     ParsesOk("select -- blah\n 1");
     ParsesOk("select -- select 1\n 1");
+    ParsesOk("select 1 -- sortby(()");
+    // Mismatching parentheses
+    ParserError("select 1 -- +sortby(()\n");
   }
 
   /**
@@ -241,10 +251,10 @@ public class ParserTest extends FrontendTestBase {
     SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
     Preconditions.checkState(selectStmt.getTableRefs().size() > 1);
     List<String> actualHints = Lists.newArrayList();
-    assertEquals(null, selectStmt.getTableRefs().get(0).getJoinHints());
+    assertTrue(selectStmt.getTableRefs().get(0).getJoinHints().isEmpty());
     for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
-      List<String> hints = selectStmt.getTableRefs().get(i).getJoinHints();
-      if (hints != null) actualHints.addAll(hints);
+      List<PlanHint> hints = selectStmt.getTableRefs().get(i).getJoinHints();
+      for (PlanHint hint: hints) actualHints.add(hint.toString());
     }
     if (actualHints.isEmpty()) actualHints = Lists.newArrayList((String) null);
     assertEquals(Lists.newArrayList(expectedHints), actualHints);
@@ -255,8 +265,8 @@ public class ParserTest extends FrontendTestBase {
     Preconditions.checkState(selectStmt.getTableRefs().size() > 0);
     List<String> actualHints = Lists.newArrayList();
     for (int i = 0; i < selectStmt.getTableRefs().size(); ++i) {
-      List<String> hints = selectStmt.getTableRefs().get(i).getTableHints();
-      if (hints != null) actualHints.addAll(hints);
+      List<PlanHint> hints = selectStmt.getTableRefs().get(i).getTableHints();
+      for (PlanHint hint: hints) actualHints.add(hint.toString());
     }
     if (actualHints.isEmpty()) actualHints = Lists.newArrayList((String) null);
     assertEquals(Lists.newArrayList(expectedHints), actualHints);
@@ -267,10 +277,10 @@ public class ParserTest extends FrontendTestBase {
     Preconditions.checkState(selectStmt.getTableRefs().size() > 0);
     List<String> actualHints = Lists.newArrayList();
     for (int i = 0; i < selectStmt.getTableRefs().size(); ++i) {
-      List<String> joinHints = selectStmt.getTableRefs().get(i).getJoinHints();
-      if (joinHints != null) actualHints.addAll(joinHints);
-      List<String> tableHints = selectStmt.getTableRefs().get(i).getTableHints();
-      if (tableHints != null) actualHints.addAll(tableHints);
+      List<PlanHint> joinHints = selectStmt.getTableRefs().get(i).getJoinHints();
+      for (PlanHint hint: joinHints) actualHints.add(hint.toString());
+      List<PlanHint> tableHints = selectStmt.getTableRefs().get(i).getTableHints();
+      for (PlanHint hint: tableHints) actualHints.add(hint.toString());
     }
     if (actualHints.isEmpty()) actualHints = Lists.newArrayList((String) null);
     assertEquals(Lists.newArrayList(expectedHints), actualHints);
@@ -282,8 +292,10 @@ public class ParserTest extends FrontendTestBase {
    */
   private void TestSelectListHints(String stmt, String... expectedHints) {
     SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
-    List<String> actualHints = selectStmt.getSelectList().getPlanHints();
-    if (actualHints == null) actualHints = Lists.newArrayList((String) null);
+    List<String> actualHints = Lists.newArrayList();
+    List<PlanHint> hints = selectStmt.getSelectList().getPlanHints();
+    for (PlanHint hint: hints) actualHints.add(hint.toString());
+    if (actualHints.isEmpty()) actualHints = Lists.newArrayList((String) null);
     assertEquals(Lists.newArrayList(expectedHints), actualHints);
   }
 
@@ -292,8 +304,10 @@ public class ParserTest extends FrontendTestBase {
    */
   private void TestInsertHints(String stmt, String... expectedHints) {
     InsertStmt insertStmt = (InsertStmt) ParsesOk(stmt);
-    List<String> actualHints = insertStmt.getPlanHints();
-    if (actualHints == null) actualHints = Lists.newArrayList((String) null);
+    List<String> actualHints = Lists.newArrayList();
+    List<PlanHint> hints = insertStmt.getPlanHints();
+    for (PlanHint hint: hints) actualHints.add(hint.toString());
+    if (actualHints.isEmpty()) actualHints = Lists.newArrayList((String) null);
     assertEquals(Lists.newArrayList(expectedHints), actualHints);
   }
 
@@ -407,22 +421,26 @@ public class ParserTest extends FrontendTestBase {
           suffix), "schedule_cache_local", "schedule_random_replica", "broadcast",
           "schedule_remote");
 
+      TestSelectListHints(String.format(
+          "select %sfoo,bar,baz%s * from functional.alltypes a", prefix, suffix),
+          "foo", "bar", "baz");
+
       // Test select-list hints (e.g., straight_join). The legacy-style hint has no
       // prefix and suffix.
-      if (prefix.contains("[")) {
-        prefix = "";
-        suffix = "";
-      }
-      TestSelectListHints(String.format(
-          "select %sstraight_join%s * from functional.alltypes a", prefix, suffix),
-          "straight_join");
-      // Only the new hint-style is recognized
-      if (!prefix.equals("")) {
+      {
+        String localPrefix = prefix;
+        String localSuffix = suffix;
+        if (prefix == "[") {
+          localPrefix = "";
+          localSuffix = "";
+        }
         TestSelectListHints(String.format(
-            "select %sfoo,bar,baz%s * from functional.alltypes a", prefix, suffix),
-            "foo", "bar", "baz");
+            "select %sstraight_join%s * from functional.alltypes a", localPrefix,
+            localSuffix), "straight_join");
       }
-      if (prefix.isEmpty()) continue;
+
+      // Below are tests for hints that are not supported by the legacy syntax.
+      if (prefix == "[") continue;
 
       // Test mixing commented hints and comments.
       for (String[] commentStyle: commentStyles) {
@@ -439,6 +457,22 @@ public class ParserTest extends FrontendTestBase {
         TestSelectListHints(query, "straight_join");
         TestJoinHints(query, "shuffle");
       }
+
+      // Tests for hints with arguments.
+      TestInsertHints(String.format(
+          "insert into t %ssortby(a)%s select * from t", prefix, suffix),
+          "sortby(a)");
+      TestInsertHints(String.format(
+          "insert into t %sclustered,shuffle,sortby(a)%s select * from t", prefix,
+          suffix), "clustered", "shuffle", "sortby(a)");
+      TestInsertHints(String.format(
+          "insert into t %ssortby(a,b)%s select * from t", prefix, suffix),
+          "sortby(a,b)");
+      TestInsertHints(String.format(
+          "insert into t %ssortby(a  , b)%s select * from t", prefix, suffix),
+          "sortby(a,b)");
+      ParserError(String.format(
+          "insert into t %ssortby(  a  ,  , ,,, b  )%s select * from t", prefix, suffix));
     }
     // No "+" at the beginning so the comment is not recognized as a hint.
     TestJoinHints("select * from functional.alltypes a join /* comment */" +

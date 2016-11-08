@@ -276,10 +276,10 @@ terminal COLON, SEMICOLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, NOTEQUAL, LESSTHAN, GREATERTHAN;
 terminal FACTORIAL; // Placeholder terminal for postfix factorial operator
+terminal COMMENTED_PLAN_HINT_START, COMMENTED_PLAN_HINT_END;
 terminal String IDENT;
 terminal String EMPTY_IDENT;
 terminal String NUMERIC_OVERFLOW;
-terminal String COMMENTED_PLAN_HINTS;
 terminal BigDecimal INTEGER_LITERAL;
 terminal BigDecimal DECIMAL_LITERAL;
 terminal String STRING_LITERAL;
@@ -367,7 +367,8 @@ nonterminal TableRef table_ref;
 nonterminal Subquery subquery;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
-nonterminal ArrayList<String> opt_plan_hints;
+nonterminal PlanHint plan_hint;
+nonterminal List<PlanHint> opt_plan_hints, plan_hint_list;
 nonterminal TypeDef type_def;
 nonterminal Type type;
 nonterminal Expr sign_chain_expr;
@@ -2300,41 +2301,41 @@ table_ref_list ::=
     list.add(table);
     RESULT = list;
   :}
-  | table_ref_list:list KW_CROSS KW_JOIN opt_plan_hints:hints table_ref:table
+  | table_ref_list:list KW_CROSS KW_JOIN opt_plan_hints:join_hints table_ref:table
     opt_plan_hints:table_hints
   {:
     table.setJoinOp(JoinOperator.CROSS_JOIN);
     // We will throw an AnalysisException if there are join hints so that we can provide
     // a better error message than a parser exception.
-    table.setJoinHints(hints);
+    table.setJoinHints(join_hints);
     table.setTableHints(table_hints);
     list.add(table);
     RESULT = list;
   :}
-  | table_ref_list:list join_operator:op opt_plan_hints:hints table_ref:table
+  | table_ref_list:list join_operator:op opt_plan_hints:join_hints table_ref:table
     opt_plan_hints:table_hints
   {:
     table.setJoinOp((JoinOperator) op);
-    table.setJoinHints(hints);
+    table.setJoinHints(join_hints);
     table.setTableHints(table_hints);
     list.add(table);
     RESULT = list;
   :}
-  | table_ref_list:list join_operator:op opt_plan_hints:hints table_ref:table
+  | table_ref_list:list join_operator:op opt_plan_hints:join_hints table_ref:table
     opt_plan_hints:table_hints KW_ON expr:e
   {:
     table.setJoinOp((JoinOperator) op);
-    table.setJoinHints(hints);
+    table.setJoinHints(join_hints);
     table.setTableHints(table_hints);
     table.setOnClause(e);
     list.add(table);
     RESULT = list;
   :}
-  | table_ref_list:list join_operator:op opt_plan_hints:hints table_ref:table
+  | table_ref_list:list join_operator:op opt_plan_hints:join_hints table_ref:table
     opt_plan_hints:table_hints KW_USING LPAREN ident_list:colNames RPAREN
   {:
     table.setJoinOp((JoinOperator) op);
-    table.setJoinHints(hints);
+    table.setJoinHints(join_hints);
     table.setTableHints(table_hints);
     table.setUsingClause(colNames);
     list.add(table);
@@ -2381,28 +2382,40 @@ opt_outer ::=
   ;
 
 opt_plan_hints ::=
-  COMMENTED_PLAN_HINTS:l
-  {:
-    ArrayList<String> hints = new ArrayList<String>();
-    String[] tokens = l.split(",");
-    for (String token: tokens) {
-      String trimmedToken = token.trim();
-      if (trimmedToken.length() > 0) hints.add(trimmedToken);
-    }
-    RESULT = hints;
-  :}
+  COMMENTED_PLAN_HINT_START plan_hint_list:hints COMMENTED_PLAN_HINT_END
+  {: RESULT = hints; :}
   /* legacy straight_join hint style */
   | KW_STRAIGHT_JOIN
-  {:
-    ArrayList<String> hints = new ArrayList<String>();
-    hints.add("straight_join");
-    RESULT = hints;
-  :}
+  {: RESULT = Lists.newArrayList(new PlanHint("straight_join")); :}
   /* legacy plan-hint style */
-  | LBRACKET ident_list:l RBRACKET
-  {: RESULT = l; :}
+  | LBRACKET plan_hint_list:hints RBRACKET
+  {: RESULT = hints; :}
+  | /* empty */
+  {: RESULT = Lists.newArrayList(); :}
+  ;
+
+plan_hint ::=
+  KW_STRAIGHT_JOIN
+  {: RESULT = new PlanHint("straight_join"); :}
+  | IDENT:name
+  {: RESULT = new PlanHint(name); :}
+  | IDENT:name LPAREN ident_list:args RPAREN
+  {: RESULT = new PlanHint(name, args); :}
   | /* empty */
   {: RESULT = null; :}
+  ;
+
+plan_hint_list ::=
+  plan_hint:hint
+  {:
+    ArrayList<PlanHint> hints = Lists.newArrayList(hint);
+    RESULT = hints;
+  :}
+  | plan_hint_list:hints COMMA plan_hint:hint
+  {:
+    if (hint != null) hints.add(hint);
+    RESULT = hints;
+  :}
   ;
 
 ident_list ::=

@@ -1604,14 +1604,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           String.format("select * from functional.alltypes a join %sbadhint%s " +
               "functional.alltypes b using (int_col)", prefix, suffix),
           "JOIN hint not recognized: badhint");
-      // Hints must be comma separated. Legacy-style hint does not parse because
-      // of space-separated identifiers.
-      if (!prefix.contains("[")) {
-        AnalyzesOk(String.format(
-            "select * from functional.alltypes a join %sbroadcast broadcast%s " +
-                "functional.alltypes b using (int_col)", prefix, suffix),
-            "JOIN hint not recognized: broadcast broadcast");
-      }
       AnalysisError(
           String.format("select * from functional.alltypes a cross join %sshuffle%s " +
           "functional.alltypes b", prefix, suffix),
@@ -1744,7 +1736,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalysisError(String.format(
           "insert into table functional_hbase.alltypes %sshuffle%s " +
           "select * from functional_hbase.alltypes", prefix, suffix),
-          "INSERT hints are only supported for inserting into Hdfs and Kudu tables.");
+          "INSERT hints are only supported for inserting into Hdfs and Kudu tables: " +
+          "functional_hbase.alltypes");
       // Conflicting plan hints.
       AnalysisError("insert into table functional.alltypessmall " +
           "partition (year, month) /* +shuffle,noshuffle */ " +
@@ -1766,6 +1759,46 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "insert into table functional.alltypessmall partition (year, month) " +
           "/* +clustered,noclustered */ select * from functional.alltypes", prefix,
           suffix), "Conflicting INSERT hints: clustered and noclustered");
+
+      // Below are tests for hints that are not supported by the legacy syntax.
+      if (prefix == "[") continue;
+
+      // Tests for sortby hint
+      AnalyzesOk(String.format("insert into functional.alltypessmall " +
+          "partition (year, month) %ssortby(int_col)%s select * from functional.alltypes",
+          prefix, suffix));
+      AnalyzesOk(String.format("insert into functional.alltypessmall " +
+          "partition (year, month) %sshuffle,clustered,sortby(int_col)%s select * from " +
+          "functional.alltypes", prefix, suffix));
+      AnalyzesOk(String.format("insert into functional.alltypessmall " +
+          "partition (year, month) %ssortby(int_col, bool_col)%s select * from " +
+          "functional.alltypes", prefix, suffix));
+      AnalyzesOk(String.format("insert into functional.alltypessmall " +
+          "partition (year, month) %sshuffle,clustered,sortby(int_col,bool_col)%s " +
+          "select * from functional.alltypes", prefix, suffix));
+      AnalyzesOk(String.format("insert into functional.alltypessmall " +
+          "partition (year, month) %sshuffle,sortby(int_col,bool_col),clustered%s " +
+          "select * from functional.alltypes", prefix, suffix));
+      AnalyzesOk(String.format("insert into functional.alltypessmall " +
+          "partition (year, month) %ssortby(int_col,bool_col),shuffle,clustered%s " +
+          "select * from functional.alltypes", prefix, suffix));
+      // Column in sortby hint must exist.
+      AnalysisError(String.format("insert into functional.alltypessmall " +
+          "partition (year, month) %ssortby(foo)%s select * from functional.alltypes",
+          prefix, suffix), "Could not find SORTBY hint column 'foo' in table.");
+      // Column in sortby hint must not be a Hdfs partition column.
+      AnalysisError(String.format("insert into functional.alltypessmall " +
+          "partition (year, month) %ssortby(year)%s select * from " +
+          "functional.alltypes", prefix, suffix),
+          "SORTBY hint column list must not contain Hdfs partition column: 'year'");
+      // Column in sortby hint must not be a Kudu primary key column.
+      AnalysisError(String.format("insert into functional_kudu.alltypessmall " +
+          "%ssortby(id)%s select * from functional_kudu.alltypes", prefix, suffix),
+          "SORTBY hint column list must not contain Kudu primary key column: 'id'");
+      // sortby() hint is not supported in UPSERT queries
+      AnalysisError(String.format("upsert into functional_kudu.alltypessmall " +
+          "%ssortby(id)%s select * from functional_kudu.alltypes", prefix, suffix),
+          "SORTBY hint is not supported in UPSERT statements.");
     }
 
     // Multiple non-conflicting hints and case insensitivity of hints.
