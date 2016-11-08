@@ -88,6 +88,7 @@ export IMPALA_GFLAGS_VERSION=2.0
 export IMPALA_GLOG_VERSION=0.3.2-p2
 export IMPALA_GPERFTOOLS_VERSION=2.5
 export IMPALA_GTEST_VERSION=1.6.0
+export IMPALA_LIBEV_VERSION=4.20
 export IMPALA_LLVM_VERSION=3.8.0-p1
 export IMPALA_LLVM_ASAN_VERSION=3.8.0-p1
 # Debug builds should use the release+asserts build to get additional coverage.

@@ -77,6 +77,7 @@ set_dep_root(GFLAGS)
 set_dep_root(GLOG)
 set_dep_root(GPERFTOOLS)
 set_dep_root(GTEST)
+set_dep_root(LIBEV)
 set_dep_root(LLVM)
 set(LLVM_DEBUG_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION})
 set_dep_root(LZ4)
@@ -309,6 +310,11 @@ ADD_THIRDPARTY_LIB(protobuf
 ADD_THIRDPARTY_LIB(protoc
   STATIC_LIB "${PROTOBUF_PROTOC_STATIC_LIBRARY}"
   DEPS protobuf)
+
+find_package(LibEv REQUIRED)
+include_directories(SYSTEM ${LIBEV_INCLUDE_DIR})
+ADD_THIRDPARTY_LIB(libev
+  STATIC_LIB "${LIBEV_STATIC_LIB}")
 
 ###################################################################
 
