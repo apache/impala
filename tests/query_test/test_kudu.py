@@ -64,6 +64,27 @@ class TestKuduOperations(KuduTestSuite):
   def test_kudu_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_stats', vector, use_db=unique_database)
 
+  def test_kudu_column_options(self, cursor, kudu_client, unique_database):
+    encodings = ["ENCODING PLAIN_ENCODING", ""]
+    compressions = ["COMPRESSION SNAPPY", ""]
+    nullability = ["NOT NULL", "NULL", ""]
+    defaults = ["DEFAULT 1", ""]
+    blocksizes = ["BLOCK_SIZE 32768", ""]
+    indx = 1
+    for encoding in encodings:
+      for compression in compressions:
+        for default in defaults:
+          for blocksize in blocksizes:
+            for nullable in nullability:
+              impala_tbl_name = "test_column_options_%s" % str(indx)
+              cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY
+                  %s %s %s %s, b INT %s %s %s %s %s) DISTRIBUTE BY HASH (a) INTO 3
+                  BUCKETS STORED AS KUDU""" % (unique_database, impala_tbl_name,
+                  encoding, compression, default, blocksize, nullable, encoding,
+                  compression, default, blocksize))
+              indx = indx + 1
+              kudu_tbl_name = "impala::%s.%s" % (unique_database, impala_tbl_name)
+              assert kudu_client.table_exists(kudu_tbl_name)
 
 class TestCreateExternalTable(KuduTestSuite):
 
@@ -228,13 +249,14 @@ class TestShowCreateTable(KuduTestSuite):
 
   def test_primary_key_and_distribution(self, cursor):
     # TODO: Add test cases with column comments once KUDU-1711 is fixed.
+    # TODO: Add case with BLOCK_SIZE
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT PRIMARY KEY)
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
@@ -243,14 +265,14 @@ class TestShowCreateTable(KuduTestSuite):
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
-        CREATE TABLE {table} (c INT PRIMARY KEY, d STRING)
+        CREATE TABLE {table} (c INT PRIMARY KEY, d STRING NULL)
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c)
         (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
          PARTITION 2 < VALUES) STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
-          d STRING,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          d STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c) (...)
@@ -259,11 +281,11 @@ class TestShowCreateTable(KuduTestSuite):
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
-        CREATE TABLE {table} (c INT, PRIMARY KEY (c))
+        CREATE TABLE {table} (c INT ENCODING PLAIN_ENCODING, PRIMARY KEY (c))
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
+          c INT NOT NULL ENCODING PLAIN_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
@@ -272,14 +294,14 @@ class TestShowCreateTable(KuduTestSuite):
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
-        CREATE TABLE {table} (c INT, d STRING, PRIMARY KEY(c, d))
+        CREATE TABLE {table} (c INT COMPRESSION LZ4, d STRING, PRIMARY KEY(c, d))
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS,
         RANGE (c, d) (PARTITION VALUE = (1, 'aaa'), PARTITION VALUE = (2, 'bbb'))
         STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
-          d STRING,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION LZ4,
+          d STRING NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c, d)
         )
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS, RANGE (c, d) (...)
@@ -288,14 +310,14 @@ class TestShowCreateTable(KuduTestSuite):
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
-        CREATE TABLE {table} (c INT, d STRING, e INT, PRIMARY KEY(c, d))
+        CREATE TABLE {table} (c INT, d STRING, e INT NULL DEFAULT 10, PRIMARY KEY(c, d))
         DISTRIBUTE BY RANGE (c) (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
         PARTITION 2 < VALUES <= 3, PARTITION 3 < VALUES) STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
-          d STRING,
-          e INT,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          d STRING NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          e INT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION DEFAULT 10,
           PRIMARY KEY (c, d)
         )
         DISTRIBUTE BY RANGE (c) (...)
@@ -316,7 +338,7 @@ class TestShowCreateTable(KuduTestSuite):
         TBLPROPERTIES ({props})""".format(props=props),
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
@@ -335,7 +357,7 @@ class TestShowCreateTable(KuduTestSuite):
         TBLPROPERTIES ({props})""".format(props=props),
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS

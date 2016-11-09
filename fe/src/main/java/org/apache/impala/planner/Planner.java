@@ -186,6 +186,8 @@ public class Planner {
         Table targetTable = ctx_.getAnalysisResult().getInsertStmt().getTargetTable();
         graph.addTargetColumnLabels(targetTable);
         Preconditions.checkNotNull(targetTable);
+        // Lineage is not currently supported for Kudu tables (see IMPALA-4283)
+        if (targetTable instanceof KuduTable) return fragments;
         List<Expr> exprs = Lists.newArrayList();
         if (targetTable instanceof HBaseTable) {
           exprs.addAll(resultExprs);

@@ -17,8 +17,9 @@
 
 package org.apache.impala.analysis;
 
-import java.util.EnumSet;
+import java.util.Collections;
 import java.util.List;
+import java.util.EnumSet;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Db;
@@ -147,7 +148,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
               "mismatch: %s != %s", partitionLabel, colLabel));
         }
 
-        ColumnDef colDef = new ColumnDef(colLabel, null, null);
+        ColumnDef colDef = new ColumnDef(colLabel, null);
         colDef.setType(tmpQueryStmt.getBaseTblResultExprs().get(i).getType());
         createStmt_.getPartitionColumnDefs().add(colDef);
       }
@@ -159,8 +160,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
     int colCnt = tmpQueryStmt.getColLabels().size();
     createStmt_.getColumnDefs().clear();
     for (int i = 0; i < colCnt; ++i) {
-      ColumnDef colDef = new ColumnDef(
-          tmpQueryStmt.getColLabels().get(i), null, null);
+      ColumnDef colDef = new ColumnDef(tmpQueryStmt.getColLabels().get(i), null,
+          Collections.<ColumnDef.Option, Object>emptyMap());
       colDef.setType(tmpQueryStmt.getBaseTblResultExprs().get(i).getType());
       createStmt_.getColumnDefs().add(colDef);
     }

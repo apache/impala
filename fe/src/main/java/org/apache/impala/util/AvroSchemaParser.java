@@ -29,10 +29,12 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
-import org.codehaus.jackson.JsonNode;
-
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.TypeDef;
 import org.apache.impala.catalog.ArrayType;
@@ -42,8 +44,7 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+import org.codehaus.jackson.JsonNode;
 
 /**
  * Utility class used to parse Avro schema. Checks that the schema is valid
@@ -81,9 +82,12 @@ public class AvroSchemaParser {
     }
     List<ColumnDef> colDefs = Lists.newArrayListWithCapacity(schema.getFields().size());
     for (Schema.Field field: schema.getFields()) {
+      Map<ColumnDef.Option, Object> option = Maps.newHashMap();
+      String comment = field.doc();
+      if (comment != null) option.put(ColumnDef.Option.COMMENT, comment);
       ColumnDef colDef = new ColumnDef(field.name(),
-          new TypeDef(getTypeInfo(field.schema(), field.name())), field.doc());
-      colDef.analyze();
+          new TypeDef(getTypeInfo(field.schema(), field.name())), option);
+      colDef.analyze(null);
       colDefs.add(colDef);
     }
     return colDefs;

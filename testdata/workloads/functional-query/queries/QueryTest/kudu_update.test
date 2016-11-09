@@ -1,8 +1,9 @@
 ====
 ---- QUERY
 create table tdata
-  (id int primary key, name string, valf float, vali bigint, valv string, valb boolean,
-   valt tinyint, vals smallint, vald double)
+  (id int primary key, name string null, valf float null, vali bigint null,
+   valv string null, valb boolean null, valt tinyint null, vals smallint null,
+   vald double null)
   DISTRIBUTE BY RANGE (PARTITION VALUES < 10, PARTITION 10 <= VALUES < 30,
   PARTITION 30 <= VALUES <= 10000) STORED AS KUDU
 ---- RESULTS

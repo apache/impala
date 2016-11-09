@@ -31,6 +31,8 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+import org.apache.impala.common.ImpalaRuntimeException;
+
 /**
  * Internal representation of column-related metadata.
  * Owned by Catalog instance.
@@ -84,7 +86,7 @@ public class Column {
                   .add("position_", position_).toString();
   }
 
-  public static Column fromThrift(TColumn columnDesc) {
+  public static Column fromThrift(TColumn columnDesc) throws ImpalaRuntimeException {
     String comment = columnDesc.isSetComment() ? columnDesc.getComment() : null;
     Preconditions.checkState(columnDesc.isSetPosition());
     int position = columnDesc.getPosition();
@@ -98,11 +100,7 @@ public class Column {
           columnDesc.getColumn_qualifier(), columnDesc.isIs_binary(),
           Type.fromThrift(columnDesc.getColumnType()), comment, position);
     } else if (columnDesc.isIs_kudu_column()) {
-      Preconditions.checkState(columnDesc.isSetIs_key());
-      Preconditions.checkState(columnDesc.isSetIs_nullable());
-      col = new KuduColumn(columnDesc.getColumnName(), columnDesc.isIs_key(),
-          columnDesc.isIs_nullable(),
-          Type.fromThrift(columnDesc.getColumnType()), comment, position);
+      col = KuduColumn.fromThrift(columnDesc, position);
     } else {
       // Hdfs table column.
       col = new Column(columnDesc.getColumnName(),

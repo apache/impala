@@ -174,7 +174,7 @@ class TableDef {
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
     fqTableName_ = analyzer.getFqTableName(getTblName());
     fqTableName_.analyze();
-    analyzeColumnDefs();
+    analyzeColumnDefs(analyzer);
     analyzePrimaryKeys();
 
     if (analyzer.dbContainsTable(getTblName().getDb(), getTbl(), Privilege.CREATE)
@@ -194,16 +194,20 @@ class TableDef {
    * Analyzes table and partition column definitions, checking whether all column
    * names are unique.
    */
-  private void analyzeColumnDefs() throws AnalysisException {
+  private void analyzeColumnDefs(Analyzer analyzer) throws AnalysisException {
     Set<String> colNames = Sets.newHashSet();
     for (ColumnDef colDef: columnDefs_) {
-      colDef.analyze();
+      colDef.analyze(analyzer);
       if (!colNames.add(colDef.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }
+      if (getFileFormat() != THdfsFileFormat.KUDU && colDef.hasKuduOptions()) {
+        throw new AnalysisException(String.format("Unsupported column options for " +
+            "file format '%s': '%s'", getFileFormat().name(), colDef.toString()));
+      }
     }
     for (ColumnDef colDef: getPartitionColumnDefs()) {
-      colDef.analyze();
+      colDef.analyze(analyzer);
       if (!colDef.getType().supportsTablePartitioning()) {
         throw new AnalysisException(
             String.format("Type '%s' is not supported as partition-column type " +
@@ -246,6 +250,10 @@ class TableDef {
         }
         throw new AnalysisException(String.format(
             "PRIMARY KEY column '%s' does not exist in the table", colName));
+      }
+      if (colDef.isNullable()) {
+        throw new AnalysisException("Primary key columns cannot be nullable: " +
+            colDef.toString());
       }
       primaryKeyColDefs_.add(colDef);
     }

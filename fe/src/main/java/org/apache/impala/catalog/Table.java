@@ -256,12 +256,17 @@ public abstract class Table implements CatalogObject {
 
     colsByPos_.clear();
     colsByPos_.ensureCapacity(columns.size());
-    for (int i = 0; i < columns.size(); ++i) {
-      Column col = Column.fromThrift(columns.get(i));
-      colsByPos_.add(col.getPosition(), col);
-      colsByName_.put(col.getName().toLowerCase(), col);
-      ((StructType) type_.getItemType()).addField(
-          new StructField(col.getName(), col.getType(), col.getComment()));
+    try {
+      for (int i = 0; i < columns.size(); ++i) {
+        Column col = Column.fromThrift(columns.get(i));
+        colsByPos_.add(col.getPosition(), col);
+        colsByName_.put(col.getName().toLowerCase(), col);
+        ((StructType) type_.getItemType()).addField(
+            new StructField(col.getName(), col.getType(), col.getComment()));
+      }
+    } catch (ImpalaRuntimeException e) {
+      throw new TableLoadingException(String.format("Error loading schema for " +
+          "table '%s'", getName()), e);
     }
 
     numClusteringCols_ = thriftTable.getClustering_columns().size();

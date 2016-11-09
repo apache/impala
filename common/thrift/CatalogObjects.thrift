@@ -72,7 +72,18 @@ enum THdfsCompression {
   SNAPPY,
   SNAPPY_BLOCKED,
   LZO,
-  LZ4
+  LZ4,
+  ZLIB
+}
+
+enum TColumnEncoding {
+  AUTO,
+  PLAIN,
+  PREFIX,
+  GROUP_VARINT,
+  RLE,
+  DICTIONARY,
+  BIT_SHUFFLE
 }
 
 enum THdfsSeqCompressionMode {
@@ -191,11 +202,14 @@ struct TColumn {
   8: optional string column_qualifier
   9: optional bool is_binary
 
-  // Indicates whether this is a Kudu column. If true implies all following Kudu specific
-  // fields are set.
+  // All the following are Kudu-specific column properties
   10: optional bool is_kudu_column
   11: optional bool is_key
   12: optional bool is_nullable
+  13: optional TColumnEncoding encoding
+  14: optional THdfsCompression compression
+  15: optional Exprs.TExpr default_value
+  16: optional i32 block_size
 }
 
 // Represents a block in an HDFS file

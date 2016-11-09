@@ -18,15 +18,18 @@
 package org.apache.impala.analysis;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java_cup.runtime.Symbol;
 
 import org.apache.impala.analysis.ColumnDef;
+import org.apache.impala.analysis.ColumnDef.Option;
 import org.apache.impala.analysis.UnionStmt.Qualifier;
 import org.apache.impala.analysis.UnionStmt.UnionOperand;
 import org.apache.impala.analysis.RangePartition;
@@ -240,16 +243,17 @@ parser code {:
 // ALL KEYWORDS ALSO NEED TO BE ADDED TO THE ident_or_kw PRODUCTION.
 terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_ANALYTIC, KW_AND, KW_ANTI, KW_API_VERSION,
-  KW_ARRAY, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN,
-  KW_BUCKETS, KW_BY, KW_CACHED, KW_CASCADE, KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR,
-  KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_CREATE,
-  KW_CROSS, KW_CURRENT, KW_DATA, KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME,
-  KW_DECIMAL, KW_DELETE, KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DISTRIBUTE,
-  KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN,
-  KW_EXTENDED, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN,
-  KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
-  KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HASH, KW_IGNORE, KW_HAVING, KW_IF,
-  KW_ILIKE, KW_IN, KW_INCREMENTAL, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,
+  KW_ARRAY, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BLOCKSIZE,
+  KW_BOOLEAN, KW_BUCKETS, KW_BY, KW_CACHED, KW_CASCADE, KW_CASE, KW_CAST, KW_CHANGE,
+  KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPRESSION,
+  KW_COMPUTE, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA, KW_DATABASE, KW_DATABASES,
+  KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DEFAULT, KW_DELETE, KW_DELIMITED, KW_DESC,
+  KW_DESCRIBE, KW_DISTINCT, KW_DISTRIBUTE, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE,
+  KW_ENCODING, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTENDED, KW_EXTERNAL,
+  KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT,
+  KW_FOLLOWING, KW_FOR, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION,
+  KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HASH, KW_IGNORE, KW_HAVING, KW_IF, KW_ILIKE,
+  KW_IN, KW_INCREMENTAL, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,
   KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IREGEXP, KW_IS, KW_JOIN,
   KW_KUDU, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION, KW_MAP,
   KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR, KW_ORDER,
@@ -280,6 +284,10 @@ terminal String STRING_LITERAL;
 terminal String UNMATCHED_STRING_LITERAL;
 terminal String UNEXPECTED_CHAR;
 
+// IMPALA-3726 introduced the DEFAULT keyword which could break existing applications
+// that use the identifier "KEYWORD" as database, column or table names. To avoid that,
+// the ident_or_default non-terminal is introduced and should be used instead of IDENT.
+nonterminal String ident_or_keyword, ident_or_default;
 nonterminal StatementBase stmt;
 // Single select statement.
 nonterminal SelectStmt select_stmt;
@@ -399,7 +407,6 @@ nonterminal CreateDataSrcStmt create_data_src_stmt;
 nonterminal DropDataSrcStmt drop_data_src_stmt;
 nonterminal ShowDataSrcsStmt show_data_srcs_stmt;
 nonterminal StructField struct_field_def;
-nonterminal String ident_or_keyword;
 nonterminal DistributeParam distribute_hash_param;
 nonterminal List<RangePartition> range_params_list;
 nonterminal RangePartition range_param;
@@ -415,7 +422,7 @@ nonterminal ArrayList<StructField> struct_field_def_list;
 // Options for DDL commands - CREATE/DROP/ALTER
 nonterminal HdfsCachingOp cache_op_val;
 nonterminal BigDecimal opt_cache_op_replication;
-nonterminal String comment_val;
+nonterminal String comment_val, opt_comment_val;
 nonterminal Boolean external_val;
 nonterminal Boolean purge_val;
 nonterminal String opt_init_string_val;
@@ -444,6 +451,13 @@ nonterminal String opt_kw_column;
 nonterminal String opt_kw_table;
 nonterminal Boolean overwrite_val;
 nonterminal Boolean cascade_val;
+nonterminal Boolean nullability_val;
+nonterminal String encoding_val;
+nonterminal String compression_val;
+nonterminal Expr default_val;
+nonterminal LiteralExpr block_size_val;
+nonterminal Pair<Option, Object> column_option;
+nonterminal Map<Option, Object> column_options_map;
 
 // For GRANT/REVOKE/AUTH DDL statements
 nonterminal ShowRolesStmt show_roles_stmt;
@@ -487,6 +501,7 @@ nonterminal TFunctionCategory opt_function_category;
 precedence left KW_OR;
 precedence left KW_AND;
 precedence right KW_NOT, NOT;
+precedence left KW_DEFAULT;
 precedence left KW_BETWEEN, KW_IN, KW_IS, KW_EXISTS;
 precedence left KW_LIKE, KW_RLIKE, KW_ILIKE, KW_REGEXP, KW_IREGEXP;
 precedence left EQUAL, NOTEQUAL, LESSTHAN, GREATERTHAN, KW_FROM, KW_DISTINCT;
@@ -789,31 +804,33 @@ opt_kw_table ::=
 show_roles_stmt ::=
   KW_SHOW KW_ROLES
   {: RESULT = new ShowRolesStmt(false, null); :}
-  | KW_SHOW KW_ROLE KW_GRANT KW_GROUP IDENT:group
+  | KW_SHOW KW_ROLE KW_GRANT KW_GROUP ident_or_default:group
   {: RESULT = new ShowRolesStmt(false, group); :}
   | KW_SHOW KW_CURRENT KW_ROLES
   {: RESULT = new ShowRolesStmt(true, null); :}
   ;
 
 show_grant_role_stmt ::=
-  KW_SHOW KW_GRANT KW_ROLE IDENT:role
+  KW_SHOW KW_GRANT KW_ROLE ident_or_default:role
   {: RESULT = new ShowGrantRoleStmt(role, null); :}
-  | KW_SHOW KW_GRANT KW_ROLE IDENT:role KW_ON server_ident:server_kw
+  | KW_SHOW KW_GRANT KW_ROLE ident_or_default:role KW_ON server_ident:server_kw
   {:
     RESULT = new ShowGrantRoleStmt(role,
         PrivilegeSpec.createServerScopedPriv(TPrivilegeLevel.ALL));
   :}
-  | KW_SHOW KW_GRANT KW_ROLE IDENT:role KW_ON KW_DATABASE IDENT:db_name
+  | KW_SHOW KW_GRANT KW_ROLE ident_or_default:role KW_ON
+    KW_DATABASE ident_or_default:db_name
   {:
     RESULT = new ShowGrantRoleStmt(role,
         PrivilegeSpec.createDbScopedPriv(TPrivilegeLevel.ALL, db_name));
   :}
-  | KW_SHOW KW_GRANT KW_ROLE IDENT:role KW_ON KW_TABLE table_name:tbl_name
+  | KW_SHOW KW_GRANT KW_ROLE ident_or_default:role KW_ON KW_TABLE table_name:tbl_name
   {:
     RESULT = new ShowGrantRoleStmt(role,
         PrivilegeSpec.createTableScopedPriv(TPrivilegeLevel.ALL, tbl_name));
   :}
-  | KW_SHOW KW_GRANT KW_ROLE IDENT:role KW_ON uri_ident:uri_kw STRING_LITERAL:uri
+  | KW_SHOW KW_GRANT KW_ROLE ident_or_default:role KW_ON uri_ident:uri_kw
+    STRING_LITERAL:uri
   {:
     RESULT = new ShowGrantRoleStmt(role,
         PrivilegeSpec.createUriScopedPriv(TPrivilegeLevel.ALL, new HdfsUri(uri)));
@@ -821,40 +838,40 @@ show_grant_role_stmt ::=
   ;
 
 create_drop_role_stmt ::=
-  KW_CREATE KW_ROLE IDENT:role
+  KW_CREATE KW_ROLE ident_or_default:role
   {: RESULT = new CreateDropRoleStmt(role, false); :}
-  | KW_DROP KW_ROLE IDENT:role
+  | KW_DROP KW_ROLE ident_or_default:role
   {: RESULT = new CreateDropRoleStmt(role, true); :}
   ;
 
 grant_role_stmt ::=
-  KW_GRANT KW_ROLE IDENT:role KW_TO KW_GROUP IDENT:group
+  KW_GRANT KW_ROLE ident_or_default:role KW_TO KW_GROUP ident_or_default:group
   {: RESULT = new GrantRevokeRoleStmt(role, group, true); :}
   ;
 
 revoke_role_stmt ::=
-  KW_REVOKE KW_ROLE IDENT:role KW_FROM KW_GROUP IDENT:group
+  KW_REVOKE KW_ROLE ident_or_default:role KW_FROM KW_GROUP ident_or_default:group
   {: RESULT = new GrantRevokeRoleStmt(role, group, false); :}
   ;
 
 grant_privilege_stmt ::=
-  KW_GRANT privilege_spec:priv KW_TO opt_kw_role:opt_role IDENT:role
+  KW_GRANT privilege_spec:priv KW_TO opt_kw_role:opt_role ident_or_default:role
   opt_with_grantopt:grant_opt
   {: RESULT = new GrantRevokePrivStmt(role, priv, true, grant_opt); :}
   ;
 
 revoke_privilege_stmt ::=
   KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM
-  opt_kw_role:opt_role IDENT:role
+  opt_kw_role:opt_role ident_or_default:role
   {: RESULT = new GrantRevokePrivStmt(role, priv, false, grant_opt); :}
   ;
 
 privilege_spec ::=
   privilege:priv KW_ON server_ident:server_kw
   {: RESULT = PrivilegeSpec.createServerScopedPriv(priv); :}
-  | privilege:priv KW_ON server_ident:server_kw IDENT:server_name
+  | privilege:priv KW_ON server_ident:server_kw ident_or_default:server_name
   {: RESULT = PrivilegeSpec.createServerScopedPriv(priv, server_name); :}
-  | privilege:priv KW_ON KW_DATABASE IDENT:db_name
+  | privilege:priv KW_ON KW_DATABASE ident_or_default:db_name
   {: RESULT = PrivilegeSpec.createDbScopedPriv(priv, db_name); :}
   | privilege:priv KW_ON KW_TABLE table_name:tbl_name
   {: RESULT = PrivilegeSpec.createTableScopedPriv(priv, tbl_name); :}
@@ -902,9 +919,9 @@ alter_tbl_stmt ::=
     RESULT = new AlterTableAddPartitionStmt(table, partition,
         location, if_not_exists, cache_op);
   :}
-  | KW_ALTER KW_TABLE table_name:table KW_DROP opt_kw_column IDENT:col_name
+  | KW_ALTER KW_TABLE table_name:table KW_DROP opt_kw_column ident_or_default:col_name
   {: RESULT = new AlterTableDropColStmt(table, col_name); :}
-  | KW_ALTER KW_TABLE table_name:table KW_CHANGE opt_kw_column IDENT:col_name
+  | KW_ALTER KW_TABLE table_name:table KW_CHANGE opt_kw_column ident_or_default:col_name
     column_def:col_def
   {: RESULT = new AlterTableChangeColStmt(table, col_name, col_def); :}
   | KW_ALTER KW_TABLE table_name:table KW_DROP if_exists_val:if_exists
@@ -927,7 +944,7 @@ alter_tbl_stmt ::=
     table_property_type:target LPAREN properties_map:properties RPAREN
   {: RESULT = new AlterTableSetTblProperties(table, partitions, target, properties); :}
   | KW_ALTER KW_TABLE table_name:table opt_partition_set:partition KW_SET
-    KW_COLUMN KW_STATS IDENT:col LPAREN properties_map:map RPAREN
+    KW_COLUMN KW_STATS ident_or_default:col LPAREN properties_map:map RPAREN
   {:
     // The opt_partition_set is used to avoid conflicts even though
     // a partition clause does not make sense for this stmt. If a partition
@@ -966,8 +983,8 @@ replace_existing_cols_val ::=
   ;
 
 create_db_stmt ::=
-  KW_CREATE db_or_schema_kw if_not_exists_val:if_not_exists IDENT:db_name
-  comment_val:comment location_val:location
+  KW_CREATE db_or_schema_kw if_not_exists_val:if_not_exists ident_or_default:db_name
+  opt_comment_val:comment location_val:location
   {: RESULT = new CreateDbStmt(db_name, comment, location, if_not_exists); :}
   ;
 
@@ -1032,9 +1049,9 @@ create_tbl_stmt ::=
     RESULT = new CreateTableStmt(tbl_def);
   :}
   | tbl_def_with_col_defs:tbl_def
-    KW_PRODUCED KW_BY KW_DATA source_ident:is_source_id IDENT:data_src_name
+    KW_PRODUCED KW_BY KW_DATA source_ident:is_source_id ident_or_default:data_src_name
     opt_init_string_val:init_string
-    comment_val:comment
+    opt_comment_val:comment
   {:
     // Need external_val in the grammar to avoid shift/reduce conflict with other
     // CREATE TABLE statements.
@@ -1067,7 +1084,7 @@ create_tbl_stmt ::=
 create_tbl_like_stmt ::=
   tbl_def_without_col_defs:tbl_def
   KW_LIKE table_name:other_table
-  comment_val:comment
+  opt_comment_val:comment
   file_format_create_table_val:file_format location_val:location
   {:
     RESULT = new CreateTableLikeStmt(tbl_def.getTblName(), other_table,
@@ -1089,7 +1106,8 @@ tbl_def_with_col_defs ::=
     tbl_def.getColumnDefs().addAll(list);
     RESULT = tbl_def;
   :}
-  | tbl_def_without_col_defs:tbl_def LPAREN column_def_list:list COMMA primary_keys:primary_keys RPAREN
+  | tbl_def_without_col_defs:tbl_def LPAREN column_def_list:list COMMA
+    primary_keys:primary_keys RPAREN
   {:
     tbl_def.getColumnDefs().addAll(list);
     tbl_def.getPrimaryKeyColumnNames().addAll(primary_keys);
@@ -1103,7 +1121,7 @@ primary_keys ::=
   ;
 
 tbl_options ::=
-  comment_val:comment row_format_val:row_format serde_properties:serde_props
+  opt_comment_val:comment row_format_val:row_format serde_properties:serde_props
   file_format_create_table_val:file_format location_val:location cache_op_val:cache_op
   tbl_properties:tbl_props
   {:
@@ -1282,6 +1300,11 @@ opt_cache_op_replication ::=
 comment_val ::=
   KW_COMMENT STRING_LITERAL:comment
   {: RESULT = comment; :}
+  ;
+
+opt_comment_val ::=
+  KW_COMMENT STRING_LITERAL:comment
+  {: RESULT = comment; :}
   | /* empty */
   {: RESULT = null; :}
   ;
@@ -1422,20 +1445,81 @@ column_def_list ::=
   ;
 
 column_def ::=
-  IDENT:col_name type_def:type is_primary_key_val:primary_key comment_val:comment
-  {: RESULT = new ColumnDef(col_name, type, primary_key, comment); :}
+  ident_or_default:col_name type_def:type column_options_map:options
+  {: RESULT = new ColumnDef(col_name, type, options); :}
+  | ident_or_default:col_name type_def:type
+  {: RESULT = new ColumnDef(col_name, type); :}
+  ;
+
+column_options_map ::=
+  column_options_map:map column_option:col_option
+  {:
+    if (map.put(col_option.first, col_option.second) != null) {
+      throw new Exception(String.format("Column option %s is specified multiple times",
+          col_option.first.toString()));
+    }
+    RESULT = map;
+  :}
+  | column_option:col_option
+  {:
+    Map<Option, Object> options = Maps.newHashMap();
+    options.put(col_option.first, col_option.second);
+    RESULT = options;
+  :}
+  ;
+
+column_option ::=
+  is_primary_key_val:primary_key
+  {: RESULT = new Pair<Option, Object>(Option.IS_PRIMARY_KEY, primary_key); :}
+  | nullability_val:nullability
+  {: RESULT = new Pair<Option, Object>(Option.IS_NULLABLE, nullability); :}
+  | encoding_val:encoding
+  {: RESULT = new Pair<Option, Object>(Option.ENCODING, encoding); :}
+  | compression_val:compression
+  {: RESULT = new Pair<Option, Object>(Option.COMPRESSION, compression); :}
+  | default_val:default_val
+  {: RESULT = new Pair<Option, Object>(Option.DEFAULT, default_val); :}
+  | block_size_val:block_size
+  {: RESULT = new Pair<Option, Object>(Option.BLOCK_SIZE, block_size); :}
+  | comment_val:comment
+  {: RESULT = new Pair<Option, Object>(Option.COMMENT, comment); :}
   ;
 
 is_primary_key_val ::=
   KW_PRIMARY key_ident
   {: RESULT = true; :}
-  | /* empty */
+  ;
+
+nullability_val ::=
+  KW_NOT KW_NULL
   {: RESULT = false; :}
+  | KW_NULL
+  {: RESULT = true; :}
+  ;
+
+encoding_val ::=
+  KW_ENCODING ident_or_default:encoding_ident
+  {: RESULT = encoding_ident; :}
+  ;
+
+compression_val ::=
+  KW_COMPRESSION ident_or_default:compression_ident
+  {: RESULT = compression_ident; :}
+  ;
+
+default_val ::=
+  KW_DEFAULT expr:default_val
+  {: RESULT = default_val; :}
+  ;
+
+block_size_val ::=
+  KW_BLOCKSIZE literal:block_size
+  {: RESULT = block_size; :}
   ;
 
 create_view_stmt ::=
   KW_CREATE KW_VIEW if_not_exists_val:if_not_exists table_name:view_name
-  view_column_defs:col_defs comment_val:comment KW_AS query_stmt:view_def
+  view_column_defs:col_defs opt_comment_val:comment KW_AS query_stmt:view_def
   {:
     RESULT = new CreateViewStmt(if_not_exists, view_name, col_defs, comment, view_def);
   :}
@@ -1443,7 +1527,7 @@ create_view_stmt ::=
 
 create_data_src_stmt ::=
   KW_CREATE KW_DATA source_ident:is_source_id
-  if_not_exists_val:if_not_exists IDENT:data_src_name
+  if_not_exists_val:if_not_exists ident_or_default:data_src_name
   KW_LOCATION STRING_LITERAL:location
   KW_CLASS STRING_LITERAL:class_name
   KW_API_VERSION STRING_LITERAL:api_version
@@ -1534,8 +1618,12 @@ view_column_def_list ::=
   ;
 
 view_column_def ::=
-  IDENT:col_name comment_val:comment
-  {: RESULT = new ColumnDef(col_name, null, comment); :}
+  ident_or_default:col_name opt_comment_val:comment
+  {:
+    Map<Option, Object> options = Maps.newHashMap();
+    if (comment != null) options.put(Option.COMMENT, comment);
+    RESULT = new ColumnDef(col_name, null, options);
+  :}
   ;
 
 alter_view_stmt ::=
@@ -1571,7 +1659,8 @@ drop_stats_stmt ::=
   ;
 
 drop_db_stmt ::=
-  KW_DROP db_or_schema_kw if_exists_val:if_exists IDENT:db_name cascade_val:cascade
+  KW_DROP db_or_schema_kw if_exists_val:if_exists ident_or_default:db_name
+  cascade_val:cascade
   {: RESULT = new DropDbStmt(db_name, if_exists, cascade); :}
   ;
 
@@ -1593,7 +1682,8 @@ drop_function_stmt ::=
   ;
 
 drop_data_src_stmt ::=
-  KW_DROP KW_DATA source_ident:is_source_id if_exists_val:if_exists IDENT:data_src_name
+  KW_DROP KW_DATA source_ident:is_source_id if_exists_val:if_exists
+  ident_or_default:data_src_name
   {: RESULT = new DropDataSrcStmt(data_src_name, if_exists); :}
   ;
 
@@ -1683,7 +1773,7 @@ static_partition_key_value_list ::=
 
 partition_key_value ::=
   // Dynamic partition key values.
-  IDENT:column
+  ident_or_default:column
   {: RESULT = new PartitionKeyValue(column, null); :}
   | static_partition_key_value:partition
   {: RESULT = partition; :}
@@ -1691,7 +1781,7 @@ partition_key_value ::=
 
 static_partition_key_value ::=
   // Static partition key values.
-  IDENT:column EQUAL expr:e
+  ident_or_default:column EQUAL expr:e
   {: RESULT = new PartitionKeyValue(column, e); :}
   ;
 
@@ -1825,11 +1915,12 @@ opt_with_clause ::=
   ;
 
 with_view_def ::=
-  IDENT:alias KW_AS LPAREN query_stmt:query RPAREN
+  ident_or_default:alias KW_AS LPAREN query_stmt:query RPAREN
   {: RESULT = new View(alias, query, null); :}
   | STRING_LITERAL:alias KW_AS LPAREN query_stmt:query RPAREN
   {: RESULT = new View(alias, query, null); :}
-  | IDENT:alias LPAREN ident_list:col_names RPAREN KW_AS LPAREN query_stmt:query RPAREN
+  | ident_or_default:alias LPAREN ident_list:col_names RPAREN KW_AS LPAREN
+    query_stmt:query RPAREN
   {: RESULT = new View(alias, query, col_names); :}
   | STRING_LITERAL:alias LPAREN ident_list:col_names RPAREN
     KW_AS LPAREN query_stmt:query RPAREN
@@ -1957,7 +2048,7 @@ values_operand_list ::=
   ;
 
 use_stmt ::=
-  KW_USE IDENT:db
+  KW_USE ident_or_default:db
   {: RESULT = new UseStmt(db); :}
   ;
 
@@ -1966,9 +2057,9 @@ show_tables_stmt ::=
   {: RESULT = new ShowTablesStmt(); :}
   | KW_SHOW KW_TABLES show_pattern:showPattern
   {: RESULT = new ShowTablesStmt(showPattern); :}
-  | KW_SHOW KW_TABLES KW_IN IDENT:db
+  | KW_SHOW KW_TABLES KW_IN ident_or_default:db
   {: RESULT = new ShowTablesStmt(db, null); :}
-  | KW_SHOW KW_TABLES KW_IN IDENT:db show_pattern:showPattern
+  | KW_SHOW KW_TABLES KW_IN ident_or_default:db show_pattern:showPattern
   {: RESULT = new ShowTablesStmt(db, showPattern); :}
   ;
 
@@ -1996,9 +2087,9 @@ show_functions_stmt ::=
   {: RESULT = new ShowFunctionsStmt(null, null, fn_type); :}
   | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS show_pattern:showPattern
   {: RESULT = new ShowFunctionsStmt(null, showPattern, fn_type); :}
-  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS KW_IN IDENT:db
+  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS KW_IN ident_or_default:db
   {: RESULT = new ShowFunctionsStmt(db, null, fn_type); :}
-  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS KW_IN IDENT:db
+  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS KW_IN ident_or_default:db
       show_pattern:showPattern
   {: RESULT = new ShowFunctionsStmt(db, showPattern, fn_type); :}
   ;
@@ -2051,7 +2142,7 @@ show_files_stmt ::=
   ;
 
 describe_db_stmt ::=
-  KW_DESCRIBE db_or_schema_kw describe_output_style:style IDENT:db
+  KW_DESCRIBE db_or_schema_kw describe_output_style:style ident_or_default:db
   {: RESULT = new DescribeDbStmt(db, style); :}
   ;
 
@@ -2108,9 +2199,9 @@ select_clause ::=
   ;
 
 set_stmt ::=
-  KW_SET IDENT:key EQUAL literal:l
+  KW_SET ident_or_default:key EQUAL literal:l
   {: RESULT = new SetStmt(key, l.getStringValue()); :}
-  | KW_SET IDENT:key EQUAL IDENT:ident
+  | KW_SET ident_or_default:key EQUAL ident_or_default:ident
   {: RESULT = new SetStmt(key, ident); :}
   | KW_SET
   {: RESULT = new SetStmt(null, null); :}
@@ -2140,9 +2231,9 @@ select_list_item ::=
   ;
 
 alias_clause ::=
-  KW_AS IDENT:ident
+  KW_AS ident_or_default:ident
   {: RESULT = ident; :}
-  | IDENT:ident
+  | ident_or_default:ident
   {: RESULT = ident; :}
   | KW_AS STRING_LITERAL:l
   {: RESULT = l; :}
@@ -2158,9 +2249,9 @@ star_expr ::=
   ;
 
 table_name ::=
-  IDENT:tbl
+  ident_or_default:tbl
   {: RESULT = new TableName(null, tbl); :}
-  | IDENT:db DOT IDENT:tbl
+  | ident_or_default:db DOT ident_or_default:tbl
   {: RESULT = new TableName(db, tbl); :}
   ;
 
@@ -2295,13 +2386,13 @@ opt_plan_hints ::=
   ;
 
 ident_list ::=
-  IDENT:ident
+  ident_or_default:ident
   {:
     ArrayList<String> list = new ArrayList<String>();
     list.add(ident);
     RESULT = list;
   :}
-  | ident_list:list COMMA IDENT:ident
+  | ident_list:list COMMA ident_or_default:ident
   {:
     list.add(ident);
     RESULT = list;
@@ -2525,7 +2616,7 @@ function_call_expr ::=
   | function_name:fn_name LPAREN function_params:params RPAREN
   {: RESULT = FunctionCallExpr.createExpr(fn_name, params); :}
   // Below is a special case for EXTRACT. Idents are used to avoid adding new keywords.
-  | function_name:fn_name LPAREN IDENT:u KW_FROM expr:t RPAREN
+  | function_name:fn_name LPAREN ident_or_default:u KW_FROM expr:t RPAREN
   {:  RESULT = new ExtractFromExpr(fn_name, u, t); :}
   ;
 
@@ -2828,13 +2919,13 @@ slot_ref ::=
   ;
 
 dotted_path ::=
-  IDENT:ident
+  ident_or_default:ident
   {:
     ArrayList<String> list = new ArrayList<String>();
     list.add(ident);
     RESULT = list;
   :}
-  | dotted_path:list DOT IDENT:ident
+  | dotted_path:list DOT ident_or_default:ident
   {:
     list.add(ident);
     RESULT = list;
@@ -2895,7 +2986,7 @@ type ::=
 // that we can parse type strings from the Hive Metastore which
 // may have unquoted identifiers corresponding to keywords.
 struct_field_def ::=
-  ident_or_keyword:name COLON type:t comment_val:comment
+  ident_or_keyword:name COLON type:t opt_comment_val:comment
   {: RESULT = new StructField(name, t, comment); :}
   ;
 
@@ -2911,6 +3002,13 @@ struct_field_def_list ::=
     list.add(field_def);
     RESULT = list;
   :}
+  ;
+
+ident_or_default ::=
+  IDENT:name
+  {: RESULT = name.toString(); :}
+  | KW_DEFAULT:name
+  {: RESULT = name.toString(); :}
   ;
 
 ident_or_keyword ::=
@@ -2946,6 +3044,8 @@ ident_or_keyword ::=
   {: RESULT = r.toString(); :}
   | KW_BINARY:r
   {: RESULT = r.toString(); :}
+  | KW_BLOCKSIZE:r
+  {: RESULT = r.toString(); :}
   | KW_BOOLEAN:r
   {: RESULT = r.toString(); :}
   | KW_BUCKETS:r
@@ -2974,6 +3074,8 @@ ident_or_keyword ::=
   {: RESULT = r.toString(); :}
   | KW_COMMENT:r
   {: RESULT = r.toString(); :}
+  | KW_COMPRESSION:r
+  {: RESULT = r.toString(); :}
   | KW_COMPUTE:r
   {: RESULT = r.toString(); :}
   | KW_CREATE:r
@@ -2994,6 +3096,8 @@ ident_or_keyword ::=
   {: RESULT = r.toString(); :}
   | KW_DECIMAL:r
   {: RESULT = r.toString(); :}
+  | KW_DEFAULT:r
+  {: RESULT = r.toString(); :}
   | KW_DELETE:r
   {: RESULT = r.toString(); :}
   | KW_DELIMITED:r
@@ -3013,6 +3117,8 @@ ident_or_keyword ::=
   | KW_DROP:r
   {: RESULT = r.toString(); :}
   | KW_ELSE:r
+  {: RESULT = r.toString(); :}
+  | KW_ENCODING:r
   {: RESULT = r.toString(); :}
   | KW_END:r
   {: RESULT = r.toString(); :}

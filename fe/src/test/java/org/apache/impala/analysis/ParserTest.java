@@ -929,8 +929,8 @@ public class ParserTest extends FrontendTestBase {
   @Test
   public void TestIdentQuoting() {
     ParsesOk("select a from `t`");
-    ParsesOk("select a from `default`.`t`");
-    ParsesOk("select a from `default`.t");
+    ParsesOk("select a from default.`t`");
+    ParsesOk("select a from default.t");
     ParsesOk("select a from default.`t`");
     ParsesOk("select 01a from default.`01_t`");
 
@@ -962,7 +962,7 @@ public class ParserTest extends FrontendTestBase {
 
     // Quoted identifiers can contain any characters except "`".
     ParsesOk("select a from `all types`");
-    ParsesOk("select a from `default`.`all types`");
+    ParsesOk("select a from default.`all types`");
     ParsesOk("select a from `~!@#$%^&*()-_=+|;:'\",<.>/?`");
     // Quoted identifiers do not unescape escape sequences.
     ParsesOk("select a from `ab\rabc`");
@@ -1676,7 +1676,7 @@ public class ParserTest extends FrontendTestBase {
 
   @Test
   public void TestKuduUpdate() {
-    TestUtils.assumeKuduIsSupported();
+    //TestUtils.assumeKuduIsSupported();
     ParserError("update (select * from functional_kudu.testtbl) a set name = '10'");
   }
 
@@ -2456,6 +2456,51 @@ public class ParserTest extends FrontendTestBase {
         "(PARTITION VALUES = 10) STORED AS KUDU");
     ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
         "(PARTITION 10 < VALUE < 20) STORED AS KUDU");
+
+    // Column options for Kudu tables
+    String[] encodings = {"encoding auto_encoding", "encoding plain_encoding",
+        "encoding prefix_encoding", "encoding group_varint", "encoding rle",
+        "encoding dict_encoding", "encoding bit_shuffle", "encoding unknown", ""};
+    String[] compression = {"compression default_compression",
+        "compression no_compression", "compression snappy", "compression lz4",
+        "compression zlib", "compression unknown", ""};
+
+    String[] nullability = {"not null", "null", ""};
+    String[] defaultVal = {"default 10", ""};
+    String[] blockSize = {"block_size 4096", ""};
+    for (String enc: encodings) {
+      for (String comp: compression) {
+        for (String nul: nullability) {
+          for (String def: defaultVal) {
+            for (String block: blockSize) {
+              ParsesOk(String.format("CREATE TABLE Foo (i int PRIMARY KEY " +
+                  "%s %s %s %s %s) STORED AS KUDU", nul, enc, comp, def, block));
+              ParsesOk(String.format("CREATE TABLE Foo (i int PRIMARY KEY " +
+                  "%s %s %s %s %s) STORED AS KUDU", block, nul, enc, comp, def));
+              ParsesOk(String.format("CREATE TABLE Foo (i int PRIMARY KEY " +
+                  "%s %s %s %s %s) STORED AS KUDU", def, block, nul, enc, comp));
+              ParsesOk(String.format("CREATE TABLE Foo (i int PRIMARY KEY " +
+                  "%s %s %s %s %s) STORED AS KUDU", comp, def, block, nul, enc));
+              ParsesOk(String.format("CREATE TABLE Foo (i int PRIMARY KEY " +
+                  "%s %s %s %s %s) STORED AS KUDU", enc, comp, def, block, nul));
+              ParsesOk(String.format("CREATE TABLE Foo (i int PRIMARY KEY " +
+                  "%s %s %s %s %s) STORED AS KUDU", enc, comp, block, def, nul));
+            }
+          }
+        }
+      }
+    }
+    // Column option is specified multiple times for the same column
+    ParserError("CREATE TABLE Foo(a int PRIMARY KEY ENCODING RLE ENCODING PLAIN) " +
+        "STORED AS KUDU");
+    // Constant expr used in DEFAULT
+    ParsesOk("CREATE TABLE Foo(a int PRIMARY KEY, b int DEFAULT 1+1) STORED AS KUDU");
+    ParsesOk("CREATE TABLE Foo(a int PRIMARY KEY, b float DEFAULT cast(1.1 as float)) " +
+        "STORED AS KUDU");
+    // Non-literal value used in BLOCK_SIZE
+    ParserError("CREATE TABLE Foo(a int PRIMARY KEY, b int BLOCK_SIZE 1+1) " +
+        "STORED AS KUDU");
+    ParserError("CREATE TABLE Foo(a int PRIMARY KEY BLOCK_SIZE -1) STORED AS KUDU");
   }
 
   @Test
@@ -2886,7 +2931,7 @@ public class ParserTest extends FrontendTestBase {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: ALL, CASE, CAST, DISTINCT, EXISTS, " +
+        "Expected: ALL, CASE, CAST, DEFAULT, DISTINCT, EXISTS, " +
         "FALSE, IF, INTERVAL, NOT, NULL, " +
         "STRAIGHT_JOIN, TRUNCATE, TRUE, IDENTIFIER\n");
 
@@ -2896,8 +2941,8 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c where a = 5\n" +
         "               ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: AND, AS, BETWEEN, DIV, FROM, ILIKE, IN, IREGEXP, IS, LIKE, LIMIT, NOT, OR, " +
-        "ORDER, REGEXP, RLIKE, UNION, COMMA, IDENTIFIER\n");
+        "Expected: AND, AS, BETWEEN, DEFAULT, DIV, FROM, ILIKE, IN, IREGEXP, IS, LIKE, " +
+        "LIMIT, NOT, OR, ORDER, REGEXP, RLIKE, UNION, COMMA, IDENTIFIER\n");
 
     // missing table list
     ParserError("select c, b, c from where a = 5",
@@ -2905,7 +2950,7 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from where a = 5\n" +
         "                    ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: IDENTIFIER\n");
+        "Expected: DEFAULT, IDENTIFIER\n");
 
     // missing predicate in where clause (no group by)
     ParserError("select c, b, c from t where",
@@ -2913,7 +2958,7 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from t where\n" +
         "                           ^\n" +
         "Encountered: EOF\n" +
-        "Expected: CASE, CAST, EXISTS, FALSE, " +
+        "Expected: CASE, CAST, DEFAULT, EXISTS, FALSE, " +
         "IF, INTERVAL, NOT, NULL, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
@@ -2922,7 +2967,7 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from t where group by a, b\n" +
         "                            ^\n" +
         "Encountered: GROUP\n" +
-        "Expected: CASE, CAST, EXISTS, FALSE, " +
+        "Expected: CASE, CAST, DEFAULT, EXISTS, FALSE, " +
         "IF, INTERVAL, NOT, NULL, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "
@@ -2983,7 +3028,7 @@ public class ParserTest extends FrontendTestBase {
         "...c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t\n" +
         "                             ^\n" +
         "Encountered: COMMA\n" +
-        "Expected: CASE, CAST, EXISTS, FALSE, " +
+        "Expected: CASE, CAST, DEFAULT, EXISTS, FALSE, " +
         "IF, INTERVAL, NOT, NULL, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // Parsing identifiers that have different names printed as EXPECTED
@@ -3004,7 +3049,7 @@ public class ParserTest extends FrontendTestBase {
         "USE ` `\n" +
         "    ^\n" +
         "Encountered: EMPTY IDENTIFIER\n" +
-        "Expected: IDENTIFIER\n");
+        "Expected: DEFAULT, IDENTIFIER\n");
 
     // Expecting = token
     ParserError("SET foo",

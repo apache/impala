@@ -215,12 +215,13 @@ public class KuduTable extends Table {
     cols.clear();
     int pos = 0;
     for (ColumnSchema colSchema: kuduTable.getSchema().getColumns()) {
-      Type type = KuduUtil.toImpalaType(colSchema.getType());
-      String colName = colSchema.getName();
-      cols.add(new FieldSchema(colName, type.toSql().toLowerCase(), null));
-      boolean isKey = colSchema.isKey();
-      if (isKey) primaryKeyColumnNames_.add(colName);
-      addColumn(new KuduColumn(colName, isKey, !isKey, type, null, pos));
+      KuduColumn kuduCol = KuduColumn.fromColumnSchema(colSchema, pos);
+      Preconditions.checkNotNull(kuduCol);
+      // Add the HMS column
+      cols.add(new FieldSchema(kuduCol.getName(), kuduCol.getType().toSql().toLowerCase(),
+          null));
+      if (kuduCol.isKey()) primaryKeyColumnNames_.add(kuduCol.getName());
+      addColumn(kuduCol);
       ++pos;
     }
   }

@@ -41,6 +41,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Table;
@@ -351,6 +352,21 @@ public class ToSqlUtils {
   private static String columnToSql(Column col) {
     StringBuilder sb = new StringBuilder(col.getName());
     if (col.getType() != null) sb.append(" " + col.getType().toSql());
+    if (col instanceof KuduColumn) {
+      KuduColumn kuduCol = (KuduColumn) col;
+      Boolean isNullable = kuduCol.isNullable();
+      if (isNullable != null) sb.append(isNullable ? " NULL" : " NOT NULL");
+      if (kuduCol.getEncoding() != null) sb.append(" ENCODING " + kuduCol.getEncoding());
+      if (kuduCol.getCompression() != null) {
+        sb.append(" COMPRESSION " + kuduCol.getCompression());
+      }
+      if (kuduCol.getDefaultValue() != null) {
+        sb.append(" DEFAULT " + kuduCol.getDefaultValue().toSql());
+      }
+      if (kuduCol.getBlockSize() != 0) {
+        sb.append(String.format(" BLOCK_SIZE %d", kuduCol.getBlockSize()));
+      }
+    }
     if (!Strings.isNullOrEmpty(col.getComment())) {
       sb.append(String.format(" COMMENT '%s'", col.getComment()));
     }

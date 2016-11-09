@@ -48,6 +48,8 @@ import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.util.MetaStoreUtil;
+import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
+import org.apache.kudu.ColumnSchema.Encoding;
 import org.junit.Test;
 
 import com.google.common.base.Joiner;
@@ -1615,6 +1617,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Supported file formats. Exclude Avro since it is tested separately.
     String [] fileFormats =
         {"TEXTFILE", "SEQUENCEFILE", "PARQUET", "PARQUETFILE", "RCFILE"};
+    String [] fileFormatsStr =
+        {"TEXT", "SEQUENCE_FILE", "PARQUET", "PARQUET", "RC_FILE"};
+    int formatIndx = 0;
     for (String format: fileFormats) {
       for (String create: ImmutableList.of("create table", "create external table")) {
         AnalyzesOk(String.format("%s new_table (i int) " +
@@ -1625,9 +1630,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
             "Table requires at least 1 column");
       }
       AnalysisError(String.format("create table t (i int primary key) stored as %s",
-          format), "Only Kudu tables can specify a PRIMARY KEY");
+          format), String.format("Unsupported column options for file format " +
+              "'%s': 'i INT PRIMARY KEY'", fileFormatsStr[formatIndx]));
       AnalysisError(String.format("create table t (i int, primary key(i)) stored as %s",
           format), "Only Kudu tables can specify a PRIMARY KEY");
+      formatIndx++;
     }
 
     // Note: Backslashes need to be escaped twice - once for Java and once for Impala.
@@ -1986,7 +1993,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "partition 10 < values <= 30, partition 30 < values) " +
         "stored as kudu tblproperties('kudu.master_addresses'='127.0.0.1')");
     // Not using the STORED AS KUDU syntax to specify a Kudu table
-    AnalysisError("create table tab (x int primary key) tblproperties (" +
+    AnalysisError("create table tab (x int) tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')",
         CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
     AnalysisError("create table tab (x int primary key) stored as kudu tblproperties (" +
@@ -2035,6 +2042,86 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "distribute by hash(x) into 3 buckets stored as kudu", t);
       AnalysisError(stmt, expectedError);
     }
+
+    // Test column options
+    String[] nullability = {"not null", "null", ""};
+    String[] defaultVal = {"default 10", ""};
+    String[] blockSize = {"block_size 4096", ""};
+    for (Encoding enc: Encoding.values()) {
+      for (CompressionAlgorithm comp: CompressionAlgorithm.values()) {
+        for (String nul: nullability) {
+          for (String def: defaultVal) {
+            for (String block: blockSize) {
+              AnalyzesOk(String.format("create table tab (x int primary key " +
+                  "not null encoding %s compression %s %s %s, y int encoding %s " +
+                  "compression %s %s %s %s) distribute by hash (x) " +
+                  "into 3 buckets stored as kudu", enc, comp, def, block, enc,
+                  comp, def, nul, block));
+            }
+          }
+        }
+      }
+    }
+    // Primary key specified using the PRIMARY KEY clause
+    AnalyzesOk("create table tab (x int not null encoding plain_encoding " +
+        "compression snappy block_size 1, y int null encoding rle compression lz4 " +
+        "default 1, primary key(x)) distribute by hash (x) into 3 buckets " +
+        "stored as kudu");
+    // Primary keys can't be null
+    AnalysisError("create table tab (x int primary key null, y int not null) " +
+        "distribute by hash (x) into 3 buckets stored as kudu", "Primary key columns " +
+        "cannot be nullable: x INT PRIMARY KEY NULL");
+    AnalysisError("create table tab (x int not null, y int null, primary key (x, y)) " +
+        "distribute by hash (x) into 3 buckets stored as kudu", "Primary key columns " +
+        "cannot be nullable: y INT NULL");
+    // Unsupported encoding value
+    AnalysisError("create table tab (x int primary key, y int encoding invalid_enc) " +
+        "distribute by hash (x) into 3 buckets stored as kudu", "Unsupported encoding " +
+        "value 'INVALID_ENC'. Supported encoding values are: " +
+        Joiner.on(", ").join(Encoding.values()));
+    // Unsupported compression algorithm
+    AnalysisError("create table tab (x int primary key, y int compression " +
+        "invalid_comp) distribute by hash (x) into 3 buckets stored as kudu",
+        "Unsupported compression algorithm 'INVALID_COMP'. Supported compression " +
+        "algorithms are: " + Joiner.on(", ").join(CompressionAlgorithm.values()));
+    // Default values
+    AnalyzesOk("create table tab (i1 tinyint default 1, i2 smallint default 10, " +
+        "i3 int default 100, i4 bigint default 1000, vals string default 'test', " +
+        "valf float default cast(1.2 as float), vald double default " +
+        "cast(3.1452 as double), valb boolean default true, " +
+        "primary key (i1, i2, i3, i4, vals)) distribute by hash (i1) into 3 " +
+        "buckets stored as kudu");
+    AnalyzesOk("create table tab (i int primary key default 1+1+1) " +
+        "distribute by hash (i) into 3 buckets stored as kudu");
+    AnalyzesOk("create table tab (i int primary key default factorial(5)) " +
+        "distribute by hash (i) into 3 buckets stored as kudu");
+    AnalyzesOk("create table tab (i int primary key, x int null default " +
+        "isnull(null, null)) distribute by hash (i) into 3 buckets stored as kudu");
+    // Invalid default values
+    AnalysisError("create table tab (i int primary key default 'string_val') " +
+        "distribute by hash (i) into 3 buckets stored as kudu", "Default value " +
+        "'string_val' (type: STRING) is not compatible with column 'i' (type: INT).");
+    AnalysisError("create table tab (i int primary key, x int default 1.1) " +
+        "distribute by hash (i) into 3 buckets stored as kudu",
+        "Default value 1.1 (type: DECIMAL(2,1)) is not compatible with column " +
+        "'x' (type: INT).");
+    AnalysisError("create table tab (i tinyint primary key default 128) " +
+        "distribute by hash (i) into 3 buckets stored as kudu", "Default value " +
+        "128 (type: SMALLINT) is not compatible with column 'i' (type: TINYINT).");
+    AnalysisError("create table tab (i int primary key default isnull(null, null)) " +
+        "distribute by hash (i) into 3 buckets stored as kudu", "Default value of " +
+        "NULL not allowed on non-nullable column: 'i'");
+    AnalysisError("create table tab (i int primary key, x int not null " +
+        "default isnull(null, null)) distribute by hash (i) into 3 buckets " +
+        "stored as kudu", "Default value of NULL not allowed on non-nullable column: " +
+        "'x'");
+    // Invalid block_size values
+    AnalysisError("create table tab (i int primary key block_size 1.1) " +
+        "distribute by hash (i) into 3 buckets stored as kudu", "Invalid value " +
+        "for BLOCK_SIZE: 1.1. A positive INTEGER value is expected.");
+    AnalysisError("create table tab (i int primary key block_size 'val') " +
+        "distribute by hash (i) into 3 buckets stored as kudu", "Invalid value " +
+        "for BLOCK_SIZE: 'val'. A positive INTEGER value is expected.");
   }
 
   @Test
@@ -2279,11 +2366,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Type 'STRUCT<f1:INT>' is not supported as partition-column type in column: x");
 
     // Kudu specific clauses used in an Avro table.
-    AnalysisError("create table functional.new_table (i int primary key) " +
+    AnalysisError("create table functional.new_table (i int) " +
         "distribute by hash(i) into 3 buckets stored as avro",
         "Only Kudu tables can use the DISTRIBUTE BY clause.");
     AnalysisError("create table functional.new_table (i int primary key) " +
-        "stored as avro", "Only Kudu tables can specify a PRIMARY KEY.");
+        "stored as avro", "Unsupported column options for file format 'AVRO': " +
+        "'i INT PRIMARY KEY'");
   }
 
   @Test

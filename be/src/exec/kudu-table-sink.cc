@@ -195,17 +195,13 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
     bool add_row = true;
 
     for (int j = 0; j < output_expr_ctxs_.size(); ++j) {
-      // For INSERT, output_expr_ctxs_ will contain all columns of the table in order.
-      // For UPDATE and UPSERT, output_expr_ctxs_ only contains the columns that the op
+      // output_expr_ctxs_ only contains the columns that the op
       // applies to, i.e. columns explicitly mentioned in the query, and
       // referenced_columns is then used to map to actual column positions.
       int col = kudu_table_sink_.referenced_columns.empty() ?
           j : kudu_table_sink_.referenced_columns[j];
 
       void* value = output_expr_ctxs_[j]->GetValue(current_row);
-
-      // If the value is NULL, we only need to explicitly set it for UPDATE and UPSERT.
-      // For INSERT, it can be ignored as unspecified cols will be implicitly set to NULL.
       if (value == NULL) {
         if (table_schema.Column(j).is_nullable()) {
           KUDU_RETURN_IF_ERROR(write->mutable_row()->SetNull(col),

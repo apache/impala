@@ -31,6 +31,7 @@ import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TDistributeParam;
 import org.apache.impala.thrift.TRangePartition;
@@ -74,7 +75,7 @@ public class KuduCatalogOpExecutor {
         throw new ImpalaRuntimeException(String.format(
             "Table '%s' already exists in Kudu.", kuduTableName));
       }
-      Schema schema = createTableSchema(msTbl, params);
+      Schema schema = createTableSchema(params);
       CreateTableOptions tableOpts = buildTableOptions(msTbl, params, schema);
       kudu.createTable(kuduTableName, schema, tableOpts);
     } catch (Exception e) {
@@ -86,22 +87,31 @@ public class KuduCatalogOpExecutor {
   /**
    * Creates the schema of a new Kudu table.
    */
-  private static Schema createTableSchema(
-      org.apache.hadoop.hive.metastore.api.Table msTbl, TCreateTableParams params)
+  private static Schema createTableSchema(TCreateTableParams params)
       throws ImpalaRuntimeException {
     Set<String> keyColNames = new HashSet<>(params.getPrimary_key_column_names());
-    List<FieldSchema> fieldSchemas = msTbl.getSd().getCols();
-    List<ColumnSchema> colSchemas = new ArrayList<>(fieldSchemas.size());
-    for (FieldSchema fieldSchema: fieldSchemas) {
-      Type type = Type.parseColumnType(fieldSchema.getType());
+    List<ColumnSchema> colSchemas = new ArrayList<>(params.getColumnsSize());
+    for (TColumn column: params.getColumns()) {
+      Type type = Type.fromThrift(column.getColumnType());
       Preconditions.checkState(type != null);
       org.apache.kudu.Type kuduType = KuduUtil.fromImpalaType(type);
       // Create the actual column and check if the column is a key column
       ColumnSchemaBuilder csb =
-          new ColumnSchemaBuilder(fieldSchema.getName(), kuduType);
-      boolean isKeyCol = keyColNames.contains(fieldSchema.getName());
-      csb.key(isKeyCol);
-      csb.nullable(!isKeyCol);
+          new ColumnSchemaBuilder(column.getColumnName(), kuduType);
+      Preconditions.checkState(column.isSetIs_key());
+      csb.key(keyColNames.contains(column.getColumnName()));
+      if (column.isSetIs_nullable()) csb.nullable(column.isIs_nullable());
+      if (column.isSetDefault_value()) {
+        csb.defaultValue(KuduUtil.getKuduDefaultValue(column.getDefault_value(), kuduType,
+            column.getColumnName()));
+      }
+      if (column.isSetBlock_size()) csb.desiredBlockSize(column.getBlock_size());
+      if (column.isSetEncoding()) {
+        csb.encoding(KuduUtil.fromThrift(column.getEncoding()));
+      }
+      if (column.isSetCompression()) {
+        csb.compressionAlgorithm(KuduUtil.fromThrift(column.getCompression()));
+      }
       colSchemas.add(csb.build());
     }
     return new Schema(colSchemas);

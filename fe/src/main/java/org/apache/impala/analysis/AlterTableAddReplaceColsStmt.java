@@ -90,7 +90,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     // partition columns.
     Set<String> colNames = Sets.newHashSet();
     for (ColumnDef c: columnDefs_) {
-      c.analyze();
+      c.analyze(analyzer);
       String colName = c.getColName().toLowerCase();
       if (existingPartitionKeys.contains(colName)) {
         throw new AnalysisException(

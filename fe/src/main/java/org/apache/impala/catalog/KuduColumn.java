@@ -17,36 +17,108 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.base.Preconditions;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.util.KuduUtil;
+
+import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
+import org.apache.kudu.ColumnSchema.Encoding;
+import org.apache.kudu.ColumnSchema;
 
 /**
- *  Describes a Kudu column mapped to a Hive column (as described in the metastore).
- *  This class extends Column with Kudu-specific information about whether it is part of a primary
- *  key, and whether it is nullable.
+ *  Represents a Kudu column.
+ *
+ *  This class extends Column with Kudu-specific information:
+ *  - primary key
+ *  - nullability constraint
+ *  - encoding
+ *  - compression
+ *  - default value
+ *  - desired block size
  */
 public class KuduColumn extends Column {
   private final boolean isKey_;
   private final boolean isNullable_;
+  private final Encoding encoding_;
+  private final CompressionAlgorithm compression_;
+  private final LiteralExpr defaultValue_;
+  private final int blockSize_;
 
-  public KuduColumn(String name, boolean isKey, boolean isNullable, Type type,
-      String comment, int position) {
+  private KuduColumn(String name, Type type, boolean isKey, boolean isNullable,
+      Encoding encoding, CompressionAlgorithm compression, LiteralExpr defaultValue,
+      int blockSize, String comment, int position) {
     super(name, type, comment, position);
     isKey_ = isKey;
     isNullable_ = isNullable;
+    encoding_ = encoding;
+    compression_ = compression;
+    defaultValue_ = defaultValue;
+    blockSize_ = blockSize;
+  }
+
+  public static KuduColumn fromColumnSchema(ColumnSchema colSchema, int position)
+      throws ImpalaRuntimeException {
+    Type type = KuduUtil.toImpalaType(colSchema.getType());
+    Object defaultValue = colSchema.getDefaultValue();
+    LiteralExpr defaultValueExpr = null;
+    if (defaultValue != null) {
+      try {
+        defaultValueExpr = LiteralExpr.create(defaultValue.toString(), type);
+      } catch (AnalysisException e) {
+        throw new ImpalaRuntimeException(String.format("Error parsing default value: " +
+            "'%s'", defaultValue), e);
+      }
+      Preconditions.checkNotNull(defaultValueExpr);
+    }
+    return new KuduColumn(colSchema.getName(), type, colSchema.isKey(),
+        colSchema.isNullable(), colSchema.getEncoding(),
+        colSchema.getCompressionAlgorithm(), defaultValueExpr,
+        colSchema.getDesiredBlockSize(), null, position);
+  }
+
+  public static KuduColumn fromThrift(TColumn column, int position)
+      throws ImpalaRuntimeException {
+    Preconditions.checkState(column.isSetIs_key());
+    Preconditions.checkState(column.isSetIs_nullable());
+    Type columnType = Type.fromThrift(column.getColumnType());
+    Encoding encoding = null;
+    if (column.isSetEncoding()) encoding = KuduUtil.fromThrift(column.getEncoding());
+    CompressionAlgorithm compression = null;
+    if (column.isSetCompression()) {
+      compression = KuduUtil.fromThrift(column.getCompression());
+    }
+    LiteralExpr defaultValue = null;
+    if (column.isSetDefault_value()) {
+      defaultValue =
+          LiteralExpr.fromThrift(column.getDefault_value().getNodes().get(0), columnType);
+    }
+    int blockSize = 0;
+    if (column.isSetBlock_size()) blockSize = column.getBlock_size();
+    return new KuduColumn(column.getColumnName(), columnType, column.isIs_key(),
+        column.isIs_nullable(), encoding, compression, defaultValue, blockSize, null,
+        position);
   }
 
   public boolean isKey() { return isKey_; }
   public boolean isNullable() { return isNullable_; }
+  public Encoding getEncoding() { return encoding_; }
+  public CompressionAlgorithm getCompression() { return compression_; }
+  public LiteralExpr getDefaultValue() { return defaultValue_; }
+  public boolean hasDefaultValue() { return defaultValue_ != null; }
+  public int getBlockSize() { return blockSize_; }
 
   @Override
   public TColumn toThrift() {
     TColumn colDesc = new TColumn(name_, type_.toThrift());
+    KuduUtil.setColumnOptions(colDesc, isKey_, isNullable_, encoding_, compression_,
+        defaultValue_, blockSize_);
     if (comment_ != null) colDesc.setComment(comment_);
     colDesc.setCol_stats(getStats().toThrift());
     colDesc.setPosition(position_);
     colDesc.setIs_kudu_column(true);
-    colDesc.setIs_key(isKey_);
-    colDesc.setIs_nullable(isNullable_);
     return colDesc;
   }
 }

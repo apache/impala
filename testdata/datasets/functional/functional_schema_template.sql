@@ -551,20 +551,20 @@ DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_idx;
 
 CREATE TABLE {db_name}{db_suffix}.{table_name}_idx (
   kudu_idx BIGINT PRIMARY KEY,
-  id INT,
-  bool_col BOOLEAN,
-  tinyint_col TINYINT,
-  smallint_col SMALLINT,
-  int_col INT,
-  bigint_col BIGINT,
-  float_col FLOAT,
-  double_col DOUBLE,
-  date_string_col STRING,
-  string_col STRING,
-  timestamp_col STRING,
-  year INT,
-  month INT,
-  day INT
+  id INT NULL,
+  bool_col BOOLEAN NULL,
+  tinyint_col TINYINT NULL,
+  smallint_col SMALLINT NULL,
+  int_col INT NULL,
+  bigint_col BIGINT NULL,
+  float_col FLOAT NULL,
+  double_col DOUBLE NULL,
+  date_string_col STRING NULL,
+  string_col STRING NULL,
+  timestamp_col STRING NULL,
+  year INT NULL,
+  month INT NULL,
+  day INT NULL
 )
 DISTRIBUTE BY HASH (kudu_idx) INTO 3 BUCKETS STORED AS KUDU;
 CREATE VIEW {db_name}{db_suffix}.{table_name} AS
@@ -763,8 +763,8 @@ delimited fields terminated by ','  escaped by '\\'
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   id bigint primary key,
-  name string,
-  zip int
+  name string null,
+  zip int null
 )
 distribute by range(id) (partition values <= 1003, partition 1003 < values <= 1007,
 partition 1007 < values) stored as kudu;
@@ -1310,7 +1310,8 @@ OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
-  a string primary key, b string, c string, d int, e double, f string, g string
+  a string primary key, b string null, c string null, d int null, e double null,
+  f string null, g string null
 )
 distribute by hash(a) into 3 buckets stored as kudu;
 ====
@@ -1412,10 +1413,10 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/ImpalaDemoDataset/DEC_00_SF3_P077
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   id string primary key,
-  zip string,
-  description1 string,
-  description2 string,
-  income int)
+  zip string null,
+  description1 string null,
+  description2 string null,
+  income int null)
 distribute by range(id)
 (partition values <= '8600000US01475',
  partition '8600000US01475' < values <= '8600000US63121',

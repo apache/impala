@@ -29,17 +29,25 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TColumnEncoding;
+import org.apache.impala.thrift.THdfsCompression;
+
+import com.google.common.base.Splitter;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+
 import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.ColumnSchema.Encoding;
+import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduClient.KuduClientBuilder;
 import org.apache.kudu.client.PartialRow;
 import org.apache.kudu.client.RangePartitionBound;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 public class KuduUtil {
 
@@ -136,6 +144,145 @@ public class KuduUtil {
         throw new ImpalaRuntimeException("Key columns not supported for type: "
             + type.toString());
     }
+  }
+
+  public static Object getKuduDefaultValue(TExpr defaultValue,
+      org.apache.kudu.Type type, String colName) throws ImpalaRuntimeException {
+    Preconditions.checkState(defaultValue.getNodes().size() == 1);
+    TExprNode literal = defaultValue.getNodes().get(0);
+    switch (type) {
+      case INT8:
+        checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
+        return (byte) literal.getInt_literal().getValue();
+      case INT16:
+        checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
+        return (short) literal.getInt_literal().getValue();
+      case INT32:
+        checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
+        return (int) literal.getInt_literal().getValue();
+      case INT64:
+        checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
+        return (long) literal.getInt_literal().getValue();
+      case FLOAT:
+        checkCorrectType(literal.isSetFloat_literal(), type, colName, literal);
+        return (float) literal.getFloat_literal().getValue();
+      case DOUBLE:
+        checkCorrectType(literal.isSetFloat_literal(), type, colName, literal);
+        return (double) literal.getFloat_literal().getValue();
+      case STRING:
+        checkCorrectType(literal.isSetString_literal(), type, colName, literal);
+        return literal.getString_literal().getValue();
+      default:
+        throw new ImpalaRuntimeException("Unsupported value for column type: " +
+            type.toString());
+    }
+  }
+
+  public static Encoding fromThrift(TColumnEncoding encoding)
+      throws ImpalaRuntimeException {
+    switch (encoding) {
+      case AUTO:
+        return Encoding.AUTO_ENCODING;
+      case PLAIN:
+        return Encoding.PLAIN_ENCODING;
+      case PREFIX:
+        return Encoding.PREFIX_ENCODING;
+      case GROUP_VARINT:
+        return Encoding.GROUP_VARINT;
+      case RLE:
+        return Encoding.RLE;
+      case DICTIONARY:
+        return Encoding.DICT_ENCODING;
+      case BIT_SHUFFLE:
+        return Encoding.BIT_SHUFFLE;
+      default:
+        throw new ImpalaRuntimeException("Unsupported encoding: " +
+            encoding.toString());
+    }
+  }
+
+  public static TColumnEncoding toThrift(Encoding encoding)
+      throws ImpalaRuntimeException {
+    switch (encoding) {
+      case AUTO_ENCODING:
+        return TColumnEncoding.AUTO;
+      case PLAIN_ENCODING:
+        return TColumnEncoding.PLAIN;
+      case PREFIX_ENCODING:
+        return TColumnEncoding.PREFIX;
+      case GROUP_VARINT:
+        return TColumnEncoding.GROUP_VARINT;
+      case RLE:
+        return TColumnEncoding.RLE;
+      case DICT_ENCODING:
+        return TColumnEncoding.DICTIONARY;
+      case BIT_SHUFFLE:
+        return TColumnEncoding.BIT_SHUFFLE;
+      default:
+        throw new ImpalaRuntimeException("Unsupported encoding: " +
+            encoding.toString());
+    }
+  }
+
+  public static CompressionAlgorithm fromThrift(THdfsCompression compression)
+      throws ImpalaRuntimeException {
+    switch (compression) {
+      case DEFAULT:
+        return CompressionAlgorithm.DEFAULT_COMPRESSION;
+      case NONE:
+        return CompressionAlgorithm.NO_COMPRESSION;
+      case SNAPPY:
+        return CompressionAlgorithm.SNAPPY;
+      case LZ4:
+        return CompressionAlgorithm.LZ4;
+      case ZLIB:
+        return CompressionAlgorithm.ZLIB;
+      default:
+        throw new ImpalaRuntimeException("Unsupported compression algorithm: " +
+            compression.toString());
+    }
+  }
+
+  public static THdfsCompression toThrift(CompressionAlgorithm compression)
+      throws ImpalaRuntimeException {
+    switch (compression) {
+      case NO_COMPRESSION:
+        return THdfsCompression.NONE;
+      case DEFAULT_COMPRESSION:
+        return THdfsCompression.DEFAULT;
+      case SNAPPY:
+        return THdfsCompression.SNAPPY;
+      case LZ4:
+        return THdfsCompression.LZ4;
+      case ZLIB:
+        return THdfsCompression.ZLIB;
+      default:
+        throw new ImpalaRuntimeException("Unsupported compression algorithm: " +
+            compression.toString());
+    }
+  }
+
+  public static TColumn setColumnOptions(TColumn column, boolean isKey,
+      Boolean isNullable, Encoding encoding, CompressionAlgorithm compression,
+      Expr defaultValue, Integer blockSize) {
+    column.setIs_key(isKey);
+    if (isNullable != null) column.setIs_nullable(isNullable);
+    try {
+      if (encoding != null) column.setEncoding(toThrift(encoding));
+      if (compression != null) column.setCompression(toThrift(compression));
+    } catch (ImpalaRuntimeException e) {
+      // This shouldn't happen
+      throw new IllegalStateException(String.format("Error parsing " +
+          "encoding/compression values for Kudu column '%s': %s", column.getColumnName(),
+          e.getMessage()));
+    }
+
+    if (defaultValue != null) {
+      Preconditions.checkState(defaultValue instanceof LiteralExpr);
+      column.setDefault_value(defaultValue.treeToThrift());
+    }
+    if (blockSize != null) column.setBlock_size(blockSize);
+    return column;
   }
 
   /**

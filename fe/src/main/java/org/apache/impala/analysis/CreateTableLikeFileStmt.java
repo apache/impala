@@ -21,9 +21,11 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -36,7 +38,6 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
@@ -328,8 +329,9 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
       Type type = convertParquetType(field);
       Preconditions.checkNotNull(type);
       String colName = field.getName();
-      schema.add(new ColumnDef(colName, new TypeDef(type),
-          "Inferred from Parquet file."));
+      Map<ColumnDef.Option, Object> option = Maps.newHashMap();
+      option.put(ColumnDef.Option.COMMENT, "Inferred from Parquet file.");
+      schema.add(new ColumnDef(colName, new TypeDef(type), option));
     }
     return schema;
   }
