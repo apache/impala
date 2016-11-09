@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_cdh">
+
+  <title>How Impala Works with CDH</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Concepts"/>
+      <data name="Category" value="CDH"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p conref="../shared/impala_common.xml#common/impala_overview_diagram"/>
+
+    <p conref="../shared/impala_common.xml#common/component_list"/>
+
+    <p conref="../shared/impala_common.xml#common/query_overview"/>
+  </conbody>
+</concept>

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="about_impala">
+
+  <title>Apache Impala (incubating) - Interactive SQL</title>
+  <titlealts audience="PDF"><navtitle>Impala Guide</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Components"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="SQL"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p conref="../shared/impala_common.xml#common/impala_mission_statement"/>
+
+    <p conref="../shared/impala_common.xml#common/impala_hive_compatibility"/>
+
+    <p conref="../shared/impala_common.xml#common/impala_advantages"/>
+
+    <p outputclass="toc"/>
+
+    <p audience="integrated">
+      <b>Related information throughout the CDH 5 library:</b>
+    </p>
+
+    <p audience="integrated">
+      In CDH 5, the Impala documentation for Release Notes, Installation, Upgrading, and Security has been
+      integrated alongside the corresponding information for other Hadoop components:
+    </p>
+
+<!-- Same list is in impala.xml and Impala FAQs. Conref in both places. -->
+
+    <ul>
+      <li>
+        <xref href="impala_new_features.xml#new_features">New features</xref>
+      </li>
+
+      <li>
+        <xref href="impala_known_issues.xml#known_issues">Known and fixed issues</xref>
+      </li>
+
+      <li>
+        <xref href="impala_incompatible_changes.xml#incompatible_changes">Incompatible changes</xref>
+      </li>
+
+      <li>
+        <xref href="impala_install.xml#install">Installing Impala</xref>
+      </li>
+
+      <li>
+        <xref href="impala_upgrading.xml#upgrading">Upgrading Impala</xref>
+      </li>
+
+      <li>
+        <xref href="impala_config.xml#config">Configuring Impala</xref>
+      </li>
+
+      <li>
+        <xref href="impala_processes.xml#processes">Starting Impala</xref>
+      </li>
+
+      <li>
+        <xref href="impala_security.xml#security">Security for Impala</xref>
+      </li>
+
+      <li>
+        <xref href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH-Version-and-Packaging-Information/CDH-Version-and-Packaging-Information.html" scope="external" format="html">CDH
+        Version and Packaging Information</xref>
+      </li>
+    </ul>
+  </conbody>
+</concept>

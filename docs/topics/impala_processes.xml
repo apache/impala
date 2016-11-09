@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="processes">
+
+  <title>Starting Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Starting and Stopping"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Operators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="1.2">
+      <indexterm audience="Cloudera">state store</indexterm>
+      <indexterm audience="Cloudera">starting services</indexterm>
+      <indexterm audience="Cloudera">services</indexterm>
+      To activate Impala if it is installed but not yet started:
+    </p>
+
+    <ol>
+      <li>
+        Set any necessary configuration options for the Impala services. See
+        <xref href="impala_config_options.xml#config_options"/> for details.
+      </li>
+
+      <li>
+        Start one instance of the Impala statestore. The statestore helps Impala to distribute work efficiently,
+        and to continue running in the event of availability problems for other Impala nodes. If the statestore
+        becomes unavailable, Impala continues to function.
+      </li>
+
+      <li>
+        Start one instance of the Impala catalog service.
+      </li>
+
+      <li>
+        Start the main Impala service on one or more DataNodes, ideally on all DataNodes to maximize local
+        processing and avoid network traffic due to remote reads.
+      </li>
+    </ol>
+
+    <p>
+      Once Impala is running, you can conduct interactive experiments using the instructions in
+      <xref href="impala_tutorial.xml#tutorial"/> and try <xref href="impala_impala_shell.xml#impala_shell"/>.
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="starting_via_cm">
+
+    <title>Starting Impala through Cloudera Manager</title>
+
+    <conbody>
+
+      <p>
+        If you installed Impala with Cloudera Manager, use Cloudera Manager to start and stop services. The
+        Cloudera Manager GUI is a convenient way to check that all services are running, to set configuration
+        options using form fields in a browser, and to spot potential issues such as low disk space before they
+        become serious. Cloudera Manager automatically starts all the Impala-related services as a group, in the
+        correct order. See
+        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_start_stop_service.html" scope="external" format="html">the
+        Cloudera Manager Documentation</xref> for details.
+      </p>
+
+      <note>
+        <p conref="../shared/impala_common.xml#common/udf_persistence_restriction"/>
+      </note>
+    </conbody>
+  </concept>
+
+  <concept id="starting_via_cmdline">
+
+    <title>Starting Impala from the Command Line</title>
+
+    <conbody>
+
+      <p>
+        To start the Impala state store and Impala from the command line or a script, you can either use the
+        <cmdname>service</cmdname> command or you can start the daemons directly through the
+        <cmdname>impalad</cmdname>, <codeph>statestored</codeph>, and <cmdname>catalogd</cmdname> executables.
+      </p>
+
+      <p>
+        Start the Impala statestore and then start <codeph>impalad</codeph> instances. You can modify the values
+        the service initialization scripts use when starting the statestore and Impala by editing
+        <codeph>/etc/default/impala</codeph>.
+      </p>
+
+      <p>
+        Start the statestore service using a command similar to the following:
+      </p>
+
+      <p>
+<codeblock>$ sudo service impala-state-store start</codeblock>
+      </p>
+
+      <p rev="1.2">
+        Start the catalog service using a command similar to the following:
+      </p>
+
+<codeblock rev="1.2">$ sudo service impala-catalog start</codeblock>
+
+      <p>
+        Start the Impala service on each DataNode using a command similar to the following:
+      </p>
+
+      <p>
+<codeblock>$ sudo service impala-server start</codeblock>
+      </p>
+
+      <note>
+        <p conref="../shared/impala_common.xml#common/udf_persistence_restriction"/>
+      </note>
+
+      <p>
+        If any of the services fail to start, review:
+        <ul>
+          <li>
+            <xref href="impala_logging.xml#logs_debug"/>
+          </li>
+
+          <li>
+            <xref href="impala_troubleshooting.xml#troubleshooting"/>
+          </li>
+        </ul>
+      </p>
+    </conbody>
+  </concept>
+</concept>

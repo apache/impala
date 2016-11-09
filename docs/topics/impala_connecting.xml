@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="connecting">
+
+  <title>Connecting to impalad through impala-shell</title>
+  <titlealts audience="PDF"><navtitle>Connecting to impalad</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="impala-shell"/>
+      <data name="Category" value="Network"/>
+      <data name="Category" value="DataNode"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+<!--
+TK: This would be a good theme for a tutorial topic.
+Lots of nuances to illustrate through sample code.
+-->
+
+    <p>
+      Within an <cmdname>impala-shell</cmdname> session, you can only issue queries while connected to an instance
+      of the <cmdname>impalad</cmdname> daemon. You can specify the connection information:
+      <ul>
+        <li>
+          Through command-line options when you run the <cmdname>impala-shell</cmdname> command.
+        </li>
+        <li>
+          Through a configuration file that is read when you run the <cmdname>impala-shell</cmdname> command.
+        </li>
+        <li>
+          During an <cmdname>impala-shell</cmdname> session, by issuing a <codeph>CONNECT</codeph> command.
+        </li>
+      </ul>
+      See <xref href="impala_shell_options.xml"/> for the command-line and configuration file options you can use.
+    </p>
+
+    <p>
+      You can connect to any DataNode where an instance of <cmdname>impalad</cmdname> is running,
+      and that host coordinates the execution of all queries sent to it.
+    </p>
+
+    <p>
+      For simplicity during development, you might always connect to the same host, perhaps running <cmdname>impala-shell</cmdname> on
+      the same host as <cmdname>impalad</cmdname> and specifying the hostname as <codeph>localhost</codeph>.
+    </p>
+
+    <p>
+      In a production environment, you might enable load balancing, in which you connect to specific host/port combination
+      but queries are forwarded to arbitrary hosts. This technique spreads the overhead of acting as the coordinator
+      node among all the DataNodes in the cluster. See <xref href="impala_proxy.xml"/> for details.
+    </p>
+
+    <p>
+      <b>To connect the Impala shell during shell startup:</b>
+    </p>
+
+    <ol>
+      <li>
+        Locate the hostname of a DataNode within the cluster that is running an instance of the
+        <cmdname>impalad</cmdname> daemon. If that DataNode uses a non-default port (something
+        other than port 21000) for <cmdname>impala-shell</cmdname> connections, find out the
+        port number also.
+      </li>
+
+      <li>
+        Use the <codeph>-i</codeph> option to the
+        <cmdname>impala-shell</cmdname> interpreter to specify the connection information for
+        that instance of <cmdname>impalad</cmdname>:
+<codeblock>
+# When you are logged into the same machine running impalad.
+# The prompt will reflect the current hostname.
+$ impala-shell
+
+# When you are logged into the same machine running impalad.
+# The host will reflect the hostname 'localhost'.
+$ impala-shell -i localhost
+
+# When you are logged onto a different host, perhaps a client machine
+# outside the Hadoop cluster.
+$ impala-shell -i <varname>some.other.hostname</varname>
+
+# When you are logged onto a different host, and impalad is listening
+# on a non-default port. Perhaps a load balancer is forwarding requests
+# to a different host/port combination behind the scenes.
+$ impala-shell -i <varname>some.other.hostname</varname>:<varname>port_number</varname>
+</codeblock>
+      </li>
+    </ol>
+
+    <p>
+      <b>To connect the Impala shell after shell startup:</b>
+    </p>
+
+    <ol>
+      <li>
+        Start the Impala shell with no connection:
+<codeblock>$ impala-shell</codeblock>
+        <p>
+          You should see a prompt like the following:
+        </p>
+<codeblock>Welcome to the Impala shell. Press TAB twice to see a list of available commands.
+
+Copyright (c) <varname>year</varname> Cloudera, Inc. All rights reserved.
+
+<ph conref="../shared/ImpalaVariables.xml#impala_vars/ShellBanner"/>
+[Not connected] &gt; </codeblock>
+      </li>
+
+      <li>
+        Locate the hostname of a DataNode within the cluster that is running an instance of the
+        <cmdname>impalad</cmdname> daemon. If that DataNode uses a non-default port (something
+        other than port 21000) for <cmdname>impala-shell</cmdname> connections, find out the
+        port number also.
+      </li>
+
+      <li>
+        Use the <codeph>connect</codeph> command to connect to an Impala instance. Enter a command of the form:
+<codeblock>[Not connected] &gt; connect <varname>impalad-host</varname>
+[<varname>impalad-host</varname>:21000] &gt;</codeblock>
+        <note>
+          Replace <varname>impalad-host</varname> with the hostname you have configured for any DataNode running
+          Impala in your environment. The changed prompt indicates a successful connection.
+        </note>
+      </li>
+    </ol>
+
+    <p>
+      <b>To start <cmdname>impala-shell</cmdname> in a specific database:</b>
+    </p>
+
+    <p>
+      You can use all the same connection options as in previous examples.
+      For simplicity, these examples assume that you are logged into one of
+      the DataNodes that is running the <cmdname>impalad</cmdname> daemon.
+    </p>
+
+    <ol>
+      <li>
+        Find the name of the database containing the relevant tables, views, and so
+        on that you want to operate on.
+      </li>
+
+      <li>
+        Use the <codeph>-d</codeph> option to the
+        <cmdname>impala-shell</cmdname> interpreter to connect and immediately
+        switch to the specified database, without the need for a <codeph>USE</codeph>
+        statement or fully qualified names:
+<codeblock>
+# Subsequent queries with unqualified names operate on
+# tables, views, and so on inside the database named 'staging'.
+$ impala-shell -i localhost -d staging
+
+# It is common during development, ETL, benchmarking, and so on
+# to have different databases containing the same table names
+# but with different contents or layouts.
+$ impala-shell -i localhost -d parquet_snappy_compression
+$ impala-shell -i localhost -d parquet_gzip_compression
+</codeblock>
+      </li>
+    </ol>
+
+    <p>
+      <b>To run one or several statements in non-interactive mode:</b>
+    </p>
+
+    <p>
+      You can use all the same connection options as in previous examples.
+      For simplicity, these examples assume that you are logged into one of
+      the DataNodes that is running the <cmdname>impalad</cmdname> daemon.
+    </p>
+
+    <ol>
+      <li>
+        Construct a statement, or a file containing a sequence of statements,
+        that you want to run in an automated way, without typing or copying
+        and pasting each time.
+      </li>
+
+      <li>
+        Invoke <cmdname>impala-shell</cmdname> with the <codeph>-q</codeph> option to run a single statement, or
+        the <codeph>-f</codeph> option to run a sequence of statements from a file.
+        The <cmdname>impala-shell</cmdname> command returns immediately, without going into
+        the interactive interpreter.
+<codeblock>
+# A utility command that you might run while developing shell scripts
+# to manipulate HDFS files.
+$ impala-shell -i localhost -d database_of_interest -q 'show tables'
+
+# A sequence of CREATE TABLE, CREATE VIEW, and similar DDL statements
+# can go into a file to make the setup process repeatable.
+$ impala-shell -i localhost -d database_of_interest -f recreate_tables.sql
+</codeblock>
+      </li>
+    </ol>
+
+  </conbody>
+</concept>

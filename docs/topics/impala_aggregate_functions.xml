@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="aggregate_functions">
+
+  <title>Impala Aggregate Functions</title>
+  <titlealts audience="PDF"><navtitle>Aggregate Functions</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p conref="../shared/impala_common.xml#common/aggr1"/>
+
+<codeblock conref="../shared/impala_common.xml#common/aggr2"/>
+
+    <p conref="../shared/impala_common.xml#common/aggr3"/>
+
+    <p>
+      <indexterm audience="Cloudera">aggregate functions</indexterm>
+    </p>
+
+    <p outputclass="toc"/>
+  </conbody>
+</concept>

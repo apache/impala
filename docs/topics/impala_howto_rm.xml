@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="howto_impala_rm">
+
+ <title>How to Configure Resource Management for Impala</title>
+ <prolog>
+  <metadata>
+   <data name="Category" value="Impala"/>
+   <data name="Category" value="Admission Control"/>
+   <data name="Category" value="Resource Management"/>
+  </metadata>
+ </prolog>
+ <conbody>
+  <p>Impala includes features that balance and maximize resources in your CDH cluster. This topic describes
+  how you can enhance a CDH cluster using Impala to improve efficiency.</p>
+  <p outputclass="toc inpage">A typical deployment uses the following.</p>
+  <ul audience="HTML">
+   <li audience="HTML">Creating Static Service Pools</li>
+   <li audience="HTML">Using Admission Control <ul>
+     <li audience="HTML">Setting Per-query Memory Limits</li>
+     <li audience="HTML">Creating Dynamic Resource Pools</li>
+    </ul></li>
+
+  </ul>
+ </conbody>
+ <concept id="static_service_pools">
+   <title>Creating Static Service Pools</title>
+  <conbody>
+  <p>Use Static Service Pools to allocate dedicated resources for Impala and other services to allow
+    for predictable resource availability. </p>
+    <p>Static service pools isolate services from one another, so that high load on one service has
+    bounded impact on other services. You can use Cloudera Manager to configure static service pools
+    that control memory, CPU and Disk I/O.</p>
+    <p >The following screenshot shows a sample configuration for Static Service Pools in
+    Cloudera Manager:</p>
+   <draft-comment author="ddawson">
+    <p>Need accurate numbers - or can we remove services other than HDFS, Impala, and YARN? Matt
+     Jacobs is going to run these numbers by someone in the field.</p>
+   </draft-comment>
+   <p>
+    <image href="../images/howto_static_server_pools_config.png" placement="break"
+     id="PDF_33" align="center" scale="33" audience="HTML"/>
+    <image href="../images/howto_static_server_pools_config.png" placement="break"
+     id="HTML_SCALEFIT" align="center" scalefit="yes" audience="PDF"/>
+   </p>
+   <p>
+    <ul id="ul_tkw_4rs_pw">
+     <li >
+      <p >HDFS always needs to have a minimum of 5-10% of the resources.</p>
+     </li>
+     <li >
+      Generally, YARN and Impala split the rest of the resources.
+     
+     <ul id="ul_ukw_4rs_pw">
+      <li >
+       <p >For mostly batch workloads, you might allocate YARN 60%, Impala 30%, and HDFS
+        10%. </p>
+      </li>
+      <li >
+       <p >For mostly ad hoc query workloads, you might allocate Impala 60%, YARN 30%, and
+        HDFS 10%.</p>
+      </li>
+     </ul></li>
+    </ul>
+   </p>
+   </conbody>
+  </concept>
+ <concept id="enable_admission_control">
+  <title>Using Admission Control</title>
+  <conbody>
+   <p>Within the constraints of the static service pool, you can further subdivide Impala's
+    resources using Admission Control. You configure Impala Admission Control pools in the Cloudera
+    Manager Dynamic Resource Pools page.</p>
+   <p>You use Admission Control to divide usage between Dynamic Resource Pools in multitenant use
+    cases. Allocating resources judiciously allows your most important queries to run faster and
+    more reliably.</p>
+   <p>
+    <note>In this context, Impala Dynamic Resource Pools are different than the default YARN Dynamic
+     Resource Pools. You can turn on Dynamic Resource Pools that are exclusively for use by
+     Impala.</note>
+   </p>
+   <p>Admission Control is enabled by default.</p>
+   <p>A Dynamic Resource Pool has the following properties:<ul id="ul_blk_jjg_sw">
+     <li><b>Max Running Queries</b>: Maximum number of concerrently executing queries in the pool
+      before incoming queries are queued.</li>
+     <li><b>Max Memory Resources</b>: Maximum memory used by queries in the pool before incoming
+      queries are queued. This value is used at the time of admission and is not enforced at query
+      runtime.</li>
+     <li><b>Default Query Memory Limit</b>: Defines the maximum amount of memory a query can
+      allocate on each node. This is enforced at runtime. If the query attempts to use more memory,
+      it is forced to spill, if possible. Otherwise, it is cancelled. The total memory that can be
+      used by a query is the <codeph>MEM_LIMIT</codeph> times the number of nodes.</li>
+     <li><b>Max Queued Queries</b>: Maximum number of queries that can be queued in the pool before
+      additional queries are rejected.</li>
+     <li><b>Queue Timeout</b>: Specifies how long queries can wait in the queue before they are
+      cancelled with a timeout error.</li>
+    </ul></p>
+  </conbody>
+ </concept>
+ <concept id="set_per_query_memory_limits">
+  <title>Setting Per-query Memory Limits</title>
+  <conbody>
+   <p>Use per-query memory limits to prevent queries from consuming excessive memory resources that
+    impact other queries. <ph rev="upstream">Cloudera</ph> recommends that you set the query memory limits whenever
+    possible.</p>
+   <p>If you set the <b>Pool Max Mem Resources</b> for a resource pool, Impala attempts to throttle
+    queries if there is not enough memory to run them within the specified resources.</p>
+   <p>Only use admission control with maximum memory resources if you can ensure there are query
+    memory limits. Set the pool <b>Default Query Memory Limit</b> to be certain. You can override
+    this setting with the <codeph>query</codeph> option, if necessary.</p>
+   <p>Typically, you set query memory limits using the <codeph>set MEM_LIMIT=Xg;</codeph> query
+    option. When you find the right value for your business case, memory-based admission control
+    works well. The potential downside is that queries that attempt to use more memory might perform
+    poorly or even be cancelled.</p>
+   <p>To find a reasonable default query memory limit:<ol id="ol_ydt_xhy_pw">
+     <li>Run the workload.</li>
+     <li>In Cloudera Manager, go to <menucascade>
+       <uicontrol>Impala</uicontrol>
+       <uicontrol>Queries</uicontrol>
+      </menucascade>.</li>
+     <li>Click <uicontrol>Select Attributes</uicontrol>.</li>
+     <li>Select <uicontrol>Per Node Peak Memory Usage</uicontrol> and click
+       <uicontrol>Update</uicontrol>.</li>
+     <li>Allow the system time to gather information, then click the <uicontrol>Show
+       Histogram</uicontrol> icon to see the results.<image placement="break"
+       href="../images/howto_show_histogram.png" align="center" id="image_hmv_xky_pw"/></li>
+     <li>Use the histogram to find a value that accounts for most queries. Queries that require more
+      resources than this limit should explicitly set the memory limit to ensure they can run to
+       completion.<draft-comment author="ddawson">This chart uses bad sample data - we will change
+       the chart when we have real numbers from the sample use case.</draft-comment><image
+       placement="break" href="../images/howto_per_node_peak_memory_usage.png" align="center"
+       id="image_ehn_hly_pw" scalefit="yes"/></li>
+    </ol></p>
+  </conbody>
+ </concept>
+ <concept id="concept_en4_3sy_pw">
+  <title>Creating Dynamic Resource Pools</title>
+  <conbody>
+   <p>A dynamic resource pool is a named configuration of resources and a policy for scheduling the
+    resources among Impala queries running in the pool. Dynamic resource pools allow you to schedule
+    and allocate resources to Impala queries based on a user's access to specific pools and the
+    resources available to those pools. </p>
+   <p>This example creates both production and development resource pools or queues. It assumes you
+    have 3 worker nodes with 24GiB of RAM each for an aggregate memory of 72000MiB. This pool
+    configuration allocates the Production queue twice the memory resources of the Development
+    queue, and a higher number of concurrent queries.</p>
+   <p>To create a Production dynamic resource pool for Impala:</p>
+    <ol>
+     <li>In Cloudera Manager, select <menucascade>
+      <uicontrol>Clusters</uicontrol>
+      <uicontrol>Dynamic Resource Pool Configuration</uicontrol>
+     </menucascade>.</li>
+     <li>Click the <uicontrol>Impala Admission Control</uicontrol> tab.</li>
+     <li>Click <b>Create Resource Pool</b>.</li>
+     <li>Specify a name and resource limits for the Production pool:<ul id="ul_rjt_wqv_2v">
+       <li>In the <b>Resource Pool Name</b> field, enter <userinput>Production</userinput>.</li>
+       <li>In the <uicontrol>Max Memory</uicontrol> field, enter <userinput>48000</userinput>.</li>
+      <li>In the <uicontrol>Default Query Memory Limit</uicontrol> field, enter
+        <userinput>1600</userinput>.</li>
+       <li>In the <uicontrol>Max Running Queries</uicontrol> field, enter
+       <userinput>10</userinput>.</li>
+       <li>In the <uicontrol>Max Queued Queries</uicontrol> field, enter
+       <userinput>200</userinput>.</li>
+      </ul></li>
+     <li>Click <uicontrol>Create</uicontrol>.</li>
+     <li>Click <uicontrol>Refresh Dynamic Resource Pools</uicontrol>.</li>
+    </ol>
+    <p>The Production queue runs up to 10 queries at once. If the total memory requested
+    by these queries exceeds 48000 MiB, it holds the next query in the queue until the memory is
+    released. It also prevents a query from running if it needs more memory than is currently
+    available. Admission Control holds the next query if either Max Running Queries is reached, or
+    the pool Max Memory limit is reached.</p>
+   <p>Here, Max Memory resources and Default Query Memory Limit throttle throughput to 10 queries,
+    so setting Max Running Queries might not be necessary, though it does not hurt to do so. Most
+    users set Max Running Queries when they cannot pick good numbers for memory. Since users can
+    override the query option <varname>mem_limit</varname>, setting the Max Running Queries property
+    might make sense.</p>
+    <p>To create a Development dynamic resource pool for Impala:</p>
+
+    <ol>
+     <li>In Cloudera Manager, select <menucascade>
+      <uicontrol>Clusters</uicontrol>
+      <uicontrol>Dynamic Resource Pool Configuration</uicontrol>
+     </menucascade>.</li>
+     <li>Click the <uicontrol>Impala Admission Control</uicontrol> tab.</li>
+     <li>Click <b>Create Resource Pool</b>.</li>
+     <li>Specify a name and resource limits for the Development pool:<ul id="ul_j42_q3z_pw">
+       <li>In the <b>Resource Pool Name</b> field, enter <userinput>Development</userinput>.</li>
+       <li>In the <uicontrol>Max Memory</uicontrol> field, enter <userinput>24000</userinput>.</li>
+      <li>In the <uicontrol>Default Query Memory Limit</uicontrol> field, enter
+        <userinput>8000</userinput>.</li>
+       <li>In the <uicontrol>Max Running Queries</uicontrol> field, enter 1.</li>
+       <li>In the <uicontrol>Max Queued Queries</uicontrol> field, enter 100.</li>
+      </ul></li>
+     <li>Click <uicontrol>Create</uicontrol>.</li>
+     <li>Click <uicontrol>Refresh Dynamic Resource Pools</uicontrol>.<p>The Development queue runs
+      one query at a time. If the total memory required by the query exceeds 24000 MiB, it holds the
+      query until memory is released.</p></li>
+    </ol>
+  </conbody>
+  <concept id="setting_placement_rules">
+   <title>Understanding Placement Rules</title>
+   <conbody>
+    <p>Placement rules determine how queries are mapped to resource pools. The standard settings are
+     to use a specified pool when specified; otherwise, use the default pool.</p>
+    <p>For example, you can use the SET statement to select the pool in which to run a
+     query.<codeblock>SET REQUEST_POOL=Production;</codeblock></p>
+    <p>If you do not use a <codeph>SET</codeph> statement, queries are run in the default pool.</p>
+   </conbody>
+  </concept>
+  <concept id="setting_access_control_on_pools">
+  <title>Setting Access Control on Pools</title>
+  <conbody>
+   <p>You can specify that only cetain users and groups are allowed to use the pools you define.</p>
+   <p>To create a Development dynamic resource pool for Impala:</p>
+   <ol>
+    <li>In Cloudera Manager, select <menucascade>
+       <uicontrol>Clusters</uicontrol>
+       <uicontrol>Dynamic Resource Pool Configuration</uicontrol>
+      </menucascade>.</li>
+    <li>Click the <uicontrol>Impala Admission Control</uicontrol> tab.</li>
+    <li>Click the <uicontrol>Edit</uicontrol> button for the Production pool.</li>
+    <li>Click the Submission Access Control tab.</li>
+    <li>Select <uicontrol>Allow these users and groups to submit to this pool</uicontrol>.</li>
+    <li>Enter a comma-separated list of users who can use the pool.
+     <image placement="break"
+      href="../images/howto_access_control.png" align="center" scalefit="yes"/>
+     </li>
+    
+    <li>Click <uicontrol>Save</uicontrol>.</li>
+   </ol>
+  </conbody>
+ </concept>
+ </concept>
+<concept id="impala_resource_management_example">
+ <title>Impala Resource Management Example</title>
+ <conbody>
+   <p>Anne Chang is administrator for an enterprise data hub that runs a number of workloads,
+    including Impala. </p>
+   <p>Anne has a 20-node cluster that uses Cloudera Manager static partitioning. Because of the
+    heavy Impala workload, Anne needs to make sure Impala gets enough resources. While the best
+    configuration values might not be known in advance, she decides to start by allocating 50% of
+    resources to Impala. Each node has 128 GiB dedicated to each impalad. Impala has 2560 GiB in
+    aggregate that can be shared across the resource pools she creates.</p>
+   <p>Next, Anne studies the workload in more detail. After some research, she might choose to
+    revisit these initial values for static partitioning. </p>
+   <p>To figure out how to further allocate Impala’s resources, Anne needs to consider the workloads
+    and users, and determine their requirements. There are a few main sources of Impala queries: <ul
+     id="ul_ml3_sf2_5w">
+     <li>Large reporting queries executed by an external process/tool. These are critical business
+      intelligence queries that are important for business decisions. It is important that they get
+      the resources they need to run. There typically are not many of these queries at a given
+      time.</li>
+     <li>Frequent, small queries generated by a web UI. These queries scan a limited amount of data
+      and do not require expensive joins or aggregations. These queries are important, but not as
+      critical, perhaps the client tries resending the query or the end user refreshes the
+      page.</li>
+     <li>Occasionally, expert users might run ad-hoc queries. The queries can vary significantly in
+      their resource requirements. While Anne wants a good experience for these users, it is hard to
+      control what they do (for example, submitting inefficient or incorrect queries by mistake).
+      Anne restricts these queries by default and tells users to reach out to her if they need more
+      resources. </li>
+    </ul></p>
+   <p>To set up admission control for this workload, Anne first runs the workloads independently, so
+    that she can observe the workload’s resource usage in Cloudera Manager. If they could not easily
+    be run manually, but had been run in the past, Anne uses the history information from Cloudera
+    Manager. It can be helpful to use other search criteria (for example, <i>user</i>) to isolate
+    queries by workload. Anne uses the Cloudera Manager chart for Per-Node Peak Memory usage to
+    identify the maximum memory requirements for the queries. </p>
+   <p>From this data, Anne observes the following about the queries in the groups above:<ul
+     id="ul_amq_ng2_5w">
+     <li> Large reporting queries use up to 32 GiB per node. There are typically 1 or 2 queries
+      running at a time. On one occasion, she observed that 3 of these queries were running
+      concurrently. Queries can take 3 minutes to complete.</li>
+     <li>Web UI-generated queries use between 100 MiB per node to usually less than 4 GiB per node
+      of memory, but occasionally as much as 10 GiB per node. Queries take, on average, 5 seconds,
+      and there can be as many as 140 incoming queries per minute.</li>
+     <li>Anne has little data on ad hoc queries, but some are trivial (approximately 100 MiB per
+      node), others join several tables (requiring a few GiB per node), and one user submitted a
+      huge cross join of all tables that used all system resources (that was likely a mistake).</li>
+    </ul></p>
+   <p>Based on these observations, Anne creates the admission control configuration with the
+    following pools: </p>
+   <section id="section_yjc_h32_5w">
+    <title>XL_Reporting</title>
+    <p>
+     <table frame="all" rowsep="1" colsep="1" id="XL_Reporting_Table">
+      <tgroup cols="2">
+       <colspec colname="c1" colnum="1" colwidth="1.0*"/>
+       <colspec colname="c2" colnum="2" colwidth="1.0*"/>
+       <thead>
+        <row>
+         <entry>Property</entry>
+         <entry>Value</entry>
+        </row>
+       </thead>
+       <tbody>
+        <row>
+         <entry>Max Memory</entry>
+         <entry>1280 GiB</entry>
+        </row>
+        <row>
+         <entry>Default Query Memory Limit</entry>
+         <entry>32 GiB</entry>
+        </row>
+        <row>
+         <entry>Max Running Queries</entry>
+         <entry>2</entry>
+        </row>
+        <row>
+         <entry>Queue Timeout</entry>
+         <entry>5 minutes</entry>
+        </row>
+       </tbody>
+      </tgroup>
+     </table>
+    </p>
+    <p>This pool is for large reporting queries. In order to support running 2 queries at a time,
+     the pool memory resources are set to 1280 GiB (aggregate cluster memory). This is for 2
+     queries, each with 32 GiB per node, across 20 nodes. Anne sets the pool’s Default Query Memory
+     Limit to 32 GiB so that no query uses more than 32 GiB on any given node. She sets Max Running
+     Queries to 2 (though it is not necessary she do so). She increases the pool’s queue timeout to
+     5 minutes in case a third query comes in and has to wait. She does not expect more than 3
+     concurrent queries, and she does not want them to wait that long anyway, so she does not
+     increase the queue timeout. If the workload increases in the future, she might choose to adjust
+     the configuration or buy more hardware. </p>
+   </section>
+   <section id="section_xm3_j32_5w"><title>HighThroughput_UI</title>
+    <p>
+     <table frame="all" rowsep="1" colsep="1" id="High_Throughput_UI_Table">
+      <tgroup cols="2">
+       <colspec colname="c1" colnum="1" colwidth="1.0*"/>
+       <colspec colname="c2" colnum="2" colwidth="1.0*"/>
+       <thead>
+        <row>
+         <entry>Property</entry>
+         <entry>Value</entry>
+        </row>
+       </thead>
+       <tbody>
+        <row>
+         <entry>Max Memory</entry>
+         <entry>960 GiB (inferred)</entry>
+        </row>
+        <row>
+         <entry>Default Query Memory Limit</entry>
+         <entry>4 GiB</entry>
+        </row>
+        <row>
+         <entry>Max Running Queries</entry>
+         <entry>12</entry>
+        </row>
+        <row>
+         <entry>Queue Timeout</entry>
+         <entry>5 minutes</entry>
+        </row>
+       </tbody>
+      </tgroup>
+     </table>
+    </p>
+    <p>This pool is used for the small, high throughput queries generated by the web tool. Anne sets
+     the Default Query Memory Limit to 4 GiB per node, and sets Max Running Queries to 12. This
+     implies a maximum amount of memory per node used by the queries in this pool: 48 GiB per node
+     (12 queries * 4 GiB per node memory limit).</p><p>Notice that Anne does not set the pool memory resources, but does set the pool’s Default Query
+     Memory Limit. This is intentional: admission control processes queries faster when a pool uses
+     the Max Running Queries limit instead of the peak memory resources.</p><p>This should be enough memory for most queries, since only a few go over 4 GiB per node. For those
+     that do require more memory, they can probably still complete with less memory (spilling if
+     necessary). If, on occasion, a query cannot run with this much memory and it fails, Anne might
+     reconsider this configuration later, or perhaps she does not need to worry about a few rare
+     failures from this web UI.</p><p>With regard to throughput, since these queries take around 5 seconds and she is allowing 12
+     concurrent queries, the pool should be able to handle approximately 144 queries per minute,
+     which is enough for the peak maximum expected of 140 queries per minute. In case there is a
+     large burst of queries, Anne wants them to queue. The default maximum size of the queue is
+     already 200, which should be more than large enough. Anne does not need to change it.</p></section>
+   <section id="section_asm_yj2_5w"><title>Default</title>
+    <p>
+     <table frame="all" rowsep="1" colsep="1" id="default_table">
+      <tgroup cols="2">
+       <colspec colname="c1" colnum="1" colwidth="1.0*"/>
+       <colspec colname="c2" colnum="2" colwidth="1.0*"/>
+       <thead>
+        <row>
+         <entry>Property</entry>
+         <entry>Value</entry>
+        </row>
+       </thead>
+       <tbody>
+        <row>
+         <entry>Max Memory</entry>
+         <entry>320 GiB</entry>
+        </row>
+        <row>
+         <entry>Default Query Memory Limit</entry>
+         <entry>4 GiB</entry>
+        </row>
+        <row>
+         <entry>Max Running Queries</entry>
+         <entry>Unlimited</entry>
+        </row>
+        <row>
+         <entry>Queue Timeout</entry>
+         <entry>60 Seconds</entry>
+        </row>
+       </tbody>
+      </tgroup>
+     </table>
+    </p><p>The default pool (which already exists) is a catch all for ad-hoc queries. Anne wants to use the
+     remaining memory not used by the first two pools, 16 GiB per node (XL_Reporting uses 64 GiB per
+     node, High_Throughput_UI uses 48 GiB per node). For the other pools to get the resources they
+     expect, she must still set the Max Memory resources and the Default Query Memory Limit. She
+     sets the Max Memory resources to 320 GiB (16 * 20). She sets the Default Query Memory Limit to
+     4 GiB per node for now. That is somewhat arbitrary, but satisfies some of the ad hoc queries
+     she observed. If someone writes a bad query by mistake, she does not actually want it using all
+     the system resources. If a user has a large query to submit, an expert user can override the
+     Default Query Memory Limit (up to 16 GiB per node, since that is bound by the pool Max Memory
+     resources). If that is still insufficient for this user’s workload, the user should work with
+     Anne to adjust the settings and perhaps create a dedicated pool for the workload.</p></section>
+  </conbody>
+</concept>
+</concept>

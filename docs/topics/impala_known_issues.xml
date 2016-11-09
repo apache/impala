@@ -1,0 +1,1812 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="ver" id="known_issues">
+
+  <title><ph audience="standalone">Known Issues and Workarounds in Impala</ph><ph audience="integrated">Apache Impala (incubating) Known Issues</ph></title>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Release Notes"/>
+      <data name="Category" value="Known Issues"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Upgrading"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The following sections describe known issues and workarounds in Impala, as of the current production release. This page summarizes the
+      most serious or frequently encountered issues in the current release, to help you make planning decisions about installing and
+      upgrading. Any workarounds are listed here. The bug links take you to the Impala issues site, where you can see the diagnosis and
+      whether a fix is in the pipeline.
+    </p>
+
+    <note>
+      The online issue tracking system for Impala contains comprehensive information and is updated in real time. To verify whether an issue
+      you are experiencing has already been reported, or which release an issue is fixed in, search on the
+      <xref href="https://issues.cloudera.org/" scope="external" format="html">issues.cloudera.org JIRA tracker</xref>.
+    </note>
+
+    <p outputclass="toc inpage"/>
+
+    <p>
+      For issues fixed in various Impala releases, see <xref href="impala_fixed_issues.xml#fixed_issues"/>.
+    </p>
+
+<!-- Use as a template for new issues.
+    <concept id="">
+      <title></title>
+      <conbody>
+        <p>
+        </p>
+        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Resolution:</b> </p>
+        <p><b>Workaround:</b> </p>
+      </conbody>
+    </concept>
+
+-->
+
+  </conbody>
+
+<!-- New known issues for CDH 5.5 / Impala 2.3.
+
+Title: Server-to-server SSL and Kerberos do not work together
+Description: If server<->server SSL is enabled (with ssl_client_ca_certificate), and Kerberos auth is used between servers, the cluster will fail to start.
+Upstream & Internal JIRAs: https://issues.cloudera.org/browse/IMPALA-2598
+Severity: Medium.  Server-to-server SSL is practically unusable but this is a new feature.
+Workaround: No known workaround.
+
+Title: Queries may hang on server-to-server exchange errors
+Description: The DataStreamSender::Channel::CloseInternal() does not close the channel on an error. This will cause the node on the other side of the channel to wait indefinitely causing a hang.
+Upstream & Internal JIRAs: https://issues.cloudera.org/browse/IMPALA-2592
+Severity: Low.  This does not occur frequently.
+Workaround: No known workaround.
+
+Title: Catalogd may crash when loading metadata for tables with many partitions, many columns and with incremental stats
+Description: Incremental stats use up about 400 bytes per partition X column.  So for a table with 20K partitions and 100 columns this is about 800 MB.  When serialized this goes past the 2 GB Java array size limit and leads to a catalog crash.
+Upstream & Internal JIRAs: https://issues.cloudera.org/browse/IMPALA-2648, IMPALA-2647, IMPALA-2649.
+Severity: Low.  This does not occur frequently.
+Workaround:  Reduce the number of partitions.
+
+More from: https://issues.cloudera.org/browse/IMPALA-2093?filter=11278&jql=project%20%3D%20IMPALA%20AND%20priority%20in%20(blocker%2C%20critical)%20AND%20status%20in%20(open%2C%20Reopened)%20AND%20labels%20%3D%20correctness%20ORDER%20BY%20priority%20DESC
+
+IMPALA-2093
+Wrong plan of NOT IN aggregate subquery when a constant is used in subquery predicate
+IMPALA-1652
+Incorrect results with basic predicate on CHAR typed column.
+IMPALA-1459
+Incorrect assignment of predicates through an outer join in an inline view.
+IMPALA-2665
+Incorrect assignment of On-clause predicate inside inline view with an outer join.
+IMPALA-2603
+Crash: impala::Coordinator::ValidateCollectionSlots
+IMPALA-2375
+Fix issues with the legacy join and agg nodes using enable_partitioned_hash_join=false and enable_partitioned_aggregation=false
+IMPALA-1862
+Invalid bool value not reported as a scanner error
+IMPALA-1792
+ImpalaODBC: Can not get the value in the SQLGetData(m-x th column) after the SQLBindCol(m th column)
+IMPALA-1578
+Impala incorrectly handles text data when the new line character \n\r is split between different HDFS block
+IMPALA-2643
+Duplicated column in inline view causes dropping null slots during scan
+IMPALA-2005
+A failed CTAS does not drop the table if the insert fails.
+IMPALA-1821
+Casting scenarios with invalid/inconsistent results
+
+Another list from Alex, of correctness problems with predicates; might overlap with ones I already have:
+
+https://issues.cloudera.org/browse/IMPALA-2665 - Already have
+https://issues.cloudera.org/browse/IMPALA-2643 - Already have
+https://issues.cloudera.org/browse/IMPALA-1459 - Already have
+https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
+
+-->
+
+  <concept id="known_issues_crash">
+
+    <title>Impala Known Issues: Crashes and Hangs</title>
+
+    <conbody>
+
+      <p>
+        These issues can cause Impala to quit or become unresponsive.
+      </p>
+
+    </conbody>
+
+    <concept id="IMPALA-3069" rev="IMPALA-3069">
+
+      <title>Setting BATCH_SIZE query option too large can cause a crash</title>
+
+      <conbody>
+
+        <p>
+          Using a value in the millions for the <codeph>BATCH_SIZE</codeph> query option, together with wide rows or large string values in
+          columns, could cause a memory allocation of more than 2 GB resulting in a crash.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3069" scope="external" format="html">IMPALA-3069</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.9.0 / Impala 2.7.0.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-3441" rev="IMPALA-3441">
+
+      <title></title>
+
+      <conbody>
+
+        <p>
+          Malformed Avro data, such as out-of-bounds integers or values in the wrong format, could cause a crash when queried.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3441" scope="external" format="html">IMPALA-3441</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.9.0 / Impala 2.7.0 and CDH 5.8.2 / Impala 2.6.2.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-2592" rev="IMPALA-2592">
+
+      <title>Queries may hang on server-to-server exchange errors</title>
+
+      <conbody>
+
+        <p>
+          The <codeph>DataStreamSender::Channel::CloseInternal()</codeph> does not close the channel on an error. This causes the node on
+          the other side of the channel to wait indefinitely, causing a hang.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2592" scope="external" format="html">IMPALA-2592</xref>
+        </p>
+
+        <p>
+          <b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-2365" rev="IMPALA-2365">
+
+      <title>Impalad is crashing if udf jar is not available in hdfs location for first time</title>
+
+      <conbody>
+
+        <p>
+          If the JAR file corresponding to a Java UDF is removed from HDFS after the Impala <codeph>CREATE FUNCTION</codeph> statement is
+          issued, the <cmdname>impalad</cmdname> daemon crashes.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2365" scope="external" format="html">IMPALA-2365</xref>
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.</p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
+  <concept id="known_issues_performance">
+
+    <title id="ki_performance">Impala Known Issues: Performance</title>
+
+    <conbody>
+
+      <p>
+        These issues involve the performance of operations such as queries or DDL statements.
+      </p>
+
+    </conbody>
+
+    <concept id="IMPALA-1480" rev="IMPALA-1480">
+
+<!-- Not part of Alex's spreadsheet. Spreadsheet has IMPALA-1423 which mentions it's similar to this one but not a duplicate. -->
+
+      <title>Slow DDL statements for tables with large number of partitions</title>
+
+      <conbody>
+
+        <p>
+          DDL statements for tables with a large number of partitions might be slow.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1480" scope="external" format="html"></xref>IMPALA-1480
+        </p>
+
+        <p>
+          <b>Workaround:</b> Run the DDL statement in Hive if the slowness is an issue.
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.</p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
+  <concept id="known_issues_usability">
+
+    <title id="ki_usability">Impala Known Issues: Usability</title>
+
+    <conbody>
+
+      <p>
+        These issues affect the convenience of interacting directly with Impala, typically through the Impala shell or Hue.
+      </p>
+
+    </conbody>
+
+    <concept id="IMPALA-3133" rev="IMPALA-3133">
+
+      <title>Unexpected privileges in show output</title>
+
+      <conbody>
+
+        <p>
+          Due to a timing condition in updating cached policy data from Sentry, the <codeph>SHOW</codeph> statements for Sentry roles could
+          sometimes display out-of-date role settings. Because Impala rechecks authorization for each SQL statement, this discrepancy does
+          not represent a security issue for other statements.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3133" scope="external" format="html">IMPALA-3133</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+        <p>
+          <b>Resolution:</b> Fixes have been issued for some but not all CDH / Impala releases. Check the JIRA for details of fix releases.
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.8.0 / Impala 2.6.0 and CDH 5.7.1 / Impala 2.5.1.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-1776" rev="IMPALA-1776">
+
+      <title>Less than 100% progress on completed simple SELECT queries</title>
+
+      <conbody>
+
+        <p>
+          Simple <codeph>SELECT</codeph> queries show less than 100% progress even though they are already completed.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1776" scope="external" format="html">IMPALA-1776</xref>
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="concept_lmx_dk5_lx">
+
+      <title>Unexpected column overflow behavior with INT datatypes</title>
+
+      <conbody>
+
+        <p conref="../shared/impala_common.xml#common/int_overflow_behavior" />
+
+        <p>
+          <b>Bug:</b>
+          <xref href="https://issues.cloudera.org/browse/IMPALA-3123"
+            scope="external" format="html">IMPALA-3123</xref>
+        </p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
+  <concept id="known_issues_drivers">
+
+    <title id="ki_drivers">Impala Known Issues: JDBC and ODBC Drivers</title>
+
+    <conbody>
+
+      <p>
+        These issues affect applications that use the JDBC or ODBC APIs, such as business intelligence tools or custom-written applications
+        in languages such as Java or C++.
+      </p>
+
+    </conbody>
+
+    <concept id="IMPALA-1792" rev="IMPALA-1792">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>ImpalaODBC: Can not get the value in the SQLGetData(m-x th column) after the SQLBindCol(m th column)</title>
+
+      <conbody>
+
+        <p>
+          If the ODBC <codeph>SQLGetData</codeph> is called on a series of columns, the function calls must follow the same order as the
+          columns. For example, if data is fetched from column 2 then column 1, the <codeph>SQLGetData</codeph> call for column 1 returns
+          <codeph>NULL</codeph>.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1792" scope="external" format="html">IMPALA-1792</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Fetch columns in the same order they are defined in the table.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
+  <concept id="known_issues_security">
+
+    <title id="ki_security">Impala Known Issues: Security</title>
+
+    <conbody>
+
+      <p>
+        These issues relate to security features, such as Kerberos authentication, Sentry authorization, encryption, auditing, and
+        redaction.
+      </p>
+
+    </conbody>
+
+<!-- To do: Hiding for the moment. https://jira.cloudera.com/browse/CDH-38736 reports the issue is fixed. -->
+
+    <concept id="impala-shell_ssl_dependency" audience="Cloudera" rev="impala-shell_ssl_dependency">
+
+      <title>impala-shell requires Python with ssl module</title>
+
+      <conbody>
+
+        <p>
+          On CentOS 5.10 and Oracle Linux 5.11 using the built-in Python 2.4, invoking the <cmdname>impala-shell</cmdname> with the
+          <codeph>--ssl</codeph> option might fail with the following error:
+        </p>
+
+<codeblock>
+Unable to import the python 'ssl' module. It is required for an SSL-secured connection.
+</codeblock>
+
+<!-- No associated IMPALA-* JIRA... It is the internal JIRA CDH-38736. -->
+
+        <p>
+          <b>Severity:</b> Low, workaround available
+        </p>
+
+        <p>
+          <b>Resolution:</b> Customers are less likely to experience this issue over time, because <codeph>ssl</codeph> module is included
+          in newer Python releases packaged with recent Linux releases.
+        </p>
+
+        <p>
+          <b>Workaround:</b> To use SSL with <cmdname>impala-shell</cmdname> on these platform versions, install the <codeph>ssh</codeph>
+          Python module:
+        </p>
+
+<codeblock>
+yum install python-ssl
+</codeblock>
+
+        <p>
+          Then <cmdname>impala-shell</cmdname> can run when using SSL. For example:
+        </p>
+
+<codeblock>
+impala-shell -s impala --ssl --ca_cert /path_to_truststore/truststore.pem
+</codeblock>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="renewable_kerberos_tickets">
+
+<!-- Not part of Alex's spreadsheet. Not associated with a JIRA number AFAIK. -->
+
+      <title>Kerberos tickets must be renewable</title>
+
+      <conbody>
+
+        <p>
+          In a Kerberos environment, the <cmdname>impalad</cmdname> daemon might not start if Kerberos tickets are not renewable.
+        </p>
+
+        <p>
+          <b>Workaround:</b> Configure your KDC to allow tickets to be renewed, and configure <filepath>krb5.conf</filepath> to request
+          renewable tickets.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+<!-- To do: Fixed in 2.5.0, 2.3.2. Commenting out until I see how it can fix into "known issues now fixed" convention.
+     That set of fix releases looks incomplete so probably have to do some detective work with the JIRA.
+     https://issues.cloudera.org/browse/IMPALA-2598
+    <concept id="IMPALA-2598" rev="IMPALA-2598">
+
+      <title>Server-to-server SSL and Kerberos do not work together</title>
+
+      <conbody>
+
+        <p>
+          If SSL is enabled between internal Impala components (with <codeph>ssl_client_ca_certificate</codeph>), and Kerberos
+          authentication is used between servers, the cluster fails to start.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2598" scope="external" format="html">IMPALA-2598</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Do not use the new <codeph>ssl_client_ca_certificate</codeph> setting on Kerberos-enabled clusters until this
+          issue is resolved.
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0 and CDH 5.5.2 / Impala 2.3.2.</p>
+
+      </conbody>
+
+    </concept>
+-->
+
+  </concept>
+
+<!--
+  <concept id="known_issues_supportability">
+
+    <title id="ki_supportability">Impala Known Issues: Supportability</title>
+
+    <conbody>
+
+      <p>
+        These issues affect the ability to debug and troubleshoot Impala, such as incorrect output in query profiles or the query state
+        shown in monitoring applications.
+      </p>
+
+    </conbody>
+
+  </concept>
+-->
+
+  <concept id="known_issues_resources">
+
+    <title id="ki_resources">Impala Known Issues: Resources</title>
+
+    <conbody>
+
+      <p>
+        These issues involve memory or disk usage, including out-of-memory conditions, the spill-to-disk feature, and resource management
+        features.
+      </p>
+
+    </conbody>
+
+    <concept id="TSB-168">
+
+      <title>Impala catalogd heap issues when upgrading to 5.7</title>
+
+      <conbody>
+
+        <p>
+          The default heap size for Impala <cmdname>catalogd</cmdname> has changed in <keyword keyref="impala25_full"/> and higher:
+        </p>
+
+        <ul>
+          <li>
+            <p>
+              Before 5.7, by default <cmdname>catalogd</cmdname> was using the JVM's default heap size, which is the smaller of 1/4th of the
+              physical memory or 32 GB.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              Starting with CDH 5.7.0, the default <cmdname>catalogd</cmdname> heap size is 4 GB.
+            </p>
+          </li>
+        </ul>
+
+        <p>
+          For example, on a host with 128GB physical memory this will result in catalogd heap decreasing from 32GB to 4GB. This can result
+          in out-of-memory errors in catalogd and leading to query failures.
+        </p>
+
+        <p audience="Cloudera">
+          <b>Bug:</b> <xref href="https://jira.cloudera.com/browse/TSB-168" scope="external" format="html">TSB-168</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+        <p>
+          <b>Workaround:</b> Increase the <cmdname>catalogd</cmdname> memory limit as follows.
+<!-- See <xref href="impala_scalability.xml#scalability_catalog"/> for the procedure. -->
+<!-- Including full details here via conref, for benefit of PDF readers or anyone else
+             who might have trouble seeing or following the link. -->
+        </p>
+
+        <p conref="../shared/impala_common.xml#common/increase_catalogd_heap_size"/>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-3509" rev="IMPALA-3509">
+
+      <title>Breakpad minidumps can be very large when the thread count is high</title>
+
+      <conbody>
+
+        <p>
+          The size of the breakpad minidump files grows linearly with the number of threads. By default, each thread adds 8 KB to the
+          minidump size. Minidump files could consume significant disk space when the daemons have a high number of threads.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3509" scope="external" format="html">IMPALA-3509</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+        <p>
+          <b>Workaround:</b> Add <codeph>--minidump_size_limit_hint_kb=<varname>size</varname></codeph> to set a soft upper limit on the
+          size of each minidump file. If the minidump file would exceed that limit, Impala reduces the amount of information for each thread
+          from 8 KB to 2 KB. (Full thread information is captured for the first 20 threads, then 2 KB per thread after that.) The minidump
+          file can still grow larger than the <q>hinted</q> size. For example, if you have 10,000 threads, the minidump file can be more
+          than 20 MB.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-3662" rev="IMPALA-3662">
+
+      <title>Parquet scanner memory increase after IMPALA-2736</title>
+
+      <conbody>
+
+        <p>
+          The initial release of <keyword keyref="impala26_full"/> sometimes has a higher peak memory usage than in previous releases while reading
+          Parquet files.
+        </p>
+
+        <p>
+          <keyword keyref="impala26_full"/> addresses the issue IMPALA-2736, which improves the efficiency of Parquet scans by up to 2x. The faster scans
+          may result in a higher peak memory consumption compared to earlier versions of Impala due to the new column-wise row
+          materialization strategy. You are likely to experience higher memory consumption in any of the following scenarios:
+          <ul>
+            <li>
+              <p>
+                Very wide rows due to projecting many columns in a scan.
+              </p>
+            </li>
+
+            <li>
+              <p>
+                Very large rows due to big column values, for example, long strings or nested collections with many items.
+              </p>
+            </li>
+
+            <li>
+              <p>
+                Producer/consumer speed imbalances, leading to more rows being buffered between a scan (producer) and downstream (consumer)
+                plan nodes.
+              </p>
+            </li>
+          </ul>
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3662" scope="external" format="html">IMPALA-3662</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+        <p>
+          <b>Workaround:</b> The following query options might help to reduce memory consumption in the Parquet scanner:
+          <ul>
+            <li>
+              Reduce the number of scanner threads, for example: <codeph>set num_scanner_threads=30</codeph>
+            </li>
+
+            <li>
+              Reduce the batch size, for example: <codeph>set batch_size=512</codeph>
+            </li>
+
+            <li>
+              Increase the memory limit, for example: <codeph>set mem_limit=64g</codeph>
+            </li>
+          </ul>
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-691" rev="IMPALA-691">
+
+      <title>Process mem limit does not account for the JVM's memory usage</title>
+
+<!-- Supposed to be resolved for Impala 2.3.0. -->
+
+      <conbody>
+
+        <p>
+          Some memory allocated by the JVM used internally by Impala is not counted against the memory limit for the
+          <cmdname>impalad</cmdname> daemon.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-691" scope="external" format="html">IMPALA-691</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> To monitor overall memory usage, use the <cmdname>top</cmdname> command, or add the memory figures in the
+          Impala web UI <uicontrol>/memz</uicontrol> tab to JVM memory usage shown on the <uicontrol>/metrics</uicontrol> tab.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-2375" rev="IMPALA-2375">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>Fix issues with the legacy join and agg nodes using --enable_partitioned_hash_join=false and --enable_partitioned_aggregation=false</title>
+
+      <conbody>
+
+        <p></p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2375" scope="external" format="html">IMPALA-2375</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Transition away from the <q>old-style</q> join and aggregation mechanism if practical.
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.</p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
+  <concept id="known_issues_correctness">
+
+    <title id="ki_correctness">Impala Known Issues: Correctness</title>
+
+    <conbody>
+
+      <p>
+        These issues can cause incorrect or unexpected results from queries. They typically only arise in very specific circumstances.
+      </p>
+
+    </conbody>
+
+    <concept id="IMPALA-3084" rev="IMPALA-3084">
+
+      <title>Incorrect assignment of NULL checking predicate through an outer join of a nested collection.</title>
+
+      <conbody>
+
+        <p>
+          A query could return wrong results (too many or too few <codeph>NULL</codeph> values) if it referenced an outer-joined nested
+          collection and also contained a null-checking predicate (<codeph>IS NULL</codeph>, <codeph>IS NOT NULL</codeph>, or the
+          <codeph>&lt;=&gt;</codeph> operator) in the <codeph>WHERE</codeph> clause.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3084" scope="external" format="html">IMPALA-3084</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.9.0 / Impala 2.7.0.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-3094" rev="IMPALA-3094">
+
+      <title>Incorrect result due to constant evaluation in query with outer join</title>
+
+      <conbody>
+
+        <p>
+          An <codeph>OUTER JOIN</codeph> query could omit some expected result rows due to a constant such as <codeph>FALSE</codeph> in
+          another join clause. For example:
+        </p>
+
+<codeblock><![CDATA[
+explain SELECT 1 FROM alltypestiny a1
+  INNER JOIN alltypesagg a2 ON a1.smallint_col = a2.year AND false
+  RIGHT JOIN alltypes a3 ON a1.year = a1.bigint_col;
++---------------------------------------------------------+
+| Explain String                                          |
++---------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=1.00KB VCores=1 |
+|                                                         |
+| 00:EMPTYSET                                             |
++---------------------------------------------------------+
+]]>
+</codeblock>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3094" scope="external" format="html">IMPALA-3094</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+        <p>
+          <b>Resolution:</b>
+        </p>
+
+        <p>
+          <b>Workaround:</b>
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-3126" rev="IMPALA-3126">
+
+      <title>Incorrect assignment of an inner join On-clause predicate through an outer join.</title>
+
+      <conbody>
+
+        <p>
+          Impala may return incorrect results for queries that have the following properties:
+        </p>
+
+        <ul>
+          <li>
+            <p>
+              There is an INNER JOIN following a series of OUTER JOINs.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              The INNER JOIN has an On-clause with a predicate that references at least two tables that are on the nullable side of the
+              preceding OUTER JOINs.
+            </p>
+          </li>
+        </ul>
+
+        <p>
+          The following query demonstrates the issue:
+        </p>
+
+<codeblock>
+select 1 from functional.alltypes a left outer join
+  functional.alltypes b on a.id = b.id left outer join
+  functional.alltypes c on b.id = c.id right outer join
+  functional.alltypes d on c.id = d.id inner join functional.alltypes e
+on b.int_col = c.int_col;
+</codeblock>
+
+        <p>
+          The following listing shows the incorrect <codeph>EXPLAIN</codeph> plan:
+        </p>
+
+<codeblock><![CDATA[
++-----------------------------------------------------------+
+| Explain String                                            |
++-----------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=480.04MB VCores=4 |
+|                                                           |
+| 14:EXCHANGE [UNPARTITIONED]                               |
+| |                                                         |
+| 08:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]               |
+| |                                                         |
+| |--13:EXCHANGE [BROADCAST]                                |
+| |  |                                                      |
+| |  04:SCAN HDFS [functional.alltypes e]                   |
+| |     partitions=24/24 files=24 size=478.45KB             |
+| |                                                         |
+| 07:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]              |
+| |  hash predicates: c.id = d.id                           |
+| |  runtime filters: RF000 <- d.id                         |
+| |                                                         |
+| |--12:EXCHANGE [HASH(d.id)]                               |
+| |  |                                                      |
+| |  03:SCAN HDFS [functional.alltypes d]                   |
+| |     partitions=24/24 files=24 size=478.45KB             |
+| |                                                         |
+| 06:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]               |
+| |  hash predicates: b.id = c.id                           |
+| |  other predicates: b.int_col = c.int_col     <--- incorrect placement; should be at node 07 or 08
+| |  runtime filters: RF001 <- c.int_col                    |
+| |                                                         |
+| |--11:EXCHANGE [HASH(c.id)]                               |
+| |  |                                                      |
+| |  02:SCAN HDFS [functional.alltypes c]                   |
+| |     partitions=24/24 files=24 size=478.45KB             |
+| |     runtime filters: RF000 -> c.id                      |
+| |                                                         |
+| 05:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]              |
+| |  hash predicates: b.id = a.id                           |
+| |  runtime filters: RF002 <- a.id                         |
+| |                                                         |
+| |--10:EXCHANGE [HASH(a.id)]                               |
+| |  |                                                      |
+| |  00:SCAN HDFS [functional.alltypes a]                   |
+| |     partitions=24/24 files=24 size=478.45KB             |
+| |                                                         |
+| 09:EXCHANGE [HASH(b.id)]                                  |
+| |                                                         |
+| 01:SCAN HDFS [functional.alltypes b]                      |
+|    partitions=24/24 files=24 size=478.45KB                |
+|    runtime filters: RF001 -> b.int_col, RF002 -> b.id     |
++-----------------------------------------------------------+
+]]>
+</codeblock>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3126" scope="external" format="html">IMPALA-3126</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+        <p>
+          <b>Workaround:</b> High
+        </p>
+
+        <p>
+          For some queries, this problem can be worked around by placing the problematic <codeph>ON</codeph> clause predicate in the
+          <codeph>WHERE</codeph> clause instead, or changing the preceding <codeph>OUTER JOIN</codeph>s to <codeph>INNER JOIN</codeph>s (if
+          the <codeph>ON</codeph> clause predicate would discard <codeph>NULL</codeph>s). For example, to fix the problematic query above:
+        </p>
+
+<codeblock><![CDATA[
+select 1 from functional.alltypes a
+  left outer join functional.alltypes b
+    on a.id = b.id
+  left outer join functional.alltypes c
+    on b.id = c.id
+  right outer join functional.alltypes d
+    on c.id = d.id
+  inner join functional.alltypes e
+where b.int_col = c.int_col
+
++-----------------------------------------------------------+
+| Explain String                                            |
++-----------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=480.04MB VCores=4 |
+|                                                           |
+| 14:EXCHANGE [UNPARTITIONED]                               |
+| |                                                         |
+| 08:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]               |
+| |                                                         |
+| |--13:EXCHANGE [BROADCAST]                                |
+| |  |                                                      |
+| |  04:SCAN HDFS [functional.alltypes e]                   |
+| |     partitions=24/24 files=24 size=478.45KB             |
+| |                                                         |
+| 07:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]              |
+| |  hash predicates: c.id = d.id                           |
+| |  other predicates: b.int_col = c.int_col          <-- correct assignment
+| |  runtime filters: RF000 <- d.id                         |
+| |                                                         |
+| |--12:EXCHANGE [HASH(d.id)]                               |
+| |  |                                                      |
+| |  03:SCAN HDFS [functional.alltypes d]                   |
+| |     partitions=24/24 files=24 size=478.45KB             |
+| |                                                         |
+| 06:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]               |
+| |  hash predicates: b.id = c.id                           |
+| |                                                         |
+| |--11:EXCHANGE [HASH(c.id)]                               |
+| |  |                                                      |
+| |  02:SCAN HDFS [functional.alltypes c]                   |
+| |     partitions=24/24 files=24 size=478.45KB             |
+| |     runtime filters: RF000 -> c.id                      |
+| |                                                         |
+| 05:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]              |
+| |  hash predicates: b.id = a.id                           |
+| |  runtime filters: RF001 <- a.id                         |
+| |                                                         |
+| |--10:EXCHANGE [HASH(a.id)]                               |
+| |  |                                                      |
+| |  00:SCAN HDFS [functional.alltypes a]                   |
+| |     partitions=24/24 files=24 size=478.45KB             |
+| |                                                         |
+| 09:EXCHANGE [HASH(b.id)]                                  |
+| |                                                         |
+| 01:SCAN HDFS [functional.alltypes b]                      |
+|    partitions=24/24 files=24 size=478.45KB                |
+|    runtime filters: RF001 -> b.id                         |
++-----------------------------------------------------------+
+]]>
+</codeblock>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-3006" rev="IMPALA-3006">
+
+      <title>Impala may use incorrect bit order with BIT_PACKED encoding</title>
+
+      <conbody>
+
+        <p>
+          Parquet <codeph>BIT_PACKED</codeph> encoding as implemented by Impala is LSB first. The parquet standard says it is MSB first.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3006" scope="external" format="html">IMPALA-3006</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High, but rare in practice because BIT_PACKED is infrequently used, is not written by Impala, and is deprecated
+          in Parquet 2.0.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-3082" rev="IMPALA-3082">
+
+      <title>BST between 1972 and 1995</title>
+
+      <conbody>
+
+        <p>
+          The calculation of start and end times for the BST (British Summer Time) time zone could be incorrect between 1972 and 1995.
+          Between 1972 and 1995, BST began and ended at 02:00 GMT on the third Sunday in March (or second Sunday when Easter fell on the
+          third) and fourth Sunday in October. For example, both function calls should return 13, but actually return 12, in a query such
+          as:
+        </p>
+
+<codeblock>
+select
+  extract(from_utc_timestamp(cast('1970-01-01 12:00:00' as timestamp), 'Europe/London'), "hour") summer70start,
+  extract(from_utc_timestamp(cast('1970-12-31 12:00:00' as timestamp), 'Europe/London'), "hour") summer70end;
+</codeblock>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3082" scope="external" format="html">IMPALA-3082</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-1170" rev="IMPALA-1170">
+
+      <title>parse_url() returns incorrect result if @ character in URL</title>
+
+      <conbody>
+
+        <p>
+          If a URL contains an <codeph>@</codeph> character, the <codeph>parse_url()</codeph> function could return an incorrect value for
+          the hostname field.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1170" scope="external" format="html"></xref>IMPALA-1170
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0 and CDH 5.5.4 / Impala 2.3.4.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-2422" rev="IMPALA-2422">
+
+      <title>% escaping does not work correctly when occurs at the end in a LIKE clause</title>
+
+      <conbody>
+
+        <p>
+          If the final character in the RHS argument of a <codeph>LIKE</codeph> operator is an escaped <codeph>\%</codeph> character, it
+          does not match a <codeph>%</codeph> final character of the LHS argument.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2422" scope="external" format="html">IMPALA-2422</xref>
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-397" rev="IMPALA-397">
+
+      <title>ORDER BY rand() does not work.</title>
+
+      <conbody>
+
+        <p>
+          Because the value for <codeph>rand()</codeph> is computed early in a query, using an <codeph>ORDER BY</codeph> expression
+          involving a call to <codeph>rand()</codeph> does not actually randomize the results.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-397" scope="external" format="html">IMPALA-397</xref>
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-2643" rev="IMPALA-2643">
+
+      <title>Duplicated column in inline view causes dropping null slots during scan</title>
+
+      <conbody>
+
+        <p>
+          If the same column is queried twice within a view, <codeph>NULL</codeph> values for that column are omitted. For example, the
+          result of <codeph>COUNT(*)</codeph> on the view could be less than expected.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2643" scope="external" format="html">IMPALA-2643</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Avoid selecting the same column twice within an inline view.
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0, CDH 5.5.2 / Impala 2.3.2, and CDH 5.4.10 / Impala 2.2.10.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-1459" rev="IMPALA-1459">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>Incorrect assignment of predicates through an outer join in an inline view.</title>
+
+      <conbody>
+
+        <p>
+          A query involving an <codeph>OUTER JOIN</codeph> clause where one of the table references is an inline view might apply predicates
+          from the <codeph>ON</codeph> clause incorrectly.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1459" scope="external" format="html">IMPALA-1459</xref>
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0, CDH 5.5.2 / Impala 2.3.2, and CDH 5.4.9 / Impala 2.2.9.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-2603" rev="IMPALA-2603">
+
+      <title>Crash: impala::Coordinator::ValidateCollectionSlots</title>
+
+      <conbody>
+
+        <p>
+          A query could encounter a serious error if includes multiple nested levels of <codeph>INNER JOIN</codeph> clauses involving
+          subqueries.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2603" scope="external" format="html">IMPALA-2603</xref>
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-2665" rev="IMPALA-2665">
+
+      <title>Incorrect assignment of On-clause predicate inside inline view with an outer join.</title>
+
+      <conbody>
+
+        <p>
+          A query might return incorrect results due to wrong predicate assignment in the following scenario:
+        </p>
+
+        <ol>
+          <li>
+            There is an inline view that contains an outer join
+          </li>
+
+          <li>
+            That inline view is joined with another table in the enclosing query block
+          </li>
+
+          <li>
+            That join has an On-clause containing a predicate that only references columns originating from the outer-joined tables inside
+            the inline view
+          </li>
+        </ol>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2665" scope="external" format="html">IMPALA-2665</xref>
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0, CDH 5.5.2 / Impala 2.3.2, and CDH 5.4.9 / Impala 2.2.9.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-2144" rev="IMPALA-2144">
+
+      <title>Wrong assignment of having clause predicate across outer join</title>
+
+      <conbody>
+
+        <p>
+          In an <codeph>OUTER JOIN</codeph> query with a <codeph>HAVING</codeph> clause, the comparison from the <codeph>HAVING</codeph>
+          clause might be applied at the wrong stage of query processing, leading to incorrect results.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2144" scope="external" format="html">IMPALA-2144</xref>
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-2093" rev="IMPALA-2093">
+
+      <title>Wrong plan of NOT IN aggregate subquery when a constant is used in subquery predicate</title>
+
+      <conbody>
+
+        <p>
+          A <codeph>NOT IN</codeph> operator with a subquery that calls an aggregate function, such as <codeph>NOT IN (SELECT
+          SUM(...))</codeph>, could return incorrect results.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2093" scope="external" format="html">IMPALA-2093</xref>
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0 and CDH 5.5.4 / Impala 2.3.4.</p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
+  <concept id="known_issues_metadata">
+
+    <title id="ki_metadata">Impala Known Issues: Metadata</title>
+
+    <conbody>
+
+      <p>
+        These issues affect how Impala interacts with metadata. They cover areas such as the metastore database, the <codeph>COMPUTE
+        STATS</codeph> statement, and the Impala <cmdname>catalogd</cmdname> daemon.
+      </p>
+
+    </conbody>
+
+    <concept id="IMPALA-2648" rev="IMPALA-2648">
+
+      <title>Catalogd may crash when loading metadata for tables with many partitions, many columns and with incremental stats</title>
+
+      <conbody>
+
+        <p>
+          Incremental stats use up about 400 bytes per partition for each column. For example, for a table with 20K partitions and 100
+          columns, the memory overhead from incremental statistics is about 800 MB. When serialized for transmission across the network,
+          this metadata exceeds the 2 GB Java array size limit and leads to a <codeph>catalogd</codeph> crash.
+        </p>
+
+        <p>
+          <b>Bugs:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2647" scope="external" format="html">IMPALA-2647</xref>,
+          <xref href="https://issues.cloudera.org/browse/IMPALA-2648" scope="external" format="html">IMPALA-2648</xref>,
+          <xref href="https://issues.cloudera.org/browse/IMPALA-2649" scope="external" format="html">IMPALA-2649</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> If feasible, compute full stats periodically and avoid computing incremental stats for that table. The
+          scalability of incremental stats computation is a continuing work item.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-1420" rev="IMPALA-1420 2.0.0">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>Can't update stats manually via alter table after upgrading to CDH 5.2</title>
+
+      <conbody>
+
+        <p></p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1420" scope="external" format="html">IMPALA-1420</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> On CDH 5.2, when adjusting table statistics manually by setting the <codeph>numRows</codeph>, you must also
+          enable the Boolean property <codeph>STATS_GENERATED_VIA_STATS_TASK</codeph>. For example, use a statement like the following to
+          set both properties with a single <codeph>ALTER TABLE</codeph> statement:
+        </p>
+
+<codeblock>ALTER TABLE <varname>table_name</varname> SET TBLPROPERTIES('numRows'='<varname>new_value</varname>', 'STATS_GENERATED_VIA_STATS_TASK' = 'true');</codeblock>
+
+        <p>
+          <b>Resolution:</b> The underlying cause is the issue
+          <xref href="https://issues.apache.org/jira/browse/HIVE-8648" scope="external" format="html">HIVE-8648</xref> that affects the
+          metastore in Hive 0.13. The workaround is only needed until the fix for this issue is incorporated into a CDH release.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
+  <concept id="known_issues_interop">
+
+    <title id="ki_interop">Impala Known Issues: Interoperability</title>
+
+    <conbody>
+
+      <p>
+        These issues affect the ability to interchange data between Impala and other database systems. They cover areas such as data types
+        and file formats.
+      </p>
+
+    </conbody>
+
+<!-- Opened based on CDH-41605. Not part of Alex's spreadsheet AFAIK. -->
+
+    <concept id="CDH-41605">
+
+      <title>DESCRIBE FORMATTED gives error on Avro table</title>
+
+      <conbody>
+
+        <p>
+          This issue can occur either on old Avro tables (created prior to Hive 1.1 / CDH 5.4) or when changing the Avro schema file by
+          adding or removing columns. Columns added to the schema file will not show up in the output of the <codeph>DESCRIBE
+          FORMATTED</codeph> command. Removing columns from the schema file will trigger a <codeph>NullPointerException</codeph>.
+        </p>
+
+        <p>
+          As a workaround, you can use the output of <codeph>SHOW CREATE TABLE</codeph> to drop and recreate the table. This will populate
+          the Hive metastore database with the correct column definitions.
+        </p>
+
+        <note type="warning">
+          Only use this for external tables, or Impala will remove the data files. In case of an internal table, set it to external first:
+<codeblock>
+ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
+</codeblock>
+          (The part in parentheses is case sensitive.) Make sure to pick the right choice between internal and external when recreating the
+          table. See <xref href="impala_tables.xml#tables"/> for the differences between internal and external tables.
+        </note>
+
+        <p audience="Cloudera">
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/CDH-41605" scope="external" format="html">CDH-41605</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMP-469">
+
+<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
+
+      <title>Deviation from Hive behavior: Impala does not do implicit casts between string and numeric and boolean types.</title>
+
+      <conbody>
+
+        <p audience="Cloudera">
+          <b>Cloudera Bug:</b> <xref href="https://jira.cloudera.com/browse/IMP-469" scope="external" format="html"/>; KI added 0.1
+          <i>Cloudera internal only</i>
+        </p>
+
+        <p>
+          <b>Anticipated Resolution</b>: None
+        </p>
+
+        <p>
+          <b>Workaround:</b> Use explicit casts.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMP-175">
+
+<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
+
+      <title>Deviation from Hive behavior: Out of range values float/double values are returned as maximum allowed value of type (Hive returns NULL)</title>
+
+      <conbody>
+
+        <p>
+          Impala behavior differs from Hive with respect to out of range float/double values. Out of range values are returned as maximum
+          allowed value of type (Hive returns NULL).
+        </p>
+
+        <p audience="Cloudera">
+          <b>Cloudera Bug:</b> <xref href="https://jira.cloudera.com/browse/IMP-175" scope="external" format="html">IMPALA-175</xref> ; KI
+          added 0.1 <i>Cloudera internal only</i>
+        </p>
+
+        <p>
+          <b>Workaround:</b> None
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="CDH-13199">
+
+<!-- Not part of Alex's spreadsheet. The CDH- prefix makes it an oddball. -->
+
+      <title>Configuration needed for Flume to be compatible with Impala</title>
+
+      <conbody>
+
+        <p>
+          For compatibility with Impala, the value for the Flume HDFS Sink <codeph>hdfs.writeFormat</codeph> must be set to
+          <codeph>Text</codeph>, rather than its default value of <codeph>Writable</codeph>. The <codeph>hdfs.writeFormat</codeph> setting
+          must be changed to <codeph>Text</codeph> before creating data files with Flume; otherwise, those files cannot be read by either
+          Impala or Hive.
+        </p>
+
+        <p>
+          <b>Resolution:</b> This information has been requested to be added to the upstream Flume documentation.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-635" rev="IMPALA-635">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>Avro Scanner fails to parse some schemas</title>
+
+      <conbody>
+
+        <p>
+          Querying certain Avro tables could cause a crash or return no rows, even though Impala could <codeph>DESCRIBE</codeph> the table.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-635" scope="external" format="html">IMPALA-635</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Swap the order of the fields in the schema specification. For example, <codeph>["null", "string"]</codeph>
+          instead of <codeph>["string", "null"]</codeph>.
+        </p>
+
+        <p>
+          <b>Resolution:</b> Not allowing this syntax agrees with the Avro specification, so it may still cause an error even when the
+          crashing issue is resolved.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-1024" rev="IMPALA-1024">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>Impala BE cannot parse Avro schema that contains a trailing semi-colon</title>
+
+      <conbody>
+
+        <p>
+          If an Avro table has a schema definition with a trailing semicolon, Impala encounters an error when the table is queried.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1024" scope="external" format="html">IMPALA-1024</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> Remove trailing semicolon from the Avro schema.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-2154" rev="IMPALA-2154">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>Fix decompressor to allow parsing gzips with multiple streams</title>
+
+      <conbody>
+
+        <p>
+          Currently, Impala can only read gzipped files containing a single stream. If a gzipped file contains multiple concatenated
+          streams, the Impala query only processes the data from the first stream.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2154" scope="external" format="html">IMPALA-2154</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Use a different gzip tool to compress file to a single stream file.
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-1578" rev="IMPALA-1578">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>Impala incorrectly handles text data when the new line character \n\r is split between different HDFS block</title>
+
+      <conbody>
+
+        <p>
+          If a carriage return / newline pair of characters in a text table is split between HDFS data blocks, Impala incorrectly processes
+          the row following the <codeph>\n\r</codeph> pair twice.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1578" scope="external" format="html">IMPALA-1578</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Use the Parquet format for large volumes of data where practical.
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.8.0 / Impala 2.6.0.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-1862" rev="IMPALA-1862">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>Invalid bool value not reported as a scanner error</title>
+
+      <conbody>
+
+        <p>
+          In some cases, an invalid <codeph>BOOLEAN</codeph> value read from a table does not produce a warning message about the bad value.
+          The result is still <codeph>NULL</codeph> as expected. Therefore, this is not a query correctness issue, but it could lead to
+          overlooking the presence of invalid data.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1862" scope="external" format="html">IMPALA-1862</xref>
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-1652" rev="IMPALA-1652">
+
+<!-- To do: Isn't this more a correctness issue? -->
+
+      <title>Incorrect results with basic predicate on CHAR typed column.</title>
+
+      <conbody>
+
+        <p>
+          When comparing a <codeph>CHAR</codeph> column value to a string literal, the literal value is not blank-padded and so the
+          comparison might fail when it should match.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1652" scope="external" format="html">IMPALA-1652</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Use the <codeph>RPAD()</codeph> function to blank-pad literals compared with <codeph>CHAR</codeph> columns to
+          the expected length.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
+  <concept id="known_issues_limitations">
+
+    <title>Impala Known Issues: Limitations</title>
+
+    <conbody>
+
+      <p>
+        These issues are current limitations of Impala that require evaluation as you plan how to integrate Impala into your data management
+        workflow.
+      </p>
+
+    </conbody>
+
+    <concept id="IMPALA-77" rev="IMPALA-77">
+
+<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
+
+      <title>Impala does not support running on clusters with federated namespaces</title>
+
+      <conbody>
+
+        <p>
+          Impala does not support running on clusters with federated namespaces. The <codeph>impalad</codeph> process will not start on a
+          node running such a filesystem based on the <codeph>org.apache.hadoop.fs.viewfs.ViewFs</codeph> class.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-77" scope="external" format="html">IMPALA-77</xref>
+        </p>
+
+        <p>
+          <b>Anticipated Resolution:</b> Limitation
+        </p>
+
+        <p>
+          <b>Workaround:</b> Use standard HDFS on all Impala nodes.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
+  <concept id="known_issues_misc">
+
+    <title>Impala Known Issues: Miscellaneous / Older Issues</title>
+
+    <conbody>
+
+      <p>
+        These issues do not fall into one of the above categories or have not been categorized yet.
+      </p>
+
+    </conbody>
+
+    <concept id="IMPALA-2005" rev="IMPALA-2005">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>A failed CTAS does not drop the table if the insert fails.</title>
+
+      <conbody>
+
+        <p>
+          If a <codeph>CREATE TABLE AS SELECT</codeph> operation successfully creates the target table but an error occurs while querying
+          the source table or copying the data, the new table is left behind rather than being dropped.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2005" scope="external" format="html">IMPALA-2005</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Drop the new table manually after a failed <codeph>CREATE TABLE AS SELECT</codeph>.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-1821" rev="IMPALA-1821">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>Casting scenarios with invalid/inconsistent results</title>
+
+      <conbody>
+
+        <p>
+          Using a <codeph>CAST()</codeph> function to convert large literal values to smaller types, or to convert special values such as
+          <codeph>NaN</codeph> or <codeph>Inf</codeph>, produces values not consistent with other database systems. This could lead to
+          unexpected results from queries.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1821" scope="external" format="html">IMPALA-1821</xref>
+        </p>
+
+<!-- <p><b>Workaround:</b> Doublecheck that <codeph>CAST()</codeph> operations work as expect. The issue applies to expressions involving literals, not values read from table columns.</p> -->
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-1619" rev="IMPALA-1619">
+
+<!-- Not part of Alex's spreadsheet -->
+
+      <title>Support individual memory allocations larger than 1 GB</title>
+
+      <conbody>
+
+        <p>
+          The largest single block of memory that Impala can allocate during a query is 1 GiB. Therefore, a query could fail or Impala could
+          crash if a compressed text file resulted in more than 1 GiB of data in uncompressed form, or if a string function such as
+          <codeph>group_concat()</codeph> returned a value greater than 1 GiB.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1619" scope="external" format="html">IMPALA-1619</xref>
+        </p>
+
+        <p><b>Resolution:</b> Fixed in CDH 5.9.0 / Impala 2.7.0 and CDH 5.8.3 / Impala 2.6.3.</p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-941" rev="IMPALA-941">
+
+<!-- Not part of Alex's spreadsheet. Maybe this is interop? -->
+
+      <title>Impala Parser issue when using fully qualified table names that start with a number.</title>
+
+      <conbody>
+
+        <p>
+          A fully qualified table name starting with a number could cause a parsing error. In a name such as <codeph>db.571_market</codeph>,
+          the decimal point followed by digits is interpreted as a floating-point number.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-941" scope="external" format="html">IMPALA-941</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Surround each part of the fully qualified name with backticks (<codeph>``</codeph>).
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMPALA-532" rev="IMPALA-532">
+
+<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
+
+      <title>Impala should tolerate bad locale settings</title>
+
+      <conbody>
+
+        <p>
+          If the <codeph>LC_*</codeph> environment variables specify an unsupported locale, Impala does not start.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-532" scope="external" format="html">IMPALA-532</xref>
+        </p>
+
+        <p>
+          <b>Workaround:</b> Add <codeph>LC_ALL="C"</codeph> to the environment settings for both the Impala daemon and the Statestore
+          daemon. See <xref href="impala_config_options.xml#config_options"/> for details about modifying these environment settings.
+        </p>
+
+        <p>
+          <b>Resolution:</b> Fixing this issue would require an upgrade to Boost 1.47 in the Impala distribution.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="IMP-1203">
+
+<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
+
+      <title>Log Level 3 Not Recommended for Impala</title>
+
+      <conbody>
+
+        <p>
+          The extensive logging produced by log level 3 can cause serious performance overhead and capacity issues.
+        </p>
+
+        <p>
+          <b>Workaround:</b> Reduce the log level to its default value of 1, that is, <codeph>GLOG_v=1</codeph>. See
+          <xref href="impala_logging.xml#log_levels"/> for details about the effects of setting different logging levels.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+  </concept>
+
+</concept>

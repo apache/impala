@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+  <concept id="map">
+
+    <title>MAP Complex Type (<keyword keyref="impala23"/> or higher only)</title>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Impala"/>
+        <data name="Category" value="Impala Data Types"/>
+        <data name="Category" value="SQL"/>
+        <data name="Category" value="Developers"/>
+        <data name="Category" value="Data Analysts"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+
+      <p>
+        A complex data type representing an arbitrary set of key-value pairs.
+        The key part is a scalar type, while the value part can be a scalar or
+        another complex type (<codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>,
+        or <codeph>MAP</codeph>).
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>column_name</varname> MAP &lt; <varname>primitive_type</varname>, <varname>type</varname> &gt;
+
+type ::= <varname>primitive_type</varname> | <varname>complex_type</varname>
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_combo"/>
+
+      <p>
+        The <codeph>MAP</codeph> complex data type represents a set of key-value pairs.
+        Each element of the map is indexed by a primitive type such as <codeph>BIGINT</codeph> or
+        <codeph>STRING</codeph>, letting you define sequences that are not continuous or categories with arbitrary names.
+        You might find it convenient for modelling data produced in other languages, such as a
+        Python dictionary or Java HashMap, where a single scalar value serves as the lookup key.
+      </p>
+
+      <p>
+        In a big data context, the keys in a map column might represent a numeric sequence of events during a
+        manufacturing process, or <codeph>TIMESTAMP</codeph> values corresponding to sensor observations.
+        The map itself is inherently unordered, so you choose whether to make the key values significant
+        (such as a recorded <codeph>TIMESTAMP</codeph>) or synthetic (such as a random global universal ID).
+      </p>
+
+      <note>
+        Behind the scenes, the <codeph>MAP</codeph> type is implemented in a similar way as the
+        <codeph>ARRAY</codeph> type. Impala does not enforce any uniqueness constraint on the
+        <codeph>KEY</codeph> values, and the <codeph>KEY</codeph> values are processed by
+        looping through the elements of the <codeph>MAP</codeph> rather than by a constant-time lookup.
+        Therefore, this type is primarily for ease of understanding when importing data and
+        algorithms from non-SQL contexts, rather than optimizing the performance of key lookups.
+      </note>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_describe"/>
+
+      <p conref="../shared/impala_common.xml#common/added_in_230"/>
+
+      <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+      <ul conref="../shared/impala_common.xml#common/complex_types_restrictions">
+        <li/>
+      </ul>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <note conref="../shared/impala_common.xml#common/complex_type_schema_pointer"/>
+
+      <p>
+        The following example shows a table with various kinds of <codeph>MAP</codeph> columns,
+        both at the top level and nested within other complex types.
+        Each row represents information about a specific country, with complex type fields
+        of various levels of nesting to represent different information associated
+        with the country: factual measurements such as area and population,
+        notable people in different categories, geographic features such as
+        cities, points of interest within each city, and mountains with associated facts.
+        Practice the <codeph>CREATE TABLE</codeph> and query notation for complex type columns
+        using empty tables, until you can visualize a complex data structure and construct corresponding SQL statements reliably.
+      </p>
+
+<codeblock><![CDATA[create TABLE map_demo
+(
+  country_id BIGINT,
+
+-- Numeric facts about each country, looked up by name.
+-- For example, 'Area':1000, 'Population':999999.
+-- Using a MAP instead of a STRUCT because there could be
+-- a different set of facts for each country.
+  metrics MAP <STRING, BIGINT>,
+
+-- MAP whose value part is an ARRAY.
+-- For example, the key 'Famous Politicians' could represent an array of 10 elements,
+-- while the key 'Famous Actors' could represent an array of 20 elements.
+  notables MAP <STRING, ARRAY <STRING>>,
+
+-- MAP that is a field within a STRUCT.
+-- (The STRUCT is inside another ARRAY, because it is rare
+-- for a STRUCT to be a top-level column.)
+-- For example, city #1 might have points of interest with key 'Zoo',
+-- representing an array of 3 different zoos.
+-- City #2 might have completely different kinds of points of interest.
+-- Because the set of field names is potentially large, and most entries could be blank,
+-- a MAP makes more sense than a STRUCT to represent such a sparse data structure.
+  cities ARRAY < STRUCT <
+    name: STRING,
+    points_of_interest: MAP <STRING, ARRAY <STRING>>
+  >>,
+
+-- MAP that is an element within an ARRAY. The MAP is inside a STRUCT field to associate
+-- the mountain name with all the facts about the mountain.
+-- The "key" of the map (the first STRING field) represents the name of some fact whose value
+-- can be expressed as an integer, such as 'Height', 'Year First Climbed', and so on.
+  mountains ARRAY < STRUCT < name: STRING, facts: MAP <STRING, INT > > >
+)
+STORED AS PARQUET;
+]]>
+</codeblock>
+
+<codeblock><![CDATA[DESCRIBE map_demo;
++------------+------------------------------------------------+
+| name       | type                                           |
++------------+------------------------------------------------+
+| country_id | bigint                                         |
+| metrics    | map<string,bigint>                             |
+| notables   | map<string,array<string>>                      |
+| cities     | array<struct<                                  |
+|            |   name:string,                                 |
+|            |   points_of_interest:map<string,array<string>> |
+|            | >>                                             |
+| mountains  | array<struct<                                  |
+|            |   name:string,                                 |
+|            |   facts:map<string,int>                        |
+|            | >>                                             |
++------------+------------------------------------------------+
+
+DESCRIBE map_demo.metrics;
++-------+--------+
+| name  | type   |
++-------+--------+
+| key   | string |
+| value | bigint |
++-------+--------+
+
+DESCRIBE map_demo.notables;
++-------+---------------+
+| name  | type          |
++-------+---------------+
+| key   | string        |
+| value | array<string> |
++-------+---------------+
+
+DESCRIBE map_demo.notables.value;
++------+--------+
+| name | type   |
++------+--------+
+| item | string |
+| pos  | bigint |
++------+--------+
+
+DESCRIBE map_demo.cities;
++------+------------------------------------------------+
+| name | type                                           |
++------+------------------------------------------------+
+| item | struct<                                        |
+|      |   name:string,                                 |
+|      |   points_of_interest:map<string,array<string>> |
+|      | >                                              |
+| pos  | bigint                                         |
++------+------------------------------------------------+
+
+DESCRIBE map_demo.cities.item.points_of_interest;
++-------+---------------+
+| name  | type          |
++-------+---------------+
+| key   | string        |
+| value | array<string> |
++-------+---------------+
+
+DESCRIBE map_demo.cities.item.points_of_interest.value;
++------+--------+
+| name | type   |
++------+--------+
+| item | string |
+| pos  | bigint |
++------+--------+
+
+DESCRIBE map_demo.mountains;
++------+-------------------------+
+| name | type                    |
++------+-------------------------+
+| item | struct<                 |
+|      |   name:string,          |
+|      |   facts:map<string,int> |
+|      | >                       |
+| pos  | bigint                  |
++------+-------------------------+
+
+DESCRIBE map_demo.mountains.item.facts;
++-------+--------+
+| name  | type   |
++-------+--------+
+| key   | string |
+| value | int    |
++-------+--------+
+]]>
+</codeblock>
+
+      <p>
+        The following example shows a table that uses a variety of data types for the <codeph>MAP</codeph>
+        <q>key</q> field. Typically, you use <codeph>BIGINT</codeph> or <codeph>STRING</codeph> to use
+        numeric or character-based keys without worrying about exceeding any size or length constraints.
+      </p>
+
+<codeblock><![CDATA[CREATE TABLE map_demo_obscure
+(
+  id BIGINT,
+  m1 MAP <INT, INT>,
+  m2 MAP <SMALLINT, INT>,
+  m3 MAP <TINYINT, INT>,
+  m4 MAP <TIMESTAMP, INT>,
+  m5 MAP <BOOLEAN, INT>,
+  m6 MAP <CHAR(5), INT>,
+  m7 MAP <VARCHAR(25), INT>,
+  m8 MAP <FLOAT, INT>,
+  m9 MAP <DOUBLE, INT>,
+  m10 MAP <DECIMAL(12,2), INT>
+)
+STORED AS PARQUET;
+]]>
+</codeblock>
+
+<codeblock>CREATE TABLE celebrities (name STRING, birth_year MAP &lt; STRING, SMALLINT &gt;) STORED AS PARQUET;
+-- A typical row might represent values with 2 different birth years, such as:
+-- ("Joe Movie Star", { "real": 1972, "claimed": 1977 })
+
+CREATE TABLE countries (name STRING, famous_leaders MAP &lt; INT, STRING &gt;) STORED AS PARQUET;
+-- A typical row might represent values with different leaders, with key values corresponding to their numeric sequence, such as:
+-- ("United States", { 1: "George Washington", 3: "Thomas Jefferson", 16: "Abraham Lincoln" })
+
+CREATE TABLE airlines (name STRING, special_meals MAP &lt; STRING, MAP &lt; STRING, STRING &gt; &gt;) STORED AS PARQUET;
+-- A typical row might represent values with multiple kinds of meals, each with several components:
+-- ("Elegant Airlines",
+--   {
+--     "vegetarian": { "breakfast": "pancakes", "snack": "cookies", "dinner": "rice pilaf" },
+--     "gluten free": { "breakfast": "oatmeal", "snack": "fruit", "dinner": "chicken" }
+--   } )
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/related_info"/>
+
+      <p>
+        <xref href="impala_complex_types.xml#complex_types"/>,
+        <xref href="impala_array.xml#array"/>,
+        <xref href="impala_struct.xml#struct"/>
+        <!-- <xref href="impala_map.xml#map"/> -->
+      </p>
+
+    </conbody>
+
+  </concept>
+
+

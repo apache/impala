@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="upgrading">
+
+  <title>Upgrading Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Upgrading"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Upgrading Impala involves stopping Impala services, using your operating system's package management
+      tool to upgrade Impala to the latest version, and then restarting Impala services.
+    </p>
+
+    <note>
+      <ul>
+        <li>
+          Each version of CDH 5 has an associated version of Impala, When you upgrade from CDH 4 to CDH 5, you get
+          whichever version of Impala comes with the associated level of CDH. Depending on the version of Impala
+          you were running on CDH 4, this could install a lower level of Impala on CDH 5. For example, if you
+          upgrade to CDH 5.0 from CDH 4 plus Impala 1.4, the CDH 5.0 installation comes with Impala 1.3. Always
+          check the associated level of Impala before upgrading to a specific version of CDH 5. Where practical,
+          upgrade from CDH 4 to the latest CDH 5, which also has the latest Impala.
+        </li>
+
+        <li rev="ver">
+          When you upgrade Impala, also upgrade Cloudera Manager if necessary:
+          <ul>
+            <li>
+              Users running Impala on CDH 5 must upgrade to Cloudera Manager 5.0.0 or higher.
+            </li>
+
+            <li>
+              Users running Impala on CDH 4 must upgrade to Cloudera Manager 4.8 or higher. Cloudera Manager 4.8
+              includes management support for the Impala catalog service, and is the minimum Cloudera Manager
+              version you can use.
+            </li>
+
+            <li>
+              Cloudera Manager is continually updated with configuration settings for features introduced in the
+              latest Impala releases.
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          If you are upgrading from CDH 5 beta to CDH 5.0 production, make sure you are using the appropriate CDH 5
+          repositories shown on the
+<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH-Version-and-Packaging-Information/CDH-Version-and-Packaging-Information.html -->
+          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/rg_vd.html" scope="external" format="html">CDH
+          version and packaging</xref> page, then follow the procedures throughout the rest of this section.
+        </li>
+
+        <li>
+          Every time you upgrade to a new major or minor Impala release, see
+          <xref href="impala_incompatible_changes.xml#incompatible_changes"/> in the <cite>Release Notes</cite> for
+          any changes needed in your source code, startup scripts, and so on.
+        </li>
+
+        <li>
+          Also check <xref href="impala_known_issues.xml#known_issues"/> in the <cite>Release Notes</cite> for any
+          issues or limitations that require workarounds.
+        </li>
+
+      </ul>
+    </note>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="upgrade_cm_parcels">
+
+    <title>Upgrading Impala through Cloudera Manager - Parcels</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Cloudera Manager"/>
+      <data name="Category" value="Parcels"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        Parcels are an alternative binary distribution format available in Cloudera Manager 4.5 and higher.
+      </p>
+
+      <note type="important">
+        In CDH 5, there is not a separate Impala parcel; Impala is part of the main CDH 5 parcel. Each level of CDH
+        5 has a corresponding version of Impala, and you upgrade Impala by upgrading CDH. See the
+        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_upgrading_cdh.html" scope="external" format="html">CDH
+        5 upgrade instructions</xref> and choose the instructions for parcels. The remainder of this section only covers parcel upgrades for
+        Impala under CDH 4.
+      </note>
+
+      <p>
+        To upgrade Impala for CDH 4 in a Cloudera Managed environment, using parcels:
+      </p>
+
+      <ol>
+        <li>
+          <p>
+            If you originally installed using packages and now are switching to parcels, remove all the
+            Impala-related packages first. You can check which packages are installed using one of the following
+            commands, depending on your operating system:
+          </p>
+<codeblock>rpm -qa               # RHEL, Oracle Linux, CentOS, Debian
+dpkg --get-selections # Debian</codeblock>
+          and then remove the packages using one of the following commands:
+<codeblock>sudo yum remove <varname>pkg_names</varname>    # RHEL, Oracle Linux, CentOS
+sudo zypper remove <varname>pkg_names</varname> # SLES
+sudo apt-get purge <varname>pkg_names</varname> # Ubuntu, Debian</codeblock>
+        </li>
+
+        <li>
+          <p>
+            Connect to the Cloudera Manager Admin Console.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Go to the <menucascade><uicontrol>Hosts</uicontrol><uicontrol>Parcels</uicontrol></menucascade> tab.
+            You should see a parcel with a newer version of Impala that you can upgrade to.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Click <uicontrol>Download</uicontrol>, then <uicontrol>Distribute</uicontrol>. (The button changes as
+            each step completes.)
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Click <uicontrol>Activate</uicontrol>.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            When prompted, click <uicontrol>Restart</uicontrol> to restart the Impala service.
+          </p>
+        </li>
+      </ol>
+    </conbody>
+  </concept>
+
+  <concept id="upgrade_cm_pkgs">
+
+    <title>Upgrading Impala through Cloudera Manager - Packages</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Packages"/>
+      <data name="Category" value="Cloudera Manager"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        To upgrade Impala in a Cloudera Managed environment, using packages:
+      </p>
+
+      <ol>
+        <li>
+          Connect to the Cloudera Manager Admin Console.
+        </li>
+
+        <li>
+          In the <b>Services</b> tab, click the <b>Impala</b> service.
+        </li>
+
+        <li>
+          Click <b>Actions</b> and click <b>Stop</b>.
+        </li>
+
+        <li>
+          Use <b>one</b> of the following sets of commands to update Impala on each Impala node in your cluster:
+          <p>
+            <b>For RHEL, Oracle Linux, or CentOS systems:</b>
+          </p>
+<codeblock rev="1.2">$ sudo yum update impala
+$ sudo yum update hadoop-lzo-cdh4 # Optional; if this package is already installed
+</codeblock>
+          <p>
+            <b>For SUSE systems:</b>
+          </p>
+<codeblock rev="1.2">$ sudo zypper update impala
+$ sudo zypper update hadoop-lzo-cdh4 # Optional; if this package is already installed
+</codeblock>
+          <p>
+            <b>For Debian or Ubuntu systems:</b>
+          </p>
+<codeblock rev="1.2">$ sudo apt-get install impala
+$ sudo apt-get install hadoop-lzo-cdh4 # Optional; if this package is already installed
+</codeblock>
+        </li>
+
+        <li>
+          Use <b>one</b> of the following sets of commands to update Impala shell on each node on which it is
+          installed:
+          <p>
+            <b>For RHEL, Oracle Linux, or CentOS systems:</b>
+          </p>
+<codeblock>$ sudo yum update impala-shell</codeblock>
+          <p>
+            <b>For SUSE systems:</b>
+          </p>
+<codeblock>$ sudo zypper update impala-shell</codeblock>
+          <p>
+            <b>For Debian or Ubuntu systems:</b>
+          </p>
+<codeblock>$ sudo apt-get install impala-shell</codeblock>
+        </li>
+
+        <li>
+          Connect to the Cloudera Manager Admin Console.
+        </li>
+
+        <li>
+          In the <b>Services</b> tab, click the Impala service.
+        </li>
+
+        <li>
+          Click <b>Actions</b> and click <b>Start</b>.
+        </li>
+      </ol>
+    </conbody>
+  </concept>
+
+  <concept id="upgrade_noncm">
+
+    <title>Upgrading Impala without Cloudera Manager</title>
+  <prolog>
+    <metadata>
+      <!-- Fill in relevant metatag(s) when we decide how to mark non-CM topics. -->
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        To upgrade Impala on a cluster not managed by Cloudera Manager, run these Linux commands on the appropriate
+        hosts in your cluster:
+      </p>
+
+      <ol>
+        <li>
+          Stop Impala services.
+          <ol>
+            <li>
+              Stop <codeph>impalad</codeph> on each Impala node in your cluster:
+<codeblock>$ sudo service impala-server stop</codeblock>
+            </li>
+
+            <li>
+              Stop any instances of the state store in your cluster:
+<codeblock>$ sudo service impala-state-store stop</codeblock>
+            </li>
+
+            <li rev="1.2">
+              Stop any instances of the catalog service in your cluster:
+<codeblock>$ sudo service impala-catalog stop</codeblock>
+            </li>
+          </ol>
+        </li>
+
+        <li>
+          Check if there are new recommended or required configuration settings to put into place in the
+          configuration files, typically under <filepath>/etc/impala/conf</filepath>. See
+          <xref href="impala_config_performance.xml#config_performance"/> for settings related to performance and
+          scalability.
+        </li>
+
+        <li>
+          Use <b>one</b> of the following sets of commands to update Impala on each Impala node in your cluster:
+          <p>
+            <b>For RHEL, Oracle Linux, or CentOS systems:</b>
+          </p>
+<codeblock>$ sudo yum update impala-server
+$ sudo yum update hadoop-lzo-cdh4 # Optional; if this package is already installed
+$ sudo yum update impala-catalog # New in Impala 1.2; do yum install when upgrading from 1.1.
+</codeblock>
+          <p>
+            <b>For SUSE systems:</b>
+          </p>
+<codeblock>$ sudo zypper update impala-server
+$ sudo zypper update hadoop-lzo-cdh4 # Optional; if this package is already installed
+$ sudo zypper update impala-catalog # New in Impala 1.2; do zypper install when upgrading from 1.1.
+</codeblock>
+          <p>
+            <b>For Debian or Ubuntu systems:</b>
+          </p>
+<codeblock>$ sudo apt-get install impala-server
+$ sudo apt-get install hadoop-lzo-cdh4 # Optional; if this package is already installed
+$ sudo apt-get install impala-catalog # New in Impala 1.2.
+</codeblock>
+        </li>
+
+        <li>
+          Use <b>one</b> of the following sets of commands to update Impala shell on each node on which it is
+          installed:
+          <p>
+            <b>For RHEL, Oracle Linux, or CentOS systems:</b>
+          </p>
+<codeblock>$ sudo yum update impala-shell</codeblock>
+          <p>
+            <b>For SUSE systems:</b>
+          </p>
+<codeblock>$ sudo zypper update impala-shell</codeblock>
+          <p>
+            <b>For Debian or Ubuntu systems:</b>
+          </p>
+<codeblock>$ sudo apt-get install impala-shell</codeblock>
+        </li>
+
+        <li rev="alternatives">
+          Depending on which release of Impala you are upgrading from, you might find that the symbolic links
+          <filepath>/etc/impala/conf</filepath> and <filepath>/usr/lib/impala/sbin</filepath> are missing. If so,
+          see <xref href="impala_known_issues.xml#known_issues"/> for the procedure to work around this
+          problem.
+        </li>
+
+        <li>
+          Restart Impala services:
+          <ol>
+            <li>
+              Restart the Impala state store service on the desired nodes in your cluster. Expect to see a process
+              named <codeph>statestored</codeph> if the service started successfully.
+<codeblock>$ sudo service impala-state-store start
+$ ps ax | grep [s]tatestored
+ 6819 ?        Sl     0:07 /usr/lib/impala/sbin/statestored -log_dir=/var/log/impala -state_store_port=24000
+</codeblock>
+              <p>
+                Restart the state store service <i>before</i> the Impala server service to avoid <q>Not
+                connected</q> errors when you run <codeph>impala-shell</codeph>.
+              </p>
+            </li>
+
+            <li rev="1.2">
+              Restart the Impala catalog service on whichever host it runs on in your cluster. Expect to see a
+              process named <codeph>catalogd</codeph> if the service started successfully.
+<codeblock>$ sudo service impala-catalog restart
+$ ps ax | grep [c]atalogd
+ 6068 ?        Sl     4:06 /usr/lib/impala/sbin/catalogd
+</codeblock>
+            </li>
+
+            <li>
+              Restart the Impala daemon service on each node in your cluster. Expect to see a process named
+              <codeph>impalad</codeph> if the service started successfully.
+<codeblock>$ sudo service impala-server start
+$ ps ax | grep [i]mpalad
+ 7936 ?        Sl     0:12 /usr/lib/impala/sbin/impalad -log_dir=/var/log/impala -state_store_port=24000 -use_statestore
+-state_store_host=127.0.0.1 -be_port=22000
+</codeblock>
+            </li>
+          </ol>
+        </li>
+      </ol>
+
+      <note>
+        <p>
+          If the services did not start successfully (even though the <codeph>sudo service</codeph> command might
+          display <codeph>[OK]</codeph>), check for errors in the Impala log file, typically in
+          <filepath>/var/log/impala</filepath>.
+        </p>
+      </note>
+    </conbody>
+  </concept>
+</concept>

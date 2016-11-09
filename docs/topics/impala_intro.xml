@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="intro">
+
+  <title id="impala"><ph audience="standalone">Introducing Apache Impala (incubating)</ph><ph audience="integrated">Apache Impala (incubating) Overview</ph></title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Getting Started"/>
+      <data name="Category" value="Concepts"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody id="intro_body">
+
+      <p>
+        Impala provides fast, interactive SQL queries directly on your Apache Hadoop data stored in HDFS,
+        HBase, <ph rev="2.2.0">or the Amazon Simple Storage Service (S3)</ph>.
+        In addition to using the same unified storage platform,
+        Impala also uses the same metadata, SQL syntax (Hive SQL), ODBC driver, and user interface
+        (Impala query UI in Hue) as Apache Hive. This
+        provides a familiar and unified platform for real-time or batch-oriented queries.
+      </p>
+
+      <p>
+        Impala is an addition to tools available for querying big data. Impala does not replace the batch
+        processing frameworks built on MapReduce such as Hive. Hive and other frameworks built on MapReduce are
+        best suited for long running batch jobs, such as those involving batch processing of Extract, Transform,
+        and Load (ETL) type jobs.
+      </p>
+
+      <note>
+        Impala was accepted into the Apache incubator on December 2, 2015.
+        In places where the documentation formerly referred to <q>Cloudera Impala</q>,
+        now the official name is <q>Apache Impala (incubating)</q>.
+      </note>
+
+  </conbody>
+
+  <concept id="benefits">
+
+    <title>Impala Benefits</title>
+
+    <conbody>
+
+      <p conref="../shared/impala_common.xml#common/impala_benefits"/>
+
+    </conbody>
+  </concept>
+
+  <concept id="impala_cdh">
+
+    <title>How Impala Works with CDH</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Concepts"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p conref="../shared/impala_common.xml#common/impala_overview_diagram"/>
+
+      <p conref="../shared/impala_common.xml#common/component_list"/>
+
+      <p conref="../shared/impala_common.xml#common/query_overview"/>
+    </conbody>
+  </concept>
+
+  <concept id="features">
+
+    <title>Primary Impala Features</title>
+
+    <conbody>
+
+      <p conref="../shared/impala_common.xml#common/feature_list"/>
+    </conbody>
+  </concept>
+</concept>

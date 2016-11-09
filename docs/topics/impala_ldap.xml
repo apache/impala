@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="ldap">
+
+  <title>Enabling LDAP Authentication for Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="LDAP"/>
+      <data name="Category" value="Authentication"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="Starting and Stopping"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+<!-- Similar discussion under 'Authentication' parent topic. Maybe do some conref'ing or linking upward. -->
+
+    <p> Authentication is the process of allowing only specified named users to
+      access the server (in this case, the Impala server). This feature is
+      crucial for any production deployment, to prevent misuse, tampering, or
+      excessive load on the server. Impala uses LDAP for authentication,
+      verifying the credentials of each user who connects through
+        <cmdname>impala-shell</cmdname>, Hue, a Business Intelligence tool, JDBC
+      or ODBC application, and so on. </p>
+
+    <note conref="../shared/impala_common.xml#common/authentication_vs_authorization"/>
+
+    <p outputclass="toc inpage"/>
+
+    <p>
+      An alternative form of authentication you can use is Kerberos, described in
+      <xref href="impala_kerberos.xml#kerberos"/>.
+    </p>
+  </conbody>
+
+  <concept id="ldap_prereqs">
+
+    <title>Requirements for Using Impala with LDAP</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Requirements"/>
+      <data name="Category" value="Planning"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p rev="1.4.0">
+        Authentication against LDAP servers is available in Impala 1.2.2 and higher. Impala 1.4.0 adds support for
+        secure LDAP authentication through SSL and TLS.
+      </p>
+
+      <p>
+        The Impala LDAP support lets you use Impala with systems such as Active Directory that use LDAP behind the
+        scenes.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="ldap_client_server">
+
+    <title>Client-Server Considerations for LDAP</title>
+
+    <conbody>
+
+      <p>
+        Only client-&gt;Impala connections can be authenticated by LDAP.
+      </p>
+
+      <p> You must use the Kerberos authentication mechanism for connections
+        between internal Impala components, such as between the
+          <cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>, and
+          <cmdname>catalogd</cmdname> daemons. See <xref
+          href="impala_kerberos.xml#kerberos" /> on how to set up Kerberos for
+        Impala. </p>
+    </conbody>
+  </concept>
+
+  <concept id="ldap_config">
+
+    <title>Server-Side LDAP Setup</title>
+
+    <conbody>
+
+      <p>
+        These requirements apply on the server side when configuring and starting Impala:
+      </p>
+
+      <p>
+        To enable LDAP authentication, set the following startup options for <cmdname>impalad</cmdname>:
+      </p>
+
+      <ul>
+        <li>
+          <codeph>--enable_ldap_auth</codeph> enables LDAP-based authentication between the client and Impala.
+        </li>
+
+        <li rev="1.4.0">
+          <codeph>--ldap_uri</codeph> sets the URI of the LDAP server to use. Typically, the URI is prefixed with
+          <codeph>ldap://</codeph>. In Impala 1.4.0 and higher, you can specify secure SSL-based LDAP transport by
+          using the prefix <codeph>ldaps://</codeph>. The URI can optionally specify the port, for example:
+          <codeph>ldap://ldap_server.cloudera.com:389</codeph> or
+          <codeph>ldaps://ldap_server.cloudera.com:636</codeph>. (389 and 636 are the default ports for non-SSL and
+          SSL LDAP connections, respectively.)
+        </li>
+
+<!-- Some amount of this bullet could be conref'ed. Similar but not identical bullet occurs later under TLS. -->
+
+        <li rev="1.4.0">
+          For <codeph>ldaps://</codeph> connections secured by SSL,
+          <codeph>--ldap_ca_certificate="<varname>/path/to/certificate/pem</varname>"</codeph> specifies the
+          location of the certificate in standard <codeph>.PEM</codeph> format. Store this certificate on the local
+          filesystem, in a location that only the <codeph>impala</codeph> user and other trusted users can read.
+        </li>
+
+<!-- Per Henry: not for public consumption.
+<li>
+  If you need to provide a custom SASL configuration,
+  set <codeph>- -ldap_manual_config</codeph> to bypass all the automatic configuration.
+</li>
+-->
+      </ul>
+    </conbody>
+  </concept>
+
+  <concept id="ldap_bind_strings">
+
+    <title>Support for Custom Bind Strings</title>
+
+    <conbody>
+
+      <p>
+        When Impala connects to LDAP it issues a bind call to the LDAP server to authenticate as the connected
+        user. Impala clients, including the Impala shell, provide the short name of the user to Impala. This is
+        necessary so that Impala can use Sentry for role-based access, which uses short names.
+      </p>
+
+      <p>
+        However, LDAP servers often require more complex, structured usernames for authentication. Impala supports
+        three ways of transforming the short name (for example, <codeph>'henry'</codeph>) to a more complicated
+        string. If necessary, specify one of the following configuration options when starting the
+        <cmdname>impalad</cmdname> daemon on each DataNode:
+      </p>
+
+      <ul>
+        <li>
+          <codeph>--ldap_domain</codeph>: Replaces the username with a string
+          <codeph><varname>username</varname>@<varname>ldap_domain</varname></codeph>.
+        </li>
+
+        <li>
+          <codeph>--ldap_baseDN</codeph>: Replaces the username with a <q>distinguished name</q> (DN) of the form:
+          <codeph>uid=<varname>userid</varname>,ldap_baseDN</codeph>. (This is equivalent to a Hive option).
+        </li>
+
+        <li>
+          <codeph>--ldap_bind_pattern</codeph>: This is the most general option, and replaces the username with the
+          string <varname>ldap_bind_pattern</varname> where all instances of the string <codeph>#UID</codeph> are
+          replaced with <varname>userid</varname>. For example, an <codeph>ldap_bind_pattern</codeph> of
+          <codeph>"user=#UID,OU=foo,CN=bar"</codeph> with a username of <codeph>henry</codeph> will construct a
+          bind name of <codeph>"user=henry,OU=foo,CN=bar"</codeph>.
+        </li>
+      </ul>
+
+      <p rev="CDH-26854">
+        For clusters not managed by Cloudera Manager,
+        specify the option on the <cmdname>impalad</cmdname> command line.
+        For clusters managed by Cloudera Manager 5.4.0 and higher,
+        search for the configuration field names <codeph>ldap_domain</codeph>,
+        <codeph>ldap_basedn</codeph>, or <codeph>ldap_bind_pattern</codeph>,
+        fill in and save the appropriate field values, and restart the Impala service.
+        Prior to Cloudera Manager 5.4.0, these values were filled in using the
+        <uicontrol>Impala Daemon Command Line Argument Advanced Configuration Snippet (Safety Valve)</uicontrol>
+        field.
+      </p>
+
+      <p>
+        These options are mutually exclusive; Impala does not start if more than one of these options is specified.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="ldap_security">
+
+    <title>Secure LDAP Connections</title>
+
+    <conbody>
+
+      <p>
+        To avoid sending credentials over the wire in cleartext, you must configure a secure connection between
+        both the client and Impala, and between Impala and the LDAP server. The secure connection could use SSL or
+        TLS.
+      </p>
+
+      <p>
+        <b>Secure LDAP connections through SSL:</b>
+      </p>
+
+      <p>
+        For SSL-enabled LDAP connections, specify a prefix of <codeph>ldaps://</codeph> instead of
+        <codeph>ldap://</codeph>. Also, the default port for SSL-enabled LDAP connections is 636 instead of 389.
+      </p>
+
+      <p rev="1.4.0">
+        <b>Secure LDAP connections through TLS:</b>
+      </p>
+
+      <p>
+        <xref href="http://en.wikipedia.org/wiki/Transport_Layer_Security" scope="external" format="html">TLS</xref>,
+        the successor to the SSL protocol, is supported by most modern LDAP servers. Unlike SSL connections, TLS
+        connections can be made on the same server port as non-TLS connections. To secure all connections using
+        TLS, specify the following flags as startup options to the <cmdname>impalad</cmdname> daemon:
+      </p>
+
+      <ul>
+        <li>
+          <codeph>--ldap_tls</codeph> tells Impala to start a TLS connection to the LDAP server, and to fail
+          authentication if it cannot be done.
+        </li>
+
+        <li rev="1.4.0">
+          <codeph>--ldap_ca_certificate="<varname>/path/to/certificate/pem</varname>"</codeph> specifies the
+          location of the certificate in standard <codeph>.PEM</codeph> format. Store this certificate on the local
+          filesystem, in a location that only the <codeph>impala</codeph> user and other trusted users can read.
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+
+  <concept id="ldap_impala_shell">
+
+    <title>LDAP Authentication for impala-shell Interpreter</title>
+
+    <conbody>
+
+      <p>
+        To connect to Impala using LDAP authentication, you specify command-line options to the
+        <cmdname>impala-shell</cmdname> command interpreter and enter the password when prompted:
+      </p>
+
+      <ul>
+        <li>
+          <codeph>-l</codeph> enables LDAP authentication.
+        </li>
+
+        <li>
+          <codeph>-u</codeph> sets the user. Per Active Directory, the user is the short username, not the full
+          LDAP distinguished name. If your LDAP settings include a search base, use the
+          <codeph>--ldap_bind_pattern</codeph> on the <cmdname>impalad</cmdname> daemon to translate the short user
+          name from <cmdname>impala-shell</cmdname> automatically to the fully qualified name.
+<!--
+include that as part of the
+username, for example <codeph>username@example.com</codeph>.
+-->
+        </li>
+
+        <li>
+          <cmdname>impala-shell</cmdname> automatically prompts for the password.
+        </li>
+      </ul>
+
+      <p>
+        For the full list of available <cmdname>impala-shell</cmdname> options, see
+        <xref href="impala_shell_options.xml#shell_options"/>.
+      </p>
+
+      <p>
+        <b>LDAP authentication for JDBC applications:</b> See <xref href="impala_jdbc.xml#impala_jdbc"/> for the
+        format to use with the JDBC connection string for servers using LDAP authentication.
+      </p>
+    </conbody>
+  </concept>
+  <concept id="ldap_impala_hue">
+    <title>Enabling LDAP for Impala in Hue</title>
+    <prolog>
+      <metadata>
+        <data name="Category" value="Hue"/>
+      </metadata>
+    </prolog>
+    <conbody>
+      <section id="ldap_impala_hue_cm">
+        <title>Enabling LDAP for Impala in Hue Using Cloudera Manager</title>
+        <p>
+          <ol>
+            <li>Go to the Hue service.</li>
+            <li>Click the Configuration tab.</li>
+            <li>Select <menucascade><uicontrol>Scope</uicontrol><uicontrol>Hue
+                  Server</uicontrol></menucascade>.</li>
+            <li>Select
+              <menucascade><uicontrol>Category</uicontrol><uicontrol>Advanced</uicontrol></menucascade>.</li>
+            <li>Add the following properties to the <b>Hue Server Advanced
+                Configuration Snippet (Safety Valve) for
+                hue_safety_valve_server.ini</b>
+              property.<codeblock>[impala]
+auth_username=&lt;LDAP username of Hue user to be authenticated>
+auth_password=&lt;LDAP password of Hue user to be authenticated></codeblock></li>
+            <li>Click <b>Save Changes</b>.</li>
+          </ol>
+        </p>
+      </section>
+      <section id="ldap_impala_hue_cmdline">
+        <title>Enabling LDAP for Impala in Hue Using the Command Line</title>
+        <p>LDAP authentication for the Impala app in Hue can be enabled by
+          setting the following properties under the <codeph>[impala]</codeph>
+          section in <codeph>hue.ini</codeph>. <table id="ldap_impala_hue_configs">
+            <tgroup cols="2">
+              <colspec colname="1" colwidth="1*" />
+              <colspec colname="2" colwidth="2*" />
+              <tbody>
+                <row>
+                  <entry><codeph>auth_username</codeph></entry>
+                  <entry>LDAP username of Hue user to be authenticated.</entry>
+                </row>
+                <row>
+                  <entry><codeph>auth_password</codeph></entry>
+                  <entry>
+                    <p>LDAP password of Hue user to be authenticated.</p>
+                  </entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </table>These login details are only used by Impala to authenticate to
+          LDAP. The Impala service trusts Hue to have already validated the user
+          being impersonated, rather than simply passing on the credentials.</p>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="ldap_delegation">
+    <title>Enabling Impala Delegation for LDAP Users</title>
+    <conbody>
+      <p>
+        See <xref href="impala_delegation.xml#delegation"/> for details about the delegation feature
+        that lets certain users submit queries using the credentials of other users.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="ldap_restrictions">
+
+    <title>LDAP Restrictions for Impala</title>
+
+    <conbody>
+
+      <p>
+        The LDAP support is preliminary. It currently has only been tested against Active Directory.
+      </p>
+    </conbody>
+  </concept>
+</concept>

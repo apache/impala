@@ -1,0 +1,689 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="insert">
+
+  <title>INSERT Statement</title>
+  <titlealts audience="PDF"><navtitle>INSERT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="ETL"/>
+      <data name="Category" value="Ingest"/>
+      <data name="Category" value="DML"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="S3"/>
+      <!-- <data name="Category" value="Kudu"/> -->
+      <!-- This is such an important statement, think if there are more applicable categories. -->
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">INSERT statement</indexterm>
+      Impala supports inserting into tables and partitions that you create with the Impala <codeph>CREATE
+      TABLE</codeph> statement, or pre-defined tables and partitions created through Hive.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>[<varname>with_clause</varname>]
+INSERT { INTO | OVERWRITE } [TABLE] <varname>table_name</varname>
+  [(<varname>column_list</varname>)]
+  [ PARTITION (<varname>partition_clause</varname>)]
+{
+    [<varname>hint_clause</varname>] <varname>select_statement</varname>
+  | VALUES (<varname>value</varname> [, <varname>value</varname> ...]) [, (<varname>value</varname> [, <varname>value</varname> ...]) ...]
+}
+
+partition_clause ::= <varname>col_name</varname> [= <varname>constant</varname>] [, <varname>col_name</varname> [= <varname>constant</varname>] ...]
+
+hint_clause ::= [SHUFFLE] | [NOSHUFFLE]    (Note: the square brackets are part of the syntax.)
+</codeblock>
+
+    <p>
+      <b>Appending or replacing (INTO and OVERWRITE clauses):</b>
+    </p>
+
+    <p>
+      The <codeph>INSERT INTO</codeph> syntax appends data to a table. The existing data files are left as-is, and
+      the inserted data is put into one or more new data files.
+    </p>
+
+    <p>
+      The <codeph>INSERT OVERWRITE</codeph> syntax replaces the data in a table.
+<!-- What happens with INSERT OVERWRITE if the target is a single partition or multiple partitions? -->
+<!-- If that gets too detailed, cover later under "Partitioning Considerations". -->
+      Currently, the overwritten data files are deleted immediately; they do not go through the HDFS trash
+      mechanism.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p rev="2.3.0">
+      The <codeph>INSERT</codeph> statement currently does not support writing data files
+      containing complex types (<codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>).
+      To prepare Parquet data for such tables, you generate the data files outside Impala and then
+      use <codeph>LOAD DATA</codeph> or <codeph>CREATE EXTERNAL TABLE</codeph> to associate those
+      data files with the table. Currently, such tables must use the Parquet file format.
+      See <xref href="impala_complex_types.xml#complex_types"/> for details about working with complex types.
+    </p>
+
+    <p rev="kudu">
+      <b>Ignoring duplicate partition keys for Kudu tables (IGNORE clause)</b>
+    </p>
+
+    <p rev="kudu">
+      Normally, an <codeph>INSERT</codeph> operation into a Kudu table fails if
+      it would result in duplicate partition key columns for any rows.
+      Specify <codeph>INSERT IGNORE <varname>rest_of_statement</varname></codeph> to
+      make the <codeph>INSERT</codeph> continue in this case. The rows that would
+      have duplicate partition key columns are not inserted.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      Impala currently supports:
+    </p>
+
+    <ul>
+      <li>
+        Copy data from another table using <codeph>SELECT</codeph> query. In Impala 1.2.1 and higher, you can
+        combine <codeph>CREATE TABLE</codeph> and <codeph>INSERT</codeph> operations into a single step with the
+        <codeph>CREATE TABLE AS SELECT</codeph> syntax, which bypasses the actual <codeph>INSERT</codeph> keyword.
+      </li>
+
+      <li>
+        An optional <xref href="impala_with.xml#with"><codeph>WITH</codeph> clause</xref> before the
+        <codeph>INSERT</codeph> keyword, to define a subquery referenced in the <codeph>SELECT</codeph> portion.
+      </li>
+
+      <li>
+        Create one or more new rows using constant expressions through <codeph>VALUES</codeph> clause. (The
+        <codeph>VALUES</codeph> clause was added in Impala 1.0.1.)
+      </li>
+
+      <li rev="1.1">
+        <p>
+          By default, the first column of each newly inserted row goes into the first column of the table, the
+          second column into the second column, and so on.
+        </p>
+        <p>
+          You can also specify the columns to be inserted, an arbitrarily ordered subset of the columns in the
+          destination table, by specifying a column list immediately after the name of the destination table. This
+          feature lets you adjust the inserted columns to match the layout of a <codeph>SELECT</codeph> statement,
+          rather than the other way around. (This feature was added in Impala 1.1.)
+        </p>
+        <p>
+          The number of columns mentioned in the column list (known as the <q>column permutation</q>) must match
+          the number of columns in the <codeph>SELECT</codeph> list or the <codeph>VALUES</codeph> tuples. The
+          order of columns in the column permutation can be different than in the underlying table, and the columns
+          of each input row are reordered to match. If the number of columns in the column permutation is less than
+          in the destination table, all unmentioned columns are set to <codeph>NULL</codeph>.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          For a partitioned table, the optional <codeph>PARTITION</codeph> clause identifies which partition or
+          partitions the new values go into. If a partition key column is given a constant value such as
+          <codeph>PARTITION (year=2012)</codeph> or <codeph>PARTITION (year=2012, month=2)</codeph>, all the
+          inserted rows use those same values for those partition key columns and you omit any corresponding
+          columns in the source table from the <codeph>SELECT</codeph> list. This form is known as <q>static
+          partitioning</q>.
+        </p>
+        <p>
+          If a partition key column is mentioned but not assigned a value, such as in <codeph>PARTITION (year,
+          region)</codeph> (both columns unassigned) or <codeph>PARTITION(year, region='CA')</codeph>
+          (<codeph>year</codeph> column unassigned), the unassigned columns are filled in with the final columns of
+          the <codeph>SELECT</codeph> list. In this case, the number of columns in the <codeph>SELECT</codeph> list
+          must equal the number of columns in the column permutation plus the number of partition key columns not
+          assigned a constant value. This form is known as <q>dynamic partitioning</q>.
+        </p>
+        <p>
+          See <xref href="impala_partitioning.xml#partition_static_dynamic"/> for examples and performance
+          characteristics of static and dynamic partitioned inserts.
+        </p>
+      </li>
+
+      <li rev="1.2.2">
+        An optional hint clause immediately before the <codeph>SELECT</codeph> keyword, to fine-tune the behavior
+        when doing an <codeph>INSERT ... SELECT</codeph> operation into partitioned Parquet tables. The hint
+        keywords are <codeph>[SHUFFLE]</codeph> and <codeph>[NOSHUFFLE]</codeph>, including the square brackets.
+        Inserting into partitioned Parquet tables can be a resource-intensive operation because it potentially
+        involves many files being written to HDFS simultaneously, and separate
+        <ph rev="parquet_block_size">large</ph> memory buffers being allocated to buffer the data for each
+        partition. For usage details, see <xref href="impala_parquet.xml#parquet_etl"/>.
+      </li>
+    </ul>
+
+    <note>
+      <ul>
+        <li>
+          Insert commands that partition or add files result in changes to Hive metadata. Because Impala uses Hive
+          metadata, such changes may necessitate a metadata refresh. For more information, see the
+          <xref href="impala_refresh.xml#refresh">REFRESH</xref> function.
+        </li>
+
+        <li>
+          Currently, Impala can only insert data into tables that use the text and Parquet formats. For other file
+          formats, insert the data using Hive and use Impala to query it.
+        </li>
+
+        <li>
+          As an alternative to the <codeph>INSERT</codeph> statement, if you have existing data files elsewhere in
+          HDFS, the <codeph>LOAD DATA</codeph> statement can move those files into a table. This statement works
+          with tables of any file format.
+        </li>
+      </ul>
+    </note>
+
+    <p conref="../shared/impala_common.xml#common/dml_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      When you insert the results of an expression, particularly of a built-in function call, into a small numeric
+      column such as <codeph>INT</codeph>, <codeph>SMALLINT</codeph>, <codeph>TINYINT</codeph>, or
+      <codeph>FLOAT</codeph>, you might need to use a <codeph>CAST()</codeph> expression to coerce values into the
+      appropriate type. Impala does not automatically convert from a larger type to a smaller one. For example, to
+      insert cosine values into a <codeph>FLOAT</codeph> column, write <codeph>CAST(COS(angle) AS FLOAT)</codeph>
+      in the <codeph>INSERT</codeph> statement to make the conversion explicit.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/file_format_blurb"/>
+
+    <p rev="DOCS-1523">
+      Because Impala can read certain file formats that it cannot write,
+      the <codeph>INSERT</codeph> statement does not work for all kinds of
+      Impala tables. See <xref href="impala_file_formats.xml#file_formats"/>
+      for details about what file formats are supported by the
+      <codeph>INSERT</codeph> statement.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/insert_parquet_blocksize"/>
+
+    <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
+
+    <note conref="../shared/impala_common.xml#common/compute_stats_next"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following example sets up new tables with the same definition as the <codeph>TAB1</codeph> table from the
+      <xref href="impala_tutorial.xml#tutorial">Tutorial</xref> section, using different file
+      formats, and demonstrates inserting data into the tables created with the <codeph>STORED AS TEXTFILE</codeph>
+      and <codeph>STORED AS PARQUET</codeph> clauses:
+    </p>
+
+<codeblock>CREATE DATABASE IF NOT EXISTS file_formats;
+USE file_formats;
+
+DROP TABLE IF EXISTS text_table;
+CREATE TABLE text_table
+( id INT, col_1 BOOLEAN, col_2 DOUBLE, col_3 TIMESTAMP )
+STORED AS TEXTFILE;
+
+DROP TABLE IF EXISTS parquet_table;
+CREATE TABLE parquet_table
+( id INT, col_1 BOOLEAN, col_2 DOUBLE, col_3 TIMESTAMP )
+STORED AS PARQUET;</codeblock>
+
+    <p>
+      With the <codeph>INSERT INTO TABLE</codeph> syntax, each new set of inserted rows is appended to any existing
+      data in the table. This is how you would record small amounts of data that arrive continuously, or ingest new
+      batches of data alongside the existing data. For example, after running 2 <codeph>INSERT INTO TABLE</codeph>
+      statements with 5 rows each, the table contains 10 rows total:
+    </p>
+
+<codeblock>[localhost:21000] &gt; insert into table text_table select * from default.tab1;
+Inserted 5 rows in 0.41s
+
+[localhost:21000] &gt; insert into table text_table select * from default.tab1;
+Inserted 5 rows in 0.46s
+
+[localhost:21000] &gt; select count(*) from text_table;
++----------+
+| count(*) |
++----------+
+| 10       |
++----------+
+Returned 1 row(s) in 0.26s</codeblock>
+
+    <p>
+      With the <codeph>INSERT OVERWRITE TABLE</codeph> syntax, each new set of inserted rows replaces any existing
+      data in the table. This is how you load data to query in a data warehousing scenario where you analyze just
+      the data for a particular day, quarter, and so on, discarding the previous data each time. You might keep the
+      entire set of data in one raw table, and transfer and transform certain rows into a more compact and
+      efficient form to perform intensive analysis on that subset.
+    </p>
+
+    <p>
+      For example, here we insert 5 rows into a table using the <codeph>INSERT INTO</codeph> clause, then replace
+      the data by inserting 3 rows with the <codeph>INSERT OVERWRITE</codeph> clause. Afterward, the table only
+      contains the 3 rows from the final <codeph>INSERT</codeph> statement.
+    </p>
+
+<codeblock>[localhost:21000] &gt; insert into table parquet_table select * from default.tab1;
+Inserted 5 rows in 0.35s
+
+[localhost:21000] &gt; insert overwrite table parquet_table select * from default.tab1 limit 3;
+Inserted 3 rows in 0.43s
+[localhost:21000] &gt; select count(*) from parquet_table;
++----------+
+| count(*) |
++----------+
+| 3        |
++----------+
+Returned 1 row(s) in 0.43s</codeblock>
+
+    <p>
+      The <codeph><xref href="impala_insert.xml#values">VALUES</xref></codeph> clause lets you insert one or more
+      rows by specifying constant values for all the columns. The number, types, and order of the expressions must
+      match the table definition.
+    </p>
+
+    <note id="insert_values_warning">
+      The <codeph>INSERT ... VALUES</codeph> technique is not suitable for loading large quantities of data into
+      HDFS-based tables, because the insert operations cannot be parallelized, and each one produces a separate
+      data file. Use it for setting up small dimension tables or tiny amounts of data for experimenting with SQL
+      syntax, or with HBase tables. Do not use it for large ETL jobs or benchmark tests for load operations. Do not
+      run scripts with thousands of <codeph>INSERT ... VALUES</codeph> statements that insert a single row each
+      time. If you do run <codeph>INSERT ... VALUES</codeph> operations to load data into a staging table as one
+      stage in an ETL pipeline, include multiple row values if possible within each <codeph>VALUES</codeph> clause,
+      and use a separate database to make cleanup easier if the operation does produce many tiny files.
+    </note>
+
+    <p>
+      The following example shows how to insert one row or multiple rows, with expressions of different types,
+      using literal values, expressions, and function return values:
+    </p>
+
+<codeblock>create table val_test_1 (c1 int, c2 float, c3 string, c4 boolean, c5 timestamp);
+insert into val_test_1 values (100, 99.9/10, 'abc', true, now());
+create table val_test_2 (id int, token string);
+insert overwrite val_test_2 values (1, 'a'), (2, 'b'), (-1,'xyzzy');</codeblock>
+
+    <p>
+      These examples show the type of <q>not implemented</q> error that you see when attempting to insert data into
+      a table with a file format that Impala currently does not write to:
+    </p>
+
+<codeblock>DROP TABLE IF EXISTS sequence_table;
+CREATE TABLE sequence_table
+( id INT, col_1 BOOLEAN, col_2 DOUBLE, col_3 TIMESTAMP )
+STORED AS SEQUENCEFILE;
+
+DROP TABLE IF EXISTS rc_table;
+CREATE TABLE rc_table
+( id INT, col_1 BOOLEAN, col_2 DOUBLE, col_3 TIMESTAMP )
+STORED AS RCFILE;
+
+[localhost:21000] &gt; insert into table rc_table select * from default.tab1;
+Remote error
+Backend 0:RC_FILE not implemented.
+
+[localhost:21000] &gt; insert into table sequence_table select * from default.tab1;
+Remote error
+Backend 0:SEQUENCE_FILE not implemented. </codeblock>
+
+    <p>
+      Inserting data into partitioned tables requires slightly different syntax that divides the partitioning
+      columns from the others:
+    </p>
+
+<codeblock>create table t1 (i int) <b>partitioned by (x int, y string)</b>;
+-- Select an INT column from another table.
+-- All inserted rows will have the same x and y values, as specified in the INSERT statement.
+-- This technique of specifying all the partition key values is known as static partitioning.
+insert into t1 <b>partition(x=10, y='a')</b> select c1 from some_other_table;
+-- Select two INT columns from another table.
+-- All inserted rows will have the same y value, as specified in the INSERT statement.
+-- Values from c2 go into t1.x.
+-- Any partitioning columns whose value is not specified are filled in
+-- from the columns specified last in the SELECT list.
+-- This technique of omitting some partition key values is known as dynamic partitioning.
+insert into t1 <b>partition(x, y='b')</b> select c1, c2 from some_other_table;
+-- Select an INT and a STRING column from another table.
+-- All inserted rows will have the same x value, as specified in the INSERT statement.
+-- Values from c3 go into t1.y.
+insert into t1 <b>partition(x=20, y)</b> select c1, c3  from some_other_table;</codeblock>
+
+    <p rev="1.1">
+      The following examples show how you can copy the data in all the columns from one table to another, copy the
+      data from only some columns, or specify the columns in the select list in a different order than they
+      actually appear in the table:
+    </p>
+
+<codeblock>-- Start with 2 identical tables.
+create table t1 (c1 int, c2 int);
+create table t2 like t1;
+
+-- If there is no () part after the destination table name,
+-- all columns must be specified, either as * or by name.
+insert into t2 select * from t1;
+insert into t2 select c1, c2 from t1;
+
+-- With the () notation following the destination table name,
+-- you can omit columns (all values for that column are NULL
+-- in the destination table), and/or reorder the values
+-- selected from the source table. This is the "column permutation" feature.
+insert into t2 (c1) select c1 from t1;
+insert into t2 (c2, c1) select c1, c2 from t1;
+
+-- The column names can be entirely different in the source and destination tables.
+-- You can copy any columns, not just the corresponding ones, from the source table.
+-- But the number and type of selected columns must match the columns mentioned in the () part.
+alter table t2 replace columns (x int, y int);
+insert into t2 (y) select c1 from t1;
+
+-- For partitioned tables, all the partitioning columns must be mentioned in the () column list
+-- or a PARTITION clause; these columns cannot be defaulted to NULL.
+create table pt1 (x int, y int) partitioned by (z int);
+-- The values from c1 are copied into the column x in the new table,
+-- all in the same partition based on a constant value for z.
+-- The values of y in the new table are all NULL.
+insert into pt1 (x) partition (z=5) select c1 from t1;
+-- Again we omit the values for column y so they are all NULL.
+-- The inserted x values can go into different partitions, based on
+-- the different values inserted into the partitioning column z.
+insert into pt1 (x,z) select x, z from t2;
+</codeblock>
+
+    <p>
+      <codeph>SELECT *</codeph> for a partitioned table requires that all partition key columns in the source table
+      be declared as the last columns in the <codeph>CREATE TABLE</codeph> statement. You still include a
+      <codeph>PARTITION BY</codeph> clause listing all the partition key columns. These partition columns are
+      automatically mapped to the last columns from the <codeph>SELECT *</codeph> list.
+    </p>
+
+<codeblock>create table source (x int, y int, year int, month int, day int);
+create table destination (x int, y int) partitioned by (year int, month int, day int);
+...load some data into the unpartitioned source table...
+-- Insert a single partition of data.
+-- The SELECT * means you cannot specify partition (year=2014, month, day).
+insert overwrite destination partition (year, month, day) select * from source where year=2014;
+-- Insert the data for all year/month/day combinations.
+insert overwrite destination partition (year, month, day) select * from source;
+
+-- If one of the partition columns is omitted from the source table,
+-- then you can specify a specific value for that column in the PARTITION clause.
+-- Here the source table holds only data from 2014, and so does not include a year column.
+create table source_2014 (x int, y int, month, day);
+...load some data into the unpartitioned source_2014 table...
+insert overwrite destination partition (year=2014, month, day) select * from source_2014;
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/insert_sort_blurb"/>
+
+    <p>
+      <b>Concurrency considerations:</b> Each <codeph>INSERT</codeph> operation creates new data files with unique
+      names, so you can run multiple <codeph>INSERT INTO</codeph> statements simultaneously without filename
+      conflicts.
+<!--
+If data is inserted into a table by a statement issued to a different
+<cmdname>impalad</cmdname> node,
+issue a <codeph>REFRESH <varname>table_name</varname></codeph>
+statement to make the node you are connected to aware of this new data.
+-->
+      While data is being inserted into an Impala table, the data is staged temporarily in a subdirectory inside
+      the data directory; during this period, you cannot issue queries against that table in Hive. If an
+      <codeph>INSERT</codeph> operation fails, the temporary data file and the subdirectory could be left behind in
+      the data directory. If so, remove the relevant subdirectory and any data files it contains manually, by
+      issuing an <codeph>hdfs dfs -rm -r</codeph> command, specifying the full path of the work subdirectory, whose
+      name ends in <codeph>_dir</codeph>.
+    </p>
+  </conbody>
+
+  <concept id="values">
+
+    <title>VALUES Clause</title>
+
+    <conbody>
+
+      <p>
+        The <codeph>VALUES</codeph> clause is a general-purpose way to specify the columns of one or more rows,
+        typically within an <codeph><xref href="impala_insert.xml#insert">INSERT</xref></codeph> statement.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/insert_values_warning">
+        <p/>
+      </note>
+
+      <p>
+        The following examples illustrate:
+      </p>
+
+      <ul>
+        <li>
+          How to insert a single row using a <codeph>VALUES</codeph> clause.
+        </li>
+
+        <li>
+          How to insert multiple rows using a <codeph>VALUES</codeph> clause.
+        </li>
+
+        <li>
+          How the row or rows from a <codeph>VALUES</codeph> clause can be appended to a table through
+          <codeph>INSERT INTO</codeph>, or replace the contents of the table through <codeph>INSERT
+          OVERWRITE</codeph>.
+        </li>
+
+        <li>
+          How the entries in a <codeph>VALUES</codeph> clause can be literals, function results, or any other kind
+          of expression. See <xref href="impala_literals.xml#literals"/> for the notation to use for literal
+          values, especially <xref href="impala_literals.xml#string_literals"/> for quoting and escaping
+          conventions for strings. See <xref href="impala_operators.xml#operators"/> and
+          <xref href="impala_functions.xml#builtins"/> for other things you can include in expressions with the
+          <codeph>VALUES</codeph> clause.
+        </li>
+      </ul>
+
+<codeblock>[localhost:21000] &gt; describe val_example;
+Query: describe val_example
+Query finished, fetching results ...
++-------+---------+---------+
+| name  | type    | comment |
++-------+---------+---------+
+| id    | int     |         |
+| col_1 | boolean |         |
+| col_2 | double  |         |
++-------+---------+---------+
+
+[localhost:21000] &gt; insert into val_example values (1,true,100.0);
+Inserted 1 rows in 0.30s
+[localhost:21000] &gt; select * from val_example;
++----+-------+-------+
+| id | col_1 | col_2 |
++----+-------+-------+
+| 1  | true  | 100   |
++----+-------+-------+
+
+[localhost:21000] &gt; insert overwrite val_example values (10,false,pow(2,5)), (50,true,10/3);
+Inserted 2 rows in 0.16s
+[localhost:21000] &gt; select * from val_example;
++----+-------+-------------------+
+| id | col_1 | col_2             |
++----+-------+-------------------+
+| 10 | false | 32                |
+| 50 | true  | 3.333333333333333 |
++----+-------+-------------------+</codeblock>
+
+      <p>
+        When used in an <codeph>INSERT</codeph> statement, the Impala <codeph>VALUES</codeph> clause can specify
+        some or all of the columns in the destination table, and the columns can be specified in a different order
+        than they actually appear in the table. To specify a different set or order of columns than in the table,
+        use the syntax:
+      </p>
+
+<codeblock>INSERT INTO <varname>destination</varname>
+  (<varname>col_x</varname>, <varname>col_y</varname>, <varname>col_z</varname>)
+  VALUES
+  (<varname>val_x</varname>, <varname>val_y</varname>, <varname>val_z</varname>);
+</codeblock>
+
+      <p>
+        Any columns in the table that are not listed in the <codeph>INSERT</codeph> statement are set to
+        <codeph>NULL</codeph>.
+      </p>
+
+<!--
+      <p>
+        does not support specifying a subset of the
+        columns in the table or specifying the columns in a different order. Use a
+        <codeph>VALUES</codeph> clause with all the column values in the same order as
+        the table definition, using <codeph>NULL</codeph> values for any columns you
+        want to omit from the <codeph>INSERT</codeph> operation.
+      </p>
+-->
+
+      <p>
+        To use a <codeph>VALUES</codeph> clause like a table in other statements, wrap it in parentheses and use
+        <codeph>AS</codeph> clauses to specify aliases for the entire object and any columns you need to refer to:
+      </p>
+
+<codeblock>[localhost:21000] &gt; select * from (values(4,5,6),(7,8,9)) as t;
++---+---+---+
+| 4 | 5 | 6 |
++---+---+---+
+| 4 | 5 | 6 |
+| 7 | 8 | 9 |
++---+---+---+
+[localhost:21000] &gt; select * from (values(1 as c1, true as c2, 'abc' as c3),(100,false,'xyz')) as t;
++-----+-------+-----+
+| c1  | c2    | c3  |
++-----+-------+-----+
+| 1   | true  | abc |
+| 100 | false | xyz |
++-----+-------+-----+</codeblock>
+
+      <p>
+        For example, you might use a tiny table constructed like this from constant literals or function return
+        values as part of a longer statement involving joins or <codeph>UNION ALL</codeph>.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/hdfs_blurb"/>
+
+      <p>
+        Impala physically writes all inserted files under the ownership of its default user, typically
+        <codeph>impala</codeph>. Therefore, this user must have HDFS write permission in the corresponding table
+        directory.
+      </p>
+
+      <p>
+        The permission requirement is independent of the authorization performed by the Sentry framework. (If the
+        connected user is not authorized to insert into a table, Sentry blocks that operation immediately,
+        regardless of the privileges available to the <codeph>impala</codeph> user.) Files created by Impala are
+        not owned by and do not inherit permissions from the connected user.
+      </p>
+
+      <p>
+        The number of data files produced by an <codeph>INSERT</codeph> statement depends on the size of the
+        cluster, the number of data blocks that are processed, the partition key columns in a partitioned table,
+        and the mechanism Impala uses for dividing the work in parallel. Do not assume that an
+        <codeph>INSERT</codeph> statement will produce some particular number of output files. In case of
+        performance issues with data written by Impala, check that the output files do not suffer from issues such
+        as many tiny files or many tiny partitions. (In the Hadoop context, even files or partitions of a few tens
+        of megabytes are considered <q>tiny</q>.)
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/insert_hidden_work_directory"/>
+
+      <p conref="../shared/impala_common.xml#common/hbase_blurb"/>
+
+      <p>
+        You can use the <codeph>INSERT</codeph> statement with HBase tables as follows:
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            You can insert a single row or a small set of rows into an HBase table with the <codeph>INSERT ...
+            VALUES</codeph> syntax. This is a good use case for HBase tables with Impala, because HBase tables are
+            not subject to the same kind of fragmentation from many small insert operations as HDFS tables are.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            You can insert any number of rows at once into an HBase table using the <codeph>INSERT ...
+            SELECT</codeph> syntax.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            If more than one inserted row has the same value for the HBase key column, only the last inserted row
+            with that value is visible to Impala queries. You can take advantage of this fact with <codeph>INSERT
+            ... VALUES</codeph> statements to effectively update rows one at a time, by inserting new rows with the
+            same key values as existing rows. Be aware that after an <codeph>INSERT ... SELECT</codeph> operation
+            copying from an HDFS table, the HBase table might contain fewer rows than were inserted, if the key
+            column in the source table contained duplicate values.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            You cannot <codeph>INSERT OVERWRITE</codeph> into an HBase table. New rows are always appended.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            When you create an Impala or Hive table that maps to an HBase table, the column order you specify with
+            the <codeph>INSERT</codeph> statement might be different than the order you declare with the
+            <codeph>CREATE TABLE</codeph> statement. Behind the scenes, HBase arranges the columns based on how
+            they are divided into column families. This might cause a mismatch during insert operations, especially
+            if you use the syntax <codeph>INSERT INTO <varname>hbase_table</varname> SELECT * FROM
+            <varname>hdfs_table</varname></codeph>. Before inserting data, verify the column order by issuing a
+            <codeph>DESCRIBE</codeph> statement for the table, and adjust the order of the select list in the
+            <codeph>INSERT</codeph> statement.
+          </p>
+        </li>
+      </ul>
+
+      <p>
+        See <xref href="impala_hbase.xml#impala_hbase"/> for more details about using Impala with HBase.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/s3_blurb"/>
+      <p conref="../shared/impala_common.xml#common/s3_dml"/>
+      <p conref="../shared/impala_common.xml#common/s3_dml_performance"/>
+      <p>See <xref href="../topics/impala_s3.xml#s3"/> for details about reading and writing S3 data with Impala.</p>
+
+      <p conref="../shared/impala_common.xml#common/security_blurb"/>
+      <p conref="../shared/impala_common.xml#common/redaction_yes"/>
+
+      <p conref="../shared/impala_common.xml#common/cancel_blurb_yes"/>
+
+      <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
+      <p rev="CDH-19187">
+        The user ID that the <cmdname>impalad</cmdname> daemon runs under,
+        typically the <codeph>impala</codeph> user, must have read
+        permission for the files in the source directory of an <codeph>INSERT ... SELECT</codeph>
+        operation, and write permission for all affected directories in the destination table.
+        (An <codeph>INSERT</codeph> operation could write files to multiple different HDFS directories
+        if the destination table is partitioned.)
+        This user must also have write permission to create a temporary work directory
+        in the top-level HDFS directory of the destination table.
+        An <codeph>INSERT OVERWRITE</codeph> operation does not require write permission on
+        the original data files in the table, only on the table directories themselves.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/char_varchar_cast_from_string"/>
+
+      <p conref="../shared/impala_common.xml#common/related_options"/>
+
+      <p rev="1.3.1" conref="../shared/impala_common.xml#common/insert_inherit_permissions"/>
+    </conbody>
+  </concept>
+
+<!-- Values clause -->
+</concept>
+<!-- INSERT statement -->

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="obsolete_faq">
+
+  <title>Impala Frequently Asked Questions</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="FAQs"/>
+      <data name="Category" value="Planning"/>
+      <data name="Category" value="Getting Started"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <draft-comment translate="no">
+      Obsolete. Content all moved into impala_faq.xml.
+    </draft-comment>
+  </conbody>
+</concept>

@@ -1,0 +1,794 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="bit_functions" rev="2.3.0">
+
+  <title>Impala Bit Functions</title>
+  <titlealts audience="PDF"><navtitle>Bit Functions</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.3.0">
+      Bit manipulation functions perform bitwise operations involved in scientific processing or computer science algorithms.
+      For example, these functions include setting, clearing, or testing bits within an integer value, or changing the
+      positions of bits with or without wraparound.
+    </p>
+
+    <p>
+      If a function takes two integer arguments that are required to be of the same type, the smaller argument is promoted
+      to the type of the larger one if required. For example, <codeph>BITAND(1,4096)</codeph> treats both arguments as
+      <codeph>SMALLINT</codeph>, because 1 can be represented as a <codeph>TINYINT</codeph> but 4096 requires a <codeph>SMALLINT</codeph>.
+    </p>
+
+    <p>
+     Remember that all Impala integer values are signed. Therefore, when dealing with binary values where the most significant
+     bit is 1, the specified or returned values might be negative when represented in base 10.
+    </p>
+
+    <p>
+      Whenever any argument is <codeph>NULL</codeph>, either the input value, bit position, or number of shift or rotate positions,
+      the return value from any of these functions is also <codeph>NULL</codeph>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      The bit functions operate on all the integral data types: <xref href="impala_int.xml#int"/>,
+      <xref href="impala_bigint.xml#bigint"/>, <xref href="impala_smallint.xml#smallint"/>, and
+      <xref href="impala_tinyint.xml#tinyint"/>.
+    </p>
+
+    <p>
+      <b>Function reference:</b>
+    </p>
+
+    <p>
+      Impala supports the following bit functions:
+    </p>
+
+<!--
+bitand
+bitnot
+bitor
+bitxor
+countset
+getbit
+rotateleft
+rotateright
+setbit
+shiftleft
+shiftright
+-->
+
+    <dl>
+
+      <dlentry id="bitand">
+
+        <dt>
+          <codeph>bitand(integer_type a, same_type b)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">bitand() function</indexterm>
+          <b>Purpose:</b> Returns an integer value representing the bits that are set to 1 in both of the arguments.
+          If the arguments are of different sizes, the smaller is promoted to the type of the larger.
+          <p>
+            <b>Usage notes:</b> The <codeph>bitand()</codeph> function is equivalent to the <codeph>&amp;</codeph> binary operator.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples show the results of ANDing integer values.
+            255 contains all 1 bits in its lowermost 7 bits.
+            32767 contains all 1 bits in its lowermost 15 bits.
+            <!--
+            Negative numbers have a 1 in the sign bit and the value is the
+            <xref href="https://en.wikipedia.org/wiki/Two%27s_complement" scope="external" format="html">two's complement</xref>
+            of the positive equivalent.
+            -->
+            You can use the <codeph>bin()</codeph> function to check the binary representation of any
+            integer value, although the result is always represented as a 64-bit value.
+            If necessary, the smaller argument is promoted to the
+            type of the larger one.
+          </p>
+<codeblock>select bitand(255, 32767); /* 0000000011111111 &amp; 0111111111111111 */
++--------------------+
+| bitand(255, 32767) |
++--------------------+
+| 255                |
++--------------------+
+
+select bitand(32767, 1); /* 0111111111111111 &amp; 0000000000000001 */
++------------------+
+| bitand(32767, 1) |
++------------------+
+| 1                |
++------------------+
+
+select bitand(32, 16); /* 00010000 &amp; 00001000 */
++----------------+
+| bitand(32, 16) |
++----------------+
+| 0              |
++----------------+
+
+select bitand(12,5); /* 00001100 &amp; 00000101 */
++---------------+
+| bitand(12, 5) |
++---------------+
+| 4             |
++---------------+
+
+select bitand(-1,15); /* 11111111 &amp; 00001111 */
++----------------+
+| bitand(-1, 15) |
++----------------+
+| 15             |
++----------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="bitnot">
+
+        <dt>
+          <codeph>bitnot(integer_type a)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">bitnot() function</indexterm>
+          <b>Purpose:</b> Inverts all the bits of the input argument.
+          <p>
+            <b>Usage notes:</b> The <codeph>bitnot()</codeph> function is equivalent to the <codeph>~</codeph> unary operator.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            These examples illustrate what happens when you flip all the bits of an integer value.
+            The sign always changes. The decimal representation is one different between the positive and
+            negative values.
+            <!--
+            because negative values are represented as the
+            <xref href="https://en.wikipedia.org/wiki/Two%27s_complement" scope="external" format="html">two's complement</xref>
+            of the corresponding positive value.
+            -->
+          </p>
+<codeblock>select bitnot(127); /* 01111111 -> 10000000 */
++-------------+
+| bitnot(127) |
++-------------+
+| -128        |
++-------------+
+
+select bitnot(16); /* 00010000 -> 11101111 */
++------------+
+| bitnot(16) |
++------------+
+| -17        |
++------------+
+
+select bitnot(0); /* 00000000 -> 11111111 */
++-----------+
+| bitnot(0) |
++-----------+
+| -1        |
++-----------+
+
+select bitnot(-128); /* 10000000 -> 01111111 */
++--------------+
+| bitnot(-128) |
++--------------+
+| 127          |
++--------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="bitor">
+
+        <dt>
+          <codeph>bitor(integer_type a, same_type b)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">bitor() function</indexterm>
+          <b>Purpose:</b> Returns an integer value representing the bits that are set to 1 in either of the arguments.
+          If the arguments are of different sizes, the smaller is promoted to the type of the larger.
+          <p>
+            <b>Usage notes:</b> The <codeph>bitor()</codeph> function is equivalent to the <codeph>|</codeph> binary operator.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples show the results of ORing integer values.
+          </p>
+<codeblock>select bitor(1,4); /* 00000001 | 00000100 */
++-------------+
+| bitor(1, 4) |
++-------------+
+| 5           |
++-------------+
+
+select bitor(16,48); /* 00001000 | 00011000 */
++---------------+
+| bitor(16, 48) |
++---------------+
+| 48            |
++---------------+
+
+select bitor(0,7); /* 00000000 | 00000111 */
++-------------+
+| bitor(0, 7) |
++-------------+
+| 7           |
++-------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="bitxor">
+
+        <dt>
+          <codeph>bitxor(integer_type a, same_type b)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">bitxor() function</indexterm>
+          <b>Purpose:</b> Returns an integer value representing the bits that are set to 1 in one but not both of the arguments.
+          If the arguments are of different sizes, the smaller is promoted to the type of the larger.
+          <p>
+            <b>Usage notes:</b> The <codeph>bitxor()</codeph> function is equivalent to the <codeph>^</codeph> binary operator.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples show the results of XORing integer values.
+            XORing a non-zero value with zero returns the non-zero value.
+            XORing two identical values returns zero, because all the 1 bits from the first argument are also 1 bits in the second argument.
+            XORing different non-zero values turns off some bits and leaves others turned on, based on whether the same bit is set in both arguments.
+          </p>
+<codeblock>select bitxor(0,15); /* 00000000 ^ 00001111 */
++---------------+
+| bitxor(0, 15) |
++---------------+
+| 15            |
++---------------+
+
+select bitxor(7,7); /* 00000111 ^ 00000111 */
++--------------+
+| bitxor(7, 7) |
++--------------+
+| 0            |
++--------------+
+
+select bitxor(8,4); /* 00001000 ^ 00000100 */
++--------------+
+| bitxor(8, 4) |
++--------------+
+| 12           |
++--------------+
+
+select bitxor(3,7); /* 00000011 ^ 00000111 */
++--------------+
+| bitxor(3, 7) |
++--------------+
+| 4            |
++--------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="countset">
+
+        <dt>
+          <codeph>countset(integer_type a [, int zero_or_one])</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">countset() function</indexterm>
+          <b>Purpose:</b> By default, returns the number of 1 bits in the specified integer value.
+          If the optional second argument is set to zero, it returns the number of 0 bits instead.
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            In discussions of information theory, this operation is referred to as the
+            <q><xref href="https://en.wikipedia.org/wiki/Hamming_weight" scope="external" format="html">population count</xref></q>
+            or <q>popcount</q>.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples show how to count the number of 1 bits in an integer value.
+          </p>
+<codeblock>select countset(1); /* 00000001 */
++-------------+
+| countset(1) |
++-------------+
+| 1           |
++-------------+
+
+select countset(3); /* 00000011 */
++-------------+
+| countset(3) |
++-------------+
+| 2           |
++-------------+
+
+select countset(16); /* 00010000 */
++--------------+
+| countset(16) |
++--------------+
+| 1            |
++--------------+
+
+select countset(17); /* 00010001 */
++--------------+
+| countset(17) |
++--------------+
+| 2            |
++--------------+
+
+select countset(7,1); /* 00000111 = 3 1 bits; the function counts 1 bits by default */
++----------------+
+| countset(7, 1) |
++----------------+
+| 3              |
++----------------+
+
+select countset(7,0); /* 00000111 = 5 0 bits; third argument can only be 0 or 1 */
++----------------+
+| countset(7, 0) |
++----------------+
+| 5              |
++----------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="getbit">
+
+        <dt>
+          <codeph>getbit(integer_type a, int position)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">getbit() function</indexterm>
+          <b>Purpose:</b> Returns a 0 or 1 representing the bit at a
+          specified position. The positions are numbered right to left, starting at zero.
+          The position argument cannot be negative.
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            When you use a literal input value, it is treated as an 8-bit, 16-bit,
+            and so on value, the smallest type that is appropriate.
+            The type of the input value limits the range of the positions.
+            Cast the input value to the appropriate type if you need to
+            ensure it is treated as a 64-bit, 32-bit, and so on value.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples show how to test a specific bit within an integer value.
+          </p>
+<codeblock>select getbit(1,0); /* 00000001 */
++--------------+
+| getbit(1, 0) |
++--------------+
+| 1            |
++--------------+
+
+select getbit(16,1) /* 00010000 */
++---------------+
+| getbit(16, 1) |
++---------------+
+| 0             |
++---------------+
+
+select getbit(16,4) /* 00010000 */
++---------------+
+| getbit(16, 4) |
++---------------+
+| 1             |
++---------------+
+
+select getbit(16,5) /* 00010000 */
++---------------+
+| getbit(16, 5) |
++---------------+
+| 0             |
++---------------+
+
+select getbit(-1,3); /* 11111111 */
++---------------+
+| getbit(-1, 3) |
++---------------+
+| 1             |
++---------------+
+
+select getbit(-1,25); /* 11111111 */
+ERROR: Invalid bit position: 25
+
+select getbit(cast(-1 as int),25); /* 11111111111111111111111111111111 */
++-----------------------------+
+| getbit(cast(-1 as int), 25) |
++-----------------------------+
+| 1                           |
++-----------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="rotateleft">
+
+        <dt>
+          <codeph>rotateleft(integer_type a, int positions)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">rotateleft() function</indexterm>
+          <b>Purpose:</b> Rotates an integer value left by a specified number of bits.
+          As the most significant bit is taken out of the original value,
+          if it is a 1 bit, it is <q>rotated</q> back to the least significant bit.
+          Therefore, the final value has the same number of 1 bits as the original value,
+          just in different positions.
+          In computer science terms, this operation is a
+          <q><xref href="https://en.wikipedia.org/wiki/Circular_shift" scope="external" format="html">circular shift</xref></q>.
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            Specifying a second argument of zero leaves the original value unchanged.
+            Rotating a -1 value by any number of positions still returns -1,
+            because the original value has all 1 bits and all the 1 bits are
+            preserved during rotation.
+            Similarly, rotating a 0 value by any number of positions still returns 0.
+            Rotating a value by the same number of bits as in the value returns the same value.
+            Because this is a circular operation, the number of positions is not limited
+            to the number of bits in the input value.
+            For example, rotating an 8-bit value by 1, 9, 17, and so on positions returns an
+            identical result in each case.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>select rotateleft(1,4); /* 00000001 -> 00010000 */
++------------------+
+| rotateleft(1, 4) |
++------------------+
+| 16               |
++------------------+
+
+select rotateleft(-1,155); /* 11111111 -> 11111111 */
++---------------------+
+| rotateleft(-1, 155) |
++---------------------+
+| -1                  |
++---------------------+
+
+select rotateleft(-128,1); /* 10000000 -> 00000001 */
++---------------------+
+| rotateleft(-128, 1) |
++---------------------+
+| 1                   |
++---------------------+
+
+select rotateleft(-127,3); /* 10000001 -> 00001100 */
++---------------------+
+| rotateleft(-127, 3) |
++---------------------+
+| 12                  |
++---------------------+
+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="rotateright">
+
+        <dt>
+          <codeph>rotateright(integer_type a, int positions)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">rotateright() function</indexterm>
+          <b>Purpose:</b> Rotates an integer value right by a specified number of bits.
+          As the least significant bit is taken out of the original value,
+          if it is a 1 bit, it is <q>rotated</q> back to the most significant bit.
+          Therefore, the final value has the same number of 1 bits as the original value,
+          just in different positions.
+          In computer science terms, this operation is a
+          <q><xref href="https://en.wikipedia.org/wiki/Circular_shift" scope="external" format="html">circular shift</xref></q>.
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            Specifying a second argument of zero leaves the original value unchanged.
+            Rotating a -1 value by any number of positions still returns -1,
+            because the original value has all 1 bits and all the 1 bits are
+            preserved during rotation.
+            Similarly, rotating a 0 value by any number of positions still returns 0.
+            Rotating a value by the same number of bits as in the value returns the same value.
+            Because this is a circular operation, the number of positions is not limited
+            to the number of bits in the input value.
+            For example, rotating an 8-bit value by 1, 9, 17, and so on positions returns an
+            identical result in each case.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>select rotateright(16,4); /* 00010000 -> 00000001 */
++--------------------+
+| rotateright(16, 4) |
++--------------------+
+| 1                  |
++--------------------+
+
+select rotateright(-1,155); /* 11111111 -> 11111111 */
++----------------------+
+| rotateright(-1, 155) |
++----------------------+
+| -1                   |
++----------------------+
+
+select rotateright(-128,1); /* 10000000 -> 01000000 */
++----------------------+
+| rotateright(-128, 1) |
++----------------------+
+| 64                   |
++----------------------+
+
+select rotateright(-127,3); /* 10000001 -> 00110000 */
++----------------------+
+| rotateright(-127, 3) |
++----------------------+
+| 48                   |
++----------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="setbit">
+
+        <dt>
+          <codeph>setbit(integer_type a, int position [, int zero_or_one])</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">setbit() function</indexterm>
+          <b>Purpose:</b> By default, changes a bit at a specified position to a 1, if it is not already.
+          If the optional third argument is set to zero, the specified bit is set to 0 instead.
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          If the bit at the specified position was already 1 (by default)
+          or 0 (with a third argument of zero), the return value is
+          the same as the first argument.
+          The positions are numbered right to left, starting at zero.
+          (Therefore, the return value could be different from the first argument
+          even if the position argument is zero.)
+          The position argument cannot be negative.
+          <p>
+            When you use a literal input value, it is treated as an 8-bit, 16-bit,
+            and so on value, the smallest type that is appropriate.
+            The type of the input value limits the range of the positions.
+            Cast the input value to the appropriate type if you need to
+            ensure it is treated as a 64-bit, 32-bit, and so on value.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>select setbit(0,0); /* 00000000 -> 00000001 */
++--------------+
+| setbit(0, 0) |
++--------------+
+| 1            |
++--------------+
+
+select setbit(0,3); /* 00000000 -> 00001000 */
++--------------+
+| setbit(0, 3) |
++--------------+
+| 8            |
++--------------+
+
+select setbit(7,3); /* 00000111 -> 00001111 */
++--------------+
+| setbit(7, 3) |
++--------------+
+| 15           |
++--------------+
+
+select setbit(15,3); /* 00001111 -> 00001111 */
++---------------+
+| setbit(15, 3) |
++---------------+
+| 15            |
++---------------+
+
+select setbit(0,32); /* By default, 0 is a TINYINT with only 8 bits. */
+ERROR: Invalid bit position: 32
+
+select setbit(cast(0 as bigint),32); /* For BIGINT, the position can be 0..63. */
++-------------------------------+
+| setbit(cast(0 as bigint), 32) |
++-------------------------------+
+| 4294967296                    |
++-------------------------------+
+
+select setbit(7,3,1); /* 00000111 -> 00001111; setting to 1 is the default */
++-----------------+
+| setbit(7, 3, 1) |
++-----------------+
+| 15              |
++-----------------+
+
+select setbit(7,2,0); /* 00000111 -> 00000011; third argument of 0 clears instead of sets */
++-----------------+
+| setbit(7, 2, 0) |
++-----------------+
+| 3               |
++-----------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="shiftleft">
+
+        <dt>
+          <codeph>shiftleft(integer_type a, int positions)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">shiftleft() function</indexterm>
+          <b>Purpose:</b> Shifts an integer value left by a specified number of bits.
+          As the most significant bit is taken out of the original value,
+          it is discarded and the least significant bit becomes 0.
+          In computer science terms, this operation is a <q><xref href="https://en.wikipedia.org/wiki/Logical_shift" scope="external" format="html">logical shift</xref></q>.
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            The final value has either the same number of 1 bits as the original value, or fewer.
+            Shifting an 8-bit value by 8 positions, a 16-bit value by 16 positions, and so on produces
+            a result of zero.
+          </p>
+          <p>
+            Specifying a second argument of zero leaves the original value unchanged.
+            Shifting any value by 0 returns the original value.
+            Shifting any value by 1 is the same as multiplying it by 2,
+            as long as the value is small enough; larger values eventually
+            become negative when shifted, as the sign bit is set.
+            Starting with the value 1 and shifting it left by N positions gives
+            the same result as 2 to the Nth power, or <codeph>pow(2,<varname>N</varname>)</codeph>.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>select shiftleft(1,0); /* 00000001 -> 00000001 */
++-----------------+
+| shiftleft(1, 0) |
++-----------------+
+| 1               |
++-----------------+
+
+select shiftleft(1,3); /* 00000001 -> 00001000 */
++-----------------+
+| shiftleft(1, 3) |
++-----------------+
+| 8               |
++-----------------+
+
+select shiftleft(8,2); /* 00001000 -> 00100000 */
++-----------------+
+| shiftleft(8, 2) |
++-----------------+
+| 32              |
++-----------------+
+
+select shiftleft(127,1); /* 01111111 -> 11111110 */
++-------------------+
+| shiftleft(127, 1) |
++-------------------+
+| -2                |
++-------------------+
+
+select shiftleft(127,5); /* 01111111 -> 11100000 */
++-------------------+
+| shiftleft(127, 5) |
++-------------------+
+| -32               |
++-------------------+
+
+select shiftleft(-1,4); /* 11111111 -> 11110000 */
++------------------+
+| shiftleft(-1, 4) |
++------------------+
+| -16              |
++------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="shiftright">
+
+        <dt>
+          <codeph>shiftright(integer_type a, int positions)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">shiftright() function</indexterm>
+          <b>Purpose:</b> Shifts an integer value right by a specified number of bits.
+          As the least significant bit is taken out of the original value,
+          it is discarded and the most significant bit becomes 0.
+          In computer science terms, this operation is a <q><xref href="https://en.wikipedia.org/wiki/Logical_shift" scope="external" format="html">logical shift</xref></q>.
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+          Therefore, the final value has either the same number of 1 bits as the original value, or fewer.
+          Shifting an 8-bit value by 8 positions, a 16-bit value by 16 positions, and so on produces
+          a result of zero.
+          </p>
+          <p>
+            Specifying a second argument of zero leaves the original value unchanged.
+            Shifting any value by 0 returns the original value.
+            Shifting any positive value right by 1 is the same as dividing it by 2.
+            Negative values become positive when shifted right.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>select shiftright(16,0); /* 00010000 -> 00000000 */
++-------------------+
+| shiftright(16, 0) |
++-------------------+
+| 16                |
++-------------------+
+
+select shiftright(16,4); /* 00010000 -> 00000000 */
++-------------------+
+| shiftright(16, 4) |
++-------------------+
+| 1                 |
++-------------------+
+
+select shiftright(16,5); /* 00010000 -> 00000000 */
++-------------------+
+| shiftright(16, 5) |
++-------------------+
+| 0                 |
++-------------------+
+
+select shiftright(-1,1); /* 11111111 -> 01111111 */
++-------------------+
+| shiftright(-1, 1) |
++-------------------+
+| 127               |
++-------------------+
+
+select shiftright(-1,5); /* 11111111 -> 00000111 */
++-------------------+
+| shiftright(-1, 5) |
++-------------------+
+| 7                 |
++-------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+    </dl>
+  </conbody>
+</concept>

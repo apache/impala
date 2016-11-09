@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="batch_size">
+
+  <title>BATCH_SIZE Query Option</title>
+  <titlealts audience="PDF"><navtitle>BATCH_SIZE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Performance"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">BATCH_SIZE query option</indexterm>
+      Number of rows evaluated at a time by SQL operators. Unspecified or a size of 0 uses a predefined default
+      size. Using a large number improves responsiveness, especially for scan operations, at the cost of a higher memory footprint.
+    </p>
+
+    <p>
+      This option is primarily for testing during Impala development, or for use under the direction of <keyword keyref="support_org"/>.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p>
+      <b>Default:</b> 0 (meaning the predefined default of 1024)
+    </p>
+  </conbody>
+</concept>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_vars">
+  <title>Cloudera Impala Variables</title>
+  <prolog id="prolog_slg_nmv_km">
+    <metadata id="metadata_ecq_qmv_km">
+      <prodinfo audience="PDF" id="prodinfo_for_html">
+        <prodname>Impala</prodname>
+        <vrmlist>
+          <vrm version="Impala 2.7.x / CDH 5.9.x"/>
+        </vrmlist>
+      </prodinfo>
+      <prodinfo audience="HTML" id="prodinfo_for_pdf">
+        <prodname></prodname>
+        <vrmlist>
+          <vrm version="Impala 2.7.x / CDH 5.9.x"/>
+        </vrmlist>
+      </prodinfo>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>Substitution variables for denoting features available in release X or higher.
+       The upstream docs can refer to the Impala release number.
+       The docs included with a distro can refer to the distro release number by
+       editing the values here.
+       <ul>
+        <li><ph id="impala27">CDH 5.9</ph></li>
+        <li><ph id="impala26">CDH 5.8</ph></li>
+        <li><ph id="impala25">CDH 5.7</ph></li>
+        <li><ph id="impala24">CDH 5.6</ph></li>
+        <li><ph id="impala23">CDH 5.5</ph></li>
+        <li><ph id="impala22">CDH 5.4</ph></li>
+        <li><ph id="impala21">CDH 5.3</ph></li>
+        <li><ph id="impala20">CDH 5.2</ph></li>
+        <li><ph id="impala14">CDH 5.1</ph></li>
+        <li><ph id="impala13">CDH 5.0</ph></li>
+      </ul>
+    </p>
+    <p>Release Version Variable - <ph id="ReleaseVersion">Impala 2.7.x / CDH 5.9.x</ph></p>
+    <p>Banner for examples showing shell version -<ph id="ShellBanner">(Shell
+      build version: Impala Shell v2.7.x (<varname>hash</varname>) built on
+      <varname>date</varname>)</ph></p>
+    <p>Banner for examples showing impalad version -<ph id="ImpaladBanner">Server version: impalad version 2.7.x (build
+      x.y.z)</ph></p>
+    <data name="version-message" id="version-message">
+      <foreign>
+        <lines xml:space="preserve">This is the documentation for <data name="version"/>.
+Documentation for other versions is available at <xref href="http://www.cloudera.com/content/support/en/documentation.html" scope="external" format="html">Cloudera Documentation</xref>.</lines>
+      </foreign>
+    </data>
+  </conbody>
+</concept>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="planning">
+
+  <title>Planning for Impala Deployment</title>
+  <titlealts audience="PDF"><navtitle>Deployment Planning</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Deploying"/>
+      <data name="Category" value="Planning"/>
+      <data name="Category" value="Proof of Concept"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Stub Pages"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">planning</indexterm>
+      Before you set up Impala in production, do some planning to make sure that your hardware setup has sufficient
+      capacity, that your cluster topology is optimal for Impala queries, and that your schema design and ETL
+      processes follow the best practices for Impala.
+    </p>
+
+    <p outputclass="toc"/>
+  </conbody>
+</concept>

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.1" id="security_guidelines">
+
+  <title>Security Guidelines for Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Planning"/>
+      <data name="Category" value="Guidelines"/>
+      <data name="Category" value="Best Practices"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The following are the major steps to harden a cluster running Impala against accidents and mistakes, or
+      malicious attackers trying to access sensitive data:
+    </p>
+
+    <ul>
+      <li>
+      <p>
+        Secure the <codeph>root</codeph> account. The <codeph>root</codeph> user can tamper with the
+        <cmdname>impalad</cmdname> daemon, read and write the data files in HDFS, log into other user accounts, and
+        access other system services that are beyond the control of Impala.
+      </p>
+      </li>
+
+      <li>
+      <p>
+        Restrict membership in the <codeph>sudoers</codeph> list (in the <filepath>/etc/sudoers</filepath> file).
+        The users who can run the <codeph>sudo</codeph> command can do many of the same things as the
+        <codeph>root</codeph> user.
+      </p>
+      </li>
+
+      <li>
+      <p>
+        Ensure the Hadoop ownership and permissions for Impala data files are restricted.
+      </p>
+      </li>
+
+      <li>
+      <p>
+        Ensure the Hadoop ownership and permissions for Impala log files are restricted.
+      </p>
+      </li>
+
+      <li>
+      <p>
+        Ensure that the Impala web UI (available by default on port 25000 on each Impala node) is
+        password-protected. See <xref href="impala_webui.xml#webui"/> for details.
+      </p>
+      </li>
+
+      <li>
+      <p>
+        Create a policy file that specifies which Impala privileges are available to users in particular Hadoop
+        groups (which by default map to Linux OS groups). Create the associated Linux groups using the
+        <cmdname>groupadd</cmdname> command if necessary.
+      </p>
+      </li>
+
+      <li>
+      <p>
+        The Impala authorization feature makes use of the HDFS file ownership and permissions mechanism; for
+        background information, see the
+        <xref href="https://archive.cloudera.com/cdh/3/hadoop/hdfs_permissions_guide.html" scope="external" format="html">CDH
+        HDFS Permissions Guide</xref>. Set up users and assign them to groups at the OS level, corresponding to the
+        different categories of users with different access levels for various databases, tables, and HDFS
+        locations (URIs). Create the associated Linux users using the <cmdname>useradd</cmdname> command if
+        necessary, and add them to the appropriate groups with the <cmdname>usermod</cmdname> command.
+      </p>
+      </li>
+
+      <li>
+      <p>
+        Design your databases, tables, and views with database and table structure to allow policy rules to specify
+        simple, consistent rules. For example, if all tables related to an application are inside a single
+        database, you can assign privileges for that database and use the <codeph>*</codeph> wildcard for the table
+        name. If you are creating views with different privileges than the underlying base tables, you might put
+        the views in a separate database so that you can use the <codeph>*</codeph> wildcard for the database
+        containing the base tables, while specifying the precise names of the individual views. (For specifying
+        table or database names, you either specify the exact name or <codeph>*</codeph> to mean all the databases
+        on a server, or all the tables and views in a database.)
+      </p>
+      </li>
+
+      <li>
+      <p>
+        Enable authorization by running the <codeph>impalad</codeph> daemons with the <codeph>-server_name</codeph>
+        and <codeph>-authorization_policy_file</codeph> options on all nodes. (The authorization feature does not
+        apply to the <cmdname>statestored</cmdname> daemon, which has no access to schema objects or data files.)
+      </p>
+      </li>
+
+      <li>
+      <p>
+        Set up authentication using Kerberos, to make sure users really are who they say they are.
+      </p>
+      </li>
+    </ul>
+  </conbody>
+</concept>

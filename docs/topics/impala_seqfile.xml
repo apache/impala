@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="seqfile">
+
+  <title id="sequencefile">Using the SequenceFile File Format with Impala Tables</title>
+  <titlealts audience="PDF"><navtitle>SequenceFile Data Files</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <!-- <data name="Category" value="SequenceFile"/> -->
+      <data name="Category" value="File Formats"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">SequenceFile support in Impala</indexterm>
+      Impala supports using SequenceFile data files.
+    </p>
+
+    <table>
+      <title>SequenceFile Format Support in Impala</title>
+      <tgroup cols="5">
+        <colspec colname="1" colwidth="10*"/>
+        <colspec colname="2" colwidth="10*"/>
+        <colspec colname="3" colwidth="20*"/>
+        <colspec colname="4" colwidth="30*"/>
+        <colspec colname="5" colwidth="30*"/>
+        <thead>
+          <row>
+            <entry>
+              File Type
+            </entry>
+            <entry>
+              Format
+            </entry>
+            <entry>
+              Compression Codecs
+            </entry>
+            <entry>
+              Impala Can CREATE?
+            </entry>
+            <entry>
+              Impala Can INSERT?
+            </entry>
+          </row>
+        </thead>
+        <tbody>
+          <row conref="impala_file_formats.xml#file_formats/sequencefile_support">
+            <entry/>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="seqfile_create">
+
+    <title>Creating SequenceFile Tables and Loading Data</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="ETL"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        If you do not have an existing data file to use, begin by creating one in the appropriate format.
+      </p>
+
+      <p>
+        <b>To create a SequenceFile table:</b>
+      </p>
+
+      <p>
+        In the <codeph>impala-shell</codeph> interpreter, issue a command similar to:
+      </p>
+
+<codeblock>create table sequencefile_table (<varname>column_specs</varname>) stored as sequencefile;</codeblock>
+
+      <p>
+        Because Impala can query some kinds of tables that it cannot currently write to, after creating tables of
+        certain file formats, you might use the Hive shell to load the data. See
+        <xref href="impala_file_formats.xml#file_formats"/> for details. After loading data into a table through
+        Hive or other mechanism outside of Impala, issue a <codeph>REFRESH <varname>table_name</varname></codeph>
+        statement the next time you connect to the Impala node, before querying the table, to make Impala recognize
+        the new data.
+      </p>
+
+      <p>
+        For example, here is how you might create some SequenceFile tables in Impala (by specifying the columns
+        explicitly, or cloning the structure of another table), load data through Hive, and query them through
+        Impala:
+      </p>
+
+<codeblock>$ impala-shell -i localhost
+[localhost:21000] &gt; create table seqfile_table (x int) stored as sequencefile;
+[localhost:21000] &gt; create table seqfile_clone like some_other_table stored as sequencefile;
+[localhost:21000] &gt; quit;
+
+$ hive
+hive&gt; insert into table seqfile_table select x from some_other_table;
+3 Rows loaded to seqfile_table
+Time taken: 19.047 seconds
+hive&gt; quit;
+
+$ impala-shell -i localhost
+[localhost:21000] &gt; select * from seqfile_table;
+Returned 0 row(s) in 0.23s
+[localhost:21000] &gt; -- Make Impala recognize the data loaded through Hive;
+[localhost:21000] &gt; refresh seqfile_table;
+[localhost:21000] &gt; select * from seqfile_table;
++---+
+| x |
++---+
+| 1 |
+| 2 |
+| 3 |
++---+
+Returned 3 row(s) in 0.23s</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_unsupported_filetype"/>
+
+    </conbody>
+  </concept>
+
+  <concept id="seqfile_compression">
+
+    <title>Enabling Compression for SequenceFile Tables</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Compression"/>
+      <data name="Category" value="Snappy"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">compression</indexterm>
+        You may want to enable compression on existing tables. Enabling compression provides performance gains in
+        most cases and is supported for SequenceFile tables. For example, to enable Snappy compression, you would
+        specify the following additional settings when loading data through the Hive shell:
+      </p>
+
+<codeblock>hive&gt; SET hive.exec.compress.output=true;
+hive&gt; SET mapred.max.split.size=256000000;
+hive&gt; SET mapred.output.compression.type=BLOCK;
+hive&gt; SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+hive&gt; insert overwrite table <varname>new_table</varname> select * from <varname>old_table</varname>;</codeblock>
+
+      <p>
+        If you are converting partitioned tables, you must complete additional steps. In such a case, specify
+        additional settings similar to the following:
+      </p>
+
+<codeblock>hive&gt; create table <varname>new_table</varname> (<varname>your_cols</varname>) partitioned by (<varname>partition_cols</varname>) stored as <varname>new_format</varname>;
+hive&gt; SET hive.exec.dynamic.partition.mode=nonstrict;
+hive&gt; SET hive.exec.dynamic.partition=true;
+hive&gt; insert overwrite table <varname>new_table</varname> partition(<varname>comma_separated_partition_cols</varname>) select * from <varname>old_table</varname>;</codeblock>
+
+      <p>
+        Remember that Hive does not require that you specify a source format for it. Consider the case of
+        converting a table with two partition columns called <codeph>year</codeph> and <codeph>month</codeph> to a
+        Snappy compressed SequenceFile. Combining the components outlined previously to complete this table
+        conversion, you would specify settings similar to the following:
+      </p>
+
+<codeblock>hive&gt; create table TBL_SEQ (int_col int, string_col string) STORED AS SEQUENCEFILE;
+hive&gt; SET hive.exec.compress.output=true;
+hive&gt; SET mapred.max.split.size=256000000;
+hive&gt; SET mapred.output.compression.type=BLOCK;
+hive&gt; SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+hive&gt; SET hive.exec.dynamic.partition.mode=nonstrict;
+hive&gt; SET hive.exec.dynamic.partition=true;
+hive&gt; INSERT OVERWRITE TABLE tbl_seq SELECT * FROM tbl;</codeblock>
+
+      <p>
+        To complete a similar process for a table that includes partitions, you would specify settings similar to
+        the following:
+      </p>
+
+<codeblock>hive&gt; CREATE TABLE tbl_seq (int_col INT, string_col STRING) PARTITIONED BY (year INT) STORED AS SEQUENCEFILE;
+hive&gt; SET hive.exec.compress.output=true;
+hive&gt; SET mapred.max.split.size=256000000;
+hive&gt; SET mapred.output.compression.type=BLOCK;
+hive&gt; SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+hive&gt; SET hive.exec.dynamic.partition.mode=nonstrict;
+hive&gt; SET hive.exec.dynamic.partition=true;
+hive&gt; INSERT OVERWRITE TABLE tbl_seq PARTITION(year) SELECT * FROM tbl;</codeblock>
+
+      <note>
+        <p>
+          The compression type is specified in the following command:
+        </p>
+<codeblock>SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;</codeblock>
+        <p>
+          You could elect to specify alternative codecs such as <codeph>GzipCodec</codeph> here.
+        </p>
+      </note>
+    </conbody>
+  </concept>
+
+  <concept audience="Cloudera" id="seqfile_data_types">
+
+    <title>Data Type Considerations for SequenceFile Tables</title>
+
+    <conbody>
+
+      <p></p>
+    </conbody>
+  </concept>
+
+  <concept id="seqfile_performance">
+
+    <title>Query Performance for Impala SequenceFile Tables</title>
+
+    <conbody>
+
+      <p>
+        In general, expect query performance with SequenceFile tables to be
+        faster than with tables using text data, but slower than with
+        Parquet tables. See <xref href="impala_parquet.xml#parquet"/>
+        for information about using the Parquet file format for
+        high-performance analytic queries.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/s3_block_splitting"/>
+
+    </conbody>
+  </concept>
+
+</concept>

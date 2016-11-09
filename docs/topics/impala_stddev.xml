@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.4" id="stddev">
+
+  <title>STDDEV, STDDEV_SAMP, STDDEV_POP Functions</title>
+  <titlealts audience="PDF"><navtitle>STDDEV, STDDEV_SAMP, STDDEV_POP</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">stddev() function</indexterm>
+      <indexterm audience="Cloudera">stddev_samp() function</indexterm>
+      <indexterm audience="Cloudera">stddev_pop() function</indexterm>
+      An aggregate function that
+      <xref href="http://en.wikipedia.org/wiki/Standard_deviation" scope="external" format="html">standard
+      deviation</xref> of a set of numbers.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>{ STDDEV | STDDEV_SAMP | STDDEV_POP } ([DISTINCT | ALL] <varname>expression</varname>)</codeblock>
+
+    <p>
+      This function works with any numeric data type.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/former_odd_return_type_string"/>
+
+    <p>
+      This function is typically used in mathematical formulas related to probability distributions.
+    </p>
+
+    <p>
+      The <codeph>STDDEV_POP()</codeph> and <codeph>STDDEV_SAMP()</codeph> functions compute the population
+      standard deviation and sample standard deviation, respectively, of the input values.
+      (<codeph>STDDEV()</codeph> is an alias for <codeph>STDDEV_SAMP()</codeph>.) Both functions evaluate all input
+      rows matched by the query. The difference is that <codeph>STDDEV_SAMP()</codeph> is scaled by
+      <codeph>1/(N-1)</codeph> while <codeph>STDDEV_POP()</codeph> is scaled by <codeph>1/N</codeph>.
+    </p>
+
+    <p>
+      If no input rows match the query, the result of any of these functions is <codeph>NULL</codeph>. If a single
+      input row matches the query, the result of any of these functions is <codeph>"0.0"</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      This example demonstrates how <codeph>STDDEV()</codeph> and <codeph>STDDEV_SAMP()</codeph> return the same
+      result, while <codeph>STDDEV_POP()</codeph> uses a slightly different calculation to reflect that the input
+      data is considered part of a larger <q>population</q>.
+    </p>
+
+<codeblock>[localhost:21000] &gt; select stddev(score) from test_scores;
++---------------+
+| stddev(score) |
++---------------+
+| 28.5          |
++---------------+
+[localhost:21000] &gt; select stddev_samp(score) from test_scores;
++--------------------+
+| stddev_samp(score) |
++--------------------+
+| 28.5               |
++--------------------+
+[localhost:21000] &gt; select stddev_pop(score) from test_scores;
++-------------------+
+| stddev_pop(score) |
++-------------------+
+| 28.4858           |
++-------------------+
+</codeblock>
+
+    <p>
+      This example demonstrates that, because the return value of these aggregate functions is a
+      <codeph>STRING</codeph>, you must currently convert the result with <codeph>CAST</codeph>.
+    </p>
+
+<codeblock>[localhost:21000] &gt; create table score_stats as select cast(stddev(score) as decimal(7,4)) `standard_deviation`, cast(variance(score) as decimal(7,4)) `variance` from test_scores;
++-------------------+
+| summary           |
++-------------------+
+| Inserted 1 row(s) |
++-------------------+
+[localhost:21000] &gt; desc score_stats;
++--------------------+--------------+---------+
+| name               | type         | comment |
++--------------------+--------------+---------+
+| standard_deviation | decimal(7,4) |         |
+| variance           | decimal(7,4) |         |
++--------------------+--------------+---------+
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/analytic_not_allowed_caveat"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      The <codeph>STDDEV()</codeph>, <codeph>STDDEV_POP()</codeph>, and <codeph>STDDEV_SAMP()</codeph> functions
+      compute the standard deviation (square root of the variance) based on the results of
+      <codeph>VARIANCE()</codeph>, <codeph>VARIANCE_POP()</codeph>, and <codeph>VARIANCE_SAMP()</codeph>
+      respectively. See <xref href="impala_variance.xml#variance"/> for details about the variance property.
+    </p>
+  </conbody>
+</concept>

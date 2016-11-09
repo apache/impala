@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="upsert">
+
+  <title>UPSERT Statement (<keyword keyref="impala28"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>UPSERT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Kudu"/>
+      <data name="Category" value="ETL"/>
+      <data name="Category" value="Ingest"/>
+      <data name="Category" value="DML"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">UPSERT statement</indexterm>
+      Acts as a combination of the <codeph>INSERT</codeph>
+      and <codeph>UPDATE</codeph> statements.
+      For each row processed by the <codeph>UPSERT</codeph>
+      statement:
+      <ul>
+        <li>
+          <p>
+            If another row already exists with the same set of primary key
+            values, the other columns are updated to match the values
+            from the row being <q>UPSERTed</q>.
+          </p>
+        </li>
+        <li>
+          <p>
+            If there is not any row with the same set of primary key values,
+            the row is created, the same as if the <codeph>INSERT</codeph>
+            statement was used.
+          </p>
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      Although inserting or updating a single row or a small set of rows would be inefficient for tables using HDFS
+      data files, Kudu is able to perform this operation efficiently.
+      Therefore, this statement only works for Impala tables that use the
+      Kudu storage engine.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/dml_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
+
+    <note conref="../shared/impala_common.xml#common/compute_stats_next"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>
+
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_kudu.xml#impala_kudu"/>,
+      <xref href="impala_insert.xml#insert"/>,
+      <xref href="impala_update.xml#update"/>
+    </p>
+
+  </conbody>
+
+</concept>

@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.2" id="resource_management">
+
+  <title>Resource Management for Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="YARN"/>
+      <data name="Category" value="Resource Management"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <note conref="../shared/impala_common.xml#common/impala_llama_obsolete"/>
+
+    <p>
+      You can limit the CPU and memory resources used by Impala, to manage and prioritize workloads on clusters
+      that run jobs from many Hadoop components.
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept audience="Cloudera" id="llama">
+  <!-- Hiding the whole concept now that Llama is desupported. -->
+
+    <title>The Llama Daemon</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Llama"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+<!-- Copied from http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_install_llama.html - turn into a conref in both places. -->
+
+      <p>
+        Llama is a system that mediates resource management between Impala and Hadoop YARN. Llama enables
+        Impala to reserve, use, and release resource allocations in a Hadoop cluster. Llama is only required if
+        resource management is enabled in Impala.
+      </p>
+
+      <p id="p_b2y_msl_jp">
+        By default, YARN allocates resources bit-by-bit as needed by MapReduce jobs. Impala needs all resources
+        available at the same time, so that intermediate results can be exchanged between cluster nodes, and
+        queries do not stall partway through waiting for new resources to be allocated. Llama is the intermediary
+        process that ensures all requested resources are available before each Impala query actually begins.
+      </p>
+
+<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_llama_installation.html -->
+
+<!-- Highly likely to be removed per https://jira.cloudera.com/browse/CDH-21352,
+     so commenting out for now. Feels like there should be some 'installing llama via CM' topic
+     even if it says not to worry.
+
+      <p>
+        For Llama installation instructions, see
+        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_llama_installation.html" scope="external" format="html">Llama
+        Installation</xref>.
+      </p>
+-->
+
+<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CM5/latest/Cloudera-Manager-Managing-Clusters/cm_mc_impala_service.html -->
+
+      <p>
+        For management through Cloudera Manager, see
+        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/admin_llama.html" scope="external" format="html">The
+        Impala Llama ApplicationMaster</xref>.
+      </p>
+    </conbody>
+  </concept>
+
+<!-- Hiding more content per MJ feedback.
+  <concept id="rm_resource_estimates">
+
+    <title>Controlling Resource Estimation Behavior</title>
+
+    <conbody>
+
+      <p>
+        By default, Impala consults the table statistics and column statistics for each table in a query, and uses
+        those figures to construct estimates of needed resources for each query. See
+        <xref href="impala_compute_stats.xml#compute_stats"/> for the statement to collect table and column
+        statistics for a table.
+      </p>
+
+      <p>
+        In <keyword keyref="impala25_full"/> and higher, the preferred way to avoid overcommitting memory in a high-concurrency
+        or multitenant scenario is to use Impala admission control together with dynamic resource pools.
+        You can specify a <uicontrol>Default Query Memory Limit</uicontrol> setting, with a different value for each
+        pool, and Impala uses that value to calculate how many queries can safely run within a specified
+        cluster-wide aggregate memory size.
+        See <xref href="impala_admission.xml#admission_control"/> for details.
+      </p>
+
+      <p>
+        To avoid problems with inaccurate or missing statistics, which can lead to inaccurate estimates of resource
+        consumption, Impala allows you to set default estimates for CPU and memory resource consumption.
+        When the query is complete, those resources are returned to YARN as
+        normal. To enable this feature, use the command-line option <codeph>-rm_always_use_defaults</codeph> when
+        starting <cmdname>impalad</cmdname>, and optionally
+        <codeph>-rm_default_memory=<varname>size</varname></codeph> and <codeph>-rm_default_cpu_cores</codeph>.
+        See <xref href="impala_resource_management.xml#rm_options"/> for details about each option.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="rm_checking">
+
+    <title>Checking Resource Estimates and Actual Usage</title>
+
+    <conbody>
+
+      <p>
+        To make resource usage easier to verify, the output of the <codeph>EXPLAIN</codeph> SQL statement now
+        includes information about estimated memory usage, whether table and column statistics are available for
+        each table, and the number of virtual cores that a query will use. You can get this information through the
+        <codeph>EXPLAIN</codeph> statement without actually running the query. The extra information requires
+        setting the query option <codeph>EXPLAIN_LEVEL=verbose</codeph>; see
+        <xref href="impala_explain.xml#explain"/> for details. The same extended information is shown at the start
+        of the output from the <codeph>PROFILE</codeph> statement in <cmdname>impala-shell</cmdname>. The detailed
+        profile information is only available after running the query. You can take appropriate actions (gathering
+        statistics, adjusting query options) if you find that queries fail or run with suboptimal performance when
+        resource management is enabled.
+      </p>
+    </conbody>
+  </concept>
+-->
+
+  <concept id="rm_enforcement">
+
+    <title>How Resource Limits Are Enforced</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Concepts"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <ul>
+        <li>
+          If Cloudera Manager Static Partitioning is used, it creates a cgroup in which Impala runs.
+          This cgroup limits CPU, network, and IO according to the static partitioning policy.
+        </li>
+
+        <li>
+          Limits on memory usage are enforced by Impala's process memory limit (the <codeph>MEM_LIMIT</codeph>
+          query option setting). The admission control feature checks this setting to decide how many queries
+          can be safely run at the same time. Then the Impala daemon enforces the limit by activating the
+          spill-to-disk mechanism when necessary, or cancelling a query altogether if the limit is exceeded at runtime.
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+
+<!--
+  <concept id="rm_enable">
+
+    <title>Enabling Resource Management for Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="Starting and Stopping"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        To enable resource management for Impala, first you <xref href="#rm_cdh_prereqs">set up the YARN
+        service for your CDH cluster</xref>. Then you <xref href="#rm_options">add startup options and customize
+        resource management settings</xref> for the Impala services.
+      </p>
+    </conbody>
+
+    <concept id="rm_cdh_prereqs">
+
+      <title>Required CDH Setup for Resource Management with Impala</title>
+
+      <conbody>
+
+        <p>
+          YARN is the general-purpose service that manages resources for many Hadoop components within a CDH
+          cluster.
+        </p>
+
+        <p>
+          For information about setting up the YARN service, see the instructions for
+          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_yarn_service.html" scope="external" format="html">Cloudera
+          Manager</xref>.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="rm_options">
+
+      <title>impalad Startup Options for Resource Management</title>
+
+      <conbody>
+
+        <p id="resource_management_impalad_options">
+          The following startup options for <cmdname>impalad</cmdname> enable resource management and customize its
+          parameters for your cluster configuration:
+          <ul>
+            <li>
+              <codeph>-enable_rm</codeph>: Whether to enable resource management or not, either
+              <codeph>true</codeph> or <codeph>false</codeph>. The default is <codeph>false</codeph>. None of the
+              other resource management options have any effect unless <codeph>-enable_rm</codeph> is turned on.
+            </li>
+
+            <li>
+              <codeph>-cgroup_hierarchy_path</codeph>: Path where YARN will create cgroups for granted
+              resources. Impala assumes that the cgroup for an allocated container is created in the path
+              '<varname>cgroup_hierarchy_path</varname> + <varname>container_id</varname>'.
+            </li>
+
+            <li rev="1.4.0">
+              <codeph>-rm_always_use_defaults</codeph>: If this Boolean option is enabled, Impala ignores computed
+              estimates and always obtains the default memory and CPU allocation settings at the start of the
+              query. These default estimates are approximately 2 CPUs and 4 GB of memory, possibly varying slightly
+              depending on cluster size, workload, and so on. <ph rev="upstream">Cloudera</ph> recommends enabling
+              <codeph>-rm_always_use_defaults</codeph> whenever resource management is used, and relying on these
+              default values (that is, leaving out the two following options).
+            </li>
+
+            <li rev="1.4.0">
+              <codeph>-rm_default_memory=<varname>size</varname></codeph>: Optionally sets the default estimate for
+              memory usage for each query. You can use suffixes such as M and G for megabytes and gigabytes, the
+              same as with the <xref href="impala_mem_limit.xml#mem_limit">MEM_LIMIT</xref> query option. Only has
+              an effect when <codeph>-rm_always_use_defaults</codeph> is also enabled.
+            </li>
+
+            <li rev="1.4.0">
+              <codeph>-rm_default_cpu_cores</codeph>: Optionally sets the default estimate for number of virtual
+              CPU cores for each query. Only has an effect when <codeph>-rm_always_use_defaults</codeph> is also
+              enabled.
+            </li>
+          </ul>
+        </p>
+
+      </conbody>
+    </concept>
+-->
+
+    <concept id="rm_query_options">
+
+      <title>impala-shell Query Options for Resource Management</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala Query Options"/>
+    </metadata>
+  </prolog>
+
+      <conbody>
+
+        <p>
+          Before issuing SQL statements through the <cmdname>impala-shell</cmdname> interpreter, you can use the
+          <codeph>SET</codeph> command to configure the following parameters related to resource management:
+        </p>
+
+        <ul id="ul_nzt_twf_jp">
+          <li>
+            <xref href="impala_explain_level.xml#explain_level"/>
+          </li>
+
+          <li>
+            <xref href="impala_mem_limit.xml#mem_limit"/>
+          </li>
+
+<!-- Not supported in CDH 5.5 / Impala 2.3 and up.
+          <li>
+            <xref href="impala_reservation_request_timeout.xml#reservation_request_timeout"/>
+          </li>
+
+          <li>
+            <xref href="impala_v_cpu_cores.xml#v_cpu_cores"/>
+          </li>
+-->
+        </ul>
+      </conbody>
+    </concept>
+
+<!-- Parent topic is going away, so former subtopic is hoisted up a level.
+  </concept>
+-->
+
+  <concept id="rm_limitations">
+
+    <title>Limitations of Resource Management for Impala</title>
+
+    <conbody>
+
+<!-- Conditionalizing some content here with audience="Cloudera" because there are already some XML comments
+     inside the list, so not practical to enclose the whole thing in XML comments. -->
+
+      <p audience="Cloudera">
+        Currently, Impala in CDH 5 has the following limitations for resource management of Impala queries:
+      </p>
+
+      <ul audience="Cloudera">
+        <li>
+          Table statistics are required, and column statistics are highly valuable, for Impala to produce accurate
+          estimates of how much memory to request from YARN. See
+          <xref href="impala_perf_stats.xml#perf_table_stats"/> and
+          <xref href="impala_perf_stats.xml#perf_column_stats"/> for instructions on gathering both kinds of
+          statistics, and <xref href="impala_explain.xml#explain"/> for the extended <codeph>EXPLAIN</codeph>
+          output where you can check that statistics are available for a specific table and set of columns.
+        </li>
+
+        <li>
+          If the Impala estimate of required memory is lower than is actually required for a query, Impala
+          dynamically expands the amount of requested memory.
+<!--          Impala will cancel the query when it exceeds the requested memory size. -->
+          Queries might still be cancelled if the reservation expansion fails, for example if there are
+          insufficient remaining resources for that pool, or the expansion request takes long enough that it
+          exceeds the query timeout interval, or because of YARN preemption.
+<!--          This could happen in some cases with complex queries, even when table and column statistics are available. -->
+          You can see the actual memory usage after a failed query by issuing a <codeph>PROFILE</codeph> command in
+          <cmdname>impala-shell</cmdname>. Specify a larger memory figure with the <codeph>MEM_LIMIT</codeph>
+          query option and re-try the query.
+        </li>
+      </ul>
+
+      <p rev="2.0.0">
+        The <codeph>MEM_LIMIT</codeph> query option, and the other resource-related query options, are settable
+        through the ODBC or JDBC interfaces in Impala 2.0 and higher. This is a former limitation that is now
+        lifted.
+      </p>
+    </conbody>
+  </concept>
+</concept>

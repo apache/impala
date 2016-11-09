@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="distinct">
+
+  <title>DISTINCT Operator</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">DISTINCT operator</indexterm>
+      The <codeph>DISTINCT</codeph> operator in a <codeph>SELECT</codeph> statement filters the result set to
+      remove duplicates:
+    </p>
+
+<codeblock>-- Returns the unique values from one column.
+-- NULL is included in the set of values if any rows have a NULL in this column.
+select distinct c_birth_country from customer;
+-- Returns the unique combinations of values from multiple columns.
+select distinct c_salutation, c_last_name from customer;</codeblock>
+
+    <p>
+      You can use <codeph>DISTINCT</codeph> in combination with an aggregation function, typically
+      <codeph>COUNT()</codeph>, to find how many different values a column contains:
+    </p>
+
+<codeblock>-- Counts the unique values from one column.
+-- NULL is not included as a distinct value in the count.
+select count(distinct c_birth_country) from customer;
+-- Counts the unique combinations of values from multiple columns.
+select count(distinct c_salutation, c_last_name) from customer;</codeblock>
+
+    <p>
+      One construct that Impala SQL does <i>not</i> support is using <codeph>DISTINCT</codeph> in more than one
+      aggregation function in the same query. For example, you could not have a single query with both
+      <codeph>COUNT(DISTINCT c_first_name)</codeph> and <codeph>COUNT(DISTINCT c_last_name)</codeph> in the
+      <codeph>SELECT</codeph> list.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/zero_length_strings"/>
+
+    <note conref="../shared/impala_common.xml#common/multiple_count_distinct"/>
+
+    <note>
+      <p>
+        In contrast with some database systems that always return <codeph>DISTINCT</codeph> values in sorted order,
+        Impala does not do any ordering of <codeph>DISTINCT</codeph> values. Always include an <codeph>ORDER
+        BY</codeph> clause if you need the values in alphabetical or numeric sorted order.
+      </p>
+    </note>
+  </conbody>
+</concept>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="relnotes" audience="standalone">
+
+  <title>Impala Release Notes</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Release Notes"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody id="relnotes_intro">
+
+    <p>
+      These release notes provide information on the <xref href="impala_new_features.xml#new_features">new
+      features</xref> and <xref href="impala_known_issues.xml#known_issues">known issues and limitations</xref> for
+      Impala versions up to <ph conref="../shared/ImpalaVariables.xml#impala_vars/ReleaseVersion"/>. For users
+      upgrading from earlier Impala releases, or using Impala in combination with specific versions of other
+      Cloudera software, <xref href="impala_incompatible_changes.xml#incompatible_changes"/> lists any changes to
+      file formats, SQL syntax, or software dependencies to take into account.
+    </p>
+
+    <p>
+      Once you are finished reviewing these release notes, for more information about using Impala, see
+      <xref audience="integrated" href="impala.xml"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/impala.html" scope="external" format="html"/>.
+    </p>
+
+    <p outputclass="toc"/>
+  </conbody>
+</concept>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="support_start_over">
+
+  <title>SUPPORT_START_OVER Query Option</title>
+  <titlealts audience="PDF"><navtitle>SUPPORT_START_OVER</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">SUPPORT_START_OVER query option</indexterm>
+      Leave this setting at its default value.
+      It is a read-only setting, tested by some client applications such as Hue.
+    </p>
+    <p>
+      If you accidentally change it through <cmdname>impala-shell</cmdname>,
+      subsequent queries encounter errors until you undo the change
+      by issuing <codeph>UNSET support_start_over</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false"/>
+  </conbody>
+</concept>

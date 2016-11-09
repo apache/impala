@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="performance_testing">
+
+  <title>Testing Impala Performance</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Proof of Concept"/>
+      <data name="Category" value="Logs"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+      <!-- Should reorg this topic to use nested topics, not sections. Some keywords like 'logs' buried in section titles. -->
+      <data name="Category" value="Sectionated Pages"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Test to ensure that Impala is configured for optimal performance. If you have installed Impala without
+      Cloudera Manager, complete the processes described in this topic to help ensure a proper configuration. Even
+      if you installed Impala with Cloudera Manager, which automatically applies appropriate configurations, these
+      procedures can be used to verify that Impala is set up correctly.
+    </p>
+
+    <section id="checking_config_performance">
+
+      <title>Checking Impala Configuration Values</title>
+
+      <p>
+        You can inspect Impala configuration values by connecting to your Impala server using a browser.
+      </p>
+
+      <p>
+        <b>To check Impala configuration values:</b>
+      </p>
+
+      <ol>
+        <li>
+          Use a browser to connect to one of the hosts running <codeph>impalad</codeph> in your environment.
+          Connect using an address of the form
+          <codeph>http://<varname>hostname</varname>:<varname>port</varname>/varz</codeph>.
+          <note>
+            In the preceding example, replace <codeph>hostname</codeph> and <codeph>port</codeph> with the name and
+            port of your Impala server. The default port is 25000.
+          </note>
+        </li>
+
+        <li>
+          Review the configured values.
+          <p>
+            For example, to check that your system is configured to use block locality tracking information, you
+            would check that the value for <codeph>dfs.datanode.hdfs-blocks-metadata.enabled</codeph> is
+            <codeph>true</codeph>.
+          </p>
+        </li>
+      </ol>
+
+      <p id="p_31">
+        <b>To check data locality:</b>
+      </p>
+
+      <ol>
+        <li>
+          Execute a query on a dataset that is available across multiple nodes. For example, for a table named
+          <codeph>MyTable</codeph> that has a reasonable chance of being spread across multiple DataNodes:
+<codeblock>[impalad-host:21000] &gt; SELECT COUNT (*) FROM MyTable</codeblock>
+        </li>
+
+        <li>
+          After the query completes, review the contents of the Impala logs. You should find a recent message
+          similar to the following:
+<codeblock>Total remote scan volume = 0</codeblock>
+        </li>
+      </ol>
+
+      <p>
+        The presence of remote scans may indicate <codeph>impalad</codeph> is not running on the correct nodes.
+        This can be because some DataNodes do not have <codeph>impalad</codeph> running or it can be because the
+        <codeph>impalad</codeph> instance that is starting the query is unable to contact one or more of the
+        <codeph>impalad</codeph> instances.
+      </p>
+
+      <p>
+        <b>To understand the causes of this issue:</b>
+      </p>
+
+      <ol>
+        <li>
+          Connect to the debugging web server. By default, this server runs on port 25000. This page lists all
+          <codeph>impalad</codeph> instances running in your cluster. If there are fewer instances than you expect,
+          this often indicates some DataNodes are not running <codeph>impalad</codeph>. Ensure
+          <codeph>impalad</codeph> is started on all DataNodes.
+        </li>
+
+        <li>
+          <!-- To do:
+            There are other references to this tip about the "Impala daemon's hostname" elsewhere. Could reconcile, conref, or link.
+          -->
+          If you are using multi-homed hosts, ensure that the Impala daemon's hostname resolves to the interface on
+          which <codeph>impalad</codeph> is running. The hostname Impala is using is displayed when
+          <codeph>impalad</codeph> starts. To explicitly set the hostname, use the <codeph>--hostname</codeph> flag.
+        </li>
+
+        <li>
+          Check that <codeph>statestored</codeph> is running as expected. Review the contents of the state store
+          log to ensure all instances of <codeph>impalad</codeph> are listed as having connected to the state
+          store.
+        </li>
+      </ol>
+    </section>
+
+    <section id="checking_config_logs">
+
+      <title>Reviewing Impala Logs</title>
+
+      <p>
+        You can review the contents of the Impala logs for signs that short-circuit reads or block location
+        tracking are not functioning. Before checking logs, execute a simple query against a small HDFS dataset.
+        Completing a query task generates log messages using current settings. Information on starting Impala and
+        executing queries can be found in <xref href="impala_processes.xml#processes"/> and
+        <xref href="impala_impala_shell.xml#impala_shell"/>. Information on logging can be found in
+        <xref href="impala_logging.xml#logging"/>. Log messages and their interpretations are as follows:
+      </p>
+
+      <table>
+        <tgroup cols="2">
+          <colspec colname="1" colwidth="30*"/>
+          <colspec colname="2" colwidth="10*"/>
+          <thead>
+            <row>
+              <entry>
+                Log Message
+              </entry>
+              <entry>
+                Interpretation
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                <p>
+<pre>Unknown disk id. This will negatively affect performance. Check your hdfs settings to enable block location metadata
+</pre>
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Tracking block locality is not enabled.
+                </p>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <p>
+<pre>Unable to load native-hadoop library for your platform... using builtin-java classes where applicable</pre>
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Native checksumming is not enabled.
+                </p>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+    </section>
+  </conbody>
+</concept>

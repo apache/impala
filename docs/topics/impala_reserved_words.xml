@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="reserved_words">
+
+  <title>Impala Reserved Words</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Planning"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">reserved words</indexterm>
+      The following are the reserved words for the current release of Impala. A reserved word is one that
+      cannot be used directly as an identifier; you must quote it with backticks. For example, a statement
+      <codeph>CREATE TABLE select (x INT)</codeph> fails, while <codeph>CREATE TABLE `select` (x INT)</codeph>
+      succeeds. Impala does not reserve the names of aggregate or scalar built-in functions. (Formerly, Impala did
+      reserve the names of some aggregate functions.)
+    </p>
+
+    <p>
+      Because different database systems have different sets of reserved words, and the reserved words change from
+      release to release, carefully consider database, table, and column names to ensure maximum compatibility
+      between products and versions.
+    </p>
+
+    <p>
+      Because you might switch between Impala and Hive when doing analytics and ETL, also consider whether
+      your object names are the same as any Hive keywords, and rename or quote any that conflict. Consult the
+      <xref href="https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-Keywords,Non-reservedKeywordsandReservedKeywords" scope="external" format="html">list of Hive keywords</xref>.
+    </p>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
+
+<concept id="reserved_words_current">
+<title>List of Current Reserved Words</title>
+<conbody>
+<!-- This list is derived from the source code at:
+     https://github.com/cloudera/Impala/blob/master/fe/src/main/jflex/sql-scanner.flex
+
+See the history, any recent changes, here:
+     https://github.com/cloudera/Impala/commits/master/fe/src/main/jflex/sql-scanner.flex
+-->
+
+<codeblock rev="ver">add
+aggregate
+all
+alter
+<ph rev="2.0.0">analytic</ph>
+and
+<ph rev="2.0.0">anti</ph>
+<ph rev="1.4.0">api_version</ph>
+as
+asc
+avro
+between
+bigint
+<ph rev="1.4.0">binary</ph>
+boolean
+<ph rev="2.6.0">buckets</ph>
+by
+<ph rev="1.4.0">cached</ph>
+<ph rev="2.3.0">cascade</ph>
+case
+cast
+change
+<ph rev="2.0.0">char</ph>
+<ph rev="1.4.0">class</ph>
+<ph rev="1.2.1">close_fn</ph>
+column
+columns
+comment
+compute
+create
+cross
+<ph rev="2.0.0">current</ph>
+data
+database
+databases
+date
+datetime
+decimal
+<ph rev="2.6.0">delete</ph>
+delimited
+desc
+describe
+distinct
+<ph rev="2.6.0">distribute</ph>
+div
+double
+drop
+else
+end
+escaped
+exists
+explain
+<ph rev="2.5.0">extended</ph>
+external
+false
+fields
+fileformat
+<ph rev="1.2.1">finalize_fn</ph>
+first
+float
+<ph rev="2.0.0">following</ph>
+<ph rev="2.1.0">for</ph>
+format
+formatted
+from
+full
+function
+functions
+<ph rev="2.1.0">grant</ph>
+group
+<ph rev="2.6.0">hash</ph>
+having
+if
+<ph rev="2.6.0">ignore</ph>
+<ph rev="2.5.0">ilike</ph>
+in
+<ph rev="2.1.0">incremental</ph>
+<ph rev="1.2.1">init_fn</ph>
+inner
+inpath
+insert
+int
+integer
+intermediate
+interval
+into
+invalidate
+<ph rev="2.5.0">iregexp</ph>
+is
+join
+last
+left
+like
+limit
+lines
+load
+location
+<ph rev="1.2.1">merge_fn</ph>
+metadata
+not
+null
+nulls
+offset
+on
+or
+order
+outer
+<ph rev="2.0.0">over</ph>
+overwrite
+parquet
+parquetfile
+partition
+partitioned
+<ph rev="1.4.0">partitions</ph>
+<ph rev="2.0.0">preceding</ph>
+<ph rev="1.2.1">prepare_fn</ph>
+<ph rev="1.4.0">produced</ph>
+<ph rev="2.3.0">purge</ph>
+<ph rev="2.0.0">range</ph>
+rcfile
+real
+refresh
+regexp
+rename
+replace
+<ph rev="2.3.0">restrict</ph>
+returns
+<ph rev="2.1.0">revoke</ph>
+right
+rlike
+<ph rev="2.1.0">role</ph>
+<ph rev="2.1.0">roles</ph>
+row
+<ph rev="2.0.0">rows</ph>
+schema
+schemas
+select
+semi
+sequencefile
+serdeproperties
+<ph rev="2.0.0">serialize_fn</ph>
+set
+show
+smallint
+<ph rev="2.6.0">split</ph>
+stats
+stored
+straight_join
+string
+symbol
+table
+tables
+tblproperties
+terminated
+textfile
+then
+timestamp
+tinyint
+to
+true
+<ph rev="2.0.0">truncate</ph>
+<ph rev="2.0.0">unbounded</ph>
+<ph rev="1.4.0">uncached</ph>
+union
+<ph rev="2.6.0">update</ph>
+<ph rev="1.2.1">update_fn</ph>
+use
+using
+values
+<ph rev="2.0.0">varchar</ph>
+view
+when
+where
+with</codeblock>
+</conbody>
+</concept>
+
+<concept id="reserved_words_planning">
+<title>Planning for Future Reserved Words</title>
+<conbody>
+<p>
+The previous list of reserved words includes all the keywords
+used in the current level of Impala SQL syntax.
+To future-proof your code,
+you should avoid additional words in case they
+become reserved words if
+Impala adds features in later releases.
+This kind of planning can also help to avoid
+name conflicts in case you port SQL from other systems that
+have different sets of reserved words.
+</p>
+
+<p>
+The following list contains additional words that Cloudera
+recommends avoiding for table, column, or other object names,
+even though they are not currently reserved by Impala.
+</p>
+
+<codeblock>any
+authorization
+backup
+begin
+break
+browse
+bulk
+cascade
+check
+checkpoint
+close
+clustered
+coalesce
+collate
+commit
+constraint
+contains
+continue
+convert
+current
+current_date
+current_time
+current_timestamp
+current_user
+cursor
+dbcc
+deallocate
+declare
+default
+deny
+disk
+distributed
+dump
+errlvl
+escape
+except
+exec
+execute
+exit
+fetch
+file
+fillfactor
+for
+foreign
+freetext
+goto
+holdlock
+identity
+index
+intersect
+key
+kill
+lineno
+merge
+national
+nocheck
+nonclustered
+nullif
+of
+off
+offsets
+open
+option
+percent
+pivot
+plan
+precision
+primary
+print
+proc
+procedure
+public
+raiserror
+read
+readtext
+reconfigure
+references
+replication
+restore
+restrict
+return
+revert
+rollback
+rowcount
+rule
+save
+securityaudit
+session_user
+setuser
+shutdown
+some
+statistics
+system_user
+tablesample
+textsize
+then
+top
+tran
+transaction
+trigger
+try_convert
+unique
+unpivot
+updatetext
+user
+varying
+waitfor
+while
+within
+writetext
+</codeblock>
+</conbody>
+</concept>
+
+</concept>

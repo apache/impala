@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_kudu" rev="kudu">
+
+  <title>Using Impala to Query Kudu Tables</title>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Kudu"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">Kudu</indexterm>
+      You can use Impala to query Kudu tables. This capability allows convenient access to a storage system that is
+      tuned for different kinds of workloads than the default with Impala. The default Impala tables use data files
+      stored on HDFS, which are ideal for bulk loads and queries using full-table scans. In contrast, Kudu can do
+      efficient queries for data organized either in data warehouse style (with full table scans) or for OLTP-style
+      workloads (with key-based lookups for single rows or small ranges of values).
+    </p>
+
+    <p>
+      Certain Impala SQL statements, such as <codeph>UPDATE</codeph> and <codeph>DELETE</codeph>, only work with
+      Kudu tables. These operations were impractical from a performance perspective to perform at large scale on
+      HDFS data, or on HBase tables.
+    </p>
+
+  </conbody>
+
+  <concept id="kudu_benefits">
+
+    <title>Benefits of Using Kudu Tables with Impala</title>
+
+    <conbody>
+
+      <p>
+        The combination of Kudu and Impala works best for tables where scan performance is important, but data
+        arrives continuously, in small batches, or needs to be updated without being completely replaced. In these
+        scenarios (such as for streaming data), it might be impractical to use Parquet tables because Parquet works
+        best with multi-megabyte data files, requiring substantial overhead to replace or reorganize data files to
+        accomodate frequent additions or changes to data. Impala can query Kudu tables with scan performance close
+        to that of Parquet, and Impala can also perform update or delete operations without replacing the entire
+        table contents. You can also use the Kudu API to do ingestion or transformation operations outside of
+        Impala, and Impala can query the current data at any time.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="kudu_primary_key">
+
+    <title>Primary Key Columns for Kudu Tables</title>
+
+    <conbody>
+
+      <p>
+        Kudu tables introduce the notion of primary keys to Impala for the first time. The primary key is made up
+        of one or more columns, whose values are combined and used as a lookup key during queries. These columns
+        cannot contain any <codeph>NULL</codeph> values or any duplicate values, and can never be updated. For a
+        partitioned Kudu table, all the partition key columns must come from the set of primary key columns.
+      </p>
+
+      <p>
+        Impala itself still does not have the notion of unique or non-<codeph>NULL</codeph> constraints. These
+        restrictions on the primary key columns are enforced on the Kudu side.
+      </p>
+
+      <p>
+        The primary key columns must be the first ones specified in the <codeph>CREATE TABLE</codeph> statement.
+        You specify which column or columns make up the primary key in the table properties, rather than through
+        attributes in the column list.
+      </p>
+
+      <p>
+        Kudu can do extra optimizations for queries that refer to the primary key columns in the
+        <codeph>WHERE</codeph> clause. It is not crucial though to include the primary key columns in the
+        <codeph>WHERE</codeph> clause of every query. The benefit is mainly for partitioned tables,
+        which divide the data among various tablet servers based on the distribution of
+        data values in some or all of the primary key columns.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="kudu_dml">
+
+    <title>Impala DML Support for Kudu Tables</title>
+
+    <conbody>
+
+      <p>
+        Impala supports certain DML statements for Kudu tables only. The <codeph>UPDATE</codeph> and
+        <codeph>DELETE</codeph> statements let you modify data within Kudu tables without rewriting substantial
+        amounts of table data.
+      </p>
+
+      <p>
+        The <codeph>INSERT</codeph> statement for Kudu tables honors the unique and non-<codeph>NULL</codeph>
+        requirements for the primary key columns.
+      </p>
+
+      <p>
+        Because Impala and Kudu do not support transactions, the effects of any <codeph>INSERT</codeph>,
+        <codeph>UPDATE</codeph>, or <codeph>DELETE</codeph> statement are immediately visible. For example, you
+        cannot do a sequence of <codeph>UPDATE</codeph> statements and only make the change visible after all the
+        statements are finished. Also, if a DML statement fails partway through, any rows that were already
+        inserted, deleted, or changed remain in the table; there is no rollback mechanism to undo the changes.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="kudu_partitioning">
+
+    <title>Partitioning for Kudu Tables</title>
+
+    <conbody>
+
+      <p>
+        Kudu tables use special mechanisms to evenly distribute data among the underlying tablet servers. Although
+        we refer to such tables as partitioned tables, they are distinguished from traditional Impala partitioned
+        tables by use of different clauses on the <codeph>CREATE TABLE</codeph> statement. Partitioned Kudu tables
+        use <codeph>DISTRIBUTE BY</codeph>, <codeph>HASH</codeph>, <codeph>RANGE</codeph>, and <codeph>SPLIT
+        ROWS</codeph> clauses rather than the traditional <codeph>PARTITIONED BY</codeph> clause. All of the
+        columns involved in these clauses must be primary key columns. These clauses let you specify different ways
+        to divide the data for each column, or even for different value ranges within a column. This flexibility
+        lets you avoid problems with uneven distribution of data, where the partitioning scheme for HDFS tables
+        might result in some partitions being much larger than others. By setting up an effective partitioning
+        scheme for a Kudu table, you can ensure that the work for a query can be parallelized evenly across the
+        hosts in a cluster.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="kudu_performance">
+
+    <title>Impala Query Performance for Kudu Tables</title>
+
+    <conbody>
+
+      <p>
+        For queries involving Kudu tables, Impala can delegate much of the work of filtering the result set to
+        Kudu, avoiding some of the I/O involved in full table scans of tables containing HDFS data files. This type
+        of optimization is especially effective for partitioned Kudu tables, where the Impala query
+        <codeph>WHERE</codeph> clause refers to one or more primary key columns that are also used as partition key
+        columns. For example, if a partitioned Kudu table uses a <codeph>HASH</codeph> clause for
+        <codeph>col1</codeph> and a <codeph>RANGE</codeph> clause for <codeph>col2</codeph>, a query using a clause
+        such as <codeph>WHERE col1 IN (1,2,3) AND col2 &gt; 100</codeph> can determine exactly which tablet servers
+        contain relevant data, and therefore parallelize the query very efficiently.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+</concept>

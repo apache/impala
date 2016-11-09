@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="troubleshooting">
+
+  <title>Troubleshooting Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">troubleshooting</indexterm>
+      Troubleshooting for Impala requires being able to diagnose and debug problems
+      with performance, network connectivity, out-of-memory conditions, disk space usage,
+      and crash or hang conditions in any of the Impala-related daemons.
+    </p>
+
+    <p outputclass="toc inpage" audience="PDF">
+      The following sections describe the general troubleshooting procedures to diagnose
+      different kinds of problems:
+    </p>
+
+  </conbody>
+
+  <concept id="trouble_sql">
+
+    <title>Troubleshooting Impala SQL Syntax Issues</title>
+
+    <conbody>
+
+      <p>
+        In general, if queries issued against Impala fail, you can try running these same queries against Hive.
+      </p>
+
+      <ul>
+        <li>
+          If a query fails against both Impala and Hive, it is likely that there is a problem with your query or
+          other elements of your CDH environment:
+          <ul>
+            <li>
+              Review the <xref href="impala_langref.xml#langref">Language Reference</xref> to ensure your query is
+              valid.
+            </li>
+
+            <li>
+              Check <xref href="impala_reserved_words.xml#reserved_words"/> to see if any database, table,
+              column, or other object names in your query conflict with Impala reserved words.
+              Quote those names with backticks (<codeph>``</codeph>) if so.
+            </li>
+
+            <li>
+              Check <xref href="impala_functions.xml#builtins"/> to confirm whether Impala supports all the
+              built-in functions being used by your query, and whether argument and return types are the
+              same as you expect.
+            </li>
+
+            <li>
+              Review the <xref href="impala_logging.xml#logs_debug">contents of the Impala logs</xref> for any information that may be useful in identifying the
+              source of the problem.
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          If a query fails against Impala but not Hive, it is likely that there is a problem with your Impala
+          installation.
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+
+  <concept id="trouble_io" rev="CDH-19201">
+    <title>Troubleshooting I/O Capacity Problems</title>
+    <conbody>
+      <p>
+        Impala queries are typically I/O-intensive. If there is an I/O problem with storage devices,
+        or with HDFS itself, Impala queries could show slow response times with no obvious cause
+        on the Impala side. Slow I/O on even a single DataNode could result in an overall slowdown, because
+        queries involving clauses such as <codeph>ORDER BY</codeph>, <codeph>GROUP BY</codeph>, or <codeph>JOIN</codeph>
+        do not start returning results until all DataNodes have finished their work.
+      </p>
+      <p>
+        To test whether the Linux I/O system itself is performing as expected, run Linux commands like
+        the following on each DataNode:
+      </p>
+<codeblock>
+$ sudo sysctl -w vm.drop_caches=3 vm.drop_caches=0
+vm.drop_caches = 3
+vm.drop_caches = 0
+$ sudo dd if=/dev/sda bs=1M of=/dev/null count=1k 
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB) copied, 5.60373 s, 192 MB/s
+$ sudo dd if=/dev/sdb bs=1M of=/dev/null count=1k
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB) copied, 5.51145 s, 195 MB/s
+$ sudo dd if=/dev/sdc bs=1M of=/dev/null count=1k
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB) copied, 5.58096 s, 192 MB/s
+$ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB) copied, 5.43924 s, 197 MB/s
+</codeblock>
+      <p>
+        On modern hardware, a throughput rate of less than 100 MB/s typically indicates
+        a performance issue with the storage device. Correct the hardware problem before
+        continuing with Impala tuning or benchmarking.
+      </p>
+    </conbody>
+  </concept>
+
+
+  <concept id="trouble_cookbook">
+
+    <title>Impala Troubleshooting Quick Reference</title>
+
+    <conbody>
+
+      <p>
+        The following table lists common problems and potential solutions.
+      </p>
+
+      <table>
+        <tgroup cols="3">
+          <colspec colname="1" colwidth="10*"/>
+          <colspec colname="2" colwidth="30*"/>
+          <colspec colname="3" colwidth="30*"/>
+          <thead>
+            <row>
+              <entry>
+                Symptom
+              </entry>
+              <entry>
+                Explanation
+              </entry>
+              <entry>
+                Recommendation
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                Impala takes a long time to start.
+              </entry>
+              <entry>
+                Impala instances with large numbers of tables, partitions, or data files take longer to start
+                because the metadata for these objects is broadcast to all <cmdname>impalad</cmdname> nodes and
+                cached.
+              </entry>
+              <entry>
+                Adjust timeout and synchronicity settings.
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <p>
+                  Joins fail to complete.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  There may be insufficient memory. During a join, data from the second, third, and so on sets to
+                  be joined is loaded into memory. If Impala chooses an inefficient join order or join mechanism,
+                  the query could exceed the total memory available.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Start by gathering statistics with the <codeph>COMPUTE STATS</codeph> statement for each table
+                  involved in the join. Consider specifying the <codeph>[SHUFFLE]</codeph> hint so that data from
+                  the joined tables is split up between nodes rather than broadcast to each node. If tuning at the
+                  SQL level is not sufficient, add more memory to your system or join smaller data sets.
+                </p>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <p>
+                  Queries return incorrect results.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Impala metadata may be outdated after changes are performed in Hive.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Where possible, use the appropriate Impala statement (<codeph>INSERT</codeph>, <codeph>LOAD
+                  DATA</codeph>, <codeph>CREATE TABLE</codeph>, <codeph>ALTER TABLE</codeph>, <codeph>COMPUTE
+                  STATS</codeph>, and so on) rather than switching back and forth between Impala and Hive. Impala
+                  automatically broadcasts the results of DDL and DML operations to all Impala nodes in the
+                  cluster, but does not automatically recognize when such changes are made through Hive. After
+                  inserting data, adding a partition, or other operation in Hive, refresh the metadata for the
+                  table as described in <xref href="impala_refresh.xml#refresh"/>.
+                </p>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <p>
+                  Queries are slow to return results.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Some <codeph>impalad</codeph> instances may not have started. Using a browser, connect to the
+                  host running the Impala state store. Connect using an address of the form
+                  <codeph>http://<varname>hostname</varname>:<varname>port</varname>/metrics</codeph>.
+                </p>
+
+                <p>
+                  <note>
+                    Replace <varname>hostname</varname> and <varname>port</varname> with the hostname and port of
+                    your Impala state store host machine and web server port. The default port is 25010.
+                  </note>
+                  The number of <codeph>impalad</codeph> instances listed should match the expected number of
+                  <codeph>impalad</codeph> instances installed in the cluster. There should also be one
+                  <codeph>impalad</codeph> instance installed on each DataNode
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Ensure Impala is installed on all DataNodes. Start any <codeph>impalad</codeph> instances that
+                  are not running.
+                </p>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <p>
+                  Queries are slow to return results.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Impala may not be configured to use native checksumming. Native checksumming uses
+                  machine-specific instructions to compute checksums over HDFS data very quickly. Review Impala
+                  logs. If you find instances of "<codeph>INFO util.NativeCodeLoader: Loaded the
+                  native-hadoop</codeph>" messages, native checksumming is not enabled.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Ensure Impala is configured to use native checksumming as described in
+                  <xref href="impala_config_performance.xml#config_performance"/>.
+                </p>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <p>
+                  Queries are slow to return results.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Impala may not be configured to use data locality tracking.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Test Impala for data locality tracking and make configuration changes as necessary. Information
+                  on this process can be found in <xref href="impala_config_performance.xml#config_performance"/>.
+                </p>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <p>
+                  Attempts to complete Impala tasks such as executing INSERT-SELECT actions fail. The Impala logs
+                  include notes that files could not be opened due to permission denied.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  This can be the result of permissions issues. For example, you could use the Hive shell as the
+                  hive user to create a table. After creating this table, you could attempt to complete some
+                  action, such as an INSERT-SELECT on the table. Because the table was created using one user and
+                  the INSERT-SELECT is attempted by another, this action may fail due to permissions issues.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  In general, ensure the Impala user has sufficient permissions. In the preceding example, ensure
+                  the Impala user has sufficient permissions to the table that the Hive user created.
+                </p>
+              </entry>
+            </row>
+            <row rev="IMP-1210">
+              <entry>
+                <p>
+                  Impala fails to start up, with the <cmdname>impalad</cmdname> logs referring to errors connecting
+                  to the statestore service and attempts to re-register.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  A large number of databases, tables, partitions, and so on can require metadata synchronization,
+                  particularly on startup, that takes longer than the default timeout for the statestore service.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Configure the statestore timeout value and possibly other settings related to the frequency of
+                  statestore updates and metadata loading. See
+                  <xref href="impala_timeouts.xml#statestore_timeout"/> and
+                  <xref href="impala_scalability.xml#statestore_scalability"/>.
+                </p>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+
+      <p audience="Cloudera">
+        Some or all of these settings might also be useful.
+<codeblock>NUM_SCANNER_THREADS: 0
+ABORT_ON_DEFAULT_LIMIT_EXCEEDED: 0
+MAX_IO_BUFFERS: 0
+DEFAULT_ORDER_BY_LIMIT: -1
+BATCH_SIZE: 0
+NUM_NODES: 0
+DISABLE_CODEGEN: 0
+MAX_ERRORS: 0
+ABORT_ON_ERROR: 0
+MAX_SCAN_RANGE_LENGTH: 0
+ALLOW_UNSUPPORTED_FORMATS: 0
+SUPPORT_START_OVER: false
+DEBUG_ACTION:
+MEM_LIMIT: 0
+</codeblock>
+      </p>
+    </conbody>
+  </concept>
+
+  <concept audience="Cloudera" id="core_dumps">
+
+    <title>Enabling Core Dumps for Impala</title>
+
+    <conbody>
+
+        <p>
+          Fill in details, then unhide.
+        </p>
+
+        <p>
+          From Nong:
+        </p>
+
+        <p>
+          In a CM-managed cluster, search for "core" from the impala configuration page. You should see the "enable
+          core dump" config.
+        </p>
+
+        <p>
+          From <xref href="impala_config_options.xml#config_options"/>:
+        </p>
+
+<codeblock>export ENABLE_CORE_DUMPS=${ENABLE_COREDUMPS:-false}</codeblock>
+
+        <note conref="../shared/impala_common.xml#common/core_dump_considerations"/>
+
+      <p></p>
+    </conbody>
+  </concept>
+
+  <concept audience="Cloudera" id="io_throughput">
+    <title>Verifying I/O Throughput</title>
+    <conbody>
+      <p>
+        Optimal Impala query performance depends on being able to perform I/O across multiple storage devices
+        in parallel, with the data transferred at or close to the maximum throughput for each device.
+        If a hardware or configuration issue causes a reduction in I/O throughput, even if the problem only
+        affects a subset of storage devices, you might experience
+        slow query performance that cannot be improved by using regular SQL tuning techniques.
+      </p>
+      <p>
+        As a general guideline, expect each commodity storage device (for example, a standard rotational
+        hard drive) to be able to transfer approximately 100 MB per second. If you see persistent slow query
+        perormance, examine the Impala logs to check
+      </p>
+
+<codeblock>
+<![CDATA[
+Useful test from beta at Visa.
+SME: Jayant@
+
+Symptoms:
+* Queries running slow
+* Scan rate of IO in Impala logs show noticeably less than expected IO rate for each disk (typical commodity disk should provide ~100 MB/s
+
+Actions:
+* Validate disk read from OS to confirm no issue at hardware or OS level
+* Validate disk read at HDFS to see if issue at HDFS config
+
+Specifics:
+Testing Linux and hardware IO:
+# First running:
+sudo sysctl -w vm.drop_caches=3 vm.drop_caches=0
+
+# Then Running:
+sudo dd if=/dev/sda bs=1M of=/dev/null count=1k
+& sudo dd if=/dev/sdb bs=1M of=/dev/null count=1k
+& sudo dd if=/dev/sdc bs=1M of=/dev/null count=1k
+& sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k & wait
+
+Testing HDFS IO:
+# You can use TestDFSIO. Its documented here ; http://answers.oreilly.com/topic/460-how-to-benchmark-a-hadoop-cluster/
+# You can also use sar, dd and iostat for monitoring the disk.
+
+# writes 10 files each of 1000 MB
+hadoop jar $HADOOP_INSTALL/hadoop-*-test.jar TestDFSIO -write -nrFiles 10 -fileSize 1000
+
+# run the read benchmark
+hadoop jar $HADOOP_INSTALL/hadoop-*-test.jar TestDFSIO -read -nrFiles 10 -fileSize 1000
+
+# clean up the data
+hadoop jar $HADOOP_INSTALL/hadoop-*-test.jar TestDFSIO -clean
+]]>
+</codeblock>
+
+    </conbody>
+  </concept>
+
+  <concept id="webui_snippet" audience="PDF">
+    <title conref="impala_webui.xml#webui/webui_title"/>
+    <conbody>
+      <p conref="impala_webui.xml#webui/webui_intro"/>
+      <p>
+        For full details, see <xref href="impala_webui.xml#webui"/>.
+      </p>
+    </conbody>
+  </concept>
+
+</concept>

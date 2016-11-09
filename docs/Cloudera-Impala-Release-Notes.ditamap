@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map audience="standalone">
+  <title>Cloudera Impala Release Notes</title>
+  <topicref href="topics/impala_relnotes.xml" audience="HTML standalone"/>
+  <topicref href="topics/impala_new_features.xml"/>
+  <topicref href="topics/impala_incompatible_changes.xml"/>
+  <topicref href="topics/impala_known_issues.xml"/>
+  <topicref href="topics/impala_fixed_issues.xml"/>
+</map>

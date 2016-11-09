@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="use">
+
+  <title>USE Statement</title>
+  <titlealts audience="PDF"><navtitle>USE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Databases"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">USE statement</indexterm>
+      Switches the current session to a specified database. The <term>current database</term> is where any
+      <codeph>CREATE TABLE</codeph>, <codeph>INSERT</codeph>, <codeph>SELECT</codeph>, or other statements act when
+      you specify a table or other object name, without prefixing it with a database name. The new current database
+      applies for the duration of the session or unti another <codeph>USE</codeph> statement is executed.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>USE <varname>db_name</varname></codeblock>
+
+    <p>
+      By default, when you connect to an Impala instance, you begin in a database named <codeph>default</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      Switching the default database is convenient in the following situations:
+    </p>
+
+    <ul>
+      <li>
+        To avoid qualifying each reference to a table with the database name. For example, <codeph>SELECT * FROM t1
+        JOIN t2</codeph> rather than <codeph>SELECT * FROM db.t1 JOIN db.t2</codeph>.
+      </li>
+
+      <li>
+        To do a sequence of operations all within the same database, such as creating a table, inserting data, and
+        querying the table.
+      </li>
+    </ul>
+
+    <p>
+      To start the <cmdname>impala-shell</cmdname> interpreter and automatically issue a <codeph>USE</codeph>
+      statement for a particular database, specify the option <codeph>-d <varname>db_name</varname></codeph> for
+      the <cmdname>impala-shell</cmdname> command. The <codeph>-d</codeph> option is useful to run SQL scripts,
+      such as setup or test scripts, against multiple databases without hardcoding a <codeph>USE</codeph> statement
+      into the SQL source.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      See <xref href="impala_create_database.xml#create_database"/> for examples covering <codeph>CREATE
+      DATABASE</codeph>, <codeph>USE</codeph>, and <codeph>DROP DATABASE</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_create_database.xml#create_database"/>,
+      <xref href="impala_drop_database.xml#drop_database"/>, <xref href="impala_show.xml#show_databases"/>
+    </p>
+  </conbody>
+</concept>

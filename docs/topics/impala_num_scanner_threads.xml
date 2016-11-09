@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="num_scanner_threads">
+
+  <title>NUM_SCANNER_THREADS Query Option</title>
+  <titlealts audience="PDF"><navtitle>NUM_SCANNER_THREADS</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">NUM_SCANNER_THREADS query option</indexterm>
+      Maximum number of scanner threads (on each node) used for each query. By default, Impala uses as many cores
+      as are available (one thread per core). You might lower this value if queries are using excessive resources
+      on a busy cluster. Impala imposes a maximum value automatically, so a high value has no practical effect.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p>
+      <b>Default:</b> 0
+    </p>
+
+  </conbody>
+</concept>

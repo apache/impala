@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="shell_running_commands">
+
+  <title>Running Commands and SQL Statements in impala-shell</title>
+  <titlealts audience="PDF"><navtitle>Running Commands and SQL Statements</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="impala-shell"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      For information on available commands, see
+      <xref href="impala_shell_commands.xml#shell_commands"/>. You can see the full set of available
+      commands by pressing TAB twice, for example:
+    </p>
+
+<codeblock>[impalad-host:21000] &gt;
+connect   describe  explain   help      history   insert    quit      refresh   select    set       shell     show      use       version
+[impalad-host:21000] &gt;</codeblock>
+
+    <note>
+      Commands must be terminated by a semi-colon. A command can span multiple lines.
+    </note>
+
+    <p>
+      For example:
+    </p>
+
+<codeblock>[localhost:21000] &gt; select *
+                  &gt; from t1
+                  &gt; limit 5;
++---------+-----------+
+| s1      | s2        |
++---------+-----------+
+| hello   | world     |
+| goodbye | cleveland |
++---------+-----------+
+</codeblock>
+
+    <p>
+      A comment is considered part of the statement it precedes, so when you enter a <codeph>--</codeph> or
+      <codeph>/* */</codeph> comment, you get a continuation prompt until you finish entering a statement ending
+      with a semicolon:
+    </p>
+
+<codeblock>[localhost:21000] &gt; -- This is a test comment
+                  &gt; show tables like 't*';
++--------+
+| name   |
++--------+
+| t1     |
+| t2     |
+| tab1   |
+| tab2   |
+| tab3   |
+| text_t |
++--------+
+</codeblock>
+
+    <p>
+      Use the up-arrow and down-arrow keys to cycle through and edit previous commands.
+      <cmdname>impala-shell</cmdname> uses the <codeph>readline</codeph> library and so supports a standard set of
+      keyboard shortcuts for editing and cursor movement, such as <codeph>Ctrl-A</codeph> for beginning of line and
+      <codeph>Ctrl-E</codeph> for end of line.
+    </p>
+
+    <p rev="2.5.0 IMPALA-2179 IMPALA-2180">
+      In <keyword keyref="impala25_full"/> and higher, you can define substitution variables to be used within SQL statements
+      processed by <cmdname>impala-shell</cmdname>. On the command line, you specify the option
+      <codeph>--var=<varname>variable_name</varname>=<varname>value</varname></codeph>.
+      Within an interactive session or a script file processed by the <codeph>-f</codeph> option, you specify
+      a <codeph>SET</codeph> command using the notation <codeph>SET VAR:<varname>variable_name</varname>=<varname>value</varname></codeph>.
+      Within a SQL statement, you substitute the value by using the notation <codeph>${var:<varname>variable_name</varname>}</codeph>.
+    </p>
+
+    <note>
+      Because this feature is part of <cmdname>impala-shell</cmdname> rather than the <cmdname>impalad</cmdname>
+      backend, make sure the client system you are connecting from has the most recent <cmdname>impala-shell</cmdname>.
+      You can use this feature with a new <cmdname>impala-shell</cmdname> connecting to an older <cmdname>impalad</cmdname>,
+      but not the reverse.
+    </note>
+
+    <p rev="2.5.0 IMPALA-2179 IMPALA-2180">
+      For example, here are some <cmdname>impala-shell</cmdname> commands that define substitution variables and then
+      use them in SQL statements executed through the <codeph>-q</codeph> and <codeph>-f</codeph> options.
+      Notice how the <codeph>-q</codeph> argument strings are single-quoted to prevent shell expansion of the
+      <codeph>${var:value}</codeph> notation, and any string literals within the queries are enclosed by double quotation marks.
+    </p>
+
+<codeblock rev="2.5.0 IMPALA-2179 IMPALA-2180">
+$ impala-shell --var=tname=table1 --var=colname=x --var=coltype=string -q 'create table ${var:tname} (${var:colname} ${var:coltype}) stored as parquet'
+Starting Impala Shell without Kerberos authentication
+Connected to <varname>hostname</varname>
+Server version: <varname>impalad_version</varname>
+Query: create table table1 (x string) stored as parquet
+
+$ NEW_STRING="hello world"
+$ impala-shell --var=tname=table1 --var=insert_val="$NEW_STRING" -q 'insert into ${var:tname} values ("${var:insert_val}")'
+Starting Impala Shell without Kerberos authentication
+Connected to <varname>hostname</varname>
+Server version: <varname>impalad_version</varname>
+Query: insert into table1 values ("hello world")
+Inserted 1 row(s) in 1.40s
+
+$ for VAL in foo bar bletch
+do
+  impala-shell --var=tname=table1 --var=insert_val="$VAL" -q 'insert into ${var:tname} values ("${var:insert_val}")'
+done
+...
+Query: insert into table1 values ("foo")
+Inserted 1 row(s) in 0.22s
+Query: insert into table1 values ("bar")
+Inserted 1 row(s) in 0.11s
+Query: insert into table1 values ("bletch")
+Inserted 1 row(s) in 0.21s
+
+$ echo "Search for what substring?" ; read answer
+Search for what substring?
+b
+$ impala-shell --var=tname=table1 -q 'select x from ${var:tname} where x like "%${var:answer}%"'
+Starting Impala Shell without Kerberos authentication
+Connected to <varname>hostname</varname>
+Server version: <varname>impalad_version</varname>
+Query: select x from table1 where x like "%b%"
++--------+
+| x      |
++--------+
+| bletch |
+| bar    |
++--------+
+Fetched 2 row(s) in 0.83s
+</codeblock>
+
+    <p rev="2.5.0 IMPALA-2179 IMPALA-2180">
+      Here is a substitution variable passed in by the <codeph>--var</codeph> option,
+      and then referenced by statements issued interactively. Then the variable is
+      cleared with the <codeph>UNSET</codeph> command, and defined again with the
+      <codeph>SET</codeph> command.
+    </p>
+
+<codeblock rev="2.5.0 IMPALA-2179 IMPALA-2180">
+$ impala-shell --quiet --var=tname=table1
+Starting Impala Shell without Kerberos authentication
+***********************************************************************************
+<varname>banner_message</varname>
+***********************************************************************************
+[<varname>hostname</varname>:21000] > select count(*) from ${var:tname};
++----------+
+| count(*) |
++----------+
+| 4        |
++----------+
+[<varname>hostname</varname>:21000] > unset var:tname;
+Unsetting variable TNAME
+[<varname>hostname</varname>:21000] > select count(*) from ${var:tname};
+Error: Unknown variable TNAME
+[<varname>hostname</varname>:21000] > set var:tname=table1;
+[<varname>hostname</varname>:21000] > select count(*) from ${var:tname};
++----------+
+| count(*) |
++----------+
+| 4        |
++----------+
+</codeblock>
+
+    <p rev="IMPALA-3397 CDH-40097">
+      The following example shows how the <codeph>SOURCE</codeph> command can execute
+      a series of statements from a file:
+    </p>
+
+<codeblock rev="IMPALA-3397 CDH-40097">
+$ cat commands.sql
+show databases;
+show tables in default;
+show functions in _impala_builtins like '*minute*';
+
+$ impala-shell -i localhost
+...
+[localhost:21000] > source commands.sql;
+Query: show databases
++------------------+----------------------------------------------+
+| name             | comment                                      |
++------------------+----------------------------------------------+
+| _impala_builtins | System database for Impala builtin functions |
+| default          | Default Hive database                        |
++------------------+----------------------------------------------+
+Fetched 2 row(s) in 0.06s
+Query: show tables in default
++-----------+
+| name      |
++-----------+
+| customers |
+| sample_07 |
+| sample_08 |
+| web_logs  |
++-----------+
+Fetched 4 row(s) in 0.02s
+Query: show functions in _impala_builtins like '*minute*'
++-------------+--------------------------------+-------------+---------------+
+| return type | signature                      | binary type | is persistent |
++-------------+--------------------------------+-------------+---------------+
+| INT         | minute(TIMESTAMP)              | BUILTIN     | true          |
+| TIMESTAMP   | minutes_add(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | minutes_add(TIMESTAMP, INT)    | BUILTIN     | true          |
+| TIMESTAMP   | minutes_sub(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | minutes_sub(TIMESTAMP, INT)    | BUILTIN     | true          |
++-------------+--------------------------------+-------------+---------------+
+Fetched 5 row(s) in 0.03s
+</codeblock>
+
+    <p rev="IMPALA-3397 CDH-40097">
+      The following example shows how a file that is run by the <codeph>SOURCE</codeph> command,
+      or through the <codeph>-q</codeph> or <codeph>-f</codeph> options of <cmdname>impala-shell</cmdname>,
+      can contain additional <codeph>SOURCE</codeph> commands.
+      The first file, <filepath>nested1.sql</filepath>, runs an <cmdname>impala-shell</cmdname> command
+      and then also runs the commands from <filepath>nested2.sql</filepath>.
+      This ability for scripts to call each other is often useful for code that sets up schemas for applications
+      or test environments.
+    </p>
+
+<codeblock rev="IMPALA-3397 CDH-40097">
+$ cat nested1.sql
+show functions in _impala_builtins like '*minute*';
+source nested2.sql
+$ cat nested2.sql
+show functions in _impala_builtins like '*hour*'
+
+$ impala-shell -i localhost -f nested1.sql
+Starting Impala Shell without Kerberos authentication
+Connected to localhost:21000
+...
+Query: show functions in _impala_builtins like '*minute*'
++-------------+--------------------------------+-------------+---------------+
+| return type | signature                      | binary type | is persistent |
++-------------+--------------------------------+-------------+---------------+
+| INT         | minute(TIMESTAMP)              | BUILTIN     | true          |
+| TIMESTAMP   | minutes_add(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | minutes_add(TIMESTAMP, INT)    | BUILTIN     | true          |
+| TIMESTAMP   | minutes_sub(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | minutes_sub(TIMESTAMP, INT)    | BUILTIN     | true          |
++-------------+--------------------------------+-------------+---------------+
+Fetched 5 row(s) in 0.01s
+Query: show functions in _impala_builtins like '*hour*'
++-------------+------------------------------+-------------+---------------+
+| return type | signature                    | binary type | is persistent |
++-------------+------------------------------+-------------+---------------+
+| INT         | hour(TIMESTAMP)              | BUILTIN     | true          |
+| TIMESTAMP   | hours_add(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | hours_add(TIMESTAMP, INT)    | BUILTIN     | true          |
+| TIMESTAMP   | hours_sub(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | hours_sub(TIMESTAMP, INT)    | BUILTIN     | true          |
++-------------+------------------------------+-------------+---------------+
+Fetched 5 row(s) in 0.01s
+</codeblock>
+
+  </conbody>
+</concept>

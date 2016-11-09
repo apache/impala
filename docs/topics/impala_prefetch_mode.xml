@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="prefetch_mode" rev="2.6.0 IMPALA-3286">
+
+  <title>PREFETCH_MODE Query Option (<keyword keyref="impala26"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>PREFETCH_MODE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.6.0 IMPALA-3286">
+      <indexterm audience="Cloudera">PREFETCH_MODE query option</indexterm>
+      Determines whether the prefetching optimization is applied during
+      join query processing.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric (0, 1)
+      or corresponding mnemonic strings (<codeph>NONE</codeph>, <codeph>HT_BUCKET</codeph>).
+    </p>
+
+    <p>
+      <b>Default:</b> 1 (equivalent to <codeph>HT_BUCKET</codeph>)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_260"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>
+      The default mode is 1, which means that hash table buckets are
+      prefetched during join query processing.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_joins.xml#joins"/>,
+      <xref href="impala_perf_joins.xml#perf_joins"/>.
+    </p>
+
+  </conbody>
+</concept>

@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="perf_skew">
+
+  <title>Detecting and Correcting HDFS Block Skew Conditions</title>
+  <titlealts audience="PDF"><navtitle>HDFS Block Skew</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="HDFS"/>
+      <data name="Category" value="Proof of Concept"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      For best performance of Impala parallel queries, the work is divided equally across hosts in the cluster, and
+      all hosts take approximately equal time to finish their work. If one host takes substantially longer than
+      others, the extra time needed for the slow host can become the dominant factor in query performance.
+      Therefore, one of the first steps in performance tuning for Impala is to detect and correct such conditions.
+    </p>
+
+    <p>
+      The main cause of uneven performance that you can correct within Impala is <term>skew</term> in the number of
+      HDFS data blocks processed by each host, where some hosts process substantially more data blocks than others.
+      This condition can occur because of uneven distribution of the data values themselves, for example causing
+      certain data files or partitions to be large while others are very small. (Although it is possible to have
+      unevenly distributed data without any problems with the distribution of HDFS blocks.) Block skew could also
+      be due to the underlying block allocation policies within HDFS, the replication factor of the data files, and
+      the way that Impala chooses the host to process each data block.
+    </p>
+
+    <p>
+      The most convenient way to detect block skew, or slow-host issues in general, is to examine the <q>executive
+      summary</q> information from the query profile after running a query:
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          In <cmdname>impala-shell</cmdname>, issue the <codeph>SUMMARY</codeph> command immediately after the
+          query is complete, to see just the summary information. If you detect issues involving skew, you might
+          switch to issuing the <codeph>PROFILE</codeph> command, which displays the summary information followed
+          by a detailed performance analysis.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          In the Cloudera Manager interface or the Impala debug web UI, click on the <uicontrol>Profile</uicontrol>
+          link associated with the query after it is complete. The executive summary information is displayed early
+          in the profile output.
+        </p>
+      </li>
+    </ul>
+
+    <p>
+      For each phase of the query, you see an <uicontrol>Avg Time</uicontrol> and a <uicontrol>Max Time</uicontrol>
+      value, along with <uicontrol>#Hosts</uicontrol> indicating how many hosts are involved in that query phase.
+      For all the phases with <uicontrol>#Hosts</uicontrol> greater than one, look for cases where the maximum time
+      is substantially greater than the average time. Focus on the phases that took the longest, for example, those
+      taking multiple seconds rather than milliseconds or microseconds.
+    </p>
+
+    <p>
+      If you detect that some hosts take longer than others, first rule out non-Impala causes. One reason that some
+      hosts could be slower than others is if those hosts have less capacity than the others, or if they are
+      substantially busier due to unevenly distributed non-Impala workloads:
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          For clusters running Impala, keep the relative capacities of all hosts roughly equal. Any cost savings
+          from including some underpowered hosts in the cluster will likely be outweighed by poor or uneven
+          performance, and the time spent diagnosing performance issues.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          If non-Impala workloads cause slowdowns on some hosts but not others, use the appropriate load-balancing
+          techniques for the non-Impala components to smooth out the load across the cluster.
+        </p>
+      </li>
+    </ul>
+
+    <p>
+      If the hosts on your cluster are evenly powered and evenly loaded, examine the detailed profile output to
+      determine which host is taking longer than others for the query phase in question. Examine how many bytes are
+      processed during that phase on that host, how much memory is used, and how many bytes are transmitted across
+      the network.
+    </p>
+
+    <p>
+      The most common symptom is a higher number of bytes read on one host than others, due to one host being
+      requested to process a higher number of HDFS data blocks. This condition is more likely to occur when the
+      number of blocks accessed by the query is relatively small. For example, if you have a 10-node cluster and
+      the query processes 10 HDFS blocks, each node might not process exactly one block. If one node sits idle
+      while another node processes two blocks, the query could take twice as long as if the data was perfectly
+      distributed.
+    </p>
+
+    <p>
+      Possible solutions in this case include:
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          If the query is artificially small, perhaps for benchmarking purposes, scale it up to process a larger
+          data set. For example, if some nodes read 10 HDFS data blocks while others read 11, the overall effect of
+          the uneven distribution is much lower than when some nodes did twice as much work as others. As a
+          guideline, aim for a <q>sweet spot</q> where each node reads 2 GB or more from HDFS per query. Queries
+          that process lower volumes than that could experience inconsistent performance that smooths out as
+          queries become more data-intensive.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          If the query processes only a few large blocks, so that many nodes sit idle and cannot help to
+          parallelize the query, consider reducing the overall block size. For example, you might adjust the
+          <codeph>PARQUET_FILE_SIZE</codeph> query option before copying or converting data into a Parquet table.
+          Or you might adjust the granularity of data files produced earlier in the ETL pipeline by non-Impala
+          components. In Impala 2.0 and later, the default Parquet block size is 256 MB, reduced from 1 GB, to
+          improve parallelism for common cluster sizes and data volumes.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          Reduce the amount of compression applied to the data. For text data files, the highest degree of
+          compression (gzip) produces unsplittable files that are more difficult for Impala to process in parallel,
+          and require extra memory during processing to hold the compressed and uncompressed data simultaneously.
+          For binary formats such as Parquet and Avro, compression can result in fewer data blocks overall, but
+          remember that when queries process relatively few blocks, there is less opportunity for parallel
+          execution and many nodes in the cluster might sit idle. Note that when Impala writes Parquet data with
+          the query option <codeph>COMPRESSION_CODEC=NONE</codeph> enabled, the data is still typically compact due
+          to the encoding schemes used by Parquet, independent of the final compression step.
+        </p>
+      </li>
+    </ul>
+  </conbody>
+</concept>

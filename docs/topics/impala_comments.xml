@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="comments">
+
+  <title>Comments</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">comments (SQL)</indexterm>
+      Impala supports the familiar styles of SQL comments:
+    </p>
+
+    <ul>
+      <li>
+        All text from a <codeph>--</codeph> sequence to the end of the line is considered a comment and ignored.
+        This type of comment can occur on a single line by itself, or after all or part of a statement.
+      </li>
+
+      <li>
+        All text from a <codeph>/*</codeph> sequence to the next <codeph>*/</codeph> sequence is considered a
+        comment and ignored. This type of comment can stretch over multiple lines. This type of comment can occur
+        on one or more lines by itself, in the middle of a statement, or before or after a statement.
+      </li>
+    </ul>
+
+    <p>
+      For example:
+    </p>
+
+<codeblock>-- This line is a comment about a table.
+create table ...;
+
+/*
+This is a multi-line comment about a query.
+*/
+select ...;
+
+select * from t /* This is an embedded comment about a query. */ where ...;
+
+select * from t -- This is a trailing comment within a multi-line command.
+where ...;
+</codeblock>
+  </conbody>
+</concept>

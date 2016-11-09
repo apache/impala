@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="max_errors">
+
+  <title>MAX_ERRORS Query Option</title>
+  <titlealts audience="PDF"><navtitle>MAX_ERRORS</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Logs"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">MAX_ERRORS query option</indexterm>
+      Maximum number of non-fatal errors for any particular query that are recorded in the Impala log file. For
+      example, if a billion-row table had a non-fatal data error in every row, you could diagnose the problem
+      without all billion errors being logged. Unspecified or 0 indicates the built-in default value of 1000.
+    </p>
+
+    <p>
+      This option only controls how many errors are reported. To specify whether Impala continues or halts when it
+      encounters such errors, use the <codeph>ABORT_ON_ERROR</codeph> option.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p>
+      <b>Default:</b> 0 (meaning 1000 errors)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_abort_on_error.xml#abort_on_error"/>,
+      <xref href="impala_logging.xml#logging"/>
+    </p>
+
+  </conbody>
+</concept>

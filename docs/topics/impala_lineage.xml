@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="lineage" rev="2.2.0">
+
+  <title>Viewing Lineage Information for Impala Data</title>
+  <titlealts audience="PDF"><navtitle>Viewing Lineage Info</navtitle></titlealts>
+  <prolog>
+
+    <metadata>
+
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Lineage"/>
+      <data name="Category" value="Governance"/>
+      <data name="Category" value="Data Management"/>
+      <data name="Category" value="Navigator"/>
+      <data name="Category" value="Administrators"/>
+
+    </metadata>
+
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.2.0">
+      <indexterm audience="Cloudera">lineage</indexterm>
+      <indexterm audience="Cloudera">column lineage</indexterm>
+      <term>Lineage</term> is a feature in the Cloudera Navigator data
+      management component that helps you track where data originated, and how
+      data propagates through the system through SQL statements such as
+        <codeph>SELECT</codeph>, <codeph>INSERT</codeph>, and <codeph>CREATE
+        TABLE AS SELECT</codeph>. Impala is covered by the Cloudera Navigator
+      lineage features in <keyword keyref="impala22_full"/> and higher. </p>
+
+    <p>
+      This type of tracking is important in high-security configurations, especially in highly regulated industries
+      such as healthcare, pharmaceuticals, financial services and intelligence. For such kinds of sensitive data, it is important to know all
+      the places in the system that contain that data or other data derived from it; to verify who has accessed
+      that data; and to be able to doublecheck that the data used to make a decision was processed correctly and
+      not tampered with.
+    </p>
+
+    <p>
+      You interact with this feature through <term>lineage diagrams</term> showing relationships between tables and
+      columns. For instructions about interpreting lineage diagrams, see
+      <xref audience="integrated" href="cn_iu_lineage.xml" /><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cn_iu_lineage.html" scope="external" format="html"/>.
+    </p>
+
+    <section id="column_lineage">
+
+      <title>Column Lineage</title>
+
+      <p>
+        <term>Column lineage</term> tracks information in fine detail, at the level of
+        particular columns rather than entire tables.
+      </p>
+
+      <p>
+        For example, if you have a table with information derived from web logs, you might copy that data into
+        other tables as part of the ETL process. The ETL operations might involve transformations through
+        expressions and function calls, and rearranging the columns into more or fewer tables
+        (<term>normalizing</term> or <term>denormalizing</term> the data). Then for reporting, you might issue
+        queries against multiple tables and views. In this example, column lineage helps you determine that data
+        that entered the system as <codeph>RAW_LOGS.FIELD1</codeph> was then turned into
+        <codeph>WEBSITE_REPORTS.IP_ADDRESS</codeph> through an <codeph>INSERT ... SELECT</codeph> statement. Or,
+        conversely, you could start with a reporting query against a view, and trace the origin of the data in a
+        field such as <codeph>TOP_10_VISITORS.USER_ID</codeph> back to the underlying table and even further back
+        to the point where the data was first loaded into Impala.
+      </p>
+
+      <p>
+        When you have tables where you need to track or control access to sensitive information at the column
+        level, see <xref href="impala_authorization.xml#authorization"/> for how to implement column-level
+        security. You set up authorization using the Sentry framework, create views that refer to specific sets of
+        columns, and then assign authorization privileges to those views rather than the underlying tables.
+      </p>
+
+    </section>
+
+    <section id="lineage_data">
+
+      <title>Lineage Data for Impala</title>
+
+      <p>
+        The lineage feature is enabled by default. When lineage logging is enabled, the serialized column lineage
+        graph is computed for each query and stored in a specialized log file in JSON format.
+      </p>
+
+      <p>
+        Impala records queries in the lineage log if they complete successfully, or fail due to authorization
+        errors. For write operations such as <codeph>INSERT</codeph> and <codeph>CREATE TABLE AS SELECT</codeph>,
+        the statement is recorded in the lineage log only if it successfully completes. Therefore, the lineage
+        feature tracks data that was accessed by successful queries, or that was attempted to be accessed by
+        unsuccessful queries that were blocked due to authorization failure. These kinds of queries represent data
+        that really was accessed, or where the attempted access could represent malicious activity.
+      </p>
+
+      <p>
+        Impala does not record in the lineage log queries that fail due to syntax errors or that fail or are
+        cancelled before they reach the stage of requesting rows from the result set.
+      </p>
+
+      <p>
+        To enable or disable this feature on a system not managed by Cloudera Manager, set or remove the
+        <codeph>-lineage_event_log_dir</codeph> configuration option for the <cmdname>impalad</cmdname> daemon. For
+        information about turning the lineage feature on and off through Cloudera Manager, see
+        <xref audience="integrated" href="datamgmt_impala_lineage_log.xml"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/datamgmt_impala_lineage_log.html" scope="external" format="html"/>.
+      </p>
+
+    </section>
+
+  </conbody>
+
+</concept>

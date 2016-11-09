@@ -1,0 +1,926 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="string_functions">
+
+  <title>Impala String Functions</title>
+  <titlealts audience="PDF"><navtitle>String Functions</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.0.0">
+      String functions are classified as those primarily accepting or returning <codeph>STRING</codeph>,
+      <codeph>VARCHAR</codeph>, or <codeph>CHAR</codeph> data types, for example to measure the length of a string
+      or concatenate two strings together.
+      <ul>
+        <li>
+          All the functions that accept <codeph>STRING</codeph> arguments also accept the <codeph>VARCHAR</codeph>
+          and <codeph>CHAR</codeph> types introduced in Impala 2.0.
+        </li>
+
+        <li>
+          Whenever <codeph>VARCHAR</codeph> or <codeph>CHAR</codeph> values are passed to a function that returns a
+          string value, the return type is normalized to <codeph>STRING</codeph>. For example, a call to
+          <codeph>concat()</codeph> with a mix of <codeph>STRING</codeph>, <codeph>VARCHAR</codeph>, and
+          <codeph>CHAR</codeph> arguments produces a <codeph>STRING</codeph> result.
+        </li>
+      </ul>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      The string functions operate mainly on these data types: <xref href="impala_string.xml#string"/>,
+      <xref href="impala_varchar.xml#varchar"/>, and <xref href="impala_char.xml#char"/>.
+    </p>
+
+    <p>
+      <b>Function reference:</b>
+    </p>
+
+    <p>
+      Impala supports the following string functions:
+    </p>
+
+    <dl>
+      <dlentry id="ascii">
+
+        <dt>
+          <codeph>ascii(string str)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">ascii() function</indexterm>
+          <b>Purpose:</b> Returns the numeric ASCII code of the first character of the argument.
+          <p>
+            <b>Return type:</b> <codeph>int</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="2.3.0" id="btrim">
+
+        <dt>
+          <codeph>btrim(string a)</codeph>,
+          <codeph>btrim(string a, string chars_to_trim)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">btrim() function</indexterm>
+          <b>Purpose:</b> Removes all instances of one or more characters
+          from the start and end of a <codeph>STRING</codeph> value.
+          By default, removes only spaces.
+          If a non-<codeph>NULL</codeph> optional second argument is specified, the function removes all
+          occurrences of characters in that second argument from the beginning and
+          end of the string.
+          <p><b>Return type:</b> <codeph>string</codeph></p>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples show the default <codeph>btrim()</codeph> behavior,
+            and what changes when you specify the optional second argument.
+            All the examples bracket the output value with <codeph>[ ]</codeph>
+            so that you can see any leading or trailing spaces in the <codeph>btrim()</codeph> result.
+            By default, the function removes and number of both leading and trailing spaces.
+            When the second argument is specified, any number of occurrences of any
+            character in the second argument are removed from the start and end of the
+            input string; in this case, spaces are not removed (unless they are part of the second
+            argument) and any instances of the characters are not removed if they do not come
+            right at the beginning or end of the string.
+          </p>
+<codeblock>-- Remove multiple spaces before and one space after.
+select concat('[',btrim('    hello '),']');
++---------------------------------------+
+| concat('[', btrim('    hello '), ']') |
++---------------------------------------+
+| [hello]                               |
++---------------------------------------+
+
+-- Remove any instances of x or y or z at beginning or end. Leave spaces alone.
+select concat('[',btrim('xy    hello zyzzxx','xyz'),']');
++------------------------------------------------------+
+| concat('[', btrim('xy    hello zyzzxx', 'xyz'), ']') |
++------------------------------------------------------+
+| [    hello ]                                         |
++------------------------------------------------------+
+
+-- Remove any instances of x or y or z at beginning or end.
+-- Leave x, y, z alone in the middle of the string.
+select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
++----------------------------------------------------+
+| concat('[', btrim('xyhelxyzlozyzzxx', 'xyz'), ']') |
++----------------------------------------------------+
+| [helxyzlo]                                         |
++----------------------------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="1.3.0" id="char_length">
+
+        <dt>
+          <codeph>char_length(string a), <ph rev="1.3.0" id="character_length">character_length(string a)</ph></codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">char_length() function</indexterm>
+          <indexterm audience="Cloudera">character_length() function</indexterm>
+          <b>Purpose:</b> Returns the length in characters of the argument string. Aliases for the
+          <codeph>length()</codeph> function.
+          <p>
+            <b>Return type:</b> <codeph>int</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="2.3.0" id="chr">
+
+        <dt>
+          <codeph>chr(int character_code)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">chr() function</indexterm>
+          <b>Purpose:</b> Returns a character specified by a decimal code point value.
+          The interpretation and display of the resulting character depends on your system locale.
+          Because consistent processing of Impala string values is only guaranteed
+          for values within the ASCII range, only use this function for values
+          corresponding to ASCII characters.
+          In particular, parameter values greater than 255 return an empty string.
+          <p><b>Return type:</b> <codeph>string</codeph></p>
+          <p>
+            <b>Usage notes:</b> Can be used as the inverse of the <codeph>ascii()</codeph> function, which
+            converts a character to its numeric ASCII code.
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>SELECT chr(65);
++---------+
+| chr(65) |
++---------+
+| A       |
++---------+
+
+SELECT chr(97);
++---------+
+| chr(97) |
++---------+
+| a       |
++---------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="concat">
+
+        <dt>
+          <codeph>concat(string a, string b...)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">concat() function</indexterm>
+          <b>Purpose:</b> Returns a single string representing all the argument values joined together.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/concat_blurb"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="concat_ws">
+
+        <dt>
+          <codeph>concat_ws(string sep, string a, string b...)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">concat_ws() function</indexterm>
+          <b>Purpose:</b> Returns a single string representing the second and following argument values joined
+          together, delimited by a specified separator.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/concat_blurb"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="find_in_set">
+
+        <dt>
+          <codeph>find_in_set(string str, string strList)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">find_in_set() function</indexterm>
+          <b>Purpose:</b> Returns the position (starting from 1) of the first occurrence of a specified string
+          within a comma-separated string. Returns <codeph>NULL</codeph> if either argument is
+          <codeph>NULL</codeph>, 0 if the search string is not found, or 0 if the search string contains a comma.
+          <p>
+            <b>Return type:</b> <codeph>int</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="1.2" id="group_concat">
+
+        <dt>
+          <codeph>group_concat(string s [, string sep])</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">group_concat() function</indexterm>
+          <b>Purpose:</b> Returns a single string representing the argument value concatenated together for each
+          row of the result set. If the optional separator string is specified, the separator is added between each
+          pair of concatenated values.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/concat_blurb"/>
+          <p>
+            By default, returns a single string covering the whole result set. To include other columns or values
+            in the result set, or to produce multiple concatenated strings for subsets of rows, include a
+            <codeph>GROUP BY</codeph> clause in the query.
+          </p>
+          <p>
+            Strictly speaking, <codeph>group_concat()</codeph> is an aggregate function, not a scalar
+            function like the others in this list.
+            For additional details and examples, see <xref href="impala_group_concat.xml#group_concat"/>.
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="1.2" id="initcap">
+
+        <dt>
+          <codeph>initcap(string str)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">initcap() function</indexterm>
+          <b>Purpose:</b> Returns the input string with the first letter capitalized.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="instr">
+
+        <dt>
+          <codeph>instr(string str, string substr)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">instr() function</indexterm>
+          <b>Purpose:</b> Returns the position (starting from 1) of the first occurrence of a substring within a
+          longer string.
+          <p>
+            <b>Return type:</b> <codeph>int</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="length">
+
+        <dt>
+          <codeph>length(string a)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">length() function</indexterm>
+          <b>Purpose:</b> Returns the length in characters of the argument string.
+          <p>
+            <b>Return type:</b> <codeph>int</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="locate">
+
+        <dt>
+          <codeph>locate(string substr, string str[, int pos])</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">locate() function</indexterm>
+          <b>Purpose:</b> Returns the position (starting from 1) of the first occurrence of a substring within a
+          longer string, optionally after a particular position.
+          <p>
+            <b>Return type:</b> <codeph>int</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="lower">
+
+        <dt>
+          <codeph>lower(string a), <ph id="lcase">lcase(string a)</ph> </codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">lower() function</indexterm>
+          <b>Purpose:</b> Returns the argument string converted to all-lowercase.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p conref="../shared/impala_common.xml#common/case_insensitive_comparisons_tip"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="lpad">
+
+        <dt>
+          <codeph>lpad(string str, int len, string pad)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">lpad() function</indexterm>
+          <b>Purpose:</b> Returns a string of a specified length, based on the first argument string. If the
+          specified string is too short, it is padded on the left with a repeating sequence of the characters from
+          the pad string. If the specified string is too long, it is truncated on the right.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="ltrim">
+
+        <dt>
+          <codeph>ltrim(string a)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">ltrim() function</indexterm>
+          <b>Purpose:</b> Returns the argument string with any leading spaces removed from the left side.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="parse_url">
+
+        <dt>
+          <codeph>parse_url(string urlString, string partToExtract [, string keyToExtract])</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">parse_url() function</indexterm>
+          <b>Purpose:</b> Returns the portion of a URL corresponding to a specified part. The part argument can be
+          <codeph>'PROTOCOL'</codeph>, <codeph>'HOST'</codeph>, <codeph>'PATH'</codeph>, <codeph>'REF'</codeph>,
+          <codeph>'AUTHORITY'</codeph>, <codeph>'FILE'</codeph>, <codeph>'USERINFO'</codeph>, or
+          <codeph>'QUERY'</codeph>. Uppercase is required for these literal values. When requesting the
+          <codeph>QUERY</codeph> portion of the URL, you can optionally specify a key to retrieve just the
+          associated value from the key-value pairs in the query string.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p>
+            <b>Usage notes:</b> This function is important for the traditional Hadoop use case of interpreting web
+            logs. For example, if the web traffic data features raw URLs not divided into separate table columns,
+            you can count visitors to a particular page by extracting the <codeph>'PATH'</codeph> or
+            <codeph>'FILE'</codeph> field, or analyze search terms by extracting the corresponding key from the
+            <codeph>'QUERY'</codeph> field.
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="regexp_extract">
+
+        <dt>
+          <codeph>regexp_extract(string subject, string pattern, int index)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">regexp_extract() function</indexterm>
+          <b>Purpose:</b> Returns the specified () group from a string based on a regular expression pattern. Group
+          0 refers to the entire extracted string, while group 1, 2, and so on refers to the first, second, and so
+          on <codeph>(...)</codeph> portion.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/regexp_re2"/>
+          <p conref="../shared/impala_common.xml#common/regexp_re2_warning"/>
+          <p conref="../shared/impala_common.xml#common/regexp_escapes"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            This example shows how group 0 matches the full pattern string, including the portion outside any
+            <codeph>()</codeph> group:
+          </p>
+<codeblock>[localhost:21000] &gt; select regexp_extract('abcdef123ghi456jkl','.*?(\\d+)',0);
++------------------------------------------------------+
+| regexp_extract('abcdef123ghi456jkl', '.*?(\\d+)', 0) |
++------------------------------------------------------+
+| abcdef123ghi456                                      |
++------------------------------------------------------+
+Returned 1 row(s) in 0.11s</codeblock>
+          <p>
+            This example shows how group 1 matches just the contents inside the first <codeph>()</codeph> group in
+            the pattern string:
+          </p>
+<codeblock>[localhost:21000] &gt; select regexp_extract('abcdef123ghi456jkl','.*?(\\d+)',1);
++------------------------------------------------------+
+| regexp_extract('abcdef123ghi456jkl', '.*?(\\d+)', 1) |
++------------------------------------------------------+
+| 456                                                  |
++------------------------------------------------------+
+Returned 1 row(s) in 0.11s</codeblock>
+          <p rev="2.0.0">
+            Unlike in earlier Impala releases, the regular expression library used in Impala 2.0 and later supports
+            the <codeph>.*?</codeph> idiom for non-greedy matches. This example shows how a pattern string starting
+            with <codeph>.*?</codeph> matches the shortest possible portion of the source string, returning the
+            rightmost set of lowercase letters. A pattern string both starting and ending with <codeph>.*?</codeph>
+            finds two potential matches of equal length, and returns the first one found (the leftmost set of
+            lowercase letters).
+          </p>
+<codeblock>[localhost:21000] &gt; select regexp_extract('AbcdBCdefGHI','.*?([[:lower:]]+)',1);
++--------------------------------------------------------+
+| regexp_extract('abcdbcdefghi', '.*?([[:lower:]]+)', 1) |
++--------------------------------------------------------+
+| def                                                    |
++--------------------------------------------------------+
+[localhost:21000] &gt; select regexp_extract('AbcdBCdefGHI','.*?([[:lower:]]+).*?',1);
++-----------------------------------------------------------+
+| regexp_extract('abcdbcdefghi', '.*?([[:lower:]]+).*?', 1) |
++-----------------------------------------------------------+
+| bcd                                                       |
++-----------------------------------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="2.3.0" id="regexp_like">
+
+        <dt>
+          <codeph>regexp_like(string source, string pattern[, string options])</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">regexp_like() function</indexterm>
+          <b>Purpose:</b> Returns <codeph>true</codeph> or <codeph>false</codeph> to indicate
+          whether the source string contains anywhere inside it the regular expression given by the pattern.
+          The optional third argument consists of letter flags that change how the match is performed,
+          such as <codeph>i</codeph> for case-insensitive matching.
+          <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+          <p>
+            The flags that you can include in the optional third argument are:
+          </p>
+          <ul>
+          <li>
+          <codeph>c</codeph>: Case-sensitive matching (the default).
+          </li>
+          <li>
+          <codeph>i</codeph>: Case-insensitive matching. If multiple instances of <codeph>c</codeph> and <codeph>i</codeph>
+          are included in the third argument, the last such option takes precedence.
+          </li>
+          <li>
+          <codeph>m</codeph>: Multi-line matching. The <codeph>^</codeph> and <codeph>$</codeph>
+          operators match the start or end of any line within the source string, not the
+          start and end of the entire string.
+          </li>
+          <li>
+          <codeph>n</codeph>: Newline matching. The <codeph>.</codeph> operator can match the
+          newline character. A repetition operator such as <codeph>.*</codeph> can
+          match a portion of the source string that spans multiple lines.
+          </li>
+          </ul>
+          <p>
+            <b>Return type:</b> <codeph>boolean</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/regexp_re2"/>
+          <p conref="../shared/impala_common.xml#common/regexp_re2_warning"/>
+          <p conref="../shared/impala_common.xml#common/regexp_escapes"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            This example shows how <codeph>regexp_like()</codeph> can test for the existence
+            of various kinds of regular expression patterns within a source string:
+          </p>
+<codeblock><![CDATA[
+-- Matches because the 'f' appears somewhere in 'foo'.
+select regexp_like('foo','f');
++-------------------------+
+| regexp_like('foo', 'f') |
++-------------------------+
+| true                    |
++-------------------------+
+
+-- Does not match because the comparison is case-sensitive by default.
+select regexp_like('foo','F');
++-------------------------+
+| regexp_like('foo', 'f') |
++-------------------------+
+| false                   |
++-------------------------+
+
+-- The 3rd argument can change the matching logic, such as 'i' meaning case-insensitive.
+select regexp_like('foo','F','i');
++------------------------------+
+| regexp_like('foo', 'f', 'i') |
++------------------------------+
+| true                         |
++------------------------------+
+
+-- The familiar regular expression notations work, such as ^ and $ anchors...
+select regexp_like('foo','f$');
++--------------------------+
+| regexp_like('foo', 'f$') |
++--------------------------+
+| false                    |
++--------------------------+
+
+select regexp_like('foo','o$');
++--------------------------+
+| regexp_like('foo', 'o$') |
++--------------------------+
+| true                     |
++--------------------------+
+
+-- ...and repetition operators such as * and +
+select regexp_like('foooooobar','fo+b');
++-----------------------------------+
+| regexp_like('foooooobar', 'fo+b') |
++-----------------------------------+
+| true                              |
++-----------------------------------+
+
+select regexp_like('foooooobar','fx*y*o*b');
++---------------------------------------+
+| regexp_like('foooooobar', 'fx*y*o*b') |
++---------------------------------------+
+| true                                  |
++---------------------------------------+
+]]>
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="regexp_replace">
+
+        <dt>
+          <codeph>regexp_replace(string initial, string pattern, string replacement)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">regexp_replace() function</indexterm>
+          <b>Purpose:</b> Returns the initial argument with the regular expression pattern replaced by the final
+          argument string.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/regexp_re2"/>
+          <p conref="../shared/impala_common.xml#common/regexp_re2_warning"/>
+          <p conref="../shared/impala_common.xml#common/regexp_escapes"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            These examples show how you can replace parts of a string matching a pattern with replacement text,
+            which can include backreferences to any <codeph>()</codeph> groups in the pattern string. The
+            backreference numbers start at 1, and any <codeph>\</codeph> characters must be escaped as
+            <codeph>\\</codeph>.
+          </p>
+          <p>
+            Replace a character pattern with new text:
+          </p>
+<codeblock>[localhost:21000] &gt; select regexp_replace('aaabbbaaa','b+','xyz');
++------------------------------------------+
+| regexp_replace('aaabbbaaa', 'b+', 'xyz') |
++------------------------------------------+
+| aaaxyzaaa                                |
++------------------------------------------+
+Returned 1 row(s) in 0.11s</codeblock>
+          <p>
+            Replace a character pattern with substitution text that includes the original matching text:
+          </p>
+<codeblock>[localhost:21000] &gt; select regexp_replace('aaabbbaaa','(b+)','&lt;\\1&gt;');
++----------------------------------------------+
+| regexp_replace('aaabbbaaa', '(b+)', '&lt;\\1&gt;') |
++----------------------------------------------+
+| aaa&lt;bbb&gt;aaa                                  |
++----------------------------------------------+
+Returned 1 row(s) in 0.11s</codeblock>
+          <p>
+            Remove all characters that are not digits:
+          </p>
+<codeblock>[localhost:21000] &gt; select regexp_replace('123-456-789','[^[:digit:]]','');
++---------------------------------------------------+
+| regexp_replace('123-456-789', '[^[:digit:]]', '') |
++---------------------------------------------------+
+| 123456789                                         |
++---------------------------------------------------+
+Returned 1 row(s) in 0.12s</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="repeat">
+
+        <dt>
+          <codeph>repeat(string str, int n)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">repeat() function</indexterm>
+          <b>Purpose:</b> Returns the argument string repeated a specified number of times.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="reverse">
+
+        <dt>
+          <codeph>reverse(string a)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">reverse() function</indexterm>
+          <b>Purpose:</b> Returns the argument string with characters in reversed order.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="rpad">
+
+        <dt>
+          <codeph>rpad(string str, int len, string pad)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">rpad() function</indexterm>
+          <b>Purpose:</b> Returns a string of a specified length, based on the first argument string. If the
+          specified string is too short, it is padded on the right with a repeating sequence of the characters from
+          the pad string. If the specified string is too long, it is truncated on the right.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="rtrim">
+
+        <dt>
+          <codeph>rtrim(string a)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">rtrim() function</indexterm>
+          <b>Purpose:</b> Returns the argument string with any trailing spaces removed from the right side.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="space">
+
+        <dt>
+          <codeph>space(int n)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">space() function</indexterm>
+          <b>Purpose:</b> Returns a concatenated string of the specified number of spaces. Shorthand for
+          <codeph>repeat(' ',<varname>n</varname>)</codeph>.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="2.3.0 CDH-35915 IMPALA-2084" id="split_part">
+
+        <dt>
+          <codeph>split_part(string source, string delimiter, bigint n)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">split_part() function</indexterm>
+          <b>Purpose:</b> Returns the nth field within a delimited string.
+          The fields are numbered starting from 1.
+          The delimiter can consist of multiple characters, not just a
+          single character. All matching of the delimiter is done exactly, not using any
+          regular expression patterns.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/regexp_re2"/>
+          <p conref="../shared/impala_common.xml#common/regexp_re2_warning"/>
+          <p conref="../shared/impala_common.xml#common/regexp_escapes"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            These examples show how to retrieve the nth field from a delimited string:
+          </p>
+<codeblock><![CDATA[
+select split_part('x,y,z',',',1);
++-----------------------------+
+| split_part('x,y,z', ',', 1) |
++-----------------------------+
+| x                           |
++-----------------------------+
+
+select split_part('x,y,z',',',2);
++-----------------------------+
+| split_part('x,y,z', ',', 2) |
++-----------------------------+
+| y                           |
++-----------------------------+
+
+select split_part('x,y,z',',',3);
++-----------------------------+
+| split_part('x,y,z', ',', 3) |
++-----------------------------+
+| z                           |
++-----------------------------+
+</codeblock>
+
+          <p>
+            These examples show what happens for out-of-range field positions.
+            Specifying a value less than 1 produces an error. Specifying a value
+            greater than the number of fields returns a zero-length string
+            (which is not the same as <codeph>NULL</codeph>).
+          </p>
+<codeblock><![CDATA[
+select split_part('x,y,z',',',0);
+ERROR: Invalid field position: 0
+
+with t1 as (select split_part('x,y,z',',',4) nonexistent_field)
+  select
+      nonexistent_field
+    , concat('[',nonexistent_field,']')
+    , length(nonexistent_field);
+from t1
++-------------------+-------------------------------------+---------------------------+
+| nonexistent_field | concat('[', nonexistent_field, ']') | length(nonexistent_field) |
++-------------------+-------------------------------------+---------------------------+
+|                   | []                                  | 0                         |
++-------------------+-------------------------------------+---------------------------+
+</codeblock>
+
+          <p>
+            These examples show how the delimiter can be a multi-character value:
+          </p>
+<codeblock><![CDATA[
+select split_part('one***two***three','***',2);
++-------------------------------------------+
+| split_part('one***two***three', '***', 2) |
++-------------------------------------------+
+| two                                       |
++-------------------------------------------+
+
+select split_part('one\|/two\|/three','\|/',3);
++-------------------------------------------+
+| split_part('one\|/two\|/three', '\|/', 3) |
++-------------------------------------------+
+| three                                     |
++-------------------------------------------+
+]]>
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="strleft">
+
+        <dt>
+          <codeph>strleft(string a, int num_chars)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">strleft() function</indexterm>
+          <b>Purpose:</b> Returns the leftmost characters of the string. Shorthand for a call to
+          <codeph>substr()</codeph> with 2 arguments.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="strright">
+
+        <dt>
+          <codeph>strright(string a, int num_chars)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">strright() function</indexterm>
+          <b>Purpose:</b> Returns the rightmost characters of the string. Shorthand for a call to
+          <codeph>substr()</codeph> with 2 arguments.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="substr">
+
+        <dt>
+          <codeph>substr(string a, int start [, int len]), <ph id="substring">substring(string a, int start [, int
+          len])</ph></codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">substr() function</indexterm>
+          <b>Purpose:</b> Returns the portion of the string starting at a specified point, optionally with a
+          specified maximum length. The characters in the string are indexed starting at 1.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="translate">
+
+        <dt>
+          <codeph>translate(string input, string from, string to)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">translate() function</indexterm>
+          <b>Purpose:</b> Returns the input string with a set of characters replaced by another set of characters.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="trim">
+
+        <dt>
+          <codeph>trim(string a)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">trim() function</indexterm>
+          <b>Purpose:</b> Returns the input string with both leading and trailing spaces removed. The same as
+          passing the string through both <codeph>ltrim()</codeph> and <codeph>rtrim()</codeph>.
+          <p>
+            <b>Usage notes:</b> Often used during data cleansing operations during the ETL cycle, if input values might still have surrounding spaces.
+            For a more general-purpose function that can remove other leading and trailing characters besides spaces, see <codeph>btrim()</codeph>.
+          </p>
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="upper">
+
+        <dt>
+          <codeph>upper(string a), <ph id="ucase">ucase(string a)</ph></codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">upper() function</indexterm>
+          <indexterm audience="Cloudera">ucase() function</indexterm>
+          <b>Purpose:</b> Returns the argument string converted to all-uppercase.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p conref="../shared/impala_common.xml#common/case_insensitive_comparisons_tip"/>
+        </dd>
+
+      </dlentry>
+    </dl>
+  </conbody>
+</concept>

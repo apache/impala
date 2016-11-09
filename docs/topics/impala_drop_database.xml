@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="drop_database">
+
+  <title>DROP DATABASE Statement</title>
+  <titlealts audience="PDF"><navtitle>DROP DATABASE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Databases"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">DROP DATABASE statement</indexterm>
+      Removes a database from the system. The physical operations involve removing the metadata for the database
+      from the metastore, and deleting the corresponding <codeph>*.db</codeph> directory from HDFS.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>DROP (DATABASE|SCHEMA) [IF EXISTS] <varname>database_name</varname> <ph rev="2.3.0">[RESTRICT | CASCADE]</ph>;</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      By default, the database must be empty before it can be dropped, to avoid losing any data.
+    </p>
+
+    <p rev="2.3.0">
+      In <keyword keyref="impala23_full"/> and higher, you can include the <codeph>CASCADE</codeph>
+      clause to make Impala drop all tables and other objects in the database before dropping the database itself.
+      The <codeph>RESTRICT</codeph> clause enforces the original requirement that the database be empty
+      before being dropped. Because the <codeph>RESTRICT</codeph> behavior is still the default, this
+      clause is optional.
+    </p>
+
+    <p rev="2.3.0">
+      The automatic dropping resulting from the <codeph>CASCADE</codeph> clause follows the same rules as the
+      corresponding <codeph>DROP TABLE</codeph>, <codeph>DROP VIEW</codeph>, and <codeph>DROP FUNCTION</codeph> statements.
+      In particular, the HDFS directories and data files for any external tables are left behind when the
+      tables are removed.
+    </p>
+
+    <p>
+      When you do not use the <codeph>CASCADE</codeph> clause, drop or move all the objects inside the database manually
+      before dropping the database itself:
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          Use the <codeph>SHOW TABLES</codeph> statement to locate all tables and views in the database,
+          and issue <codeph>DROP TABLE</codeph> and <codeph>DROP VIEW</codeph> statements to remove them all.
+        </p>
+      </li>
+      <li>
+        <p>
+          Use the <codeph>SHOW FUNCTIONS</codeph> and <codeph>SHOW AGGREGATE FUNCTIONS</codeph> statements
+          to locate all user-defined functions in the database, and issue <codeph>DROP FUNCTION</codeph>
+          and <codeph>DROP AGGREGATE FUNCTION</codeph> statements to remove them all.
+        </p>
+      </li>
+      <li>
+        <p>
+          To keep tables or views contained by a database while removing the database itself, use
+          <codeph>ALTER TABLE</codeph> and <codeph>ALTER VIEW</codeph> to move the relevant
+          objects to a different database before dropping the original database.
+        </p>
+      </li>
+    </ul>
+
+    <p>
+      You cannot drop the current database, that is, the database your session connected to
+      either through the <codeph>USE</codeph> statement or the <codeph>-d</codeph> option of <cmdname>impala-shell</cmdname>.
+      Issue a <codeph>USE</codeph> statement to switch to a different database first.
+      Because the <codeph>default</codeph> database is always available, issuing
+      <codeph>USE default</codeph> is a convenient way to leave the current database
+      before dropping it.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/hive_blurb"/>
+
+    <p>
+      When you drop a database in Impala, the database can no longer be used by Hive.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<!-- Better to conref the same examples in both places. -->
+
+    <p>
+      See <xref href="impala_create_database.xml#create_database"/> for examples covering <codeph>CREATE
+      DATABASE</codeph>, <codeph>USE</codeph>, and <codeph>DROP DATABASE</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/s3_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/s3_ddl"/>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
+    <p rev="CDH-19187">
+      The user ID that the <cmdname>impalad</cmdname> daemon runs under,
+      typically the <codeph>impala</codeph> user, must have write
+      permission for the directory associated with the database.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <codeblock conref="../shared/impala_common.xml#common/create_drop_db_example"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_databases.xml#databases"/>, <xref href="impala_create_database.xml#create_database"/>,
+      <xref href="impala_use.xml#use"/>, <xref href="impala_show.xml#show_databases"/>, <xref href="impala_drop_table.xml#drop_table"/>
+    </p>
+  </conbody>
+</concept>

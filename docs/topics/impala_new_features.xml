@@ -1,0 +1,4015 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="ver" id="new_features">
+
+  <title><ph audience="standalone">New Features in Apache Impala (incubating)</ph><ph audience="integrated">What's New in Apache Impala (incubating)</ph></title>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Release Notes"/>
+      <data name="Category" value="New Features"/>
+      <data name="Category" value="What's New"/>
+      <data name="Category" value="Getting Started"/>
+      <data name="Category" value="Upgrading"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      This release of Impala contains the following changes and enhancements from previous releases.
+    </p>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
+
+<!-- All 2.7.x new features go under here -->
+
+  <concept rev="2.7.0" id="new_features_270">
+
+    <title>New Features in Impala 2.7.x / CDH 5.9.x</title>
+
+    <conbody>
+
+      <ul id="feature_list">
+        <li>
+          <p>
+            Performance improvements:
+          </p>
+          <ul>
+            <li>
+              <p rev="IMPALA-3206 CDH-43744">
+                [<xref href="https://issues.cloudera.org/browse/IMPALA-3206" scope="external" format="html">IMPALA-3206</xref>]
+                Speedup for queries against <codeph>DECIMAL</codeph> columns in Avro tables.
+                The code that parses <codeph>DECIMAL</codeph> values from Avro now uses
+                native code generation.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-3674">
+                [<xref href="https://issues.cloudera.org/browse/IMPALA-3674" scope="external" format="html">IMPALA-3674</xref>]
+                Improved efficiency in LLVM code generation can reduce codegen time, especially
+                for short queries.
+              </p>
+            </li>
+            <!-- Not actually a new feature, it's more a tip about when to expect remote reads and how to minimize them. To go somewhere in the performance / best practices / Parquet info.
+            <li>
+              <p rev="IMPALA-3885 CDH-43793">
+                [<xref href="https://issues.cloudera.org/browse/IMPALA-3885" scope="external" format="html">IMPALA-3885</xref>]
+                Parquet files with multiple blocks can now be processed
+                without remote reads.
+              </p>
+            </li>
+            -->
+            <li>
+              <p rev="IMPALA-2979 CDH-43739"> [<xref
+                  href="https://issues.cloudera.org/browse/IMPALA-2979" scope="external"
+                  format="html">IMPALA-2979</xref>] Improvements to scheduling on worker nodes,
+                enabled by the <codeph>REPLICA_PREFERENCE</codeph> query option.
+                See <xref
+                  href="impala_replica_preference.xml#replica_preference"/> for details.
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li audience="Cloudera">
+          <p rev="IMPALA-3210 CDH-43736"><!-- Patch didn't make it into in <keyword keyref="impala27_full"/> -->
+            [<xref href="https://issues.cloudera.org/browse/IMPALA-3210" scope="external" format="html">IMPALA-3210</xref>]
+            The analytic functions <codeph>FIRST_VALUE()</codeph> and <codeph>LAST_VALUE()</codeph>
+            accept a new clause, <codeph>IGNORE NULLS</codeph>.
+            See <xref href="impala_analytic_functions.xml#first_value"/>
+            and <xref href="impala_analytic_functions.xml#last_value"/>
+            for details.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1683 CDH-43732">
+            [<xref href="https://issues.cloudera.org/browse/IMPALA-1683" scope="external" format="html">IMPALA-1683</xref>]
+            The <codeph>REFRESH</codeph> statement can be applied to a single partition,
+            rather than the entire table. See <xref href="impala_refresh.xml#refresh"/>
+            and <xref href="impala_partitioning.xml#partition_refresh"/> for details.
+          </p>
+        </li>
+        <li>
+          <p>
+            Improvements to the Impala web user interface:
+          </p>
+          <ul>
+            <li>
+              <p rev="IMPALA-2767 CDH-43748">
+                [<xref href="https://issues.cloudera.org/browse/IMPALA-2767" scope="external" format="html">IMPALA-2767</xref>]
+                You can now force a session to expire by clicking a link in the web UI,
+                on the <uicontrol>/sessions</uicontrol> tab.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-3715 CDH-43743">
+                [<xref href="https://issues.cloudera.org/browse/IMPALA-3715" scope="external" format="html">IMPALA-3715</xref>]
+                The <uicontrol>/memz</uicontrol> tab includes more information about
+                Impala memory usage.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-3716 CDH-43741">
+                [<xref href="https://issues.cloudera.org/browse/IMPALA-3716" scope="external" format="html">IMPALA-3716</xref>]
+                The <uicontrol>Details</uicontrol> page for a query now includes
+                a <uicontrol>Memory</uicontrol> tab.
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p rev="IMPALA-3499 CDH-43740">
+            [<xref href="https://issues.cloudera.org/browse/IMPALA-3499" scope="external" format="html">IMPALA-3499</xref>]
+            Scalability improvements to the catalog server. Impala handles internal communication
+            more efficiently for tables with large numbers of columns and partitions, where the
+            size of the metadata exceeds 2 GiB.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3677 CDH-43745">
+            [<xref href="https://issues.cloudera.org/browse/IMPALA-3677" scope="external" format="html">IMPALA-3677</xref>]
+            You can send a <codeph>SIGUSR1</codeph> signal to any Impala-related daemon to write a
+            Breakpad minidump. For advanced troubleshooting, you can now produce a minidump
+            without triggering a crash. See <xref href="impala_breakpad.xml#breakpad"/> for
+            details about the Breakpad minidump feature.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3687 CDH-43731">
+            [<xref href="https://issues.cloudera.org/browse/IMPALA-3687" scope="external" format="html">IMPALA-3687</xref>]
+            The schema reconciliation rules for Avro tables have changed slightly
+            for <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph> columns. Now, if
+            the definition of such a column is changed in the Avro schema file,
+            the column retains its <codeph>CHAR</codeph> or <codeph>VARCHAR</codeph>
+            type as specified in the SQL definition, but the column name and comment
+            from the Avro schema file take precedence.
+            See <xref href="impala_avro.xml#avro_create_table"/> for details about
+            column definitions in Avro tables.
+          </p>
+        </li>
+        <li audience="Cloudera"><!-- Patch didn't make it into in <keyword keyref="impala27_full"/> -->
+          <p rev="IMPALA-1654 CDH-43747">
+            [<xref href="https://issues.cloudera.org/browse/IMPALA-1654" scope="external" format="html">IMPALA-1654</xref>]
+            Several kinds of DDL operations
+            can now work on a range of partitions. The partitions can be specified
+            using operators such as <codeph>&lt;</codeph>, <codeph>&gt;=</codeph>, and
+            <codeph>!=</codeph> rather than just an equality predicate applying to a single
+            partition.
+            This new feature extends the syntax of
+            several clauses
+            of the <codeph>ALTER TABLE</codeph> statement
+            (<codeph>DROP PARTITION</codeph>, <codeph>SET [UN]CACHED</codeph>,
+            <codeph>SET FILEFORMAT | SERDEPROPERTIES | TBLPROPERTIES</codeph>),
+            the <codeph>SHOW FILES</codeph> statement, and the
+            <codeph>COMPUTE INCREMENTAL STATS</codeph> statement.
+            It does not apply to statements that are defined to only apply to a single
+            partition, such as <codeph>LOAD DATA</codeph>, <codeph>ALTER TABLE ... ADD PARTITION</codeph>,
+            <codeph>SET LOCATION</codeph>, and <codeph>INSERT</codeph> with a static
+            partitioning clause.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3575 CDH-43742"> [<xref
+              href="https://issues.cloudera.org/browse/IMPALA-3575"
+              scope="external" format="html">IMPALA-3575</xref>] Some network
+            operations now have additional timeout and retry settings. The extra
+            configuration helps avoid failed queries for transient network
+            problems, to avoid hangs when a sender or receiver fails in the
+            middle of a network transmission, and to make cancellation requests
+            more reliable despite network issues. </p>
+        </li>
+      </ul>
+
+    </conbody>
+  </concept>
+<!-- All 2.6.x new features go under here -->
+
+  <concept rev="2.6.0" id="new_features_260">
+
+    <title>New Features in Impala 2.6.x / CDH 5.8.x</title>
+
+    <conbody>
+
+      <!-- <note conref="../shared/impala_common.xml#common/only_cdh5_260" /> -->
+
+      <ul>
+        <li>
+          <p>
+            Improvements to Impala support for the Amazon S3 filesystem:
+          </p>
+          <ul>
+            <li>
+              <p rev="IMPALA-1878 CDH-33310">
+                Impala can now write to S3 tables through the <codeph>INSERT</codeph>
+                or <codeph>LOAD DATA</codeph> statements.
+                See <xref href="impala_s3.xml#s3"/> for general information about
+                using Impala with S3.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-3452 CDH-39913">
+                A new query option, <codeph>S3_SKIP_INSERT_STAGING</codeph>, lets you
+                trade off between fast <codeph>INSERT</codeph> performance and
+                slower <codeph>INSERT</codeph>s that are more consistent if a
+                problem occurs during the statement. The new behavior is enabled by default.
+                See <xref href="impala_s3_skip_insert_staging.xml#s3_skip_insert_staging"/> for details
+                about this option.
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p rev="CDH-41184">
+            Performance improvements for the runtime filtering feature:
+          </p>
+          <ul>
+            <li>
+              <p rev="CDH-41184 IMPALA-3333">
+                The default for the <codeph>RUNTIME_FILTER_MODE</codeph> 
+                query option is changed to <codeph>GLOBAL</codeph> (the highest setting).
+                See <xref href="impala_runtime_filter_mode.xml#runtime_filter_mode"/> for
+                details about this option.
+              </p>
+            </li>
+            <li rev="CDH-41184 IMPALA-3007">
+              <p>
+                The <codeph>RUNTIME_BLOOM_FILTER_SIZE</codeph> setting is now only used
+                as a fallback if statistics are not available; otherwise, Impala
+                uses the statistics to estimate the appropriate size to use for each filter.
+                See <xref href="impala_runtime_bloom_filter_size.xml#runtime_bloom_filter_size"/> for
+                details about this option.
+              </p>
+            </li>
+            <li rev="CDH-41184 IMPALA-3480">
+              <p>
+                New query options <codeph>RUNTIME_FILTER_MIN_SIZE</codeph> and
+                <codeph>RUNTIME_FILTER_MAX_SIZE</codeph> let you fine-tune
+                the sizes of the Bloom filter structures used for runtime filtering.
+                If the filter size derived from Impala internal estimates or from
+                the <codeph>RUNTIME_FILTER_BLOOM_SIZE</codeph> falls outside the size
+                range specified by these options, any too-small filter size is adjusted
+                to the minimum, and any too-large filter size is adjusted to the maximum.
+                See <xref href="impala_runtime_filter_min_size.xml#runtime_filter_min_size"/>
+                and <xref href="impala_runtime_filter_max_size.xml#runtime_filter_max_size"/>
+                for details about these options.
+              </p>
+            </li>
+            <li rev="CDH-41184 IMPALA-2956">
+              <p>
+                Runtime filter propagation now applies to all the
+                operands of <codeph>UNION</codeph> and <codeph>UNION ALL</codeph>
+                operators.
+              </p>
+            </li>
+            <li rev="CDH-41184 IMPALA-3077">
+              <p>
+                Runtime filters can now be produced during join queries even 
+                when the join processing activates the spill-to-disk mechanism.
+              </p>
+            </li>
+          </ul>
+            See <xref href="impala_runtime_filtering.xml#runtime_filtering"/> for
+            general information about the runtime filtering feature.
+        </li>
+        <!-- Have to look closer at resource management / admission control to see if
+             there are any ripple effects from this default change. -->
+        <li>
+          <p rev="IMPALA-3199">
+            Admission control and dynamic resource pools are enabled by default.
+            See <xref href="impala_admission.xml#admission_control"/> for details
+            about admission control.
+          </p>
+        </li>
+        <!-- Below here are features that are pretty well taken care of already;
+             some of them didn't need much if any doc in the first place. -->
+        <li>
+          <p rev="IMPALA-3369">
+            Impala can now manually set column statistics,
+            using the <codeph>ALTER TABLE</codeph> statement with a
+            <codeph>SET COLUMN STATS</codeph> clause.
+            See <xref href="impala_perf_stats.xml#perf_column_stats_manual"/> for details.
+          </p>
+        </li>
+        <li>
+          <p rev="CDH-40238 CDH-39818 IMPALA-3490 IMPALA-3581 IMPALA-2686">
+            Impala can now write lightweight <q>minidump</q> files, rather
+            than large core files, to save diagnostic information when
+            any of the Impala-related daemons crash. This feature uses the
+            open source <codeph>breakpad</codeph> framework.
+            See <xref href="impala_breakpad.xml#breakpad"/> for details.
+          </p>
+        </li>
+        <li>
+          <p>
+            New query options improve interoperability with Parquet files:
+            <ul>
+              <li>
+                <p rev="IMPALA-2835 CDH-33330">
+                  The <codeph>PARQUET_FALLBACK_SCHEMA_RESOLUTION</codeph> query option
+                  lets Impala locate columns within Parquet files based on
+                  column name rather than ordinal position.
+                  This enhancement improves interoperability with applications
+                  that write Parquet files with a different order or subset of
+                  columns than are used in the Impala table.
+                  See <xref href="impala_parquet_fallback_schema_resolution.xml#parquet_fallback_schema_resolution"/>
+                  for details.
+                </p>
+              </li>
+              <li>
+                <p rev="IMPALA-2069">
+                  The <codeph>PARQUET_ANNOTATE_STRINGS_UTF8</codeph> query option
+                  makes Impala include the <codeph>UTF-8</codeph> annotation
+                  metadata for <codeph>STRING</codeph>, <codeph>CHAR</codeph>,
+                  and <codeph>VARCHAR</codeph> columns in Parquet files created
+                  by <codeph>INSERT</codeph> or <codeph>CREATE TABLE AS SELECT</codeph>
+                  statements.
+                  See <xref href="impala_parquet_annotate_strings_utf8.xml#parquet_annotate_strings_utf8"/>
+                  for details.
+                </p>
+              </li>
+            </ul>
+            See <xref href="impala_parquet.xml#parquet"/> for general information about working
+            with Parquet files.
+          </p>
+        </li>
+        <li>
+          <p>
+            Improvements to security and reduction in overhead for secure clusters:
+          </p>
+          <ul>
+            <li>
+              <p rev="IMPALA-1928">
+                Overall performance improvements for secure clusters.
+                (TPC-H queries on a secure cluster were benchmarked
+                at roughly 3x as fast as the previous release.)
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-2660 CDH-40241">
+                Impala now recognizes the <codeph>auth_to_local</codeph> setting,
+                specified through the HDFS configuration setting
+                <codeph>hadoop.security.auth_to_local</codeph>.
+                This feature is disabled by default; to enable it,
+                specify <codeph>--load_auth_to_local_rules=true</codeph>
+                in the <cmdname>impalad</cmdname> configuration settings.
+                See <xref href="impala_kerberos.xml#auth_to_local"/> for details.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-2599">
+                Timing improvements in the mechanism for the <cmdname>impalad</cmdname>
+                daemon to acquire Kerberos tickets. This feature spreads out the overhead
+                on the KDC during Impala startup, especially for large clusters.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-3554">
+                For Kerberized clusters, the Catalog service now uses
+                the Kerberos principal instead of the operating sytem user that runs
+                the <cmdname>catalogd</cmdname> daemon. 
+                This eliminates the requirement to configure a <codeph>hadoop.user.group.static.mapping.overrides</codeph> 
+                setting to put the OS user into the Sentry administrative group, on clusters where the principal
+                and the OS user name for this user are different.
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p rev="IMPALA-3286">
+            Overall performance improvements for join queries, by using a prefetching mechanism
+            while building the in-memory hash table to evaluate join predicates.
+            See <xref href="impala_prefetch_mode.xml#prefetch_mode"/> for the query option
+            to control this optimization.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3397 CDH-40097">
+            The <cmdname>impala-shell</cmdname> interpreter has a new command,
+            <codeph>SOURCE</codeph>, that lets you run a set of SQL statements
+            or other <cmdname>impala-shell</cmdname> commands stored in a file.
+            You can run additional <codeph>SOURCE</codeph> commands from inside
+            a file, to set up flexible sequences of statements for use cases
+            such as schema setup, ETL, or reporting.
+            See <xref href="impala_shell_commands.xml#shell_commands"/> for details
+            and <xref href="impala_shell_running_commands.xml#shell_running_commands"/>
+            for examples.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1772 CDH-38381">
+            The <codeph>millisecond()</codeph> built-in function lets you extract
+            the fractional seconds part of a <codeph>TIMESTAMP</codeph> value.
+            See <xref href="impala_datetime_functions.xml#datetime_functions"/> for details.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3092">
+            If an Avro table is created without column definitions in the
+            <codeph>CREATE TABLE</codeph> statement, and columns are later
+            added through <codeph>ALTER TABLE</codeph>, the resulting
+            table is now queryable. Missing values from the newly added
+            columns now default to <codeph>NULL</codeph>.
+            See <xref href="impala_avro.xml#avro"/> for general details about
+            working with Avro files.
+          </p>
+        </li>
+        <li>
+          <p>
+            The mechanism for interpreting <codeph>DECIMAL</codeph> literals is
+            improved, no longer going through an intermediate conversion step
+            to <codeph>DOUBLE</codeph>:
+            <ul>
+              <li>
+                <p rev="IMPALA-3163">
+                  Casting a <codeph>DECIMAL</codeph> value to <codeph>TIMESTAMP</codeph>
+                  <codeph>DOUBLE</codeph> produces a more precise
+                  value for the <codeph>TIMESTAMP</codeph> than formerly.
+                </p>
+              </li>
+              <li>
+                <p rev="IMPALA-3439">
+                  Certain function calls involving <codeph>DECIMAL</codeph> literals
+                  now succeed, when formerly they failed due to lack of a function
+                  signature with a <codeph>DOUBLE</codeph> argument.
+                </p>
+              </li>
+              <li>
+                <p rev="">
+                  Faster runtime performance for <codeph>DECIMAL</codeph> constant
+                  values, through improved native code generation for all combinations
+                  of precision and scale.
+                </p>
+              </li>
+            </ul>
+            See <xref href="impala_decimal.xml#decimal"/> for details about the <codeph>DECIMAL</codeph> type.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3155">
+            Improved type accuracy for <codeph>CASE</codeph> return values.
+            If all <codeph>WHEN</codeph> clauses of the <codeph>CASE</codeph>
+            expression are of <codeph>CHAR</codeph> type, the final result
+            is also <codeph>CHAR</codeph> instead of being converted to
+            <codeph>STRING</codeph>.
+            See <xref href="impala_conditional_functions.xml#conditional_functions"/>
+            for details about the <codeph>CASE</codeph> function.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3232">
+            Uncorrelated queries using the <codeph>NOT EXISTS</codeph> operator
+            are now supported. Formerly, the <codeph>NOT EXISTS</codeph>
+            operator was only available for correlated subqueries.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2736">
+            Improved performance for reading Parquet files.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3375">
+            Improved performance for <term>top-N</term> queries, that is,
+            those including both <codeph>ORDER BY</codeph> and
+            <codeph>LIMIT</codeph> clauses.
+          </p>
+        </li>
+        <!-- JIRA still in open state as of 5.8 / 2.6, commenting out.
+        <li>
+          <p rev="IMPALA-3471">
+            A top-N query can now also activate the spill-to-disk mechanism if
+            a host runs low on memory while evaluating it. For example, using
+            large <codeph>LIMIT</codeph> and/or <codeph>OFFSET</codeph> clauses
+            adds some memory overhead that could cause spilling.
+          </p>
+        </li>
+        -->
+        <li>
+          <p rev="IMPALA-1740">
+            Impala optionally skips an arbitrary number of header lines from text input
+            files on HDFS based on the <codeph>skip.header.line.count</codeph> value
+            in the <codeph>TBLPROPERTIES</codeph> field of the table metadata.
+            See <xref href="impala_txtfile.xml#text_data_files"/> for details.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2336">
+            Trailing comments are now allowed in queries processed by
+            the <cmdname>impala-shell</cmdname> options <codeph>-q</codeph>
+            and <codeph>-f</codeph>.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2844">
+            Impala can run <codeph>COUNT</codeph> queries for RCFile tables
+            that include complex type columns.
+            See <xref href="impala_complex_types.xml#complex_types"/> for
+            general information about working with complex types,
+            and <xref href="impala_array.xml#array"/>,
+            <xref href="impala_map.xml#map"/>, and <xref href="impala_struct.xml#struct"/>
+            for syntax details of each type.
+          </p>
+        </li>
+      </ul>
+
+    </conbody>
+  </concept>
+
+<!-- All 2.5.x new features go under here -->
+
+  <concept rev="2.5.0" id="new_features_250">
+
+    <title>New Features in Impala 2.5.x / CDH 5.7.x</title>
+
+    <conbody>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_250" />
+
+      <ul>
+        <li><!-- Spec: https://docs.google.com/document/d/1ambtYJ1t05iITCVIrN6N1A-e7PZBSetBPgjy8SLzJrA/edit#heading=h.vcftzwlpn845 -->
+          <p rev="CDH-33292 IMPALA-2552 IMPALA-3054">
+            Dynamic partition pruning. When a query refers to a partition key column in a <codeph>WHERE</codeph>
+            clause, and the exact set of column values are not known until the query is executed,
+            Impala evaluates the predicate and skips the I/O for entire partitions that are not needed.
+            For example, if a table was partitioned by year, Impala would apply this technique to a query
+            such as <codeph>SELECT c1 FROM partitioned_table WHERE year = (SELECT MAX(year) FROM other_table)</codeph>.
+            <ph audience="standalone">See <xref href="impala_partitioning.xml#dynamic_partition_pruning"/> for details.</ph>
+          </p>
+          <p>
+            The dynamic partition pruning optimization technique lets Impala avoid reading
+            data files from partitions that are not part of the result set, even when
+            that determination cannot be made in advance. This technique is especially valuable
+            when performing join queries involving partitioned tables. For example, if a join
+            query includes an <codeph>ON</codeph> clause and a <codeph>WHERE</codeph> clause
+            that refer to the same columns, the query can find the set of column values that
+            match the <codeph>WHERE</codeph> clause, and only scan the associated partitions
+            when evaluating the <codeph>ON</codeph> clause.
+          </p>
+          <p>
+            Dynamic partition pruning is controlled by the same settings as the runtime filtering feature.
+            By default, this feature is enabled at a medium level, because the maximum setting can use
+            slightly more memory for queries than in previous releases.
+            To fully enable this feature, set the query option <codeph>RUNTIME_FILTER_MODE=GLOBAL</codeph>.
+          </p>
+        </li>
+        <li><!-- Spec: https://docs.google.com/document/d/1ambtYJ1t05iITCVIrN6N1A-e7PZBSetBPgjy8SLzJrA/edit#heading=h.vcftzwlpn845 -->
+          <p rev="IMPALA-2419 IMPALA-3001 IMPALA-3008 IMPALA-3039 IMPALA-3046 IMPALA-3054">
+            Runtime filtering. This is a wide-ranging set of optimizations that are especially valuable for join queries.
+            Using the same technique as with dynamic partition pruning,
+            Impala uses the predicates from <codeph>WHERE</codeph> and <codeph>ON</codeph> clauses
+            to determine the subset of column values from one of the joined tables could possibly be part of the
+            result set. Impala sends a compact representation of the filter condition to the hosts in the cluster,
+            instead of the full set of values or the entire table.
+            <ph audience="PDF">See <xref href="impala_runtime_filtering.xml#runtime_filtering"/> for details.</ph>
+          </p>
+          <p>
+            By default, this feature is enabled at a medium level, because the maximum setting can use
+            slightly more memory for queries than in previous releases.
+            To fully enable this feature, set the query option <codeph>RUNTIME_FILTER_MODE=GLOBAL</codeph>.
+            <ph audience="PDF">See <xref href="impala_runtime_filter_mode.xml#runtime_filter_mode"/> for details.</ph>
+          </p>
+          <p>
+            This feature involves some new query options:
+            <xref audience="standalone" href="impala_runtime_filter_mode.xml">RUNTIME_FILTER_MODE</xref><codeph audience="integrated">RUNTIME_FILTER_MODE</codeph>,
+            <xref audience="standalone" href="impala_max_num_runtime_filters.xml">MAX_NUM_RUNTIME_FILTERS</xref><codeph audience="integrated">MAX_NUM_RUNTIME_FILTERS</codeph>,
+            <xref audience="standalone" href="impala_runtime_bloom_filter_size.xml">RUNTIME_BLOOM_FILTER_SIZE</xref><codeph audience="integrated">RUNTIME_BLOOM_FILTER_SIZE</codeph>,
+            <xref audience="standalone" href="impala_runtime_filter_wait_time_ms.xml">RUNTIME_FILTER_WAIT_TIME_MS</xref><codeph audience="integrated">RUNTIME_FILTER_WAIT_TIME_MS</codeph>,
+            and <xref audience="standalone" href="impala_disable_row_runtime_filtering.xml">DISABLE_ROW_RUNTIME_FILTERING</xref><codeph audience="integrated">DISABLE_ROW_RUNTIME_FILTERING</codeph>.
+            <ph audience="PDF">See
+            <xref href="impala_runtime_filter_mode.xml#runtime_filter_mode">RUNTIME_FILTER_MODE</xref>,
+            <xref href="impala_max_num_runtime_filters.xml#max_num_runtime_filters">MAX_NUM_RUNTIME_FILTERS</xref>,
+            <xref href="impala_runtime_bloom_filter_size.xml#runtime_bloom_filter_size">RUNTIME_BLOOM_FILTER_SIZE</xref>,
+            <xref href="impala_runtime_filter_wait_time_ms.xml#runtime_filter_wait_time_ms">RUNTIME_FILTER_WAIT_TIME_MS</xref>, and
+            <xref href="impala_disable_row_runtime_filtering.xml#disable_row_runtime_filtering">DISABLE_ROW_RUNTIME_FILTERING</xref>
+            for details.
+            </ph>
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2696">
+            More efficient use of the HDFS caching feature, to avoid
+            hotspots and bottlenecks that could occur if heavily used
+            cached data blocks were always processed by the same host.
+            By default, Impala now randomizes which host processes each cached
+            HDFS data block, when cached replicas are available on multiple hosts.
+            (Remember to use the <codeph>WITH REPLICATION</codeph> clause with the
+            <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph> statement
+            when enabling HDFS caching for a table or partition, to cache the same
+            data blocks across multiple hosts.)
+            The new query option <codeph>SCHEDULE_RANDOM_REPLICA</codeph>
+            <!-- and <codeph>REPLICA_PREFERENCE</codeph> -->
+            lets you fine-tune the interaction with HDFS caching even more.
+            <ph audience="PDF">See <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2641">
+            The <codeph>TRUNCATE TABLE</codeph> statement now accepts an <codeph>IF EXISTS</codeph>
+            clause, making <codeph>TRUNCATE TABLE</codeph> easier to use in setup or ETL scripts where the table might or
+            might not exist.
+            <ph audience="PDF">See <xref href="impala_truncate_table.xml#truncate_table"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2681 IMPALA-2688 IMPALA-2749">
+            Improved performance and reliability for the <codeph>DECIMAL</codeph> data type:
+            <ul>
+            <li>
+              <p rev="IMPALA-2681">
+                Using <codeph>DECIMAL</codeph> values in a <codeph>GROUP BY</codeph> clause now
+                triggers the native code generation optimization, speeding up queries that
+                group by values such as prices.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-2688">
+                Checking for overflow in <codeph>DECIMAL</codeph>
+                multiplication is now substantially faster, making <codeph>DECIMAL</codeph>
+                a more practical data type in some use cases where formerly <codeph>DECIMAL</codeph>
+                was much slower than <codeph>FLOAT</codeph> or <codeph>DOUBLE</codeph>.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-2749">
+                Multiplying a mixture of <codeph>DECIMAL</codeph>
+                and <codeph>FLOAT</codeph> or <codeph>DOUBLE</codeph> values now returns the
+                <codeph>DOUBLE</codeph> rather than <codeph>DECIMAL</codeph>. This change avoids
+                some cases where an intermediate value would underflow or overflow and become
+                <codeph>NULL</codeph> unexpectedly.
+              </p>
+            </li>
+            </ul>
+            <ph audience="PDF">See <xref href="impala_decimal.xml"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2382">
+            For UDFs written in Java, or Hive UDFs reused for Impala,
+            Impala now allows parameters and return values to be primitive types.
+            Formerly, these things were required to be one of the <q>Writable</q>
+            object types.
+            <ph audience="PDF">See <xref href="impala_udf.xml#udfs_hive"/> for details.</ph>
+          </p>
+        </li>
+        <!-- CDH-33298 is for scoping internationalization / UTF-8 / Unicode support. That work is pushed out to 5.8.
+        <li>
+          <p rev="CDH-33298">
+            Improvements to internationalization support.
+            Now Impala can process data that uses the UTF-8 character encoding.
+          </p>
+        </li>
+        -->
+        <li>
+          <p rev="IMPALA-1588"><!-- This is from 2015, so perhaps it's really in an earlier release. -->
+            Performance improvements for HDFS I/O. Impala now caches HDFS file handles to avoid the
+            overhead of repeatedly opening the same file.
+          </p>
+        </li>
+
+        <!-- Kudu didn't make it into 2.5 / 5.7 release, so no DELETE or UPDATE statement. -->
+        <li>
+          <p><!-- Is there a JIRA for that one? Alex? -->
+            Performance improvements for queries involving nested complex types.
+            Certain basic query types, such as counting the elements of a complex column,
+            now use an optimized code path.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3044 IMPALA-2538 IMPALA-1168 CDH-33289 CDH-34603">
+            Improvements to the memory reservation mechanism for the Impala
+            admission control feature. You can specify more settings, such
+            as the timeout period and maximum aggregate memory used, for each
+            resource pool instead of globally for the Impala instance. The
+            default limit for concurrent queries (the <uicontrol>max requests</uicontrol>
+            setting) is now unlimited instead of 200.
+            The Cloudera Manager user interface for admission control has been
+            reworked, with the settings available under the
+            <uicontrol>Dynamic Resource Pools</uicontrol> window.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1755">
+            Performance improvements related to code generation.
+            Even in queries where code generation is not performed
+            for some phases of execution (such as reading data from
+            Parquet tables), Impala can still use code generation in
+            other parts of the query, such as evaluating
+            functions in the <codeph>WHERE</codeph> clause.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1305">
+            Performance improvements for queries using aggregation functions
+            on high-cardinality columns.
+            Formerly, Impala could do unnecessary extra work to produce intermediate
+            results for operations such as <codeph>DISTINCT</codeph> or <codeph>GROUP BY</codeph>
+            on columns that were unique or had few duplicate values.
+            Now, Impala decides at run time whether it is more efficient to
+            do an initial aggregation phase and pass along a smaller set of intermediate data,
+            or to pass raw intermediate data back to next phase of query processing to be aggregated there.
+            This feature is known as <term>streaming pre-aggregation</term>.
+            In case of performance regression, this feature can be turned off
+            using the <codeph>DISABLE_STREAMING_PREAGGREGATIONS</codeph> query option.
+            <ph audience="PDF">See <xref href="impala_disable_streaming_preaggregations.xml#disable_streaming_preaggregations"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <p>
+            Spill-to-disk feature now always recommended. In earlier releases, the spill-to-disk feature
+            could be turned off using a pair of configuration settings,
+            <codeph>enable_partitioned_aggregation=false</codeph> and
+            <codeph>enable_partitioned_hash_join=false</codeph>.
+            The latest improvements in the spill-to-disk mechanism, and related features that
+            interact with it, make this feature robust enough that disabling it is now
+            no longer needed or supported. In particular, some new features in <keyword keyref="impala25_full"/>
+            and higher do not work when the spill-to-disk feature is disabled.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1067">
+            Improvements to scripting capability for the <cmdname>impala-shell</cmdname> command,
+            through user-specified substitution variables that can appear in statements processed
+            by <cmdname>impala-shell</cmdname>:
+          </p>
+          <ul>
+            <li rev="IMPALA-2179">
+              <p>
+                The <codeph>--var</codeph> command-line option lets you pass key-value pairs to
+                <cmdname>impala-shell</cmdname>. The shell can substitute the values
+                into queries before executing them, where the query text contains the notation
+                <codeph>${var:<varname>varname</varname>}</codeph>. For example, you might prepare a SQL file
+                containing a set of DDL statements and queries containing variables for
+                database and table names, and then pass the applicable names as part of the
+                <codeph>impala-shell -f <varname>filename</varname></codeph> command.
+                <ph audience="PDF">See <xref href="impala_shell_running_commands.xml#shell_running_commands"/> for details.</ph>
+              </p>
+            </li>
+            <li rev="IMPALA-2180">
+              <p>
+                The <codeph>SET</codeph> and <codeph>UNSET</codeph> commands within the
+                <cmdname>impala-shell</cmdname> interpreter now work with user-specified
+                substitution variables, as well as the built-in query options.
+                The two kinds of variables are divided in the <codeph>SET</codeph> output.
+                As with variables defined by the <codeph>--var</codeph> command-line option,
+                you refer to the user-specified substitution variables in queries by using
+                the notation <codeph>${var:<varname>varname</varname>}</codeph>
+                in the query text. Because the substitution variables are processed by
+                <cmdname>impala-shell</cmdname> instead of the <cmdname>impalad</cmdname>
+                backend, you cannot define your own substitution variables through the
+                <codeph>SET</codeph> statement in a JDBC or ODBC application.
+                <ph audience="PDF">See <xref href="impala_set.xml#set"/> for details.</ph>
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p rev="IMPALA-1599">
+            Performance improvements for query startup. Impala better parallelizes certain work
+            when coordinating plan distribution between <cmdname>impalad</cmdname> instances, which improves
+            startup time for queries involving tables with many partitions on large clusters,
+            or complicated queries with many plan fragments.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2560">
+            Performance and scalability improvements for tables with many partitions.
+            The memory requirements on the coordinator node are reduced, making it substantially
+            faster and less resource-intensive
+            to do joins involving several tables with thousands of partitions each.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3095">
+            Whitelisting for access to internal APIs. For applications that need direct access
+            to Impala APIs, without going through the HiveServer2 or Beeswax interfaces, you can
+            specify a list of Kerberos users who are allowed to call those APIs. By default, the
+            <codeph>impala</codeph> and <codeph>hdfs</codeph> users are the only ones authorized
+            for this kind of access.
+            Any users not explicitly authorized through the <codeph>internal_principals_whitelist</codeph>
+            configuration setting are blocked from accessing the APIs. This setting applies to all the
+            Impala-related daemons, although currently it is primarily used for HDFS to control the
+            behavior of the catalog server.
+          </p>
+        </li>
+        <li>
+          <p rev="CDH-37009 CDH-30378">
+            Improvements to Impala integration and usability for Hue. (The code changes
+            are actually on the Hue side.)
+          </p>
+          <ul>
+          <li>
+            <p rev="CDH-37009">
+              The list of tables now refreshes dynamically.
+            </p>
+          </li>
+          </ul>
+        </li>
+        <li>
+          <p rev="IMPALA-1787">
+            Usability improvements for case-insensitive queries.
+            You can now use the operators <codeph>ILIKE</codeph> and <codeph>IREGEXP</codeph>
+            to perform case-insensitive wildcard matches or regular expression matches,
+            rather than explicitly converting column values with <codeph>UPPER</codeph>
+            or <codeph>LOWER</codeph>.
+            <ph audience="PDF">See <xref href="impala_operators.xml#ilike"/> and <xref href="impala_operators.xml#iregexp"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1480">
+            Performance and reliability improvements for DDL and insert operations on partitioned tables with a large
+            number of partitions. Impala only re-evaluates metadata for partitions that are affected by
+            a DDL operation, not all partitions in the table. While a DDL or insert statement is in progress,
+            other Impala statements that attempt to modify metadata for the same table wait until the first one
+            finishes.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2867">
+            Reliability improvements for the <codeph>LOAD DATA</codeph> statement.
+            Previously, this statement would fail if the source HDFS directory
+            contained any subdirectories at all. Now, the statement ignores
+            any hidden subdirectories, for example <filepath>_impala_insert_staging</filepath>.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2147">
+            A new operator, <codeph>IS [NOT] DISTINCT FROM</codeph>, lets you compare values
+            and always get a <codeph>true</codeph> or <codeph>false</codeph> result,
+            even if one or both of the values are <codeph>NULL</codeph>.
+            The <codeph>IS NOT DISTINCT FROM</codeph> operator, or its equivalent
+            <codeph>&lt;=&gt;</codeph> notation, improves the efficiency of join queries that
+            treat key values that are <codeph>NULL</codeph> in both tables as equal.
+            <ph audience="PDF">See <xref href="impala_operators.xml#is_distinct_from"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1934">
+            Security enhancements for the <cmdname>impala-shell</cmdname> command.
+            A new option, <codeph>--ldap_password_cmd</codeph>, lets you specify
+            a command to retrieve the LDAP password. The resulting password is
+            then used to authenticate the <cmdname>impala-shell</cmdname> command
+            with the LDAP server.
+            <ph audience="PDF">See <xref href="impala_shell_options.xml"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <p>
+            The <codeph>CREATE TABLE AS SELECT</codeph> statement now accepts a
+            <codeph>PARTITIONED BY</codeph> clause, which lets you create a
+            partitioned table and insert data into it with a single statement.
+            <ph audience="PDF">See <xref href="impala_create_table.xml#create_table"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1748 CDH-38369">
+            User-defined functions (UDFs and UDAFs) written in C++ now persist automatically
+            when the <cmdname>catalogd</cmdname> daemon is restarted. You no longer
+            have to run the <codeph>CREATE FUNCTION</codeph> statements again after a restart.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2843 CDH-39148">
+            User-defined functions (UDFs) written in Java can now persist
+            when the <cmdname>catalogd</cmdname> daemon is restarted, and can be shared
+            transparently between Impala and Hive. You must do a one-time operation to recreate these
+            UDFs using new <codeph>CREATE FUNCTION</codeph> syntax, without a signature for arguments
+            or the return value. Afterwards, you no longer have to run the <codeph>CREATE FUNCTION</codeph>
+            statements again after a restart.
+            Although Impala does not have visibility into the UDFs that implement the 
+            Hive built-in functions, user-created Hive UDFs are now automatically available
+            for calling through Impala.
+            <ph audience="PDF">See <xref href="impala_create_function.xml#create_function"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <!-- Listed as fixed in 2.6.0. Is this item inappropriate or did it actually come from a different JIRA? -->
+          <p rev="IMPALA-2728">
+            Reliability enhancements for memory management. Some aggregation and join queries
+            that formerly might have failed with an out-of-memory error due to memory contention,
+            now can succeed using the spill-to-disk mechanism.
+          </p>
+        </li>
+        <li>
+          <!-- Same blurb is under Incompatible Changes. Turn into a conref. -->
+          <p rev="IMPALA-2070">
+            The <codeph>SHOW DATABASES</codeph> statement now returns two columns rather than one.
+            The second column includes the associated comment string, if any, for each database.
+            Adjust any application code that examines the list of databases and assumes the
+            result set contains only a single column.
+            <ph audience="PDF">See <xref href="impala_show.xml#show_databases"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-2499">
+            A new optimization speeds up aggregation operations that involve only the partition key
+            columns of partitioned tables. For example, a query such as <codeph>SELECT COUNT(DISTINCT k), MIN(k), MAX(k) FROM t1</codeph>
+            can avoid reading any data files if <codeph>T1</codeph> is a partitioned table and <codeph>K</codeph>
+            is one of the partition key columns. Because this technique can produce different results in cases
+            where HDFS files in a partition are manually deleted or are empty, you must enable the optimization
+            by setting the query option <codeph>OPTIMIZE_PARTITION_KEY_SCANS</codeph>.
+            <ph audience="PDF">See <xref href="impala_optimize_partition_key_scans.xml"/> for details.</ph>
+          </p>
+        </li>
+        <li audience="Cloudera"><!-- All the other undocumented query options are not really new features for this release, so hiding this whole bullet. -->
+          <p>
+            Other new query options:
+          </p>
+          <ul>
+            <li audience="Cloudera"><!-- Actually from a long way back, just never documented. Not sure if appropriate to keep internal-only or expose. -->
+              <codeph>DISABLE_OUTERMOST_TOPN</codeph>
+            </li>
+            <li audience="Cloudera"><!-- Actually from a long way back, just never documented. Not sure if appropriate to keep internal-only or expose. -->
+              <codeph>RM_INITIAL_MEM</codeph>
+            </li>
+            <li audience="Cloudera"><!-- Seems to be related to writing sequence files, a capability not externalized at this time. -->
+              <codeph>SEQ_COMPRESSION_MODE</codeph>
+            </li>
+            <li audience="Cloudera"><!-- Actually, was only used for working around one JIRA. Being deprecated now in Impala 2.3 via IMPALA-2963. -->
+              <codeph>DISABLE_CACHED_READS</codeph>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p rev="IMPALA-2196">
+            The <codeph>DESCRIBE</codeph> statement can now display metadata about a database, using the
+            syntax <codeph>DESCRIBE DATABASE <varname>db_name</varname></codeph>.
+            <ph audience="PDF">See <xref href="impala_describe.xml#describe"/> for details.</ph>
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1477">
+            The <codeph>uuid()</codeph> built-in function generates an
+            alphanumeric value that you can use as a guaranteed unique identifier.
+            The uniqueness applies even across tables, for cases where an ascending
+            numeric sequence is not suitable.
+            <ph audience="PDF">See <xref href="impala_misc_functions.xml#misc_functions"/> for details.</ph>
+          </p>
+        </li>
+      </ul>
+
+    </conbody>
+  </concept>
+
+<!-- All 2.4.x new features go under here -->
+
+  <concept rev="2.4.0" id="new_features_240">
+
+    <title>New Features in Impala 2.4.x / CDH 5.6.x</title>
+
+    <conbody>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_240" />
+
+      <ul>
+        <li>
+          <p>
+            Impala can be used on the DSSD D5 Storage Appliance.
+            From a user perspective, the Impala features are the same as in CDH 5.5 / Impala 2.3.
+          </p>
+        </li>
+      </ul>
+
+    </conbody>
+  </concept>
+
+<!-- All 2.3.x subsections go under here -->
+
+<!-- Actually for 2.3 / 5.5, let's get away from doing a separate subhead for each maintenance release,
+     because in the normal course of events there will be nothing to add here until 5.6. If something new
+     needs to get noted, just add a new bullet with wording to indicate which 5.5.x release it applies to. -->
+
+  <concept rev="2.3.0" id="new_features_230">
+
+    <title>New Features in Impala 2.3.x / CDH 5.5.x</title>
+
+    <conbody>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_23x" />
+
+      <p>
+        The following are the major new features in Impala 2.3.x. This major release, available as part of CDH
+        5.5.x, contains improvements to SQL syntax (particularly new support for complex types), performance,
+        manageability, security.
+      </p>
+
+      <ul>
+
+        <li>
+          <p>
+            Complex data types: <codeph>STRUCT</codeph>, <codeph>ARRAY</codeph>, and <codeph>MAP</codeph>. These
+            types can encode multiple named fields, positional items, or key-value pairs within a single column.
+            You can combine these types to produce nested types with arbitrarily deep nesting,
+            such as an <codeph>ARRAY</codeph> of <codeph>STRUCT</codeph> values,
+            a <codeph>MAP</codeph> where each key-value pair is an <codeph>ARRAY</codeph> of other <codeph>MAP</codeph> values,
+            and so on. Currently, complex data types are only supported for the Parquet file format.
+            <ph audience="PDF">See <xref href="impala_complex_types.xml#complex_types"/> for usage details and <xref href="impala_array.xml#array"/>, <xref href="impala_struct.xml#struct"/>, and <xref href="impala_map.xml#map"/> for syntax.</ph>
+          </p>
+        </li>
+
+        <li rev="collevelauth">
+          <p>
+            Column-level authorization lets you define access to particular columns within a table,
+            rather than the entire table. This feature lets you reduce the reliance on creating views to
+            set up authorization schemes for subsets of information.
+            <ph audience="integrated">See <xref href="sg_hive_sql.xml#concept_c2q_4qx_p4/col_level_auth_sentry"/> for background details, and <xref href="impala_grant.xml#grant"/> and <xref href="impala_revoke.xml#revoke"/> for Impala-specific syntax.</ph>
+          </p>
+        </li>
+
+        <li rev="IMPALA-1139">
+          <p>
+            The <codeph>TRUNCATE TABLE</codeph> statement removes all the data from a table without removing the table itself.
+            <ph audience="PDF">See <xref href="impala_truncate_table.xml#truncate_table"/> for details.</ph>
+          </p>
+        </li>
+
+        <li id="IMPALA-2015">
+          <p>
+            Nested loop join queries. Some join queries that formerly required equality comparisons can now use
+            operators such as <codeph>&lt;</codeph> or <codeph>&gt;=</codeph>. This same join mechanism is used
+            internally to optimize queries that retrieve values from complex type columns.
+            <ph audience="PDF">See <xref href="impala_joins.xml#joins"/> for details about Impala join queries.</ph>
+          </p>
+        </li>
+
+        <li id="CDH-28141">
+          <p>
+            Reduced memory usage and improved performance and robustness for spill-to-disk feature.
+            <ph audience="PDF">See <xref href="impala_scalability.xml#spill_to_disk"/> for details about this feature.</ph>
+          </p>
+        </li>
+
+        <li rev="IMPALA-1881 CDH-34620">
+          <p>
+            Performance improvements for querying Parquet data files containing multiple row groups
+            and multiple data blocks:
+          </p>
+          <ul>
+          <li>
+          <p> For files written by Hive, SparkSQL, and other Parquet MR writers
+                and spanning multiple HDFS blocks, Impala now scans the extra
+                data blocks locally when possible, rather than using remote
+                reads. </p>
+          </li>
+          <li>
+          <p>
+            Impala queries benefit from the improved alignment of row groups with HDFS blocks for Parquet
+            files written by Hive, MapReduce, and other components in <ph rev="upstream">CDH 5.5</ph> and higher. (Impala itself never writes
+            multiblock Parquet files, so the alignment change does not apply to Parquet files produced by Impala.)
+            These Parquet writers now add padding to Parquet files that they write to align row groups with HDFS blocks.
+            The <codeph>parquet.writer.max-padding</codeph> setting specifies the maximum number of bytes, by default
+            8 megabytes, that can be added to the file between row groups to fill the gap at the end of one block
+            so that the next row group starts at the beginning of the next block.
+            If the gap is larger than this size, the writer attempts to fit another entire row group in the remaining space.
+            Include this setting in the <filepath>hive-site</filepath> configuration file to influence Parquet files written by Hive,
+            or the <filepath>hdfs-site</filepath> configuration file to influence Parquet files written by all non-Impala components.
+          </p>
+          </li>
+          </ul>
+          <p audience="PDF">
+            See <xref href="impala_parquet.xml#parquet"/> for instructions about using Parquet data files
+            with Impala, and
+            <xref audience="integrated" href="cdh_ig_parquet.xml#parquet_format"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_parquet.html" scope="external" format="html"/>
+            for instructions for
+            other components that can read and write Parquet files.
+          </p>
+        </li>
+
+        <li id="IMPALA-1660">
+          <p>
+            Many new built-in scalar functions, for convenience and enhanced portability of SQL that uses common industry extensions.
+          </p>
+
+          <p rev="IMPALA-1771">
+            Math functions<ph audience="PDF"> (see <xref href="impala_math_functions.xml#math_functions"/> for details)</ph>:
+          </p>
+          <ul>
+            <li>
+              <codeph>ATAN2</codeph>
+            </li>
+
+            <li>
+              <codeph>COSH</codeph>
+            </li>
+
+            <li>
+              <codeph>COT</codeph>
+            </li>
+
+            <li>
+              <codeph>DCEIL</codeph>
+            </li>
+
+            <li>
+              <codeph>DEXP</codeph>
+            </li>
+
+            <li>
+              <codeph>DFLOOR</codeph>
+            </li>
+
+            <li>
+              <codeph>DLOG10</codeph>
+            </li>
+
+            <li>
+              <codeph>DPOW</codeph>
+            </li>
+
+            <li>
+              <codeph>DROUND</codeph>
+            </li>
+
+            <li>
+              <codeph>DSQRT</codeph>
+            </li>
+
+            <li>
+              <codeph>DTRUNC</codeph>
+            </li>
+
+            <li>
+              <codeph>FACTORIAL</codeph>, and corresponding <codeph>!</codeph> operator
+            </li>
+
+            <li>
+              <codeph>FPOW</codeph>
+            </li>
+
+            <li>
+              <codeph>RADIANS</codeph>
+            </li>
+
+            <li>
+              <codeph>RANDOM</codeph>
+            </li>
+
+            <li>
+              <codeph>SINH</codeph>
+            </li>
+
+            <li>
+              <codeph>TANH</codeph>
+            </li>
+          </ul>
+
+          <p>
+            String functions<ph audience="PDF"> (see <xref href="impala_string_functions.xml#string_functions"/> for details)</ph>:
+          </p>
+          <ul>
+            <li>
+              <codeph>BTRIM</codeph>
+            </li>
+            <li>
+              <codeph>CHR</codeph>
+            </li>
+            <li>
+              <codeph>REGEXP_LIKE</codeph>
+            </li>
+            <li>
+              <codeph>SPLIT_PART</codeph>
+            </li>
+          </ul>
+
+          <p>
+            Date and time functions<ph audience="PDF"> (see <xref href="impala_datetime_functions.xml#datetime_functions"/> for details)</ph>:
+          </p>
+          <ul>
+              <li>
+                <codeph>INT_MONTHS_BETWEEN</codeph>
+              </li>
+              <li>
+                <codeph>MONTHS_BETWEEN</codeph>
+              </li>
+              <li>
+                <codeph>TIMEOFDAY</codeph>
+              </li>
+              <li>
+                <codeph>TIMESTAMP_CMP</codeph>
+              </li>
+          </ul>
+
+          <p>
+            Bit manipulation functions<ph audience="PDF"> (see <xref href="impala_bit_functions.xml#bit_functions"/> for details)</ph>:
+          </p>
+          <ul>
+            <li>
+              <codeph>BITAND</codeph>
+            </li>
+
+            <li>
+              <codeph>BITNOT</codeph>
+            </li>
+
+            <li>
+              <codeph>BITOR</codeph>
+            </li>
+
+            <li>
+              <codeph>BITXOR</codeph>
+            </li>
+
+            <li>
+              <codeph>COUNTSET</codeph>
+            </li>
+
+            <li>
+              <codeph>GETBIT</codeph>
+            </li>
+
+            <li>
+              <codeph>ROTATELEFT</codeph>
+            </li>
+
+            <li>
+              <codeph>ROTATERIGHT</codeph>
+            </li>
+
+            <li>
+              <codeph>SETBIT</codeph>
+            </li>
+
+            <li>
+              <codeph>SHIFTLEFT</codeph>
+            </li>
+
+            <li>
+              <codeph>SHIFTRIGHT</codeph>
+            </li>
+          </ul>
+          <p>
+            Type conversion functions<ph audience="PDF"> (see <xref href="impala_conversion_functions.xml#conversion_functions"/> for details)</ph>:
+          </p>
+          <ul>
+            <li>
+              <codeph>TYPEOF</codeph>
+            </li>
+          </ul>
+          <p>
+            The <codeph>effective_user()</codeph> function<ph audience="PDF"> (see <xref href="impala_misc_functions.xml#misc_functions"/> for details)</ph>.
+          </p>
+        </li>
+
+        <li id="IMPALA-2081">
+          <p>
+            New built-in analytic functions: <codeph>PERCENT_RANK</codeph>, <codeph>NTILE</codeph>,
+            <codeph>CUME_DIST</codeph>.
+            <ph audience="PDF">See <xref href="impala_analytic_functions.xml#analytic_functions"/> for details.</ph>
+          </p>
+        </li>
+
+        <li id="IMPALA-595">
+          <p>
+            The <codeph>DROP DATABASE</codeph> statement now works for a non-empty database.
+            When you specify the optional <codeph>CASCADE</codeph> clause, any tables in the
+            database are dropped before the database itself is removed.
+            <ph audience="PDF">See <xref href="impala_drop_database.xml#drop_database"/> for details.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>DROP TABLE</codeph> and <codeph>ALTER TABLE DROP PARTITION</codeph> statements have a new optional keyword, <codeph>PURGE</codeph>.
+            This keyword causes Impala to immediately remove the relevant HDFS data files rather than sending them to the HDFS trashcan.
+            This feature can help to avoid out-of-space errors on storage devices, and to avoid files being left behind in case of
+            a problem with the HDFS trashcan, such as the trashcan not being configured or being in a different HDFS encryption zone
+            than the data files.
+            <ph audience="PDF">See <xref href="impala_drop_table.xml#drop_table"/> and <xref href="impala_alter_table.xml#alter_table"/> for syntax.</ph>
+          </p>
+        </li>
+
+        <li id="IMPALA-80">
+          <p>
+            The <cmdname>impala-shell</cmdname> command has a new feature for live progress reporting. This feature
+            is enabled through the <codeph>--live_progress</codeph> and <codeph>--live_summary</codeph>
+            command-line options, or during a session through the <codeph>LIVE_SUMMARY</codeph> and
+            <codeph>LIVE_PROGRESS</codeph> query options.
+            <ph audience="PDF">See <xref href="impala_live_progress.xml#live_progress"/> and <xref href="impala_live_summary.xml#live_summary"/> for details.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <cmdname>impala-shell</cmdname> command also now displays a random <q>tip of the day</q> when it starts.
+          </p>
+        </li>
+
+        <li id="IMPALA-1413">
+          <p>
+            The <cmdname>impala-shell</cmdname> option <codeph>-f</codeph> now recognizes a special filename
+            <codeph>-</codeph> to accept input from stdin.
+            <ph audience="PDF">See <xref href="impala_shell_options.xml#shell_options"/> for details about the options for running <cmdname>impala-shell</cmdname> in non-interactive mode.</ph>
+          </p>
+        </li>
+
+        <li id="IMPALA-1963">
+          <p>
+            Format strings for the <codeph>unix_timestamp()</codeph> function can now include numeric timezone offsets.
+            <ph audience="PDF">See <xref href="impala_datetime_functions.xml#datetime_functions"/> for details.</ph>
+          </p>
+        </li>
+
+        <li id="CDH-27547">
+          <p>
+            Impala can now run a specified command to obtain the password to decrypt a private-key PEM file,
+            rather than having the private-key file be unencrypted on disk.
+            <ph audience="PDF">See <xref href="impala_ssl.xml#ssl"/> for details.</ph>
+          </p>
+        </li>
+
+        <li id="IMPALA-859">
+          <p>
+            Impala components now can use SSL for more of their internal communication. SSL is used for
+            communication between all three Impala-related daemons when the configuration option
+            <codeph>ssl_server_certificate</codeph> is enabled. SSL is used for communication with client
+            applications when the configuration option <codeph>ssl_client_ca_certificate</codeph> is enabled.
+            <ph audience="PDF">See <xref href="impala_ssl.xml#ssl"/> for details.</ph>
+          </p>
+          <p>
+            Currently, you can only use one of server-to-server TLS/SSL encryption or Kerberos authentication.
+            This limitation is tracked by the issue
+            <xref href="https://issues.cloudera.org/browse/IMPALA-2598" scope="external" format="html">IMPALA-2598</xref>.
+          </p>
+        </li>
+
+        <li id="IMPALA-1829">
+          <p>
+            Improved flexibility for intermediate data types in user-defined aggregate functions (UDAFs).
+            <ph audience="PDF">See <xref href="impala_udf.xml#udafs"/> for details.</ph>
+          </p>
+        </li>
+
+      </ul>
+
+      <p>
+        In CDH 5.5.2 / Impala 2.3.2, the bug fix for <xref href="https://issues.cloudera.org/browse/IMPALA-2598" scope="external" format="html">IMPALA-2598</xref>
+        removes the restriction on using both Kerberos and SSL for internal communication between Impala components.
+      </p>
+
+<!-- End of new feature list for 2.3 / 5.5. -->
+
+    </conbody>
+
+  </concept>
+
+<!-- All 2.2.x subsections go under here -->
+
+<!-- Removing all the 5.4.x release subtopics for which there wasn't anything to say.
+     Same convention as used in 5.5.x, 5.6.x, 5.7.x, 5.8.x. Only have one subtopic for
+     the .0.
+  <concept rev="5.4.10" id="new_features_2210">
+
+    <title>New Features in Impala 2.2.10 / CDH 5.4.10</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="5.4.9" id="new_features_229">
+
+    <title>New Features in Impala 2.2.9 / CDH 5.4.9</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="5.4.8" id="new_features_228">
+
+    <title>New Features in Impala 2.2.8 / CDH 5.4.8</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="5.4.7" id="new_features_227">
+
+    <title>New Features in Impala 2.2.7 / CDH 5.4.7</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
+
+    </conbody>
+
+  </concept>
+
+  <concept audience="Cloudera" rev="5.4.6" id="new_features_226">
+
+    <title>New Features in Impala 2.2.6 / CDH 5.4.6</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="5.4.5" id="new_features_225">
+
+    <title>New Features in Impala 2.2.x for CDH 5.4.5</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
+
+    </conbody>
+
+  </concept>
+-->
+
+  <concept rev="5.4.3" id="new_features_223">
+
+    <title>New Features in Impala 2.2.x for CDH 5.4.3 and 5.4.4</title>
+
+    <conbody>
+
+      <p>
+        No new features added to the Impala code. The certification of Impala with EMC Isilon under CDH 5.4.4 means
+        that now you can query data stored on Isilon storage devices through Impala. See
+        <xref audience="integrated" href="cm_mc_isilon_service.xml"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_isilon_service.html" scope="external" format="html"/>
+        for details. The same level of Impala is included with both CDH
+        5.4.3 and 5.4.4.
+<!-- This point release is exclusively a bug fix release. -->
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
+
+    </conbody>
+
+  </concept>
+
+<!-- I let the 5.4.3/5.4.3 subtopic above remain in existence, but now back to hiding specific 5.4.x subtopics
+     after the .0 one that has the actual new features.
+  <concept audience="Cloudera" rev="5.4.2" id="new_features_222">
+
+    <title>New Features in Impala 2.2.x for CDH 5.4.2</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="5.4.x" id="new_features_54x">
+
+    <title>New Features in Impala for CDH 5.4.x</title>
+
+    <conbody>
+
+      <p>
+        See <xref href="impala_new_features.xml#new_features_220"/> for the most recent set of new Impala features.
+        CDH maintenance releases such as 5.4.1, 5.4.2, and so on are exclusively bug fix releases,
+        therefore there are no new features for the 5.4.x series after 5.4.0.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
+
+    </conbody>
+
+  </concept>
+-->
+
+  <concept rev="2.2.0" id="new_features_220">
+
+    <title>New Features in Impala 2.2.x / CDH 5.4.x</title>
+
+    <conbody>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_220" />
+
+      <p>
+        The following are the major new features in Impala 2.2.x. This release, available as part of CDH
+        5.4.x, contains improvements to performance, manageability, security, and SQL syntax.
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            Several improvements to date and time features enable higher interoperability with Hive and other
+            database systems, provide more flexibility for handling time zones, and future-proof the handling of
+            <codeph>TIMESTAMP</codeph> values:
+          </p>
+          <ul>
+            <li>
+              <p>
+                The <codeph>WITH REPLICATION</codeph> clause for the <codeph>CREATE TABLE</codeph> and
+                <codeph>ALTER TABLE</codeph> statements lets you control the replication factor for
+                HDFS caching for a specific table or partition. By default, each cached block is
+                only present on a single host, which can lead to CPU contention if the same host
+                processes each cached block. Increasing the replication factor lets Impala choose
+                different hosts to process different cached blocks, to better distribute the CPU load.
+              </p>
+            </li>
+            <li>
+              <p>
+                Startup flags for the <cmdname>impalad</cmdname> daemon enable a higher level of compatibility with
+                <codeph>TIMESTAMP</codeph> values written by Hive, and more flexibility for working with date and
+                time data using the local time zone instead of UTC. To enable these features, set the
+                <cmdname>impalad</cmdname> startup flags
+                <codeph>-use_local_tz_for_unix_timestamp_conversions=true</codeph> and
+                <codeph>-convert_legacy_hive_parquet_utc_timestamps=true</codeph>.
+              </p>
+
+              <p>
+                The <codeph>-use_local_tz_for_unix_timestamp_conversions</codeph> setting controls how the
+                <codeph>unix_timestamp()</codeph>, <codeph>from_unixtime()</codeph>, and <codeph>now()</codeph>
+                functions handle time zones. By default (when this setting is turned off), Impala considers all
+                <codeph>TIMESTAMP</codeph> values to be in the UTC time zone when converting to or from Unix time
+                values. When this setting is enabled, Impala treats <codeph>TIMESTAMP</codeph> values passed to or
+                returned from these functions to be in the local time zone. When this setting is enabled, take
+                particular care that all hosts in the cluster have the same timezone settings, to avoid
+                inconsistent results depending on which host reads or writes <codeph>TIMESTAMP</codeph> data.
+              </p>
+
+              <p>
+                The <codeph>-convert_legacy_hive_parquet_utc_timestamps</codeph> setting causes Impala to convert
+                <codeph>TIMESTAMP</codeph> values to the local time zone when it reads them from Parquet files
+                written by Hive. This setting only applies to data using the Parquet file format, where Impala can
+                use metadata in the files to reliably determine that the files were written by Hive. If in the
+                future Hive changes the way it writes <codeph>TIMESTAMP</codeph> data in Parquet, Impala will
+                automatically handle that new <codeph>TIMESTAMP</codeph> encoding.
+              </p>
+
+              <p>
+                See <xref href="impala_timestamp.xml#timestamp"/> for details about time zone handling and the
+                configuration options for Impala / Hive compatibility with Parquet format.
+              </p>
+            </li>
+
+            <li>
+              <p conref="../shared/impala_common.xml#common/y2k38" />
+
+              <p>
+                See <xref href="impala_datetime_functions.xml#datetime_functions"/> for the current function
+                signatures.
+              </p>
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>SHOW FILES</codeph> statement lets you view the names and sizes of the files that make up
+            an entire table or a specific partition. See <xref href="impala_show.xml#show_files"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Impala can now run queries against Parquet data containing columns with complex or nested types, as
+            long as the query only refers to columns with scalar types.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Performance improvements for queries that include <codeph>IN()</codeph> operators and involve
+            partitioned tables.
+          </p>
+        </li>
+
+        <li>
+<!-- Same text for this item in impala_fixed_issues.xml. Could turn into a conref. -->
+          <p>
+            The new <codeph>-max_log_files</codeph> configuration option specifies how many log files to keep at
+            each severity level. The default value is 10, meaning that Impala preserves the latest 10 log files for
+            each severity level (<codeph>INFO</codeph>, <codeph>WARNING</codeph>, and <codeph>ERROR</codeph>) for
+            each Impala-related daemon (<cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>, and
+            <cmdname>catalogd</cmdname>). Impala checks to see if any old logs need to be removed based on the
+            interval specified in the <codeph>logbufsecs</codeph> setting, every 5 seconds by default. See
+            <xref href="impala_logging.xml#logs_rotate"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Redaction of sensitive data from Impala log files. This feature protects details such as credit card
+            numbers or tax IDs from administrators who see the text of SQL statements in the course of monitoring
+            and troubleshooting a Hadoop cluster. See <xref href="impala_logging.xml#redaction"/> for background
+            information for Impala users, and
+            <xref audience="integrated" href="sg_redaction.xml#log_redact"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_redaction.html" scope="external" format="html">the CDH 5 Security Guide</xref>
+            for usage details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Lineage information is available for data created or queried by Impala. This feature lets you track who
+            has accessed data through Impala SQL statements, down to the level of specific columns, and how data
+            has been propagated between tables. See <xref href="impala_lineage.xml#lineage"/> for background
+            information for Impala users,
+            <xref audience="integrated" href="datamgmt_impala_lineage_log.xml"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/datamgmt_impala_lineage_log.html" scope="external" format="html"/>
+            for usage details, and
+            <xref audience="integrated" href="cn_iu_lineage.xml" /><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cn_iu_lineage.html" scope="external" format="html"/>.
+            for how to interpret the lineage
+            information.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Impala tables and partitions can now be located on the Amazon Simple Storage Service (S3) filesystem,
+            for convenience in cases where data is already located in S3 and you prefer to query it in-place.
+            Queries might have lower performance than when the data files reside on HDFS, because Impala uses some
+            HDFS-specific optimizations. Impala can query data in S3, but cannot write to S3. Therefore, statements
+            such as <codeph>INSERT</codeph> and <codeph>LOAD DATA</codeph> are not available when the destination
+            table or partition is in S3. See <xref href="impala_s3.xml#s3"/> for details.
+          </p>
+
+          <note conref="../shared/impala_common.xml#common/s3_caveat" />
+        </li>
+
+        <li>
+        <!-- Only want the link out of the release notes to appear for HTML
+             (N.B. audience="PDF" means hide from PDF), and only in the HTML for the
+             integrated build where the topic is available for link resolution. -->
+          <p>
+            Improved support for HDFS encryption. The <codeph>LOAD DATA</codeph> statement now works when the
+            source directory and destination table are in different encryption zones. <ph audience="integrated"><ph audience="PDF">See
+            <xref href="cdh_sg_component_kms.xml#impala_encryption"/> for details about using HDFS encryption with
+            Impala.</ph></ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Additional arithmetic function <codeph>mod()</codeph>. See
+            <xref href="impala_math_functions.xml#math_functions"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Flexibility to interpret <codeph>TIMESTAMP</codeph> values using the UTC time zone (the traditional
+            Impala behavior) or using the local time zone (for compatibility with <codeph>TIMESTAMP</codeph> values
+            produced by Hive).
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Enhanced support for ETL using tools such as Flume. Impala ignores temporary files typically produced
+            by these tools (filenames with suffixes <codeph>.copying</codeph> and <codeph>.tmp</codeph>).
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The CPU requirement for Impala, which had become more restrictive in Impala 2.0.x and 2.1.x, has now
+            been relaxed.
+          </p>
+
+          <p conref="../shared/impala_common.xml#common/cpu_prereq" />
+        </li>
+
+        <li>
+          <p>
+            Enhanced support for <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph> types in the <codeph>COMPUTE
+            STATS</codeph> statement.
+          </p>
+        </li>
+
+        <li rev="CDH-26073">
+          <p>
+            The amount of memory required during setup for <q>spill to disk</q> operations is greatly reduced. This
+            enhancement reduces the chance of a memory-intensive join or aggregation query failing with an
+            out-of-memory error.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Several new conditional functions provide enhanced compatibility when porting code that uses industry
+            extensions. The new functions are: <codeph>isfalse()</codeph>, <codeph>isnotfalse()</codeph>,
+            <codeph>isnottrue()</codeph>, <codeph>istrue()</codeph>, <codeph>nonnullvalue()</codeph>, and
+            <codeph>nullvalue()</codeph>. See <xref href="impala_conditional_functions.xml#conditional_functions"/>
+            for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The Impala debug web UI now can display a visual representation of the query plan. On the
+            <uicontrol>/queries</uicontrol> tab, select <uicontrol>Details</uicontrol> for a particular query. The
+            <uicontrol>Details</uicontrol> page includes a <uicontrol>Plan</uicontrol> tab with a plan diagram that
+            you can zoom in or out (using scroll gestures through mouse wheel or trackpad).
+          </p>
+        </li>
+      </ul>
+
+<!-- End of new feature list for 5.4. -->
+
+    </conbody>
+
+  </concept>
+
+<!-- All 2.1.x subsections go under here -->
+
+  <concept rev="2.1.8" id="new_features_218">
+
+    <title>New Features in Impala 2.1.8 / CDH 5.3.10</title>
+
+    <conbody>
+
+      <p>
+        This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.1.7" id="new_features_217">
+
+    <title>New Features in Impala 2.1.7 / CDH 5.3.9</title>
+
+    <conbody>
+
+      <p>
+        This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.1.6" id="new_features_216">
+
+    <title>New Features in Impala 2.1.6 / CDH 5.3.8</title>
+
+    <conbody>
+
+      <p>
+        This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.1.5" id="new_features_215">
+
+    <title>New Features in Impala 2.1.5 / CDH 5.3.6</title>
+
+    <conbody>
+
+      <p>
+        This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.1.4" id="new_features_214">
+
+    <title>New Features in Impala 2.1.4 / CDH 5.3.4</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+        <ph conref="../shared/impala_common.xml#common/impala_214_redux"/>
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.1.3" id="new_features_213">
+
+    <title>New Features in Impala 2.1.3 / CDH 5.3.3</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_213" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.1.2" id="new_features_212">
+
+    <title>New Features in Impala 2.1.2 / CDH 5.3.2</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_212" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.1.1" id="new_features_211">
+
+    <title>New Features in Impala 2.1.1 / CDH 5.3.1</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.1.0" id="new_features_210">
+
+    <title>New Features in Impala 2.1.0 / CDH 5.3.0</title>
+
+    <conbody>
+
+      <p>
+        This release contains the following enhancements to query performance and system scalability:
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            Impala can now collect statistics for individual partitions in a partitioned table, rather than
+            processing the entire table for each <codeph>COMPUTE STATS</codeph> statement. This feature is known as
+            incremental statistics, and is controlled by the <codeph>COMPUTE INCREMENTAL STATS</codeph> syntax.
+            (You can still use the original <codeph>COMPUTE STATS</codeph> statement for nonpartitioned tables or
+            partitioned tables that are unchanging or whose contents are entirely replaced all at once.) See
+            <xref href="impala_compute_stats.xml#compute_stats"/> and
+            <xref href="impala_perf_stats.xml#perf_stats"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Optimization for small queries lets Impala process queries that process very few rows without the
+            unnecessary overhead of parallelizing and generating native code. Reducing this overhead lets Impala
+            clear small queries quickly, keeping YARN resources and admission control slots available for
+            data-intensive queries. The number of rows considered to be a <q>small</q> query is controlled by the
+            <codeph>EXEC_SINGLE_NODE_ROWS_THRESHOLD</codeph> query option. See
+            <xref href="impala_exec_single_node_rows_threshold.xml#exec_single_node_rows_threshold"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            An enhancement to the statestore component lets it transmit heartbeat information independently of
+            broadcasting metadata updates. This optimization improves reliability of health checking on large
+            clusters with many tables and partitions.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The memory requirement for querying gzip-compressed text is reduced. Now Impala decompresses the data
+            as it is read, rather than reading the entire gzipped file and decompressing it in memory.
+          </p>
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+<!-- All 2.0.x subsections go under here -->
+
+  <concept rev="2.0.5" id="new_features_205">
+
+    <title>New Features in Impala 2.0.5 / CDH 5.2.6</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_205"/>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.0.4" id="new_features_204">
+
+    <title>New Features in Impala 2.0.4 / CDH 5.2.5</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_204" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.0.3" id="new_features_203">
+
+    <title>New Features in Impala 2.0.3 / CDH 5.2.4</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_203" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.0.2" id="new_features_202">
+
+    <title>New Features in Impala 2.0.2 / CDH 5.2.3</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_202" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.0.1" id="new_features_201">
+
+    <title>New Features in Impala 2.0.1 / CDH 5.2.1</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.0.0" id="new_features_200">
+
+    <title>New Features in Impala 2.0.0 / CDH 5.2.0</title>
+
+    <conbody>
+
+      <p>
+        The following are the major new features in Impala 2.0. This major release, available both with CDH 5.2 and
+        for CDH 4, contains improvements to performance, scalability, security, and SQL syntax.
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            Queries with joins or aggregation functions involving high volumes of data can now use temporary work
+            areas on disk, reducing the chance of failure due to out-of-memory errors. When the required memory for
+            the intermediate result set exceeds the amount available on a particular node, the query automatically
+            uses a temporary work area on disk. This <q>spill to disk</q> mechanism is similar to the <codeph>ORDER
+            BY</codeph> improvement from Impala 1.4. For details, see
+            <xref href="impala_scalability.xml#spill_to_disk"/>.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Subquery enhancements:
+            <ul>
+              <li>
+                Subqueries are now allowed in the <codeph>WHERE</codeph> clause, for example with the
+                <codeph>IN</codeph> operator.
+              </li>
+
+              <li>
+                The <codeph>EXISTS</codeph> and <codeph>NOT EXISTS</codeph> operators are available. They are
+                always used in conjunction with subqueries.
+              </li>
+
+              <li>
+                The <codeph>IN</codeph> and <codeph>NOT IN</codeph> queries can now operate on the result set from
+                a subquery, not just a hardcoded list of values.
+              </li>
+
+              <li>
+                Uncorrelated subqueries let you compare against one or more values for equality,
+                <codeph>IN</codeph>, and <codeph>EXISTS</codeph> comparisons. For example, you might use
+                <codeph>WHERE</codeph> clauses such as <codeph>WHERE <varname>column</varname> = (SELECT
+                MAX(<varname>some_other_column</varname> FROM <varname>table</varname>)</codeph> or <codeph>WHERE
+                <varname>column</varname> IN (SELECT <varname>some_other_column</varname> FROM
+                <varname>table</varname> WHERE <varname>conditions</varname>)</codeph>.
+              </li>
+
+              <li>
+                Correlated subqueries let you cross-reference values from the outer query block and the subquery.
+              </li>
+
+              <li>
+                Scalar subqueries let you substitute the result of single-value aggregate functions such as
+                <codeph>MAX()</codeph>, <codeph>MIN()</codeph>, <codeph>COUNT()</codeph>, or
+                <codeph>AVG()</codeph>, where you would normally use a numeric value in a <codeph>WHERE</codeph>
+                clause.
+              </li>
+            </ul>
+          </p>
+
+          <p>
+            For details about subqueries, see <xref href="impala_subqueries.xml#subqueries"/> For information about
+            new and improved operators, see <xref href="impala_operators.xml#exists"/> and
+            <xref href="impala_operators.xml#in"/>.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Analytic functions such as <codeph>RANK()</codeph>, <codeph>LAG()</codeph>, <codeph>LEAD()</codeph>,
+            and <codeph>FIRST_VALUE()</codeph> let you analyze sequences of rows with flexible ordering and
+            grouping. Existing aggregate functions such as <codeph>MAX()</codeph>, <codeph>SUM()</codeph>, and
+            <codeph>COUNT()</codeph> can also be used in an analytic context. See
+            <xref href="impala_analytic_functions.xml#analytic_functions"/> for details. See
+            <xref href="impala_aggregate_functions.xml#aggregate_functions"/> for enhancements to existing
+            aggregate functions.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            New data types provide greater compatibility with source code from traditional database systems:
+          </p>
+          <ul>
+            <li>
+              <codeph>VARCHAR</codeph> is like the <codeph>STRING</codeph> data type, but with a maximum length.
+              See <xref href="impala_varchar.xml#varchar"/> for details.
+            </li>
+
+            <li>
+              <codeph>CHAR</codeph> is like the <codeph>STRING</codeph> data type, but with a precise length. Short
+              values are padded with spaces on the right. See <xref href="impala_char.xml#char"/> for details.
+            </li>
+
+            <li audience="Cloudera">
+<!-- This feature will be undocumented in Impala 2.0, probably ready for prime time in 2.1. -->
+              <codeph>DATE</codeph>. See <xref href="impala_date.xml#date"/> for details.
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          <p>
+            Security enhancements:
+            <ul>
+              <li>
+                Formerly, Impala was restricted to using either Kerberos or LDAP / Active Directory authentication
+                within a cluster. Now, Impala can freely accept either kind of authentication request, allowing you
+                to set up some hosts with Kerberos authentication and others with LDAP or Active Directory. See
+                <xref href="impala_mixed_security.xml#mixed_security"/> for details.
+              </li>
+
+              <li>
+                <codeph>GRANT</codeph> statement. See <xref href="impala_grant.xml#grant"/> for details.
+              </li>
+
+              <li>
+                <codeph>REVOKE</codeph> statement. See <xref href="impala_revoke.xml#revoke"/> for details.
+              </li>
+
+              <li>
+                <codeph>CREATE ROLE</codeph> statement. See <xref href="impala_create_role.xml#create_role"/> for
+                details.
+              </li>
+
+              <li>
+                <codeph>DROP ROLE</codeph> statement. See <xref href="impala_drop_role.xml#drop_role"/> for
+                details.
+              </li>
+
+              <li>
+                <codeph>SHOW ROLES</codeph> and <codeph>SHOW ROLE GRANT</codeph> statements. See
+                <xref href="impala_show.xml#show"/> for details.
+              </li>
+
+              <li>
+                <p>
+                  To complement the HDFS encryption feature, a new Impala configuration option,
+                  <codeph>--disk_spill_encryption</codeph> secures sensitive data from being observed or tampered
+                  with when temporarily stored on disk.
+                </p>
+              </li>
+            </ul>
+          </p>
+
+          <p>
+            The new security-related SQL statements work along with the Sentry authorization framework. See
+            <xref
+              href="http://www.cloudera.com/documentation/enterprise/latest/topics/impala_authorization.html#authorization"
+              format="html" scope="external">Enabling
+              Sentry
+              Authorization for Impala</xref> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Impala can now read compressed text files compressed by gzip, bzip, or Snappy. These files do not
+            require any special table settings to work in an Impala text table. Impala recognizes the compression
+            type automatically based on file extensions of <codeph>.gz</codeph>, <codeph>.bz2</codeph>, and
+            <codeph>.snappy</codeph> respectively. These types of compressed text files are intended for
+            convenience with existing ETL pipelines. Their non-splittable nature means they are not optimal for
+            high-performance parallel queries. See <xref href="impala_txtfile.xml#gzip"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Query hints can now use comment notation, <codeph>/* +<varname>hint_name</varname> */</codeph> or
+            <codeph>-- +<varname>hint_name</varname></codeph>, at the same places in the query where the hints
+            enclosed by <codeph>[ ]</codeph> are recognized. This enhancement makes it easier to reuse Impala
+            queries on other database systems. See <xref href="impala_hints.xml#hints"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            A new query option, <codeph>QUERY_TIMEOUT_S</codeph>, lets you specify a timeout period in seconds for
+            individual queries.
+          </p>
+
+          <p>
+            The working of the <codeph>--idle_query_timeout</codeph> configuration option is extended. If no
+            <codeph>QUERY_OPTION_S</codeph> query option is in effect, <codeph>--idle_query_timeout</codeph> works
+            the same as before, setting the timeout interval. When the <codeph>QUERY_OPTION_S</codeph> query option
+            is specified, its maximum value is capped by the value of the <codeph>--idle_query_timeout</codeph>
+            option.
+          </p>
+
+          <p>
+            That is, the system administrator sets the default and maximum timeout through the
+            <codeph>--idle_query_timeout</codeph> startup option, and then individual users or applications can set
+            a lower timeout value if desired through the <codeph>QUERY_TIMEOUT_S</codeph> query option. See
+            <xref href="impala_timeouts.xml#timeouts"/> and
+            <xref href="impala_query_timeout_s.xml#query_timeout_s"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            New functions <codeph>VAR_SAMP()</codeph> and <codeph>VAR_POP()</codeph> are aliases for the existing
+            <codeph>VARIANCE_SAMP()</codeph> and <codeph>VARIANCE_POP()</codeph> functions.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            A new date and time function, <codeph>DATE_PART()</codeph>, provides similar functionality to
+            <codeph>EXTRACT()</codeph>. You can also call the <codeph>EXTRACT()</codeph> function using the SQL-99
+            syntax, <codeph>EXTRACT(<varname>unit</varname> FROM <varname>timestamp</varname>)</codeph>. These
+            enhancements simplify the porting process for date-related code from other systems. See
+            <xref href="impala_datetime_functions.xml#datetime_functions"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            New approximation features provide a fast way to get results when absolute precision is not required:
+          </p>
+          <ul>
+            <li>
+              The <codeph>APPX_COUNT_DISTINCT</codeph> query option lets Impala rewrite
+              <codeph>COUNT(DISTINCT)</codeph> calls to use <codeph>NDV()</codeph> instead, which speeds up the
+              operation and allows multiple <codeph>COUNT(DISTINCT)</codeph> operations in a single query. See
+              <xref href="impala_appx_count_distinct.xml#appx_count_distinct"/> for details.
+            </li>
+          </ul>
+          The <codeph>APPX_MEDIAN()</codeph> aggregate function produces an estimate for the median value of a
+          column by using sampling. See <xref href="impala_appx_median.xml#appx_median"/> for details.
+        </li>
+
+        <li>
+          <p>
+            Impala now supports a <codeph>DECODE()</codeph> function. This function works as a shorthand for a
+            <codeph>CASE()</codeph> expression, and improves compatibility with SQL code containing vendor
+            extensions. See <xref href="impala_conditional_functions.xml#conditional_functions"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>STDDEV()</codeph>, <codeph>STDDEV_POP()</codeph>, <codeph>STDDEV_SAMP()</codeph>,
+            <codeph>VARIANCE()</codeph>, <codeph>VARIANCE_POP()</codeph>, <codeph>VARIANCE_SAMP()</codeph>, and
+            <codeph>NDV()</codeph> aggregate functions now all return <codeph>DOUBLE</codeph> results rather than
+            <codeph>STRING</codeph>. Formerly, you were required to <codeph>CAST()</codeph> the result to a numeric
+            type before using it in arithmetic operations.
+          </p>
+        </li>
+
+        <li id="parquet_block_size">
+          <p>
+            The default settings for Parquet block size, and the associated <codeph>PARQUET_FILE_SIZE</codeph>
+            query option, are changed. Now, Impala writes Parquet files with a size of 256 MB and an HDFS block
+            size of 256 MB. Previously, Impala attempted to write Parquet files with a size of 1 GB and an HDFS
+            block size of 1 GB. In practice, Impala used a conservative estimate of the disk space needed for each
+            Parquet block, leading to files that were typically 512 MB anyway. Thus, this change will make the file
+            size more accurate if you specify a value for the <codeph>PARQUET_FILE_SIZE</codeph> query option. It
+            also reduces the amount of memory reserved during <codeph>INSERT</codeph> into Parquet tables,
+            potentially avoiding out-of-memory errors and improving scalability when inserting data into Parquet
+            tables.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Anti-joins are now supported, expressed using the <codeph>LEFT ANTI JOIN</codeph> and <codeph>RIGHT
+            ANTI JOIN</codeph> clauses.
+<!-- Maybe RIGHT SEMI JOIN is new too? -->
+<!-- Make following statement true in the context of RIGHT ANTI JOIN. -->
+            These clauses returns results from one table that have no match in the other table. You might use this
+            type of join in the same sorts of use cases as the <codeph>NOT EXISTS</codeph> and <codeph>NOT
+            IN</codeph> operators. See <xref href="impala_joins.xml#joins"/> for details.
+          </p>
+        </li>
+
+        <li audience="Cloudera">
+<!-- This feature will be undocumented in Impala 2.0, probably ready for prime time in 2.1. -->
+          <p>
+            Improved file format support. Impala can now write to Avro, compressed text, SequenceFile, and RCFile
+            tables using the <codeph>INSERT</codeph> or <codeph>CREATE TABLE AS SELECT</codeph> statements. See
+            <xref href="impala_file_formats.xml#file_formats"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>SET</codeph> command in <cmdname>impala-shell</cmdname> has been promoted to a real SQL
+            statement. You can now set query options such as <codeph>PARQUET_FILE_SIZE</codeph>,
+            <codeph>MEM_LIMIT</codeph>, and <codeph>SYNC_DDL</codeph> within JDBC, ODBC, or any other kind of
+            application that submits SQL without going through the <cmdname>impala-shell</cmdname> interpreter. See
+            <xref href="impala_set.xml#set"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <cmdname>impala-shell</cmdname> interpreter now reads settings from an optional configuration file,
+            named <filepath>$HOME/.impalarc</filepath> by default. See
+            <xref href="impala_shell_options.xml#shell_config_file"/> for details.
+          </p>
+        </li>
+
+        <li audience="Cloudera">
+<!-- This feature will be undocumented in Impala 2.0, probably ready for prime time in 2.1. -->
+          <p>
+            The <codeph>COMPUTE STATS</codeph> statement can now gather statistics for newly added partitions
+            rather than the entire table. This feature is known as <term>incremental statistics</term>. See
+            <xref href="impala_compute_stats.xml#compute_stats"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The library used for regular expression parsing has changed from Boost to Google RE2. This
+            implementation change adds support for non-greedy matches using the <codeph>.*?</codeph> notation. This
+            and other changes in the way regular expressions are interpreted means you might need to re-test
+            queries that use functions such as <codeph>regexp_extract()</codeph> or
+            <codeph>regexp_replace()</codeph>, or operators such as <codeph>REGEXP</codeph> or
+            <codeph>RLIKE</codeph>. See <xref href="impala_incompatible_changes.xml#incompatible_changes"/> for
+            those details.
+          </p>
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.4.4" id="new_features_144">
+    <title>New Features in Impala 1.4.4 / CDH 5.1.5</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_144" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.4.3" id="new_features_143">
+
+    <title>New Features in Impala 1.4.3 / CDH 5.1.4</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release for an SSL security issue.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_143" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.4.2" id="new_features_142">
+
+    <title>New Features in Impala 1.4.2 / CDH 5.1.3</title>
+
+    <conbody>
+
+      <p>
+        Impala 1.4.2 is purely a bug-fix release. It does not include any new features.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_142" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.4.1" id="new_features_141">
+
+    <title>New Features in Impala 1.4.1 / CDH 5.1.2</title>
+
+    <conbody>
+
+      <p>
+        Impala 1.4.1 is purely a bug-fix release. It does not include any new features.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.4.0" id="new_features_140">
+
+    <title>New Features in Impala 1.4.0 / CDH 5.1.0</title>
+
+    <conbody>
+
+      <p>
+        The following are the major new features in Impala 1.4.
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            The <codeph>DECIMAL</codeph> data type lets you store fixed-precision values, for working with currency
+            or other fractional values where it is important to represent values exactly and avoid rounding errors.
+            This feature includes enhancements to built-in functions, numeric literals, and arithmetic expressions.
+            <ph audience="PDF">See <xref href="impala_decimal.xml#decimal"/> for details.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            On CDH 5, Impala can take advantage of the HDFS caching feature to <q>pin</q> entire tables or
+            individual partitions in memory, to speed up queries on frequently accessed data and reduce the CPU
+            overhead of memory-to-memory copying. When HDFS files are cached in memory, Impala can read the cached
+            data without any disk reads, and without making an additional copy of the data in memory. Other Hadoop
+            components that read the same data files also experience a performance benefit.
+          </p>
+
+          <p audience="PDF">
+<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_hdfs_caching.html -->
+            For background information about HDFS caching in CDH, see
+            <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hdfs_caching.html" scope="external" format="html">the
+            CDH 5 Installation Guide</xref>. For performance information about using this feature with Impala, see
+            <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/>. For the <codeph>SET CACHED</codeph> and
+            <codeph>SET UNCACHED</codeph> clauses that let you control cached table data through DDL statements,
+            see <xref href="impala_create_table.xml#create_table"/> and
+            <xref href="impala_alter_table.xml#alter_table"/>.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Impala can now use Sentry-based authorization based either on the original policy file, or on rules
+            defined by <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements issued through Hive.
+            <ph audience="PDF">See <xref
+              href="http://www.cloudera.com/documentation/enterprise/latest/topics/impala_authorization.html#authorization"
+              scope="external" format="html">Enabling Sentry Authorization for Impala</xref>
+              for details.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            For interoperability with Parquet files created through other Hadoop components, such as Pig or
+            MapReduce jobs, you can create an Impala table that automatically sets up the column definitions based
+            on the layout of an existing Parquet data file. <ph audience="PDF">See
+            <xref href="impala_create_table.xml#create_table"/> for the syntax, and
+            <xref href="impala_parquet.xml#parquet_ddl"/> for usage information.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            <codeph>ORDER BY</codeph> queries no longer require a <codeph>LIMIT</codeph> clause. If the size of the
+            result set to be sorted exceeds the memory available to Impala, Impala uses a temporary work space on
+            disk to perform the sort operation. <ph audience="PDF">See <xref href="impala_order_by.xml#order_by"/>
+            for details.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            LDAP connections can be secured through either SSL or TLS. <ph audience="PDF">See
+            <xref href="impala_ldap.xml#ldap"/> for details.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The following new built-in scalar and aggregate functions are available:
+          </p>
+          <ul>
+            <li>
+              <p>
+                A new built-in function, <codeph>EXTRACT()</codeph>, returns one date or time field from a
+                <codeph>TIMESTAMP</codeph> value. <ph audience="PDF">See
+                <xref href="impala_datetime_functions.xml#datetime_functions"/> for details.</ph>
+              </p>
+            </li>
+
+            <li>
+              <p>
+                A new built-in function, <codeph>TRUNC()</codeph>, truncates date/time values to a particular
+                granularity, such as year, month, day, hour, and so on. <ph audience="PDF">See
+                <xref href="impala_datetime_functions.xml#datetime_functions"/> for details.</ph>
+              </p>
+            </li>
+
+            <li>
+              <p>
+                <codeph>ADD_MONTHS()</codeph> built-in function, an alias for the existing
+                <codeph>MONTHS_ADD()</codeph> function. <ph audience="PDF">See
+                <xref href="impala_datetime_functions.xml#datetime_functions"/> for details.</ph>
+              </p>
+            </li>
+
+            <li>
+              <p>
+                A new built-in function, <codeph>ROUND()</codeph>, rounds <codeph>DECIMAL</codeph> values to a
+                specified number of fractional digits. <ph audience="PDF">See
+                <xref href="impala_math_functions.xml#math_functions"/> for details.</ph>
+              </p>
+            </li>
+
+            <li>
+              <p>
+                Several built-in aggregate functions for computing properties for statistical distributions:
+                <codeph>STDDEV()</codeph>, <codeph>STDDEV_SAMP()</codeph>, <codeph>STDDEV_POP()</codeph>,
+                <codeph>VARIANCE()</codeph>, <codeph>VARIANCE_SAMP()</codeph>, and <codeph>VARIANCE_POP()</codeph>.
+                <ph audience="PDF">See <xref href="impala_stddev.xml#stddev"/> and
+                <xref href="impala_variance.xml#variance"/> for details.</ph>
+              </p>
+            </li>
+
+            <li>
+              <p>
+                Several new built-in functions, such as <codeph>MAX_INT()</codeph>,
+                <codeph>MIN_SMALLINT()</codeph>, and so on, let you conveniently check whether data values are in
+                an expected range. You might be able to switch a column to a smaller type, saving memory during
+                processing. <ph audience="PDF">See <xref href="impala_math_functions.xml#math_functions"/> for
+                details.</ph>
+              </p>
+            </li>
+
+            <li>
+              <p>
+                New built-in functions, <codeph>IS_INF()</codeph> and <codeph>IS_NAN()</codeph>, check for the
+                special values infinity and <q>not a number</q>. These values could be specified as
+                <codeph>inf</codeph> or <codeph>nan</codeph> in text data files, or be produced by certain
+                arithmetic expressions. <ph audience="PDF">See
+                <xref href="impala_math_functions.xml#math_functions"/> for details.</ph>
+              </p>
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>SHOW PARTITIONS</codeph> statement displays information about the structure of a
+            partitioned table. <ph audience="PDF">See <xref href="impala_show.xml#show"/> for details.</ph>
+          </p>
+        </li>
+
+        <li audience="Cloudera">
+<!-- Not documenting for 1.4. Revisit in a future release. -->
+          <p>
+            Data sources. <ph audience="PDF">See <xref href="impala_data_sources.xml#data_sources"/> for
+            details.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            New configuration options for the <cmdname>impalad</cmdname> daemon let you specify initial memory
+            usage for all queries. The initial resource requests handled by Llama and YARN can be expanded later if
+            needed, avoiding unnecessary over-allocation and reducing the chance of out-of-memory conditions.
+            <ph audience="PDF">See <xref href="impala_resource_management.xml#resource_management"/> for
+            details.</ph>
+          </p>
+        </li>
+
+        <li>
+          The Impala <codeph>CREATE TABLE</codeph> statement now has a <codeph>STORED AS AVRO</codeph> clause,
+          allowing you to create Avro tables through Impala. <ph audience="PDF">See
+          <xref href="impala_avro.xml#avro"/> for details and examples.</ph>
+        </li>
+
+        <li>
+          <p>
+            New <cmdname>impalad</cmdname> configuration options let you fine-tune the calculations Impala makes to
+            estimate resource requirements for each query. These options can help avoid problems due to
+            overconsumption due to too-low estimates, or underutilization due to too-high estimates.
+            <ph audience="PDF">See <xref href="impala_resource_management.xml#resource_management"/> for
+            details.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            A new <codeph>SUMMARY</codeph> command in the <cmdname>impala-shell</cmdname> interpreter provides a
+            high-level summary of the work performed at each stage of the explain plan. The summary is also
+            included in output from the <codeph>PROFILE</codeph> command. <ph audience="PDF">See
+            <xref href="impala_shell_commands.xml#shell_commands"/> and
+            <xref href="impala_explain_plan.xml#perf_summary"/> for details.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Performance improvements for the <codeph>COMPUTE STATS</codeph> statement:
+          </p>
+          <ul>
+<!-- This particular change has been pushed out to a later release. -->
+
+            <li audience="Cloudera">
+              Certain simple aggregation operations (with no <codeph>GROUP BY</codeph> step) are multi-threaded if
+              spare cores are available.
+            </li>
+
+            <li>
+              The <codeph>NDV</codeph> function is speeded up through native code generation.
+            </li>
+
+            <li>
+              Because the <codeph>NULL</codeph> count is not currently used by the Impala query planner, in Impala
+              1.4.0 and higher, <codeph>COMPUTE STATS</codeph> does not count the <codeph>NULL</codeph> values for
+              each column. (The <codeph>#Nulls</codeph> field of the stats table is left as -1, signifying that the
+              value is unknown.)
+            </li>
+          </ul>
+          <p audience="PDF">
+            See <xref href="impala_compute_stats.xml#compute_stats"/> for general details about the <codeph>COMPUTE
+            STATS</codeph> statement, and <xref href="impala_perf_stats.xml#perf_stats"/> for how to use the
+            statistics to improve query performance.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Performance improvements for partition pruning. This feature reduces the time spent in query planning,
+            for partitioned tables with thousands of partitions. Previously, Impala typically queried tables with
+            up to approximately 3000 partitions. With the performance improvement in partition pruning, now Impala
+            can comfortably handle tables with tens of thousands of partitions. <ph audience="PDF">See
+            <xref href="impala_partitioning.xml#partition_pruning"/> for information about partition pruning.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The documentation provides additional guidance for planning tasks. <ph audience="PDF">See
+            <xref href="impala_planning.xml#planning"/>.</ph> <ph audience="PDF">In particular, see
+            <xref href="impala_cluster_sizing.xml#cluster_sizing"/> before you purchase or repurpose hardware for a
+            cluster to run Impala.</ph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <cmdname>impala-shell</cmdname> interpreter now supports UTF-8 characters for input and output. You
+            can control whether <cmdname>impala-shell</cmdname> ignores invalid Unicode code points through the
+            <codeph>--strict_unicode</codeph> option. (Although this option is removed in Impala 2.0.)
+          </p>
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.3.3" id="new_features_133">
+
+    <title>New Features in Impala 1.3.3 / CDH 5.0.5</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release for an SSL security issue.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_133" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.3.2" id="new_features_132">
+
+    <title>New Features in Impala 1.3.2 / CDH 5.0.4</title>
+
+    <conbody>
+
+      <p>
+        No new features. This point release is exclusively a bug fix release for the IMPALA-1019 issue related to
+        HDFS caching.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/only_cdh5_132" />
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.3.1" id="new_features_131">
+
+    <title>New Features in Impala 1.3.1 / CDH 5.0.3</title>
+
+    <conbody>
+
+      <p>
+        This point release is primarily a vehicle to deliver bug fixes. Any new features are minor changes
+        resulting from fixes for performance, reliability, or usability issues.
+      </p>
+
+      <p>
+        Because 1.3.1 is the first 1.3.x release for CDH 4, if you are on CDH 4, also consult
+        <xref href="impala_new_features.xml#new_features_130"/> for more features that are new to you.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/impala13_cdh" />
+
+      <ul>
+        <li>
+          <p>
+            A new <cmdname>impalad</cmdname> startup option, <codeph>--insert_inherit_permissions</codeph>, causes
+            Impala <codeph>INSERT</codeph> statements to create each new partition with the same HDFS permissions
+            as its parent directory. By default, <codeph>INSERT</codeph> statements create directories for new
+            partitions using default HDFS permissions. See <xref href="impala_insert.xml#insert"/> for examples of
+            <codeph>INSERT</codeph> statements for partitioned tables.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>SHOW FUNCTIONS</codeph> statement now displays the return type of each function, in
+            addition to the types of its arguments. See <xref href="impala_show.xml#show"/> for examples.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            You can now specify the clause <codeph>FIELDS TERMINATED BY '\0'</codeph> with a <codeph>CREATE
+            TABLE</codeph> statement to use text data files that use ASCII 0 (<codeph>nul</codeph>) characters as a
+            delimiter. See <xref href="impala_txtfile.xml#txtfile"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p conref="../shared/impala_common.xml#common/regexp_matching" />
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.3.0" id="new_features_130">
+
+    <title>New Features in Impala 1.3.0 / CDH 5.0.0</title>
+
+    <conbody>
+
+      <note conref="../shared/impala_common.xml#common/impala13_cdh" />
+
+      <ul>
+        <li>
+          <p>
+            The admission control feature lets you control and prioritize the volume and resource consumption of
+            concurrent queries. This mechanism reduces spikes in resource usage, helping Impala to run alongside
+            other kinds of workloads on a busy cluster. It also provides more user-friendly conflict resolution
+            when multiple memory-intensive queries are submitted concurrently, avoiding resource contention that
+            formerly resulted in out-of-memory errors. See <xref href="impala_admission.xml#admission_control"/>
+            for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Enhanced <codeph>EXPLAIN</codeph> plans provide more detail in an easier-to-read format. Now there are
+            four levels of verbosity: the <codeph>EXPLAIN_LEVEL</codeph> option can be set from 0 (most concise) to
+            3 (most verbose). See <xref href="impala_explain.xml#explain"/> for syntax and
+            <xref href="impala_explain_plan.xml#explain_plan"/> for usage information.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>TIMESTAMP</codeph> data type accepts more kinds of input string formats through the
+            <codeph>UNIX_TIMESTAMP</codeph> function, and produces more varieties of string formats through the
+            <codeph>FROM_UNIXTIME</codeph> function. The documentation now also lists more functions for date
+            arithmetic, used for adding and subtracting <codeph>INTERVAL</codeph> expressions from
+            <codeph>TIMESTAMP</codeph> values. See <xref href="impala_datetime_functions.xml#datetime_functions"/>
+            for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            New conditional functions, <codeph>NULLIF()</codeph>, <codeph>NULLIFZERO()</codeph>, and
+            <codeph>ZEROIFNULL()</codeph>, simplify porting SQL containing vendor extensions to Impala. See
+            <xref href="impala_conditional_functions.xml#conditional_functions"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            New utility function, <codeph>CURRENT_DATABASE()</codeph>. See
+            <xref href="impala_misc_functions.xml#misc_functions"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Integration with the YARN resource management framework. Only available in combination with CDH 5. This
+            feature makes use of the underlying YARN service, plus an additional service (Llama) that coordinates
+            requests to YARN for Impala resources, so that the Impala query only proceeds when all requested
+            resources are available. See <xref href="impala_resource_management.xml#resource_management"/> for full
+            details.
+          </p>
+
+          <p>
+            On the Impala side, this feature involves some new startup options for the <cmdname>impalad</cmdname>
+            daemon:
+          </p>
+          <ul>
+            <li>
+              <codeph>-enable_rm</codeph>
+            </li>
+
+            <li>
+              <codeph>-llama_host</codeph>
+            </li>
+
+            <li>
+              <codeph>-llama_port</codeph>
+            </li>
+
+            <li>
+              <codeph>-llama_callback_port</codeph>
+            </li>
+
+            <li>
+              <codeph>-cgroup_hierarchy_path</codeph>
+            </li>
+          </ul>
+          <p>
+            For details of these startup options, see <xref href="impala_config_options.xml#config_options"/>.
+          </p>
+
+          <p>
+            This feature also involves several new or changed query options that you can set through the
+            <cmdname>impala-shell</cmdname> interpreter and apply within a specific session:
+          </p>
+          <ul>
+            <li>
+              <codeph>MEM_LIMIT</codeph>: the function of this existing option changes when Impala resource
+              management is enabled.
+            </li>
+
+            <li>
+              <codeph>REQUEST_POOL</codeph>: a new option. (Renamed to <codeph>RESOURCE_POOL</codeph> in Impala
+              1.3.0.)
+            </li>
+
+            <li>
+              <codeph>V_CPU_CORES</codeph>: a new option.
+            </li>
+
+            <li>
+              <codeph>RESERVATION_REQUEST_TIMEOUT</codeph>: a new option.
+            </li>
+          </ul>
+          <p>
+            For details of these query options, see <xref href="impala_resource_management.xml#rm_query_options"/>.
+          </p>
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.2.4" id="new_features_124">
+
+    <title>New Features in Impala 1.2.4</title>
+
+    <conbody>
+
+      <note>
+        Impala 1.2.4 works with CDH 4. It is primarily a bug fix release for Impala 1.2.3, plus some performance
+        enhancements for the catalog server to minimize startup and DDL wait times for Impala deployments with
+        large numbers of databases, tables, and partitions.
+      </note>
+
+      <ul>
+        <li>
+          <p>
+            On Impala startup, the metadata loading and synchronization mechanism has been improved and optimized,
+            to give more responsiveness when starting Impala on a system with a large number of databases, tables,
+            or partitions. The initial metadata loading happens in the background, allowing queries to be run
+            before the entire process is finished. When a query refers to a table whose metadata is not yet loaded,
+            the query waits until the metadata for that table is loaded, and the load operation for that table is
+            prioritized to happen first.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Formerly, if you created a new table in Hive, you had to issue the <codeph>INVALIDATE METADATA</codeph>
+            statement (with no table name) which was an expensive operation that reloaded metadata for all tables.
+            Impala did not recognize the name of the Hive-created table, so you could not do <codeph>INVALIDATE
+            METADATA <varname>new_table</varname></codeph> to get the metadata for just that one table. Now, when
+            you issue <codeph>INVALIDATE METADATA <varname>table_name</varname></codeph>, Impala checks to see if
+            that name represents a table created in Hive, and if so recognizes the new table and loads the metadata
+            for it. Additionally, if the new table is in a database that was newly created in Hive, Impala also
+            recognizes the new database.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            If you issue <codeph>INVALIDATE METADATA <varname>table_name</varname></codeph> and the table has been
+            dropped through Hive, Impala will recognize that the table no longer exists.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            New startup options let you control the parallelism of the metadata loading during startup for the
+            <cmdname>catalogd</cmdname> daemon:
+          </p>
+          <ul>
+            <li>
+              <p>
+                <codeph>--load_catalog_in_background</codeph> makes Impala load and cache metadata using background
+                threads after startup. It is <codeph>true</codeph> by default. Previously, a system with a large
+                number of databases, tables, or partitions could be unresponsive or even time out during startup.
+              </p>
+            </li>
+
+            <li>
+              <p>
+                <codeph>--num_metadata_loading_threads</codeph> determines how much parallelism Impala devotes to
+                loading metadata in the background. The default is 16. You might increase this value for systems
+                with huge numbers of databases, tables, or partitions. You might lower this value for busy systems
+                that are CPU-constrained due to jobs from components other than Impala.
+              </p>
+            </li>
+          </ul>
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.2.3" id="new_features_123">
+
+    <title>New Features in Impala 1.2.3</title>
+
+    <conbody>
+
+      <note>
+        Impala 1.2.3 works with CDH 4 and with CDH 5 beta 2. The resource management feature requires CDH 5 beta.
+      </note>
+
+      <p>
+        Impala 1.2.3 contains exactly the same feature set as Impala 1.2.2. Its only difference is one additional
+        fix for compatibility with Parquet files generated outside of Impala by components such as Hive, Pig, or
+        MapReduce. If you are upgrading from Impala 1.2.1 or earlier, see
+        <xref href="impala_new_features.xml#new_features_122"/> for the latest added features.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.2.2" id="new_features_122">
+
+    <title>New Features in Impala 1.2.2</title>
+
+    <conbody>
+
+      <note>
+        Impala 1.2.2 works with CDH 4. Its feature set is a superset of features in the Impala 1.2.0 beta, with the
+        exception of resource management, which relies on CDH 5.
+      </note>
+
+      <p>
+        Impala 1.2.2 includes new features for performance, security, and flexibility. The major enhancements over
+        1.2.1 are performance related, primarily for join queries.
+      </p>
+
+      <p>
+        New user-visible features include:
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            Join order optimizations. This highly valuable feature automatically distributes and parallelizes the
+            work for a join query to minimize disk I/O and network traffic. The automatic optimization reduces the
+            need to use query hints or to rewrite join queries with the tables in a specific order based on size or
+            cardinality. The new <codeph>COMPUTE STATS</codeph> statement gathers statistical information about
+            each table that is crucial for enabling the join optimizations. See
+            <xref href="impala_perf_joins.xml#perf_joins"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            <codeph>COMPUTE STATS</codeph> statement to collect both table statistics and column statistics with a
+            single statement. Intended to be more comprehensive, efficient, and reliable than the corresponding
+            Hive <codeph>ANALYZE TABLE</codeph> statement, which collects statistics in multiple phases through
+            MapReduce jobs. These statistics are important for query planning for join queries, queries on
+            partitioned tables, and other types of data-intensive operations. For optimal planning of join queries,
+            you need to collect statistics for each table involved in the join. See
+            <xref href="impala_compute_stats.xml#compute_stats"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Reordering of tables in a join query can be overridden by the <codeph>STRAIGHT_JOIN</codeph> operator,
+            allowing you to fine-tune the planning of the join query if necessary, by using the original technique
+            of ordering the joined tables in descending order of size. See
+            <xref href="impala_perf_joins.xml#straight_join"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>CROSS JOIN</codeph> clause in the
+            <codeph><xref href="impala_select.xml#select">SELECT</xref></codeph> statement to allow Cartesian
+            products in queries, that is, joins without an equality comparison between columns in both tables.
+            Because such queries must be carefully checked to avoid accidental overconsumption of memory, you must
+            use the <codeph>CROSS JOIN</codeph> operator to explicitly select this kind of join. See
+            <xref href="impala_tutorial.xml#tut_cross_join"/> for examples.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>ALTER TABLE</codeph> statement has new clauses that let you fine-tune table statistics. You
+            can use this technique as a less-expensive way to update specific statistics, in case the statistics
+            become stale, or to experiment with the effects of different data distributions on query planning.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            LDAP username/password authentication in JDBC/ODBC. See <xref href="impala_ldap.xml#ldap"/> for
+            details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            <xref href="impala_string_functions.xml#string_functions/group_concat">GROUP_CONCAT()</xref> aggregate
+            function to concatenate column values across all rows of a result set.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>INSERT</codeph> statement now accepts hints, <codeph>[SHUFFLE]</codeph> and
+            <codeph>[NOSHUFFLE]</codeph>, to influence the way work is redistributed during
+            <codeph>INSERT...SELECT</codeph> operations. The hints are primarily useful for inserting into
+            partitioned Parquet tables, where using the <codeph>[SHUFFLE]</codeph> hint can avoid problems due to
+            memory consumption and simultaneous open files in HDFS, by collecting all the new data for each
+            partition on a specific node.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Several built-in functions and operators are now overloaded for more numeric data types, to reduce the
+            requirement to use <codeph>CAST()</codeph> for type coercion in <codeph>INSERT</codeph> statements. For
+            example, the expression <codeph>2+2</codeph> in an <codeph>INSERT</codeph> statement formerly produced
+            a <codeph>BIGINT</codeph> result, requiring a <codeph>CAST()</codeph> to be stored in an
+            <codeph>INT</codeph> variable. Now, addition, subtraction, and multiplication only produce a result
+            that is one step <q>bigger</q> than their arguments, and numeric and conditional functions can return
+            <codeph>SMALLINT</codeph>, <codeph>FLOAT</codeph>, and other smaller types rather than always
+            <codeph>BIGINT</codeph> or <codeph>DOUBLE</codeph>.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            New <codeph>fnv_hash()</codeph> built-in function for constructing hashed values. See
+            <xref href="impala_math_functions.xml#math_functions"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The clause <codeph>STORED AS PARQUET</codeph> is accepted as an equivalent for <codeph>STORED AS
+            PARQUETFILE</codeph>. This more concise form is recommended for new code.
+          </p>
+        </li>
+      </ul>
+
+      <p>
+        Because Impala 1.2.2 builds on a number of features introduced in 1.2.1, if you are upgrading from an older
+        1.1.x release straight to 1.2.2, also review <xref href="impala_new_features.xml#new_features_121"/> to see
+        features such as the <codeph>SHOW TABLE STATS</codeph> and <codeph>SHOW COLUMN STATS</codeph> statements,
+        and user-defined functions (UDFs).
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.2" id="new_features_121">
+
+    <title>New Features in Impala 1.2.1</title>
+
+    <conbody>
+
+      <note>
+        Impala 1.2.1 works with CDH 4. Its feature set is a superset of features in the Impala 1.2.0 beta, with the
+        exception of resource management, which relies on CDH 5.
+      </note>
+
+      <p>
+        Impala 1.2.1 includes new features for security, performance, and flexibility.
+      </p>
+
+      <p>
+        New user-visible features include:
+      </p>
+
+      <ul>
+        <li rev="1.2.1">
+          <p>
+            <codeph>SHOW TABLE STATS <varname>table_name</varname></codeph> and <codeph>SHOW COLUMN STATS
+            <varname>table_name</varname></codeph> statements, to verify that statistics are available and to see
+            the values used during query planning.
+          </p>
+        </li>
+
+        <li rev="1.2.1">
+          <p>
+            <codeph>CREATE TABLE AS SELECT</codeph> syntax, to create a new table and transfer data into it in a
+            single operation.
+          </p>
+        </li>
+
+        <li rev="1.2.1">
+          <p>
+            <codeph>OFFSET</codeph> clause, for use with the <codeph>ORDER BY</codeph> and <codeph>LIMIT</codeph>
+            clauses to produce <q>paged</q> result sets such as items 1-10, then 11-20, and so on.
+          </p>
+        </li>
+
+        <li rev="1.2.1">
+          <p>
+            <codeph>NULLS FIRST</codeph> and <codeph>NULLS LAST</codeph> clauses to ensure consistent placement of
+            <codeph>NULL</codeph> values in <codeph>ORDER BY</codeph> queries.
+          </p>
+        </li>
+
+        <li rev="1.2.1">
+          <p>
+            New <xref href="impala_functions.xml#builtins">built-in functions</xref>: <codeph>least()</codeph>,
+            <codeph>greatest()</codeph>, <codeph>initcap()</codeph>.
+          </p>
+        </li>
+
+        <li rev="1.2.1">
+          <p>
+            New aggregate function: <codeph>ndv()</codeph>, a fast alternative to <codeph>COUNT(DISTINCT
+            <varname>col</varname>)</codeph> returning an approximate result.
+          </p>
+        </li>
+
+        <li rev="1.2.1">
+          <p>
+            The <codeph>LIMIT</codeph> clause can now accept a numeric expression as an argument, rather than only
+            a literal constant.
+          </p>
+        </li>
+
+        <li rev="1.2.1">
+          <p>
+            The <codeph>SHOW CREATE TABLE</codeph> statement displays the end result of all the <codeph>CREATE
+            TABLE</codeph> and <codeph>ALTER TABLE</codeph> statements for a particular table. You can use the
+            output to produce a simplified setup script for a schema.
+          </p>
+        </li>
+
+        <li rev="1.2.1">
+          <p>
+            The <codeph>--idle_query_timeout</codeph> and <codeph>--idle_session_timeout</codeph> options for
+            <cmdname>impalad</cmdname> control the time intervals after which idle queries are cancelled, and idle
+            sessions expire. See <xref href="impala_timeouts.xml#timeouts"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            User-defined functions (UDFs). This feature lets you transform data in very flexible ways, which is
+            important when using Impala as part of an ETL or ELT pipeline. Prior to Impala 1.2, using UDFs required
+            switching into Hive. Impala 1.2 can run scalar UDFs and user-defined aggregate functions (UDAs). Impala
+            can run high-performance functions written in C++, or you can reuse existing Hive functions written in
+            Java.
+          </p>
+
+          <p>
+            You create UDFs through the <codeph>CREATE FUNCTION</codeph> statement and drop them through the
+            <codeph>DROP FUNCTION</codeph> statement. See <xref href="impala_udf.xml#udfs"/> for instructions about
+            coding, building, and deploying UDFs, and <xref href="impala_create_function.xml#create_function"/> and
+            <xref href="impala_drop_function.xml#drop_function"/> for related SQL syntax.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            A new service automatically propagates changes to table data and metadata made by one Impala node,
+            sending the new or updated metadata to all the other Impala nodes. The automatic synchronization
+            mechanism eliminates the need to use the <codeph>INVALIDATE METADATA</codeph> and
+            <codeph>REFRESH</codeph> statements after issuing Impala statements such as <codeph>CREATE
+            TABLE</codeph>, <codeph>ALTER TABLE</codeph>, <codeph>DROP TABLE</codeph>, <codeph>INSERT</codeph>, and
+            <codeph>LOAD DATA</codeph>.
+          </p>
+
+          <p>
+            For even more precise synchronization, you can enable the
+            <codeph><xref href="impala_sync_ddl.xml#sync_ddl">SYNC_DDL</xref></codeph> query option before issuing
+            a DDL, <codeph>INSERT</codeph>, or <codeph>LOAD DATA</codeph> statement. This option causes the
+            statement to wait, returning only after the catalog service has broadcast the applicable changes to all
+            Impala nodes in the cluster.
+          </p>
+
+          <note>
+            <p>
+              Because the catalog service only monitors operations performed through Impala, <codeph>INVALIDATE
+              METADATA</codeph> and <codeph>REFRESH</codeph> are still needed on the Impala side after creating new
+              tables or loading data through the Hive shell or by manipulating data files directly in HDFS. Because
+              the catalog service broadcasts the result of the <codeph>REFRESH</codeph> and <codeph>INVALIDATE
+              METADATA</codeph> statements to all Impala nodes, when you do need to use those statements, you can
+              do so a single time rather than on every Impala node.
+            </p>
+          </note>
+
+          <p>
+            This service is implemented by the <cmdname>catalogd</cmdname> daemon. See
+            <xref href="impala_components.xml#intro_catalogd"/> for details.
+          </p>
+        </li>
+
+        <li audience="Cloudera">
+          <p>
+            Integration with the YARN resource management framework. Only available in combination with CDH 5. This
+            feature makes use of the underlying YARN service, plus an additional service (Llama) that coordinates
+            requests to YARN for Impala resources, so that the Impala query only proceeds when all requested
+            resources are available. See <xref href="impala_resource_management.xml#resource_management"/> for full
+            details.
+          </p>
+
+          <p>
+            On the Impala side, this feature involves some new startup options for the <cmdname>impalad</cmdname>
+            daemon:
+          </p>
+          <ul>
+            <li>
+              <codeph>-enable_rm</codeph>
+            </li>
+
+            <li>
+              <codeph>-llama_host</codeph>
+            </li>
+
+            <li>
+              <codeph>-llama_port</codeph>
+            </li>
+
+            <li>
+              <codeph>-llama_callback_port</codeph>
+            </li>
+
+            <li>
+              <codeph>-cgroup_hierarchy_path</codeph>
+            </li>
+          </ul>
+          <p>
+            For details of these startup options, see <xref href="impala_config_options.xml#config_options"/>.
+          </p>
+
+          <p>
+            This feature also involves several new or changed query options that you can set through the
+            <cmdname>impala-shell</cmdname> interpreter and apply within a specific session:
+          </p>
+          <ul>
+            <li>
+              <codeph>MEM_LIMIT</codeph>: the function of this existing option changes when Impala resource
+              management is enabled.
+            </li>
+
+            <li>
+              <codeph>YARN_POOL</codeph>: a new option. (Renamed to <codeph>RESOURCE_POOL</codeph> in Impala
+              1.3.0.)
+            </li>
+
+            <li>
+              <codeph>V_CPU_CORES</codeph>: a new option.
+            </li>
+
+            <li>
+              <codeph>RESERVATION_REQUEST_TIMEOUT</codeph>: a new option.
+            </li>
+          </ul>
+          <p>
+            For details of these query options, see <xref href="impala_resource_management.xml#rm_query_options"/>.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            <codeph>CREATE TABLE ... AS SELECT</codeph> syntax, to create a table and copy data into it in a single
+            operation. See <xref href="impala_create_table.xml#create_table"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph> statements have new clauses
+            <codeph>TBLPROPERTIES</codeph> and <codeph>WITH SERDEPROPERTIES</codeph>. The
+            <codeph>TBLPROPERTIES</codeph> clause lets you associate arbitrary items of metadata with a particular
+            table as key-value pairs. The <codeph>WITH SERDEPROPERTIES</codeph> clause lets you specify the
+            serializer/deserializer (SerDes) classes that read and write data for a table; although Impala does not
+            make use of these properties, sometimes particular values are needed for Hive compatibility. See
+            <xref href="impala_create_table.xml#create_table"/> and
+            <xref href="impala_alter_table.xml#alter_table"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Delegation support lets you authorize certain OS users associated with applications (for example,
+            <codeph>hue</codeph>), to submit requests using the credentials of other users. Only available in
+            combination with CDH 5. See <xref href="impala_delegation.xml#delegation"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Enhancements to <codeph>EXPLAIN</codeph> output. In particular, when you enable the new
+            <codeph>EXPLAIN_LEVEL</codeph> query option, the <codeph>EXPLAIN</codeph> and <codeph>PROFILE</codeph>
+            statements produce more verbose output showing estimated resource requirements and whether table and
+            column statistics are available for the applicable tables and columns. See
+            <xref href="impala_explain.xml#explain"/> for details.
+          </p>
+        </li>
+
+        <li rev="1.2.1">
+          <p>
+            <codeph>SHOW CREATE TABLE</codeph> summarizes the effects of the original <codeph>CREATE TABLE</codeph>
+            statement and any subsequent <codeph>ALTER TABLE</codeph> statements, giving you a <codeph>CREATE
+            TABLE</codeph> statement that will re-create the current structure and layout for a table.
+          </p>
+        </li>
+
+        <li rev="1.2.1">
+          <p>
+            The <codeph>LIMIT</codeph> clause for queries now accepts an arithmetic expression, in addition to
+            numeric literals.
+          </p>
+        </li>
+
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="1.2" id="new_features_120">
+
+    <title>New Features in Impala 1.2.0 (Beta)</title>
+
+    <conbody>
+
+      <note>
+        The Impala 1.2.0 beta release only works in combination with the beta version of CDH 5. The Impala 1.2.0
+        software is bundled together with the CDH 5 beta 1 download.
+      </note>
+
+      <p>
+        The Impala 1.2.0 beta includes new features for security, performance, and flexibility.
+      </p>
+
+      <p>
+        New user-visible features include:
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            User-defined functions (UDFs). This feature lets you transform data in very flexible ways, which is
+            important when using Impala as part of an ETL or ELT pipeline. Prior to Impala 1.2, using UDFs required
+            switching into Hive. Impala 1.2 can run scalar UDFs and user-defined aggregate functions (UDAs). Impala
+            can run high-performance functions written in C++, or you can reuse existing Hive functions written in
+            Java.
+          </p>
+
+          <p>
+            You create UDFs through the <codeph>CREATE FUNCTION</codeph> statement and drop them through the
+            <codeph>DROP FUNCTION</codeph> statement. See <xref href="impala_udf.xml#udfs"/> for instructions about
+            coding, building, and deploying UDFs, and <xref href="impala_create_function.xml#create_function"/> and
+            <xref href="impala_drop_function.xml#drop_function"/> for related SQL syntax.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            A new service automatically propagates changes to table data and metadata made by one Impala node,
+            sending the new or updated metadata to all the other Impala nodes. The automatic synchronization
+            mechanism eliminates the need to use the <codeph>INVALIDATE METADATA</codeph> and
+            <codeph>REFRESH</codeph> statements after issuing Impala statements such as <codeph>CREATE
+            TABLE</codeph>, <codeph>ALTER TABLE</codeph>, <codeph>DROP TABLE</codeph>, <codeph>INSERT</codeph>, and
+            <codeph>LOAD DATA</codeph>.
+          </p>
+
+          <note>
+            <p>
+              Because this service only monitors operations performed through Impala, <codeph>INVALIDATE
+              METADATA</codeph> and <codeph>REFRESH</codeph> are still needed on the Impala side after creating new
+              tables or loading data through the Hive shell or by manipulating data files directly in HDFS. Because
+              the catalog service broadcasts the result of the <codeph>REFRESH</codeph> and <codeph>INVALIDATE
+              METADATA</codeph> statements to all Impala nodes, when you do need to use those statements, you can
+              do so a single time rather than on every Impala node.
+            </p>
+          </note>
+
+          <p>
+            This service is implemented by the <cmdname>catalogd</cmdname> daemon. See
+            <xref href="impala_components.xml#intro_catalogd"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Integration with the YARN resource management framework. Only available in combination with CDH 5. This
+            feature makes use of the underlying YARN service, plus an additional service (Llama) that coordinates
+            requests to YARN for Impala resources, so that the Impala query only proceeds when all requested
+            resources are available. See <xref href="impala_resource_management.xml#resource_management"/> for full
+            details.
+          </p>
+
+          <p>
+            On the Impala side, this feature involves some new startup options for the <cmdname>impalad</cmdname>
+            daemon:
+          </p>
+          <ul>
+            <li>
+              <codeph>-enable_rm</codeph>
+            </li>
+
+            <li>
+              <codeph>-llama_host</codeph>
+            </li>
+
+            <li>
+              <codeph>-llama_port</codeph>
+            </li>
+
+            <li>
+              <codeph>-llama_callback_port</codeph>
+            </li>
+
+            <li>
+              <codeph>-cgroup_hierarchy_path</codeph>
+            </li>
+          </ul>
+          <p>
+            For details of these startup options, see <xref href="impala_config_options.xml#config_options"/>.
+          </p>
+
+          <p>
+            This feature also involves several new or changed query options that you can set through the
+            <cmdname>impala-shell</cmdname> interpreter and apply within a specific session:
+          </p>
+          <ul>
+            <li>
+              <codeph>MEM_LIMIT</codeph>: the function of this existing option changes when Impala resource
+              management is enabled.
+            </li>
+
+            <li>
+              <codeph>YARN_POOL</codeph>: a new option. (Renamed to <codeph>RESOURCE_POOL</codeph> in Impala
+              1.3.0.)
+            </li>
+
+            <li>
+              <codeph>V_CPU_CORES</codeph>: a new option.
+            </li>
+
+            <li>
+              <codeph>RESERVATION_REQUEST_TIMEOUT</codeph>: a new option.
+            </li>
+          </ul>
+          <p>
+            For details of these query options, see <xref href="impala_resource_management.xml#rm_query_options"/>.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            <codeph>CREATE TABLE ... AS SELECT</codeph> syntax, to create a table and copy data into it in a single
+            operation. See <xref href="impala_create_table.xml#create_table"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph> statements have a new
+            <codeph>TBLPROPERTIES</codeph> clause that lets you associate arbitrary items of metadata with a
+            particular table as key-value pairs. See <xref href="impala_create_table.xml#create_table"/> and
+            <xref href="impala_alter_table.xml#alter_table"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Delegation support lets you authorize certain OS users associated with applications (for example,
+            <codeph>hue</codeph>), to submit requests using the credentials of other users. Only available in
+            combination with CDH 5. See <xref href="impala_delegation.xml#delegation"/> for details.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Enhancements to <codeph>EXPLAIN</codeph> output. In particular, when you enable the new
+            <codeph>EXPLAIN_LEVEL</codeph> query option, the <codeph>EXPLAIN</codeph> and <codeph>PROFILE</codeph>
+            statements produce more verbose output showing estimated resource requirements and whether table and
+            column statistics are available for the applicable tables and columns. See
+            <xref href="impala_explain.xml#explain"/> for details.
+          </p>
+        </li>
+
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="new_features_111">
+
+    <title>New Features in Impala 1.1.1</title>
+
+    <conbody>
+
+      <p>
+        Impala 1.1.1 includes new features for security and stability.
+      </p>
+
+      <p>
+        New user-visible features include:
+      </p>
+
+      <ul>
+        <li>
+          Additional security feature: auditing. New startup options for <cmdname>impalad</cmdname> let you capture
+          information about Impala queries that succeed or are blocked due to insufficient privileges. To take full
+          advantage of this feature with Cloudera Manager, upgrade to Cloudera Manager 4.7 or higher. For details,
+          see <xref href="impala_security.xml#security"/>.
+        </li>
+
+        <li>
+          Parquet data files generated by Impala 1.1.1 are now compatible with the Parquet support in Hive. See
+          <xref href="impala_incompatible_changes.xml#incompatible_changes"/> for the procedure to update older
+          Impala-created Parquet files to be compatible with the Hive Parquet support.
+        </li>
+
+        <li>
+          Additional improvements to stability and resource utilization for Impala queries.
+        </li>
+
+        <li>
+          Additional enhancements for compatibility with existing file formats.
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="new_features_11">
+
+    <title>New Features in Impala 1.1</title>
+
+    <conbody>
+
+      <p>
+        Impala 1.1 includes new features for security, performance, and usability.
+      </p>
+
+      <p>
+        New user-visible features include:
+      </p>
+
+      <ul>
+        <li>
+          Extensive new security features, built on top of the Sentry open source project. Impala now supports
+          fine-grained authorization based on roles. A policy file determines which privileges on which schema
+          objects (servers, databases, tables, and HDFS paths) are available to users based on their membership in
+          groups. By assigning privileges for views, you can control access to table data at the column level. For
+          details, see <xref href="impala_security.xml#security"/>.
+        </li>
+
+        <li>
+          Impala 1.1 works with Cloudera Manager 4.6 or higher. To use Cloudera Manager to manage authorization for
+          the Impala web UI (the web pages served from port 25000 by default), use Cloudera Manager 4.6.2 or
+          higher.
+        </li>
+
+        <li>
+          Impala can now create, alter, drop, and query views. Views provide a flexible way to set up simple
+          aliases for complex queries; hide query details from applications and users; and simplify maintenance as
+          you rename or reorganize databases, tables, and columns. See the overview section
+          <xref href="impala_views.xml#views"/> and the statements
+          <xref href="impala_create_view.xml#create_view"/>, <xref href="impala_alter_view.xml#alter_view"/>, and
+          <xref href="impala_drop_view.xml#drop_view"/>.
+        </li>
+
+        <li>
+          Performance is improved through a number of automatic optimizations. Resource consumption is also reduced
+          for Impala queries. These improvements apply broadly across all kinds of workloads and file formats. The
+          major areas of performance enhancement include:
+          <ul>
+            <li>
+              Improved disk and thread scheduling, which applies to all queries.
+            </li>
+
+            <li>
+              Improved hash join and aggregation performance, which applies to queries with large build tables or a
+              large number of groups.
+            </li>
+
+            <li>
+              Dictionary encoding with Parquet, which applies to Parquet tables with short string columns.
+            </li>
+
+            <li>
+              Improved performance on systems with SSDs, which applies to all queries and file formats.
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          Some new built-in functions are implemented:
+          <xref href="impala_string_functions.xml#string_functions/translate">translate()</xref> to substitute
+          characters within strings,
+<!-- IMPALA-418 -->
+          <xref href="impala_misc_functions.xml#misc_functions/user">user()</xref> to check the login ID of the
+          connected user.
+<!-- IMPALA-??? -->
+        </li>
+
+        <li>
+          The new <codeph>WITH</codeph> clause for <codeph>SELECT</codeph> statements lets you simplify complicated
+          queries in a way similar to creating a view. The effects of the <codeph>WITH</codeph> clause only last
+          for the duration of one query, unlike views, which are persistent schema objects that can be used by
+          multiple sessions or applications. See <xref href="impala_with.xml#with"/>.
+        </li>
+
+        <li>
+          An enhancement to <codeph>DESCRIBE</codeph> statement, <codeph>DESCRIBE FORMATTED
+          <varname>table_name</varname></codeph>, displays more detailed information about the table. This
+          information includes the file format, location, delimiter, ownership, external or internal, creation and
+          access times, and partitions. The information is returned as a result set that can be interpreted and
+          used by a management or monitoring application. See <xref href="impala_describe.xml#describe"/>.
+        </li>
+
+        <li>
+          You can now insert a subset of columns for a table, with other columns being left as all
+          <codeph>NULL</codeph> values. Or you can specify the columns in any order in the destination table,
+          rather than having to match the order of the corresponding columns in the source. <codeph>VALUES</codeph>
+          clause. This feature is known as <q>column permutation</q>. See <xref href="impala_insert.xml#insert"/>.
+        </li>
+
+        <li>
+          The new <codeph>LOAD DATA</codeph> statement lets you load data into a table directly from an HDFS data
+          file. This technique lets you minimize the number of steps in your ETL process, and provides more
+          flexibility. For example, you can bring data into an Impala table in one step. Formerly, you might have
+          created an external table where the data files are not entirely under your control, or copied the data
+          files to Impala data directories manually, or loaded the original data into one table and then used the
+          <codeph>INSERT</codeph> statement to copy it to a new table with a different file format, partitioning
+          scheme, and so on. See <xref href="impala_load_data.xml#load_data"/>.
+        </li>
+
+        <li>
+          Improvements to Impala-HBase integration:
+          <ul>
+            <li>
+              New query options for HBase performance:
+              <codeph><xref href="impala_hbase_cache_blocks.xml#hbase_cache_blocks">HBASE_CACHE_BLOCKS</xref></codeph>
+              and <codeph><xref href="impala_hbase_caching.xml#hbase_caching">HBASE_CACHING</xref></codeph>.
+            </li>
+
+            <li>
+              Support for binary data types in HBase tables. See <xref href="impala_hbase.xml#hbase_types"/> for
+              details.
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          You can issue <codeph>REFRESH</codeph> as a SQL statement through any of the programming interfaces that
+          Impala supports. <codeph>REFRESH</codeph> formerly had to be issued as a command through the
+          <cmdname>impala-shell</cmdname> interpreter, and was not available through a JDBC or ODBC API call. As
+          part of this change, the functionality of the <codeph>REFRESH</codeph> statement is divided between two
+          statements. In Impala 1.1, <codeph>REFRESH</codeph> requires a table name argument and immediately
+          reloads the metadata; the new <codeph>INVALIDATE METADATA</codeph> statement works the same as the Impala
+          1.0 <codeph>REFRESH</codeph> did: the table name argument is optional, and the metadata for one or all
+          tables is marked as stale, but not actually reloaded until the table is queried. When you create a new
+          table in the Hive shell or through a different Impala node, you must enter <codeph>INVALIDATE
+          METADATA</codeph> with no table parameter before you can see the new table in
+          <cmdname>impala-shell</cmdname>. See <xref href="impala_refresh.xml#refresh"/> and
+          <xref href="impala_invalidate_metadata.xml#invalidate_metadata"/>.
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="new_features_101">
+
+    <title>New Features in Impala 1.0.1</title>
+
+    <conbody>
+
+      <p>
+        The primary enhancements in Impala 1.0.1 are internal, for compatibility with the new Cloudera Manager 4.6
+        release. Try out the new <uicontrol>Impala Query Monitoring</uicontrol> feature in Cloudera Manager 4.6,
+        which requires Impala 1.0.1.
+      </p>
+
+      <p>
+        New user-visible features include:
+      </p>
+
+      <ul>
+        <li>
+          The <codeph>VALUES</codeph> clause lets you <codeph>INSERT</codeph> one or more rows using literals,
+          function return values, or other expressions. For performance and scalability, you should still use
+          <codeph>INSERT ... SELECT</codeph> for bringing large quantities of data into an Impala table. The
+          <codeph>VALUES</codeph> clause is a convenient way to set up small tables, particularly for initial
+          testing of SQL features that do not require large amounts of data. See
+          <xref href="impala_insert.xml#values"/> for details.
+        </li>
+
+        <li>
+          The <codeph>-B</codeph> and <codeph>-o</codeph> options of the <codeph>impala-shell</codeph> command can
+          turn query results into delimited text files and store them in an output file. The plain text results are
+          useful for using with other Hadoop components or Unix tools. In benchmark tests, it is also faster to
+          produce plain rather than pretty-printed results, and write to a file rather than to the screen, giving a
+          more accurate picture of the actual query time.
+        </li>
+
+        <li>
+          Several bug fixes. See <xref href="impala_fixed_issues.xml#fixed_issues_101"/> for details.
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="new_features_10">
+
+    <title>New Features in Impala 1.0</title>
+
+    <conbody>
+
+      <p>
+        This version has multiple performance improvements and adds the following functionality:
+      </p>
+
+      <ul>
+        <li>
+          Several bug fixes. See <xref href="impala_fixed_issues.xml#fixed_issues_10"/>.
+        </li>
+
+        <li>
+          <codeph><xref href="impala_alter_table.xml#alter_table">ALTER TABLE</xref></codeph> statement.
+        </li>
+
+        <li>
+          <xref href="impala_hints.xml#hints">Hints</xref> to allow specifying a particular join strategy.
+        </li>
+
+        <li>
+          <codeph><xref href="impala_refresh.xml#refresh">REFRESH</xref></codeph> for a single table.
+        </li>
+
+        <li>
+          Dynamic resource management, allowing high concurrency for Impala queries.
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="new_features_07">
+
+    <title>New Features in Version 0.7 of the Impala Beta Release</title>
+
+    <conbody>
+
+      <p>
+        This version has multiple performance improvements and adds the following functionality:
+      </p>
+
+      <ul>
+        <li>
+          Several bug fixes. See <xref href="impala_fixed_issues.xml#fixed_issues_07"/>.
+        </li>
+
+        <li>
+          Support for the Parquet file format. For more information on file formats, see
+          <xref href="impala_file_formats.xml#file_formats"/>.
+        </li>
+
+        <li>
+          Added support for Avro.
+        </li>
+
+        <li>
+          Support for the memory limits. For more information, see the example on modifying memory limits in
+          <xref href="impala_config_options.xml#config_options"/>.
+        </li>
+
+        <li>
+          Bigger and faster joins through the addition of partitioned joins to the already supported broadcast
+          joins.
+        </li>
+
+        <li>
+          Fully distributed aggregations.
+        </li>
+
+        <li>
+          Fully distributed top-n computation.
+        </li>
+
+        <li>
+          Support for creating and altering tables.
+        </li>
+
+        <li>
+          Support for GROUP BY with floats and doubles.
+        </li>
+      </ul>
+
+      <p>
+        In this version, both CDH 4.1 and 4.2 are supported, but due to performance improvements added, we highly
+        recommend you use CDH 4.2 or higher to see the full benefit. If you are using Cloudera Manager, version 4.5
+        is required.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="new_features_06">
+
+    <title>New Features in Version 0.6 of the Impala Beta Release</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          Several bug fixes. See <xref href="impala_fixed_issues.xml#fixed_issues_06"/>.
+        </li>
+
+        <li>
+          Added support for Impala on SUSE and Debian/Ubuntu. Impala is now supported on:
+          <ul>
+            <li>
+              RHEL5.7/6.2 and Centos5.7/6.2
+            </li>
+
+            <li>
+              SUSE 11 with Service Pack 1 or higher
+            </li>
+
+            <li>
+              Ubuntu 10.04/12.04 and Debian 6.03
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          Cloudera Manager 4.5 and CDH 4.2 support Impala 0.6.
+        </li>
+
+        <li>
+          Support for the RCFile file format. For more information on file formats, see
+          <xref href="impala_file_formats.xml#file_formats">Understanding File Formats</xref>.
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="new_features_05">
+
+    <title>New Features in Version 0.5 of the Impala Beta Release</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          Several bug fixes. See <xref href="impala_fixed_issues.xml#fixed_issues_05"/>.
+        </li>
+
+        <li>
+          Added support for a JDBC driver that allows you to access Impala from a Java client. To use this feature,
+          follow the instructions in <xref href="impala_jdbc.xml#impala_jdbc"/> to install the JDBC
+          driver JARs on the client machine and modify the <codeph>CLASSPATH</codeph> on the client to include the
+          JARs.
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="new_features_04">
+
+    <title>New Features in Version 0.4 of the Impala Beta Release</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          Several bug fixes. See <xref href="impala_fixed_issues.xml#fixed_issues_04"/>.
+        </li>
+
+        <li>
+          Added support for Impala on RHEL5.7/Centos5.7. Impala is now supported on RHEL5.7/6.2 and Centos5.7/6.2.
+        </li>
+
+        <li>
+          Cloudera Manager 4.1.3 supports Impala 0.4.
+        </li>
+
+        <li>
+          The Impala debug webserver now has the ability to serve static files from
+          <codeph>${IMPALA_HOME}/www</codeph>. This can be disabled by setting
+          <codeph>--enable_webserver_doc_root=false</codeph> on the command line. As a result, Impala now uses the
+          Twitter Bootstrap library to style its debug webpages, and the <codeph>/queries</codeph> page now tracks
+          the last 25 queries run by each Impala daemon.
+        </li>
+
+        <li>
+          Additional metrics available on the Impala Debug Webpage.
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="new_features_03">
+
+    <title>New Features in Version 0.3 of the Impala Beta Release</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          Several bug fixes. See <xref href="impala_fixed_issues.xml#fixed_issues_03"/>.
+        </li>
+
+        <li>
+          The <codeph>state-store-service binary</codeph> has been renamed <codeph>statestored</codeph>.
+        </li>
+
+        <li>
+          The location of the Impala configuration files has changed from the <codeph>/usr/lib/impala/conf</codeph>
+          directory to the <codeph>/etc/impala/conf</codeph> directory.
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="new_features_02">
+
+    <title>New Features in Version 0.2 of the Impala Beta Release</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          Several bug fixes. See <xref href="impala_fixed_issues.xml#fixed_issues_02"/>.
+        </li>
+
+        <li>
+          <b>Added Default Query Options</b> Default query options override all default QueryOption values when
+          starting <codeph>impalad</codeph>. The format is:
+<codeblock>-default_query_options='key=value;key=value'</codeblock>
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+</concept>

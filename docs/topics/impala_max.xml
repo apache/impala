@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="max">
+
+  <title>MAX Function</title>
+  <titlealts audience="PDF"><navtitle>MAX</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="Analytic Functions"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">max() function</indexterm>
+      An aggregate function that returns the maximum value from a set of numbers. Opposite of the
+      <codeph>MIN</codeph> function. Its single argument can be numeric column, or the numeric result of a function
+      or expression applied to the column value. Rows with a <codeph>NULL</codeph> value for the specified column
+      are ignored. If the table is empty, or all the values supplied to <codeph>MAX</codeph> are
+      <codeph>NULL</codeph>, <codeph>MAX</codeph> returns <codeph>NULL</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>MAX([DISTINCT | ALL] <varname>expression</varname>) [OVER (<varname>analytic_clause</varname>)]</codeblock>
+
+    <p>
+      When the query contains a <codeph>GROUP BY</codeph> clause, returns one value for each combination of
+      grouping values.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_sliding_window"/>
+
+    <p conref="../shared/impala_common.xml#common/return_type_same_except_string"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/partition_key_optimization"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_aggregation_explanation"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_aggregation_example"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>-- Find the largest value for this column in the table.
+select max(c1) from t1;
+-- Find the largest value for this column from a subset of the table.
+select max(c1) from t1 where month = 'January' and year = '2013';
+-- Find the largest value from a set of numeric function results.
+select max(length(s)) from t1;
+-- Can also be used in combination with DISTINCT and/or GROUP BY.
+-- Return more than one result.
+select month, year, max(purchase_price) from store_stats group by month, year;
+-- Filter the input to eliminate duplicates before performing the calculation.
+select max(distinct x) from t1;
+</codeblock>
+
+    <p rev="2.0.0">
+      The following examples show how to use <codeph>MAX()</codeph> in an analytic context. They use a table
+      containing integers from 1 to 10. Notice how the <codeph>MAX()</codeph> is reported for each input value, as
+      opposed to the <codeph>GROUP BY</codeph> clause which condenses the result set.
+<codeblock>select x, property, max(x) over (partition by property) as max from int_t where property in ('odd','even');
++----+----------+-----+
+| x  | property | max |
++----+----------+-----+
+| 2  | even     | 10  |
+| 4  | even     | 10  |
+| 6  | even     | 10  |
+| 8  | even     | 10  |
+| 10 | even     | 10  |
+| 1  | odd      | 9   |
+| 3  | odd      | 9   |
+| 5  | odd      | 9   |
+| 7  | odd      | 9   |
+| 9  | odd      | 9   |
++----+----------+-----+
+</codeblock>
+
+Adding an <codeph>ORDER BY</codeph> clause lets you experiment with results that are cumulative or apply to a moving
+set of rows (the <q>window</q>). The following examples use <codeph>MAX()</codeph> in an analytic context
+(that is, with an <codeph>OVER()</codeph> clause) to display the smallest value of <codeph>X</codeph>
+encountered up to each row in the result set. The examples use two columns in the <codeph>ORDER BY</codeph>
+clause to produce a sequence of values that rises and falls, to illustrate how the <codeph>MAX()</codeph>
+result only increases or stays the same throughout each partition within the result set.
+The basic <codeph>ORDER BY x</codeph> clause implicitly
+activates a window clause of <codeph>RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</codeph>,
+which is effectively the same as <codeph>ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</codeph>,
+therefore all of these examples produce the same results:
+
+<codeblock>select x, property,
+  max(x) <b>over (order by property, x desc)</b> as 'maximum to this point'
+from int_t where property in ('prime','square');
++---+----------+-----------------------+
+| x | property | maximum to this point |
++---+----------+-----------------------+
+| 7 | prime    | 7                     |
+| 5 | prime    | 7                     |
+| 3 | prime    | 7                     |
+| 2 | prime    | 7                     |
+| 9 | square   | 9                     |
+| 4 | square   | 9                     |
+| 1 | square   | 9                     |
++---+----------+-----------------------+
+
+select x, property,
+  max(x) over
+  (
+    <b>order by property, x desc</b>
+    <b>rows between unbounded preceding and current row</b>
+  ) as 'maximum to this point'
+from int_t where property in ('prime','square');
++---+----------+-----------------------+
+| x | property | maximum to this point |
++---+----------+-----------------------+
+| 7 | prime    | 7                     |
+| 5 | prime    | 7                     |
+| 3 | prime    | 7                     |
+| 2 | prime    | 7                     |
+| 9 | square   | 9                     |
+| 4 | square   | 9                     |
+| 1 | square   | 9                     |
++---+----------+-----------------------+
+
+select x, property,
+  max(x) over
+  (
+    <b>order by property, x desc</b>
+    <b>range between unbounded preceding and current row</b>
+  ) as 'maximum to this point'
+from int_t where property in ('prime','square');
++---+----------+-----------------------+
+| x | property | maximum to this point |
++---+----------+-----------------------+
+| 7 | prime    | 7                     |
+| 5 | prime    | 7                     |
+| 3 | prime    | 7                     |
+| 2 | prime    | 7                     |
+| 9 | square   | 9                     |
+| 4 | square   | 9                     |
+| 1 | square   | 9                     |
++---+----------+-----------------------+
+</codeblock>
+
+The following examples show how to construct a moving window, with a running maximum taking into account all rows before
+and 1 row after the current row.
+Because of a restriction in the Impala <codeph>RANGE</codeph> syntax, this type of
+moving window is possible with the <codeph>ROWS BETWEEN</codeph> clause but not the <codeph>RANGE BETWEEN</codeph> clause.
+Because of an extra Impala restriction on the <codeph>MAX()</codeph> and <codeph>MIN()</codeph> functions in an
+analytic context, the lower bound must be <codeph>UNBOUNDED PRECEDING</codeph>.
+<codeblock>select x, property,
+  max(x) over
+  (
+    <b>order by property, x</b>
+    <b>rows between unbounded preceding and 1 following</b>
+  ) as 'local maximum'
+from int_t where property in ('prime','square');
++---+----------+---------------+
+| x | property | local maximum |
++---+----------+---------------+
+| 2 | prime    | 3             |
+| 3 | prime    | 5             |
+| 5 | prime    | 7             |
+| 7 | prime    | 7             |
+| 1 | square   | 7             |
+| 4 | square   | 9             |
+| 9 | square   | 9             |
++---+----------+---------------+
+
+-- Doesn't work because of syntax restriction on RANGE clause.
+select x, property,
+  max(x) over
+  (
+    <b>order by property, x</b>
+    <b>range between unbounded preceding and 1 following</b>
+  ) as 'local maximum'
+from int_t where property in ('prime','square');
+ERROR: AnalysisException: RANGE is only supported with both the lower and upper bounds UNBOUNDED or one UNBOUNDED and the other CURRENT ROW.
+</codeblock>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_analytic_functions.xml#analytic_functions"/>, <xref href="impala_min.xml#min"/>,
+      <xref href="impala_avg.xml#avg"/>
+    </p>
+  </conbody>
+</concept>

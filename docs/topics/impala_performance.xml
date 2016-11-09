@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="performance">
+
+  <title>Tuning Impala for Performance</title>
+  <titlealts audience="PDF"><navtitle>Performance Tuning</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Databases"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <!-- Like Impala Administration, this page has a fair bit of info already, but it could benefit from wiki-style embedded of intro text from those other pages. -->
+      <data name="Category" value="Stub Pages"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The following sections explain the factors affecting the performance of Impala features, and procedures for
+      tuning, monitoring, and benchmarking Impala queries and other SQL operations.
+    </p>
+
+    <p>
+      This section also describes techniques for maximizing Impala scalability. Scalability is tied to performance:
+      it means that performance remains high as the system workload increases. For example, reducing the disk I/O
+      performed by a query can speed up an individual query, and at the same time improve scalability by making it
+      practical to run more queries simultaneously. Sometimes, an optimization technique improves scalability more
+      than performance. For example, reducing memory usage for a query might not change the query performance much,
+      but might improve scalability by allowing more Impala queries or other kinds of jobs to run at the same time
+      without running out of memory.
+    </p>
+
+    <note>
+      <p>
+        Before starting any performance tuning or benchmarking, make sure your system is configured with all the
+        recommended minimum hardware requirements from <xref href="impala_prereqs.xml#prereqs_hardware"/> and
+        software settings from <xref href="impala_config_performance.xml#config_performance"/>.
+      </p>
+    </note>
+
+    <ul>
+      <li>
+        <xref href="impala_partitioning.xml#partitioning"/>. This technique physically divides the data based on
+        the different values in frequently queried columns, allowing queries to skip reading a large percentage of
+        the data in a table.
+      </li>
+
+      <li>
+        <xref href="impala_perf_joins.xml#perf_joins"/>. Joins are the main class of queries that you can tune at
+        the SQL level, as opposed to changing physical factors such as the file format or the hardware
+        configuration. The related topics <xref href="impala_perf_stats.xml#perf_column_stats"/> and
+        <xref href="impala_perf_stats.xml#perf_table_stats"/> are also important primarily for join performance.
+      </li>
+
+      <li>
+        <xref href="impala_perf_stats.xml#perf_table_stats"/> and
+        <xref href="impala_perf_stats.xml#perf_column_stats"/>. Gathering table and column statistics, using the
+        <codeph>COMPUTE STATS</codeph> statement, helps Impala automatically optimize the performance for join
+        queries, without requiring changes to SQL query statements. (This process is greatly simplified in Impala
+        1.2.2 and higher, because the <codeph>COMPUTE STATS</codeph> statement gathers both kinds of statistics in
+        one operation, and does not require any setup and configuration as was previously necessary for the
+        <codeph>ANALYZE TABLE</codeph> statement in Hive.)
+      </li>
+
+      <li>
+        <xref href="impala_perf_testing.xml#performance_testing"/>. Do some post-setup testing to ensure Impala is
+        using optimal settings for performance, before conducting any benchmark tests.
+      </li>
+
+      <li>
+        <xref href="impala_perf_benchmarking.xml#perf_benchmarks"/>. The configuration and sample data that you use
+        for initial experiments with Impala is often not appropriate for doing performance tests.
+      </li>
+
+      <li>
+        <xref href="impala_perf_resources.xml#mem_limits"/>. The more memory Impala can utilize, the better query
+        performance you can expect. In a cluster running other kinds of workloads as well, you must make tradeoffs
+        to make sure all Hadoop components have enough memory to perform well, so you might cap the memory that
+        Impala can use.
+      </li>
+
+      <li rev="1.2" audience="Cloudera">
+        <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/>. Impala can use the HDFS caching feature to pin
+        frequently accessed data in memory, reducing disk I/O.
+      </li>
+
+      <li rev="2.2.0">
+        <xref href="impala_s3.xml#s3"/>. Queries against data stored in the Amazon Simple Storage Service (S3)
+        have different performance characteristics than when the data is stored in HDFS.
+      </li>
+    </ul>
+
+    <p outputclass="toc"/>
+
+    <p conref="../shared/impala_common.xml#common/cookbook_blurb"/>
+
+  </conbody>
+
+<!-- Empty/hidden stub sections that might be worth expanding later. -->
+
+  <concept id="perf_network" audience="Cloudera">
+
+    <title>Network Traffic</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="perf_partition_schema" audience="Cloudera">
+
+    <title>Designing Partitioned Tables</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="perf_partition_query" audience="Cloudera">
+
+    <title>Queries on Partitioned Tables</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="perf_monitoring" audience="Cloudera">
+
+    <title>Monitoring Performance through the Impala Web Interface</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Monitoring"/>
+    </metadata>
+  </prolog>
+
+    <conbody/>
+  </concept>
+
+  <concept id="perf_query_coord" audience="Cloudera">
+
+    <title>Query Coordination</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="perf_bottlenecks" audience="Cloudera">
+
+    <title>Performance Bottlenecks</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="perf_long_queries" audience="Cloudera">
+
+    <title>Managing Long-Running Queries</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="perf_load" audience="Cloudera">
+
+    <title>Performance Considerations for Loading Data</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="perf_file_formats" audience="Cloudera">
+
+    <title>Performance Considerations for File Formats</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="perf_compression" audience="Cloudera">
+
+    <title>Performance Considerations for Compression</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Compression"/>
+    </metadata>
+  </prolog>
+
+    <conbody/>
+  </concept>
+
+  <concept id="perf_codegen" audience="Cloudera">
+
+    <title>Native Code Generation</title>
+
+    <conbody/>
+  </concept>
+</concept>

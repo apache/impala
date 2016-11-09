@@ -1,0 +1,635 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="proxy">
+
+  <title>Using Impala through a Proxy for High Availability</title>
+  <titlealts audience="PDF"><navtitle>Load-Balancing Proxy for HA</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="High Availability"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Network"/>
+      <data name="Category" value="Proxy"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      For most clusters that have multiple users and production availability requirements, you might set up a proxy
+      server to relay requests to and from Impala.
+    </p>
+
+    <p>
+      Currently, the Impala statestore mechanism does not include such proxying and load-balancing features. Set up
+      a software package of your choice to perform these functions.
+    </p>
+
+    <note>
+      <p conref="../shared/impala_common.xml#common/statestored_catalogd_ha_blurb"/>
+    </note>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
+
+  <concept id="proxy_overview">
+
+    <title>Overview of Proxy Usage and Load Balancing for Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Concepts"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        Using a load-balancing proxy server for Impala has the following advantages:
+      </p>
+
+      <ul>
+        <li>
+          Applications connect to a single well-known host and port, rather than keeping track of the hosts where
+          the <cmdname>impalad</cmdname> daemon is running.
+        </li>
+
+        <li>
+          If any host running the <cmdname>impalad</cmdname> daemon becomes unavailable, application connection
+          requests still succeed because you always connect to the proxy server rather than a specific host running
+          the <cmdname>impalad</cmdname> daemon.
+        </li>
+
+        <li>
+          The coordinator node for each Impala query potentially requires more memory and CPU cycles than the other
+          nodes that process the query. The proxy server can issue queries using round-robin scheduling, so that
+          each connection uses a different coordinator node. This load-balancing technique lets the Impala nodes
+          share this additional work, rather than concentrating it on a single machine.
+        </li>
+      </ul>
+
+      <p>
+        The following setup steps are a general outline that apply to any load-balancing proxy software:
+      </p>
+
+      <ol>
+        <li>
+          Download the load-balancing proxy software. It should only need to be installed and configured on a
+          single host. Pick a host other than the DataNodes where <cmdname>impalad</cmdname> is running,
+          because the intention is to protect against the possibility of one or more of these DataNodes becoming unavailable.
+        </li>
+
+        <li>
+          Configure the load balancer (typically by editing a configuration file).
+          In particular:
+          <ul>
+            <li>
+              <p>
+                Set up a port that the load balancer will listen on to relay Impala requests back and forth.
+              </p>
+            </li>
+            <li>
+              <p rev="DOCS-690">
+                Consider enabling <q>sticky sessions</q>. <ph rev="upstream">Cloudera</ph> recommends enabling this setting
+                so that stateless client applications such as <cmdname>impalad</cmdname> and Hue
+                are not disconnected from long-running queries. Evaluate whether this setting is
+                appropriate for your combination of workload and client applications.
+              </p>
+            </li>
+            <li>
+              <p>
+                For Kerberized clusters, follow the instructions in <xref href="impala_proxy.xml#proxy_kerberos"/>.
+              </p>
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          Specify the host and port settings for each Impala node. These are the hosts that the load balancer will
+          choose from when relaying each Impala query. See <xref href="impala_ports.xml#ports"/> for when to use
+          port 21000, 21050, or another value depending on what type of connections you are load balancing.
+          <note rev="CDH-30399">
+            <p rev="CDH-30399">
+              In particular, if you are using Hue or JDBC-based applications,
+              you typically set up load balancing for both ports 21000 and 21050, because
+              these client applications connect through port 21050 while the <cmdname>impala-shell</cmdname>
+              command connects through port 21000.
+            </p>
+          </note>
+        </li>
+
+        <li>
+          Run the load-balancing proxy server, pointing it at the configuration file that you set up.
+        </li>
+
+        <li>
+          On systems managed by Cloudera Manager, on the page
+          <menucascade><uicontrol>Impala</uicontrol><uicontrol>Configuration</uicontrol><uicontrol>Impala Daemon
+          Default Group</uicontrol></menucascade>, specify a value for the <uicontrol>Impala Daemons Load
+          Balancer</uicontrol> field. Specify the address of the load balancer in
+          <codeph><varname>host</varname>:<varname>port</varname></codeph> format. This setting lets Cloudera
+          Manager route all appropriate Impala-related operations through the proxy server.
+        </li>
+
+        <li>
+          For any scripts, jobs, or configuration settings for applications that formerly connected to a specific
+          datanode to run Impala SQL statements, change the connection information (such as the <codeph>-i</codeph>
+          option in <cmdname>impala-shell</cmdname>) to point to the load balancer instead.
+        </li>
+      </ol>
+
+      <note>
+        The following sections use the HAProxy software as a representative example of a load balancer
+        that you can use with Impala.
+        For information specifically about using Impala with the F5 BIG-IP load balancer, see
+        <xref href="http://www.cloudera.com/documentation/other/reference-architecture/PDF/Impala-HA-with-F5-BIG-IP.pdf" scope="external" format="html">Impala HA with F5 BIG-IP</xref>.
+      </note>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="proxy_balancing" rev="CDH-33836 DOCS-349 CDH-39925 CDH-36812" audience="Cloudera">
+    <title>Choosing the Load-Balancing Algorithm</title>
+    <conbody>
+      <p>
+        Load-balancing software offers a number of algorithms to distribute requests.
+        Each algorithm has its own characteristics that make it suitable in some situations
+        but not others.
+      </p>
+
+      <dl>
+        <dlentry>
+          <dt>leastconn</dt>
+          <dd>
+            Connects sessions to the coordinator with the fewest connections, to balance the load evenly.
+            Typically used for workloads consisting of many independent, short-running queries.
+            In configurations with only a few client machines, this setting can avoid having all
+            requests go to only a small set of coordinators.
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>source affinity</dt>
+          <dd>
+            Sessions from the same IP address always go to the same coordinator.
+            A good choice for Impala workloads containing a mix of queries and
+            DDL statements, such as <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph>.
+            Because the metadata changes from a DDL statement take time to propagate across the cluster,
+            prefer to use source affinity in this case. If necessary, run the DDL and subsequent
+            queries that depend on the results of the DDL through the same session, for example
+            by running <codeph>impala-shell -f <varname>script_file</varname></codeph> to submit
+            several statements through a single session.
+            An alternative is to set the query option <codeph>SYNC_DDL=1</codeph>
+            to hold back subsequent queries until the results of a DDL operation have propagated
+            throughout the cluster, but that is a relatively expensive setting.
+            Recommended for use with Hue.
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>sticky</dt>
+          <dd>
+            Similar to source affinity. Sessions from the same IP address always go to the same coordinator.
+            The maintenance overhead for the <q>stick tables</q> can cause long-running Hue sessions
+            to disconnect, therefore source affinity is often a better choice.
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>round-robin</dt>
+          <dd>
+            Distributes connections to all coordinator nodes.
+            Typically not recommended for Impala.
+          </dd>
+        </dlentry>
+      </dl>
+
+      <p>
+        You might need to perform benchmarks and load testing to determine which setting is optimal for your
+        use case. If some client applications have special characteristics, such as long-running Hue queries
+        working best with source affinity, you might configure multiple virtual IP addresses with a
+        different load-balancing algorithm for each.
+      </p>
+
+    </conbody>
+  </concept>
+
+  <concept id="proxy_kerberos">
+
+    <title>Special Proxy Considerations for Clusters Using Kerberos</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Kerberos"/>
+      <data name="Category" value="Authentication"/>
+      <data name="Category" value="Proxy"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        In a cluster using Kerberos, applications check host credentials to verify that the host they are
+        connecting to is the same one that is actually processing the request, to prevent man-in-the-middle
+        attacks. To clarify that the load-balancing proxy server is legitimate, perform these extra Kerberos setup
+        steps:
+      </p>
+
+      <ol>
+        <li>
+          This section assumes you are starting with a Kerberos-enabled cluster. See
+          <xref href="impala_kerberos.xml#kerberos"/> for instructions for setting up Impala with Kerberos. See the
+          <cite>CDH Security Guide</cite> for
+          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_sg_kerberos_prin_keytab_deploy.html" scope="external" format="html">general steps to set up Kerberos</xref>.
+        </li>
+
+        <li>
+          Choose the host you will use for the proxy server. Based on the Kerberos setup procedure, it should
+          already have an entry <codeph>impala/<varname>proxy_host</varname>@<varname>realm</varname></codeph> in
+          its keytab. If not, go back over the initial Kerberos configuration steps for the keytab on each host
+          running the <cmdname>impalad</cmdname> daemon.
+        </li>
+
+        <li rev="CDH-40363">
+          For a cluster managed by Cloudera Manager (5.4.2 or higher), fill in the Impala configuration setting
+          <uicontrol>Impala Daemons Load Balancer</uicontrol> with the appropriate host:port combination.
+          Then restart the Impala service.
+          For systems using a recent level of Cloudera Manager, this is all the configuration you need; you can skip the remaining steps in this procedure.
+        </li>
+
+        <li>
+          On systems not managed by Cloudera Manager, or systems using Cloudera Manager earlier than 5.4.2:
+
+        <ol>
+          <li>
+            Copy the keytab file from the proxy host to all other hosts in the cluster that run the
+            <cmdname>impalad</cmdname> daemon. (For optimal performance, <cmdname>impalad</cmdname> should be running
+            on all DataNodes in the cluster.) Put the keytab file in a secure location on each of these other hosts.
+          </li>
+
+          <li>
+            Add an entry <codeph>impala/<varname>actual_hostname</varname>@<varname>realm</varname></codeph> to the keytab on each
+            host running the <cmdname>impalad</cmdname> daemon.
+          </li>
+
+          <li>
+            For each impalad node, merge the existing keytab with the proxy’s keytab using
+            <cmdname>ktutil</cmdname>, producing a new keytab file. For example:
+  <codeblock>$ ktutil
+  ktutil: read_kt proxy.keytab
+  ktutil: read_kt impala.keytab
+  ktutil: write_kt proxy_impala.keytab
+  ktutil: quit</codeblock>
+            <note>
+              On systems managed by Cloudera Manager 5.1.0 and later, the keytab merging happens automatically. To
+              verify that Cloudera Manager has merged the keytabs, run the command:
+  <codeblock>klist -k <varname>keytabfile</varname></codeblock>
+              which lists the credentials for both <codeph>principal</codeph> and <codeph>be_principal</codeph> on
+              all nodes.
+            </note>
+          </li>
+
+          <li>
+            Make sure that the <codeph>impala</codeph> user has permission to read this merged keytab file.
+          </li>
+
+          <li>
+            Change some configuration settings for each host in the cluster that participates in the load balancing.
+            Follow the appropriate steps depending on whether you use Cloudera Manager or not:
+            <ul>
+              <li> In the <cmdname>impalad</cmdname> option definition, or the advanced
+                configuration snippet, add: <codeblock>--principal=impala/<varname>proxy_host</varname>@<varname>realm</varname>
+  --be_principal=impala/<varname>actual_host</varname>@<varname>realm</varname>
+  --keytab_file=<varname>path_to_merged_keytab</varname></codeblock>
+                <note>
+                  <p>On a cluster managed by Cloudera Manager 5.1 (or higher),
+                    when you set up Kerberos authentication using the wizard, you
+                    can choose to allow Cloudera Manager to deploy the
+                      <systemoutput>krb5.conf</systemoutput> on your cluster. In
+                    such a case, you do not need to explicitly modify safety valve
+                    parameters as directed above. </p>
+                  <p>Every host has a different <codeph>--be_principal</codeph>
+                    because the actual hostname is different on each host. </p>
+                  <p> Specify the fully qualified domain name (FQDN) for the proxy
+                    host, not the IP address. Use the exact FQDN as returned by a
+                    reverse DNS lookup for the associated IP address. </p>
+                </note>
+              </li>
+
+              <li>
+                On a cluster managed by Cloudera Manager, create a role group to set the configuration values from
+                the preceding step on a per-host basis.
+              </li>
+
+              <li>
+                On a cluster not managed by Cloudera Manager, see
+                <xref href="impala_config_options.xml#config_options"/> for the procedure to modify the startup
+                options.
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            Restart Impala to make the changes take effect. Follow the appropriate steps depending on whether you use
+            Cloudera Manager or not:
+            <ul>
+              <li>
+                On a cluster managed by Cloudera Manager, restart the Impala service.
+              </li>
+
+              <li>
+                On a cluster not managed by Cloudera Manager, restart the <cmdname>impalad</cmdname> daemons on all
+                hosts in the cluster, as well as the <cmdname>statestored</cmdname> and <cmdname>catalogd</cmdname>
+                daemons.
+              </li>
+            </ul>
+          </li>
+        </ol>
+        </li>
+      </ol>
+
+<!--
+We basically want to merge the keytab from the proxy host to all the impalad host's keytab file. To merge two keytab files, we first need to ship the proxy keytab to all the impalad node, then merge keytab files using MIT Kerberos "ktutil" command line tool.
+
+<codeblock>$ ktutil
+ktutil: read_kt krb5.keytab
+ktutil: read_kt proxy-host.keytab
+ktutil: write_kt krb5.keytab
+ktutil: quit</codeblock>
+
+The setup of the -principal and -be_principal has to be set through safety valve.
+-->
+
+    </conbody>
+
+  </concept>
+
+  <concept id="tut_proxy">
+
+    <title>Example of Configuring HAProxy Load Balancer for Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Configuring"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        If you are not already using a load-balancing proxy, you can experiment with
+        <xref href="http://haproxy.1wt.eu/" scope="external" format="html">HAProxy</xref> a free, open source load
+        balancer. This example shows how you might install and configure that load balancer on a Red Hat Enterprise
+        Linux system.
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            Install the load balancer: <codeph>yum install haproxy</codeph>
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Set up the configuration file: <filepath>/etc/haproxy/haproxy.cfg</filepath>. See the following section
+            for a sample configuration file.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            Run the load balancer (on a single host, preferably one not running <cmdname>impalad</cmdname>):
+          </p>
+<codeblock>/usr/sbin/haproxy –f /etc/haproxy/haproxy.cfg</codeblock>
+        </li>
+
+        <li>
+          <p>
+            In <cmdname>impala-shell</cmdname>, JDBC applications, or ODBC applications, connect to the listener
+            port of the proxy host, rather than port 21000 or 21050 on a host actually running <cmdname>impalad</cmdname>.
+            The sample configuration file sets haproxy to listen on port 25003, therefore you would send all
+            requests to <codeph><varname>haproxy_host</varname>:25003</codeph>.
+          </p>
+        </li>
+      </ul>
+
+      <p>
+        This is the sample <filepath>haproxy.cfg</filepath> used in this example:
+      </p>
+
+<codeblock>global
+    # To have these messages end up in /var/log/haproxy.log you will
+    # need to:
+    #
+    # 1) configure syslog to accept network log events.  This is done
+    #    by adding the '-r' option to the SYSLOGD_OPTIONS in
+    #    /etc/sysconfig/syslog
+    #
+    # 2) configure local2 events to go to the /var/log/haproxy.log
+    #   file. A line like the following can be added to
+    #   /etc/sysconfig/syslog
+    #
+    #    local2.*                       /var/log/haproxy.log
+    #
+    log         127.0.0.1 local0
+    log         127.0.0.1 local1 notice
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     4000
+    user        haproxy
+    group       haproxy
+    daemon
+
+    # turn on stats unix socket
+    #stats socket /var/lib/haproxy/stats
+
+#---------------------------------------------------------------------
+# common defaults that all the 'listen' and 'backend' sections will
+# use if not designated in their block
+#
+# You might need to adjust timing values to prevent timeouts.
+#---------------------------------------------------------------------
+defaults
+    mode                    http
+    log                     global
+    option                  httplog
+    option                  dontlognull
+    option http-server-close
+    option forwardfor       except 127.0.0.0/8
+    option                  redispatch
+    retries                 3
+    maxconn                 3000
+    contimeout 5000
+    clitimeout 50000
+    srvtimeout 50000
+
+#
+# This sets up the admin page for HA Proxy at port 25002.
+#
+listen stats :25002
+    balance
+    mode http
+    stats enable
+    stats auth <varname>username</varname>:<varname>password</varname>
+
+# This is the setup for Impala. Impala client connect to load_balancer_host:25003.
+# HAProxy will balance connections among the list of servers listed below.
+# The list of Impalad is listening at port 21000 for beeswax (impala-shell) or original ODBC driver.
+# For JDBC or ODBC version 2.x driver, use port 21050 instead of 21000.
+listen impala :25003
+    mode tcp
+    option tcplog
+    balance leastconn
+
+    server <varname>symbolic_name_1</varname> impala-host-1.example.com:21000
+    server <varname>symbolic_name_2</varname> impala-host-2.example.com:21000
+    server <varname>symbolic_name_3</varname> impala-host-3.example.com:21000
+    server <varname>symbolic_name_4</varname> impala-host-4.example.com:21000
+
+# Setup for Hue or other JDBC-enabled applications.
+# In particular, Hue requires sticky sessions.
+# The application connects to load_balancer_host:21051, and HAProxy balances
+# connections to the associated hosts, where Impala listens for JDBC
+# requests on port 21050.
+listen impalajdbc :21051
+    mode tcp
+    option tcplog
+    balance source
+    server <varname>symbolic_name_5</varname> impala-host-1.example.com:21050
+    server <varname>symbolic_name_6</varname> impala-host-2.example.com:21050
+    server <varname>symbolic_name_7</varname> impala-host-3.example.com:21050
+    server <varname>symbolic_name_8</varname> impala-host-4.example.com:21050
+</codeblock>
+
+      <note conref="../shared/impala_common.xml#common/proxy_jdbc_caveat"/>
+
+      <p audience="Cloudera">
+        The following example shows extra steps needed for a cluster using Kerberos authentication:
+      </p>
+
+<codeblock audience="Cloudera">$ klist
+$ impala-shell -k
+$ kinit -r 1d -kt /systest/keytabs/hdfs.keytab hdfs
+$ impala-shell -i c2104.hal.cloudera.com:21000
+$ impala-shell -i c2104.hal.cloudera.com:25003
+[root@c2104 alan]# ps -ef |grep impalad
+root      6442  6428  0 12:21 pts/0    00:00:00 grep impalad
+impala   30577 22192 99 Nov14 ?        3-16:42:32 /usr/lib/impala/sbin-debug/impalad --flagfile=/var/run/cloudera-scm-agent/process/10342-impala-IMPALAD/impala-conf/impalad_flags
+[root@c2104 alan]# vi /var/run/cloudera-scm-agent/process/10342-impala-IMPALAD/impala-conf/impalad_flags
+$ klist -k /var/run/cloudera-scm-agent/process/10342-impala-IMPALAD/impala.keytab
+Keytab name: FILE:/var/run/cloudera-scm-agent/process/10342-impala-IMPALAD/impala.keytab
+KVNO Principal
+---- --------------------------------------------------------------------------
+   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+$ klist
+Ticket cache: FILE:/tmp/krb5cc_4028
+Default principal: hdfs@HAL17.CLOUDERA.COM
+
+Valid starting     Expires            Service principal
+11/15/13 12:17:17  11/15/13 12:32:17  krbtgt/HAL17.CLOUDERA.COM@HAL17.CLOUDERA.COM
+        renew until 11/16/13 12:17:17
+11/15/13 12:17:21  11/15/13 12:32:17  impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+        renew until 11/16/13 12:17:17
+$ kinit -r 1d -kt /systest/keytabs/hdfs.keytab hdfs
+$ kinit -R
+$ impala-shell -k -i c2106.hal.cloudera.com:21000
+Starting Impala Shell using Kerberos authentication
+Using service name 'impala'
+Connected to c2106.hal.cloudera.com:21000
+$ impala-shell -i c2104.hal.cloudera.com:25003
+$ impala-shell -k -i c2104.hal.cloudera.com:25003
+Starting Impala Shell using Kerberos authentication
+Using service name 'impala'
+Connected to c2104.hal.cloudera.com:25003
+[c2104.hal.cloudera.com:25003] &gt; create table alan_tmp(a int);
+Query: create table alan_tmp(a int)
+ERROR: InternalException: Got exception: org.apache.hadoop.ipc.RemoteException User: hive/c2102.hal.cloudera.com@HAL17.CLOUDERA.COM is not allowed to impersonate impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+$ kdestroy
+$ kinit -r 1d -kt /systest/keytabs/hdfs.keytab hdfs
+$ impala-shell -k -i c2104.hal.cloudera.com:25003
+# klist -k c2104.keytab
+Keytab name: FILE:c2104.keytab
+KVNO Principal
+---- --------------------------------------------------------------------------
+   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+$ klist -k -t c2106.keytab
+Keytab name: FILE:c2106.keytab
+KVNO Timestamp         Principal
+---- ----------------- --------------------------------------------------------
+   2 02/14/13 12:12:22 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 02/14/13 12:12:22 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 02/14/13 12:12:22 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 02/14/13 12:12:22 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 02/14/13 12:12:22 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 02/14/13 12:12:22 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 02/14/13 12:12:22 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 02/14/13 12:12:22 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+$ ktutil
+ktutil:  rkt c2104.keytab
+ktutil:  rkt c2106.keytab
+ktutil:  wkt my_test.keytab
+ktutil:  q
+$ klist -k -t my_test.keytab
+Keytab name: FILE:my_test.keytab
+KVNO Timestamp         Principal
+---- ----------------- --------------------------------------------------------
+   2 11/21/13 16:22:40 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:40 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:40 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:40 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:40 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:40 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:40 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:40 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:40 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:41 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:41 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:41 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:41 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:41 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:41 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+   2 11/21/13 16:22:41 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
+$ kdestroy
+$ kinit -r 1d -kt /systest/keytabs/hdfs.keytab hdfs
+$ vi README
+$ kinit -R
+$ impala-shell -k -i c2104.hal.cloudera.com:25003
+Starting Impala Shell using Kerberos authentication
+Using service name 'impala'
+Connected to c2104.hal.cloudera.com:25003
+<ph conref="../shared/ImpalaVariables.xml#impala_vars/ImpaladBanner"/>
+Welcome to the Impala shell. Press TAB twice to see a list of available commands.
+
+Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+
+<ph conref="../shared/ImpalaVariables.xml#impala_vars/ShellBanner"/>
+[c2104.hal.cloudera.com:25003] &gt; show tables;
+Query: show tables
+ERROR: AnalysisException: This Impala daemon is not ready to accept user requests. Status: Waiting for catalog update from the StateStore.
+[c2104.hal.cloudera.com:25003] &gt; quit;</codeblock>
+
+      <!--
+        At that point in the walkthrough with Alan Choi, we could never get Impala to accept any requests through the catalog server.
+        So I have not seen a 100% successful proxy setup process to verify all the details.
+      -->
+
+    </conbody>
+
+  </concept>
+
+</concept>

@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="breakpad" rev="2.6.0 IMPALA-2686 CDH-40238">
+
+  <title>Breakpad Minidumps for Impala (<keyword keyref="impala26"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>Breakpad Minidumps</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Support"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.6.0 IMPALA-2686 CDH-40238">
+      The <xref href="https://chromium.googlesource.com/breakpad/breakpad/" scope="external" format="html">breakpad</xref>
+      project is an open-source framework for crash reporting.
+      In <keyword keyref="impala26_full"/> and higher, Impala can use <codeph>breakpad</codeph> to record stack information and
+      register values when any of the Impala-related daemons crash due to an error such as <codeph>SIGSEGV</codeph>
+      or unhandled exceptions.
+      The dump files are much smaller than traditional core dump files. The dump mechanism itself uses very little
+      memory, which improves reliability if the crash occurs while the system is low on memory.
+    </p>
+
+    <note type="important">
+      Because of the internal mechanisms involving Impala memory allocation and Linux
+      signalling for out-of-memory (OOM) errors, if an Impala-related daemon experiences a
+      crash due to an OOM condition, it does <i>not</i> generate a minidump for that error.
+    <p>
+
+    </p>
+    </note>
+
+
+    <p outputclass="toc inpage" audience="PDF"/>
+
+  </conbody>
+
+  <concept id="breakpad_minidump_enable">
+    <title>Enabling or Disabling Minidump Generation</title>
+    <conbody>
+      <p>
+        By default, a minidump file is generated when an Impala-related daemon crashes.
+        To turn off generation of the minidump files, change the
+        <uicontrol>minidump_path</uicontrol> configuration setting of one or more Impala-related daemons
+        to the empty string, and restart the corresponding services or daemons.
+      </p>
+
+      <p rev="IMPALA-3677 CDH-43745">
+        In <keyword keyref="impala27_full"/> and higher,
+        you can send a <codeph>SIGUSR1</codeph> signal to any Impala-related daemon to write a
+        Breakpad minidump. For advanced troubleshooting, you can now produce a minidump
+        without triggering a crash.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="breakpad_minidump_location" rev="IMPALA-3581">
+    <title>Specifying the Location for Minidump Files</title>
+    <conbody>
+      <p>
+        By default, all minidump files are written to the following location
+        on the host where a crash occurs:
+        <!-- Location stated in IMPALA-3581; overridden by different location from IMPALA-2686?
+             <filepath><varname>log_directory</varname>/minidumps/<varname>daemon_name</varname></filepath> -->
+         <ul>
+          <li>
+            <p>
+              Clusters managed by Cloudera Manager: <filepath>/var/log/impala-minidumps/<varname>daemon_name</varname></filepath>
+            </p>
+          </li>
+          <li>
+            <p>
+              Clusters not managed by Cloudera Manager:
+              <filepath><varname>impala_log_dir</varname>/<varname>daemon_name</varname>/minidumps/<varname>daemon_name</varname></filepath>
+            </p>
+          </li>
+        </ul>
+        The minidump files for <cmdname>impalad</cmdname>, <cmdname>catalogd</cmdname>,
+        and <cmdname>statestored</cmdname> are each written to a separate directory.
+      </p>
+      <p>
+        To specify a different location, set the
+        <!-- Again, IMPALA-3581 says one thing and IMPALA-2686 / observation of CM interface says another.
+             <codeph>log_dir</codeph> -->
+        <uicontrol>minidump_path</uicontrol>
+        configuration setting of one or more Impala-related daemons, and restart the corresponding services or daemons.
+      </p>
+      <p>
+        If you specify a relative path for this setting, the value is interpreted relative to
+        the default <uicontrol>minidump_path</uicontrol> directory.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="breakpad_minidump_number">
+    <title>Controlling the Number of Minidump Files</title>
+    <conbody>
+      <p>
+        Like any files used for logging or troubleshooting, consider limiting the number of
+        minidump files, or removing unneeded ones, depending on the amount of free storage
+        space on the hosts in the cluster.
+      </p>
+      <p>
+        Because the minidump files are only used for problem resolution, you can remove any such files that
+        are not needed to debug current issues.
+      </p>
+      <p>
+        To control how many minidump files Impala keeps around at any one time,
+        set the <uicontrol>max_minidumps</uicontrol> configuration setting for
+        of one or more Impala-related daemon, and restart the corresponding services or daemons.
+        The default for this setting is 9. A zero or negative value is interpreted as
+        <q>unlimited</q>.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="breakpad_minidump_logging">
+    <title>Detecting Crash Events</title>
+    <conbody>
+      <p>
+        You can see in the Impala log files or in the Cloudera Manager charts for Impala
+        when crash events occur that generate minidump files. Because each restart begins
+        a new log file, the <q>crashed</q> message is always at or near the bottom of the
+        log file. (There might be another later message if core dumps are also enabled.)
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="breakpad_support_process" rev="CDH-39818">
+    <title>Using the Minidump Files for Problem Resolution</title>
+    <conbody>
+      <p>
+        Typically, you provide minidump files to <keyword keyref="support_org"/> as part of problem resolution,
+        in the same way that you might provide a core dump. The <uicontrol>Send Diagnostic Data</uicontrol>
+        under the <uicontrol>Support</uicontrol> menu in Cloudera Manager guides you through the
+        process of selecting a time period and volume of diagnostic data, then collects the data
+        from all hosts and transmits the relevant information for you.
+      </p>
+      <fig id="fig_pqw_gvx_pr">
+        <title>Send Diagnostic Data choice under Support menu</title>
+        <image href="../images/support_send_diagnostic_data.png" scalefit="yes" placement="break"/>
+      </fig>
+      <p>
+        You might get additional instructions from <keyword keyref="support_org"/> about collecting minidumps to better isolate a specific problem.
+        Because the information in the minidump files is limited to stack traces and register contents,
+        the possibility of including sensitive information is much lower than with core dump files.
+        If any sensitive information is included in the minidump, <keyword keyref="support_org"/> preserves the confidentiality of that information.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="breakpad_demo">
+    <title>Demonstration of Breakpad Feature</title>
+    <conbody>
+      <p>
+        The following example uses the command <cmdname>kill -11</cmdname> to
+        simulate a <codeph>SIGSEGV</codeph> crash for an <cmdname>impalad</cmdname>
+        process on a single DataNode, then examines the relevant log files and minidump file.
+      </p>
+      <p>
+        First, as root on a worker node, we kill the <cmdname>impalad</cmdname> process with a
+        <codeph>SIGSEGV</codeph> error. The original process ID was 23114. (Cloudera Manager
+        restarts the process with a new pid, as shown by the second <cmdname>ps</cmdname> command.)
+      </p>
+<codeblock><![CDATA[
+# ps ax | grep impalad
+23114 ?        Sl     0:18 /opt/cloudera/parcels/<parcel_version>/lib/impala/sbin-retail/impalad --flagfile=/var/run/cloudera-scm-agent/process/114-impala-IMPALAD/impala-conf/impalad_flags
+31259 pts/0    S+     0:00 grep impalad
+# 
+# kill -11 23114
+#
+# ps ax | grep impalad
+31374 ?        Rl     0:04 /opt/cloudera/parcels/<parcel_version>/lib/impala/sbin-retail/impalad --flagfile=/var/run/cloudera-scm-agent/process/114-impala-IMPALAD/impala-conf/impalad_flags
+31475 pts/0    S+     0:00 grep impalad
+]]>
+</codeblock>
+
+      <p>
+        We locate the log directory underneath <filepath>/var/log</filepath>.
+        There is a <codeph>.INFO</codeph>, <codeph>.WARNING</codeph>, and <codeph>.ERROR</codeph>
+        log file for the 23114 process ID. The minidump message is written to the
+        <codeph>.INFO</codeph> file and the <codeph>.ERROR</codeph> file, but not the
+        <codeph>.WARNING</codeph> file. In this case, a large core file was also produced.
+      </p>
+<codeblock><![CDATA[
+# cd /var/log/impalad
+# ls -la | grep 23114
+-rw-------   1 impala impala 3539079168 Jun 23 15:20 core.23114
+-rw-r--r--   1 impala impala      99057 Jun 23 15:20 hs_err_pid23114.log
+-rw-r--r--   1 impala impala        351 Jun 23 15:20 impalad.worker_node_123.impala.log.ERROR.20160623-140343.23114
+-rw-r--r--   1 impala impala      29101 Jun 23 15:20 impalad.worker_node_123.impala.log.INFO.20160623-140343.23114
+-rw-r--r--   1 impala impala        228 Jun 23 14:03 impalad.worker_node_123.impala.log.WARNING.20160623-140343.23114
+]]>
+</codeblock>
+      <p>
+        The <codeph>.INFO</codeph> log includes the location of the minidump file, followed by
+        a report of a core dump. With the breakpad minidump feature enabled, now we might
+        disable core dumps or keep fewer of them around.
+      </p>
+<codeblock><![CDATA[
+# cat impalad.worker_node_123.impala.log.INFO.20160623-140343.23114
+...
+Wrote minidump to /var/log/impala-minidumps/impalad/0980da2d-a905-01e1-25ff883a-04ee027a.dmp
+#
+# A fatal error has been detected by the Java Runtime Environment:
+#
+#  SIGSEGV (0xb) at pc=0x00000030c0e0b68a, pid=23114, tid=139869541455968
+#
+# JRE version: Java(TM) SE Runtime Environment (7.0_67-b01) (build 1.7.0_67-b01)
+# Java VM: Java HotSpot(TM) 64-Bit Server VM (24.65-b04 mixed mode linux-amd64 compressed oops)
+# Problematic frame:
+# C  [libpthread.so.0+0xb68a]  pthread_cond_wait+0xca
+#
+# Core dump written. Default location: /var/log/impalad/core or core.23114
+#
+# An error report file with more information is saved as:
+# /var/log/impalad/hs_err_pid23114.log
+#
+# If you would like to submit a bug report, please visit:
+#   http://bugreport.sun.com/bugreport/crash.jsp
+# The crash happened outside the Java Virtual Machine in native code.
+# See problematic frame for where to report the bug.
+...
+
+# cat impalad.worker_node_123.impala.log.ERROR.20160623-140343.23114
+
+Log file created at: 2016/06/23 14:03:43
+Running on machine:.worker_node_123
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+E0623 14:03:43.911002 23114 logging.cc:118] stderr will be logged to this file.
+Wrote minidump to /var/log/impala-minidumps/impalad/0980da2d-a905-01e1-25ff883a-04ee027a.dmp
+]]>
+</codeblock>
+      <p>
+        The resulting minidump file is much smaller than the corresponding core file,
+        making it much easier to supply diagnostic information to <keyword keyref="support_org"/>.
+        The transmission process for the minidump files is automated through Cloudera Manager.
+      </p>
+<codeblock><![CDATA[
+# pwd
+/var/log/impalad
+# cd ../impala-minidumps/impalad
+# ls
+0980da2d-a905-01e1-25ff883a-04ee027a.dmp
+# du -kh *
+2.4M  0980da2d-a905-01e1-25ff883a-04ee027a.dmp
+]]>
+</codeblock>
+    </conbody>
+  </concept>
+
+</concept>

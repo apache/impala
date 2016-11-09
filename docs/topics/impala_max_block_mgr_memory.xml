@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.1.0" id="max_block_mgr_memory">
+
+  <title>MAX_BLOCK_MGR_MEMORY</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Memory"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.1.0">
+      <indexterm audience="Cloudera">MAX_BLOCK_MGR_MEMORY query option</indexterm>
+    </p>
+
+    <p></p>
+
+    <p>
+      <b>Default:</b>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_20"/>
+  </conbody>
+</concept>

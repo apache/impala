@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="auditing">
+
+  <title>Auditing Impala Operations</title>
+  <titlealts audience="PDF"><navtitle>Auditing</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Auditing"/>
+      <data name="Category" value="Governance"/>
+      <data name="Category" value="Navigator"/>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      To monitor how Impala data is being used within your organization, ensure that your Impala authorization and
+      authentication policies are effective, and detect attempts at intrusion or unauthorized access to Impala
+      data, you can use the auditing feature in Impala 1.2.1 and higher:
+    </p>
+
+    <ul>
+      <li>
+        Enable auditing by including the option <codeph>-audit_event_log_dir=<varname>directory_path</varname></codeph>
+        in your <cmdname>impalad</cmdname> startup options for a cluster not managed by Cloudera Manager, or
+        <xref audience="integrated" href="cn_iu_audit_log.xml#xd_583c10bfdbd326ba--6eed2fb8-14349d04bee--7d6f/section_v25_lmy_bn">configuring Impala Daemon logging in Cloudera Manager</xref><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cn_iu_service_audit.html" scope="external" format="html">configuring Impala Daemon logging in Cloudera Manager</xref>.
+        The log directory must be a local directory on the
+        server, not an HDFS directory.
+      </li>
+
+      <li>
+        Decide how many queries will be represented in each log files. By default, Impala starts a new log file
+        every 5000 queries. To specify a different number, <ph
+          audience="standalone"
+          >include
+        the option <codeph>-max_audit_event_log_file_size=<varname>number_of_queries</varname></codeph> in the
+        <cmdname>impalad</cmdname> startup
+        options</ph><xref
+          href="cn_iu_audit_log.xml#xd_583c10bfdbd326ba--6eed2fb8-14349d04bee--7d6f/section_v25_lmy_bn"
+            audience="integrated"
+            >configure
+        Impala Daemon logging in Cloudera Manager</xref>.
+      </li>
+
+      <li> Configure Cloudera Navigator to collect and consolidate the audit
+        logs from all the hosts in the cluster. </li>
+
+      <li>
+        Use Cloudera Navigator or Cloudera Manager to filter, visualize, and produce reports based on the audit
+        data. (The Impala auditing feature works with Cloudera Manager 4.7 to 5.1 and Cloudera Navigator 2.1 and
+        higher.) Check the audit data to ensure that all activity is authorized and detect attempts at
+        unauthorized access.
+      </li>
+    </ul>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="auditing_performance">
+
+    <title>Durability and Performance Considerations for Impala Auditing</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Performance"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        The auditing feature only imposes performance overhead while auditing is enabled.
+      </p>
+
+      <p>
+        Because any Impala host can process a query, enable auditing on all hosts where the
+        <ph audience="standalone"><cmdname>impalad</cmdname> daemon</ph>
+        <ph audience="integrated">Impala Daemon role</ph> runs. Each host stores its own log
+        files, in a directory in the local filesystem. The log data is periodically flushed to disk (through an
+        <codeph>fsync()</codeph> system call) to avoid loss of audit data in case of a crash.
+      </p>
+
+      <p> The runtime overhead of auditing applies to whichever host serves as the coordinator for the query, that is, the host you connect to when you issue the query. This might be the same host for all queries, or different applications or users might connect to and issue queries through different hosts. </p>
+
+      <p> To avoid excessive I/O overhead on busy coordinator hosts, Impala syncs the audit log data (using the <codeph>fsync()</codeph> system call) periodically rather than after every query. Currently, the <codeph>fsync()</codeph> calls are issued at a fixed interval, every 5 seconds. </p>
+
+      <p>
+        By default, Impala avoids losing any audit log data in the case of an error during a logging operation
+        (such as a disk full error), by immediately shutting down
+        <cmdname audience="standalone">impalad</cmdname><ph audience="integrated">the Impala
+        Daemon role</ph> on the host where the auditing problem occurred.
+        <ph audience="standalone">You can override this setting by specifying the option
+        <codeph>-abort_on_failed_audit_event=false</codeph> in the <cmdname>impalad</cmdname> startup options.</ph>
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="auditing_format">
+
+    <title>Format of the Audit Log Files</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Logs"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p> The audit log files represent the query information in JSON format, one query per line. Typically, rather than looking at the log files themselves, you use the Cloudera Navigator product to consolidate the log data from all Impala hosts and filter and visualize the results in useful ways. (If you do examine the raw log data, you might run the files through a JSON pretty-printer first.) </p>
+
+      <p>
+        All the information about schema objects accessed by the query is encoded in a single nested record on the
+        same line. For example, the audit log for an <codeph>INSERT ... SELECT</codeph> statement records that a
+        select operation occurs on the source table and an insert operation occurs on the destination table. The
+        audit log for a query against a view records the base table accessed by the view, or multiple base tables
+        in the case of a view that includes a join query. Every Impala operation that corresponds to a SQL
+        statement is recorded in the audit logs, whether the operation succeeds or fails. Impala records more
+        information for a successful operation than for a failed one, because an unauthorized query is stopped
+        immediately, before all the query planning is completed.
+      </p>
+
+<!-- Opportunity to conref at the phrase level here... the content of this paragraph is the same as part
+     of a list bullet earlier on. -->
+
+      <p>
+        The information logged for each query includes:
+      </p>
+
+      <ul>
+        <li>
+          Client session state:
+          <ul>
+            <li>
+              Session ID
+            </li>
+
+            <li>
+              User name
+            </li>
+
+            <li>
+              Network address of the client connection
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          SQL statement details:
+          <ul>
+            <li>
+              Query ID
+            </li>
+
+            <li>
+              Statement Type - DML, DDL, and so on
+            </li>
+
+            <li>
+              SQL statement text
+            </li>
+
+            <li>
+              Execution start time, in local time
+            </li>
+
+            <li>
+              Execution Status - Details on any errors that were encountered
+            </li>
+
+            <li>
+              Target Catalog Objects:
+              <ul>
+                <li>
+                  Object Type - Table, View, or Database
+                </li>
+
+                <li>
+                  Fully qualified object name
+                </li>
+
+                <li>
+                  Privilege - How the object is being used (<codeph>SELECT</codeph>, <codeph>INSERT</codeph>,
+                  <codeph>CREATE</codeph>, and so on)
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+      </ul>
+
+<!-- Delegating actual examples to the Cloudera Navigator doc for the moment.
+<p>
+Here is an excerpt from a sample audit log file:
+</p>
+<codeblock></codeblock>
+-->
+    </conbody>
+  </concept>
+
+  <concept id="auditing_exceptions">
+
+    <title>Which Operations Are Audited</title>
+
+    <conbody>
+
+      <p>
+        The kinds of SQL queries represented in the audit log are:
+      </p>
+
+      <ul>
+        <li>
+          Queries that are prevented due to lack of authorization.
+        </li>
+
+        <li>
+          Queries that Impala can analyze and parse to determine that they are authorized. The audit data is
+          recorded immediately after Impala finishes its analysis, before the query is actually executed.
+        </li>
+      </ul>
+
+      <p>
+        The audit log does not contain entries for queries that could not be parsed and analyzed. For example, a
+        query that fails due to a syntax error is not recorded in the audit log. The audit log also does not
+        contain queries that fail due to a reference to a table that does not exist, if you would be authorized to
+        access the table if it did exist.
+      </p>
+
+      <p>
+        Certain statements in the <cmdname>impala-shell</cmdname> interpreter, such as <codeph>CONNECT</codeph>,
+        <codeph rev="1.4.0">SUMMARY</codeph>, <codeph>PROFILE</codeph>, <codeph>SET</codeph>, and
+        <codeph>QUIT</codeph>, do not correspond to actual SQL queries, and these statements are not reflected in
+        the audit log.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="auditing_reviewing">
+
+    <title>Reviewing the Audit Logs</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Logs"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        You typically do not review the audit logs in raw form. The Cloudera Manager Agent periodically transfers
+        the log information into a back-end database where it can be examined in consolidated form. See
+        <ph audience="standalone">the <xref href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Navigator/latest/Cloudera-Navigator-Installation-and-User-Guide/Cloudera-Navigator-Installation-and-User-Guide.html"
+            scope="external" format="html">Cloudera Navigator documentation</xref> for details</ph>
+            <xref href="cn_iu_audits.xml#cn_topic_7" audience="integrated" />.
+      </p>
+    </conbody>
+  </concept>
+</concept>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="rm_initial_mem" rev="2.5.0">
+
+  <title>RM_INITIAL_MEM Query Option</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.5.0">
+      <indexterm audience="Cloudera">RM_INITIAL_MEM query option</indexterm>
+    </p>
+
+    <p>
+      <b>Type:</b>
+    </p>
+
+    <p>
+      <b>Default:</b>
+    </p>
+  </conbody>
+</concept>

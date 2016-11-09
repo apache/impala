@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="runtime_filter_max_size" rev="2.6.0 IMPALA-3480 CDH-41184">
+
+  <title>RUNTIME_FILTER_MAX_SIZE Query Option (<keyword keyref="impala26"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>RUNTIME_FILTER_MAX_SIZE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.6.0 IMPALA-3480">
+      <indexterm audience="Cloudera">RUNTIME_FILTER_MAX_SIZE query option</indexterm>
+      The <codeph>RUNTIME_FILTER_MAX_SIZE</codeph> query option
+      adjusts the settings for the runtime filtering feature.
+      This option defines the maximum size for a filter,
+      no matter what the estimates produced by the planner are.
+      This value also overrides any lower number specified for the
+      <codeph>RUNTIME_BLOOM_FILTER_SIZE</codeph> query option.
+      Filter sizes are rounded up to the nearest power of two.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+
+    <p>
+      <b>Default:</b> 0 (meaning use the value from the corresponding <cmdname>impalad</cmdname> startup option)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_260"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/runtime_filtering_option_caveat"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_runtime_filtering.xml"/>,
+      <xref href="impala_runtime_filter_mode.xml#runtime_filter_mode"/>,
+      <xref href="impala_runtime_filter_min_size.xml#runtime_filter_min_size"/>,
+      <xref href="impala_runtime_bloom_filter_size.xml#runtime_bloom_filter_size"/>
+    </p>
+
+  </conbody>
+</concept>

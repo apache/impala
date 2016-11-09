@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="parquet_fallback_schema_resolution" rev="2.6.0 IMPALA-2835 CDH-33330">
+
+  <title>PARQUET_FALLBACK_SCHEMA_RESOLUTION Query Option (<keyword keyref="impala26"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>PARQUET_FALLBACK_SCHEMA_RESOLUTION</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Parquet"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.6.0 IMPALA-2835 CDH-33330">
+      <indexterm audience="Cloudera">PARQUET_FALLBACK_SCHEMA_RESOLUTION query option</indexterm>
+      Allows Impala to look up columns within Parquet files by column name, rather than column order,
+      when necessary.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>
+      By default, Impala looks up columns within a Parquet file based on
+      the order of columns in the table.
+      The <codeph>name</codeph> setting for this option enables behavior for Impala queries
+      similar to the Hive setting <codeph>parquet.column.index.access=false</codeph>.
+      It also allows Impala to query Parquet files created by Hive with the
+      <codeph>parquet.column.index.access=false</codeph> setting in effect.
+    </p>
+
+    <p>
+      <b>Type:</b> integer or string.
+      Allowed values are 0 or <codeph>position</codeph> (default), 1 or <codeph>name</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_260"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_parquet.xml#parquet_schema_evolution"/>
+    </p>
+
+  </conbody>
+</concept>

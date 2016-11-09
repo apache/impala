@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="abort_on_error">
+
+  <title>ABORT_ON_ERROR Query Option</title>
+  <titlealts audience="PDF"><navtitle>ABORT_ON_ERROR</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">ABORT_ON_ERROR query option</indexterm>
+      When this option is enabled, Impala cancels a query immediately when any of the nodes encounters an error,
+      rather than continuing and possibly returning incomplete results. This option is disabled by default, to help
+      gather maximum diagnostic information when an error occurs, for example, whether the same problem occurred on
+      all nodes or only a single node. Currently, the errors that Impala can skip over involve data corruption,
+      such as a column that contains a string value when expected to contain an integer value.
+    </p>
+
+    <p>
+      To control how much logging Impala does for non-fatal errors when <codeph>ABORT_ON_ERROR</codeph> is turned
+      off, use the <codeph>MAX_ERRORS</codeph> option.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_max_errors.xml#max_errors"/>,
+      <xref href="impala_logging.xml#logging"/>
+    </p>
+
+  </conbody>
+</concept>

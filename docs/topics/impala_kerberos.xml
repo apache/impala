@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="kerberos">
+
+  <title>Enabling Kerberos Authentication for Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Kerberos"/>
+      <data name="Category" value="Authentication"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="Starting and Stopping"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Impala supports Kerberos authentication. For more information on enabling Kerberos authentication, see the
+      topic on Configuring Hadoop Security in the
+      <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_sg_cdh5_hadoop_security.html" scope="external" format="html">CDH 5 Security Guide</xref>.
+    </p>
+
+    <p>
+      When using Impala in a managed environment, Cloudera Manager automatically completes Kerberos configuration.
+      In an unmanaged environment, create a Kerberos principal for each host running <cmdname>impalad</cmdname> or
+      <cmdname>statestored</cmdname>. <ph rev="upstream">Cloudera</ph> recommends using a consistent format, such as
+      <codeph>impala/_HOST@Your-Realm</codeph>, but you can use any three-part Kerberos server principal.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/user_kerberized"/>
+
+    <note conref="../shared/impala_common.xml#common/authentication_vs_authorization"/>
+
+    <p outputclass="toc inpage"/>
+
+    <p>
+      An alternative form of authentication you can use is LDAP, described in <xref href="impala_ldap.xml#ldap"/>.
+    </p>
+  </conbody>
+
+  <concept id="kerberos_prereqs">
+
+    <title>Requirements for Using Impala with Kerberos</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Requirements"/>
+      <data name="Category" value="Planning"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p conref="../shared/impala_common.xml#common/rhel5_kerberos"/>
+
+<!-- This note adapted from the one at http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH4/latest/CDH4-Security-Guide/cdh4sg_topic_3_4.html.
+   Ideally should be conref'ed in both places. -->
+
+      <note type="important">
+        <p>
+          If you plan to use Impala in your cluster, you must configure your KDC to allow tickets to be renewed,
+          and you must configure <filepath>krb5.conf</filepath> to request renewable tickets. Typically, you can do
+          this by adding the <codeph>max_renewable_life</codeph> setting to your realm in
+          <filepath>kdc.conf</filepath>, and by adding the <filepath>renew_lifetime</filepath> parameter to the
+          <filepath>libdefaults</filepath> section of <filepath>krb5.conf</filepath>. For more information about
+          renewable tickets, see the
+          <xref href="http://web.mit.edu/Kerberos/krb5-1.8/" scope="external" format="html"> Kerberos
+          documentation</xref>.
+        </p>
+        <p rev="1.2">
+          Currently, you cannot use the resource management feature in CDH 5 on a cluster that has Kerberos
+          authentication enabled.
+        </p>
+      </note>
+
+      <p>
+        Start all <cmdname>impalad</cmdname> and <cmdname>statestored</cmdname> daemons with the
+        <codeph>--principal</codeph> and <codeph>--keytab-file</codeph> flags set to the principal and full path
+        name of the <codeph>keytab</codeph> file containing the credentials for the principal.
+      </p>
+
+      <p>
+        Impala supports the Cloudera ODBC driver and the Kerberos interface provided. To use Kerberos through the
+        ODBC driver, the host type must be set depending on the level of the ODBD driver:
+      </p>
+
+      <ul>
+        <li>
+          <codeph>SecImpala</codeph> for the ODBC 1.0 driver.
+        </li>
+
+        <li>
+          <codeph>SecBeeswax</codeph> for the ODBC 1.2 driver.
+        </li>
+
+        <li>
+          Blank for the ODBC 2.0 driver or higher, when connecting to a secure cluster.
+        </li>
+
+        <li>
+          <codeph>HS2NoSasl</codeph> for the ODBC 2.0 driver or higher, when connecting to a non-secure cluster.
+        </li>
+      </ul>
+
+      <p>
+        To enable Kerberos in the Impala shell, start the <cmdname>impala-shell</cmdname> command using the
+        <codeph>-k</codeph> flag.
+      </p>
+
+      <p>
+        To enable Impala to work with Kerberos security on your Hadoop cluster, make sure you perform the
+        installation and configuration steps in
+        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_authentication.html" scope="external" format="html">Authentication in the CDH 5 Security Guide</xref>.
+        Also note that when Kerberos security is enabled in Impala, a web browser that
+        supports Kerberos HTTP SPNEGO is required to access the Impala web console (for example, Firefox, Internet
+        Explorer, or Chrome).
+      </p>
+
+      <p>
+        If the NameNode, Secondary NameNode, DataNode, JobTracker, TaskTrackers, ResourceManager, NodeManagers,
+        HttpFS, Oozie, Impala, or Impala statestore services are configured to use Kerberos HTTP SPNEGO
+        authentication, and two or more of these services are running on the same host, then all of the running
+        services must use the same HTTP principal and keytab file used for their HTTP endpoints.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="kerberos_config">
+
+    <title>Configuring Impala to Support Kerberos Security</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Configuring"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        Enabling Kerberos authentication for Impala involves steps that can be summarized as follows:
+      </p>
+
+      <ul>
+        <li>
+          Creating service principals for Impala and the HTTP service. Principal names take the form:
+          <codeph><varname>serviceName</varname>/<varname>fully.qualified.domain.name</varname>@<varname>KERBEROS.REALM</varname></codeph>
+        </li>
+
+        <li>
+          Creating, merging, and distributing key tab files for these principals.
+        </li>
+
+        <li>
+          Editing <codeph>/etc/default/impala</codeph> (in cluster not managed by Cloudera Manager), or editing the
+          <uicontrol>Security</uicontrol> settings in the Cloudera Manager interface, to accommodate Kerberos
+          authentication.
+        </li>
+      </ul>
+    </conbody>
+
+    <concept id="kerberos_setup">
+
+      <title>Enabling Kerberos for Impala</title>
+
+      <conbody>
+
+<!--
+      <p>
+        <b>To enable Kerberos for Impala:</b>
+      </p>
+-->
+
+        <ol>
+          <li>
+            Create an Impala service principal, specifying the name of the OS user that the Impala daemons run
+            under, the fully qualified domain name of each node running <cmdname>impalad</cmdname>, and the realm
+            name. For example:
+<codeblock>$ kadmin
+kadmin: addprinc -requires_preauth -randkey impala/impala_host.example.com@TEST.EXAMPLE.COM</codeblock>
+          </li>
+
+          <li>
+            Create an HTTP service principal. For example:
+<codeblock>kadmin: addprinc -randkey HTTP/impala_host.example.com@TEST.EXAMPLE.COM</codeblock>
+            <note>
+              The <codeph>HTTP</codeph> component of the service principal must be uppercase as shown in the
+              preceding example.
+            </note>
+          </li>
+
+          <li>
+            Create <codeph>keytab</codeph> files with both principals. For example:
+<codeblock>kadmin: xst -k impala.keytab impala/impala_host.example.com
+kadmin: xst -k http.keytab HTTP/impala_host.example.com
+kadmin: quit</codeblock>
+          </li>
+
+          <li>
+            Use <codeph>ktutil</codeph> to read the contents of the two keytab files and then write those contents
+            to a new file. For example:
+<codeblock>$ ktutil
+ktutil: rkt impala.keytab
+ktutil: rkt http.keytab
+ktutil: wkt impala-http.keytab
+ktutil: quit</codeblock>
+          </li>
+
+          <li>
+            (Optional) Test that credentials in the merged keytab file are valid, and that the <q>renew until</q>
+            date is in the future. For example:
+<codeblock>$ klist -e -k -t impala-http.keytab</codeblock>
+          </li>
+
+          <li>
+            Copy the <filepath>impala-http.keytab</filepath> file to the Impala configuration directory. Change the
+            permissions to be only read for the file owner and change the file owner to the <codeph>impala</codeph>
+            user. By default, the Impala user and group are both named <codeph>impala</codeph>. For example:
+<codeblock>$ cp impala-http.keytab /etc/impala/conf
+$ cd /etc/impala/conf
+$ chmod 400 impala-http.keytab
+$ chown impala:impala impala-http.keytab</codeblock>
+          </li>
+
+          <li>
+            Add Kerberos options to the Impala defaults file, <filepath>/etc/default/impala</filepath>. Add the
+            options for both the <cmdname>impalad</cmdname> and <cmdname>statestored</cmdname> daemons, using the
+            <codeph>IMPALA_SERVER_ARGS</codeph> and <codeph>IMPALA_STATE_STORE_ARGS</codeph> variables. For
+            example, you might add:
+<!-- Found these in a discussion post somewhere but not applicable as Impala startup options.
+-kerberos_ticket_life=36000
+-maxrenewlife 7days
+-->
+<codeblock>-kerberos_reinit_interval=60
+-principal=impala_1/impala_host.example.com@TEST.EXAMPLE.COM
+-keytab_file=/var/run/cloudera-scm-agent/process/3212-impala-IMPALAD/impala.keytab</codeblock>
+            <p>
+              For more information on changing the Impala defaults specified in
+              <filepath>/etc/default/impala</filepath>, see
+              <xref href="impala_config_options.xml#config_options">Modifying Impala Startup
+              Options</xref>.
+            </p>
+          </li>
+        </ol>
+
+        <note>
+          Restart <cmdname>impalad</cmdname> and <cmdname>statestored</cmdname> for these configuration changes to
+          take effect.
+        </note>
+      </conbody>
+    </concept>
+  </concept>
+
+  <concept id="kerberos_proxy">
+
+    <title>Enabling Kerberos for Impala with a Proxy Server</title>
+
+    <conbody>
+
+      <p>
+        A common configuration for Impala with High Availability is to use a proxy server to submit requests to the
+        actual <cmdname>impalad</cmdname> daemons on different hosts in the cluster. This configuration avoids
+        connection problems in case of machine failure, because the proxy server can route new requests through one
+        of the remaining hosts in the cluster. This configuration also helps with load balancing, because the
+        additional overhead of being the <q>coordinator node</q> for each query is spread across multiple hosts.
+      </p>
+
+      <p>
+        Although you can set up a proxy server with or without Kerberos authentication, typically users set up a
+        secure Kerberized configuration. For information about setting up a proxy server for Impala, including
+        Kerberos-specific steps, see <xref href="impala_proxy.xml#proxy"/>.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="spnego">
+
+    <title>Using a Web Browser to Access a URL Protected by Kerberos HTTP SPNEGO</title>
+
+    <conbody>
+
+      <p>
+        Your web browser must support Kerberos HTTP SPNEGO. For example, Chrome, Firefox, or Internet Explorer.
+      </p>
+
+      <p>
+        <b>To configure Firefox to access a URL protected by Kerberos HTTP SPNEGO:</b>
+      </p>
+
+      <ol>
+        <li>
+          Open the advanced settings Firefox configuration page by loading the <codeph>about:config</codeph> page.
+        </li>
+
+        <li>
+          Use the <b>Filter</b> text box to find <codeph>network.negotiate-auth.trusted-uris</codeph>.
+        </li>
+
+        <li>
+          Double-click the <codeph>network.negotiate-auth.trusted-uris</codeph> preference and enter the hostname
+          or the domain of the web server that is protected by Kerberos HTTP SPNEGO. Separate multiple domains and
+          hostnames with a comma.
+        </li>
+
+        <li>
+          Click <b>OK</b>.
+        </li>
+      </ol>
+    </conbody>
+  </concept>
+
+  <concept id="kerberos_delegation">
+    <title>Enabling Impala Delegation for Kerberos Users</title>
+    <conbody>
+      <p>
+        See <xref href="impala_delegation.xml#delegation"/> for details about the delegation feature
+        that lets certain users submit queries using the credentials of other users.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="ssl_jdbc_odbc">
+    <title>Using TLS/SSL with Business Intelligence Tools</title>
+    <conbody>
+      <p>
+        You can use Kerberos authentication, TLS/SSL encryption, or both to secure
+        connections from JDBC and ODBC applications to Impala.
+        See <xref href="impala_jdbc.xml#impala_jdbc"/> and <xref href="impala_odbc.xml#impala_odbc"/>
+        for details.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/hive_jdbc_ssl_kerberos_caveat"/>
+    </conbody>
+  </concept>
+
+  <concept id="whitelisting_internal_apis">
+  <title>Enabling Access to Internal Impala APIs for Kerberos Users</title>
+    <conbody>
+    <!-- Reusing (most of) the text from the New Features bullet here. Turn into a conref in both places. -->
+      <p rev="IMPALA-3095">
+        For applications that need direct access
+        to Impala APIs, without going through the HiveServer2 or Beeswax interfaces, you can
+        specify a list of Kerberos users who are allowed to call those APIs. By default, the
+        <codeph>impala</codeph> and <codeph>hdfs</codeph> users are the only ones authorized
+        for this kind of access.
+        Any users not explicitly authorized through the <codeph>internal_principals_whitelist</codeph>
+        configuration setting are blocked from accessing the APIs. This setting applies to all the
+        Impala-related daemons, although currently it is primarily used for HDFS to control the
+        behavior of the catalog server.
+      </p>
+    </conbody>
+
+  </concept>
+
+  <concept id="auth_to_local" rev="IMPALA-2660 CDH-40241">
+    <title>Mapping Kerberos Principals to Short Names for Impala</title>
+    <conbody>
+      <p conref="../shared/impala_common.xml#common/auth_to_local_instructions"/>
+    </conbody>
+  </concept>
+
+</concept>

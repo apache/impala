@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="shell_commands">
+
+  <title>impala-shell Command Reference</title>
+  <titlealts audience="PDF"><navtitle>Command Reference</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="impala-shell"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">impala-shell</indexterm>
+      Use the following commands within <codeph>impala-shell</codeph> to pass requests to the
+      <codeph>impalad</codeph> daemon that the shell is connected to. You can enter a command interactively at the
+      prompt, or pass it as the argument to the <codeph>-q</codeph> option of <codeph>impala-shell</codeph>. Most
+      of these commands are passed to the Impala daemon as SQL statements; refer to the corresponding
+      <xref href="impala_langref_sql.xml#langref_sql">SQL language reference sections</xref> for full syntax
+      details.
+    </p>
+
+    <table>
+      <tgroup cols="2">
+        <colspec colname="1" colwidth="10*"/>
+        <colspec colname="2" colwidth="40*"/>
+        <thead>
+          <row>
+            <entry>
+              Command
+            </entry>
+            <entry>
+              Explanation
+            </entry>
+          </row>
+        </thead>
+        <tbody>
+          <row id="alter_cmd">
+            <entry>
+              <p>
+                <codeph>alter</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Changes the underlying structure or settings of an Impala table, or a table shared between Impala
+                and Hive. See <xref href="impala_alter_table.xml#alter_table"/> and
+                <xref href="impala_alter_view.xml#alter_view"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row rev="1.2.2" id="compute_cmd">
+            <entry>
+              <p>
+                <codeph>compute stats</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Gathers important performance-related information for a table, used by Impala to optimize queries.
+                See <xref href="impala_compute_stats.xml#compute_stats"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row id="connect_cmd">
+            <entry>
+              <p>
+                <codeph>connect</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Connects to the specified instance of <codeph>impalad</codeph>. The default port of 21000 is
+                assumed unless you provide another value. You can connect to any host in your cluster that is
+                running <codeph>impalad</codeph>. If you connect to an instance of <codeph>impalad</codeph> that
+                was started with an alternate port specified by the <codeph>--fe_port</codeph> flag, you must
+                provide that alternate port. See <xref href="impala_connecting.xml#connecting"/> for examples.
+              </p>
+
+              <p conref="../shared/impala_common.xml#common/set_vs_connect"/>
+            </entry>
+          </row>
+          <row id="describe_cmd">
+            <entry>
+              <p>
+                <codeph>describe</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Shows the columns, column data types, and any column comments for a specified table.
+                <codeph>DESCRIBE FORMATTED</codeph> shows additional information such as the HDFS data directory,
+                partitions, and internal properties for the table. See <xref href="impala_describe.xml#describe"/>
+                for details about the basic <codeph>DESCRIBE</codeph> output and the <codeph>DESCRIBE
+                FORMATTED</codeph> variant. You can use <codeph>DESC</codeph> as shorthand for the
+                <codeph>DESCRIBE</codeph> command.
+              </p>
+            </entry>
+          </row>
+          <row id="drop_cmd">
+            <entry>
+              <p>
+                <codeph>drop</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Removes a schema object, and in some cases its associated data files. See
+                <xref href="impala_drop_table.xml#drop_table"/>, <xref href="impala_drop_view.xml#drop_view"/>,
+                <xref href="impala_drop_database.xml#drop_database"/>, and
+                <xref href="impala_drop_function.xml#drop_function"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row id="explain_cmd">
+            <entry>
+              <p>
+                <codeph>explain</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Provides the execution plan for a query. <codeph>EXPLAIN</codeph> represents a query as a series of
+                steps. For example, these steps might be map/reduce stages, metastore operations, or file system
+                operations such as move or rename. See <xref href="impala_explain.xml#explain"/> and
+                <xref href="impala_explain_plan.xml#perf_explain"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row id="help_cmd">
+            <entry>
+              <p>
+                <codeph>help</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Help provides a list of all available commands and options.
+              </p>
+            </entry>
+          </row>
+          <row id="history_cmd">
+            <entry>
+              <p>
+                <codeph>history</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Maintains an enumerated cross-session command history. This history is stored in the
+                <filepath>~/.impalahistory</filepath> file.
+              </p>
+            </entry>
+          </row>
+          <row id="insert_cmd">
+            <entry>
+              <p>
+                <codeph>insert</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Writes the results of a query to a specified table. This either overwrites table data or appends
+                data to the existing table content. See <xref href="impala_insert.xml#insert"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row id="invalidate_metadata_cmd">
+            <entry>
+              <p>
+                <codeph>invalidate metadata</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Updates <cmdname>impalad</cmdname> metadata for table existence and structure. Use this command
+                after creating, dropping, or altering databases, tables, or partitions in Hive. See
+                <xref href="impala_invalidate_metadata.xml#invalidate_metadata"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row id="profile_cmd">
+            <entry>
+              <p>
+                <codeph>profile</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Displays low-level information about the most recent query. Used for performance diagnosis and
+                tuning. <ph rev="1.4.0"> The report starts with the same information as produced by the
+                <codeph>EXPLAIN</codeph> statement and the <codeph>SUMMARY</codeph> command.</ph> See
+                <xref href="impala_explain_plan.xml#perf_profile"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row id="quit_cmd">
+            <entry>
+              <p>
+                <codeph>quit</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Exits the shell. Remember to include the final semicolon so that the shell recognizes the end of
+                the command.
+              </p>
+            </entry>
+          </row>
+          <row id="refresh_cmd">
+            <entry>
+              <p>
+                <codeph>refresh</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Refreshes <cmdname>impalad</cmdname> metadata for the locations of HDFS blocks corresponding to
+                Impala data files. Use this command after loading new data files into an Impala table through Hive
+                or through HDFS commands. See <xref href="impala_refresh.xml#refresh"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row id="select_cmd">
+            <entry>
+              <p>
+                <codeph>select</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Specifies the data set on which to complete some action. All information returned from
+                <codeph>select</codeph> can be sent to some output such as the console or a file or can be used to
+                complete some other element of query. See <xref href="impala_select.xml#select"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row id="set_cmd">
+            <entry>
+              <p>
+                <codeph>set</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Manages query options for an <cmdname>impala-shell</cmdname> session. The available options are the
+                ones listed in <xref href="impala_query_options.xml#query_options"/>. These options are used for
+                query tuning and troubleshooting. Issue <codeph>SET</codeph> with no arguments to see the current
+                query options, either based on the <cmdname>impalad</cmdname> defaults, as specified by you at
+                <cmdname>impalad</cmdname> startup, or based on earlier <codeph>SET</codeph> statements in the same
+                session. To modify option values, issue commands with the syntax <codeph>set
+                <varname>option</varname>=<varname>value</varname></codeph>. To restore an option to its default,
+                use the <codeph>unset</codeph> command. Some options take Boolean values of <codeph>true</codeph>
+                and <codeph>false</codeph>. Others take numeric arguments, or quoted string values.
+              </p>
+
+              <p conref="../shared/impala_common.xml#common/set_vs_connect"/>
+
+              <p rev="2.0.0">
+                In Impala 2.0 and later, <codeph>SET</codeph> is available as a SQL statement for any kind of
+                application, not only through <cmdname>impala-shell</cmdname>. See
+                <xref href="impala_set.xml#set"/> for details.
+              </p>
+
+              <p rev="2.5.0 IMPALA-2180">
+                In Impala 2.5 and later, you can use <codeph>SET</codeph> to define your own substitution variables
+                within an <cmdname>impala-shell</cmdname> session.
+                Within a SQL statement, you substitute the value by using the notation <codeph>${var:<varname>variable_name</varname>}</codeph>.
+              </p>
+            </entry>
+          </row>
+          <row id="shell_cmd">
+            <entry>
+              <p>
+                <codeph>shell</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Executes the specified command in the operating system shell without exiting
+                <codeph>impala-shell</codeph>. You can use the <codeph>!</codeph> character as shorthand for the
+                <codeph>shell</codeph> command.
+              </p>
+
+              <note>
+                Quote any instances of the <codeph>--</codeph> or <codeph>/*</codeph> tokens to avoid them being
+                interpreted as the start of a comment. To embed comments within <codeph>source</codeph> or
+                <codeph>!</codeph> commands, use the shell comment character <codeph>#</codeph> before the comment
+                portion of the line.
+              </note>
+            </entry>
+          </row>
+          <row id="show_cmd">
+            <entry>
+              <p>
+                <codeph>show</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Displays metastore data for schema objects created and accessed through Impala, Hive, or both.
+                <codeph>show</codeph> can be used to gather information about objects such as databases, tables, and functions.
+                See <xref href="impala_show.xml#show"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row id="source_cmd" rev="IMPALA-3397 CDH-40097">
+            <entry>
+              <p>
+                <codeph>source</codeph> or <codeph>src</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Executes one or more statements residing in a specified file from the local filesystem.
+                Allows you to perform the same kinds of batch operations as with the <codeph>-f</codeph> option,
+                but interactively within the interpreter. The file can contain SQL statements and other
+                <cmdname>impala-shell</cmdname> commands, including additional <codeph>SOURCE</codeph> commands
+                to perform a flexible sequence of actions. Each command or statement, except the last one in the file,
+                must end with a semicolon.
+                See <xref href="impala_shell_running_commands.xml#shell_running_commands"/> for examples.
+              </p>
+            </entry>
+          </row>
+          <row rev="1.4.0" id="summary_cmd">
+            <entry>
+              <p>
+                <codeph>summary</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Summarizes the work performed in various stages of a query. It provides a higher-level view of the
+                information displayed by the <codeph>EXPLAIN</codeph> command. Added in Impala 1.4.0. See
+                <xref href="impala_explain_plan.xml#perf_summary"/> for details about the report format
+                and how to interpret it.
+              </p>
+              <p rev="2.3.0">
+                In <keyword keyref="impala23_full"/> and higher, you can see a continuously updated report of
+                the summary information while a query is in progress.
+                See <xref href="impala_live_summary.xml#live_summary"/> for details.
+              </p>
+            </entry>
+          </row>
+          <row id="unset_cmd">
+            <entry>
+              <p>
+                <codeph>unset</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Removes any user-specified value for a query option and returns the option to its default value.
+                See <xref href="impala_query_options.xml#query_options"/> for the available query options.
+              </p>
+              <p rev="2.5.0 IMPALA-2180">
+                In <keyword keyref="impala25_full"/> and higher, it can also remove user-specified substitution variables
+                using the notation <codeph>UNSET VAR:<varname>variable_name</varname></codeph>.
+              </p>
+            </entry>
+          </row>
+          <row id="use_cmd">
+            <entry>
+              <p>
+                <codeph>use</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Indicates the database against which to execute subsequent commands. Lets you avoid using fully
+                qualified names when referring to tables in databases other than <codeph>default</codeph>. See
+                <xref href="impala_use.xml#use"/> for details. Not effective with the <codeph>-q</codeph> option,
+                because that option only allows a single statement in the argument.
+              </p>
+            </entry>
+          </row>
+          <row id="version_cmd">
+            <entry>
+              <p>
+                <codeph>version</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Returns Impala version information.
+              </p>
+            </entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+  </conbody>
+</concept>

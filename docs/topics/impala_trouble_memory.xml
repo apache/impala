@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="trouble_memory">
+
+  <title>Troubleshooting Out-of-Memory Issues</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Memory"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">memory errors</indexterm>
+      <indexterm audience="Cloudera">out-of-memory errors</indexterm>
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+</concept>

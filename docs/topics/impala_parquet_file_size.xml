@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="parquet_block_size" id="parquet_file_size">
+
+  <title>PARQUET_FILE_SIZE Query Option</title>
+  <titlealts audience="PDF"><navtitle>PARQUET_FILE_SIZE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Parquet"/>
+      <data name="Category" value="ETL"/>
+      <data name="Category" value="File Formats"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">PARQUET_FILE_SIZE query option</indexterm>
+      Specifies the maximum size of each Parquet data file produced by Impala <codeph>INSERT</codeph> statements.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+    <p>
+      Specify the size in bytes, or with a trailing <codeph>m</codeph> or <codeph>g</codeph> character to indicate
+      megabytes or gigabytes. For example:
+    </p>
+
+<codeblock>-- 128 megabytes.
+set PARQUET_FILE_SIZE=134217728
+INSERT OVERWRITE parquet_table SELECT * FROM text_table;
+
+-- 512 megabytes.
+set PARQUET_FILE_SIZE=512m;
+INSERT OVERWRITE parquet_table SELECT * FROM text_table;
+
+-- 1 gigabyte.
+set PARQUET_FILE_SIZE=1g;
+INSERT OVERWRITE parquet_table SELECT * FROM text_table;
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      With tables that are small or finely partitioned, the default Parquet block size (formerly 1 GB, now 256 MB
+      in Impala 2.0 and later) could be much larger than needed for each data file. For <codeph>INSERT</codeph>
+      operations into such tables, you can increase parallelism by specifying a smaller
+      <codeph>PARQUET_FILE_SIZE</codeph> value, resulting in more HDFS blocks that can be processed by different
+      nodes.
+<!-- Reducing the file size also reduces the memory required to buffer each block before writing it to disk. -->
+    </p>
+
+    <p>
+      <b>Type:</b> numeric, with optional unit specifier
+    </p>
+
+    <note type="important">
+    <p>
+      Currently, the maximum value for this setting is 1 gigabyte (<codeph>1g</codeph>).
+      Setting a value higher than 1 gigabyte could result in errors during
+      an <codeph>INSERT</codeph> operation.
+    </p>
+    </note>
+
+    <p>
+      <b>Default:</b> 0 (produces files with a target size of 256 MB; files might be larger for very wide tables)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/isilon_blurb"/>
+    <p conref="../shared/impala_common.xml#common/isilon_block_size_caveat"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      For information about the Parquet file format, and how the number and size of data files affects query
+      performance, see <xref href="impala_parquet.xml#parquet"/>.
+    </p>
+
+<!-- Examples actually folded into Syntax earlier.   <p conref="../shared/impala_common.xml#common/example_blurb"/> -->
+
+  </conbody>
+</concept>

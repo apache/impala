@@ -1,0 +1,650 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="webui">
+
+  <title id="webui_title">Impala Web User Interface for Debugging</title>
+  <titlealts audience="PDF"><navtitle>Web User Interface</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p id="webui_intro">
+      <indexterm audience="Cloudera">web UI</indexterm>
+      <indexterm audience="Cloudera">debug UI</indexterm>
+      Each of the Impala daemons (<cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>,
+      and <cmdname>catalogd</cmdname>) includes a built-in web server that displays
+      diagnostic and status information:
+      <ul>
+      <li>
+        <p>
+          The <cmdname>impalad</cmdname> web UI (default port: 25000) includes
+          information about configuration settings, running and completed queries, and associated performance and
+          resource usage for queries. In particular, the <uicontrol>Details</uicontrol> link for each query displays
+          alternative views of the query including a graphical representation of the plan, and the
+          output of the <codeph>EXPLAIN</codeph>, <codeph>SUMMARY</codeph>, and <codeph>PROFILE</codeph>
+          statements from <cmdname>impala-shell</cmdname>.
+          Each host that runs the <cmdname>impalad</cmdname> daemon has
+          its own instance of the web UI, with details about those queries for which that
+          host served as the coordinator. To get a consolidated view for all queries,
+          it is usually more convenient to use the charts, graphs, and other monitoring
+          features in Cloudera Manager. The <cmdname>impalad</cmdname> web UI is mainly
+          for diagnosing query problems that can be traced to a particular node.
+        </p>
+      </li>
+      <li>
+        <p>
+          The <cmdname>statestored</cmdname> web UI (default port: 25010) includes
+          information about memory usage, configuration settings, and ongoing health checks
+          performed by this daemon. Because there is only a single instance of this
+          daemon within any cluster, you view the web UI only on the particular host
+          that serves as the Impala Statestore.
+        </p>
+      </li>
+      <li>
+        <p>
+          The <cmdname>catalogd</cmdname> web UI (default port: 25020) includes
+          information about the databases, tables, and other objects managed by Impala,
+          in addition to the resource usage and configuration settings of the daemon itself.
+          The catalog information is represented as the underlying Thrift data structures.
+          Because there is only a single instance of this daemon within any cluster, you view the
+          web UI only on the particular host that serves as the Impala Catalog Server.
+        </p>
+      </li>
+      </ul>
+    </p>
+
+    <note>
+      <p>
+        The web user interface is primarily for problem diagnosis and troubleshooting. The items listed and their
+        formats are subject to change. To monitor Impala health, particularly across the entire cluster at once, use
+        the Cloudera Manager interface.
+      </p>
+    </note>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="webui_impalad">
+
+    <title>Debug Web UI for impalad</title>
+
+    <conbody>
+
+      <p>
+        To debug and troubleshoot the <cmdname>impalad</cmdname> daemon using a web-based interface, open the URL
+        <codeph>http://<varname>impala-server-hostname</varname>:25000/</codeph> in a browser. (For secure
+        clusters, use the prefix <codeph>https://</codeph> instead of <codeph>http://</codeph>.) Because each
+        Impala node produces its own set of debug information, choose a specific node that you are curious about or
+        suspect is having problems.
+      </p>
+
+      <note>
+        To get a convenient picture of the health of all Impala nodes in a cluster, use the Cloudera Manager
+        interface, which collects the low-level operational information from all Impala nodes, and presents a
+        unified view of the entire cluster.
+      </note>
+    </conbody>
+
+    <concept audience="Cloudera" id="webui_impalad_disabling">
+
+      <title>Turning off the Web UI for impalad</title>
+
+      <conbody>
+
+        <p></p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_impalad_main">
+
+      <title>Main Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the main page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25000/</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25000/</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page lists the version of the <cmdname>impalad</cmdname> daemon, plus basic hardware and software
+          information about the corresponding host, such as information about the CPU, memory, disks, and operating
+          system version.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_impalad_backends">
+
+      <title>Backends Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>backends</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25000/backends</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25000/backends</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page lists the host and port info for each of the <cmdname>impalad</cmdname> nodes in the cluster.
+          Because each <cmdname>impalad</cmdname> daemon knows about every other <cmdname>impalad</cmdname> daemon
+          through the statestore, this information should be the same regardless of which node you select. Links
+          take you to the corresponding debug web pages for any of the other nodes in the cluster.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_impalad_catalog">
+
+      <title>Catalog Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>catalog</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25000/catalog</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25000/catalog</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays a list of databases and associated tables recognized by this instance of
+          <cmdname>impalad</cmdname>. You can use this page to locate which database a table is in, check the
+          exact spelling of a database or table name, look for identical table names in multiple databases, and so
+          on.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_impalad_logs">
+
+      <title>Logs Page</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Logs"/>
+    </metadata>
+  </prolog>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>logs</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25000/logs</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25000/logs</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page shows the last portion of the <filepath>impalad.INFO</filepath> log file, the most detailed of
+          the info, warning, and error logs for the <cmdname>impalad</cmdname> daemon. You can refer here to see
+          the details of the most recent operations, whether the operations succeeded or encountered errors. This
+          central page can be more convenient than looking around the filesystem for the log files, which could be
+          in different locations on clusters that use Cloudera Manager or not.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_impalad_memz">
+
+      <title>Memz Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>memz</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25000/memz</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25000/memz</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays summary and detailed information about memory usage by the <cmdname>impalad</cmdname>
+          daemon. You can see the memory limit in effect for the node, and how much of that memory Impala is
+          currently using.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_impalad_metrics">
+
+      <title>Metrics Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>metrics</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25000/metrics</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25000/metrics</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays the current set of metrics: counters and flags representing various aspects of
+          <cmdname>impalad</cmdname> internal operation. For the meanings of these metrics, see
+          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_metrics_impala.html" scope="external" format="html">Impala
+          Metrics</xref> in the Cloudera Manager documentation.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_impalad_queries">
+
+      <title>Queries Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>queries</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25000/queries</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25000/queries</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page lists all currently running queries, plus any completed queries whose details still reside in
+          memory. The queries are listed in reverse chronological order, with the most recent at the top. (You can
+          control the amount of memory devoted to completed queries by specifying the
+          <codeph>--query_log_size</codeph> startup option for <cmdname>impalad</cmdname>.)
+        </p>
+
+        <p>
+          On this page, you can see at a glance how many SQL statements are failing (<codeph>State</codeph> value
+          of <codeph>EXCEPTION</codeph>), how large the result sets are (<codeph># rows fetched</codeph>), and how
+          long each statement took (<codeph>Start Time</codeph> and <codeph>End Time</codeph>).
+        </p>
+
+        <p>
+          Each query has an associated link that displays the detailed query profile, which you can examine to
+          understand the performance characteristics of that query. See
+          <xref href="impala_explain_plan.xml#perf_profile"/> for details.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_impalad_sessions">
+
+      <title>Sessions Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>sessions</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25000/sessions</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25000/sessions</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays information about the sessions currently connected to this <cmdname>impalad</cmdname>
+          instance. For example, sessions could include connections from the <cmdname>impala-shell</cmdname>
+          command, JDBC or ODBC applications, or the Impala Query UI in the Hue web interface.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_impalad_threadz">
+
+      <title>Threadz Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>threadz</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25000/threadz</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25000/threadz</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays information about the threads used by this instance of <cmdname>impalad</cmdname>,
+          and shows which categories they are grouped into. Making use of this information requires substantial
+          knowledge about Impala internals.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_impalad_varz">
+
+      <title>Varz Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>varz</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25000/varz</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25000/varz</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page shows the configuration settings in effect when this instance of <cmdname>impalad</cmdname>
+          communicates with other Hadoop components such as HDFS and YARN. These settings are collected from a set
+          of configuration files; Impala might not actually make use of all settings.
+        </p>
+
+        <p>
+          The bottom of this page also lists all the command-line settings in effect for this instance of
+          <cmdname>impalad</cmdname>. See <xref href="impala_config_options.xml#config_options"/> for information
+          about modifying these values.
+        </p>
+      </conbody>
+    </concept>
+  </concept>
+
+  <concept audience="Cloudera" id="webui_statestored">
+
+    <title>Debug Web UI for statestored</title>
+
+    <conbody>
+
+      <p></p>
+    </conbody>
+
+    <concept audience="Cloudera" id="webui_statestored_disabling">
+
+      <title>Turning off the Web UI for statestored</title>
+
+      <conbody>
+
+        <p></p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_statestored_main">
+
+      <title>Main Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the main page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25010/</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25010/</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page lists the version of the <cmdname>impalad</cmdname> daemon, plus basic hardware and software
+          information about the corresponding host, such as information about the CPU, memory, disks, and operating
+          system version.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_statestored_logs">
+
+      <title>Logs Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>logs</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25010/logs</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25010/logs</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page shows the last portion of the <filepath>impalad.INFO</filepath> log file, the most detailed of
+          the info, warning, and error logs for the <cmdname>impalad</cmdname> daemon. You can refer here to see
+          the details of the most recent operations, whether the operations succeeded or encountered errors. This
+          central page can be more convenient than looking around the filesystem for the log files, which could be
+          in different locations on clusters that use Cloudera Manager or not.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_statestored_memz">
+
+      <title>Memz Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>memz</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25010/memz</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25010/memz</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays summary and detailed information about memory usage by the <cmdname>impalad</cmdname>
+          daemon. You can see the memory limit in effect for the node, and how much of that memory Impala is
+          currently using.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_statestored_metrics">
+
+      <title>Metrics Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>metrics</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25010/metrics</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25010/metrics</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays the current set of metrics: counters and flags representing various aspects of
+          <cmdname>impalad</cmdname> internal operation. For the meanings of these metrics, see
+          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_metrics_impala.html" scope="external" format="html">Impala
+          Metrics</xref> in the Cloudera Manager documentation.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_statestored_subscribers">
+
+      <title>Subscribers Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>subscribers</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25010/subscribers</codeph> (non-secure cluster)
+          or <codeph>https://<varname>impala-server-hostname</varname>:25010/subscribers</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays information about...
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_statestored_threadz">
+
+      <title>Threadz Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>threadz</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25010/threadz</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25010/threadz</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays information about the threads used by this instance of <cmdname>impalad</cmdname>,
+          and shows which categories they are grouped into. Making use of this information requires substantial
+          knowledge about Impala internals.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_statestored_topics">
+
+      <title>Topics Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>topics</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25010/topics</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25010/topics</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays information about...
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_statestored_varz">
+
+      <title>Varz Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>varz</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25010/varz</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25010/varz</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page shows the configuration settings in effect when this instance of <cmdname>impalad</cmdname>
+          communicates with other Hadoop components such as HDFS and YARN. These settings are collected from a set
+          of configuration files; Impala might not actually make use of all settings.
+        </p>
+
+        <p>
+          The bottom of this page also lists all the command-line settings in effect for this instance of
+          <cmdname>impalad</cmdname>. See <xref href="impala_config_options.xml#config_options"/> for information
+          about modifying these values.
+        </p>
+      </conbody>
+    </concept>
+  </concept>
+
+  <concept audience="Cloudera" id="webui_catalogd">
+
+    <title>Debug Web UI for catalogd</title>
+
+    <conbody>
+
+      <p></p>
+    </conbody>
+
+    <concept audience="Cloudera" id="webui_catalogd_disabling">
+
+      <title>Turning off the Web UI for impalad</title>
+
+      <conbody>
+
+        <p></p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_catalogd_main">
+
+      <title>Main Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the main page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25020/</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25020/</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page lists the version of the <cmdname>impalad</cmdname> daemon, plus basic hardware and software
+          information about the corresponding host, such as information about the CPU, memory, disks, and operating
+          system version.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_catalogd_catalog">
+
+      <title>Catalog Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>catalog</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25020/catalog</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25020/catalog</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays a list of databases and associated tables recognized by this instance of
+          <cmdname>impalad</cmdname>. You can use this page to locate which database a table is in, check the
+          exact spelling of a database or table name, look for identical table names in multiple databases, and so
+          on.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_catalogd_logs">
+
+      <title>Logs Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>logs</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25020/logs</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25020/logs</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page shows the last portion of the <filepath>impalad.INFO</filepath> log file, the most detailed of
+          the info, warning, and error logs for the <cmdname>impalad</cmdname> daemon. You can refer here to see
+          the details of the most recent operations, whether the operations succeeded or encountered errors. This
+          central page can be more convenient than looking around the filesystem for the log files, which could be
+          in different locations on clusters that use Cloudera Manager or not.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_catalogd_metrics">
+
+      <title>Metrics Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>metrics</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25020/metrics</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25020/metrics</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page displays the current set of metrics: counters and flags representing various aspects of
+          <cmdname>impalad</cmdname> internal operation. For the meanings of these metrics, see
+          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_metrics_impala.html" scope="external" format="html">Impala
+          Metrics</xref> in the Cloudera Manager documentation.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="webui_catalogd_varz">
+
+      <title>Varz Page</title>
+
+      <conbody>
+
+        <p>
+          By default, the <uicontrol>varz</uicontrol> page of the debug web UI is at
+          <codeph>http://<varname>impala-server-hostname</varname>:25020/varz</codeph> (non-secure cluster) or
+          <codeph>https://<varname>impala-server-hostname</varname>:25020/varz</codeph> (secure cluster).
+        </p>
+
+        <p>
+          This page shows the configuration settings in effect when this instance of <cmdname>impalad</cmdname>
+          communicates with other Hadoop components such as HDFS and YARN. These settings are collected from a set
+          of configuration files; Impala might not actually make use of all settings.
+        </p>
+
+        <p>
+          The bottom of this page also lists all the command-line settings in effect for this instance of
+          <cmdname>impalad</cmdname>. See <xref href="impala_config_options.xml#config_options"/> for information
+          about modifying these values.
+        </p>
+      </conbody>
+    </concept>
+  </concept>
+</concept>

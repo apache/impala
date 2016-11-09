@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_jdbc">
+
+  <title id="jdbc">Configuring Impala to Work with JDBC</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="JDBC"/>
+      <data name="Category" value="Java"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="Starting and Stopping"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">JDBC</indexterm>
+      Impala supports the standard JDBC interface, allowing access from commercial Business Intelligence tools and
+      custom software written in Java or other programming languages. The JDBC driver allows you to access Impala
+      from a Java program that you write, or a Business Intelligence or similar tool that uses JDBC to communicate
+      with various database products.
+    </p>
+
+    <p>
+      Setting up a JDBC connection to Impala involves the following steps:
+    </p>
+
+    <ul>
+      <li>
+        Verifying the communication port where the Impala daemons in your cluster are listening for incoming JDBC
+        requests.
+      </li>
+
+      <li>
+        Installing the JDBC driver on every system that runs the JDBC-enabled application.
+      </li>
+
+      <li>
+        Specifying a connection string for the JDBC application to access one of the servers running the
+        <cmdname>impalad</cmdname> daemon, with the appropriate security settings.
+      </li>
+    </ul>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="jdbc_port">
+
+    <title>Configuring the JDBC Port</title>
+
+    <conbody>
+
+      <p>
+        The default port used by JDBC 2.0 and later (as well as ODBC 2.x) is 21050. Impala server accepts JDBC
+        connections through this same port 21050 by default. Make sure this port is available for communication
+        with other hosts on your network, for example, that it is not blocked by firewall software. If your JDBC
+        client software connects to a different port, specify that alternative port number with the
+        <codeph>--hs2_port</codeph> option when starting <codeph>impalad</codeph>. See
+        <xref href="impala_processes.xml#processes"/> for details about Impala startup options. See
+        <xref href="impala_ports.xml#ports"/> for information about all ports used for communication between Impala
+        and clients or between Impala components.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="jdbc_driver_choice">
+
+    <title>Choosing the JDBC Driver</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Planning"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        In Impala 2.0 and later, you have the choice between the Cloudera JDBC Connector and the Hive 0.13 JDBC driver.
+        <ph rev="upstream">Cloudera</ph> recommends using the Cloudera JDBC Connector where practical.
+      </p>
+
+      <p>
+        If you are already using JDBC applications with an earlier Impala release, you must update your JDBC driver
+        to one of these choices, because the Hive 0.12 driver that was formerly the only choice is not compatible
+        with Impala 2.0 and later.
+      </p>
+
+      <p>
+        Both the Cloudera JDBC 2.5 Connector and the Hive JDBC driver provide a substantial speed increase for JDBC
+        applications with Impala 2.0 and higher, for queries that return large result sets.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/jdbc_odbc_complex_types"/>
+      <p conref="../shared/impala_common.xml#common/jdbc_odbc_complex_types_views"/>
+
+    </conbody>
+  </concept>
+
+  <concept id="jdbc_setup">
+
+    <title>Enabling Impala JDBC Support on Client Systems</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Installing"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <section id="install_jdbc_connector">
+        <title>Using the Cloudera JDBC Connector (recommended)</title>
+
+        <p>
+          You download and install the Cloudera JDBC 2.5 connector on any Linux, Windows, or Mac system where you
+          intend to run JDBC-enabled applications. From the
+          <xref href="http://go.cloudera.com/odbc-driver-hive-impala.html" scope="external" format="html">Cloudera
+          Connectors download page</xref>, you choose the appropriate protocol (JDBC or ODBC) and target product
+          (Impala or Hive). The ease of downloading and installing on non-CDH systems makes this connector a
+          convenient choice for organizations with heterogeneous environments.
+        </p>
+
+      </section>
+
+      <section id="install_hive_driver">
+        <title>Using the Hive JDBC Driver</title>
+        <p>
+          You install the Hive JDBC driver (<codeph>hive-jdbc</codeph> package) through the Linux package manager, on
+          hosts within the CDH cluster. The driver consists of several Java JAR files. The same driver can be used by Impala and Hive.
+        </p>
+
+        <p>
+          To get the JAR files, install the Hive JDBC driver on each CDH-enabled host in the cluster that will run
+          JDBC applications. Follow the instructions for
+          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hive_jdbc_install.html" scope="external" format="html">CDH 5</xref>.
+        </p>
+
+        <note>
+          The latest JDBC driver, corresponding to Hive 0.13, provides substantial performance improvements for
+          Impala queries that return large result sets. Impala 2.0 and later are compatible with the Hive 0.13
+          driver. If you already have an older JDBC driver installed, and are running Impala 2.0 or higher, consider
+          upgrading to the latest Hive JDBC driver for best performance with JDBC applications.
+        </note>
+
+        <p>
+          If you are using JDBC-enabled applications on hosts outside the CDH cluster, you cannot use the CDH install
+          procedure on the non-CDH hosts. Install the JDBC driver on at least one CDH host using the preceding
+          procedure. Then download the JAR files to each client machine that will use JDBC with Impala:
+        </p>
+
+  <codeblock>commons-logging-X.X.X.jar
+  hadoop-common.jar
+  hive-common-X.XX.X-cdhX.X.X.jar
+  hive-jdbc-X.XX.X-cdhX.X.X.jar
+  hive-metastore-X.XX.X-cdhX.X.X.jar
+  hive-service-X.XX.X-cdhX.X.X.jar
+  httpclient-X.X.X.jar
+  httpcore-X.X.X.jar
+  libfb303-X.X.X.jar
+  libthrift-X.X.X.jar
+  log4j-X.X.XX.jar
+  slf4j-api-X.X.X.jar
+  slf4j-logXjXX-X.X.X.jar
+  </codeblock>
+
+        <p>
+          <b>To enable JDBC support for Impala on the system where you run the JDBC application:</b>
+        </p>
+
+        <ol>
+          <li>
+            Download the JAR files listed above to each client machine.
+  <!--
+            Download the
+            <xref href="https://downloads.cloudera.com/impala-jdbc/impala-jdbc-0.5-2.zip" scope="external" format="zip">Impala
+            JDBC zip file</xref> to the client machine that you will use to connect to Impala servers.
+  -->
+            <note>
+              For Maven users, see
+              <xref href="https://github.com/onefoursix/Cloudera-Impala-JDBC-Example" scope="external" format="html">this
+              sample github page</xref> for an example of the dependencies you could add to a <codeph>pom</codeph>
+              file instead of downloading the individual JARs.
+            </note>
+          </li>
+
+          <li>
+            Store the JAR files in a location of your choosing, ideally a directory already referenced in your
+            <codeph>CLASSPATH</codeph> setting. For example:
+            <ul>
+              <li>
+                On Linux, you might use a location such as
+                <codeph>/</codeph><codeph>opt</codeph><codeph>/jars/</codeph>.
+              </li>
+
+              <li>
+                On Windows, you might use a subdirectory underneath <filepath>C:\Program Files</filepath>.
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            To successfully load the Impala JDBC driver, client programs must be able to locate the associated JAR
+            files. This often means setting the <codeph>CLASSPATH</codeph> for the client process to include the
+            JARs. Consult the documentation for your JDBC client for more details on how to install new JDBC drivers,
+            but some examples of how to set <codeph>CLASSPATH</codeph> variables include:
+            <ul>
+              <li>
+                On Linux, if you extracted the JARs to <codeph>/opt/jars/</codeph>, you might issue the following
+                command to prepend the JAR files path to an existing classpath:
+  <codeblock>export CLASSPATH=/opt/jars/*.jar:$CLASSPATH</codeblock>
+              </li>
+
+              <li>
+                On Windows, use the <b>System Properties</b> control panel item to modify the <b>Environment
+                Variables</b> for your system. Modify the environment variables to include the path to which you
+                extracted the files.
+                <note>
+                  If the existing <codeph>CLASSPATH</codeph> on your client machine refers to some older version of
+                  the Hive JARs, ensure that the new JARs are the first ones listed. Either put the new JAR files
+                  earlier in the listings, or delete the other references to Hive JAR files.
+                </note>
+              </li>
+            </ul>
+          </li>
+        </ol>
+      </section>
+
+    </conbody>
+  </concept>
+
+  <concept id="jdbc_connect">
+
+    <title>Establishing JDBC Connections</title>
+
+    <conbody>
+
+      <p>
+        The JDBC driver class depends on which driver you select.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/proxy_jdbc_caveat"/>
+
+      <section id="class_jdbc_connector">
+
+        <title>Using the Cloudera JDBC Connector (recommended)</title>
+
+        <p>
+          Depending on the level of the JDBC API your application is targeting, you can use
+          the following fully-qualified class names (FQCNs):
+        </p>
+
+        <ul>
+          <li><codeph>com.cloudera.impala.jdbc41.Driver</codeph></li>
+          <li><codeph>com.cloudera.impala.jdbc41.DataSource</codeph></li>
+        </ul>
+
+        <ul>
+          <li><codeph>com.cloudera.impala.jdbc4.Driver</codeph></li>
+          <li><codeph>com.cloudera.impala.jdbc4.DataSource</codeph></li>
+        </ul>
+
+        <ul>
+          <li><codeph>com.cloudera.impala.jdbc3.Driver</codeph></li>
+          <li><codeph>com.cloudera.impala.jdbc3.DataSource</codeph></li>
+        </ul>
+
+        <p>
+          The connection string has the following format:
+        </p>
+
+<codeblock>jdbc:impala://<varname>Host</varname>:<varname>Port</varname>[/<varname>Schema</varname>];<varname>Property1</varname>=<varname>Value</varname>;<varname>Property2</varname>=<varname>Value</varname>;...</codeblock>
+
+        <p>
+          The <codeph>port</codeph> value is typically 21050 for Impala.
+        </p>
+
+        <p>
+          For full details about the classes and the connection string (especially the property values available
+          for the connection string), download the appropriate driver documentation for your platform from
+          <xref href="http://www.cloudera.com/content/cloudera/en/downloads/connectors/impala/jdbc/impala-jdbc-v2-5-5.html" scope="external" format="html">the Impala JDBC Connector download page</xref>.
+        </p>
+
+      </section>
+
+      <section id="class_hive_driver">
+      <title>Using the Hive JDBC Driver</title>
+
+      <p>
+        For example, with the Hive JDBC driver, the class name is <codeph>org.apache.hive.jdbc.HiveDriver</codeph>.
+        Once you have configured Impala to work with JDBC, you can establish connections between the two.
+        To do so for a cluster that does not use
+        Kerberos authentication, use a connection string of the form
+        <codeph>jdbc:hive2://<varname>host</varname>:<varname>port</varname>/;auth=noSasl</codeph>.
+<!--
+        Include the <codeph>auth=noSasl</codeph> argument
+        only when connecting to a non-Kerberos cluster; if Kerberos is enabled, omit the <codeph>auth</codeph> argument.
+-->
+        For example, you might use:
+      </p>
+
+<codeblock>jdbc:hive2://myhost.example.com:21050/;auth=noSasl</codeblock>
+
+      <p>
+        To connect to an instance of Impala that requires Kerberos authentication, use a connection string of the
+        form
+        <codeph>jdbc:hive2://<varname>host</varname>:<varname>port</varname>/;principal=<varname>principal_name</varname></codeph>.
+        The principal must be the same user principal you used when starting Impala. For example, you might use:
+      </p>
+
+<codeblock>jdbc:hive2://myhost.example.com:21050/;principal=impala/myhost.example.com@H2.EXAMPLE.COM</codeblock>
+
+      <p>
+        To connect to an instance of Impala that requires LDAP authentication, use a connection string of the form
+        <codeph>jdbc:hive2://<varname>host</varname>:<varname>port</varname>/<varname>db_name</varname>;user=<varname>ldap_userid</varname>;password=<varname>ldap_password</varname></codeph>.
+        For example, you might use:
+      </p>
+
+<codeblock>jdbc:hive2://myhost.example.com:21050/test_db;user=fred;password=xyz123</codeblock>
+
+      <note>
+          <p conref="../shared/impala_common.xml#common/hive_jdbc_ssl_kerberos_caveat"/>
+      </note>
+
+      </section>
+
+    </conbody>
+  </concept>
+
+  <concept rev="2.3.0" id="jdbc_odbc_notes">
+    <title>Notes about JDBC and ODBC Interaction with Impala SQL Features</title>
+    <conbody>
+      <p>
+        Most Impala SQL features work equivalently through the <cmdname>impala-shell</cmdname> interpreter
+        of the JDBC or ODBC APIs. The following are some exceptions to keep in mind when switching between
+        the interactive shell and applications using the APIs:
+      </p>
+      <ul>
+        <li>
+          <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+          <ul>
+          <li>
+          <p>
+            Queries involving the complex types (<codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>)
+            require notation that might not be available in all levels of JDBC and ODBC drivers.
+            If you have trouble querying such a table due to the driver level or
+            inability to edit the queries used by the application, you can create a view that exposes
+            a <q>flattened</q> version of the complex columns and point the application at the view.
+            See <xref href="impala_complex_types.xml#complex_types"/> for details.
+          </p>
+        </li>
+        <li>
+          <p>
+            The complex types available in <keyword keyref="impala23_full"/> and higher are supported by the
+            JDBC <codeph>getColumns()</codeph> API.
+            Both <codeph>MAP</codeph> and <codeph>ARRAY</codeph> are reported as the JDBC SQL Type <codeph>ARRAY</codeph>,
+            because this is the closest matching Java SQL type. This behavior is consistent with Hive.
+            <codeph>STRUCT</codeph> types are reported as the JDBC SQL Type <codeph>STRUCT</codeph>.
+          </p>
+          <p>
+            To be consistent with Hive's behavior, the TYPE_NAME field is populated
+            with the primitive type name for scalar types, and with the full <codeph>toSql()</codeph>
+            for complex types. The resulting type names are somewhat inconsistent,
+            because nested types are printed differently than top-level types. For example,
+            the following list shows how <codeph>toSQL()</codeph> for Impala types are
+            translated to <codeph>TYPE_NAME</codeph> values:
+<codeblock><![CDATA[DECIMAL(10,10)         becomes  DECIMAL
+CHAR(10)               becomes  CHAR
+VARCHAR(10)            becomes  VARCHAR
+ARRAY<DECIMAL(10,10)>  becomes  ARRAY<DECIMAL(10,10)>
+ARRAY<CHAR(10)>        becomes  ARRAY<CHAR(10)>
+ARRAY<VARCHAR(10)>     becomes  ARRAY<VARCHAR(10)>
+]]>
+</codeblock>
+          </p>
+          </li>
+        </ul>
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+
+</concept>

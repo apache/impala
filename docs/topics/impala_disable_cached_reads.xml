@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="disable_cached_reads" rev="1.4.0">
+
+  <title>DISABLE_CACHED_READS Query Option</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="HDFS"/>
+      <data name="Category" value="HDFS Caching"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">DISABLE_CACHED_READS query option</indexterm>
+      Prevents Impala from reading data files that are <q>pinned</q> in memory
+      through the HDFS caching feature. Primarily a debugging option for
+      cases where processing of HDFS cached data is concentrated on a single
+      host, leading to excessive CPU usage on that host.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+
+    <p conref="../shared/impala_common.xml#common/default_false"/>
+
+    <p conref="../shared/impala_common.xml#common/added_in_140"/>
+
+  </conbody>
+</concept>

@@ -1,0 +1,471 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="logging">
+
+  <title>Using Impala Logging</title>
+  <titlealts audience="PDF"><navtitle>Logging</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Logs"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The Impala logs record information about:
+    </p>
+
+    <ul>
+      <li>
+        Any errors Impala encountered. If Impala experienced a serious error during startup, you must diagnose and
+        troubleshoot that problem before you can do anything further with Impala.
+      </li>
+
+      <li>
+        How Impala is configured.
+      </li>
+
+      <li>
+        Jobs Impala has completed.
+      </li>
+    </ul>
+
+    <note>
+      <p>
+        Formerly, the logs contained the query profile for each query, showing low-level details of how the work is
+        distributed among nodes and how intermediate and final results are transmitted across the network. To save
+        space, those query profiles are now stored in zlib-compressed files in
+        <filepath>/var/log/impala/profiles</filepath>. You can access them through the Impala web user interface.
+        For example, at <codeph>http://<varname>impalad-node-hostname</varname>:25000/queries</codeph>, each query
+        is followed by a <codeph>Profile</codeph> link leading to a page showing extensive analytical data for the
+        query execution.
+      </p>
+
+      <p rev="1.1.1">
+        The auditing feature introduced in Impala 1.1.1 produces a separate set of audit log files when
+        enabled. See <xref href="impala_auditing.xml#auditing"/> for details.
+      </p>
+
+      <p rev="2.2.0">
+        The lineage feature introduced in Impala 2.2.0 produces a separate lineage log file when
+        enabled. See <xref href="impala_lineage.xml#lineage"/> for details.
+      </p>
+    </note>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
+
+  <concept id="logs_details">
+
+    <title>Locations and Names of Impala Log Files</title>
+
+    <conbody>
+
+      <ul>
+        <li>
+          By default, the log files are under the directory <filepath>/var/log/impala</filepath>.
+<!-- TK: split this task out and state CM and non-CM ways. -->
+          To change log file locations, modify the defaults file described in
+          <xref href="impala_processes.xml#processes"/>.
+        </li>
+
+        <li>
+          The significant files for the <codeph>impalad</codeph> process are <filepath>impalad.INFO</filepath>,
+          <filepath>impalad.WARNING</filepath>, and <filepath>impalad.ERROR</filepath>. You might also see a file
+          <filepath>impalad.FATAL</filepath>, although this is only present in rare conditions.
+        </li>
+
+        <li>
+          The significant files for the <codeph>statestored</codeph> process are
+          <filepath>statestored.INFO</filepath>, <filepath>statestored.WARNING</filepath>, and
+          <filepath>statestored.ERROR</filepath>. You might also see a file <filepath>statestored.FATAL</filepath>,
+          although this is only present in rare conditions.
+        </li>
+
+        <li rev="1.2">
+          The significant files for the <codeph>catalogd</codeph> process are <filepath>catalogd.INFO</filepath>,
+          <filepath>catalogd.WARNING</filepath>, and <filepath>catalogd.ERROR</filepath>. You might also see a file
+          <filepath>catalogd.FATAL</filepath>, although this is only present in rare conditions.
+        </li>
+
+        <li>
+          Examine the <codeph>.INFO</codeph> files to see configuration settings for the processes.
+        </li>
+
+        <li>
+          Examine the <codeph>.WARNING</codeph> files to see all kinds of problem information, including such
+          things as suboptimal settings and also serious runtime errors.
+        </li>
+
+        <li>
+          Examine the <codeph>.ERROR</codeph> and/or <codeph>.FATAL</codeph> files to see only the most serious
+          errors, if the processes crash, or queries fail to complete. These messages are also in the
+          <codeph>.WARNING</codeph> file.
+        </li>
+
+        <li>
+          A new set of log files is produced each time the associated daemon is restarted. These log files have
+          long names including a timestamp. The <codeph>.INFO</codeph>, <codeph>.WARNING</codeph>, and
+          <codeph>.ERROR</codeph> files are physically represented as symbolic links to the latest applicable log
+          files.
+        </li>
+
+        <li>
+          The init script for the <codeph>impala-server</codeph> service also produces a consolidated log file
+          <codeph>/var/logs/impalad/impala-server.log</codeph>, with all the same information as the
+          corresponding<codeph>.INFO</codeph>, <codeph>.WARNING</codeph>, and <codeph>.ERROR</codeph> files.
+        </li>
+
+        <li>
+          The init script for the <codeph>impala-state-store</codeph> service also produces a consolidated log file
+          <codeph>/var/logs/impalad/impala-state-store.log</codeph>, with all the same information as the
+          corresponding<codeph>.INFO</codeph>, <codeph>.WARNING</codeph>, and <codeph>.ERROR</codeph> files.
+        </li>
+      </ul>
+
+      <p>
+        Impala stores information using the <codeph>glog_v</codeph> logging system. You will see some messages
+        referring to C++ file names. Logging is affected by:
+      </p>
+
+      <ul>
+        <li>
+          The <codeph>GLOG_v</codeph> environment variable specifies which types of messages are logged. See
+          <xref href="#log_levels"/> for details.
+        </li>
+
+        <li>
+          The <codeph>-logbuflevel</codeph> startup flag for the <cmdname>impalad</cmdname> daemon specifies how
+          often the log information is written to disk. The default is 0, meaning that the log is immediately
+          flushed to disk when Impala outputs an important messages such as a warning or an error, but less
+          important messages such as informational ones are buffered in memory rather than being flushed to disk
+          immediately.
+        </li>
+
+        <li>
+          Cloudera Manager has an Impala configuration setting that sets the <codeph>-logbuflevel</codeph> startup
+          option.
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="logs_cm_noncm">
+
+    <title>Managing Impala Logs through Cloudera Manager or Manually</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Cloudera Manager"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        <ph rev="upstream">Cloudera</ph> recommends installing Impala through the Cloudera Manager administration interface. To assist with
+        troubleshooting, Cloudera Manager collects front-end and back-end logs together into a single view, and let
+        you do a search across log data for all the managed nodes rather than examining the logs on each node
+        separately. If you installed Impala using Cloudera Manager, refer to the topics on Monitoring Services
+        (<xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_dg_service_monitoring.html" scope="external" format="html">CDH 5</xref>)
+        or Logs (<xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_dg_logs.html" scope="external" format="html">CDH 5</xref>).
+      </p>
+
+      <p>
+        If you are using Impala in an environment not managed by Cloudera Manager, review Impala log files on each
+        host, when you have traced an issue back to a specific system.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="logs_rotate">
+
+    <title>Rotating Impala Logs</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Disk Storage"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        Impala periodically switches the physical files representing the current log files, after which it is safe
+        to remove the old files if they are no longer needed.
+      </p>
+
+      <p>
+        Impala can automatically remove older unneeded log files, a feature known as <term>log rotation</term>.
+<!-- Another instance of the text also used in impala_new_features.xml
+             and impala_fixed_issues.xml. (Just took out the word "new"
+             and added the reference to the starting release.)
+             At this point, a conref is definitely in the cards. -->
+      </p>
+
+      <p>
+        In Impala 2.2 and higher, the <codeph>-max_log_files</codeph> configuration option specifies how many log
+        files to keep at each severity level. You can specify an appropriate setting for each Impala-related daemon
+        (<cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>, and <cmdname>catalogd</cmdname>). The default
+        value is 10, meaning that Impala preserves the latest 10 log files for each severity level
+        (<codeph>INFO</codeph>, <codeph>WARNING</codeph>, <codeph>ERROR</codeph>, and <codeph>FATAL</codeph>).
+        Impala checks to see if any old logs need to be removed based on the interval specified in the
+        <codeph>logbufsecs</codeph> setting, every 5 seconds by default.
+      </p>
+
+<!-- This extra detail only appears here. Consider if it's worth including it
+           in the conref so people don't need to follow a link just for a couple of
+           minor factoids. -->
+
+      <p>
+        A value of 0 preserves all log files, in which case you would set up set up manual log rotation using your
+        Linux tool or technique of choice. A value of 1 preserves only the very latest log file.
+      </p>
+
+      <p>
+        To set up log rotation on a system managed by Cloudera Manager 5.4.0 and higher, search for the
+        <codeph>max_log_files</codeph> option name and set the appropriate value for the <userinput>Maximum Log
+        Files</userinput> field for each Impala configuration category (Impala, Catalog Server, and StateStore).
+        Then restart the Impala service. In earlier Cloudera Manager releases, specify the
+        <codeph>-max_log_files=<varname>maximum</varname></codeph> option in the <uicontrol>Command Line Argument
+        Advanced Configuration Snippet (Safety Valve)</uicontrol> field for each Impala configuration category.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="logs_debug">
+
+    <title>Reviewing Impala Logs</title>
+
+    <conbody>
+
+      <p>
+        By default, the Impala log is stored at <codeph>/var/logs/impalad/</codeph>. The most comprehensive log,
+        showing informational, warning, and error messages, is in the file name <filepath>impalad.INFO</filepath>.
+        View log file contents by using the web interface or by examining the contents of the log file. (When you
+        examine the logs through the file system, you can troubleshoot problems by reading the
+        <filepath>impalad.WARNING</filepath> and/or <filepath>impalad.ERROR</filepath> files, which contain the
+        subsets of messages indicating potential problems.)
+      </p>
+
+      <p>
+        On a machine named <codeph>impala.example.com</codeph> with default settings, you could view the Impala
+        logs on that machine by using a browser to access <codeph>http://impala.example.com:25000/logs</codeph>.
+      </p>
+
+      <note>
+        <p>
+          The web interface limits the amount of logging information displayed. To view every log entry, access the
+          log files directly through the file system.
+        </p>
+      </note>
+
+      <p>
+        You can view the contents of the <codeph>impalad.INFO</codeph> log file in the file system. With the
+        default configuration settings, the start of the log file appears as follows:
+      </p>
+
+<codeblock>[user@example impalad]$ pwd
+/var/log/impalad
+[user@example impalad]$ more impalad.INFO
+Log file created at: 2013/01/07 08:42:12
+Running on machine: impala.example.com
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I0107 08:42:12.292155 14876 daemon.cc:34] impalad version 0.4 RELEASE (build 9d7fadca0461ab40b9e9df8cdb47107ec6b27cff)
+Built on Fri, 21 Dec 2012 12:55:19 PST
+I0107 08:42:12.292484 14876 daemon.cc:35] Using hostname: impala.example.com
+I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug webserver):
+--dump_ir=false
+--module_output=
+--be_port=22000
+--classpath=
+--hostname=impala.example.com</codeblock>
+
+      <note>
+        The preceding example shows only a small part of the log file. Impala log files are often several megabytes
+        in size.
+      </note>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="log_format">
+
+    <title>Understanding Impala Log Contents</title>
+
+    <conbody>
+
+      <p>
+        The logs store information about Impala startup options. This information appears once for each time Impala
+        is started and may include:
+      </p>
+
+      <ul>
+        <li>
+          Machine name.
+        </li>
+
+        <li>
+          Impala version number.
+        </li>
+
+        <li>
+          Flags used to start Impala.
+        </li>
+
+        <li>
+          CPU information.
+        </li>
+
+        <li>
+          The number of available disks.
+        </li>
+      </ul>
+
+      <p>
+        There is information about each job Impala has run. Because each Impala job creates an additional set of
+        data about queries, the amount of job specific data may be very large. Logs may contained detailed
+        information on jobs. These detailed log entries may include:
+      </p>
+
+      <ul>
+        <li>
+          The composition of the query.
+        </li>
+
+        <li>
+          The degree of data locality.
+        </li>
+
+        <li>
+          Statistics on data throughput and response times.
+        </li>
+      </ul>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="log_levels">
+
+    <title>Setting Logging Levels</title>
+
+    <conbody>
+
+      <p>
+        Impala uses the GLOG system, which supports three logging levels. You can adjust the logging levels using
+        the Cloudera Manager Admin Console. You can adjust logging levels without going through the Cloudera
+        Manager Admin Console by exporting variable settings. To change logging settings manually, use a command
+        similar to the following on each node before starting <codeph>impalad</codeph>:
+      </p>
+
+<codeblock>export GLOG_v=1</codeblock>
+
+      <note>
+        For performance reasons, Cloudera highly recommends not enabling the most verbose logging level of 3.
+      </note>
+
+      <p>
+        For more information on how to configure GLOG, including how to set variable logging levels for different
+        system components, see
+        <xref href="http://google-glog.googlecode.com/svn/trunk/doc/glog.html" scope="external" format="html">How
+        To Use Google Logging Library (glog)</xref>.
+      </p>
+
+      <section id="loglevels_details">
+
+        <title>Understanding What is Logged at Different Logging Levels</title>
+
+        <p>
+          As logging levels increase, the categories of information logged are cumulative. For example, GLOG_v=2
+          records everything GLOG_v=1 records, as well as additional information.
+        </p>
+
+        <p>
+          Increasing logging levels imposes performance overhead and increases log size. <ph rev="upstream">Cloudera</ph> recommends using
+          GLOG_v=1 for most cases: this level has minimal performance impact but still captures useful
+          troubleshooting information.
+        </p>
+
+        <p>
+          Additional information logged at each level is as follows:
+        </p>
+
+        <ul>
+          <li>
+            GLOG_v=1 - The default level. Logs information about each connection and query that is initiated to an
+            <codeph>impalad</codeph> instance, including runtime profiles.
+          </li>
+
+          <li>
+            GLOG_v=2 - Everything from the previous level plus information for each RPC initiated. This level also
+            records query execution progress information, including details on each file that is read.
+          </li>
+
+          <li>
+            GLOG_v=3 - Everything from the previous level plus logging of every row that is read. This level is
+            only applicable for the most serious troubleshooting and tuning scenarios, because it can produce
+            exceptionally large and detailed log files, potentially leading to its own set of performance and
+            capacity problems.
+          </li>
+        </ul>
+
+      </section>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="redaction" rev="2.2.0">
+
+    <title>Redacting Sensitive Information from Impala Log Files</title>
+    <prolog>
+      <metadata>
+        <data name="Category" value="Redaction"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">redaction</indexterm>
+        <term>Log redaction</term> is a security feature that prevents sensitive information from being displayed in
+        locations used by administrators for monitoring and troubleshooting, such as log files, the Cloudera Manager
+        user interface, and the Impala debug web user interface. You configure regular expressions that match
+        sensitive types of information processed by your system, such as credit card numbers or tax IDs, and literals
+        matching these patterns are obfuscated wherever they would normally be recorded in log files or displayed in
+        administration or debugging user interfaces.
+      </p>
+
+      <p>
+        In a security context, the log redaction feature is complementary to the Sentry authorization framework.
+        Sentry prevents unauthorized users from being able to directly access table data. Redaction prevents
+        administrators or support personnel from seeing the smaller amounts of sensitive or personally identifying
+        information (PII) that might appear in queries issued by those authorized users.
+      </p>
+
+      <p>
+        See
+        <xref audience="integrated" href="sg_redaction.xml#log_redact"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_redaction.html" scope="external" format="html"/>
+        for details about how to enable this feature and set
+        up the regular expressions to detect and redact sensitive information within SQL statement text.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+</concept>

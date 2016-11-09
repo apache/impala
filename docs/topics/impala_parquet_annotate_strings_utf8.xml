@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="parquet_annotate_strings_utf8" rev="2.6.0 IMPALA-2069">
+
+  <title>PARQUET_ANNOTATE_STRINGS_UTF8 Query Option (<keyword keyref="impala26"/> or higher only)</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Parquet"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.6.0 IMPALA-2069">
+      <indexterm audience="Cloudera">PARQUET_ANNOTATE_STRINGS_UTF8 query option</indexterm>
+      Causes Impala <codeph>INSERT</codeph> and <codeph>CREATE TABLE AS SELECT</codeph> statements
+      to write Parquet files that use the UTF-8 annotation for <codeph>STRING</codeph> columns.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>
+      By default, Impala represents a <codeph>STRING</codeph> column in Parquet as an unannotated binary field.
+    </p>
+    <p>
+      Impala always uses the UTF-8 annotation when writing <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph>
+      columns to Parquet files. An alternative to using the query option is to cast <codeph>STRING</codeph>
+      values to <codeph>VARCHAR</codeph>.
+    </p>
+    <p>
+      This option is to help make Impala-written data more interoperable with other data processing engines.
+      Impala itself currently does not support all operations on UTF-8 data.
+      Although data processed by Impala is typically represented in ASCII, it is valid to designate the
+      data as UTF-8 when storing on disk, because ASCII is a subset of UTF-8.
+    </p>
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+
+    <p conref="../shared/impala_common.xml#common/added_in_260"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_parquet.xml#parquet"/>
+    </p>
+
+  </conbody>
+</concept>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.2" id="reservation_request_timeout">
+
+  <title>RESERVATION_REQUEST_TIMEOUT Query Option (CDH 5 only)</title>
+  <titlealts audience="PDF"><navtitle>RESERVATION_REQUEST_TIMEOUT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Resource Management"/>
+      <data name="Category" value="YARN"/>
+      <data name="Category" value="Llama"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <note conref="../shared/impala_common.xml#common/llama_query_options_obsolete"/>
+
+    <p>
+      <indexterm audience="Cloudera">RESERVATION_REQUEST_TIMEOUT query option</indexterm>
+      Maximum number of milliseconds Impala will wait for a reservation to be completely granted or denied. Used in
+      conjunction with the Impala resource management feature in Impala 1.2 and higher with CDH 5.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p>
+      <b>Default:</b> 300000 (5 minutes)
+    </p>
+
+  </conbody>
+</concept>

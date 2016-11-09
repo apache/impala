@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="runtime_bloom_filter_size" rev="2.5.0">
+
+  <title>RUNTIME_BLOOM_FILTER_SIZE Query Option (<keyword keyref="impala25"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>RUNTIME_BLOOM_FILTER_SIZE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.5.0">
+      <indexterm audience="Cloudera">RUNTIME_BLOOM_FILTER_SIZE query option</indexterm>
+      Size (in bytes) of Bloom filter data structure used by the runtime filtering
+      feature.
+    </p>
+
+    <note type="important">
+      <p rev="2.6.0 CDH-41184 IMPALA-3007">
+        In <keyword keyref="impala26_full"/> and higher, this query option only applies as a fallback, when statistics
+        are not available. By default, Impala estimates the optimal size of the Bloom filter structure
+        regardless of the setting for this option. (This is a change from the original behavior in
+        <keyword keyref="impala25_full"/>.)
+      </p>
+      <p rev="2.6.0 CDH-41184 IMPALA-3007">
+        In <keyword keyref="impala26_full"/> and higher, when the value of this query option is used for query planning,
+        it is constrained by the minimum and maximum sizes specified by the
+        <codeph>RUNTIME_FILTER_MIN_SIZE</codeph> and <codeph>RUNTIME_FILTER_MAX_SIZE</codeph> query options.
+        The filter size is adjusted upward or downward if necessary to fit within the minimum/maximum range.
+      </p>
+    </note>
+
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+
+    <p>
+      <b>Default:</b> 1048576 (1 MB)
+    </p>
+
+    <p>
+      <b>Maximum:</b> 16 MB
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_250"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      This setting affects optimizations for large and complex queries, such
+      as dynamic partition pruning for partitioned tables, and join optimization
+      for queries that join large tables.
+      Larger filters are more effective at handling
+      higher cardinality input sets, but consume more memory per filter.
+      <!--
+      See <xref href="impala_runtime_filtering.xml#runtime_filtering"/> for details about when to change
+      the setting for this query option.
+      -->
+    </p>
+
+    <p>
+      If your query filters on high-cardinality columns (for example, millions of different values)
+      and you do not get the expected speedup from the runtime filtering mechanism, consider
+      doing some benchmarks with a higher value for <codeph>RUNTIME_BLOOM_FILTER_SIZE</codeph>.
+      The extra memory devoted to the Bloom filter data structures can help make the filtering
+      more accurate.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/runtime_filtering_option_caveat"/>
+
+    <p>
+      Because the effectiveness of this setting depends so much on query characteristics and data distribution,
+      you typically only use it for specific queries that need some extra tuning, and the ideal value depends
+      on the query. Consider setting this query option immediately before the expensive query and
+      unsetting it immediately afterward.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_runtime_filtering.xml"/>,
+      <!-- , <xref href="impala_partitioning.xml#dynamic_partition_pruning"/> -->
+      <xref href="impala_runtime_filter_mode.xml#runtime_filter_mode"/>,
+      <xref href="impala_runtime_filter_min_size.xml#runtime_filter_min_size"/>,
+      <xref href="impala_runtime_filter_max_size.xml#runtime_filter_max_size"/>
+    </p>
+
+  </conbody>
+</concept>

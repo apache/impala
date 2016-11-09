@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="authentication">
+
+  <title>Impala Authentication</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Authentication"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Authentication is the mechanism to ensure that only specified hosts and users can connect to Impala. It also
+      verifies that when clients connect to Impala, they are connected to a legitimate server. This feature
+      prevents spoofing such as <term>impersonation</term> (setting up a phony client system with the same account
+      and group names as a legitimate user) and <term>man-in-the-middle attacks</term> (intercepting application
+      requests before they reach Impala and eavesdropping on sensitive information in the requests or the results).
+    </p>
+
+    <p>
+      Impala supports authentication using either Kerberos or LDAP.
+    </p>
+
+    <note conref="../shared/impala_common.xml#common/authentication_vs_authorization"/>
+
+    <p outputclass="toc"/>
+
+    <p>
+      Once you are finished setting up authentication, move on to authorization, which involves specifying what
+      databases, tables, HDFS directories, and so on can be accessed by particular users when they connect through
+      Impala. See <xref href="impala_authorization.xml#authorization"/> for details.
+    </p>
+  </conbody>
+</concept>

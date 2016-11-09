@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="ports">
+
+  <title>Ports Used by Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Ports"/>
+      <data name="Category" value="Network"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody id="conbody_ports">
+
+    <p>
+      <indexterm audience="Cloudera">ports</indexterm>
+      Impala uses the TCP ports listed in the following table. Before deploying Impala, ensure these ports are open
+      on each system.
+    </p>
+
+    <table>
+      <tgroup cols="5">
+        <colspec colname="1" colwidth="20*"/>
+        <colspec colname="2" colwidth="30*"/>
+        <colspec colname="3" colwidth="10*"/>
+        <colspec colname="4" colwidth="20*"/>
+        <colspec colname="5" colwidth="30*"/>
+        <thead>
+          <row>
+            <entry>
+              Component
+            </entry>
+            <entry>
+              Service
+            </entry>
+            <entry>
+              Port
+            </entry>
+            <entry>
+              Access Requirement
+            </entry>
+            <entry>
+              Comment
+            </entry>
+          </row>
+        </thead>
+        <tbody>
+          <row>
+            <entry>
+              <p>
+                Impala Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Impala Daemon Frontend Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                21000
+              </p>
+            </entry>
+            <entry>
+              <p>
+                External
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Used to transmit commands and receive results by <codeph>impala-shell</codeph> and
+                version 1.2 of the Cloudera ODBC driver.
+              </p>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <p>
+                Impala Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Impala Daemon Frontend Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                21050
+              </p>
+            </entry>
+            <entry>
+              <p>
+                External
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Used to transmit commands and receive results by applications, such as Business Intelligence tools,
+                using JDBC, the Beeswax query editor in Hue, and version 2.0 or higher of the Cloudera ODBC driver.
+              </p>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <p>
+                Impala Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Impala Daemon Backend Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                22000
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal use only. Impala daemons use this port to communicate with each other.
+              </p>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <p>
+                Impala Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                StateStoreSubscriber Service Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                23000
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal use only. Impala daemons listen on this port for updates from the statestore daemon.
+              </p>
+            </entry>
+          </row>
+          <row rev="2.1.0">
+            <entry>
+              <p>
+                Catalog Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                StateStoreSubscriber Service Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                23020
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal use only. The catalog daemon listens on this port for updates from the statestore daemon.
+              </p>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <p>
+                Impala Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Impala Daemon HTTP Server Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                25000
+              </p>
+            </entry>
+            <entry>
+              <p>
+                External
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Impala web interface for administrators to monitor and troubleshoot.
+              </p>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <p>
+                Impala StateStore Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                StateStore HTTP Server Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                25010
+              </p>
+            </entry>
+            <entry>
+              <p>
+                External
+              </p>
+            </entry>
+            <entry>
+              <p>
+                StateStore web interface for administrators to monitor and troubleshoot.
+              </p>
+            </entry>
+          </row>
+          <row rev="1.2">
+            <entry>
+              <p>
+                Impala Catalog Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Catalog HTTP Server Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                25020
+              </p>
+            </entry>
+            <entry>
+              <p>
+                External
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Catalog service web interface for administrators to monitor and troubleshoot. New in Impala 1.2 and
+                higher.
+              </p>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <p>
+                Impala StateStore Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                StateStore Service Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                24000
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal use only. The statestore daemon listens on this port for registration/unregistration
+                requests.
+              </p>
+            </entry>
+          </row>
+          <row rev="1.2">
+            <entry>
+              <p>
+                Impala Catalog Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                StateStore Service Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                26000
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal use only. The catalog service uses this port to communicate with the Impala daemons. New
+                in Impala 1.2 and higher.
+              </p>
+            </entry>
+          </row>
+          <row rev="1.3.0">
+            <entry>
+              <p>
+                Impala Daemon
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Llama Callback Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                28000
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal use only. Impala daemons use to communicate with Llama. New in <ph rev="upstream">CDH 5.0.0</ph> and higher.
+              </p>
+            </entry>
+          </row>
+          <row rev="1.3.0">
+            <entry>
+              <p>
+                Impala Llama ApplicationMaster
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Llama Thrift Admin Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                15002
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal use only. New in <ph rev="upstream">CDH 5.0.0</ph> and higher.
+              </p>
+            </entry>
+          </row>
+          <row rev="1.3.0">
+            <entry>
+              <p>
+                Impala Llama ApplicationMaster
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Llama Thrift Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                15000
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Internal use only. New in <ph rev="upstream">CDH 5.0.0</ph> and higher.
+              </p>
+            </entry>
+          </row>
+          <row rev="1.3.0">
+            <entry>
+              <p>
+                Impala Llama ApplicationMaster
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Llama HTTP Port
+              </p>
+            </entry>
+            <entry>
+              <p>
+                15001
+              </p>
+            </entry>
+            <entry>
+              <p>
+                External
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Llama service web interface for administrators to monitor and troubleshoot. New in CDH 5.0.0 and
+                higher.
+              </p>
+            </entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+  </conbody>
+</concept>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="langref_sql">
+
+  <title>Impala SQL Statements</title>
+  <titlealts audience="PDF"><navtitle>SQL Statements</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The Impala SQL dialect supports a range of standard elements, plus some extensions for Big Data use cases
+      related to data loading and data warehousing.
+    </p>
+
+    <note>
+      <p>
+        In the <cmdname>impala-shell</cmdname> interpreter, a semicolon at the end of each statement is required.
+        Since the semicolon is not actually part of the SQL syntax, we do not include it in the syntax definition
+        of each statement, but we do show it in examples intended to be run in <cmdname>impala-shell</cmdname>.
+      </p>
+    </note>
+
+    <p audience="PDF" outputclass="toc all">
+      The following sections show the major SQL statements that you work with in Impala:
+    </p>
+  </conbody>
+</concept>

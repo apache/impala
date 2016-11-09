@@ -1,0 +1,1877 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="faq">
+
+  <title>Impala Frequently Asked Questions</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="FAQs"/>
+      <data name="Category" value="Planning"/>
+      <data name="Category" value="Getting Started"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Here are the categories of frequently asked questions for Impala, the interactive SQL engine included with CDH.
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="faq_eval">
+
+    <title>Trying Impala</title>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="faq_tryout">
+
+        <title>How do I try Impala out?</title>
+
+        <sectiondiv id="faq_try_impala">
+
+          <p>
+            To look at the core features and functionality on Impala, the easiest way to try out Impala is to
+            download the Cloudera QuickStart VM and start the Impala service through Cloudera Manager, then use
+            <cmdname>impala-shell</cmdname> in a terminal window or the Impala Query UI in the Hue web interface.
+          </p>
+
+          <p>
+            To do performance testing and try out the management features for Impala on a cluster, you need to move
+            beyond the QuickStart VM with its virtualized single-node environment. Ideally, download the Cloudera
+            Manager software to set up the cluster, then install the Impala software through Cloudera Manager.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_demo_vm">
+
+        <title>Does Cloudera offer a VM for demonstrating Impala?</title>
+
+        <sectiondiv id="faq_demo_vm_sect">
+
+          <p>
+            Cloudera offers a demonstration VM called the QuickStart VM, available in VMWare, VirtualBox, and KVM
+            formats. For more information, see
+<!-- Was:          <xref href="cloudera-content/cloudera-docs/DemoVMs/Cloudera-QuickStart-VM/cloudera_impala.html" scope="external" format="html">Cloudera Impala Demo VM</xref> -->
+<!-- Then was:          <xref href="cloudera-content/cloudera-docs/DemoVMs/Cloudera-QuickStart-VM/cloudera_quickstart_vm.html" scope="external" format="html">the Cloudera QuickStart VM</xref>. -->
+<!-- Finally(?) was:            <xref href="https://ccp.cloudera.com/display/SUPPORT/Cloudera+QuickStart+VM" scope="external" format="html">the Cloudera QuickStart VM</xref>. -->
+            <xref href="http://www.cloudera.com/content/support/en/downloads/quickstart_vms.html" scope="external" format="html">the
+            Cloudera QuickStart VM</xref>. After booting the QuickStart VM, many services are turned off by
+            default; in the Cloudera Manager UI that appears automatically, turn on Impala and any other components
+            that you want to try out.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_docs">
+
+        <title>Where can I find Impala documentation?</title>
+
+        <sectiondiv id="faq_doc">
+
+          <p>
+            Starting with Impala 1.3.0, Impala documentation is integrated with the CDH 5 documentation, in
+            addition to the standalone Impala documentation for use with CDH 4. For CDH 5, the core Impala
+            developer and administrator information remains in the associated
+<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/Impala/impala.html -->
+            <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/impala.html" scope="external" format="html">Impala
+            documentation</xref> portion. Information about Impala release notes, installation, configuration,
+            startup, and security is embedded in the corresponding CDH 5 guides.
+          </p>
+
+<!-- Same list is in impala.xml and Impala FAQs. Conref in both places. -->
+
+          <ul>
+            <li>
+              <xref href="impala_new_features.xml#new_features">New features</xref>
+            </li>
+
+            <li>
+              <xref href="impala_known_issues.xml#known_issues">Known and fixed issues</xref>
+            </li>
+
+            <li>
+              <xref href="impala_incompatible_changes.xml#incompatible_changes">Incompatible changes</xref>
+            </li>
+
+            <li>
+              <xref href="impala_install.xml#install">Installing Impala</xref>
+            </li>
+
+            <li>
+              <xref href="impala_upgrading.xml#upgrading">Upgrading Impala</xref>
+            </li>
+
+            <li>
+              <xref href="impala_config.xml#config">Configuring Impala</xref>
+            </li>
+
+            <li>
+              <xref href="impala_processes.xml#processes">Starting Impala</xref>
+            </li>
+
+            <li>
+              <xref href="impala_security.xml#security">Security for Impala</xref>
+            </li>
+
+            <li>
+<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH-Version-and-Packaging-Information/CDH-Version-and-Packaging-Information.html -->
+              <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/rg_vd.html" scope="external" format="html">CDH
+              Version and Packaging Information</xref>
+            </li>
+          </ul>
+
+          <p>
+            Information about the latest CDH 4-compatible Impala release remains at the
+<!-- Original URL: updated this from a /v1/ URL. -->
+            <xref href="http://www.cloudera.com/content/cloudera/en/documentation/impala/latest.html" scope="external" format="html">Impala
+            for CDH 4 Documentation</xref> page.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_more_info">
+
+        <title>Where can I get more information about Impala?</title>
+
+        <sectiondiv id="faq_more_info_sect">
+
+          <!-- JDR: Not changing these instances of 'Cloudera Impala' because those are the real titles of those books or blog posts. -->
+          <p>
+            More product information is available here:
+          </p>
+
+          <ul>
+            <li>
+              O'Reilly introductory e-book:
+              <xref href="http://radar.oreilly.com/2013/10/cloudera-impala-bringing-the-sql-and-hadoop-worlds-together.html" scope="external" format="html">Cloudera
+              Impala: Bringing the SQL and Hadoop Worlds Together</xref>
+            </li>
+
+            <li>
+              O'Reilly getting started guide for developers:
+              <xref href="http://shop.oreilly.com/product/0636920033936.do" scope="external" format="html">Getting
+              Started with Impala: Interactive SQL for Apache Hadoop</xref>
+            </li>
+
+            <li>
+              Blog:
+              <xref href="http://blog.cloudera.com/blog/2012/10/cloudera-impala-real-time-queries-in-apache-hadoop-for-real" scope="external" format="html">Cloudera
+              Impala: Real-Time Queries in Apache Hadoop, For Real</xref>
+            </li>
+
+            <li>
+              Webinar:
+              <xref href="http://www.cloudera.com/content/cloudera/en/resources/library/recordedwebinar/impala-real-time-queries-in-hadoop-webinar-slides.html" scope="external" format="html">Introduction
+              to Impala</xref>
+            </li>
+
+            <li>
+              Product website page:
+              <xref href="http://www.cloudera.com/content/cloudera/en/products-and-services/cdh/impala.html" scope="external" format="html">Cloudera
+              Enterprise RTQ</xref>
+            </li>
+          </ul>
+
+          <p>
+            To see the latest release announcements for Impala, see the
+            <xref href="http://community.cloudera.com/t5/Release-Announcements/bd-p/RelAnnounce" scope="external" format="html">Cloudera
+            Announcements</xref> forum.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_community">
+
+        <title>How can I ask questions and provide feedback about Impala?</title>
+
+        <sectiondiv id="faq_qanda">
+
+          <ul>
+            <li>
+              Join the
+              <xref href="http://community.cloudera.com/t5/Interactive-Short-cycle-SQL/bd-p/Impala" scope="external" format="html">Impala
+              discussion forum</xref> and the
+              <xref href="https://groups.google.com/a/cloudera.org/forum/?fromgroups#!forum/impala-user" scope="external" format="html">Impala
+              mailing list</xref> to ask questions and provide feedback.
+            </li>
+
+            <li>
+              Use the <xref href="https://issues.cloudera.org/browse/IMPALA" scope="external" format="html">Impala
+              Jira project</xref> to log bug reports and requests for features.
+            </li>
+          </ul>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_tpcds">
+
+        <title>Where can I get sample data to try?</title>
+
+        <p>
+          You can get scripts that produce data files and set up an environment for TPC-DS style benchmark tests
+          from <xref href="https://github.com/cloudera/impala-tpcds-kit" scope="external" format="html">this Github
+          repository</xref>. In addition to being useful for experimenting with performance, the tables are suited
+          to experimenting with many aspects of SQL on Impala: they contain a good mixture of data types, data
+          distributions, partitioning, and relational data suitable for join queries.
+        </p>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="faq_prereq">
+
+    <title>Impala System Requirements</title>
+  <prolog>
+    <metadata>
+      <!-- Normally I don't categorize subtopics under FAQs. Making an exception to beef up the EC2 category,
+           and to judge whether it makes sense to relax that rule a bit. -->
+      <data name="Category" value="Amazon"/>
+      <data name="Category" value="EC2"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="faq_prereqs">
+
+        <title>What are the software and hardware requirements for running Impala?</title>
+
+        <sectiondiv id="faq_system_reqs">
+
+          <p>
+            For information on Impala requirements, see <xref href="impala_prereqs.xml#prereqs"/>. Note that there
+            is often a minimum required level of Cloudera Manager for any given Impala version.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_memory_prereq">
+
+        <title>How much memory is required?</title>
+
+        <sectiondiv id="faq_mem_req">
+
+          <!-- To do:
+            Prefer to have more examples / citations for larger memory sizes. What are the most
+            memory-intensive operations that require or benefit from large mem size?
+            Actually that info should go into impala_scalability.xml and be xref'ed from here.
+          -->
+
+          <p>
+            Although Impala is not an in-memory database, when dealing with large tables and large result sets, you
+            should expect to dedicate a substantial portion of physical memory for the <cmdname>impalad</cmdname>
+            daemon. Recommended physical memory for an Impala node is 128 GB or higher. If practical, devote
+            approximately 80% of physical memory to Impala.
+<!-- The machines we typically run on have approximately 32-48 GB. -->
+          </p>
+
+          <p>
+            The amount of memory required for an Impala operation depends on several factors:
+          </p>
+
+          <ul>
+            <li>
+              <p>
+                The file format of the table. Different file formats represent the same data in more or fewer data
+                files. The compression and encoding for each file format might require a different amount of
+                temporary memory to decompress the data for analysis.
+              </p>
+            </li>
+
+            <li>
+              <p>
+                Whether the operation is a <codeph>SELECT</codeph> or an <codeph>INSERT</codeph>. For example,
+                Parquet tables require relatively little memory to query, because Impala reads and decompresses
+                data in 8 MB chunks. Inserting into a Parquet table is a more memory-intensive operation because
+                the data for each data file (potentially <ph rev="parquet_block_size">hundreds of megabytes,
+                depending on the value of the <codeph>PARQUET_FILE_SIZE</codeph> query option</ph>) is stored in
+                memory until encoded, compressed, and written to disk.
+<!-- In 2.0, default might be smaller than maximum. -->
+              </p>
+            </li>
+
+            <li>
+              <p>
+                Whether the table is partitioned or not, and whether a query against a partitioned table can take
+                advantage of partition pruning.
+              </p>
+            </li>
+
+            <li>
+              <p>
+                Whether the final result set is sorted by the <codeph>ORDER BY</codeph> clause.
+<!--
+<ph rev="obwl">Remember, Impala requires that all <codeph>ORDER BY</codeph> queries include a
+<codeph>LIMIT</codeph> clause too, either in the query syntax or implicitly
+through the <codeph>DEFAULT_ORDER_BY_LIMIT</codeph> query option.</ph>
+-->
+                Each Impala node scans and filters a portion of the total data, and applies the
+                <codeph>LIMIT</codeph> to its own portion of the result set. <ph rev="1.4.0">In Impala 1.4.0 and
+                higher, if the sort operation requires more memory than is available on any particular host, Impala
+                uses a temporary disk work area to perform the sort.</ph> The intermediate result sets
+<!-- (each with a maximum size of <codeph>LIMIT</codeph> rows) -->
+                are all sent back to the coordinator node, which does the final sorting and then applies the
+                <codeph>LIMIT</codeph> clause to the final result set.
+              </p>
+              <p>
+                For example, if you execute the query:
+<codeblock>select * from giant_table order by some_column limit 1000;</codeblock>
+                and your cluster has 50 nodes, then each of those 50 nodes will transmit a maximum of 1000 rows
+                back to the coordinator node. The coordinator node needs enough memory to sort
+                (<codeph>LIMIT</codeph> * <varname>cluster_size</varname>) rows, although in the end the final
+                result set is at most <codeph>LIMIT</codeph> rows, 1000 in this case.
+              </p>
+              <p>
+                Likewise, if you execute the query:
+<codeblock>select * from giant_table where test_val &gt; 100 order by some_column;</codeblock>
+                then each node filters out a set of rows matching the <codeph>WHERE</codeph> conditions, sorts the
+                results (with no size limit), and sends the sorted intermediate rows back to the coordinator node.
+                The coordinator node might need substantial memory to sort the final result set, and so might use a
+                temporary disk work area for that final phase of the query.
+              </p>
+            </li>
+
+            <li>
+              <p>
+                Whether the query contains any join clauses, <codeph>GROUP BY</codeph> clauses, analytic functions,
+                or <codeph>DISTINCT</codeph> operators. These operations all require some in-memory work areas that
+                vary depending on the volume and distribution of data. In Impala 2.0 and later, these kinds of
+                operations utilize temporary disk work areas if memory usage grows too large to handle. See
+                <xref href="impala_scalability.xml#spill_to_disk"/> for details.
+              </p>
+            </li>
+
+            <li>
+              <p>
+                The size of the result set. When intermediate results are being passed around between nodes, the
+                amount of data depends on the number of columns returned by the query. For example, it is more
+                memory-efficient to query only the columns that are actually needed in the result set rather than
+                always issuing <codeph>SELECT *</codeph>.
+              </p>
+            </li>
+
+            <li>
+              <p>
+                The mechanism by which work is divided for a join query. You use the <codeph>COMPUTE STATS</codeph>
+                statement, and query hints in the most difficult cases, to help Impala pick the most efficient
+                execution plan. See <xref href="impala_perf_joins.xml#perf_joins"/> for details.
+              </p>
+            </li>
+          </ul>
+
+          <p>
+            See <xref href="impala_prereqs.xml#prereqs_hardware"/> for more details and recommendations about
+            Impala hardware prerequisites.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_cpu_prereq">
+
+        <title>What processor type and speed does Cloudera recommend?</title>
+
+        <sectiondiv id="faq_cpu_req">
+
+          <p rev="CDH-24874">
+            Impala makes use of SSE 4.1 instructions.
+<!-- Commenting out of caution after IMPALA-160 and CDH-20937.
+            For best performance, use Nehalem or later for
+            Intel chips and Bulldozer or later for AMD chips.
+          Impala runs on older machines with the SSE3 instruction set,
+          but will not achieve the best performance.
+          -->
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_prereq_ec2">
+
+        <title>What EC2 instances are recommended for Impala?</title>
+
+        <p>
+          For large storage capacity and large I/O bandwidth, consider the <codeph>hs1.8xlarge</codeph> and
+          <codeph>cc2.8xlarge</codeph> instance types. Impala I/O patterns typically do not benefit enough from SSD
+          storage to make up for the lower overall size. For performance and security considerations for deploying
+          CDH and its components on AWS, see
+          <xref href="http://www.cloudera.com/content/dam/cloudera/Resources/PDF/whitepaper/AWS_Reference_Architecture_Whitepaper.pdf" scope="external" format="html">Cloudera
+          Enterprise Reference Architecture for AWS Deployments</xref>.
+        </p>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="faq_features">
+
+    <title>Supported and Unsupported Functionality In Impala</title>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="features">
+
+        <title>What are the main features of Impala?</title>
+
+        <sectiondiv id="faq_features_sql">
+
+          <ul>
+            <li>
+              A large set of SQL statements, including <xref href="impala_select.xml#select">SELECT</xref> and
+              <xref href="impala_insert.xml#insert">INSERT</xref>, with
+              <xref href="impala_joins.xml#joins">joins</xref>, <xref href="impala_subqueries.xml#subqueries"/>,
+              and <xref href="impala_analytic_functions.xml#analytic_functions"/>. Highly compatible with HiveQL,
+              and also including some vendor extensions. For more information, see
+              <xref href="impala_langref.xml#langref"/>.
+            </li>
+
+            <li>
+              Distributed, high-performance queries. See <xref href="impala_performance.xml#performance"/> for
+              information about Impala performance optimizations and tuning techniques for queries.
+            </li>
+
+            <li>
+              Using Cloudera Manager, you can deploy and manage your Impala services. Cloudera Manager is the best
+              way to get started with Impala on your cluster.
+            </li>
+
+            <li>
+              Using Hue for queries.
+            </li>
+
+            <li>
+              Appending and inserting data into tables through the
+              <xref href="impala_insert.xml#insert">INSERT</xref> statement. See
+              <xref href="impala_file_formats.xml#file_formats"/> for the details about which operations are
+              supported for which file formats.
+            </li>
+
+            <li>
+              ODBC: Impala is certified to run against MicroStrategy and Tableau, with restrictions. For more
+              information, see <xref href="impala_odbc.xml#impala_odbc"/>.
+            </li>
+
+            <li>
+              Querying data stored in HDFS and HBase in a single query. See
+              <xref href="impala_hbase.xml#impala_hbase"/> for details.
+            </li>
+
+            <li rev="2.2.0">
+              In Impala 2.2.0 and higher, querying data stored in the Amazon Simple Storage Service (S3). See
+              <xref href="impala_s3.xml#s3"/> for details.
+            </li>
+
+            <li>
+              Concurrent client requests. Each Impala daemon can handle multiple concurrent client requests. The
+              effects on performance depend on your particular hardware and workload.
+            </li>
+
+            <li>
+              Kerberos authentication. For more information, see
+              <xref href="impala_security.xml#security"/>.
+            </li>
+
+            <li>
+              Partitions. With Impala SQL, you can create partitioned tables with the <codeph>CREATE TABLE</codeph>
+              statement, and add and drop partitions with the <codeph>ALTER TABLE</codeph> statement. Impala also
+              takes advantage of the partitioning present in Hive tables. See
+              <xref href="impala_partitioning.xml#partitioning"/> for details.
+            </li>
+          </ul>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_unsupported">
+
+        <title>What features from relational databases or Hive are not available in Impala?</title>
+
+        <sectiondiv id="faq_unsupported_sql">
+
+          <!-- To do:
+            Good opportunity for a conref since there is a similar "unsupported" topic in the Language Reference section.
+          -->
+
+          <ul>
+            <li>
+              Querying streaming data.
+            </li>
+
+            <li>
+              Deleting individual rows. You delete data in bulk by overwriting an entire table or partition, or by
+              dropping a table.
+            </li>
+
+            <li>
+              Indexing (not currently). LZO-compressed text files can be indexed outside of Impala, as described in
+              <xref href="impala_txtfile.xml#lzo"/>.
+            </li>
+
+<!--
+          <li>
+            YARN integration (available when Impala is used with CDH 5).
+          </li>
+-->
+
+            <li>
+<!-- Former URL disappeared: cloudera.comcloudera/en/products/cdh/search.html -->
+<!-- Subscription URL doesn't seem appropriate: http://www.cloudera.com/content/cloudera/en/products-and-services/cloudera-enterprise/RTS-subscription.html -->
+              Full text search on text fields. The Cloudera Search product is appropriate for this use case.
+            </li>
+
+            <li>
+              Custom Hive Serializer/Deserializer classes (SerDes). Impala supports a set of common native file
+              formats that have built-in SerDes in CDH. See <xref href="impala_file_formats.xml#file_formats"/> for
+              details.
+            </li>
+
+            <li>
+              Checkpointing within a query. That is, Impala does not save intermediate results to disk during
+              long-running queries. Currently, Impala cancels a running query if any host on which that query is
+              executing fails. When one or more hosts are down, Impala reroutes future queries to only use the
+              available hosts, and Impala detects when the hosts come back up and begins using them again. Because
+              a query can be submitted through any Impala node, there is no single point of failure. In the future,
+              we will consider adding additional work allocation features to Impala, so that a running query would
+              complete even in the presence of host failures.
+            </li>
+
+<!--
+          <li>
+            Transforms.
+          </li>
+-->
+
+            <li>
+              Encryption of data transmitted between Impala daemons.
+            </li>
+
+<!--
+            <li>
+              Window functions.
+            </li>
+-->
+
+<!--
+          <li>
+            Hive UDFs.
+          </li>
+-->
+
+            <li>
+              Hive indexes.
+            </li>
+
+            <li>
+              Non-Hadoop data stores, such as relational databases.
+            </li>
+          </ul>
+
+          <p>
+            For the detailed list of features that are different between Impala and HiveQL, see
+            <xref href="impala_langref_unsupported.xml#langref_hiveql_delta"/>.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_jdbc">
+
+        <title>Does Impala support generic JDBC?</title>
+
+        <sectiondiv id="faq_jdbc_sect">
+
+          <p>
+            Impala supports the HiveServer2 JDBC driver.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_avro">
+
+        <title>Is Avro supported?</title>
+
+        <sectiondiv id="faq_avro_sect">
+
+          <p>
+            Yes, Avro is supported. Impala has always been able to query Avro tables. You can use the Impala
+            <codeph>LOAD DATA</codeph> statement to load existing Avro data files into a table. Starting with
+            Impala 1.4, you can create Avro tables with Impala. Currently, you still use the
+            <codeph>INSERT</codeph> statement in Hive to copy data from another table into an Avro table. See
+            <xref href="impala_avro.xml#avro"/> for details.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section audience="Cloudera" id="faq_roadmap">
+
+<!-- Hidden to avoid RevRec implications. -->
+
+        <title>What's next for Impala?</title>
+
+        <sectiondiv id="faq_next">
+
+          <p>
+            See our blog post:
+            <xref href="http://blog.cloudera.com/blog/2013/09/whats-next-for-impala-after-release-1-1/" scope="external" format="html">http://blog.cloudera.com/blog/2012/12/whats-next-for-cloudera-impala/</xref>
+          </p>
+
+        </sectiondiv>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="faq_tasks">
+
+    <title>How do I?</title>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="faq_secure_sql_text">
+
+        <title>How do I prevent users from seeing the text of SQL queries?</title>
+
+        <p>
+          For instructions on making the Impala log files unreadable by unprivileged users, see
+          <xref href="impala_security_files.xml#secure_files"/>.
+        </p>
+
+        <p>
+          For instructions on password-protecting the web interface to the Impala log files and other internal
+          server information, see <xref href="impala_security_webui.xml#security_webui"/>.
+        </p>
+
+        <p rev="2.2.0">
+          In <keyword keyref="impala22_full"/> and higher, you can use the log redaction feature
+          to obfuscate sensitive information in Impala log files.
+          See
+          <xref audience="integrated" href="sg_redaction.xml#log_redact"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_redaction.html" scope="external" format="html"/>
+          for details.
+        </p>
+
+      </section>
+
+      <section id="faq_num_nodes">
+
+        <title>How do I know how many Impala nodes are in my cluster?</title>
+
+        <p>
+          The Impala statestore keeps track of how many <cmdname>impalad</cmdname> nodes are currently available.
+          You can see this information through the statestore web interface. For example, at the URL
+          <codeph>http://<varname>statestore_host</varname>:25010/metrics</codeph> you might see lines like the
+          following:
+        </p>
+
+<codeblock>statestore.live-backends:3
+statestore.live-backends.list:[<varname>host1</varname>:22000, <varname>host1</varname>:26000, <varname>host2</varname>:22000]</codeblock>
+
+        <p>
+          The number of <cmdname>impalad</cmdname> nodes is the number of list items referring to port 22000, in
+          this case two. (Typically, this number is one less than the number reported by the
+          <codeph>statestore.live-backends</codeph> line.) If an <cmdname>impalad</cmdname> node became unavailable
+          or came back after an outage, the information reported on this page would change appropriately.
+        </p>
+
+        <!-- To do:
+          If there is a good CM technique, mention that here also.
+        -->
+      </section>
+
+    </conbody>
+  </concept>
+
+  <concept id="faq_performance">
+
+    <title>Impala Performance</title>
+
+    <conbody>
+
+<!-- Template for new FAQ entries.
+      <section>
+        <title></title>
+        <sectiondiv id="">
+        <p>
+        </p>
+        </sectiondiv>
+      </section>
+
+-->
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="faq_streaming">
+
+        <title>Are results returned as they become available, or all at once when a query completes?</title>
+
+        <sectiondiv id="faq_stream_results">
+
+          <p>
+            Impala streams results whenever they are available, when possible. Certain SQL operations (aggregation
+            or <codeph>ORDER BY</codeph>) require all of the input to be ready before Impala can return results.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_slow_query">
+
+        <title>Why does my query run slowly?</title>
+
+        <sectiondiv id="faq_slow_query_sect">
+
+          <p>
+            There are many possible reasons why a given query could be slow. Use the following checklist to
+            diagnose performance issues with existing queries, and to avoid such issues when writing new queries,
+            setting up new nodes, creating new tables, or loading data.
+          </p>
+
+          <ul>
+            <li rev="1.4.0">
+              Immediately after the query finishes, issue a <codeph>SUMMARY</codeph> command in
+              <cmdname>impala-shell</cmdname>. You can check which phases of execution took the longest, and
+              compare estimated values for memory usage and number of rows with the actual values.
+            </li>
+
+            <li>
+              Immediately after the query finishes, issue a <codeph>PROFILE</codeph> command in
+              <cmdname>impala-shell</cmdname>. The numbers in the <codeph>BytesRead</codeph>,
+              <codeph>BytesReadLocal</codeph>, and <codeph>BytesReadShortCircuit</codeph> should be identical for a
+              specific node. For example:
+<codeblock>- BytesRead: 180.33 MB
+- BytesReadLocal: 180.33 MB
+- BytesReadShortCircuit: 180.33 MB</codeblock>
+              If <codeph>BytesReadLocal</codeph> is lower than <codeph>BytesRead</codeph>, something in your
+              cluster is misconfigured, such as the <cmdname>impalad</cmdname> daemon not running on all the data
+              nodes. If <codeph>BytesReadShortCircuit</codeph> is lower than <codeph>BytesRead</codeph>,
+              short-circuit reads are not enabled properly on that node; see
+              <xref href="impala_config_performance.xml#config_performance"/> for instructions.
+            </li>
+
+            <li>
+              If the table was just created, or this is the first query that accessed the table after an
+              <codeph>INVALIDATE METADATA</codeph> statement or after the <cmdname>impalad</cmdname> daemon was
+              restarted, there might be a one-time delay while the metadata for the table is loaded and cached.
+              Check whether the slowdown disappears when the query is run again. When doing performance
+              comparisons, consider issuing a <codeph>DESCRIBE <varname>table_name</varname></codeph> statement for
+              each table first, to make sure any timings only measure the actual query time and not the one-time
+              wait to load the table metadata.
+            </li>
+
+            <li>
+              Is the table data in uncompressed text format? Check by issuing a <codeph>DESCRIBE FORMATTED
+              <varname>table_name</varname></codeph> statement. A text table is indicated by the line:
+<codeblock>InputFormat: org.apache.hadoop.mapred.TextInputFormat</codeblock>
+              Although uncompressed text is the default format for a <codeph>CREATE TABLE</codeph> statement with
+              no <codeph>STORED AS</codeph> clauses, it is also the bulkiest format for disk storage and
+              consequently usually the slowest format for queries. For data where query performance is crucial,
+              particularly for tables that are frequently queried, consider starting with or converting to a
+              compact binary file format such as Parquet, Avro, RCFile, or SequenceFile. For details, see
+              <xref href="impala_file_formats.xml#file_formats"/>.
+            </li>
+
+            <li>
+              If your table has many columns, but the query refers to only a few columns, consider using the
+              Parquet file format. Its data files are organized with a column-oriented layout that lets queries
+              minimize the amount of I/O needed to retrieve, filter, and aggregate the values for specific columns.
+              See <xref href="impala_parquet.xml#parquet"/> for details.
+            </li>
+
+            <li>
+              If your query involves any joins, are the tables in the query ordered so that the tables or
+              subqueries are ordered with the one returning the largest number of rows on the left, followed by the
+              smallest (most selective), the second smallest, and so on? That ordering allows Impala to optimize
+              the way work is distributed among the nodes and how intermediate results are routed from one node to
+              another. For example, all other things being equal, the following join order results in an efficient
+              query:
+<codeblock>select some_col from
+    huge_table join big_table join small_table join medium_table
+  where
+    huge_table.id = big_table.id
+    and big_table.id = medium_table.id
+    and medium_table.id = small_table.id;</codeblock>
+              See <xref href="impala_perf_joins.xml#perf_joins"/> for performance tips for join queries.
+            </li>
+
+            <li>
+              Also for join queries, do you have table statistics for the table, and column statistics for the
+              columns used in the join clauses? Column statistics let Impala better choose how to distribute the
+              work for the various pieces of a join query. See <xref href="impala_perf_stats.xml#perf_stats"/> for
+              details about gathering statistics.
+            </li>
+
+            <li>
+              Does your table consist of many small data files? Impala works most efficiently with data files in
+              the multi-megabyte range; Parquet, a format optimized for data warehouse-style queries, uses
+              <ph rev="parquet_block_size">large files (originally 1 GB, now 256 MB in Impala 2.0 and higher) with
+              a block size matching the file size</ph>. Use the <codeph>DESCRIBE FORMATTED
+              <varname>table_name</varname></codeph> statement in <cmdname>impala-shell</cmdname> to see where the
+              data for a table is located, and use the <cmdname>hadoop fs -ls</cmdname> or <cmdname>hdfs dfs
+              -ls</cmdname> Unix commands to see the files and their sizes. If you have thousands of small data
+              files, that is a signal that you should consolidate into a smaller number of large files. Use an
+              <codeph>INSERT ... SELECT</codeph> statement to copy the data to a new table, reorganizing into new
+              data files as part of the process. Prefer to construct large data files and import them in bulk
+              through the <codeph>LOAD DATA</codeph> or <codeph>CREATE EXTERNAL TABLE</codeph> statements, rather
+              than issuing many <codeph>INSERT ... VALUES</codeph> statements; each <codeph>INSERT ...
+              VALUES</codeph> statement creates a separate tiny data file. If you have thousands of files all in
+              the same directory, but each one is megabytes in size, consider using a partitioned table so that
+              each partition contains a smaller number of files. See the following point for more on partitioning.
+            </li>
+
+            <li>
+              If your data is easy to group according to time or geographic region, have you partitioned your table
+              based on the corresponding columns such as <codeph>YEAR</codeph>, <codeph>MONTH</codeph>, and/or
+              <codeph>DAY</codeph>? Partitioning a table based on certain columns allows queries that filter based
+              on those same columns to avoid reading the data files for irrelevant years, postal codes, and so on.
+              (Do not partition down to too fine a level; try to structure the partitions so that there is still
+              sufficient data in each one to take advantage of the multi-megabyte HDFS block size.) See
+              <xref href="impala_partitioning.xml#partitioning"/> for details.
+            </li>
+          </ul>
+
+        </sectiondiv>
+      </section>
+
+      <section id="failed_query">
+
+        <title>Why does my SELECT statement fail?</title>
+
+        <sectiondiv id="faq_select_fail">
+
+          <p>
+            When a <codeph>SELECT</codeph> statement fails, the cause usually falls into one of the following
+            categories:
+          </p>
+
+          <ul>
+            <li>
+              A timeout because of a performance, capacity, or network issue affecting one particular node.
+            </li>
+
+            <li>
+              Excessive memory use for a join query, resulting in automatic cancellation of the query.
+            </li>
+
+            <li>
+              A low-level issue affecting how native code is generated on each node to handle particular
+              <codeph>WHERE</codeph> clauses in the query. For example, a machine instruction could be generated
+              that is not supported by the processor of a certain node. If the error message in the log suggests
+              the cause was an illegal instruction, consider turning off native code generation temporarily, and
+              trying the query again.
+            </li>
+
+            <li>
+              Malformed input data, such as a text data file with an enormously long line, or with a delimiter that
+              does not match the character specified in the <codeph>FIELDS TERMINATED BY</codeph> clause of the
+              <codeph>CREATE TABLE</codeph> statement.
+            </li>
+          </ul>
+
+        </sectiondiv>
+      </section>
+
+      <section id="failed_insert">
+
+        <title>Why does my INSERT statement fail?</title>
+
+        <sectiondiv id="faq_insert_fail">
+
+          <p>
+            When an <codeph>INSERT</codeph> statement fails, it is usually the result of exceeding some limit
+            within a Hadoop component, typically HDFS.
+          </p>
+
+          <ul>
+            <li>
+              An <codeph>INSERT</codeph> into a partitioned table can be a strenuous operation due to the
+              possibility of opening many files and associated threads simultaneously in HDFS. Impala 1.1.1
+              includes some improvements to distribute the work more efficiently, so that the values for each
+              partition are written by a single node, rather than as a separate data file from each node.
+            </li>
+
+            <li>
+              Certain expressions in the <codeph>SELECT</codeph> part of the <codeph>INSERT</codeph> statement can
+              complicate the execution planning and result in an inefficient <codeph>INSERT</codeph> operation. Try
+              to make the column data types of the source and destination tables match up, for example by doing
+              <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> on the source table if necessary. Try to avoid
+              <codeph>CASE</codeph> expressions in the <codeph>SELECT</codeph> portion, because they make the
+              result values harder to predict than transferring a column unchanged or passing the column through a
+              built-in function.
+            </li>
+
+            <li>
+              Be prepared to raise some limits in the HDFS configuration settings, either temporarily during the
+              <codeph>INSERT</codeph> or permanently if you frequently run such <codeph>INSERT</codeph> statements
+              as part of your ETL pipeline.
+            </li>
+
+            <li>
+              The resource usage of an <codeph>INSERT</codeph> statement can vary depending on the file format of
+              the destination table. Inserting into a Parquet table is memory-intensive, because the data for each
+              partition is buffered in memory until it reaches 1 gigabyte, at which point the data file is written
+              to disk. Impala can distribute the work for an <codeph>INSERT</codeph> more efficiently when
+              statistics are available for the source table that is queried during the <codeph>INSERT</codeph>
+              statement. See <xref href="impala_perf_stats.xml#perf_stats"/> for details about gathering
+              statistics.
+            </li>
+          </ul>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_scalability">
+
+        <title>Does Impala performance improve as it is deployed to more hosts in a cluster in much the same way that Hadoop performance does?</title>
+
+        <sectiondiv id="faq_hosts">
+
+          <draft-comment translate="no">
+Like to combine this one with the DataNodes question a little later.
+</draft-comment>
+
+          <p>
+            Yes. Impala scales with the number of hosts. It is important to install Impala on all the DataNodes in
+            the cluster, because otherwise some of the nodes must do remote reads to retrieve data not available
+            for local reads. Data locality is an important architectural aspect for Impala performance. See
+            <xref href="http://blog.cloudera.com/blog/2014/01/impala-performance-dbms-class-speed/" scope="external" format="html">this
+            Impala performance blog post</xref> for background. Note that this blog post refers to benchmarks with
+            Impala 1.1.1; Impala has added even more performance features in the 1.2.x series.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_hdfs_block_size">
+
+        <title>Is the HDFS block size reduced to achieve faster query results?</title>
+
+        <sectiondiv id="faq_block_size">
+
+          <p>
+            No. Impala does not make any changes to the HDFS or HBase data sets.
+          </p>
+
+          <p>
+            The default Parquet block size is relatively large (<ph rev="parquet_block_size">256 MB in Impala 2.0
+            and later; 1 GB in earlier releases</ph>). You can control the block size when creating Parquet files
+            using the <xref href="impala_parquet_file_size.xml#parquet_file_size">PARQUET_FILE_SIZE</xref> query
+            option.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_caching">
+
+        <title>Does Impala use caching?</title>
+
+        <sectiondiv>
+
+          <p id="caching">
+            Impala does not cache table data. It does cache some table and file metadata. Although queries might run
+            faster on subsequent iterations because the data set was cached in the OS buffer cache, Impala does not
+            explicitly control this.
+          </p>
+
+          <p rev="1.4.0">
+            Impala takes advantage of the HDFS caching feature in CDH 5. You can designate
+            which tables or partitions are cached through the <codeph>CACHED</codeph>
+            and <codeph>UNCACHED</codeph> clauses of the <codeph>CREATE TABLE</codeph>
+            and <codeph>ALTER TABLE</codeph> statements.
+            Impala can also take advantage of data that is pinned in the HDFS cache
+            through the <cmdname>hdfscacheadmin</cmdname> command.
+            See <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/> for details.
+          </p>
+
+        </sectiondiv>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="faq_use_cases">
+
+    <title>Impala Use Cases</title>
+    <prolog>
+      <metadata>
+        <data name="Category" value="Use Cases"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="faq_impala_hive_mr">
+
+        <title>What are good use cases for Impala as opposed to Hive or MapReduce?</title>
+
+        <sectiondiv id="faq_impala_vs_hive">
+
+          <p>
+            Impala is well-suited to executing SQL queries for interactive exploratory analytics on large data
+            sets. Hive and MapReduce are appropriate for very long running, batch-oriented tasks such as ETL.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_mapreduce">
+
+        <title>Is MapReduce required for Impala? Will Impala continue to work as expected if MapReduce is stopped?</title>
+
+        <sectiondiv id="faq_mapreduce_sect">
+
+          <p>
+            Impala does not use MapReduce at all.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_cep">
+
+        <title>Can Impala be used for complex event processing?</title>
+
+        <sectiondiv id="faq_cep_sect">
+
+          <p>
+            For example, in an industrial environment, many agents may generate large amounts of data. Can Impala
+            be used to analyze this data, checking for notable changes in the environment?
+          </p>
+
+          <p>
+            Complex Event Processing (CEP) is usually performed by dedicated stream-processing systems. Impala is
+            not a stream-processing system, as it most closely resembles a relational database.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_ad_hoc">
+
+        <title>Is Impala intended to handle real time queries in low-latency applications or is it for ad hoc queries for the purpose of data exploration?</title>
+
+        <sectiondiv id="faq_real_time">
+
+          <p>
+            Ad-hoc queries are the primary use case for Impala. We anticipate it being used in many other
+            situations where low-latency is required. Whether Impala is appropriate for any particular use-case
+            depends on the workload, data size and query volume. See <xref href="impala_intro.xml#benefits"/> for
+            the primary benefits you can expect when using Impala.
+          </p>
+
+        </sectiondiv>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="faq_hive">
+
+    <title>Questions about Impala And Hive</title>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <draft-comment translate="no">
+Note: earlier question refers to Impala vs. Hive and MapReduce altogether.
+Should consolidate since makes sense to have one faq_hive ID.
+</draft-comment>
+
+      <section id="faq_hive_pig">
+
+        <title>How does Impala compare to Hive and Pig?</title>
+
+        <sectiondiv id="faq_hive_pig_sect">
+
+          <p>
+            Impala is different from Hive and Pig because it uses its own daemons that are spread across the
+            cluster for queries. Because Impala does not rely on MapReduce, it avoids the startup overhead of
+            MapReduce jobs, allowing Impala to return results in real time.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_serdes">
+
+        <title>Can I do transforms or add new functionality?</title>
+
+        <sectiondiv id="faq_udf">
+
+          <p>
+            Impala adds support for UDFs in Impala 1.2. You can write your own functions in C++, or reuse existing
+            Java-based Hive UDFs. The UDF support includes scalar functions and user-defined aggregate functions
+            (UDAs). User-defined table functions (UDTFs) are not currently supported.
+          </p>
+
+          <p>
+            Impala does not currently support an extensible serialization-deserialization framework (SerDes), and
+            so adding extra functionality to Impala is not as straightforward as for Hive or Pig.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_hive_compat">
+
+        <title>Can any Impala query also be executed in Hive?</title>
+
+        <sectiondiv id="faq_hiveql">
+
+          <p>
+            Yes. There are some minor differences in how some queries are handled, but Impala queries can also be
+            completed in Hive. Impala SQL is a subset of HiveQL, with some functional limitations such as
+            transforms. For details of the Impala SQL dialect, see
+            <xref href="impala_langref_sql.xml#langref_sql"/>. For the Impala built-in functions, see
+            <xref href="impala_functions.xml#builtins"/>. For the detailed list of differences between Impala and
+            HiveQL, see <xref href="impala_langref_unsupported.xml#langref_hiveql_delta"/>.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_hive_hbase_import">
+
+        <title>Can I use Impala to query data already loaded into Hive and HBase?</title>
+
+        <sectiondiv id="faq_hive_hbase">
+
+          <p>
+            There are no additional steps to allow Impala to query tables managed by Hive, whether they are stored
+            in HDFS or HBase. Make sure that Impala is configured to access the Hive metastore correctly and you
+            should be ready to go. Keep in mind that <codeph>impalad</codeph>, by default, runs as the
+            <codeph>impala</codeph> user, so you might need to adjust some file permissions depending on how strict
+            your permissions are currently.
+          </p>
+
+          <p>
+            See <xref href="impala_hbase.xml#impala_hbase"/> for details about querying data in HBase.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_hive_prereq">
+
+        <title>Is Hive an Impala requirement?</title>
+
+        <sectiondiv id="faq_hive_prereq_sect">
+
+          <p>
+            The Hive metastore service is a requirement. Impala shares the same metastore database as Hive,
+            allowing Impala and Hive to access the same tables transparently.
+          </p>
+
+          <p>
+            Hive itself is optional, and does not need to be installed on the same nodes as Impala. Currently,
+            Impala supports a wider variety of read (query) operations than write (insert) operations; you use Hive
+            to insert data into tables that use certain file formats. See
+            <xref href="impala_file_formats.xml#file_formats"/> for details.
+          </p>
+
+        </sectiondiv>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="faq_ha">
+
+    <title>Impala Availability</title>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="faq_production">
+
+        <title>Is Impala production ready?</title>
+
+        <sectiondiv id="faq_production_sect">
+
+          <p>
+            Impala has finished its beta release cycle, and the 1.0, 1.1, and 1.2 GA releases are production ready.
+            The 1.1.x series includes additional security features for authorization, an important requirement for
+            production use in many organizations. The 1.2.x series includes important performance features,
+            particularly for large join queries. Some Cloudera customers are already using Impala for large
+            workloads.
+          </p>
+
+          <p rev="1.3.0">
+            The Impala 1.3.0 and higher releases are bundled with corresponding levels of CDH 5.
+            The number of new features grows with each release.
+            See <xref href="impala_new_features.xml#new_features"/> for a full list.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_ha_config">
+
+        <title>How do I configure Hadoop high availability (HA) for Impala?</title>
+
+        <sectiondiv id="faq_ha_config_sect">
+
+          <p rev="1.2.0">
+            You can set up a proxy server to relay requests back and forth to the Impala servers, for load
+            balancing and high availability. See <xref href="impala_proxy.xml#proxy"/> for details.
+          </p>
+
+          <p>
+            You can enable HDFS HA for the Hive metastore. See the
+            <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_hag_cdh_other_ha.html" scope="external" format="html">CDH5 High Availability Guide</xref>
+            for details.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_spof">
+
+        <title>What happens if there is an error in Impala?</title>
+
+        <sectiondiv id="faq_spof_sect">
+
+          <p>
+            There is not a single point of failure in Impala. All Impala daemons are fully able to handle incoming
+            queries. If a machine fails however, all queries with fragments running on that machine will fail.
+            Because queries are expected to return quickly, you can just rerun the query if there is a failure. See
+            <xref href="impala_concepts.xml#concepts"/> for details about the Impala architecture.
+          </p>
+
+          <draft-comment translate="no">
+Clarify to what extent the catalog service could be seen as a single point of failure.
+</draft-comment>
+
+          <p>
+            The longer answer: Impala must be able to connect to the Hive metastore. Impala aggressively caches
+            metadata so the metastore host should have minimal load. Impala relies on the HDFS NameNode, and, in
+            CDH4, you can configure HA for HDFS. Impala also has centralized services, known as the
+            <xref href="impala_components.xml#intro_statestore">statestore</xref> and
+            <xref href="impala_components.xml#intro_catalogd">catalog</xref> services, that run on one host only.
+            Impala continues to execute queries if the statestore host is down, but it will not get state updates.
+            For example, if a host is added to the cluster while the statestore host is down, the existing
+            instances of <codeph>impalad</codeph> running on the other hosts will not find out about this new host.
+            Once the statestore process is restarted, all the information it serves is automatically reconstructed
+            from all running Impala daemons.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_max_rows">
+
+        <title>What is the maximum number of rows in a table?</title>
+
+        <sectiondiv id="faq_max_rows_sect">
+
+          <p>
+            There is no defined maximum. Some customers have used Impala to query a table with over a trillion
+            rows.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_contention">
+
+        <title>Can Impala and MapReduce jobs run on the same cluster without resource contention?</title>
+
+        <sectiondiv id="faq_mapreduce_contention">
+
+          <p>
+            Yes. See <xref href="impala_perf_resources.xml#mem_limits"/> for how to control Impala resource usage
+            using the Linux cgroup mechanism, and <xref href="impala_resource_management.xml#resource_management"/>
+            for how to use Impala with the YARN resource management framework. Impala is designed to run on the
+            DataNode hosts. Any contention depends mostly on the cluster setup and workload.
+          </p>
+
+          <p conref="../shared/impala_common.xml#common/impala_mr"/>
+
+        </sectiondiv>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="faq_internals">
+
+    <title>Impala Internals</title>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="faq_impalad_hosts">
+
+        <title>On which hosts does Impala run?</title>
+
+        <sectiondiv id="faq_data_nodes">
+
+          <p>
+            Cloudera strongly recommends running the <cmdname>impalad</cmdname> daemon on each DataNode for good
+            performance. Although this topology is not a hard requirement, if there are data blocks with no Impala
+            daemons running on any of the hosts containing replicas of those blocks, queries involving that data
+            could be very inefficient. In that case, the data must be transmitted from one host to another for
+            processing by <q>remote reads</q>, a condition Impala normally tries to avoid. See
+            <xref href="impala_concepts.xml#concepts"/> for details about the Impala architecture. Impala schedules
+            query fragments on all hosts holding data relevant to the query, if possible.
+          </p>
+
+          <p>
+            In cases where some hosts in the cluster have much greater CPU and memory capacity than others, or
+            where some hosts have extra CPU capacity because some CPU-intensive phases are single-threaded,
+            some users have run multiple <cmdname>impalad</cmdname> daemons on a single host to take advantage
+            of the extra CPU capacity. This configuration is only practical for specific workloads that
+            rely heavily on aggregation, and the physical hosts must have sufficient memory to accomodate
+            the requirements for multiple <cmdname>impalad</cmdname> instances.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_join_internals">
+
+        <title>How are joins performed in Impala?</title>
+
+        <sectiondiv id="faq_joins">
+
+          <draft-comment translate="no">
+Will change with join order optimizations, now slated for 1.2.2.
+</draft-comment>
+
+          <p>
+            By default, Impala automatically determines the most efficient order in which to join tables using a
+            cost-based method, based on their overall size and number of rows. (This is a new feature in Impala
+            1.2.2 and higher.) The <codeph>COMPUTE STATS</codeph> statement gathers information about each table
+            that is crucial for efficient join performance.
+<!--
+          The order in which tables are joined is the same order in which tables appear in the
+          <codeph>SELECT</codeph> statement's
+          <codeph>FROM</codeph> clause. That is, there is no join order optimization
+          taking place at the moment. It is usually optimal for the smallest table to appear as the right-most table in
+          a <codeph>JOIN</codeph> clause.
+          -->
+            Impala chooses between two techniques for join queries, known as <q>broadcast joins</q> and
+            <q>partitioned joins</q>. See <xref href="impala_joins.xml#joins"/> for syntax details and
+            <xref href="impala_perf_joins.xml#perf_joins"/> for performance considerations.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_join_sizes">
+
+        <title>How does Impala process join queries for large tables?</title>
+
+        <sectiondiv>
+
+          <p>
+            Impala utilizes multiple strategies to allow joins between tables and result sets of various sizes.
+            When joining a large table with a small one, the data from the small table is transmitted to each node
+            for intermediate processing. When joining two large tables, the data from one of the tables is divided
+            into pieces, and each node processes only selected pieces. See <xref href="impala_joins.xml#joins"/>
+            for details about join processing, <xref href="impala_perf_joins.xml#perf_joins"/> for performance
+            considerations, and <xref href="impala_hints.xml#hints"/> for how to fine-tune the join strategy.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_aggregation_implementation">
+
+        <title>What is Impala's aggregation strategy?</title>
+
+        <sectiondiv id="faq_join_aggregation">
+
+          <p rev="2.0.0">
+            Impala currently only supports in-memory hash aggregation.
+            In Impala 2.0 and higher, if the memory requirements for a
+            join or aggregation operation exceed the memory limit for
+            a particular host, Impala uses a temporary work area on disk
+            to help the query complete successfully.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_metadata_management">
+
+        <title>How is Impala metadata managed?</title>
+
+        <sectiondiv id="faq_metadata">
+
+          <draft-comment translate="no">
+Doesn't seem related to joins...
+</draft-comment>
+
+          <p>
+            Impala uses two pieces of metadata: the catalog information from the Hive metastore and the file
+            metadata from the NameNode. Currently, this metadata is lazily populated and cached when an
+            <codeph>impalad</codeph> needs it to plan a query.
+          </p>
+
+          <p>
+            The <xref href="impala_refresh.xml#refresh">REFRESH</xref> statement updates the metadata for a
+            particular table after loading new data through Hive. The
+            <xref href="impala_invalidate_metadata.xml#invalidate_metadata"/> statement refreshes all metadata, so
+            that Impala recognizes new tables or other DDL and DML changes performed through Hive.
+          </p>
+
+          <p rev="1.2.0">
+            In Impala 1.2 and higher, a dedicated <cmdname>catalogd</cmdname> daemon broadcasts metadata changes
+            due to Impala DDL or DML statements to all nodes, reducing or eliminating the need to use the
+            <codeph>REFRESH</codeph> and <codeph>INVALIDATE METADATA</codeph> statements.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_namenode_overhead">
+
+        <title>What load do concurrent queries produce on the NameNode?</title>
+
+        <sectiondiv id="faq_namenode_load">
+
+          <p>
+            The load Impala generates is very similar to MapReduce. Impala contacts the NameNode during the
+            planning phase to get the file metadata (this is only run on the host the query was sent to). Every
+            <codeph>impalad</codeph> will read files as part of normal processing of the query.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_perf_architecture">
+
+        <title>How does Impala achieve its performance improvements?</title>
+
+        <sectiondiv id="faq_performance_features">
+
+          <p>
+            These are the main factors in the performance of Impala versus that of other Hadoop components and
+            related technologies.
+          </p>
+
+          <p>
+            Impala avoids MapReduce. While MapReduce is a great general parallel processing model with many
+            benefits, it is not designed to execute SQL. Impala avoids the inefficiencies of MapReduce in these
+            ways:
+          </p>
+
+          <ul>
+            <li>
+              Impala does not materialize intermediate results to disk. SQL queries often map to multiple MapReduce
+              jobs with all intermediate data sets written to disk.
+            </li>
+
+            <li>
+              Impala avoids MapReduce start-up time. For interactive queries, the MapReduce start-up time becomes
+              very noticeable. Impala runs as a service and essentially has no start-up time.
+            </li>
+
+            <li>
+              Impala can more naturally disperse query plans instead of having to fit them into a pipeline of map
+              and reduce jobs. This enables Impala to parallelize multiple stages of a query and avoid overheads
+              such as sort and shuffle when unnecessary.
+            </li>
+          </ul>
+
+          <p>
+            Impala uses a more efficient execution engine by taking advantage of modern hardware and technologies:
+          </p>
+
+          <ul>
+            <li>
+              Impala generates runtime code. Impala uses LLVM to generate assembly code for the query that is being
+              run. Individual queries do not have to pay the overhead of running on a system that needs to be able
+              to execute arbitrary queries.
+            </li>
+
+            <li>
+              Impala uses available hardware instructions when possible. Impala uses the supplemental SSE3 (SSSE3)
+              instructions which can offer tremendous speedups in some cases. (Impala 2.0 and 2.1 required
+              the SSE4.1 instruction set; Impala 2.2 and higher relax the restriction again so only
+              SSSE3 is required.)
+            </li>
+
+            <li>
+              Impala uses better I/O scheduling. Impala is aware of the disk location of blocks and is able to
+              schedule the order to process blocks to keep all disks busy.
+            </li>
+
+            <li>
+              Impala is designed for performance. A lot of time has been spent in designing Impala with sound
+              performance-oriented fundamentals, such as tight inner loops, inlined function calls, minimal
+              branching, better use of cache, and minimal memory usage.
+            </li>
+          </ul>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_memory_exceeded">
+
+        <title>What happens when the data set exceeds available memory?</title>
+
+        <sectiondiv id="faq_mem_limit_exceeded">
+
+          <p>
+            Currently, if the memory required to process intermediate results on a node exceeds the amount
+            available to Impala on that node, the query is cancelled. You can adjust the memory available to Impala
+            on each node, and you can fine-tune the join strategy to reduce the memory required for the biggest
+            queries. We do plan on supporting external joins and sorting in the future.
+          </p>
+
+          <p>
+            Keep in mind though that the memory usage is not directly based on the input data set size. For
+            aggregations, the memory usage is the number of rows <i>after</i> grouping. For joins, the memory usage
+            is the combined size of the tables <i>excluding</i> the biggest table, and Impala can use join
+            strategies that divide up large joined tables among the various nodes rather than transmitting the
+            entire table to each node.
+          </p>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_memory_pressure">
+
+        <title>What are the most memory-intensive operations?</title>
+
+        <sectiondiv id="faq_memory_fail">
+
+          <p>
+            If a query fails with an error indicating <q>memory limit exceeded</q>, you might suspect a memory
+            leak. The problem could actually be a query that is structured in a way that causes Impala to allocate
+            more memory than you expect, exceeded the memory allocated for Impala on a particular node. Some
+            examples of query or table structures that are especially memory-intensive are:
+          </p>
+
+          <ul>
+            <li>
+              <codeph>INSERT</codeph> statements using dynamic partitioning, into a table with many different
+              partitions. (Particularly for tables using Parquet format, where the data for each partition is held
+              in memory until it reaches <ph rev="parquet_block_size">the full block size</ph> in size before it is
+              written to disk.) Consider breaking up such operations into several different <codeph>INSERT</codeph>
+              statements, for example to load data one year at a time rather than for all years at once.
+            </li>
+
+            <li>
+              <codeph>GROUP BY</codeph> on a unique or high-cardinality column. Impala allocates some handler
+              structures for each different value in a <codeph>GROUP BY</codeph> query. Having millions of
+              different <codeph>GROUP BY</codeph> values could exceed the memory limit.
+            </li>
+
+            <li>
+              Queries involving very wide tables, with thousands of columns, particularly with many
+              <codeph>STRING</codeph> columns. Because Impala allows a <codeph>STRING</codeph> value to be up to 32
+              KB, the intermediate results during such queries could require substantial memory allocation.
+            </li>
+          </ul>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_memory_dealloc">
+
+        <title>When does Impala hold on to or return memory?</title>
+
+        <p>
+          Impala allocates memory using
+          <codeph><xref href="http://goog-perftools.sourceforge.net/doc/tcmalloc.html" scope="external" format="html">tcmalloc</xref></codeph>,
+          a memory allocator that is optimized for high concurrency. Once Impala allocates memory, it keeps that
+          memory reserved to use for future queries. Thus, it is normal for Impala to show high memory usage when
+          idle. If Impala detects that it is about to exceed its memory limit (defined by the
+          <codeph>-mem_limit</codeph> startup option or the <codeph>MEM_LIMIT</codeph> query option), it
+          deallocates memory not needed by the current queries.
+        </p>
+
+        <p>
+          When issuing queries through the JDBC or ODBC interfaces, make sure to call the appropriate close method
+          afterwards. Otherwise, some memory associated with the query is not freed.
+        </p>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="faq_sql">
+
+    <title>SQL</title>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="faq_update">
+
+        <title>Is there an UPDATE statement?</title>
+
+        <sectiondiv id="faq_update_sect">
+
+          <p>
+            Impala does not currently have an <codeph>UPDATE</codeph> statement, which would typically be used to
+            change a single row, a small group of rows, or a specific column. The HDFS-based files used by typical
+            Impala queries are optimized for bulk operations across many megabytes of data at a time, making
+            traditional <codeph>UPDATE</codeph> operations inefficient or impractical.
+          </p>
+
+          <p>
+            You can use the following techniques to achieve the same goals as the familiar <codeph>UPDATE</codeph>
+            statement, in a way that preserves efficient file layouts for subsequent queries:
+          </p>
+
+          <ul>
+            <li>
+              Replace the entire contents of a table or partition with updated data that you have already staged in
+              a different location, either using <codeph>INSERT OVERWRITE</codeph>, <codeph>LOAD DATA</codeph>, or
+              manual HDFS file operations followed by a <codeph>REFRESH</codeph> statement for the table.
+              Optionally, you can use built-in functions and expressions in the <codeph>INSERT</codeph> statement
+              to transform the copied data in the same way you would normally do in an <codeph>UPDATE</codeph>
+              statement, for example to turn a mixed-case string into all uppercase or all lowercase.
+            </li>
+
+            <li>
+              To update a single row, use an HBase table, and issue an <codeph>INSERT ... VALUES</codeph> statement
+              using the same key as the original row. Because HBase handles duplicate keys by only returning the
+              latest row with a particular key value, the newly inserted row effectively hides the previous one.
+            </li>
+          </ul>
+
+        </sectiondiv>
+      </section>
+
+      <section id="faq_udfs">
+
+        <title>Can Impala do user-defined functions (UDFs)?</title>
+
+        <p>
+          Impala 1.2 and higher does support UDFs and UDAs. You can either write native Impala UDFs and UDAs in
+          C++, or reuse UDFs (but not UDAs) originally written in Java for use with Hive. See
+          <xref href="impala_udf.xml#udfs"/> for details.
+        </p>
+      </section>
+
+      <section id="faq_refresh">
+
+        <title>Why do I have to use REFRESH and INVALIDATE METADATA, what do they do?</title>
+
+        <p>
+          In Impala 1.2 and higher, there is much less need to use the <codeph>REFRESH</codeph> and
+          <codeph>INVALIDATE METADATA</codeph> statements:
+        </p>
+
+        <ul>
+          <li>
+            The new <codeph>impala-catalog</codeph> service, represented by the <cmdname>catalogd</cmdname> daemon,
+            broadcasts the results of Impala DDL statements to all Impala nodes. Thus, if you do a <codeph>CREATE
+            TABLE</codeph> statement in Impala while connected to one node, you do not need to do
+            <codeph>INVALIDATE METADATA</codeph> before issuing queries through a different node.
+          </li>
+
+          <li>
+            The catalog service only recognizes changes made through Impala, so you must still issue a
+            <codeph>REFRESH</codeph> statement if you load data through Hive or by manipulating files in HDFS, and
+            you must issue an <codeph>INVALIDATE METADATA</codeph> statement if you create a table, alter a table,
+            add or drop partitions, or do other DDL statements in Hive.
+          </li>
+
+          <li>
+            Because the catalog service broadcasts the results of <codeph>REFRESH</codeph> and <codeph>INVALIDATE
+            METADATA</codeph> statements to all nodes, in the cases where you do still need to issue those
+            statements, you can do that on a single node rather than on every node, and the changes will be
+            automatically recognized across the cluster, making it more convenient to load balance by issuing
+            queries through arbitrary Impala nodes rather than always using the same coordinator node.
+          </li>
+        </ul>
+      </section>
+
+      <section id="faq_drop_table_space">
+
+        <title>Why is space not freed up when I issue DROP TABLE?</title>
+
+        <p>
+          Impala deletes data files when you issue a <codeph>DROP TABLE</codeph> on an internal table, but not an
+          external one. By default, the <codeph>CREATE TABLE</codeph> statement creates internal tables, where the
+          files are managed by Impala. An external table is created with a <codeph>CREATE EXTERNAL TABLE</codeph>
+          statement, where the files reside in a location outside the control of Impala. Issue a <codeph>DESCRIBE
+          FORMATTED</codeph> statement to check whether a table is internal or external. The keyword
+          <codeph>MANAGED_TABLE</codeph> indicates an internal table, from which Impala can delete the data files.
+          The keyword <codeph>EXTERNAL_TABLE</codeph> indicates an external table, where Impala will leave the data
+          files untouched when you drop the table.
+        </p>
+
+        <p>
+          Even when you drop an internal table and the files are removed from their original location, you might
+          not get the hard drive space back immediately. By default, files that are deleted in HDFS go into a
+          special trashcan directory, from which they are purged after a period of time (by default, 6 hours). For
+          background information on the trashcan mechanism, see
+          <xref href="https://archive.cloudera.com/cdh4/cdh/4/hadoop/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html" scope="external" format="html"/>.
+          For information on purging files from the trashcan, see
+          <xref href="https://archive.cloudera.com/cdh4/cdh/4/hadoop/hadoop-project-dist/hadoop-common/FileSystemShell.html" scope="external" format="html"/>.
+        </p>
+
+        <p>
+          When Impala deletes files and they are moved to the HDFS trashcan, they go into an HDFS directory owned
+          by the <codeph>impala</codeph> user. If the <codeph>impala</codeph> user does not have an HDFS home
+          directory where a trashcan can be created, the files are not deleted or moved, as a safety measure. If
+          you issue a <codeph>DROP TABLE</codeph> statement and find that the table data files are left in their
+          original location, create an HDFS directory <filepath>/user/impala</filepath>, owned and writeable by
+          the <codeph>impala</codeph> user. For example, you might find that <filepath>/user/impala</filepath> is
+          owned by the <codeph>hdfs</codeph> user, in which case you would switch to the <codeph>hdfs</codeph> user
+          and issue a command such as:
+        </p>
+
+<codeblock>hdfs dfs -chown -R impala /user/impala</codeblock>
+      </section>
+
+      <section id="faq_dual">
+
+        <title>Is there a DUAL table?</title>
+
+        <p>
+          You might be used to running queries against a single-row table named <codeph>DUAL</codeph> to try out
+          expressions, built-in functions, and UDFs. Impala does not have a <codeph>DUAL</codeph> table. To achieve
+          the same result, you can issue a <codeph>SELECT</codeph> statement without any table name:
+        </p>
+
+<codeblock>select 2+2;
+select substr('hello',2,1);
+select pow(10,6);
+</codeblock>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="faq_partitioning">
+
+    <title>Partitioned Tables</title>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="faq_partition_csv_etl">
+
+        <title>How do I load a big CSV file into a partitioned table?</title>
+
+        <p>
+          To load a data file into a partitioned table, when the data file includes fields like year, month, and so
+          on that correspond to the partition key columns, use a two-stage process. First, use the <codeph>LOAD
+          DATA</codeph> or <codeph>CREATE EXTERNAL TABLE</codeph> statement to bring the data into an unpartitioned
+          text table. Then use an <codeph>INSERT ... SELECT</codeph> statement to copy the data from the
+          unpartitioned table to a partitioned one. Include a <codeph>PARTITION</codeph> clause in the
+          <codeph>INSERT</codeph> statement to specify the partition key columns. The <codeph>INSERT</codeph>
+          operation splits up the data into separate data files for each partition. For examples, see
+          <xref href="impala_partitioning.xml#partitioning"/>. For details about loading data into partitioned
+          Parquet tables, a popular choice for high-volume data, see <xref href="impala_parquet.xml#parquet_etl"/>.
+        </p>
+      </section>
+
+      <section id="faq_partition_select_star">
+
+        <title>Can I do INSERT ... SELECT * into a partitioned table?</title>
+
+        <p>
+          When you use the <codeph>INSERT ... SELECT *</codeph> syntax to copy data into a partitioned table, the
+          columns corresponding to the partition key columns must appear last in the columns returned by the
+          <codeph>SELECT *</codeph>. You can create the table with the partition key columns defined last. Or, you
+          can use the <codeph>CREATE VIEW</codeph> statement to create a view that reorders the columns: put the
+          partition key columns last, then do the <codeph>INSERT ... SELECT *</codeph> from the view.
+        </p>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="faq_hbase">
+
+    <title>HBase</title>
+
+    <conbody>
+
+      <p outputclass="toc inpage" audience="PDF">
+        FAQs in this category:
+      </p>
+
+      <section id="faq_hbase_use_cases">
+
+        <title>What kinds of Impala queries or data are best suited for HBase?</title>
+
+        <p>
+          HBase tables are ideal for queries where normally you would use a key-value store. That is, where you
+          retrieve a single row or a few rows, by testing a special unique key column using the <codeph>=</codeph>
+          or <codeph>IN</codeph> operators.
+        </p>
+
+        <p>
+          HBase tables are not suitable for queries that produce large result sets with thousands of rows. HBase
+          tables are also not suitable for queries that perform full table scans because the <codeph>WHERE</codeph>
+          clause does not request specific values from the unique key column.
+        </p>
+
+        <p>
+          Use HBase tables for data that is inserted one row or a few rows at a time, such as by the <codeph>INSERT
+          ... VALUES</codeph> syntax. Loading data piecemeal like this into an HDFS-backed table produces many tiny
+          files, which is a very inefficient layout for HDFS data files.
+        </p>
+
+        <p>
+          If the lack of an <codeph>UPDATE</codeph> statement in Impala is a problem for you, you can simulate
+          single-row updates by doing an <codeph>INSERT ... VALUES</codeph> statement using an existing value for
+          the key column. The old row value is hidden; only the new row value is seen by queries.
+        </p>
+
+        <p>
+          HBase tables are often wide (containing many columns) and sparse (with most column values
+          <codeph>NULL</codeph>). For example, you might record hundreds of different data points for each user of
+          an online service, such as whether the user had registered for an online game or enabled particular
+          account features. With Impala and HBase, you could look up all the information for a specific customer
+          efficiently in a single query. For any given customer, most of these columns might be
+          <codeph>NULL</codeph>, because a typical customer might not make use of most features of an online
+          service.
+        </p>
+      </section>
+    </conbody>
+  </concept>
+</concept>

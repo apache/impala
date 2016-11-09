@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="hints">
+
+  <title>Query Hints in Impala SELECT Statements</title>
+  <titlealts audience="PDF"><navtitle>Hints</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">hints</indexterm>
+      The Impala SQL dialect supports query hints, for fine-tuning the inner workings of queries. Specify hints as
+      a temporary workaround for expensive queries, where missing statistics or other factors cause inefficient
+      performance.
+    </p>
+
+    <p>
+      Hints are most often used for the most resource-intensive kinds of Impala queries:
+    </p>
+
+    <ul>
+      <li>
+        Join queries involving large tables, where intermediate result sets are transmitted across the network to
+        evaluate the join conditions.
+      </li>
+
+      <li>
+        Inserting into partitioned Parquet tables, where many memory buffers could be allocated on each host to
+        hold intermediate results for each partition.
+      </li>
+    </ul>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+    <p>
+      You can represent the hints as keywords surrounded by <codeph>[]</codeph> square brackets; include the
+      brackets in the text of the SQL statement.
+    </p>
+
+<codeblock>SELECT STRAIGHT_JOIN <varname>select_list</varname> FROM
+<varname>join_left_hand_table</varname>
+  JOIN [{BROADCAST|SHUFFLE}]
+<varname>join_right_hand_table</varname>
+<varname>remainder_of_query</varname>;
+
+INSERT <varname>insert_clauses</varname>
+  [{SHUFFLE|NOSHUFFLE}]
+  SELECT <varname>remainder_of_query</varname>;
+</codeblock>
+
+    <p rev="2.0.0">
+      In <keyword keyref="impala20_full"/> and higher, you can also specify the hints inside comments that use
+      either the <codeph>/* */</codeph> or <codeph>--</codeph> notation. Specify a <codeph>+</codeph> symbol
+      immediately before the hint name.
+    </p>
+
+<codeblock rev="2.0.0">SELECT STRAIGHT_JOIN <varname>select_list</varname> FROM
+<varname>join_left_hand_table</varname>
+  JOIN /* +BROADCAST|SHUFFLE */
+<varname>join_right_hand_table</varname>
+<varname>remainder_of_query</varname>;
+
+SELECT <varname>select_list</varname> FROM
+<varname>join_left_hand_table</varname>
+  JOIN -- +BROADCAST|SHUFFLE
+<varname>join_right_hand_table</varname>
+<varname>remainder_of_query</varname>;
+
+INSERT <varname>insert_clauses</varname>
+  /* +SHUFFLE|NOSHUFFLE */
+  SELECT <varname>remainder_of_query</varname>;
+
+INSERT <varname>insert_clauses</varname>
+  -- +SHUFFLE|NOSHUFFLE
+  SELECT <varname>remainder_of_query</varname>;
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      With both forms of hint syntax, include the <codeph>STRAIGHT_JOIN</codeph>
+      keyword immediately after the <codeph>SELECT</codeph> keyword to prevent Impala from
+      reordering the tables in a way that makes the hint ineffective.
+    </p>
+
+    <p>
+      To reduce the need to use hints, run the <codeph>COMPUTE STATS</codeph> statement against all tables involved
+      in joins, or used as the source tables for <codeph>INSERT ... SELECT</codeph> operations where the
+      destination is a partitioned Parquet table. Do this operation after loading data or making substantial
+      changes to the data within each table. Having up-to-date statistics helps Impala choose more efficient query
+      plans without the need for hinting. See <xref href="impala_perf_stats.xml#perf_stats"/> for details and
+      examples.
+    </p>
+
+    <p>
+      To see which join strategy is used for a particular query, examine the <codeph>EXPLAIN</codeph> output for
+      that query. See <xref href="impala_explain_plan.xml#perf_explain"/> for details and examples.
+    </p>
+
+    <p>
+      <b>Hints for join queries:</b>
+    </p>
+
+    <p>
+      The <codeph>[BROADCAST]</codeph> and <codeph>[SHUFFLE]</codeph> hints control the execution strategy for join
+      queries. Specify one of the following constructs immediately after the <codeph>JOIN</codeph> keyword in a
+      query:
+    </p>
+
+    <ul>
+      <li>
+        <codeph>[SHUFFLE]</codeph> - Makes that join operation use the <q>partitioned</q> technique, which divides
+        up corresponding rows from both tables using a hashing algorithm, sending subsets of the rows to other
+        nodes for processing. (The keyword <codeph>SHUFFLE</codeph> is used to indicate a <q>partitioned join</q>,
+        because that type of join is not related to <q>partitioned tables</q>.) Since the alternative
+        <q>broadcast</q> join mechanism is the default when table and index statistics are unavailable, you might
+        use this hint for queries where broadcast joins are unsuitable; typically, partitioned joins are more
+        efficient for joins between large tables of similar size.
+      </li>
+
+      <li>
+        <codeph>[BROADCAST]</codeph> - Makes that join operation use the <q>broadcast</q> technique that sends the
+        entire contents of the right-hand table to all nodes involved in processing the join. This is the default
+        mode of operation when table and index statistics are unavailable, so you would typically only need it if
+        stale metadata caused Impala to mistakenly choose a partitioned join operation. Typically, broadcast joins
+        are more efficient in cases where one table is much smaller than the other. (Put the smaller table on the
+        right side of the <codeph>JOIN</codeph> operator.)
+      </li>
+    </ul>
+
+    <p>
+      <b>Hints for INSERT ... SELECT queries:</b>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/insert_hints"/>
+
+    <p>
+      <b>Suggestions versus directives:</b>
+    </p>
+
+    <p>
+      In early Impala releases, hints were always obeyed and so acted more like directives. Once Impala gained join
+      order optimizations, sometimes join queries were automatically reordered in a way that made a hint
+      irrelevant. Therefore, the hints act more like suggestions in Impala 1.2.2 and higher.
+    </p>
+
+    <p>
+      To force Impala to follow the hinted execution mechanism for a join query, include the
+      <codeph>STRAIGHT_JOIN</codeph> keyword in the <codeph>SELECT</codeph> statement. See
+      <xref href="impala_perf_joins.xml#straight_join"/> for details. When you use this technique, Impala does not
+      reorder the joined tables at all, so you must be careful to arrange the join order to put the largest table
+      (or subquery result set) first, then the smallest, second smallest, third smallest, and so on. This ordering lets Impala do the
+      most I/O-intensive parts of the query using local reads on the DataNodes, and then reduce the size of the
+      intermediate result set as much as possible as each subsequent table or subquery result set is joined.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+    <p>
+      Queries that include subqueries in the <codeph>WHERE</codeph> clause can be rewritten internally as join
+      queries. Currently, you cannot apply hints to the joins produced by these types of queries.
+    </p>
+
+    <p>
+      Because hints can prevent queries from taking advantage of new metadata or improvements in query planning,
+      use them only when required to work around performance issues, and be prepared to remove them when they are
+      no longer required, such as after a new Impala release or bug fix.
+    </p>
+
+    <p>
+      In particular, the <codeph>[BROADCAST]</codeph> and <codeph>[SHUFFLE]</codeph> hints are expected to be
+      needed much less frequently in Impala 1.2.2 and higher, because the join order optimization feature in
+      combination with the <codeph>COMPUTE STATS</codeph> statement now automatically choose join order and join
+      mechanism without the need to rewrite the query and add hints. See
+      <xref href="impala_perf_joins.xml#perf_joins"/> for details.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
+
+    <p rev="2.0.0">
+      The hints embedded within <codeph>--</codeph> comments are compatible with Hive queries. The hints embedded
+      within <codeph>/* */</codeph> comments or <codeph>[ ]</codeph> square brackets are not recognized by or not
+      compatible with Hive. For example, Hive raises an error for Impala hints within <codeph>/* */</codeph>
+      comments because it does not recognize the Impala hint names.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/view_blurb"/>
+
+    <p rev="2.0.0">
+      If you use a hint in the query that defines a view, the hint is preserved when you query the view. Impala
+      internally rewrites all hints in views to use the <codeph>--</codeph> comment notation, so that Hive can
+      query such views without errors due to unrecognized hint names.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      For example, this query joins a large customer table with a small lookup table of less than 100 rows. The
+      right-hand table can be broadcast efficiently to all nodes involved in the join. Thus, you would use the
+      <codeph>[broadcast]</codeph> hint to force a broadcast join strategy:
+    </p>
+
+<codeblock>select straight_join customer.address, state_lookup.state_name
+  from customer join <b>[broadcast]</b> state_lookup
+  on customer.state_id = state_lookup.state_id;</codeblock>
+
+    <p>
+      This query joins two large tables of unpredictable size. You might benchmark the query with both kinds of
+      hints and find that it is more efficient to transmit portions of each table to other nodes for processing.
+      Thus, you would use the <codeph>[shuffle]</codeph> hint to force a partitioned join strategy:
+    </p>
+
+<codeblock>select straight_join weather.wind_velocity, geospatial.altitude
+  from weather join <b>[shuffle]</b> geospatial
+  on weather.lat = geospatial.lat and weather.long = geospatial.long;</codeblock>
+
+    <p>
+      For joins involving three or more tables, the hint applies to the tables on either side of that specific
+      <codeph>JOIN</codeph> keyword. The <codeph>STRAIGHT_JOIN</codeph> keyword ensures that joins are processed
+      in a predictable order from left to right. For example, this query joins
+      <codeph>t1</codeph> and <codeph>t2</codeph> using a partitioned join, then joins that result set to
+      <codeph>t3</codeph> using a broadcast join:
+    </p>
+
+<codeblock>select straight_join t1.name, t2.id, t3.price
+  from t1 join <b>[shuffle]</b> t2 join <b>[broadcast]</b> t3
+  on t1.id = t2.id and t2.id = t3.id;</codeblock>
+
+    <!-- To do: This is a good place to add more sample output showing before and after EXPLAIN plans. -->
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      For more background information about join queries, see <xref href="impala_joins.xml#joins"/>. For
+      performance considerations, see <xref href="impala_perf_joins.xml#perf_joins"/>.
+    </p>
+  </conbody>
+</concept>

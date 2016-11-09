@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.2" id="delegation">
+
+  <title>Configuring Impala Delegation for Hue and BI Tools</title>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Authentication"/>
+      <data name="Category" value="Delegation"/>
+      <data name="Category" value="Hue"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+<!--
+      When users connect to Impala directly through the <cmdname>impala-shell</cmdname> interpreter, the Sentry
+      authorization framework determines what actions they can take and what data they can see.
+-->
+      When users submit Impala queries through a separate application, such as Hue or a business intelligence tool,
+      typically all requests are treated as coming from the same user. In Impala 1.2 and higher, authentication is
+      extended by a new feature that allows applications to pass along credentials for the users that connect to
+      them (known as <q>delegation</q>), and issue Impala queries with the privileges for those users. Currently,
+      the delegation feature is available only for Impala queries submitted through application interfaces such as
+      Hue and BI tools; for example, Impala cannot issue queries using the privileges of the HDFS user.
+    </p>
+
+    <p>
+      The delegation feature is enabled by a startup option for <cmdname>impalad</cmdname>:
+      <codeph>--authorized_proxy_user_config</codeph>. When you specify this option, users whose names you specify
+      (such as <codeph>hue</codeph>) can delegate the execution of a query to another user. The query runs with the
+      privileges of the delegated user, not the original user such as <codeph>hue</codeph>. The name of the
+      delegated user is passed using the HiveServer2 configuration property <codeph>impala.doas.user</codeph>.
+    </p>
+
+    <p>
+      You can specify a list of users that the application user can delegate to, or <codeph>*</codeph> to allow a
+      superuser to delegate to any other user. For example:
+    </p>
+
+<codeblock>impalad --authorized_proxy_user_config 'hue=user1,user2;admin=*' ...</codeblock>
+
+    <note>
+      Make sure to use single quotes or escape characters to ensure that any <codeph>*</codeph> characters do not
+      undergo wildcard expansion when specified in command-line arguments.
+    </note>
+
+    <p>
+      See <xref href="impala_config_options.xml#config_options"/> for details about adding or changing
+      <cmdname>impalad</cmdname> startup options. See
+      <xref href="http://blog.cloudera.com/blog/2013/07/how-hiveserver2-brings-security-and-concurrency-to-apache-hive/" scope="external" format="html">this
+      Cloudera blog post</xref> for background information about the delegation capability in HiveServer2.
+    </p>
+
+    <p>
+      To set up authentication for the delegated users:
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          On the server side, configure either user/password authentication through LDAP, or Kerberos
+          authentication, for all the delegated users. See <xref href="impala_ldap.xml#ldap"/> or
+          <xref href="impala_kerberos.xml#kerberos"/> for details.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          On the client side, follow the instructions in the <q>Using User Name and Password</q> section in the
+          <xref href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Connectors/PDF/Cloudera-ODBC-Driver-for-Impala-Install-Guide.pdf" scope="external" format="pdf">ODBC
+          driver installation guide</xref>. Then search for <q>delegation</q> in that same installation guide to
+          learn about the <uicontrol>Delegation UID</uicontrol> field and <codeph>DelegationUID</codeph> configuration keyword to enable the delegation feature for
+          ODBC-based BI tools.
+        </p>
+      </li>
+    </ul>
+
+  </conbody>
+
+</concept>

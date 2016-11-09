@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?><val>
+<!-- Exclude Cloudera-only content. This is typically material that's permanently hidden,
+     e.g. obsolete or abandoned. Use pre-release for material being actively worked on
+     that's not ready for prime time. -->
+  <prop att="audience" val="Cloudera" action="exclude"/>
+<!-- These two are backward: things marked HTML are excluded from the HTML and
+     things marked PDF are excluded from the PDF. -->
+	<prop att="audience" val="PDF" action="exclude"/>
+	<prop att="audience" val="HTML" action="include"/>
+<!-- standalone = upstream Impala docs, not part of any larger library
+     integrated = any xrefs, topicrefs, or other residue from original downstream docs
+                  that don't resolve properly in the upstream context -->
+	<prop att="audience" val="integrated" action="exclude"/>
+	<prop att="audience" val="standalone" action="include"/>
+<!-- John added this so he can work on Impala_Next in master without fear that
+     it will show up too early in released docs -->
+  <prop att="audience" val="impala_next" action="exclude"/>
+<!-- This DITAVAL specifically EXCLUDES things marked pre-release -->
+<!-- It is safe to use for generating public artifacts. -->
+  <prop att="audience" val="pre-release" action="exclude"/>
+</val>

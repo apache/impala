@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="security_metastore">
+
+  <title>Securing the Hive Metastore Database</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Hive"/>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Metastore"/>
+      <data name="Category" value="Databases"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+<!-- Some of this copied from earlier. Split out both instances into conrefs. -->
+
+    <p>
+      It is important to secure the Hive metastore, so that users cannot access the names or other information
+      about databases and tables the through the Hive client or by querying the metastore database. Do this by
+      turning on Hive metastore security, using the instructions in the
+      <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_sg_hive_security.html" scope="external" format="html">CDH 5 Security Guide</xref>
+      for securing different Hive components:
+    </p>
+
+    <ul>
+      <li>
+        Secure the Hive Metastore.
+      </li>
+
+      <li>
+        In addition, allow access to the metastore only from the HiveServer2 server, and then disable local access
+        to the HiveServer2 server.
+      </li>
+    </ul>
+  </conbody>
+</concept>

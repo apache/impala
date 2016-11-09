@@ -1,0 +1,1592 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="operators">
+
+  <title>SQL Operators</title>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">operators</indexterm>
+      SQL operators are a class of comparison functions that are widely used within the <codeph>WHERE</codeph> clauses of
+      <codeph>SELECT</codeph> statements.
+    </p>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
+
+  <concept rev="1.4.0" id="arithmetic_operators">
+
+    <title>Arithmetic Operators</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">arithmetic operators</indexterm>
+        The arithmetic operators use expressions with a left-hand argument, the operator, and then (in most cases) a right-hand argument.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>left_hand_arg</varname> <varname>binary_operator</varname> <varname>right_hand_arg</varname>
+<varname>unary_operator</varname> <varname>single_arg</varname>
+</codeblock>
+
+      <ul>
+        <li>
+          <codeph>+</codeph> and <codeph>-</codeph>: Can be used either as unary or binary operators.
+          <ul>
+            <li>
+              <p>
+                With unary notation, such as <codeph>+5</codeph>, <codeph>-2.5</codeph>, or <codeph>-<varname>col_name</varname></codeph>,
+                they multiply their single numeric argument by <codeph>+1</codeph> or <codeph>-1</codeph>. Therefore, unary
+                <codeph>+</codeph> returns its argument unchanged, while unary <codeph>-</codeph> flips the sign of its argument. Although
+                you can double up these operators in expressions such as <codeph>++5</codeph> (always positive) or <codeph>-+2</codeph> or
+                <codeph>+-2</codeph> (both always negative), you cannot double the unary minus operator because <codeph>--</codeph> is
+                interpreted as the start of a comment. (You can use a double unary minus operator if you separate the <codeph>-</codeph>
+                characters, for example with a space or parentheses.)
+              </p>
+            </li>
+
+            <li>
+              <p>
+                With binary notation, such as <codeph>2+2</codeph>, <codeph>5-2.5</codeph>, or <codeph><varname>col1</varname> +
+                <varname>col2</varname></codeph>, they add or subtract respectively the right-hand argument to (or from) the left-hand
+                argument. Both arguments must be of numeric types.
+              </p>
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          <p>
+            <codeph>*</codeph> and <codeph>/</codeph>: Multiplication and division respectively. Both arguments must be of numeric types.
+          </p>
+
+          <p>
+            When multiplying, the shorter argument is promoted if necessary (such as <codeph>SMALLINT</codeph> to <codeph>INT</codeph> or
+            <codeph>BIGINT</codeph>, or <codeph>FLOAT</codeph> to <codeph>DOUBLE</codeph>), and then the result is promoted again to the
+            next larger type. Thus, multiplying a <codeph>TINYINT</codeph> and an <codeph>INT</codeph> produces a <codeph>BIGINT</codeph>
+            result. Multiplying a <codeph>FLOAT</codeph> and a <codeph>FLOAT</codeph> produces a <codeph>DOUBLE</codeph> result. Multiplying
+            a <codeph>FLOAT</codeph> and a <codeph>DOUBLE</codeph> or a <codeph>DOUBLE</codeph> and a <codeph>DOUBLE</codeph> produces a
+            <codeph>DECIMAL(38,17)</codeph>, because <codeph>DECIMAL</codeph> values can represent much larger and more precise values than
+            <codeph>DOUBLE</codeph>.
+          </p>
+
+          <p>
+            When dividing, Impala always treats the arguments and result as <codeph>DOUBLE</codeph> values to avoid losing precision. If you
+            need to insert the results of a division operation into a <codeph>FLOAT</codeph> column, use the <codeph>CAST()</codeph>
+            function to convert the result to the correct type.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            <codeph>%</codeph>: Modulo operator. Returns the remainder of the left-hand argument divided by the right-hand argument. Both
+            arguments must be of one of the integer types.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            <codeph>&amp;</codeph>, <codeph>|</codeph>, <codeph>~</codeph>, and <codeph>^</codeph>: Bitwise operators that return the
+            logical AND, logical OR, <codeph>NOT</codeph>, or logical XOR (exclusive OR) of their argument values. Both arguments must be of
+            one of the integer types. If the arguments are of different type, the argument with the smaller type is implicitly extended to
+            match the argument with the longer type.
+          </p>
+        </li>
+      </ul>
+
+      <p>
+        You can chain a sequence of arithmetic expressions, optionally grouping them with parentheses.
+      </p>
+
+      <p>
+        The arithmetic operators generally do not have equivalent calling conventions using functional notation. For example, prior to
+        Impala 2.2.0 / CDH 5.4.0, there is no <codeph>MOD()</codeph> function equivalent to the <codeph>%</codeph> modulo operator.
+        Conversely, there are some arithmetic functions that do not have a corresponding operator. For example, for exponentiation you use
+        the <codeph>POW()</codeph> function, but there is no <codeph>**</codeph> exponentiation operator. See
+        <xref href="impala_math_functions.xml#math_functions"/> for the arithmetic functions you can use.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_aggregation_explanation"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_aggregation_example"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_caveat_no_operator"/>
+
+      <p rev="2.3.0">
+        The following example shows how to do an arithmetic operation using a numeric field of a <codeph>STRUCT</codeph> type that is an
+        item within an <codeph>ARRAY</codeph> column. Once the scalar numeric value <codeph>R_NATIONKEY</codeph> is extracted, it can be
+        used in an arithmetic expression, such as multiplying by 10:
+      </p>
+
+<codeblock rev="2.3.0">
+-- The SMALLINT is a field within an array of structs.
+describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+-- When we refer to the scalar value using dot notation,
+-- we can use arithmetic and comparison operators on it
+-- like any other number.
+select r_name, nation.item.n_name, nation.item.n_nationkey * 10
+  from region, region.r_nations as nation
+where nation.item.n_nationkey &lt; 5;
++-------------+-------------+------------------------------+
+| r_name      | item.n_name | nation.item.n_nationkey * 10 |
++-------------+-------------+------------------------------+
+| AMERICA     | CANADA      | 30                           |
+| AMERICA     | BRAZIL      | 20                           |
+| AMERICA     | ARGENTINA   | 10                           |
+| MIDDLE EAST | EGYPT       | 40                           |
+| AFRICA      | ALGERIA     | 0                            |
++-------------+-------------+------------------------------+
+</codeblock>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="between">
+
+    <title>BETWEEN Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">BETWEEN operator</indexterm>
+        In a <codeph>WHERE</codeph> clause, compares an expression to both a lower and upper bound. The comparison is successful is the
+        expression is greater than or equal to the lower bound, and less than or equal to the upper bound. If the bound values are switched,
+        so the lower bound is greater than the upper bound, does not match any values.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>expression</varname> BETWEEN <varname>lower_bound</varname> AND <varname>upper_bound</varname></codeblock>
+
+      <p>
+        <b>Data types:</b> Typically used with numeric data types. Works with any data type, although not very practical for
+        <codeph>BOOLEAN</codeph> values. (<codeph>BETWEEN false AND true</codeph> will match all <codeph>BOOLEAN</codeph> values.) Use
+        <codeph>CAST()</codeph> if necessary to ensure the lower and upper bound values are compatible types. Call string or date/time
+        functions if necessary to extract or transform the relevant portion to compare, especially if the value can be transformed into a
+        number.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+      <p>
+        Be careful when using short string operands. A longer string that starts with the upper bound value will not be included, because it
+        is considered greater than the upper bound. For example, <codeph>BETWEEN 'A' and 'M'</codeph> would not match the string value
+        <codeph>'Midway'</codeph>. Use functions such as <codeph>upper()</codeph>, <codeph>lower()</codeph>, <codeph>substr()</codeph>,
+        <codeph>trim()</codeph>, and so on if necessary to ensure the comparison works as expected.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_caveat_no_operator"/>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>-- Retrieve data for January through June, inclusive.
+select c1 from t1 where month <b>between 1 and 6</b>;
+
+-- Retrieve data for names beginning with 'A' through 'M' inclusive.
+-- Only test the first letter to ensure all the values starting with 'M' are matched.
+-- Do a case-insensitive comparison to match names with various capitalization conventions.
+select last_name from customers where upper(substr(last_name,1,1)) <b>between 'A' and 'M'</b>;
+
+-- Retrieve data for only the first week of each month.
+select count(distinct visitor_id)) from web_traffic where dayofmonth(when_viewed) <b>between 1 and 7</b>;</codeblock>
+
+      <p rev="2.3.0">
+        The following example shows how to do a <codeph>BETWEEN</codeph> comparison using a numeric field of a <codeph>STRUCT</codeph> type
+        that is an item within an <codeph>ARRAY</codeph> column. Once the scalar numeric value <codeph>R_NATIONKEY</codeph> is extracted, it
+        can be used in a comparison operator:
+      </p>
+
+<codeblock rev="2.3.0">
+-- The SMALLINT is a field within an array of structs.
+describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+-- When we refer to the scalar value using dot notation,
+-- we can use arithmetic and comparison operators on it
+-- like any other number.
+select r_name, nation.item.n_name, nation.item.n_nationkey
+from region, region.r_nations as nation
+where nation.item.n_nationkey between 3 and 5
++-------------+-------------+------------------+
+| r_name      | item.n_name | item.n_nationkey |
++-------------+-------------+------------------+
+| AMERICA     | CANADA      | 3                |
+| MIDDLE EAST | EGYPT       | 4                |
+| AFRICA      | ETHIOPIA    | 5                |
++-------------+-------------+------------------+
+</codeblock>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="comparison_operators">
+
+    <title>Comparison Operators</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">comparison operators</indexterm>
+        Impala supports the familiar comparison operators for checking equality and sort order for the column data types:
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>left_hand_expression</varname> <varname>comparison_operator</varname> <varname>right_hand_expression</varname></codeblock>
+
+      <ul>
+        <li>
+          <codeph>=</codeph>, <codeph>!=</codeph>, <codeph>&lt;&gt;</codeph>: apply to all types.
+        </li>
+
+        <li>
+          <codeph>&lt;</codeph>, <codeph>&lt;=</codeph>, <codeph>&gt;</codeph>, <codeph>&gt;=</codeph>: apply to all types; for
+          <codeph>BOOLEAN</codeph>, <codeph>TRUE</codeph> is considered greater than <codeph>FALSE</codeph>.
+        </li>
+      </ul>
+
+      <p>
+        <b>Alternatives:</b>
+      </p>
+
+      <p>
+        The <codeph>IN</codeph> and <codeph>BETWEEN</codeph> operators provide shorthand notation for expressing combinations of equality,
+        less than, and greater than comparisons with a single operator.
+      </p>
+
+      <p>
+        Because comparing any value to <codeph>NULL</codeph> produces <codeph>NULL</codeph> rather than <codeph>TRUE</codeph> or
+        <codeph>FALSE</codeph>, use the <codeph>IS NULL</codeph> and <codeph>IS NOT NULL</codeph> operators to check if a value is
+        <codeph>NULL</codeph> or not.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_caveat_no_operator"/>
+
+      <p rev="2.3.0">
+        The following example shows how to do an arithmetic operation using a numeric field of a <codeph>STRUCT</codeph> type that is an
+        item within an <codeph>ARRAY</codeph> column. Once the scalar numeric value <codeph>R_NATIONKEY</codeph> is extracted, it can be
+        used with a comparison operator such as <codeph>&lt;</codeph>:
+      </p>
+
+<codeblock rev="2.3.0">
+-- The SMALLINT is a field within an array of structs.
+describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+-- When we refer to the scalar value using dot notation,
+-- we can use arithmetic and comparison operators on it
+-- like any other number.
+select r_name, nation.item.n_name, nation.item.n_nationkey
+from region, region.r_nations as nation
+where nation.item.n_nationkey &lt; 5
++-------------+-------------+------------------+
+| r_name      | item.n_name | item.n_nationkey |
++-------------+-------------+------------------+
+| AMERICA     | CANADA      | 3                |
+| AMERICA     | BRAZIL      | 2                |
+| AMERICA     | ARGENTINA   | 1                |
+| MIDDLE EAST | EGYPT       | 4                |
+| AFRICA      | ALGERIA     | 0                |
++-------------+-------------+------------------+
+</codeblock>
+
+    </conbody>
+
+  </concept>
+
+  <concept audience="Cloudera" rev="2.1.0" id="except">
+
+    <title>EXCEPT Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">EXCEPT operator</indexterm>
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.0.0" id="exists">
+
+    <title>EXISTS Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">EXISTS operator</indexterm>
+
+        <indexterm audience="Cloudera">NOT EXISTS operator</indexterm>
+        The <codeph>EXISTS</codeph> operator tests whether a subquery returns any results. You typically use it to find values from one
+        table that have corresponding values in another table.
+      </p>
+
+      <p>
+        The converse, <codeph>NOT EXISTS</codeph>, helps to find all the values from one table that do not have any corresponding values in
+        another table.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>EXISTS (<varname>subquery</varname>)
+NOT EXISTS (<varname>subquery</varname>)
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+      <p>
+        The subquery can refer to a different table than the outer query block, or the same table. For example, you might use
+        <codeph>EXISTS</codeph> or <codeph>NOT EXISTS</codeph> to check the existence of parent/child relationships between two columns of
+        the same table.
+      </p>
+
+      <p>
+        You can also use operators and function calls within the subquery to test for other kinds of relationships other than strict
+        equality. For example, you might use a call to <codeph>COUNT()</codeph> in the subquery to check whether the number of matching
+        values is higher or lower than some limit. You might call a UDF in the subquery to check whether values in one table matches a
+        hashed representation of those same values in a different table.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/null_blurb"/>
+
+      <p>
+        If the subquery returns any value at all (even <codeph>NULL</codeph>), <codeph>EXISTS</codeph> returns <codeph>TRUE</codeph> and
+        <codeph>NOT EXISTS</codeph> returns false.
+      </p>
+
+      <p>
+        The following example shows how even when the subquery returns only <codeph>NULL</codeph> values, <codeph>EXISTS</codeph> still
+        returns <codeph>TRUE</codeph> and thus matches all the rows from the table in the outer query block.
+      </p>
+
+<codeblock>[localhost:21000] &gt; create table all_nulls (x int);
+[localhost:21000] &gt; insert into all_nulls values (null), (null), (null);
+[localhost:21000] &gt; select y from t2 where exists (select x from all_nulls);
++---+
+| y |
++---+
+| 2 |
+| 4 |
+| 6 |
++---+
+</codeblock>
+
+      <p>
+        However, if the table in the subquery is empty and so the subquery returns an empty result set, <codeph>EXISTS</codeph> returns
+        <codeph>FALSE</codeph>:
+      </p>
+
+<codeblock>[localhost:21000] &gt; create table empty (x int);
+[localhost:21000] &gt; select y from t2 where exists (select x from empty);
+[localhost:21000] &gt;
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/added_in_20"/>
+
+      <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/subquery_no_limit"/>
+
+      <p rev="IMPALA-3232">
+        Prior to <keyword keyref="impala26_full"/>,
+        the <codeph>NOT EXISTS</codeph> operator required a correlated subquery.
+        In <keyword keyref="impala26_full"/> and higher, <codeph>NOT EXISTS</codeph> works with
+        uncorrelated queries also.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_caveat_no_operator"/>
+
+<!-- To do: construct an EXISTS / NOT EXISTS example for complex types. -->
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <p>
+<!-- Maybe turn this into a conref if the same set of tables gets used for subqueries, EXISTS, other places. -->
+<!-- Yes, the material was reused under Subqueries for anti-joins. -->
+        The following examples refer to these simple tables containing small sets of integers or strings:
+<codeblock>[localhost:21000] &gt; create table t1 (x int);
+[localhost:21000] &gt; insert into t1 values (1), (2), (3), (4), (5), (6);
+
+[localhost:21000] &gt; create table t2 (y int);
+[localhost:21000] &gt; insert into t2 values (2), (4), (6);
+
+[localhost:21000] &gt; create table t3 (z int);
+[localhost:21000] &gt; insert into t3 values (1), (3), (5);
+
+[localhost:21000] &gt; create table month_names (m string);
+[localhost:21000] &gt; insert into month_names values
+                  &gt; ('January'), ('February'), ('March'),
+                  &gt; ('April'), ('May'), ('June'), ('July'),
+                  &gt; ('August'), ('September'), ('October'),
+                  &gt; ('November'), ('December');
+</codeblock>
+      </p>
+
+      <p>
+        The following example shows a correlated subquery that finds all the values in one table that exist in another table. For each value
+        <codeph>X</codeph> from <codeph>T1</codeph>, the query checks if the <codeph>Y</codeph> column of <codeph>T2</codeph> contains an
+        identical value, and the <codeph>EXISTS</codeph> operator returns <codeph>TRUE</codeph> or <codeph>FALSE</codeph> as appropriate in
+        each case.
+      </p>
+
+<codeblock>localhost:21000] &gt; select x from t1 where exists (select y from t2 where t1.x = y);
++---+
+| x |
++---+
+| 2 |
+| 4 |
+| 6 |
++---+
+</codeblock>
+
+      <p>
+        An uncorrelated query is less interesting in this case. Because the subquery always returns <codeph>TRUE</codeph>, all rows from
+        <codeph>T1</codeph> are returned. If the table contents where changed so that the subquery did not match any rows, none of the rows
+        from <codeph>T1</codeph> would be returned.
+      </p>
+
+<codeblock>[localhost:21000] &gt; select x from t1 where exists (select y from t2 where y &gt; 5);
++---+
+| x |
++---+
+| 1 |
+| 2 |
+| 3 |
+| 4 |
+| 5 |
+| 6 |
++---+
+</codeblock>
+
+      <p>
+        The following example shows how an uncorrelated subquery can test for the existence of some condition within a table. By using
+        <codeph>LIMIT 1</codeph> or an aggregate function, the query returns a single result or no result based on whether the subquery
+        matches any rows. Here, we know that <codeph>T1</codeph> and <codeph>T2</codeph> contain some even numbers, but <codeph>T3</codeph>
+        does not.
+      </p>
+
+<codeblock>[localhost:21000] &gt; select "contains an even number" from t1 where exists (select x from t1 where x % 2 = 0) limit 1;
++---------------------------+
+| 'contains an even number' |
++---------------------------+
+| contains an even number   |
++---------------------------+
+[localhost:21000] &gt; select "contains an even number" as assertion from t1 where exists (select x from t1 where x % 2 = 0) limit 1;
++-------------------------+
+| assertion               |
++-------------------------+
+| contains an even number |
++-------------------------+
+[localhost:21000] &gt; select "contains an even number" as assertion from t2 where exists (select x from t2 where y % 2 = 0) limit 1;
+ERROR: AnalysisException: couldn't resolve column reference: 'x'
+[localhost:21000] &gt; select "contains an even number" as assertion from t2 where exists (select y from t2 where y % 2 = 0) limit 1;
++-------------------------+
+| assertion               |
++-------------------------+
+| contains an even number |
++-------------------------+
+[localhost:21000] &gt; select "contains an even number" as assertion from t3 where exists (select z from t3 where z % 2 = 0) limit 1;
+[localhost:21000] &gt;
+</codeblock>
+
+      <p>
+        The following example finds numbers in one table that are 1 greater than numbers from another table. The <codeph>EXISTS</codeph>
+        notation is simpler than an equivalent <codeph>CROSS JOIN</codeph> between the tables. (The example then also illustrates how the
+        same test could be performed using an <codeph>IN</codeph> operator.)
+      </p>
+
+<codeblock>[localhost:21000] &gt; select x from t1 where exists (select y from t2 where x = y + 1);
++---+
+| x |
++---+
+| 3 |
+| 5 |
++---+
+[localhost:21000] &gt; select x from t1 where x in (select y + 1 from t2);
++---+
+| x |
++---+
+| 3 |
+| 5 |
++---+
+</codeblock>
+
+      <p>
+        The following example finds values from one table that do not exist in another table.
+      </p>
+
+<codeblock>[localhost:21000] &gt; select x from t1 where not exists (select y from t2 where x = y);
++---+
+| x |
++---+
+| 1 |
+| 3 |
+| 5 |
++---+
+</codeblock>
+
+      <p>
+        The following example uses the <codeph>NOT EXISTS</codeph> operator to find all the leaf nodes in tree-structured data. This
+        simplified <q>tree of life</q> has multiple levels (class, order, family, and so on), with each item pointing upward through a
+        <codeph>PARENT</codeph> pointer. The example runs an outer query and a subquery on the same table, returning only those items whose
+        <codeph>ID</codeph> value is <i>not</i> referenced by the <codeph>PARENT</codeph> of any other item.
+      </p>
+
+<codeblock>[localhost:21000] &gt; create table tree (id int, parent int, name string);
+[localhost:21000] &gt; insert overwrite tree values
+                  &gt; (0, null, "animals"),
+                  &gt; (1, 0, "placentals"),
+                  &gt; (2, 0, "marsupials"),
+                  &gt; (3, 1, "bats"),
+                  &gt; (4, 1, "cats"),
+                  &gt; (5, 2, "kangaroos"),
+                  &gt; (6, 4, "lions"),
+                  &gt; (7, 4, "tigers"),
+                  &gt; (8, 5, "red kangaroo"),
+                  &gt; (9, 2, "wallabies");
+[localhost:21000] &gt; select name as "leaf node" from tree one
+                  &gt; where not exists (select parent from tree two where one.id = two.parent);
++--------------+
+| leaf node    |
++--------------+
+| bats         |
+| lions        |
+| tigers       |
+| red kangaroo |
+| wallabies    |
++--------------+
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/related_info"/>
+
+      <p>
+        <xref href="impala_subqueries.xml#subqueries"/>
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.4.0" id="ilike">
+
+    <title>ILIKE Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">ILIKE operator</indexterm>
+        A case-insensitive comparison operator for <codeph>STRING</codeph> data, with basic wildcard capability using <codeph>_</codeph> to match a single
+        character and <codeph>%</codeph> to match multiple characters. The argument expression must match the entire string value.
+        Typically, it is more efficient to put any <codeph>%</codeph> wildcard match at the end of the string.
+      </p>
+
+      <p>
+        This operator, available in <keyword keyref="impala25_full"/> and higher, is the equivalent of the <codeph>LIKE</codeph> operator,
+        but with case-insensitive comparisons.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>string_expression</varname> ILIKE <varname>wildcard_expression</varname>
+<varname>string_expression</varname> NOT ILIKE <varname>wildcard_expression</varname>
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_caveat_no_operator"/>
+
+<!-- To do: construct a LIKE example for complex types. -->
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+      <p>
+        In the following examples, strings that are the same except for differences in uppercase
+        and lowercase match successfully with <codeph>ILIKE</codeph>, but do not match
+        with <codeph>LIKE</codeph>:
+      </p>
+
+<codeblock>select 'fooBar' ilike 'FOOBAR';
++-------------------------+
+| 'foobar' ilike 'foobar' |
++-------------------------+
+| true                    |
++-------------------------+
+
+select 'fooBar' like 'FOOBAR';
++------------------------+
+| 'foobar' like 'foobar' |
++------------------------+
+| false                  |
++------------------------+
+
+select 'FOOBAR' ilike 'f%';
++---------------------+
+| 'foobar' ilike 'f%' |
++---------------------+
+| true                |
++---------------------+
+
+select 'FOOBAR' like 'f%';
++--------------------+
+| 'foobar' like 'f%' |
++--------------------+
+| false              |
++--------------------+
+
+select 'ABCXYZ' not ilike 'ab_xyz';
++-----------------------------+
+| not 'abcxyz' ilike 'ab_xyz' |
++-----------------------------+
+| false                       |
++-----------------------------+
+
+select 'ABCXYZ' not like 'ab_xyz';
++----------------------------+
+| not 'abcxyz' like 'ab_xyz' |
++----------------------------+
+| true                       |
++----------------------------+
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/related_info"/>
+
+      <p rev="2.5.0">
+        For case-sensitive comparisons, see <xref href="impala_operators.xml#like"/>.
+        For a more general kind of search operator using regular expressions, see <xref href="impala_operators.xml#regexp"/>
+        or its case-insensitive counterpart <xref href="impala_operators.xml#iregexp"/>.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="in">
+
+    <title>IN Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">IN operator</indexterm>
+
+        <indexterm audience="Cloudera">NOT IN operator</indexterm>
+        The <codeph>IN</codeph> operator compares an argument value to a set of values, and returns <codeph>TRUE</codeph> if the argument
+        matches any value in the set. The <codeph>NOT IN</codeph> operator reverses the comparison, and checks if the argument value is not
+        part of a set of values.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock rev="2.0.0"><varname>expression</varname> IN (<varname>expression</varname> [, <varname>expression</varname>])
+<varname>expression</varname> IN (<varname>subquery</varname>)
+
+<varname>expression</varname> NOT IN (<varname>expression</varname> [, <varname>expression</varname>])
+<varname>expression</varname> NOT IN (<varname>subquery</varname>)
+</codeblock>
+
+      <p>
+        The left-hand expression and the set of comparison values must be of compatible types.
+      </p>
+
+      <p>
+        The left-hand expression must consist only of a single value, not a tuple. Although the left-hand expression is typically a column
+        name, it could also be some other value. For example, the <codeph>WHERE</codeph> clauses <codeph>WHERE id IN (5)</codeph> and
+        <codeph>WHERE 5 IN (id)</codeph> produce the same results.
+      </p>
+
+      <p rev="CDH-40407">
+        The set of values to check against can be specified as constants, function calls, column names, or other expressions in the query
+        text. The maximum number of expressions in the <codeph>IN</codeph> list is 9999. (The maximum number of elements of
+        a single expression is 10,000 items, and the <codeph>IN</codeph> operator itself counts as one.)
+      </p>
+
+      <p rev="2.0.0">
+        In Impala 2.0 and higher, the set of values can also be generated by a subquery. <codeph>IN</codeph> can evaluate an unlimited
+        number of results using a subquery.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+      <p>
+        Any expression using the <codeph>IN</codeph> operator could be rewritten as a series of equality tests connected with
+        <codeph>OR</codeph>, but the <codeph>IN</codeph> syntax is often clearer, more concise, and easier for Impala to optimize. For
+        example, with partitioned tables, queries frequently use <codeph>IN</codeph> clauses to filter data by comparing the partition key
+        columns to specific values.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/null_blurb"/>
+
+      <p>
+        If there really is a matching non-null value, <codeph>IN</codeph> returns <codeph>TRUE</codeph>:
+      </p>
+
+<codeblock>[localhost:21000] &gt; select 1 in (1,null,2,3);
++----------------------+
+| 1 in (1, null, 2, 3) |
++----------------------+
+| true                 |
++----------------------+
+[localhost:21000] &gt; select 1 not in (1,null,2,3);
++--------------------------+
+| 1 not in (1, null, 2, 3) |
++--------------------------+
+| false                    |
++--------------------------+
+</codeblock>
+
+      <p>
+        If the searched value is not found in the comparison values, and the comparison values include <codeph>NULL</codeph>, the result is
+        <codeph>NULL</codeph>:
+      </p>
+
+<codeblock>[localhost:21000] &gt; select 5 in (1,null,2,3);
++----------------------+
+| 5 in (1, null, 2, 3) |
++----------------------+
+| NULL                 |
++----------------------+
+[localhost:21000] &gt; select 5 not in (1,null,2,3);
++--------------------------+
+| 5 not in (1, null, 2, 3) |
++--------------------------+
+| NULL                     |
++--------------------------+
+[localhost:21000] &gt; select 1 in (null);
++-------------+
+| 1 in (null) |
++-------------+
+| NULL        |
++-------------+
+[localhost:21000] &gt; select 1 not in (null);
++-----------------+
+| 1 not in (null) |
++-----------------+
+| NULL            |
++-----------------+
+</codeblock>
+
+      <p>
+        If the left-hand argument is <codeph>NULL</codeph>, <codeph>IN</codeph> always returns <codeph>NULL</codeph>. This rule applies even
+        if the comparison values include <codeph>NULL</codeph>.
+      </p>
+
+<codeblock>[localhost:21000] &gt; select null in (1,2,3);
++-------------------+
+| null in (1, 2, 3) |
++-------------------+
+| NULL              |
++-------------------+
+[localhost:21000] &gt; select null not in (1,2,3);
++-----------------------+
+| null not in (1, 2, 3) |
++-----------------------+
+| NULL                  |
++-----------------------+
+[localhost:21000] &gt; select null in (null);
++----------------+
+| null in (null) |
++----------------+
+| NULL           |
++----------------+
+[localhost:21000] &gt; select null not in (null);
++--------------------+
+| null not in (null) |
++--------------------+
+| NULL               |
++--------------------+
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/enhanced_in_20"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_caveat_no_operator"/>
+
+      <p rev="2.3.0">
+        The following example shows how to do an arithmetic operation using a numeric field of a <codeph>STRUCT</codeph> type that is an
+        item within an <codeph>ARRAY</codeph> column. Once the scalar numeric value <codeph>R_NATIONKEY</codeph> is extracted, it can be
+        used in an arithmetic expression, such as multiplying by 10:
+      </p>
+
+<codeblock rev="2.3.0">
+-- The SMALLINT is a field within an array of structs.
+describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+-- When we refer to the scalar value using dot notation,
+-- we can use arithmetic and comparison operators on it
+-- like any other number.
+select r_name, nation.item.n_name, nation.item.n_nationkey
+from region, region.r_nations as nation
+where nation.item.n_nationkey in (1,3,5)
++---------+-------------+------------------+
+| r_name  | item.n_name | item.n_nationkey |
++---------+-------------+------------------+
+| AMERICA | CANADA      | 3                |
+| AMERICA | ARGENTINA   | 1                |
+| AFRICA  | ETHIOPIA    | 5                |
++---------+-------------+------------------+
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/subquery_no_limit"/>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>-- Using IN is concise and self-documenting.
+SELECT * FROM t1 WHERE c1 IN (1,2,10);
+-- Equivalent to series of = comparisons ORed together.
+SELECT * FROM t1 WHERE c1 = 1 OR c1 = 2 OR c1 = 10;
+
+SELECT c1 AS "starts with vowel" FROM t2 WHERE upper(substr(c1,1,1)) IN ('A','E','I','O','U');
+
+SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','June','July');</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/related_info"/>
+
+      <p>
+        <xref href="impala_subqueries.xml#subqueries"/>
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept audience="Cloudera" rev="2.1.0" id="intersect">
+
+    <title>INTERSECT Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">INTERSECT operator</indexterm>
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.5.0" id="iregexp">
+
+    <title>IREGEXP Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">IREGEXP operator</indexterm>
+        Tests whether a value matches a regular expression, using case-insensitive string comparisons.
+        Uses the POSIX regular expression syntax where <codeph>^</codeph> and
+        <codeph>$</codeph> match the beginning and end of the string, <codeph>.</codeph> represents any single character, <codeph>*</codeph>
+        represents a sequence of zero or more items, <codeph>+</codeph> represents a sequence of one or more items, <codeph>?</codeph>
+        produces a non-greedy match, and so on.
+      </p>
+
+      <p>
+        This operator, available in <keyword keyref="impala25_full"/> and higher, is the equivalent of the <codeph>REGEXP</codeph> operator,
+        but with case-insensitive comparisons.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>string_expression</varname> IREGEXP <varname>regular_expression</varname>
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/regular_expression_whole_string"/>
+
+<!-- Currently, there isn't any IRLIKE synonym, so REGEXP and IREGEXP are different in that respect.
+     I pinged IMPALA-1787 to check if that's intentional.
+      <p>
+        The <codeph>IRLIKE</codeph> operator is a synonym for <codeph>IREGEXP</codeph>.
+      </p>
+-->
+
+      <p rev="2.5.0">
+        The <codeph>|</codeph> symbol is the alternation operator, typically used within <codeph>()</codeph> to match different sequences.
+        The <codeph>()</codeph> groups do not allow backreferences. To retrieve the part of a value matched within a <codeph>()</codeph>
+        section, use the <codeph><xref href="impala_string_functions.xml#string_functions/regexp_extract">regexp_extract()</xref></codeph>
+        built-in function. (Currently, there is not any case-insensitive equivalent for the <codeph>regexp_extract()</codeph> function.)
+      </p>
+
+      <note rev="1.3.1">
+        <p rev="1.3.1" conref="../shared/impala_common.xml#common/regexp_matching"/>
+      </note>
+
+      <p conref="../shared/impala_common.xml#common/regexp_re2"/>
+
+      <p conref="../shared/impala_common.xml#common/regexp_re2_warning"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_caveat_no_operator"/>
+
+<!-- To do: construct a REGEXP example for complex types. -->
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <p>
+        The following examples demonstrate the syntax for the <codeph>IREGEXP</codeph> operator.
+      </p>
+
+<codeblock>select 'abcABCaabbcc' iregexp '^[a-c]+$';
++---------------------------------+
+| 'abcabcaabbcc' iregexp '[a-c]+' |
++---------------------------------+
+| true                            |
++---------------------------------+
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/related_info"/>
+
+      <p>
+        <xref href="impala_operators.xml#regexp"/>
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept rev="2.5.0 IMPALA-2147" id="is_distinct_from">
+
+    <title id="is_distinct">IS DISTINCT FROM Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">IS DISTINCT FROM operator</indexterm>
+
+        <indexterm audience="Cloudera">IS NOT DISTINCT FROM operator</indexterm>
+        The <codeph>IS DISTINCT FROM</codeph> operator, and its converse the <codeph>IS NOT DISTINCT FROM</codeph> operator, test whether or
+        not values are identical. <codeph>IS NOT DISTINCT FROM</codeph> is similar to the <codeph>=</codeph> operator, and <codeph>IS
+        DISTINCT FROM</codeph> is similar to the <codeph>!=</codeph> operator, except that <codeph>NULL</codeph> values are treated as
+        identical. Therefore, <codeph>IS NOT DISTINCT FROM</codeph> returns <codeph>true</codeph> rather than <codeph>NULL</codeph>, and
+        <codeph>IS DISTINCT FROM</codeph> returns <codeph>false</codeph> rather than <codeph>NULL</codeph>, when comparing two
+        <codeph>NULL</codeph> values. If one of the values being compared is <codeph>NULL</codeph> and the other is not, <codeph>IS DISTINCT
+        FROM</codeph> returns <codeph>true</codeph> and <codeph>IS NOT DISTINCT FROM</codeph> returns <codeph>false</codeph>, again instead
+        of returning <codeph>NULL</codeph> in both cases.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>expression1</varname> IS DISTINCT FROM <varname>expression2</varname>
+
+<varname>expression1</varname> IS NOT DISTINCT FROM <varname>expression2</varname>
+<varname>expression1</varname> &lt;=&gt; <varname>expression2</varname>
+</codeblock>
+
+      <p>
+        The operator <codeph>&lt;=&gt;</codeph> is an alias for <codeph>IS NOT DISTINCT FROM</codeph>.
+        It is typically used as a <codeph>NULL</codeph>-safe equality operator in join queries.
+        That is, <codeph>A &lt;=&gt; B</codeph> is true if <codeph>A</codeph> equals <codeph>B</codeph>
+        or if both <codeph>A</codeph> and <codeph>B</codeph> are <codeph>NULL</codeph>.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+      <p>
+        This operator provides concise notation for comparing two values and always producing a <codeph>true</codeph> or
+        <codeph>false</codeph> result, without treating <codeph>NULL</codeph> as a special case. Otherwise, to unambiguously distinguish
+        between two values requires a compound expression involving <codeph>IS [NOT] NULL</codeph> tests of both operands in addition to the
+        <codeph>=</codeph> or <codeph>!=</codeph> operator.
+      </p>
+
+      <p>
+        The <codeph>&lt;=&gt;</codeph> operator, used like an equality operator in a join query,
+        is more efficient than the equivalent clause: <codeph>A = B OR (A IS NULL AND B IS NULL)</codeph>.
+        The <codeph>&lt;=&gt;</codeph> operator can use a hash join, while the <codeph>OR</codeph> expression
+        cannot.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <p>
+        The following examples show how <codeph>IS DISTINCT FROM</codeph> gives output similar to
+        the <codeph>!=</codeph> operator, and <codeph>IS NOT DISTINCT FROM</codeph> gives output
+        similar to the <codeph>=</codeph> operator. The exception is when the expression involves
+        a <codeph>NULL</codeph> value on one side or both sides, where <codeph>!=</codeph> and
+        <codeph>=</codeph> return <codeph>NULL</codeph> but the <codeph>IS [NOT] DISTINCT FROM</codeph>
+        operators still return <codeph>true</codeph> or <codeph>false</codeph>.
+      </p>
+
+<codeblock>
+select 1 is distinct from 0, 1 != 0;
++----------------------+--------+
+| 1 is distinct from 0 | 1 != 0 |
++----------------------+--------+
+| true                 | true   |
++----------------------+--------+
+
+select 1 is distinct from 1, 1 != 1;
++----------------------+--------+
+| 1 is distinct from 1 | 1 != 1 |
++----------------------+--------+
+| false                | false  |
++----------------------+--------+
+
+select 1 is distinct from null, 1 != null;
++-------------------------+-----------+
+| 1 is distinct from null | 1 != null |
++-------------------------+-----------+
+| true                    | NULL      |
++-------------------------+-----------+
+
+select null is distinct from null, null != null;
++----------------------------+--------------+
+| null is distinct from null | null != null |
++----------------------------+--------------+
+| false                      | NULL         |
++----------------------------+--------------+
+
+select 1 is not distinct from 0, 1 = 0;
++--------------------------+-------+
+| 1 is not distinct from 0 | 1 = 0 |
++--------------------------+-------+
+| false                    | false |
++--------------------------+-------+
+
+select 1 is not distinct from 1, 1 = 1;
++--------------------------+-------+
+| 1 is not distinct from 1 | 1 = 1 |
++--------------------------+-------+
+| true                     | true  |
++--------------------------+-------+
+
+select 1 is not distinct from null, 1 = null;
++-----------------------------+----------+
+| 1 is not distinct from null | 1 = null |
++-----------------------------+----------+
+| false                       | NULL     |
++-----------------------------+----------+
+
+select null is not distinct from null, null = null;
++--------------------------------+-------------+
+| null is not distinct from null | null = null |
++--------------------------------+-------------+
+| true                           | NULL        |
++--------------------------------+-------------+
+</codeblock>
+
+      <p>
+        The following example shows how <codeph>IS DISTINCT FROM</codeph> considers
+        <codeph>CHAR</codeph> values to be the same (not distinct from each other)
+        if they only differ in the number of trailing spaces. Therefore, sometimes
+        the result of an <codeph>IS [NOT] DISTINCT FROM</codeph> operator differs
+        depending on whether the values are <codeph>STRING</codeph>/<codeph>VARCHAR</codeph>
+        or <codeph>CHAR</codeph>.
+      </p>
+
+<codeblock>
+select
+  'x' is distinct from 'x ' as string_with_trailing_spaces,
+  cast('x' as char(5)) is distinct from cast('x ' as char(5)) as char_with_trailing_spaces;
++-----------------------------+---------------------------+
+| string_with_trailing_spaces | char_with_trailing_spaces |
++-----------------------------+---------------------------+
+| true                        | false                     |
++-----------------------------+---------------------------+
+</codeblock>
+    </conbody>
+
+  </concept>
+
+  <concept id="is_null">
+
+    <title>IS NULL Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">IS NULL operator</indexterm>
+
+        <indexterm audience="Cloudera">IS NOT NULL operator</indexterm>
+        The <codeph>IS NULL</codeph> operator, and its converse the <codeph>IS NOT NULL</codeph> operator, test whether a specified value is
+        <codeph><xref href="impala_literals.xml#null">NULL</xref></codeph>. Because using <codeph>NULL</codeph> with any of the other
+        comparison operators such as <codeph>=</codeph> or <codeph>!=</codeph> also returns <codeph>NULL</codeph> rather than
+        <codeph>TRUE</codeph> or <codeph>FALSE</codeph>, you use a special-purpose comparison operator to check for this special condition.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>expression</varname> IS NULL
+<varname>expression</varname> IS NOT NULL
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+      <p>
+        In many cases, <codeph>NULL</codeph> values indicate some incorrect or incomplete processing during data ingestion or conversion.
+        You might check whether any values in a column are <codeph>NULL</codeph>, and if so take some followup action to fill them in.
+      </p>
+
+      <p>
+        With sparse data, often represented in <q>wide</q> tables, it is common for most values to be <codeph>NULL</codeph> with only an
+        occasional non-<codeph>NULL</codeph> value. In those cases, you can use the <codeph>IS NOT NULL</codeph> operator to identify the
+        rows containing any data at all for a particular column, regardless of the actual value.
+      </p>
+
+      <p>
+        With a well-designed database schema, effective use of <codeph>NULL</codeph> values and <codeph>IS NULL</codeph> and <codeph>IS NOT
+        NULL</codeph> operators can save having to design custom logic around special values such as 0, -1, <codeph>'N/A'</codeph>, empty
+        string, and so on. <codeph>NULL</codeph> lets you distinguish between a value that is known to be 0, false, or empty, and a truly
+        unknown value.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p rev="2.3.0">
+        This operator is not applicable to complex type columns (<codeph>STRUCT</codeph>,
+        <codeph>ARRAY</codeph>, or <codeph>MAP</codeph>). Using a complex type column
+        with <codeph>IS NULL</codeph> or <codeph>IS NOT NULL</codeph> causes a query error.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>-- If this value is non-zero, something is wrong.
+select count(*) from employees where employee_id is null;
+
+-- With data from disparate sources, some fields might be blank.
+-- Not necessarily an error condition.
+select count(*) from census where household_income is null;
+
+-- Sometimes we expect fields to be null, and followup action
+-- is needed when they are not.
+select count(*) from web_traffic where weird_http_code is not null;</codeblock>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="like">
+
+    <title>LIKE Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">LIKE operator</indexterm>
+        A comparison operator for <codeph>STRING</codeph> data, with basic wildcard capability using the underscore
+        (<codeph>_</codeph>) to match a single character and the percent sign (<codeph>%</codeph>) to match multiple
+        characters. The argument expression must match the entire string value.
+        Typically, it is more efficient to put any <codeph>%</codeph> wildcard match at the end of the string.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>string_expression</varname> LIKE <varname>wildcard_expression</varname>
+<varname>string_expression</varname> NOT LIKE <varname>wildcard_expression</varname>
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_caveat_no_operator"/>
+
+<!-- To do: construct a LIKE example for complex types. -->
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>select distinct c_last_name from customer where c_last_name like 'Mc%' or c_last_name like 'Mac%';
+select count(c_last_name) from customer where c_last_name like 'M%';
+select c_email_address from customer where c_email_address like '%.edu';
+
+-- We can find 4-letter names beginning with 'M' by calling functions...
+select distinct c_last_name from customer where length(c_last_name) = 4 and substr(c_last_name,1,1) = 'M';
+-- ...or in a more readable way by matching M followed by exactly 3 characters.
+select distinct c_last_name from customer where c_last_name like 'M___';</codeblock>
+
+      <p rev="2.5.0">
+        For case-insensitive comparisons, see <xref href="impala_operators.xml#ilike"/>.
+        For a more general kind of search operator using regular expressions, see <xref href="impala_operators.xml#regexp"/>
+        or its case-insensitive counterpart <xref href="impala_operators.xml#iregexp"/>.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="logical_operators">
+
+    <title>Logical Operators</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">logical operators</indexterm>
+        Logical operators return a <codeph>BOOLEAN</codeph> value, based on a binary or unary logical operation between arguments that are
+        also Booleans. Typically, the argument expressions use <xref href="impala_operators.xml#comparison_operators">comparison
+        operators</xref>.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>boolean_expression</varname> <varname>binary_logical_operator</varname> <varname>boolean_expression</varname>
+<varname>unary_logical_operator</varname> <varname>boolean_expression</varname>
+</codeblock>
+
+      <p>
+        The Impala logical operators are:
+      </p>
+
+      <ul>
+        <li>
+          <codeph>AND</codeph>: A binary operator that returns <codeph>true</codeph> if its left-hand and right-hand arguments both evaluate
+          to <codeph>true</codeph>, <codeph>NULL</codeph> if either argument is <codeph>NULL</codeph>, and <codeph>false</codeph> otherwise.
+        </li>
+
+        <li>
+          <codeph>OR</codeph>: A binary operator that returns <codeph>true</codeph> if either of its left-hand and right-hand arguments
+          evaluate to <codeph>true</codeph>, <codeph>NULL</codeph> if one argument is <codeph>NULL</codeph> and the other is either
+          <codeph>NULL</codeph> or <codeph>false</codeph>, and <codeph>false</codeph> otherwise.
+        </li>
+
+        <li>
+          <codeph>NOT</codeph>: A unary operator that flips the state of a Boolean expression from <codeph>true</codeph> to
+          <codeph>false</codeph>, or <codeph>false</codeph> to <codeph>true</codeph>. If the argument expression is <codeph>NULL</codeph>,
+          the result remains <codeph>NULL</codeph>. (When <codeph>NOT</codeph> is used this way as a unary logical operator, it works
+          differently than the <codeph>IS NOT NULL</codeph> comparison operator, which returns <codeph>true</codeph> when applied to a
+          <codeph>NULL</codeph>.)
+        </li>
+      </ul>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_caveat_no_operator"/>
+
+      <p rev="2.3.0">
+        The following example shows how to do an arithmetic operation using a numeric field of a <codeph>STRUCT</codeph> type that is an
+        item within an <codeph>ARRAY</codeph> column. Once the scalar numeric value <codeph>R_NATIONKEY</codeph> is extracted, it can be
+        used in an arithmetic expression, such as multiplying by 10:
+      </p>
+
+<codeblock rev="2.3.0">
+-- The SMALLINT is a field within an array of structs.
+describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+-- When we refer to the scalar value using dot notation,
+-- we can use arithmetic and comparison operators on it
+-- like any other number.
+select r_name, nation.item.n_name, nation.item.n_nationkey
+  from region, region.r_nations as nation
+where
+  nation.item.n_nationkey between 3 and 5
+  or nation.item.n_nationkey &lt; 15;
++-------------+----------------+------------------+
+| r_name      | item.n_name    | item.n_nationkey |
++-------------+----------------+------------------+
+| EUROPE      | UNITED KINGDOM | 23               |
+| EUROPE      | RUSSIA         | 22               |
+| EUROPE      | ROMANIA        | 19               |
+| ASIA        | VIETNAM        | 21               |
+| ASIA        | CHINA          | 18               |
+| AMERICA     | UNITED STATES  | 24               |
+| AMERICA     | PERU           | 17               |
+| AMERICA     | CANADA         | 3                |
+| MIDDLE EAST | SAUDI ARABIA   | 20               |
+| MIDDLE EAST | EGYPT          | 4                |
+| AFRICA      | MOZAMBIQUE     | 16               |
+| AFRICA      | ETHIOPIA       | 5                |
++-------------+----------------+------------------+
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <p>
+        These examples demonstrate the <codeph>AND</codeph> operator:
+      </p>
+
+<codeblock>[localhost:21000] &gt; select true and true;
++---------------+
+| true and true |
++---------------+
+| true          |
++---------------+
+[localhost:21000] &gt; select true and false;
++----------------+
+| true and false |
++----------------+
+| false          |
++----------------+
+[localhost:21000] &gt; select false and false;
++-----------------+
+| false and false |
++-----------------+
+| false           |
++-----------------+
+[localhost:21000] &gt; select true and null;
++---------------+
+| true and null |
++---------------+
+| NULL          |
++---------------+
+[localhost:21000] &gt; select (10 &gt; 2) and (6 != 9);
++-----------------------+
+| (10 &gt; 2) and (6 != 9) |
++-----------------------+
+| true                  |
++-----------------------+
+</codeblock>
+
+      <p>
+        These examples demonstrate the <codeph>OR</codeph> operator:
+      </p>
+
+<codeblock>[localhost:21000] &gt; select true or true;
++--------------+
+| true or true |
++--------------+
+| true         |
++--------------+
+[localhost:21000] &gt; select true or false;
++---------------+
+| true or false |
++---------------+
+| true          |
++---------------+
+[localhost:21000] &gt; select false or false;
++----------------+
+| false or false |
++----------------+
+| false          |
++----------------+
+[localhost:21000] &gt; select true or null;
++--------------+
+| true or null |
++--------------+
+| true         |
++--------------+
+[localhost:21000] &gt; select null or true;
++--------------+
+| null or true |
++--------------+
+| true         |
++--------------+
+[localhost:21000] &gt; select false or null;
++---------------+
+| false or null |
++---------------+
+| NULL          |
++---------------+
+[localhost:21000] &gt; select (1 = 1) or ('hello' = 'world');
++--------------------------------+
+| (1 = 1) or ('hello' = 'world') |
++--------------------------------+
+| true                           |
++--------------------------------+
+[localhost:21000] &gt; select (2 + 2 != 4) or (-1 &gt; 0);
++--------------------------+
+| (2 + 2 != 4) or (-1 &gt; 0) |
++--------------------------+
+| false                    |
++--------------------------+
+</codeblock>
+
+      <p>
+        These examples demonstrate the <codeph>NOT</codeph> operator:
+      </p>
+
+<codeblock>[localhost:21000] &gt; select not true;
++----------+
+| not true |
++----------+
+| false    |
++----------+
+[localhost:21000] &gt; select not false;
++-----------+
+| not false |
++-----------+
+| true      |
++-----------+
+[localhost:21000] &gt; select not null;
++----------+
+| not null |
++----------+
+| NULL     |
++----------+
+[localhost:21000] &gt; select not (1=1);
++-------------+
+| not (1 = 1) |
++-------------+
+| false       |
++-------------+
+</codeblock>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="regexp">
+
+    <title>REGEXP Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">REGEXP operator</indexterm>
+        Tests whether a value matches a regular expression. Uses the POSIX regular expression syntax where <codeph>^</codeph> and
+        <codeph>$</codeph> match the beginning and end of the string, <codeph>.</codeph> represents any single character, <codeph>*</codeph>
+        represents a sequence of zero or more items, <codeph>+</codeph> represents a sequence of one or more items, <codeph>?</codeph>
+        produces a non-greedy match, and so on.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>string_expression</varname> REGEXP <varname>regular_expression</varname>
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/regular_expression_whole_string"/>
+
+      <p>
+        The <codeph>RLIKE</codeph> operator is a synonym for <codeph>REGEXP</codeph>.
+      </p>
+
+      <p>
+        The <codeph>|</codeph> symbol is the alternation operator, typically used within <codeph>()</codeph> to match different sequences.
+        The <codeph>()</codeph> groups do not allow backreferences. To retrieve the part of a value matched within a <codeph>()</codeph>
+        section, use the <codeph><xref href="impala_string_functions.xml#string_functions/regexp_extract">regexp_extract()</xref></codeph>
+        built-in function.
+      </p>
+
+      <note rev="1.3.1">
+          <p rev="1.3.1" conref="../shared/impala_common.xml#common/regexp_matching"/>
+      </note>
+
+      <p conref="../shared/impala_common.xml#common/regexp_re2"/>
+
+      <p conref="../shared/impala_common.xml#common/regexp_re2_warning"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_caveat_no_operator"/>
+
+<!-- To do: construct a REGEXP example for complex types. -->
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <p>
+        The following examples demonstrate the identical syntax for the <codeph>REGEXP</codeph> and <codeph>RLIKE</codeph> operators.
+      </p>
+
+<!-- Same examples shown for both REGEXP and RLIKE operators. -->
+
+<codeblock conref="../shared/impala_common.xml#common/regexp_rlike_examples"/>
+
+      <p conref="../shared/impala_common.xml#common/related_info"/>
+
+      <p rev="2.5.0">
+        For regular expression matching with case-insensitive comparisons, see <xref href="impala_operators.xml#iregexp"/>.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="rlike">
+
+    <title>RLIKE Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">RLIKE operator</indexterm>
+        Synonym for the <codeph>REGEXP</codeph> operator. See <xref href="impala_operators.xml#regexp"/> for details.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <p>
+        The following examples demonstrate the identical syntax for the <codeph>REGEXP</codeph> and <codeph>RLIKE</codeph> operators.
+      </p>
+
+<!-- Same examples shown for both REGEXP and RLIKE operators. -->
+
+<codeblock conref="../shared/impala_common.xml#common/regexp_rlike_examples"/>
+
+    </conbody>
+
+  </concept>
+
+</concept>

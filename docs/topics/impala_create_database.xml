@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="create_database">
+
+  <title>CREATE DATABASE Statement</title>
+  <titlealts audience="PDF"><navtitle>CREATE DATABASE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Databases"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="S3"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">CREATE DATABASE statement</indexterm>
+      Creates a new database.
+    </p>
+
+    <p>
+      In Impala, a database is both:
+    </p>
+
+    <ul>
+      <li>
+        A logical construct for grouping together related tables, views, and functions within their own namespace.
+        You might use a separate database for each application, set of related tables, or round of experimentation.
+      </li>
+
+      <li>
+        A physical construct represented by a directory tree in HDFS. Tables (internal tables), partitions, and
+        data files are all located under this directory. You can perform HDFS-level operations such as backing it up and measuring space usage,
+        or remove it with a <codeph>DROP DATABASE</codeph> statement.
+      </li>
+    </ul>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>CREATE (DATABASE|SCHEMA) [IF NOT EXISTS] <varname>database_name</varname>[COMMENT '<varname>database_comment</varname>']
+  [LOCATION <varname>hdfs_path</varname>];</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      A database is physically represented as a directory in HDFS, with a filename extension <codeph>.db</codeph>,
+      under the main Impala data directory. If the associated HDFS directory does not exist, it is created for you.
+      All databases and their associated directories are top-level objects, with no physical or logical nesting.
+    </p>
+
+    <p>
+      After creating a database, to make it the current database within an <cmdname>impala-shell</cmdname> session,
+      use the <codeph>USE</codeph> statement. You can refer to tables in the current database without prepending
+      any qualifier to their names.
+    </p>
+
+    <p>
+      When you first connect to Impala through <cmdname>impala-shell</cmdname>, the database you start in (before
+      issuing any <codeph>CREATE DATABASE</codeph> or <codeph>USE</codeph> statements) is named
+      <codeph>default</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/builtins_db"/>
+
+    <p>
+      After creating a database, your <cmdname>impala-shell</cmdname> session or another
+      <cmdname>impala-shell</cmdname> connected to the same node can immediately access that database. To access
+      the database through the Impala daemon on a different node, issue the <codeph>INVALIDATE METADATA</codeph>
+      statement first while connected to that other node.
+    </p>
+
+    <p>
+      Setting the <codeph>LOCATION</codeph> attribute for a new database is a way to work with sets of files in an
+      HDFS directory structure outside the default Impala data directory, as opposed to setting the
+      <codeph>LOCATION</codeph> attribute for each individual table.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/hive_blurb"/>
+
+    <p>
+      When you create a database in Impala, the database can also be used by Hive.
+      When you create a database in Hive, issue an <codeph>INVALIDATE METADATA</codeph>
+      statement in Impala to make Impala permanently aware of the new database.
+    </p>
+
+    <p>
+      The <codeph>SHOW DATABASES</codeph> statement lists all databases, or the databases whose name
+      matches a wildcard pattern. <ph rev="2.5.0">In <keyword keyref="impala25_full"/> and higher, the
+      <codeph>SHOW DATABASES</codeph> output includes a second column that displays the associated
+      comment, if any, for each database.</ph>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/s3_blurb"/>
+
+    <p rev="2.6.0 CDH-39913 IMPALA-1878">
+      To specify that any tables created within a database reside on the Amazon S3 system,
+      you can include an <codeph>s3a://</codeph> prefix on the <codeph>LOCATION</codeph>
+      attribute. In <keyword keyref="impala26_full"/> and higher, Impala automatically creates any
+      required folders as the databases, tables, and partitions are created, and removes
+      them when they are dropped.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/s3_ddl"/>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
+    <p rev="CDH-19187">
+      The user ID that the <cmdname>impalad</cmdname> daemon runs under,
+      typically the <codeph>impala</codeph> user, must have write
+      permission for the parent HDFS directory under which the database
+      is located.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <codeblock conref="../shared/impala_common.xml#common/create_drop_db_example"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_databases.xml#databases"/>, <xref href="impala_drop_database.xml#drop_database"/>,
+      <xref href="impala_use.xml#use"/>, <xref href="impala_show.xml#show_databases"/>,
+      <xref href="impala_tables.xml#tables"/>
+    </p>
+  </conbody>
+</concept>

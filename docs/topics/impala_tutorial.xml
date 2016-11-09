@@ -1,0 +1,2500 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="tutorial">
+
+  <title id="tutorials">Impala Tutorials</title>
+  <titlealts audience="PDF"><navtitle>Tutorials</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Tutorials"/>
+      <data name="Category" value="Getting Started"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      This section includes tutorial scenarios that demonstrate how to begin using Impala once the software is
+      installed. It focuses on techniques for loading data, because once you have some data in tables and can query
+      that data, you can quickly progress to more advanced Impala features.
+    </p>
+
+    <note>
+      <p>
+        Where practical, the tutorials take you from <q>ground zero</q> to having the desired Impala tables and
+        data. In some cases, you might need to download additional files from outside sources, set up additional
+        software components, modify commands or scripts to fit your own configuration, or substitute your own
+        sample data.
+      </p>
+    </note>
+
+    <p>
+      Before trying these tutorial lessons, install Impala using one of these procedures:
+    </p>
+
+    <ul>
+      <li>
+        If you already have a CDH environment set up and just need to add Impala to it, follow the installation
+        process described in <xref href="impala_install.xml#install"/>. Make sure to also install the Hive
+        metastore service if you do not already have Hive configured.
+      </li>
+
+      <li>
+        To set up Impala and all its prerequisites at once, in a minimal configuration that you can use for
+        small-scale experiments, set up the Cloudera QuickStart VM, which includes CDH and Impala on CentOS.
+        Use this single-node VM to try out basic SQL functionality, not anything related to
+        performance and scalability. For more information, see
+        <xref href="http://www.cloudera.com/content/support/en/downloads/quickstart_vms.html" scope="external" format="html">the
+        Cloudera QuickStart VM</xref>.
+      </li>
+    </ul>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="tut_beginner">
+
+    <title>Tutorials for Getting Started</title>
+
+    <conbody>
+
+      <p>
+        These tutorials demonstrate the basics of using Impala. They are intended for first-time users, and for
+        trying out Impala on any new cluster to make sure the major components are working correctly.
+      </p>
+
+      <p outputclass="toc inpage"/>
+    </conbody>
+
+    <concept id="tutorial_explore">
+
+      <title>Explore a New Impala Instance</title>
+
+      <conbody>
+
+        <p>
+          This tutorial demonstrates techniques for finding your way around the tables and databases of an
+          unfamiliar (possibly empty) Impala instance.
+        </p>
+
+        <p>
+          When you connect to an Impala instance for the first time, you use the <codeph>SHOW DATABASES</codeph>
+          and <codeph>SHOW TABLES</codeph> statements to view the most common types of objects. Also, call the
+          <codeph>version()</codeph> function to confirm which version of Impala you are running; the version
+          number is important when consulting documentation and dealing with support issues.
+        </p>
+
+        <p>
+          A completely empty Impala instance contains no tables, but still has two databases:
+        </p>
+
+        <ul>
+          <li>
+            <codeph>default</codeph>, where new tables are created when you do not specify any other database.
+          </li>
+
+          <li>
+            <codeph>_impala_builtins</codeph>, a system database used to hold all the built-in functions.
+          </li>
+        </ul>
+
+        <p>
+          The following example shows how to see the available databases, and the tables in each. If the list of
+          databases or tables is long, you can use wildcard notation to locate specific databases or tables based
+          on their names.
+        </p>
+
+<codeblock>$ impala-shell -i localhost --quiet
+Starting Impala Shell without Kerberos authentication
+Welcome to the Impala shell. Press TAB twice to see a list of available commands.
+
+Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+
+(Shell build version: Impala Shell v...
+[localhost:21000] > select version();
++-------------------------------------------
+| version()
++-------------------------------------------
+| impalad version ...
+| Built on ...
++-------------------------------------------
+[localhost:21000] > show databases;
++--------------------------+
+| name                     |
++--------------------------+
+| _impala_builtins         |
+| ctas                     |
+| d1                       |
+| d2                       |
+| d3                       |
+| default                  |
+| explain_plans            |
+| external_table           |
+| file_formats             |
+| tpc                      |
++--------------------------+
+[localhost:21000] > select current_database();
++--------------------+
+| current_database() |
++--------------------+
+| default            |
++--------------------+
+[localhost:21000] > show tables;
++-------+
+| name  |
++-------+
+| ex_t  |
+| t1    |
++-------+
+[localhost:21000] > show tables in d3;
+
+[localhost:21000] > show tables in tpc;
++------------------------+
+| name                   |
++------------------------+
+| city                   |
+| customer               |
+| customer_address       |
+| customer_demographics  |
+| household_demographics |
+| item                   |
+| promotion              |
+| store                  |
+| store2                 |
+| store_sales            |
+| ticket_view            |
+| time_dim               |
+| tpc_tables             |
++------------------------+
+[localhost:21000] > show tables in tpc like 'customer*';
++-----------------------+
+| name                  |
++-----------------------+
+| customer              |
+| customer_address      |
+| customer_demographics |
++-----------------------+
+</codeblock>
+
+        <p>
+          Once you know what tables and databases are available, you descend into a database with the
+          <codeph>USE</codeph> statement. To understand the structure of each table, you use the
+          <codeph>DESCRIBE</codeph> command. Once inside a database, you can issue statements such as
+          <codeph>INSERT</codeph> and <codeph>SELECT</codeph> that operate on particular tables.
+        </p>
+
+        <p>
+          The following example explores a database named <codeph>TPC</codeph> whose name we learned in the
+          previous example. It shows how to filter the table names within a database based on a search string,
+          examine the columns of a table, and run queries to examine the characteristics of the table data. For
+          example, for an unfamiliar table you might want to know the number of rows, the number of different
+          values for a column, and other properties such as whether the column contains any <codeph>NULL</codeph>
+          values. When sampling the actual data values from a table, use a <codeph>LIMIT</codeph> clause to avoid
+          excessive output if the table contains more rows or distinct values than you expect.
+        </p>
+
+<codeblock>[localhost:21000] > use tpc;
+[localhost:21000] > show tables like '*view*';
++-------------+
+| name        |
++-------------+
+| ticket_view |
++-------------+
+[localhost:21000] > describe city;
++-------------+--------+---------+
+| name        | type   | comment |
++-------------+--------+---------+
+| id          | int    |         |
+| name        | string |         |
+| countrycode | string |         |
+| district    | string |         |
+| population  | int    |         |
++-------------+--------+---------+
+[localhost:21000] > select count(*) from city;
++----------+
+| count(*) |
++----------+
+| 0        |
++----------+
+[localhost:21000] > desc customer;
++------------------------+--------+---------+
+| name                   | type   | comment |
++------------------------+--------+---------+
+| c_customer_sk          | int    |         |
+| c_customer_id          | string |         |
+| c_current_cdemo_sk     | int    |         |
+| c_current_hdemo_sk     | int    |         |
+| c_current_addr_sk      | int    |         |
+| c_first_shipto_date_sk | int    |         |
+| c_first_sales_date_sk  | int    |         |
+| c_salutation           | string |         |
+| c_first_name           | string |         |
+| c_last_name            | string |         |
+| c_preferred_cust_flag  | string |         |
+| c_birth_day            | int    |         |
+| c_birth_month          | int    |         |
+| c_birth_year           | int    |         |
+| c_birth_country        | string |         |
+| c_login                | string |         |
+| c_email_address        | string |         |
+| c_last_review_date     | string |         |
++------------------------+--------+---------+
+[localhost:21000] > select count(*) from customer;
++----------+
+| count(*) |
++----------+
+| 100000   |
++----------+
+[localhost:21000] > select count(distinct c_birth_month) from customer;
++-------------------------------+
+| count(distinct c_birth_month) |
++-------------------------------+
+| 12                            |
++-------------------------------+
+[localhost:21000] > select count(*) from customer where c_email_address is null;
++----------+
+| count(*) |
++----------+
+| 0        |
++----------+
+[localhost:21000] > select distinct c_salutation from customer limit 10;
++--------------+
+| c_salutation |
++--------------+
+| Mr.          |
+| Ms.          |
+| Dr.          |
+|              |
+| Miss         |
+| Sir          |
+| Mrs.         |
++--------------+
+</codeblock>
+
+        <p>
+          When you graduate from read-only exploration, you use statements such as <codeph>CREATE DATABASE</codeph>
+          and <codeph>CREATE TABLE</codeph> to set up your own database objects.
+        </p>
+
+        <p>
+          The following example demonstrates creating a new database holding a new table. Although the last example
+          ended inside the <codeph>TPC</codeph> database, the new <codeph>EXPERIMENTS</codeph> database is not
+          nested inside <codeph>TPC</codeph>; all databases are arranged in a single top-level list.
+        </p>
+
+<codeblock>[localhost:21000] > create database experiments;
+[localhost:21000] > show databases;
++--------------------------+
+| name                     |
++--------------------------+
+| _impala_builtins         |
+| ctas                     |
+| d1                       |
+| d2                       |
+| d3                       |
+| default                  |
+| experiments              |
+| explain_plans            |
+| external_table           |
+| file_formats             |
+| tpc                      |
++--------------------------+
+[localhost:21000] > show databases like 'exp*';
++---------------+
+| name          |
++---------------+
+| experiments   |
+| explain_plans |
++---------------+
+</codeblock>
+
+        <p>
+          The following example creates a new table, <codeph>T1</codeph>. To illustrate a common mistake, it creates this table inside
+          the wrong database, the <codeph>TPC</codeph> database where the previous example ended. The <codeph>ALTER
+          TABLE</codeph> statement lets you move the table to the intended database, <codeph>EXPERIMENTS</codeph>, as part of a rename operation.
+          The <codeph>USE</codeph> statement is always needed to switch to a new database, and the
+          <codeph>current_database()</codeph> function confirms which database the session is in, to avoid these
+          kinds of mistakes.
+        </p>
+
+<codeblock>[localhost:21000] > create table t1 (x int);
+
+[localhost:21000] > show tables;
++------------------------+
+| name                   |
++------------------------+
+| city                   |
+| customer               |
+| customer_address       |
+| customer_demographics  |
+| household_demographics |
+| item                   |
+| promotion              |
+| store                  |
+| store2                 |
+| store_sales            |
+| t1                     |
+| ticket_view            |
+| time_dim               |
+| tpc_tables             |
++------------------------+
+[localhost:21000] > select current_database();
++--------------------+
+| current_database() |
++--------------------+
+| tpc                |
++--------------------+
+[localhost:21000] > alter table t1 rename to experiments.t1;
+[localhost:21000] > use experiments;
+[localhost:21000] > show tables;
++------+
+| name |
++------+
+| t1   |
++------+
+[localhost:21000] > select current_database();
++--------------------+
+| current_database() |
++--------------------+
+| experiments        |
++--------------------+
+</codeblock>
+
+        <p>
+          For your initial experiments with tables, you can use ones with just a few columns and a few rows, and
+          text-format data files.
+        </p>
+
+        <note>
+          As you graduate to more realistic scenarios, you will use more elaborate tables with many columns,
+          features such as partitioning, and file formats such as Parquet. When dealing with realistic data
+          volumes, you will bring in data using <codeph>LOAD DATA</codeph> or <codeph>INSERT ... SELECT</codeph>
+          statements to operate on millions or billions of rows at once.
+        </note>
+
+        <p>
+          The following example sets up a couple of simple tables with a few rows, and performs queries involving
+          sorting, aggregate functions and joins.
+        </p>
+
+<codeblock>[localhost:21000] > insert into t1 values (1), (3), (2), (4);
+[localhost:21000] > select x from t1 order by x desc;
++---+
+| x |
++---+
+| 4 |
+| 3 |
+| 2 |
+| 1 |
++---+
+[localhost:21000] > select min(x), max(x), sum(x), avg(x) from t1;
++--------+--------+--------+--------+
+| min(x) | max(x) | sum(x) | avg(x) |
++--------+--------+--------+--------+
+| 1      | 4      | 10     | 2.5    |
++--------+--------+--------+--------+
+
+[localhost:21000] > create table t2 (id int, word string);
+[localhost:21000] > insert into t2 values (1, "one"), (3, "three"), (5, 'five');
+[localhost:21000] > select word from t1 join t2 on (t1.x = t2.id);
++-------+
+| word  |
++-------+
+| one   |
+| three |
++-------+
+</codeblock>
+
+        <p>
+          After completing this tutorial, you should now know:
+        </p>
+
+        <ul>
+          <li>
+            How to tell which version of Impala is running on your system.
+          </li>
+
+          <li>
+            How to find the names of databases in an Impala instance, either displaying the full list or
+            searching for specific names.
+          </li>
+
+          <li>
+            How to find the names of tables in an Impala database, either displaying the full list or
+            searching for specific names.
+          </li>
+
+          <li>
+            How to switch between databases and check which database you are currently in.
+          </li>
+
+          <li>
+            How to learn the column names and types of a table.
+          </li>
+
+          <li>
+            How to create databases and tables, insert small amounts of test data, and run simple queries.
+          </li>
+        </ul>
+      </conbody>
+    </concept>
+
+    <concept audience="Cloudera" id="tutorial_quickstart_vm">
+
+      <title>Setting Up Impala with the QuickStart VM</title>
+
+      <conbody>
+
+        <p>
+          This tutorial scenario shows how to set up the Cloudera QuickStart VM, load some sample data, and begin
+          experimenting with Impala inside this virtualized environment.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept audience="Cloudera" id="tutorial_hdfs">
+
+      <title>Exploring the HDFS Directory Structure</title>
+
+      <conbody>
+
+        <p>
+          This tutorial scenario illustrates the HDFS directory structures that correspond to various
+          Impala databases, tables, and partitions. It also shows how data directories are shared between
+          Impala and Hive, because of the shared metastore database.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept audience="Cloudera" id="tutorial_external_table">
+
+      <title/>
+
+      <conbody>
+
+        <p>
+          In this tutorial scenario, you create a simple text-format data file in HDFS and then define an Impala
+          table that refers to the data in its original location.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="tutorial_csv_setup">
+
+      <title>Load CSV Data from Local Files</title>
+
+      <conbody>
+
+        <p>
+          This scenario illustrates how to create some very small tables, suitable for first-time users to
+          experiment with Impala SQL features. <codeph>TAB1</codeph> and <codeph>TAB2</codeph> are loaded with data
+          from files in HDFS. A subset of data is copied from <codeph>TAB1</codeph> into <codeph>TAB3</codeph>.
+        </p>
+
+        <p>
+          Populate HDFS with the data you want to query. To begin this process, create one or more new
+          subdirectories underneath your user directory in HDFS. The data for each table resides in a separate
+          subdirectory. Substitute your own username for <codeph>cloudera</codeph> where appropriate. This example
+          uses the <codeph>-p</codeph> option with the <codeph>mkdir</codeph> operation to create any necessary
+          parent directories if they do not already exist.
+        </p>
+
+<codeblock>$ whoami
+cloudera
+$ hdfs dfs -ls /user
+Found 3 items
+drwxr-xr-x   - cloudera cloudera            0 2013-04-22 18:54 /user/cloudera
+drwxrwx---   - mapred   mapred              0 2013-03-15 20:11 /user/history
+drwxr-xr-x   - hue      supergroup          0 2013-03-15 20:10 /user/hive
+<!-- $ hdfs dfs -mkdir -p /user/cloudera/sample_data/tab1 -->
+$ hdfs dfs -mkdir -p /user/cloudera/sample_data/tab1 /user/cloudera/sample_data/tab2</codeblock>
+
+        <p>
+          Here is some sample data, for two tables named <codeph>TAB1</codeph> and <codeph>TAB2</codeph>.
+        </p>
+
+        <p>
+          Copy the following content to <codeph>.csv</codeph> files in your local filesystem:
+        </p>
+
+        <p>
+          <filepath>tab1.csv</filepath>:
+        </p>
+
+<codeblock>1,true,123.123,2012-10-24 08:55:00
+2,false,1243.5,2012-10-25 13:40:00
+3,false,24453.325,2008-08-22 09:33:21.123
+4,false,243423.325,2007-05-12 22:32:21.33454
+5,true,243.325,1953-04-22 09:11:33
+</codeblock>
+
+        <p>
+          <filepath>tab2.csv</filepath>:
+        </p>
+
+<codeblock>1,true,12789.123
+2,false,1243.5
+3,false,24453.325
+4,false,2423.3254
+5,true,243.325
+60,false,243565423.325
+70,true,243.325
+80,false,243423.325
+90,true,243.325
+</codeblock>
+
+        <p>
+          Put each <codeph>.csv</codeph> file into a separate HDFS directory using commands like the following,
+          which use paths available in the Impala Demo VM:
+        </p>
+
+<codeblock><!-- $ hdfs dfs -mkdir /user/cloudera/tab1 -->$ hdfs dfs -put tab1.csv /user/cloudera/sample_data/tab1
+$ hdfs dfs -ls /user/cloudera/sample_data/tab1
+Found 1 items
+-rw-r--r--   1 cloudera cloudera        192 2013-04-02 20:08 /user/cloudera/sample_data/tab1/tab1.csv
+
+<!-- $ hdfs dfs -mkdir /user/cloudera/tab2 -->
+$ hdfs dfs -put tab2.csv /user/cloudera/sample_data/tab2
+$ hdfs dfs -ls /user/cloudera/sample_data/tab2
+Found 1 items
+-rw-r--r--   1 cloudera cloudera        158 2013-04-02 20:09 /user/cloudera/sample_data/tab2/tab2.csv
+</codeblock>
+
+        <p>
+          The name of each data file is not significant. In fact, when Impala examines the contents of the data
+          directory for the first time, it considers all files in the directory to make up the data of the table,
+          regardless of how many files there are or what the files are named.
+        </p>
+
+        <p>
+          To understand what paths are available within your own HDFS filesystem and what the permissions are for
+          the various directories and files, issue <codeph>hdfs dfs -ls /</codeph> and work your way down the tree
+          doing <codeph>-ls</codeph> operations for the various directories.
+        </p>
+
+        <p>
+          Use the <codeph>impala-shell</codeph> command to create tables, either interactively or through a SQL
+          script.
+        </p>
+
+        <p>
+          The following example shows creating three tables. For each table, the example shows creating columns
+          with various attributes such as Boolean or integer types. The example also includes commands that provide
+          information about how the data is formatted, such as rows terminating with commas, which makes sense in
+          the case of importing data from a <codeph>.csv</codeph> file. Where we already have <codeph>.csv</codeph>
+          files containing data in the HDFS directory tree, we specify the location of the directory containing the
+          appropriate <codeph>.csv</codeph> file. Impala considers all the data from all the files in that
+          directory to represent the data for the table.
+        </p>
+
+<codeblock>DROP TABLE IF EXISTS tab1;
+-- The EXTERNAL clause means the data is located outside the central location
+-- for Impala data files and is preserved when the associated Impala table is dropped.
+-- We expect the data to already exist in the directory specified by the LOCATION clause.
+CREATE EXTERNAL TABLE tab1
+(
+   id INT,
+   col_1 BOOLEAN,
+   col_2 DOUBLE,
+   col_3 TIMESTAMP
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+LOCATION '/user/cloudera/sample_data/tab1';
+
+DROP TABLE IF EXISTS tab2;
+-- TAB2 is an external table, similar to TAB1.
+CREATE EXTERNAL TABLE tab2
+(
+   id INT,
+   col_1 BOOLEAN,
+   col_2 DOUBLE
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+LOCATION '/user/cloudera/sample_data/tab2';
+
+DROP TABLE IF EXISTS tab3;
+-- Leaving out the EXTERNAL clause means the data will be managed
+-- in the central Impala data directory tree. Rather than reading
+-- existing data files when the table is created, we load the
+-- data after creating the table.
+CREATE TABLE tab3
+(
+   id INT,
+   col_1 BOOLEAN,
+   col_2 DOUBLE,
+   month INT,
+   day INT
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+</codeblock>
+
+        <note>
+          Getting through these <codeph>CREATE TABLE</codeph> statements successfully is an important validation
+          step to confirm everything is configured correctly with the Hive metastore and HDFS permissions. If you
+          receive any errors during the <codeph>CREATE TABLE</codeph> statements:
+          <ul>
+            <li>
+              Make sure you followed the installation instructions closely, in
+              <xref href="impala_install.xml#install"/>.
+            </li>
+
+            <li>
+              Make sure the <codeph>hive.metastore.warehouse.dir</codeph> property points to a directory that
+              Impala can write to. The ownership should be <codeph>hive:hive</codeph>, and the
+              <codeph>impala</codeph> user should also be a member of the <codeph>hive</codeph> group.
+            </li>
+
+            <li>
+              If the value of <codeph>hive.metastore.warehouse.dir</codeph> is different in the Cloudera Manager
+              dialogs and in the Hive shell, you might need to
+              <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_managing_roles.html" scope="external" format="html">designate
+              the hosts running <cmdname>impalad</cmdname> with the <q>gateway</q> role for Hive</xref>, and
+              <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_client_config.html" scope="external" format="html">deploy
+              the client configuration files</xref> to those hosts.
+            </li>
+          </ul>
+        </note>
+      </conbody>
+    </concept>
+
+    <concept id="tutorial_create_table">
+
+      <title>Point an Impala Table at Existing Data Files</title>
+
+      <conbody>
+
+        <p>
+          A convenient way to set up data for Impala to access is to use an external table, where the data already
+          exists in a set of HDFS files and you just point the Impala table at the directory containing those
+          files. For example, you might run in <codeph>impala-shell</codeph> a <codeph>*.sql</codeph> file with
+          contents similar to the following, to create an Impala table that accesses an existing data file used by
+          Hive.
+        </p>
+
+        <p>
+          The following examples set up 2 tables, referencing the paths and sample data supplied with the Cloudera
+          QuickStart VM. For historical reasons, the data physically resides in an HDFS directory tree under
+          <filepath>/user/hive</filepath>, although this particular data is entirely managed by Impala rather than
+          Hive. When we create an external table, we specify the directory containing one or more data files, and
+          Impala queries the combined content of all the files inside that directory. Here is how we examine the
+          directories and files within the HDFS filesystem:
+        </p>
+
+<codeblock>$ cd ~/cloudera/datasets
+$ ./tpcds-setup.sh
+... Downloads and unzips the kit, builds the data and loads it into HDFS ...
+$ hdfs dfs -ls /user/hive/tpcds/customer
+Found 1 items
+-rw-r--r--   1 cloudera supergroup   13209372 2013-03-22 18:09 /user/hive/tpcds/customer/customer.dat
+$ hdfs dfs -cat /user/hive/tpcds/customer/customer.dat | more
+1|AAAAAAAABAAAAAAA|980124|7135|32946|2452238|2452208|Mr.|Javier|Lewis|Y|9|12|1936|CHILE||Javie
+r.Lewis@VFAxlnZEvOx.org|2452508|
+2|AAAAAAAACAAAAAAA|819667|1461|31655|2452318|2452288|Dr.|Amy|Moses|Y|9|4|1966|TOGO||Amy.Moses@
+Ovk9KjHH.com|2452318|
+3|AAAAAAAADAAAAAAA|1473522|6247|48572|2449130|2449100|Miss|Latisha|Hamilton|N|18|9|1979|NIUE||
+Latisha.Hamilton@V.com|2452313|
+4|AAAAAAAAEAAAAAAA|1703214|3986|39558|2450030|2450000|Dr.|Michael|White|N|7|6|1983|MEXICO||Mic
+hael.White@i.org|2452361|
+5|AAAAAAAAFAAAAAAA|953372|4470|36368|2449438|2449408|Sir|Robert|Moran|N|8|5|1956|FIJI||Robert.
+Moran@Hh.edu|2452469|
+...
+</codeblock>
+
+        <p>
+          Here is a SQL script to set up Impala tables pointing to some of these data files in HDFS.
+          (The script in the VM sets up tables like this through Hive; ignore those tables
+          for purposes of this demonstration.)
+          Save the following as <filepath>customer_setup.sql</filepath>:
+        </p>
+
+<codeblock>--
+-- store_sales fact table and surrounding dimension tables only
+--
+create database tpcds;
+use tpcds;
+
+drop table if exists customer;
+create external table customer
+(
+    c_customer_sk             int,
+    c_customer_id             string,
+    c_current_cdemo_sk        int,
+    c_current_hdemo_sk        int,
+    c_current_addr_sk         int,
+    c_first_shipto_date_sk    int,
+    c_first_sales_date_sk     int,
+    c_salutation              string,
+    c_first_name              string,
+    c_last_name               string,
+    c_preferred_cust_flag     string,
+    c_birth_day               int,
+    c_birth_month             int,
+    c_birth_year              int,
+    c_birth_country           string,
+    c_login                   string,
+    c_email_address           string,
+    c_last_review_date        string
+)
+row format delimited fields terminated by '|'
+location '/user/hive/tpcds/customer';
+
+drop table if exists customer_address;
+create external table customer_address
+(
+    ca_address_sk             int,
+    ca_address_id             string,
+    ca_street_number          string,
+    ca_street_name            string,
+    ca_street_type            string,
+    ca_suite_number           string,
+    ca_city                   string,
+    ca_county                 string,
+    ca_state                  string,
+    ca_zip                    string,
+    ca_country                string,
+    ca_gmt_offset             float,
+    ca_location_type          string
+)
+row format delimited fields terminated by '|'
+location '/user/hive/tpcds/customer_address';
+</codeblock>
+
+        <p>
+          We would run this script with a command such as:
+<codeblock>impala-shell -i localhost -f customer_setup.sql</codeblock>
+        </p>
+
+      </conbody>
+    </concept>
+
+    <concept id="tutorial_describe_impala">
+
+      <title>Describe the Impala Table</title>
+
+      <conbody>
+
+        <p>
+          Now that you have updated the database metadata that Impala caches, you can confirm that the expected
+          tables are accessible by Impala and examine the attributes of one of the tables. We created these tables
+          in the database named <codeph>default</codeph>. If the tables were in a database other than the default,
+          we would issue a command <codeph>use <varname>db_name</varname> </codeph> to switch to that database
+          before examining or querying its tables. We could also qualify the name of a table by prepending the
+          database name, for example <codeph>default.customer</codeph> and <codeph>default.customer_name</codeph>.
+        </p>
+
+<codeblock>[impala-host:21000] &gt; show databases
+Query finished, fetching results ...
+default
+Returned 1 row(s) in 0.00s
+[impala-host:21000] &gt; show tables
+Query finished, fetching results ...
+customer
+customer_address
+Returned 2 row(s) in 0.00s
+[impala-host:21000] &gt; describe customer_address
++------------------+--------+---------+
+| name             | type   | comment |
++------------------+--------+---------+
+| ca_address_sk    | int    |         |
+| ca_address_id    | string |         |
+| ca_street_number | string |         |
+| ca_street_name   | string |         |
+| ca_street_type   | string |         |
+| ca_suite_number  | string |         |
+| ca_city          | string |         |
+| ca_county        | string |         |
+| ca_state         | string |         |
+| ca_zip           | string |         |
+| ca_country       | string |         |
+| ca_gmt_offset    | float  |         |
+| ca_location_type | string |         |
++------------------+--------+---------+
+Returned 13 row(s) in 0.01
+</codeblock>
+      </conbody>
+    </concept>
+
+    <concept id="tutorial_query_impala">
+
+      <title>Query the Impala Table</title>
+
+      <conbody>
+
+        <p>
+          You can query data contained in the tables. Impala coordinates the query execution across a single node
+          or multiple nodes depending on your configuration, without the overhead of running MapReduce jobs to
+          perform the intermediate processing.
+        </p>
+
+        <p>
+          There are a variety of ways to execute queries on Impala:
+        </p>
+
+        <ul>
+          <li>
+            Using the <codeph>impala-shell</codeph> command in interactive mode:
+<codeblock>$ impala-shell -i impala-host
+Connected to localhost:21000
+[impala-host:21000] &gt; select count(*) from customer_address;
+50000
+Returned 1 row(s) in 0.37s
+</codeblock>
+          </li>
+
+          <li>
+            Passing a set of commands contained in a file:
+<codeblock>$ impala-shell -i impala-host -f myquery.sql
+Connected to localhost:21000
+50000
+Returned 1 row(s) in 0.19s</codeblock>
+          </li>
+
+          <li>
+            Passing a single command to the <codeph>impala-shell</codeph> command. The query is executed, the
+            results are returned, and the shell exits. Make sure to quote the command, preferably with single
+            quotation marks to avoid shell expansion of characters such as <codeph>*</codeph>.
+<codeblock>$ impala-shell -i impala-host -q 'select count(*) from customer_address'
+Connected to localhost:21000
+50000
+Returned 1 row(s) in 0.29s</codeblock>
+          </li>
+        </ul>
+      </conbody>
+    </concept>
+
+    <concept id="tutorial_etl">
+
+      <title>Data Loading and Querying Examples</title>
+
+      <conbody>
+
+        <p>
+          This section describes how to create some sample tables and load data into them. These tables can then be
+          queried using the Impala shell.
+        </p>
+      </conbody>
+
+      <concept id="tutorial_loading">
+
+        <title>Loading Data</title>
+
+        <conbody>
+
+          <p>
+            Loading data involves:
+          </p>
+
+          <ul>
+            <li>
+              Establishing a data set. The example below uses <codeph>.csv</codeph> files.
+            </li>
+
+            <li>
+              Creating tables to which to load data.
+            </li>
+
+            <li>
+              Loading the data into the tables you created.
+            </li>
+          </ul>
+
+<!--
+      <section id="tut_hdfs_perms">
+
+        <title>
+          Modifying Directory Permissions
+        </title>
+
+        <p>
+          Change permission settings so Hive and Impala are both able read and write to the Hive warehouse directory.
+          This process involves changing permissions for the root warehouse directory, then modifying the client
+          <codeph>hive-site.xml</codeph> file so newly created files inherit these permissions.
+        </p>
+
+        <p>
+          Begin by modifying the file permissions. For example, if the warehouse directory is
+          <codeph>/user/hive/warehouse</codeph>, issue the following command:
+        </p>
+
+<codeblock>hdfs dfs -chmod -R 775 /user/hive/warehouse</codeblock>
+        <p>
+          Add the following property to the Hive client <codeph>hive-site.xml</codeph> file:
+        </p>
+
+<codeblock>&lt;property&gt;
+  &lt;name&gt;hive.warehouse.subdir.inherit.perms&lt;/name&gt;
+  &lt;value&gt;true&lt;/value&gt;
+  &lt;description&gt;Set this to true if the table directories should inherit the
+    permission of the warehouse or database directory instead of being created
+    with the permissions derived from dfs umask&lt;/description&gt;
+&lt;/property&gt;</codeblock>
+
+      </section>
+-->
+
+<!-- To do: This is from old days when Impala didn't support LOAD DATA; re-do to show in impala-shell.
+      <section id="tut_loading_csv">
+
+        <title>
+          Loading .csv Data into Tables
+        </title>
+
+        <p>
+          In the Hive shell, load data into TAB1 and TAB2:
+        </p>
+
+
+<codeblock>LOAD DATA LOCAL INPATH 'tab1.csv' OVERWRITE INTO TABLE tab1;
+LOAD DATA LOCAL INPATH 'tab2.csv' OVERWRITE INTO TABLE tab2;</codeblock>
+
+      </section>
+-->
+
+<!--
+      <section id="tut_updating_metadata">
+
+        <title>
+          Updating Metadata
+        </title>
+
+        <p>
+          While you have created new tables and loaded data, Impala does not have information about these new tables. To
+          enable Impala to work with the data in these new tables, connect to an Impala host and then refresh the Impala
+          metadata. For example, if you had an Impala host named <codeph>impala-host</codeph> using the default
+          port, you would issue the following command:
+        </p>
+
+<codeblock>$ impala-shell
+[Not connected] &gt; connect impala-host
+[impala-host:21000] &gt; refresh</codeblock>
+
+      </section>
+-->
+        </conbody>
+      </concept>
+
+      <concept id="tutorial_queries">
+
+        <title>Sample Queries</title>
+
+        <conbody>
+
+          <p>
+            To run these sample queries, create a SQL query file <codeph>query.sql</codeph>, copy and paste each
+            query into the query file, and then run the query file using the shell. For example, to run
+            <codeph>query.sql</codeph> on <codeph>impala-host</codeph>, you might use the command:
+          </p>
+
+<codeblock>impala-shell.sh -i impala-host -f query.sql</codeblock>
+
+          <p>
+            The examples and results below assume you have loaded the sample data into the tables as described
+            above.
+          </p>
+
+          <example>
+
+            <title>Example: Examining Contents of Tables</title>
+
+            <p>
+              Let's start by verifying that the tables do contain the data we expect. Because Impala often deals
+              with tables containing millions or billions of rows, when examining tables of unknown size, include
+              the <codeph>LIMIT</codeph> clause to avoid huge amounts of unnecessary output, as in the final query.
+              (If your interactive query starts displaying an unexpected volume of data, press
+              <codeph>Ctrl-C</codeph> in <codeph>impala-shell</codeph> to cancel the query.)
+            </p>
+
+<codeblock>SELECT * FROM tab1;
+SELECT * FROM tab2;
+SELECT * FROM tab2 LIMIT 5;</codeblock>
+
+            <p>
+              Results:
+            </p>
+
+<codeblock>+----+-------+------------+-------------------------------+
+| id | col_1 | col_2      | col_3                         |
++----+-------+------------+-------------------------------+
+| 1  | true  | 123.123    | 2012-10-24 08:55:00           |
+| 2  | false | 1243.5     | 2012-10-25 13:40:00           |
+| 3  | false | 24453.325  | 2008-08-22 09:33:21.123000000 |
+| 4  | false | 243423.325 | 2007-05-12 22:32:21.334540000 |
+| 5  | true  | 243.325    | 1953-04-22 09:11:33           |
++----+-------+------------+-------------------------------+
+
++----+-------+---------------+
+| id | col_1 | col_2         |
++----+-------+---------------+
+| 1  | true  | 12789.123     |
+| 2  | false | 1243.5        |
+| 3  | false | 24453.325     |
+| 4  | false | 2423.3254     |
+| 5  | true  | 243.325       |
+| 60 | false | 243565423.325 |
+| 70 | true  | 243.325       |
+| 80 | false | 243423.325    |
+| 90 | true  | 243.325       |
++----+-------+---------------+
+
++----+-------+-----------+
+| id | col_1 | col_2     |
++----+-------+-----------+
+| 1  | true  | 12789.123 |
+| 2  | false | 1243.5    |
+| 3  | false | 24453.325 |
+| 4  | false | 2423.3254 |
+| 5  | true  | 243.325   |
++----+-------+-----------+</codeblock>
+
+          </example>
+
+          <example>
+
+            <title>Example: Aggregate and Join</title>
+
+<codeblock>SELECT tab1.col_1, MAX(tab2.col_2), MIN(tab2.col_2)
+FROM tab2 JOIN tab1 USING (id)
+GROUP BY col_1 ORDER BY 1 LIMIT 5;</codeblock>
+
+            <p>
+              Results:
+            </p>
+
+<codeblock>+-------+-----------------+-----------------+
+| col_1 | max(tab2.col_2) | min(tab2.col_2) |
++-------+-----------------+-----------------+
+| false | 24453.325       | 1243.5          |
+| true  | 12789.123       | 243.325         |
++-------+-----------------+-----------------+</codeblock>
+
+          </example>
+
+          <example>
+
+            <title>Example: Subquery, Aggregate and Joins</title>
+
+<codeblock>SELECT tab2.*
+FROM tab2,
+(SELECT tab1.col_1, MAX(tab2.col_2) AS max_col2
+ FROM tab2, tab1
+ WHERE tab1.id = tab2.id
+ GROUP BY col_1) subquery1
+WHERE subquery1.max_col2 = tab2.col_2;</codeblock>
+
+            <p>
+              Results:
+            </p>
+
+<codeblock>+----+-------+-----------+
+| id | col_1 | col_2     |
++----+-------+-----------+
+| 1  | true  | 12789.123 |
+| 3  | false | 24453.325 |
++----+-------+-----------+</codeblock>
+
+          </example>
+
+          <example>
+
+            <title>Example: INSERT Query</title>
+
+<codeblock>INSERT OVERWRITE TABLE tab3
+SELECT id, col_1, col_2, MONTH(col_3), DAYOFMONTH(col_3)
+FROM tab1 WHERE YEAR(col_3) = 2012;</codeblock>
+
+            <p>
+              Query <codeph>TAB3</codeph> to check the result:
+            </p>
+
+<codeblock>SELECT * FROM tab3;
+</codeblock>
+
+            <p>
+              Results:
+            </p>
+
+<codeblock>+----+-------+---------+-------+-----+
+| id | col_1 | col_2   | month | day |
++----+-------+---------+-------+-----+
+| 1  | true  | 123.123 | 10    | 24  |
+| 2  | false | 1243.5  | 10    | 25  |
++----+-------+---------+-------+-----+</codeblock>
+
+          </example>
+        </conbody>
+      </concept>
+    </concept>
+  </concept>
+
+  <concept id="tut_advanced">
+
+    <title>Advanced Tutorials</title>
+
+    <conbody>
+
+      <p>
+        These tutorials walk you through advanced scenarios or specialized features.
+      </p>
+
+      <p outputclass="toc inpage"/>
+    </conbody>
+
+    <concept id="tut_external_partition_data">
+
+      <title>Attaching an External Partitioned Table to an HDFS Directory Structure</title>
+
+      <conbody>
+
+        <p>
+          This tutorial shows how you might set up a directory tree in HDFS, put data files into the lowest-level
+          subdirectories, and then use an Impala external table to query the data files from their original
+          locations.
+        </p>
+
+        <p>
+          The tutorial uses a table with web log data, with separate subdirectories for the year, month, day, and
+          host. For simplicity, we use a tiny amount of CSV data, loading the same data into each partition.
+        </p>
+
+        <p>
+          First, we make an Impala partitioned table for CSV data, and look at the underlying HDFS directory
+          structure to understand the directory structure to re-create elsewhere in HDFS. The columns
+          <codeph>field1</codeph>, <codeph>field2</codeph>, and <codeph>field3</codeph> correspond to the contents
+          of the CSV data files. The <codeph>year</codeph>, <codeph>month</codeph>, <codeph>day</codeph>, and
+          <codeph>host</codeph> columns are all represented as subdirectories within the table structure, and are
+          not part of the CSV files. We use <codeph>STRING</codeph> for each of these columns so that we can
+          produce consistent subdirectory names, with leading zeros for a consistent length.
+        </p>
+
+<codeblock>create database external_partitions;
+use external_partitions;
+create table logs (field1 string, field2 string, field3 string)
+  partitioned by (year string, month string , day string, host string)
+  row format delimited fields terminated by ',';
+insert into logs partition (year="2013", month="07", day="28", host="host1") values ("foo","foo","foo");
+insert into logs partition (year="2013", month="07", day="28", host="host2") values ("foo","foo","foo");
+insert into logs partition (year="2013", month="07", day="29", host="host1") values ("foo","foo","foo");
+insert into logs partition (year="2013", month="07", day="29", host="host2") values ("foo","foo","foo");
+insert into logs partition (year="2013", month="08", day="01", host="host1") values ("foo","foo","foo");
+</codeblock>
+
+        <p>
+          Back in the Linux shell, we examine the HDFS directory structure. (Your Impala data directory might be in
+          a different location; for historical reasons, it is sometimes under the HDFS path
+          <filepath>/user/hive/warehouse</filepath>.) We use the <codeph>hdfs dfs -ls</codeph> command to examine
+          the nested subdirectories corresponding to each partitioning column, with separate subdirectories at each
+          level (with <codeph>=</codeph> in their names) representing the different values for each partitioning
+          column. When we get to the lowest level of subdirectory, we use the <codeph>hdfs dfs -cat</codeph>
+          command to examine the data file and see CSV-formatted data produced by the <codeph>INSERT</codeph>
+          statement in Impala.
+        </p>
+
+<codeblock>$ hdfs dfs -ls /user/impala/warehouse/external_partitions.db
+Found 1 items
+drwxrwxrwt   - impala hive          0 2013-08-07 12:24 /user/impala/warehouse/external_partitions.db/logs
+$ hdfs dfs -ls /user/impala/warehouse/external_partitions.db/logs
+Found 1 items
+drwxr-xr-x   - impala hive          0 2013-08-07 12:24 /user/impala/warehouse/external_partitions.db/logs/year=2013
+$ hdfs dfs -ls /user/impala/warehouse/external_partitions.db/logs/year=2013
+Found 2 items
+drwxr-xr-x   - impala hive          0 2013-08-07 12:23 /user/impala/warehouse/external_partitions.db/logs/year=2013/month=07
+drwxr-xr-x   - impala hive          0 2013-08-07 12:24 /user/impala/warehouse/external_partitions.db/logs/year=2013/month=08
+$ hdfs dfs -ls /user/impala/warehouse/external_partitions.db/logs/year=2013/month=07
+Found 2 items
+drwxr-xr-x   - impala hive          0 2013-08-07 12:22 /user/impala/warehouse/external_partitions.db/logs/year=2013/month=07/day=28
+drwxr-xr-x   - impala hive          0 2013-08-07 12:23 /user/impala/warehouse/external_partitions.db/logs/year=2013/month=07/day=29
+$ hdfs dfs -ls /user/impala/warehouse/external_partitions.db/logs/year=2013/month=07/day=28
+Found 2 items
+drwxr-xr-x   - impala hive          0 2013-08-07 12:21 /user/impala/warehouse/external_partitions.db/logs/year=2013/month=07/day=28/host=host1
+drwxr-xr-x   - impala hive          0 2013-08-07 12:22 /user/impala/warehouse/external_partitions.db/logs/year=2013/month=07/day=28/host=host2
+$ hdfs dfs -ls /user/impala/warehouse/external_partitions.db/logs/year=2013/month=07/day=28/host=host1
+Found 1 items
+-rw-r--r--   3 impala hive         12 2013-08-07 12:21 /user/impala/warehouse/external_partiti
+ons.db/logs/year=2013/month=07/day=28/host=host1/3981726974111751120--8907184999369517436_822630111_data.0
+$ hdfs dfs -cat /user/impala/warehouse/external_partitions.db/logs/year=2013/month=07/day=28/\
+host=host1/3981726974111751120--8 907184999369517436_822630111_data.0
+foo,foo,foo
+</codeblock>
+
+        <p>
+          Still in the Linux shell, we use <codeph>hdfs dfs -mkdir</codeph> to create several data directories
+          outside the HDFS directory tree that Impala controls (<filepath>/user/impala/warehouse</filepath> in this
+          example, maybe different in your case). Depending on your configuration, you might need to log in as a
+          user with permission to write into this HDFS directory tree; for example, the commands shown here were
+          run while logged in as the <codeph>hdfs</codeph> user.
+        </p>
+
+<codeblock>$ hdfs dfs -mkdir -p /user/impala/data/logs/year=2013/month=07/day=28/host=host1
+$ hdfs dfs -mkdir -p /user/impala/data/logs/year=2013/month=07/day=28/host=host2
+$ hdfs dfs -mkdir -p /user/impala/data/logs/year=2013/month=07/day=28/host=host1
+$ hdfs dfs -mkdir -p /user/impala/data/logs/year=2013/month=07/day=29/host=host1
+$ hdfs dfs -mkdir -p /user/impala/data/logs/year=2013/month=08/day=01/host=host1
+</codeblock>
+
+        <p>
+          We make a tiny CSV file, with values different than in the <codeph>INSERT</codeph> statements used
+          earlier, and put a copy within each subdirectory that we will use as an Impala partition.
+        </p>
+
+<codeblock>$ cat &gt;dummy_log_data
+bar,baz,bletch
+$ hdfs dfs -mkdir -p /user/impala/data/external_partitions/year=2013/month=08/day=01/host=host1
+$ hdfs dfs -mkdir -p /user/impala/data/external_partitions/year=2013/month=07/day=28/host=host1
+$ hdfs dfs -mkdir -p /user/impala/data/external_partitions/year=2013/month=07/day=28/host=host2
+$ hdfs dfs -mkdir -p /user/impala/data/external_partitions/year=2013/month=07/day=29/host=host1
+$ hdfs dfs -put dummy_log_data /user/impala/data/logs/year=2013/month=07/day=28/host=host1
+$ hdfs dfs -put dummy_log_data /user/impala/data/logs/year=2013/month=07/day=28/host=host2
+$ hdfs dfs -put dummy_log_data /user/impala/data/logs/year=2013/month=07/day=29/host=host1
+$ hdfs dfs -put dummy_log_data /user/impala/data/logs/year=2013/month=08/day=01/host=host1
+</codeblock>
+
+        <p>
+          Back in the <cmdname>impala-shell</cmdname> interpreter, we move the original Impala-managed table aside,
+          and create a new <i>external</i> table with a <codeph>LOCATION</codeph> clause pointing to the directory
+          under which we have set up all the partition subdirectories and data files.
+        </p>
+
+<codeblock>use external_partitions;
+alter table logs rename to logs_original;
+create external table logs (field1 string, field2 string, field3 string)
+  partitioned by (year string, month string, day string, host string)
+  row format delimited fields terminated by ','
+  location '/user/impala/data/logs';
+</codeblock>
+
+        <p>
+          Because partition subdirectories and data files come and go during the data lifecycle, you must identify
+          each of the partitions through an <codeph>ALTER TABLE</codeph> statement before Impala recognizes the
+          data files they contain.
+        </p>
+
+<codeblock>alter table logs add partition (year="2013",month="07",day="28",host="host1")
+alter table log_type add partition (year="2013",month="07",day="28",host="host2");
+alter table log_type add partition (year="2013",month="07",day="29",host="host1");
+alter table log_type add partition (year="2013",month="08",day="01",host="host1");
+</codeblock>
+
+        <p>
+          We issue a <codeph>REFRESH</codeph> statement for the table, always a safe practice when data files have
+          been manually added, removed, or changed. Then the data is ready to be queried. The <codeph>SELECT
+          *</codeph> statement illustrates that the data from our trivial CSV file was recognized in each of the
+          partitions where we copied it. Although in this case there are only a few rows, we include a
+          <codeph>LIMIT</codeph> clause on this test query just in case there is more data than we expect.
+        </p>
+
+<codeblock>refresh log_type;
+select * from log_type limit 100;
++--------+--------+--------+------+-------+-----+-------+
+| field1 | field2 | field3 | year | month | day | host  |
++--------+--------+--------+------+-------+-----+-------+
+| bar    | baz    | bletch | 2013 | 07    | 28  | host1 |
+| bar    | baz    | bletch | 2013 | 08    | 01  | host1 |
+| bar    | baz    | bletch | 2013 | 07    | 29  | host1 |
+| bar    | baz    | bletch | 2013 | 07    | 28  | host2 |
++--------+--------+--------+------+-------+-----+-------+
+</codeblock>
+      </conbody>
+    </concept>
+
+    <concept id="tutorial_impala_hive">
+
+      <title>Switching Back and Forth Between Impala and Hive</title>
+
+      <conbody>
+
+        <p>
+          Sometimes, you might find it convenient to switch to the Hive shell to perform some data loading or
+          transformation operation, particularly on file formats such as RCFile, SequenceFile, and Avro that Impala
+          currently can query but not write to.
+        </p>
+
+        <p>
+          Whenever you create, drop, or alter a table or other kind of object through Hive, the next time you
+          switch back to the <cmdname>impala-shell</cmdname> interpreter, issue a one-time <codeph>INVALIDATE
+          METADATA</codeph> statement so that Impala recognizes the new or changed object.
+        </p>
+
+        <p>
+          Whenever you load, insert, or change data in an existing table through Hive (or even through manual HDFS
+          operations such as the <cmdname>hdfs</cmdname> command), the next time you switch back to the
+          <cmdname>impala-shell</cmdname> interpreter, issue a one-time <codeph>REFRESH
+          <varname>table_name</varname></codeph> statement so that Impala recognizes the new or changed data.
+        </p>
+
+        <p>
+          For examples showing how this process works for the <codeph>REFRESH</codeph> statement, look at the
+          examples of creating RCFile and SequenceFile tables in Impala, loading data through Hive, and then
+          querying the data through Impala. See <xref href="impala_rcfile.xml#rcfile"/> and
+          <xref href="impala_seqfile.xml#seqfile"/> for those examples.
+        </p>
+
+        <p>
+          For examples showing how this process works for the <codeph>INVALIDATE METADATA</codeph> statement, look
+          at the example of creating and loading an Avro table in Hive, and then querying the data through Impala.
+          See <xref href="impala_avro.xml#avro"/> for that example.
+        </p>
+
+        <note rev="1.2.0">
+          <p rev="1.2.0">
+            Originally, Impala did not support UDFs, but this feature is available in Impala starting in Impala
+            1.2. Some <codeph>INSERT ... SELECT</codeph> transformations that you originally did through Hive can
+            now be done through Impala. See <xref href="impala_udf.xml#udfs"/> for details.
+          </p>
+
+          <p rev="1.2.0">
+            Prior to Impala 1.2, the <codeph>REFRESH</codeph> and <codeph>INVALIDATE METADATA</codeph> statements
+            needed to be issued on each Impala node to which you connected and issued queries. In Impala 1.2 and
+            higher, when you issue either of those statements on any Impala node, the results are broadcast to all
+            the Impala nodes in the cluster, making it truly a one-step operation after each round of DDL or ETL
+            operations in Hive.
+          </p>
+        </note>
+      </conbody>
+    </concept>
+
+    <concept rev="1.2.2" id="tut_cross_join">
+
+      <title>Cross Joins and Cartesian Products with the CROSS JOIN Operator</title>
+
+      <conbody>
+
+        <p>
+          Originally, Impala restricted join queries so that they had to include at least one equality comparison
+          between the columns of the tables on each side of the join operator. With the huge tables typically
+          processed by Impala, any miscoded query that produced a full Cartesian product as a result set could
+          consume a huge amount of cluster resources.
+        </p>
+
+        <p>
+          In Impala 1.2.2 and higher, this restriction is lifted when you use the <codeph>CROSS JOIN</codeph>
+          operator in the query. You still cannot remove all <codeph>WHERE</codeph> clauses from a query like
+          <codeph>SELECT * FROM t1 JOIN t2</codeph> to produce all combinations of rows from both tables. But you
+          can use the <codeph>CROSS JOIN</codeph> operator to explicitly request such a Cartesian product.
+          Typically, this operation is applicable for smaller tables, where the result set still fits within the
+          memory of a single Impala node.
+        </p>
+
+        <p>
+          The following example sets up data for use in a series of comic books where characters battle each other.
+          At first, we use an equijoin query, which only allows characters from the same time period and the same
+          planet to meet.
+        </p>
+
+<codeblock>[localhost:21000] &gt; create table heroes (name string, era string, planet string);
+[localhost:21000] &gt; create table villains (name string, era string, planet string);
+[localhost:21000] &gt; insert into heroes values
+                  &gt; ('Tesla','20th century','Earth'),
+                  &gt; ('Pythagoras','Antiquity','Earth'),
+                  &gt; ('Zopzar','Far Future','Mars');
+Inserted 3 rows in 2.28s
+[localhost:21000] &gt; insert into villains values
+                  &gt; ('Caligula','Antiquity','Earth'),
+                  &gt; ('John Dillinger','20th century','Earth'),
+                  &gt; ('Xibulor','Far Future','Venus');
+Inserted 3 rows in 1.93s
+[localhost:21000] &gt; select concat(heroes.name,' vs. ',villains.name) as battle
+                  &gt; from heroes join villains
+                  &gt; where heroes.era = villains.era and heroes.planet = villains.planet;
++--------------------------+
+| battle                   |
++--------------------------+
+| Tesla vs. John Dillinger |
+| Pythagoras vs. Caligula  |
++--------------------------+
+Returned 2 row(s) in 0.47s</codeblock>
+
+        <p>
+          Readers demanded more action, so we added elements of time travel and space travel so that any hero could
+          face any villain. Prior to Impala 1.2.2, this type of query was impossible because all joins had to
+          reference matching values between the two tables:
+        </p>
+
+<codeblock>[localhost:21000] &gt; -- Cartesian product not possible in Impala 1.1.
+                  &gt; select concat(heroes.name,' vs. ',villains.name) as battle from heroes join villains;
+ERROR: NotImplementedException: Join between 'heroes' and 'villains' requires at least one conjunctive equality predicate between the two tables</codeblock>
+
+        <p>
+          With Impala 1.2.2, we rewrite the query slightly to use <codeph>CROSS JOIN</codeph> rather than
+          <codeph>JOIN</codeph>, and now the result set includes all combinations:
+        </p>
+
+<codeblock>[localhost:21000] &gt; -- Cartesian product available in Impala 1.2.2 with the CROSS JOIN syntax.
+                  &gt; select concat(heroes.name,' vs. ',villains.name) as battle from heroes cross join villains;
++-------------------------------+
+| battle                        |
++-------------------------------+
+| Tesla vs. Caligula            |
+| Tesla vs. John Dillinger      |
+| Tesla vs. Xibulor             |
+| Pythagoras vs. Caligula       |
+| Pythagoras vs. John Dillinger |
+| Pythagoras vs. Xibulor        |
+| Zopzar vs. Caligula           |
+| Zopzar vs. John Dillinger     |
+| Zopzar vs. Xibulor            |
++-------------------------------+
+Returned 9 row(s) in 0.33s</codeblock>
+
+        <p>
+          The full combination of rows from both tables is known as the Cartesian product. This type of result set
+          is often used for creating grid data structures. You can also filter the result set by including
+          <codeph>WHERE</codeph> clauses that do not explicitly compare columns between the two tables. The
+          following example shows how you might produce a list of combinations of year and quarter for use in a
+          chart, and then a shorter list with only selected quarters.
+        </p>
+
+<codeblock>[localhost:21000] &gt; create table x_axis (x int);
+[localhost:21000] &gt; create table y_axis (y int);
+[localhost:21000] &gt; insert into x_axis values (1),(2),(3),(4);
+Inserted 4 rows in 2.14s
+[localhost:21000] &gt; insert into y_axis values (2010),(2011),(2012),(2013),(2014);
+Inserted 5 rows in 1.32s
+[localhost:21000] &gt; select y as year, x as quarter from x_axis cross join y_axis;
++------+---------+
+| year | quarter |
++------+---------+
+| 2010 | 1       |
+| 2011 | 1       |
+| 2012 | 1       |
+| 2013 | 1       |
+| 2014 | 1       |
+| 2010 | 2       |
+| 2011 | 2       |
+| 2012 | 2       |
+| 2013 | 2       |
+| 2014 | 2       |
+| 2010 | 3       |
+| 2011 | 3       |
+| 2012 | 3       |
+| 2013 | 3       |
+| 2014 | 3       |
+| 2010 | 4       |
+| 2011 | 4       |
+| 2012 | 4       |
+| 2013 | 4       |
+| 2014 | 4       |
++------+---------+
+Returned 20 row(s) in 0.38s
+[localhost:21000] &gt; select y as year, x as quarter from x_axis cross join y_axis where x in (1,3);
++------+---------+
+| year | quarter |
++------+---------+
+| 2010 | 1       |
+| 2011 | 1       |
+| 2012 | 1       |
+| 2013 | 1       |
+| 2014 | 1       |
+| 2010 | 3       |
+| 2011 | 3       |
+| 2012 | 3       |
+| 2013 | 3       |
+| 2014 | 3       |
++------+---------+
+Returned 10 row(s) in 0.39s</codeblock>
+      </conbody>
+    </concept>
+
+    <concept audience="Cloudera" id="tut_connect">
+
+      <title>Connecting to Impala through impala-shell</title>
+
+      <conbody>
+
+        <p>
+          This tutorial provides some tips for connecting to Impala through the <cmdname>impala-shell</cmdname>
+          interpreter, and gives usage tips for particular scenarios.
+        </p>
+
+        <ul>
+          <li>
+            <p>
+              By default, <cmdname>impala-shell</cmdname> with no arguments connects to the current host, port
+              21000.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>-i localhost</codeph> option gives you a shorter command prompt.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              The <codeph>--quiet</codeph> option suppresses some informational messages, such as the
+              <codeph>Query:</codeph> line that echoes each command entered.
+            </p>
+          </li>
+
+          <li>
+            <codeph>CONNECT <varname>hostname</varname></codeph> lets you switch to another host (keeping the same
+            default port 21000).
+          </li>
+
+          <li>
+            <p>
+              You could run <cmdname>impala-shell</cmdname> from a completely different host to keep login accounts
+              off the actual Impala nodes.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              For load balancing, you would connect to different coordinator nodes for concurrent queries.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              For benchmarking, you would skip pretty printing with the <codeph>-B</codeph> option, or even skip
+              all screen output with the <codeph>-o</codeph> option or shell redirection.
+            </p>
+          </li>
+        </ul>
+      </conbody>
+    </concept>
+  </concept>
+
+  <concept audience="Cloudera" id="tut_mem_limit">
+
+    <title>Effects of Memory Limits on Impala Queries</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Memory"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p></p>
+    </conbody>
+  </concept>
+
+  <concept id="tut_parquet_schemaless">
+
+    <title>Dealing with Parquet Files with Unknown Schema</title>
+    <prolog>
+      <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Tutorials"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="Parquet"/>
+      <data name="Category" value="File Formats"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+
+      <p>
+        As data pipelines start to include more aspects such as NoSQL or loosely specified schemas, you might encounter
+        situations where you have data files (particularly in Parquet format) where you do not know the precise table definition.
+        This tutorial shows how you can build an Impala table around data that comes from non-Impala or even non-SQL sources,
+        where you do not have control of the table layout and might not be familiar with the characteristics of the data.
+      </p>
+
+<p>
+The data used in this tutorial represents airline on-time arrival statistics, from October 1987 through April 2008.
+See the details on the <xref href="http://stat-computing.org/dataexpo/2009/" scope="external" format="html">2009 ASA Data Expo web site</xref>.
+You can also see the <xref href="http://stat-computing.org/dataexpo/2009/the-data.html" scope="external" format="html">explanations of the columns</xref>;
+for purposes of this exercise, wait until after following the tutorial before examining the schema, to better simulate
+a real-life situation where you cannot rely on assumptions and assertions about the ranges and representations of
+data values.
+</p>
+
+<p>
+We will download Parquet files containing this data from the Ibis blog.
+First, we download and unpack the data files.
+There are 8 files totalling 1.4 GB.
+Each file is less than 256 MB.
+</p>
+
+<codeblock>$ wget -O airlines_parquet.tar.gz https://www.dropbox.com/s/ol9x51tqp6cv4yc/airlines_parquet.tar.gz?dl=0
+...
+Length: 1245204740 (1.2G) [application/octet-stream]
+Saving to: “airlines_parquet.tar.gz”
+
+2015-08-12 17:14:24 (23.6 MB/s) - “airlines_parquet.tar.gz” saved [1245204740/1245204740]
+
+$ tar xvzf airlines_parquet.tar.gz
+airlines_parquet/
+airlines_parquet/93459d994898a9ba-77674173b331fa9a_2073981944_data.0.parq
+airlines_parquet/93459d994898a9ba-77674173b331fa99_1555718317_data.1.parq
+airlines_parquet/93459d994898a9ba-77674173b331fa99_1555718317_data.0.parq
+airlines_parquet/93459d994898a9ba-77674173b331fa96_2118228804_data.0.parq
+airlines_parquet/93459d994898a9ba-77674173b331fa97_574780876_data.0.parq
+airlines_parquet/93459d994898a9ba-77674173b331fa96_2118228804_data.1.parq
+airlines_parquet/93459d994898a9ba-77674173b331fa98_1194408366_data.0.parq
+airlines_parquet/93459d994898a9ba-77674173b331fa9b_1413430552_data.0.parq
+$ cd airlines_parquet/
+$ du -kch *.parq
+253M  93459d994898a9ba-77674173b331fa96_2118228804_data.0.parq
+65M 93459d994898a9ba-77674173b331fa96_2118228804_data.1.parq
+156M  93459d994898a9ba-77674173b331fa97_574780876_data.0.parq
+240M  93459d994898a9ba-77674173b331fa98_1194408366_data.0.parq
+253M  93459d994898a9ba-77674173b331fa99_1555718317_data.0.parq
+16M 93459d994898a9ba-77674173b331fa99_1555718317_data.1.parq
+177M  93459d994898a9ba-77674173b331fa9a_2073981944_data.0.parq
+213M  93459d994898a9ba-77674173b331fa9b_1413430552_data.0.parq
+1.4G  total
+</codeblock>
+
+<p>
+Next, we put the Parquet data files in HDFS, all together in a single directory,
+with permissions on the directory and the files so that the <codeph>impala</codeph>
+user will be able to read them.
+</p>
+
+<note>
+After unpacking, we saw the largest Parquet file was 253 MB.
+When copying Parquet files into HDFS for Impala to use,
+for maximum query performance, make sure that each file resides in a single HDFS data block.
+Therefore, we pick a size larger than any single file and specify that as the block size, using the argument
+<codeph>-Ddfs.block.size=256m</codeph> on the <codeph>hdfs dfs -put</codeph> command.
+</note>
+
+<codeblock>$ hdfs dfs -mkdir -p hdfs://demo_host.example.com:8020/user/impala/staging/airlines
+$ hdfs dfs -Ddfs.block.size=256m -put *.parq /user/impala/staging/airlines
+$ hdfs dfs -ls /user/impala/staging
+Found 1 items
+drwxrwxrwx   - hdfs supergroup          0 2015-08-12 13:52 /user/impala/staging/airlines
+$ hdfs dfs -ls hdfs://demo_host.example.com:8020/user/impala/staging/airlines
+Found 8 items
+-rw-r--r--   3 jrussell supergroup  265107489 2015-08-12 17:18 /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa96_2118228804_data.0.parq
+-rw-r--r--   3 jrussell supergroup   67544715 2015-08-12 17:18 /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa96_2118228804_data.1.parq
+-rw-r--r--   3 jrussell supergroup  162556490 2015-08-12 17:18 /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa97_574780876_data.0.parq
+-rw-r--r--   3 jrussell supergroup  251603518 2015-08-12 17:18 /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa98_1194408366_data.0.parq
+-rw-r--r--   3 jrussell supergroup  265186603 2015-08-12 17:18 /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa99_1555718317_data.0.parq
+-rw-r--r--   3 jrussell supergroup   16663754 2015-08-12 17:18 /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa99_1555718317_data.1.parq
+-rw-r--r--   3 jrussell supergroup  185511677 2015-08-12 17:18 /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa9a_2073981944_data.0.parq
+-rw-r--r--   3 jrussell supergroup  222794621 2015-08-12 17:18 /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa9b_1413430552_data.0.parq
+</codeblock>
+
+<p>
+With the files in an accessible location in HDFS, we create a database table that uses the data in those files.
+The <codeph>CREATE EXTERNAL</codeph> syntax and the <codeph>LOCATION</codeph> attribute point Impala at the appropriate HDFS directory.
+The <codeph>LIKE PARQUET '<varname>path_to_any_parquet_file</varname>'</codeph> clause means we skip the list of column names and types;
+Impala automatically gets the column names and data types straight from the data files.
+(Currently, this technique only works for Parquet files.)
+We ignore the warning about lack of <codeph>READ_WRITE</codeph> access to the files in HDFS;
+the <codeph>impala</codeph> user can read the files, which will be sufficient for us to experiment with
+queries and perform some copy and transform operations into other tables.
+</p>
+
+<codeblock>$ impala-shell -i localhost
+Starting Impala Shell without Kerberos authentication
+Connected to localhost:21000
+Server version: impalad version 2.2.0-cdh5 RELEASE (build 2ffd73a4255cefd521362ffe1cfb37463f67f75c)
+Welcome to the Impala shell. Press TAB twice to see a list of available commands.
+
+Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+
+(Shell build version: Impala Shell v2.1.2-cdh5 (92438b7) built on Tue Feb 24 12:36:33 PST 2015)
+[localhost:21000] > create database airline_data;
+[localhost:21000] > use airline_data;
+[localhost:21000] > create external table airlines_external
+                  > like parquet 'hdfs://demo_host.example.com:8020/user/impala/staging/airlines/93459d994898a9ba-77674173b331fa96_2118228804_data.0.parq'
+                  > stored as parquet location 'hdfs://demo_host.example.com:8020/user/impala/staging/airlines';
+WARNINGS: Impala does not have READ_WRITE access to path 'hdfs://demo_host.example.com:8020/user/impala/staging'
+</codeblock>
+
+<p>
+With the table created, we examine its physical and logical characteristics to confirm that the data is really
+there and in a format and shape that we can work with.
+The <codeph>SHOW TABLE STATS</codeph> statement gives a very high-level summary of the table,
+showing how many files and how much total data it contains.
+Also, it confirms that the table is expecting all the associated data files to be in Parquet format.
+(The ability to work with all kinds of HDFS data files in different formats means that it is
+possible to have a mismatch between the format of the data files, and the format
+that the table expects the data files to be in.)
+The <codeph>SHOW FILES</codeph> statement confirms that the data in the table has the expected number,
+names, and sizes of the original Parquet files.
+The <codeph>DESCRIBE</codeph> statement (or its abbreviation <codeph>DESC</codeph>) confirms the names and types
+of the columns that Impala automatically created after reading that metadata from the Parquet file.
+The <codeph>DESCRIBE FORMATTED</codeph> statement prints out some extra detail along with the column definitions;
+the pieces we care about for this exercise are the containing database for the table,
+the location of the associated data files in HDFS, the fact that it's an external table so Impala will not
+delete the HDFS files when we finish the experiments and drop the table, and the fact that the
+table is set up to work exclusively with files in the Parquet format.
+</p>
+
+<codeblock>[localhost:21000] > show table stats airlines_external;
++-------+--------+--------+--------------+-------------------+---------+-------------------+
+| #Rows | #Files | Size   | Bytes Cached | Cache Replication | Format  | Incremental stats |
++-------+--------+--------+--------------+-------------------+---------+-------------------+
+| -1    | 8      | 1.34GB | NOT CACHED   | NOT CACHED        | PARQUET | false             |
++-------+--------+--------+--------------+-------------------+---------+-------------------+
+[localhost:21000] > show files in airlines_external;
++----------------------------------------------------------------------------------------+----------+-----------+
+| path                                                                                   | size     | partition |
++----------------------------------------------------------------------------------------+----------+-----------+
+| /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa96_2118228804_data.0.parq | 252.83MB |           |
+| /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa96_2118228804_data.1.parq | 64.42MB  |           |
+| /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa97_574780876_data.0.parq  | 155.03MB |           |
+| /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa98_1194408366_data.0.parq | 239.95MB |           |
+| /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa99_1555718317_data.0.parq | 252.90MB |           |
+| /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa99_1555718317_data.1.parq | 15.89MB  |           |
+| /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa9a_2073981944_data.0.parq | 176.92MB |           |
+| /user/impala/staging/airlines/93459d994898a9ba-77674173b331fa9b_1413430552_data.0.parq | 212.47MB |           |
++----------------------------------------------------------------------------------------+----------+-----------+
+[localhost:21000] > describe airlines_external;
++---------------------+--------+---------------------------------------------------+
+| name                | type   | comment                                           |
++---------------------+--------+---------------------------------------------------+
+| year                | int    | inferred from: optional int32 year                |
+| month               | int    | inferred from: optional int32 month               |
+| day                 | int    | inferred from: optional int32 day                 |
+| dayofweek           | int    | inferred from: optional int32 dayofweek           |
+| dep_time            | int    | inferred from: optional int32 dep_time            |
+| crs_dep_time        | int    | inferred from: optional int32 crs_dep_time        |
+| arr_time            | int    | inferred from: optional int32 arr_time            |
+| crs_arr_time        | int    | inferred from: optional int32 crs_arr_time        |
+| carrier             | string | inferred from: optional binary carrier            |
+| flight_num          | int    | inferred from: optional int32 flight_num          |
+| tail_num            | int    | inferred from: optional int32 tail_num            |
+| actual_elapsed_time | int    | inferred from: optional int32 actual_elapsed_time |
+| crs_elapsed_time    | int    | inferred from: optional int32 crs_elapsed_time    |
+| airtime             | int    | inferred from: optional int32 airtime             |
+| arrdelay            | int    | inferred from: optional int32 arrdelay            |
+| depdelay            | int    | inferred from: optional int32 depdelay            |
+| origin              | string | inferred from: optional binary origin             |
+| dest                | string | inferred from: optional binary dest               |
+| distance            | int    | inferred from: optional int32 distance            |
+| taxi_in             | int    | inferred from: optional int32 taxi_in             |
+| taxi_out            | int    | inferred from: optional int32 taxi_out            |
+| cancelled           | int    | inferred from: optional int32 cancelled           |
+| cancellation_code   | string | inferred from: optional binary cancellation_code  |
+| diverted            | int    | inferred from: optional int32 diverted            |
+| carrier_delay       | int    | inferred from: optional int32 carrier_delay       |
+| weather_delay       | int    | inferred from: optional int32 weather_delay       |
+| nas_delay           | int    | inferred from: optional int32 nas_delay           |
+| security_delay      | int    | inferred from: optional int32 security_delay      |
+| late_aircraft_delay | int    | inferred from: optional int32 late_aircraft_delay |
++---------------------+--------+---------------------------------------------------+
+[localhost:21000] > desc formatted airlines_external;
++------------------------------+-------------------------------
+| name                         | type
++------------------------------+-------------------------------
+...
+| # Detailed Table Information | NULL
+| Database:                    | airline_data
+| Owner:                       | jrussell
+...
+| Location:                    | /user/impala/staging/airlines
+| Table Type:                  | EXTERNAL_TABLE
+...
+| # Storage Information        | NULL
+| SerDe Library:               | parquet.hive.serde.ParquetHiveSerDe
+| InputFormat:                 | parquet.hive.DeprecatedParquetInputFormat
+| OutputFormat:                | parquet.hive.DeprecatedParquetOutputFormat
+...
+</codeblock>
+
+<p>
+Now that we are confident that the connections are solid between the Impala table and the
+underlying Parquet files, we run some initial queries to understand the characteristics
+of the data: the overall number of rows, and the ranges and how many
+different values are in certain columns.
+For convenience in understanding the magnitude of the <codeph>COUNT(*)</codeph>
+result, we run another query dividing the number of rows by 1 million, demonstrating that there are 123 million rows in the table.
+</p>
+
+<!-- I think this is the very longest line that could possibly fit without wrapping in the PDF output; 87 characters wide.
+[localhost:21000] > select count(*) / 1e6 as 'millions of rows' from airlines_external;
+-->
+
+<codeblock>[localhost:21000] > select count(*) from airlines_external;
++-----------+
+| count(*)  |
++-----------+
+| 123534969 |
++-----------+
+Fetched 1 row(s) in 1.32s
+[localhost:21000] > select count(*) / 1e6 as 'millions of rows' from airlines_external;
++------------------+
+| millions of rows |
++------------------+
+| 123.534969       |
++------------------+
+Fetched 1 row(s) in 1.24s
+</codeblock>
+
+<p> The <codeph>NDV()</codeph> function stands for <q>number of distinct
+          values</q>, which for performance reasons is an estimate when there
+        are lots of different values in the column, but is precise when the
+        cardinality is less than 16 K. Use <codeph>NDV()</codeph> calls for this
+        kind of exploration rather than <codeph>COUNT(DISTINCT
+            <varname>colname</varname>)</codeph>, because Impala can evaluate
+        multiple <codeph>NDV()</codeph> functions in a single query, but only a
+        single instance of <codeph>COUNT DISTINCT</codeph>. Here we see that
+        there are modest numbers of different airlines, flight numbers, and
+        origin and destination airports. Two things jump out from this query:
+        the number of <codeph>tail_num</codeph> values is much smaller than we
+        might have expected, and there are more destination airports than origin
+        airports. Let's dig further. What we find is that most
+          <codeph>tail_num</codeph> values are <codeph>NULL</codeph>. It looks
+        like this was an experimental column that wasn't filled in accurately.
+        We make a mental note that if we use this data as a starting point,
+        we'll ignore this column. We also find that certain airports are
+        represented in the <codeph>ORIGIN</codeph> column but not the
+          <codeph>DEST</codeph> column; now we know that we cannot rely on the
+        assumption that those sets of airport codes are identical. </p>
+
+<note>
+A slight digression for some performance tuning. Notice how the first
+<codeph>SELECT DISTINCT DEST</codeph> query takes almost 40 seconds.
+We expect all queries on such a small data set, less than 2 GB, to
+take a few seconds at most. The reason is because the expression
+<codeph>NOT IN (SELECT origin FROM airlines_external)</codeph>
+produces an intermediate result set of 123 million rows, then
+runs 123 million comparisons on each data node against the tiny set of destination airports.
+The way the <codeph>NOT IN</codeph> operator works internally means that
+this intermediate result set with 123 million rows might be transmitted
+across the network to each data node in the cluster.
+Applying another <codeph>DISTINCT</codeph> inside the <codeph>NOT IN</codeph>
+subquery means that the intermediate result set is only 340 items,
+resulting in much less network traffic and fewer comparison operations.
+The more efficient query with the added <codeph>DISTINCT</codeph> is approximately 7 times as fast.
+</note>
+
+<codeblock>[localhost:21000] > select ndv(carrier), ndv(flight_num), ndv(tail_num),
+                  >   ndv(origin), ndv(dest) from airlines_external;
++--------------+-----------------+---------------+-------------+-----------+
+| ndv(carrier) | ndv(flight_num) | ndv(tail_num) | ndv(origin) | ndv(dest) |
++--------------+-----------------+---------------+-------------+-----------+
+| 29           | 9086            | 3             | 340         | 347       |
++--------------+-----------------+---------------+-------------+-----------+
+[localhost:21000] > select tail_num, count(*) as howmany from airlines_external
+                  >   group by tail_num;
++----------+-----------+
+| tail_num | howmany   |
++----------+-----------+
+| 715      | 1         |
+| 0        | 406405    |
+| 112      | 6562      |
+| NULL     | 123122001 |
++----------+-----------+
+Fetched 1 row(s) in 5.18s
+[localhost:21000] > select distinct dest from airlines_external
+                  >   where dest not in (select origin from airlines_external);
++------+
+| dest |
++------+
+| LBF  |
+| CBM  |
+| RCA  |
+| SKA  |
+| LAR  |
++------+
+Fetched 5 row(s) in 39.64s
+[localhost:21000] > select distinct dest from airlines_external
+                  >   where dest not in (select distinct origin from airlines_external);
++------+
+| dest |
++------+
+| LBF  |
+| RCA  |
+| CBM  |
+| SKA  |
+| LAR  |
++------+
+Fetched 5 row(s) in 5.59s
+[localhost:21000] > select distinct origin from airlines_external
+                  >   where origin not in (select distinct dest from airlines_external);
+Fetched 0 row(s) in 5.37s
+</codeblock>
+
+<p> Next, we try doing a simple calculation, with results broken down by year.
+        This reveals that some years have no data in the
+          <codeph>AIRTIME</codeph> column. That means we might be able to use
+        that column in queries involving certain date ranges, but we cannot
+        count on it to always be reliable. The question of whether a column
+        contains any <codeph>NULL</codeph> values, and if so what is their
+        number, proportion, and distribution, comes up again and again when
+        doing initial exploration of a data set. </p>
+
+<codeblock>[localhost:21000] > select year, sum(airtime) from airlines_external
+                  >   group by year order by year desc;
++------+--------------+
+| year | sum(airtime) |
++------+--------------+
+| 2008 | 713050445    |
+| 2007 | 748015545    |
+| 2006 | 720372850    |
+| 2005 | 708204026    |
+| 2004 | 714276973    |
+| 2003 | 665706940    |
+| 2002 | 549761849    |
+| 2001 | 590867745    |
+| 2000 | 583537683    |
+| 1999 | 561219227    |
+| 1998 | 538050663    |
+| 1997 | 536991229    |
+| 1996 | 519440044    |
+| 1995 | 513364265    |
+| 1994 | NULL         |
+| 1993 | NULL         |
+| 1992 | NULL         |
+| 1991 | NULL         |
+| 1990 | NULL         |
+| 1989 | NULL         |
+| 1988 | NULL         |
+| 1987 | NULL         |
++------+--------------+
+</codeblock>
+
+<p>
+With the notion of <codeph>NULL</codeph> values in mind, let's come back to the <codeph>TAILNUM</codeph>
+column that we discovered had a lot of <codeph>NULL</codeph>s.
+Let's quantify the <codeph>NULL</codeph> and non-<codeph>NULL</codeph> values in that column for better understanding.
+First, we just count the overall number of rows versus the non-<codeph>NULL</codeph> values in that column.
+That initial result gives the appearance of relatively few non-<codeph>NULL</codeph> values, but we can break
+it down more clearly in a single query.
+Once we have the <codeph>COUNT(*)</codeph> and the <codeph>COUNT(<varname>colname</varname>)</codeph> numbers,
+we can encode that initial query in a <codeph>WITH</codeph> clause, then run a followon query that performs
+multiple arithmetic operations on those values.
+Seeing that only one-third of one percent of all rows have non-<codeph>NULL</codeph> values for the
+<codeph>TAILNUM</codeph> column clearly illustrates that that column is not of much use.
+</p>
+
+<codeblock>[localhost:21000] > select count(*) as 'rows', count(tail_num) as 'non-null tail numbers'
+                  >   from airlines_external;
++-----------+-----------------------+
+| rows      | non-null tail numbers |
++-----------+-----------------------+
+| 123534969 | 412968                |
++-----------+-----------------------+
+Fetched 1 row(s) in 1.51s
+[localhost:21000] > with t1 as
+                  >   (select count(*) as 'rows', count(tail_num) as 'nonnull'
+                  >   from airlines_external)
+                  > select `rows`, `nonnull`, `rows` - `nonnull` as 'nulls',
+                  >   (`nonnull` / `rows`) * 100 as 'percentage non-null'
+                  > from t1;
++-----------+---------+-----------+---------------------+
+| rows      | nonnull | nulls     | percentage non-null |
++-----------+---------+-----------+---------------------+
+| 123534969 | 412968  | 123122001 | 0.3342923897119365  |
++-----------+---------+-----------+---------------------+
+</codeblock>
+
+<p>
+By examining other columns using these techniques, we can form a mental picture of the way data is distributed
+throughout the table, and which columns are most significant for query purposes. For this tutorial, we focus mostly on
+the fields likely to hold discrete values, rather than columns such as <codeph>ACTUAL_ELAPSED_TIME</codeph>
+whose names suggest they hold measurements. We would dig deeper into those columns once we had a clear picture
+of which questions were worthwhile to ask, and what kinds of trends we might look for.
+For the final piece of initial exploration, let's look at the <codeph>YEAR</codeph> column.
+A simple <codeph>GROUP BY</codeph> query shows that it has a well-defined range, a manageable number of
+distinct values, and relatively even distribution of rows across the different years.
+</p>
+
+<codeblock>[localhost:21000] > select min(year), max(year), ndv(year) from airlines_external;
++-----------+-----------+-----------+
+| min(year) | max(year) | ndv(year) |
++-----------+-----------+-----------+
+| 1987      | 2008      | 22        |
++-----------+-----------+-----------+
+Fetched 1 row(s) in 2.03s
+[localhost:21000] > select year, count(*) howmany from airlines_external
+                  >   group by year order by year desc;
++------+---------+
+| year | howmany |
++------+---------+
+| 2008 | 7009728 |
+| 2007 | 7453215 |
+| 2006 | 7141922 |
+| 2005 | 7140596 |
+| 2004 | 7129270 |
+| 2003 | 6488540 |
+| 2002 | 5271359 |
+| 2001 | 5967780 |
+| 2000 | 5683047 |
+| 1999 | 5527884 |
+| 1998 | 5384721 |
+| 1997 | 5411843 |
+| 1996 | 5351983 |
+| 1995 | 5327435 |
+| 1994 | 5180048 |
+| 1993 | 5070501 |
+| 1992 | 5092157 |
+| 1991 | 5076925 |
+| 1990 | 5270893 |
+| 1989 | 5041200 |
+| 1988 | 5202096 |
+| 1987 | 1311826 |
++------+---------+
+Fetched 22 row(s) in 2.13s
+</codeblock>
+
+<p>
+We could go quite far with the data in this initial raw format, just as we downloaded it from the web.
+If the data set proved to be useful and worth persisting in Impala for extensive queries,
+we might want to copy it to an internal table, letting Impala manage the data files and perhaps
+reorganizing a little for higher efficiency.
+In this next stage of the tutorial, we copy the original data into a partitioned table, still in Parquet format.
+Partitioning based on the <codeph>YEAR</codeph> column lets us run queries with clauses such as <codeph>WHERE year = 2001</codeph>
+or <codeph>WHERE year BETWEEN 1989 AND 1999</codeph>, which can dramatically cut down on I/O by
+ignoring all the data from years outside the desired range.
+Rather than reading all the data and then deciding which rows are in the matching years, Impala can
+zero in on only the data files from specific <codeph>YEAR</codeph> partitions.
+To do this, Impala physically reorganizes the data files, putting the rows from each year into
+data files in a separate HDFS directory for each <codeph>YEAR</codeph> value.
+Along the way, we'll also get rid of the <codeph>TAIL_NUM</codeph> column that proved to be almost entirely <codeph>NULL</codeph>.
+</p>
+
+<p>
+The first step is to create a new table with a layout very similar to the original <codeph>AIRLINES_EXTERNAL</codeph> table.
+We'll do that by reverse-engineering a <codeph>CREATE TABLE</codeph> statement for the first table,
+then tweaking it slightly to include a <codeph>PARTITION BY</codeph> clause for <codeph>YEAR</codeph>,
+and excluding the <codeph>TAIL_NUM</codeph> column.
+The <codeph>SHOW CREATE TABLE</codeph> statement gives us the starting point.
+</p>
+
+<codeblock>[localhost:21000] > show create table airlines_external;
++-------------------------------------------------------------------------------------
+| result
++-------------------------------------------------------------------------------------
+| CREATE EXTERNAL TABLE airline_data.airlines_external (
+|   year INT COMMENT 'inferred from: optional int32 year',
+|   month INT COMMENT 'inferred from: optional int32 month',
+|   day INT COMMENT 'inferred from: optional int32 day',
+|   dayofweek INT COMMENT 'inferred from: optional int32 dayofweek',
+|   dep_time INT COMMENT 'inferred from: optional int32 dep_time',
+|   crs_dep_time INT COMMENT 'inferred from: optional int32 crs_dep_time',
+|   arr_time INT COMMENT 'inferred from: optional int32 arr_time',
+|   crs_arr_time INT COMMENT 'inferred from: optional int32 crs_arr_time',
+|   carrier STRING COMMENT 'inferred from: optional binary carrier',
+|   flight_num INT COMMENT 'inferred from: optional int32 flight_num',
+|   tail_num INT COMMENT 'inferred from: optional int32 tail_num',
+|   actual_elapsed_time INT COMMENT 'inferred from: optional int32 actual_elapsed_time',
+|   crs_elapsed_time INT COMMENT 'inferred from: optional int32 crs_elapsed_time',
+|   airtime INT COMMENT 'inferred from: optional int32 airtime',
+|   arrdelay INT COMMENT 'inferred from: optional int32 arrdelay',
+|   depdelay INT COMMENT 'inferred from: optional int32 depdelay',
+|   origin STRING COMMENT 'inferred from: optional binary origin',
+|   dest STRING COMMENT 'inferred from: optional binary dest',
+|   distance INT COMMENT 'inferred from: optional int32 distance',
+|   taxi_in INT COMMENT 'inferred from: optional int32 taxi_in',
+|   taxi_out INT COMMENT 'inferred from: optional int32 taxi_out',
+|   cancelled INT COMMENT 'inferred from: optional int32 cancelled',
+|   cancellation_code STRING COMMENT 'inferred from: optional binary cancellation_code',
+|   diverted INT COMMENT 'inferred from: optional int32 diverted',
+|   carrier_delay INT COMMENT 'inferred from: optional int32 carrier_delay',
+|   weather_delay INT COMMENT 'inferred from: optional int32 weather_delay',
+|   nas_delay INT COMMENT 'inferred from: optional int32 nas_delay',
+|   security_delay INT COMMENT 'inferred from: optional int32 security_delay',
+|   late_aircraft_delay INT COMMENT 'inferred from: optional int32 late_aircraft_delay'
+| )
+| STORED AS PARQUET
+| LOCATION 'hdfs://a1730.halxg.cloudera.com:8020/user/impala/staging/airlines'
+| TBLPROPERTIES ('numFiles'='0', 'COLUMN_STATS_ACCURATE'='false',
+|   'transient_lastDdlTime'='1439425228', 'numRows'='-1', 'totalSize'='0',
+|   'rawDataSize'='-1')
++-------------------------------------------------------------------------------------
+Fetched 1 row(s) in 0.03s
+[localhost:21000] > quit;
+</codeblock>
+
+<p>
+Although we could edit that output into a new SQL statement, all the ASCII box characters
+make such editing inconvenient. To get a more stripped-down <codeph>CREATE TABLE</codeph>
+to start with, we restart the <cmdname>impala-shell</cmdname> command with the
+<codeph>-B</codeph> option, which turns off the box-drawing behavior.
+</p>
+
+<codeblock>[localhost:21000] > quit;
+Goodbye jrussell
+$ impala-shell -i localhost -B -d airline_data;
+Starting Impala Shell without Kerberos authentication
+Connected to localhost:21000
+Server version: impalad version 2.2.0-cdh5 RELEASE (build 2ffd73a4255cefd521362ffe1cfb37463f67f75c)
+Welcome to the Impala shell. Press TAB twice to see a list of available commands.
+
+Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+
+(Shell build version: Impala Shell v2.1.2-cdh5 (92438b7) built on Tue Feb 24 12:36:33 PST 2015)
+[localhost:21000] > show create table airlines_external;
+"CREATE EXTERNAL TABLE airline_data.airlines_external (
+  year INT COMMENT 'inferred from: optional int32 year',
+  month INT COMMENT 'inferred from: optional int32 month',
+  day INT COMMENT 'inferred from: optional int32 day',
+  dayofweek INT COMMENT 'inferred from: optional int32 dayofweek',
+  dep_time INT COMMENT 'inferred from: optional int32 dep_time',
+  crs_dep_time INT COMMENT 'inferred from: optional int32 crs_dep_time',
+  arr_time INT COMMENT 'inferred from: optional int32 arr_time',
+  crs_arr_time INT COMMENT 'inferred from: optional int32 crs_arr_time',
+  carrier STRING COMMENT 'inferred from: optional binary carrier',
+  flight_num INT COMMENT 'inferred from: optional int32 flight_num',
+  tail_num INT COMMENT 'inferred from: optional int32 tail_num',
+  actual_elapsed_time INT COMMENT 'inferred from: optional int32 actual_elapsed_time',
+  crs_elapsed_time INT COMMENT 'inferred from: optional int32 crs_elapsed_time',
+  airtime INT COMMENT 'inferred from: optional int32 airtime',
+  arrdelay INT COMMENT 'inferred from: optional int32 arrdelay',
+  depdelay INT COMMENT 'inferred from: optional int32 depdelay',
+  origin STRING COMMENT 'inferred from: optional binary origin',
+  dest STRING COMMENT 'inferred from: optional binary dest',
+  distance INT COMMENT 'inferred from: optional int32 distance',
+  taxi_in INT COMMENT 'inferred from: optional int32 taxi_in',
+  taxi_out INT COMMENT 'inferred from: optional int32 taxi_out',
+  cancelled INT COMMENT 'inferred from: optional int32 cancelled',
+  cancellation_code STRING COMMENT 'inferred from: optional binary cancellation_code',
+  diverted INT COMMENT 'inferred from: optional int32 diverted',
+  carrier_delay INT COMMENT 'inferred from: optional int32 carrier_delay',
+  weather_delay INT COMMENT 'inferred from: optional int32 weather_delay',
+  nas_delay INT COMMENT 'inferred from: optional int32 nas_delay',
+  security_delay INT COMMENT 'inferred from: optional int32 security_delay',
+  late_aircraft_delay INT COMMENT 'inferred from: optional int32 late_aircraft_delay'
+)
+STORED AS PARQUET
+LOCATION 'hdfs://a1730.halxg.cloudera.com:8020/user/impala/staging/airlines'
+TBLPROPERTIES ('numFiles'='0', 'COLUMN_STATS_ACCURATE'='false',
+  'transient_lastDdlTime'='1439425228', 'numRows'='-1', 'totalSize'='0',
+  'rawDataSize'='-1')"
+Fetched 1 row(s) in 0.01s
+</codeblock>
+
+<p>
+After copying and pasting the <codeph>CREATE TABLE</codeph> statement into a text editor for fine-tuning, we quit and restart <cmdname>impala-shell</cmdname>
+without the <codeph>-B</codeph> option, to switch back to regular
+output.
+</p>
+<p>
+Next we run the <codeph>CREATE TABLE</codeph> statement that we adapted from the <codeph>SHOW CREATE TABLE</codeph> output.
+We kept the <codeph>STORED AS PARQUET</codeph> clause because
+we want to rearrange the data somewhat but still keep it in the high-performance
+Parquet format. The <codeph>LOCATION</codeph> and <codeph>TBLPROPERTIES</codeph>
+clauses are not relevant for this new table, so we edit those out.
+Because we are going to partition the new table based on the <codeph>YEAR</codeph>
+column, we move that column name (and its type) into a new <codeph>PARTITIONED BY</codeph> clause.
+</p>
+
+<codeblock>[localhost:21000] > CREATE TABLE airline_data.airlines
+                  > (
+                  >   month INT,
+                  >   day INT,
+                  >   dayofweek INT,
+                  >   dep_time INT,
+                  >   crs_dep_time INT,
+                  >   arr_time INT,
+                  >   crs_arr_time INT,
+                  >   carrier STRING,
+                  >   flight_num INT,
+                  >   actual_elapsed_time INT,
+                  >   crs_elapsed_time INT,
+                  >   airtime INT,
+                  >   arrdelay INT,
+                  >   depdelay INT,
+                  >   origin STRING,
+                  >   dest STRING,
+                  >   distance INT,
+                  >   taxi_in INT,
+                  >   taxi_out INT,
+                  >   cancelled INT,
+                  >   cancellation_code STRING,
+                  >   diverted INT,
+                  >   carrier_delay INT,
+                  >   weather_delay INT,
+                  >   nas_delay INT,
+                  >   security_delay INT,
+                  >   late_aircraft_delay INT
+                  > )
+                  > STORED AS PARQUET
+                  > PARTITIONED BY (year INT);
+Fetched 0 row(s) in 0.10s
+</codeblock>
+
+<p>
+Next, we copy all the rows from the original table into this new one with
+an <codeph>INSERT</codeph> statement. (We edited the <codeph>CREATE TABLE</codeph>
+statement to make an <codeph>INSERT</codeph> statement with the column names
+in the same order.) The only change is to add a <codeph>PARTITION(year)</codeph>
+clause, and move the <codeph>YEAR</codeph> column to the very end of the
+<codeph>SELECT</codeph> list of the <codeph>INSERT</codeph> statement.
+Specifying <codeph>PARTITION(year)</codeph>, rather than a fixed value
+such as <codeph>PARTITION(year=2000)</codeph>, means that Impala figures
+out the partition value for each row based on the value of the very last column
+in the <codeph>SELECT</codeph> list.
+This is the first SQL statement that legitimately takes any substantial time,
+because the rows from different years are shuffled around the cluster;
+the rows that go into each partition are collected on one node, before being
+written to one or more new data files.
+</p>
+
+<codeblock>[localhost:21000] > INSERT INTO airline_data.airlines
+                  > PARTITION (year)
+                  > SELECT
+                  >   month,
+                  >   day,
+                  >   dayofweek,
+                  >   dep_time,
+                  >   crs_dep_time,
+                  >   arr_time,
+                  >   crs_arr_time,
+                  >   carrier,
+                  >   flight_num,
+                  >   actual_elapsed_time,
+                  >   crs_elapsed_time,
+                  >   airtime,
+                  >   arrdelay,
+                  >   depdelay,
+                  >   origin,
+                  >   dest,
+                  >   distance,
+                  >   taxi_in,
+                  >   taxi_out,
+                  >   cancelled,
+                  >   cancellation_code,
+                  >   diverted,
+                  >   carrier_delay,
+                  >   weather_delay,
+                  >   nas_delay,
+                  >   security_delay,
+                  >   late_aircraft_delay,
+                  >   year
+                  > FROM airline_data.airlines_external;
+Inserted 123534969 row(s) in 202.70s
+</codeblock>
+
+<p>
+Once partitioning or join queries come into play, it's important to have statistics
+that Impala can use to optimize queries on the corresponding tables.
+The <codeph>COMPUTE INCREMENTAL STATS</codeph> statement is the way to collect
+statistics for partitioned tables.
+Then the <codeph>SHOW TABLE STATS</codeph> statement confirms that the statistics
+are in place for each partition, and also illustrates how many files and how much raw data
+is in each partition.
+</p>
+
+<codeblock>[localhost:21000] > compute incremental stats airlines;
++-------------------------------------------+
+| summary                                   |
++-------------------------------------------+
+| Updated 22 partition(s) and 27 column(s). |
++-------------------------------------------+
+[localhost:21000] > show table stats airlines;
++-------+-----------+--------+----------+--------------+------------+---------+-------------------+
+| year  | #Rows     | #Files | Size     | Bytes Cached | Cache Repl | Format  | Incremental stats |
++-------+-----------+--------+----------+--------------+------------+---------+-----
+| 1987  | 1311826   | 1      | 9.32MB   | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1988  | 5202096   | 1      | 37.04MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1989  | 5041200   | 1      | 36.25MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1990  | 5270893   | 1      | 38.39MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1991  | 5076925   | 1      | 37.23MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1992  | 5092157   | 1      | 36.85MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1993  | 5070501   | 1      | 37.16MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1994  | 5180048   | 1      | 38.31MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1995  | 5327435   | 1      | 53.14MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1996  | 5351983   | 1      | 53.64MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1997  | 5411843   | 1      | 54.41MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1998  | 5384721   | 1      | 54.01MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 1999  | 5527884   | 1      | 56.32MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 2000  | 5683047   | 1      | 58.15MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 2001  | 5967780   | 1      | 60.65MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 2002  | 5271359   | 1      | 57.99MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 2003  | 6488540   | 1      | 81.33MB  | NOT CACHED   | NOT CACHED | PARQUET | true
+| 2004  | 7129270   | 1      | 103.19MB | NOT CACHED   | NOT CACHED | PARQUET | true
+| 2005  | 7140596   | 1      | 102.61MB | NOT CACHED   | NOT CACHED | PARQUET | true
+| 2006  | 7141922   | 1      | 106.03MB | NOT CACHED   | NOT CACHED | PARQUET | true
+| 2007  | 7453215   | 1      | 112.15MB | NOT CACHED   | NOT CACHED | PARQUET | true
+| 2008  | 7009728   | 1      | 105.76MB | NOT CACHED   | NOT CACHED | PARQUET | true
+| Total | 123534969 | 22     | 1.30GB   | 0B           |            |         |
++-------+-----------+--------+----------+--------------+------------+---------+-----
+</codeblock>
+
+<p>
+At this point, we go through a quick thought process to sanity check the partitioning we did.
+All the partitions have exactly one file, which is on the low side. A query that includes a
+clause <codeph>WHERE year=2004</codeph> will only read a single data block; that data block
+will be read and processed by a single data node; therefore, for a query targeting a single year,
+all the other nodes in the cluster will sit idle while all the work happens on a single machine.
+It's even possible that by chance (depending on HDFS replication factor and the way data blocks are distributed
+across the cluster), that multiple year partitions selected by a filter such as
+<codeph>WHERE year BETWEEN 1999 AND 2001</codeph> could all be read and processed by the same data node.
+The more data files each partition has, the more parallelism you can get and the less probability of <q>hotspots</q> occurring
+on particular nodes, therefore a bigger performance boost by having a big CDH cluster.
+</p>
+
+<p>
+However, the more data files, the less data goes in each one. The overhead of dividing the work in a
+parallel query might not be worth it if each node is only reading a few megabytes. 50 or 100 megabytes
+is a decent size for a Parquet data block; 9 or 37 megabytes is on the small side.
+Which is to say, the data distribution we ended up with based on this partitioning scheme is
+on the borderline between sensible (reasonably large files) and suboptimal (few files in each partition).
+The way to see how well it works in practice is to run the same queries against the original
+flat table and the new partitioned table, and compare times.
+</p>
+
+<p>
+Spoiler: in this case, with my particular 4-node cluster with its specific distribution of data blocks and my
+particular exploratory queries, queries against the partitioned table do consistently run faster than the same queries
+against the unpartitioned table. But I could not be sure that would be the case without some real measurements.
+Here are some queries I ran to draw that conclusion, first against <codeph>AIRLINES_EXTERNAL</codeph> (no partitioning),
+then against <codeph>AIRLINES</codeph> (partitioned by year). The <codeph>AIRLINES</codeph> queries are consistently faster.
+Changing the volume of data, changing the size of the cluster, running queries that did or didn't refer to the partition key
+columns, or other factors could change the results to favor one table layout or the other.
+</p>
+
+<note>
+If you find the volume of each partition is only in the low tens of megabytes, consider lowering the granularity
+of partitioning. For example, instead of partitioning by year, month, and day, partition by year and month
+or even just by year. The ideal layout to distribute work efficiently in a parallel query is many tens or
+even hundreds of megabytes per Parquet file, and the number of Parquet files in each partition somewhat
+higher than the number of data nodes.
+</note>
+
+<codeblock>[localhost:21000] > select sum(airtime) from airlines_external;
++--------------+
+| sum(airtime) |
++--------------+
+| 8662859484   |
++--------------+
+Fetched 1 row(s) in 2.02s
+[localhost:21000] > select sum(airtime) from airlines;
++--------------+
+| sum(airtime) |
++--------------+
+| 8662859484   |
++--------------+
+Fetched 1 row(s) in 1.21s
+
+[localhost:21000] > select sum(airtime) from airlines_external where year = 2005;
++--------------+
+| sum(airtime) |
++--------------+
+| 708204026    |
++--------------+
+Fetched 1 row(s) in 2.61s
+[localhost:21000] > select sum(airtime) from airlines where year = 2005;
++--------------+
+| sum(airtime) |
++--------------+
+| 708204026    |
++--------------+
+Fetched 1 row(s) in 1.19s
+
+[localhost:21000] > select sum(airtime) from airlines_external where dayofweek = 1;
++--------------+
+| sum(airtime) |
++--------------+
+| 1264945051   |
++--------------+
+Fetched 1 row(s) in 2.82s
+[localhost:21000] > select sum(airtime) from airlines where dayofweek = 1;
++--------------+
+| sum(airtime) |
++--------------+
+| 1264945051   |
++--------------+
+Fetched 1 row(s) in 1.61s
+</codeblock>
+
+<p>
+Now we can finally do some serious analysis with this data set that, remember,
+a few minutes ago all we had were some raw data files and we didn't even know
+what columns they contained.
+Let's see whether the <q>air time</q> of a flight tends to be different depending on the
+day of the week. We can see that the average is a little higher on day number 6;
+perhaps Saturday is a busy flying day and planes have to circle for longer at the
+destination airport before landing.
+</p>
+
+<codeblock>[localhost:21000] > select dayofweek, avg(airtime) from airlines
+                  > group by dayofweek order by dayofweek;
++-----------+-------------------+
+| dayofweek | avg(airtime)      |
++-----------+-------------------+
+| 1         | 102.1560425016671 |
+| 2         | 102.1582931538807 |
+| 3         | 102.2170009256653 |
+| 4         | 102.37477661846   |
+| 5         | 102.2697358763511 |
+| 6         | 105.3627448363705 |
+| 7         | 103.4144351202054 |
++-----------+-------------------+
+Fetched 7 row(s) in 2.25s
+</codeblock>
+
+<p>
+To see if the apparent trend holds up over time, let's do the same breakdown by day of week, but also
+split up by year. Now we can see that day number 6 consistently has a higher average air time in each
+year. We can also see that the average air time increased over time across the board. And the presence
+of <codeph>NULL</codeph> for this column in years 1987 to 1994 shows that queries involving this column
+need to be restricted to a date range of 1995 and higher.
+</p>
+
+<codeblock>[localhost:21000] > select year, dayofweek, avg(airtime) from airlines
+                  > group by year, dayofweek order by year desc, dayofweek;
++------+-----------+-------------------+
+| year | dayofweek | avg(airtime)      |
++------+-----------+-------------------+
+| 2008 | 1         | 103.1821651651355 |
+| 2008 | 2         | 103.2149301386094 |
+| 2008 | 3         | 103.0585076622796 |
+| 2008 | 4         | 103.4671383539038 |
+| 2008 | 5         | 103.5575385182659 |
+| 2008 | 6         | 107.4006306562128 |
+| 2008 | 7         | 104.8648851041755 |
+| 2007 | 1         | 102.2196114337825 |
+| 2007 | 2         | 101.9317791906348 |
+| 2007 | 3         | 102.0964767689043 |
+| 2007 | 4         | 102.6215927201686 |
+| 2007 | 5         | 102.4289399000661 |
+| 2007 | 6         | 105.1477448215756 |
+| 2007 | 7         | 103.6305945644095 |
+...
+| 1996 | 1         | 99.33860750862108 |
+| 1996 | 2         | 99.54225446396656 |
+| 1996 | 3         | 99.41129336113134 |
+| 1996 | 4         | 99.5110373340348  |
+| 1996 | 5         | 99.22120745027595 |
+| 1996 | 6         | 101.1717447111921 |
+| 1996 | 7         | 99.95410136133704 |
+| 1995 | 1         | 96.93779698300494 |
+| 1995 | 2         | 96.93458674589712 |
+| 1995 | 3         | 97.00972311337051 |
+| 1995 | 4         | 96.90843832024412 |
+| 1995 | 5         | 96.78382115425562 |
+| 1995 | 6         | 98.70872826057003 |
+| 1995 | 7         | 97.85570478374616 |
+| 1994 | 1         | NULL              |
+| 1994 | 2         | NULL              |
+| 1994 | 3         | NULL              |
+...
+| 1987 | 5         | NULL              |
+| 1987 | 6         | NULL              |
+| 1987 | 7         | NULL              |
++------+-----------+-------------------+
+</codeblock>
+
+    </conbody>
+  </concept>
+
+  <concept audience="Cloudera" id="tut_synthesizing">
+
+    <title>Synthesizing Data</title>
+
+    <conbody>
+
+<!-- Scenarios:
+       INSERT VALUES 1 row or a few rows, then duplicate the values with slight alterations.
+       - Use row_number() and rank() to assign IDs to values from narrow tables.
+       - Use sum() in analytic context, with sliding window, to derive other arbitrary numbers.
+       Grab database, table, column, etc. names from metastore and play with those.
+       Maybe take results of a 'find' and play with those.
+       - Invent fields like 'username' based on /home or whatever subdirectories.
+       - Perhaps also capture permissions, timestamps, etc. via 'ls -l'.
+       - Illustrate narrow table with 'extension' field, wide table with 'jpg', 'Office', 'picture', 'XML', etc. fields
+         based on case() of extension.
+       Decompose some string values using regexp_extract.
+       Set up views to get the logical layout right before making new physical copies of data.
+-->
+
+      <p></p>
+    </conbody>
+  </concept>
+</concept>

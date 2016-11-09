@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="avg">
+
+  <title>AVG Function</title>
+  <titlealts audience="PDF"><navtitle>AVG</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="Analytic Functions"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">avg() function</indexterm>
+      An aggregate function that returns the average value from a set of numbers or <codeph>TIMESTAMP</codeph> values.
+      Its single argument can be numeric column, or the numeric result of a function or expression applied to the
+      column value. Rows with a <codeph>NULL</codeph> value for the specified column are ignored. If the table is empty,
+      or all the values supplied to <codeph>AVG</codeph> are <codeph>NULL</codeph>, <codeph>AVG</codeph> returns
+      <codeph>NULL</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>AVG([DISTINCT | ALL] <varname>expression</varname>) [OVER (<varname>analytic_clause</varname>)]
+</codeblock>
+
+    <p>
+      When the query contains a <codeph>GROUP BY</codeph> clause, returns one value for each combination of
+      grouping values.
+    </p>
+
+    <p>
+      <b>Return type:</b> <codeph>DOUBLE</codeph> for numeric values; <codeph>TIMESTAMP</codeph> for
+      <codeph>TIMESTAMP</codeph> values
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_aggregation_explanation"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_aggregation_example"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>-- Average all the non-NULL values in a column.
+insert overwrite avg_t values (2),(4),(6),(null),(null);
+-- The average of the above values is 4: (2+4+6) / 3. The 2 NULL values are ignored.
+select avg(x) from avg_t;
+-- Average only certain values from the column.
+select avg(x) from t1 where month = 'January' and year = '2013';
+-- Apply a calculation to the value of the column before averaging.
+select avg(x/3) from t1;
+-- Apply a function to the value of the column before averaging.
+-- Here we are substituting a value of 0 for all NULLs in the column,
+-- so that those rows do factor into the return value.
+select avg(isnull(x,0)) from t1;
+-- Apply some number-returning function to a string column and average the results.
+-- If column s contains any NULLs, length(s) also returns NULL and those rows are ignored.
+select avg(length(s)) from t1;
+-- Can also be used in combination with DISTINCT and/or GROUP BY.
+-- Return more than one result.
+select month, year, avg(page_visits) from web_stats group by month, year;
+-- Filter the input to eliminate duplicates before performing the calculation.
+select avg(distinct x) from t1;
+-- Filter the output after performing the calculation.
+select avg(x) from t1 group by y having avg(x) between 1 and 20;
+</codeblock>
+
+    <p rev="2.0.0">
+      The following examples show how to use <codeph>AVG()</codeph> in an analytic context. They use a table
+      containing integers from 1 to 10. Notice how the <codeph>AVG()</codeph> is reported for each input value, as
+      opposed to the <codeph>GROUP BY</codeph> clause which condenses the result set.
+<codeblock>select x, property, avg(x) over (partition by property) as avg from int_t where property in ('odd','even');
++----+----------+-----+
+| x  | property | avg |
++----+----------+-----+
+| 2  | even     | 6   |
+| 4  | even     | 6   |
+| 6  | even     | 6   |
+| 8  | even     | 6   |
+| 10 | even     | 6   |
+| 1  | odd      | 5   |
+| 3  | odd      | 5   |
+| 5  | odd      | 5   |
+| 7  | odd      | 5   |
+| 9  | odd      | 5   |
++----+----------+-----+
+</codeblock>
+
+Adding an <codeph>ORDER BY</codeph> clause lets you experiment with results that are cumulative or apply to a moving
+set of rows (the <q>window</q>). The following examples use <codeph>AVG()</codeph> in an analytic context
+(that is, with an <codeph>OVER()</codeph> clause) to produce a running average of all the even values,
+then a running average of all the odd values. The basic <codeph>ORDER BY x</codeph> clause implicitly
+activates a window clause of <codeph>RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</codeph>,
+which is effectively the same as <codeph>ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</codeph>,
+therefore all of these examples produce the same results:
+<codeblock>select x, property,
+  avg(x) over (partition by property <b>order by x</b>) as 'cumulative average'
+  from int_t where property in ('odd','even');
++----+----------+--------------------+
+| x  | property | cumulative average |
++----+----------+--------------------+
+| 2  | even     | 2                  |
+| 4  | even     | 3                  |
+| 6  | even     | 4                  |
+| 8  | even     | 5                  |
+| 10 | even     | 6                  |
+| 1  | odd      | 1                  |
+| 3  | odd      | 2                  |
+| 5  | odd      | 3                  |
+| 7  | odd      | 4                  |
+| 9  | odd      | 5                  |
++----+----------+--------------------+
+
+select x, property,
+  avg(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>range between unbounded preceding and current row</b>
+  ) as 'cumulative average'
+from int_t where property in ('odd','even');
++----+----------+--------------------+
+| x  | property | cumulative average |
++----+----------+--------------------+
+| 2  | even     | 2                  |
+| 4  | even     | 3                  |
+| 6  | even     | 4                  |
+| 8  | even     | 5                  |
+| 10 | even     | 6                  |
+| 1  | odd      | 1                  |
+| 3  | odd      | 2                  |
+| 5  | odd      | 3                  |
+| 7  | odd      | 4                  |
+| 9  | odd      | 5                  |
++----+----------+--------------------+
+
+select x, property,
+  avg(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>rows between unbounded preceding and current row</b>
+  ) as 'cumulative average'
+  from int_t where property in ('odd','even');
++----+----------+--------------------+
+| x  | property | cumulative average |
++----+----------+--------------------+
+| 2  | even     | 2                  |
+| 4  | even     | 3                  |
+| 6  | even     | 4                  |
+| 8  | even     | 5                  |
+| 10 | even     | 6                  |
+| 1  | odd      | 1                  |
+| 3  | odd      | 2                  |
+| 5  | odd      | 3                  |
+| 7  | odd      | 4                  |
+| 9  | odd      | 5                  |
++----+----------+--------------------+
+</codeblock>
+
+The following examples show how to construct a moving window, with a running average taking into account 1 row before
+and 1 row after the current row, within the same partition (all the even values or all the odd values).
+Because of a restriction in the Impala <codeph>RANGE</codeph> syntax, this type of
+moving window is possible with the <codeph>ROWS BETWEEN</codeph> clause but not the <codeph>RANGE BETWEEN</codeph>
+clause:
+<codeblock>select x, property,
+  avg(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>rows between 1 preceding and 1 following</b>
+  ) as 'moving average'
+  from int_t where property in ('odd','even');
++----+----------+----------------+
+| x  | property | moving average |
++----+----------+----------------+
+| 2  | even     | 3              |
+| 4  | even     | 4              |
+| 6  | even     | 6              |
+| 8  | even     | 8              |
+| 10 | even     | 9              |
+| 1  | odd      | 2              |
+| 3  | odd      | 3              |
+| 5  | odd      | 5              |
+| 7  | odd      | 7              |
+| 9  | odd      | 8              |
++----+----------+----------------+
+
+-- Doesn't work because of syntax restriction on RANGE clause.
+select x, property,
+  avg(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>range between 1 preceding and 1 following</b>
+  ) as 'moving average'
+from int_t where property in ('odd','even');
+ERROR: AnalysisException: RANGE is only supported with both the lower and upper bounds UNBOUNDED or one UNBOUNDED and the other CURRENT ROW.
+</codeblock>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+<!-- This conref appears under SUM(), AVG(), FLOAT, and DOUBLE topics. -->
+
+    <p conref="../shared/impala_common.xml#common/sum_double"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_analytic_functions.xml#analytic_functions"/>, <xref href="impala_max.xml#max"/>,
+      <xref href="impala_min.xml#min"/>
+    </p>
+  </conbody>
+</concept>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="hbase_caching">
+
+  <title>HBASE_CACHING Query Option</title>
+  <titlealts audience="PDF"><navtitle>HBASE_CACHING</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="HBase"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">HBASE_CACHING query option</indexterm>
+      Setting this option is equivalent to calling the
+        <codeph>setCaching</codeph> method of the class <xref
+        href="http://hbase.apache.org/apidocs/org/apache/hadoop/hbase/client/Scan.html"
+        scope="external" format="html"
+        >org.apache.hadoop.hbase.client.Scan</xref>, in an HBase Java
+      application. Helps to control the memory pressure on the HBase
+      RegionServer, in conjunction with the <codeph>HBASE_CACHE_BLOCKS</codeph>
+      query option. </p>
+
+    <p>
+      <b>Type:</b> <codeph>BOOLEAN</codeph>
+    </p>
+
+    <p>
+      <b>Default:</b> 0
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_hbase.xml#impala_hbase"/>,
+      <xref href="impala_hbase_cache_blocks.xml#hbase_cache_blocks"/>
+    </p>
+
+  </conbody>
+</concept>

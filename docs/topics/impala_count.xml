@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="count">
+
+  <title>COUNT Function</title>
+  <titlealts audience="PDF"><navtitle>COUNT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="Analytic Functions"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">count() function</indexterm>
+      An aggregate function that returns the number of rows, or the number of non-<codeph>NULL</codeph> rows.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>COUNT([DISTINCT | ALL] <varname>expression</varname>) [OVER (<varname>analytic_clause</varname>)]</codeblock>
+
+    <p>
+      Depending on the argument, <codeph>COUNT()</codeph> considers rows that meet certain conditions:
+    </p>
+
+    <ul>
+      <li>
+        The notation <codeph>COUNT(*)</codeph> includes <codeph>NULL</codeph> values in the total.
+      </li>
+
+      <li>
+        The notation <codeph>COUNT(<varname>column_name</varname>)</codeph> only considers rows where the column
+        contains a non-<codeph>NULL</codeph> value.
+      </li>
+
+      <li>
+        You can also combine <codeph>COUNT</codeph> with the <codeph>DISTINCT</codeph> operator to eliminate
+        duplicates before counting, and to count the combinations of values across multiple columns.
+      </li>
+    </ul>
+
+    <p>
+      When the query contains a <codeph>GROUP BY</codeph> clause, returns one value for each combination of
+      grouping values.
+    </p>
+
+    <p>
+      <b>Return type:</b> <codeph>BIGINT</codeph>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/partition_key_optimization"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_aggregation_explanation"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_aggregation_example"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>-- How many rows total are in the table, regardless of NULL values?
+select count(*) from t1;
+-- How many rows are in the table with non-NULL values for a column?
+select count(c1) from t1;
+-- Count the rows that meet certain conditions.
+-- Again, * includes NULLs, so COUNT(*) might be greater than COUNT(col).
+select count(*) from t1 where x &gt; 10;
+select count(c1) from t1 where x &gt; 10;
+-- Can also be used in combination with DISTINCT and/or GROUP BY.
+-- Combine COUNT and DISTINCT to find the number of unique values.
+-- Must use column names rather than * with COUNT(DISTINCT ...) syntax.
+-- Rows with NULL values are not counted.
+select count(distinct c1) from t1;
+-- Rows with a NULL value in _either_ column are not counted.
+select count(distinct c1, c2) from t1;
+-- Return more than one result.
+select month, year, count(distinct visitor_id) from web_stats group by month, year;
+</codeblock>
+
+    <p rev="2.0.0">
+      The following examples show how to use <codeph>COUNT()</codeph> in an analytic context. They use a table
+      containing integers from 1 to 10. Notice how the <codeph>COUNT()</codeph> is reported for each input value, as
+      opposed to the <codeph>GROUP BY</codeph> clause which condenses the result set.
+<codeblock>select x, property, count(x) over (partition by property) as count from int_t where property in ('odd','even');
++----+----------+-------+
+| x  | property | count |
++----+----------+-------+
+| 2  | even     | 5     |
+| 4  | even     | 5     |
+| 6  | even     | 5     |
+| 8  | even     | 5     |
+| 10 | even     | 5     |
+| 1  | odd      | 5     |
+| 3  | odd      | 5     |
+| 5  | odd      | 5     |
+| 7  | odd      | 5     |
+| 9  | odd      | 5     |
++----+----------+-------+
+</codeblock>
+
+Adding an <codeph>ORDER BY</codeph> clause lets you experiment with results that are cumulative or apply to a moving
+set of rows (the <q>window</q>). The following examples use <codeph>COUNT()</codeph> in an analytic context
+(that is, with an <codeph>OVER()</codeph> clause) to produce a running count of all the even values,
+then a running count of all the odd values. The basic <codeph>ORDER BY x</codeph> clause implicitly
+activates a window clause of <codeph>RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</codeph>,
+which is effectively the same as <codeph>ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</codeph>,
+therefore all of these examples produce the same results:
+<codeblock>select x, property,
+  count(x) over (partition by property <b>order by x</b>) as 'cumulative count'
+  from int_t where property in ('odd','even');
++----+----------+------------------+
+| x  | property | cumulative count |
++----+----------+------------------+
+| 2  | even     | 1                |
+| 4  | even     | 2                |
+| 6  | even     | 3                |
+| 8  | even     | 4                |
+| 10 | even     | 5                |
+| 1  | odd      | 1                |
+| 3  | odd      | 2                |
+| 5  | odd      | 3                |
+| 7  | odd      | 4                |
+| 9  | odd      | 5                |
++----+----------+------------------+
+
+select x, property,
+  count(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>range between unbounded preceding and current row</b>
+  ) as 'cumulative total'
+from int_t where property in ('odd','even');
++----+----------+------------------+
+| x  | property | cumulative count |
++----+----------+------------------+
+| 2  | even     | 1                |
+| 4  | even     | 2                |
+| 6  | even     | 3                |
+| 8  | even     | 4                |
+| 10 | even     | 5                |
+| 1  | odd      | 1                |
+| 3  | odd      | 2                |
+| 5  | odd      | 3                |
+| 7  | odd      | 4                |
+| 9  | odd      | 5                |
++----+----------+------------------+
+
+select x, property,
+  count(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>rows between unbounded preceding and current row</b>
+  ) as 'cumulative total'
+  from int_t where property in ('odd','even');
++----+----------+------------------+
+| x  | property | cumulative count |
++----+----------+------------------+
+| 2  | even     | 1                |
+| 4  | even     | 2                |
+| 6  | even     | 3                |
+| 8  | even     | 4                |
+| 10 | even     | 5                |
+| 1  | odd      | 1                |
+| 3  | odd      | 2                |
+| 5  | odd      | 3                |
+| 7  | odd      | 4                |
+| 9  | odd      | 5                |
++----+----------+------------------+
+</codeblock>
+
+The following examples show how to construct a moving window, with a running count taking into account 1 row before
+and 1 row after the current row, within the same partition (all the even values or all the odd values).
+Therefore, the count is consistently 3 for rows in the middle of the window, and 2 for
+rows near the ends of the window, where there is no preceding or no following row in the partition.
+Because of a restriction in the Impala <codeph>RANGE</codeph> syntax, this type of
+moving window is possible with the <codeph>ROWS BETWEEN</codeph> clause but not the <codeph>RANGE BETWEEN</codeph>
+clause:
+<codeblock>select x, property,
+  count(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>rows between 1 preceding and 1 following</b>
+  ) as 'moving total'
+  from int_t where property in ('odd','even');
++----+----------+--------------+
+| x  | property | moving total |
++----+----------+--------------+
+| 2  | even     | 2            |
+| 4  | even     | 3            |
+| 6  | even     | 3            |
+| 8  | even     | 3            |
+| 10 | even     | 2            |
+| 1  | odd      | 2            |
+| 3  | odd      | 3            |
+| 5  | odd      | 3            |
+| 7  | odd      | 3            |
+| 9  | odd      | 2            |
++----+----------+--------------+
+
+-- Doesn't work because of syntax restriction on RANGE clause.
+select x, property,
+  count(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>range between 1 preceding and 1 following</b>
+  ) as 'moving total'
+from int_t where property in ('odd','even');
+ERROR: AnalysisException: RANGE is only supported with both the lower and upper bounds UNBOUNDED or one UNBOUNDED and the other CURRENT ROW.
+</codeblock>
+    </p>
+
+    <note conref="../shared/impala_common.xml#common/multiple_count_distinct"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_analytic_functions.xml#analytic_functions"/>
+    </p>
+
+  </conbody>
+</concept>

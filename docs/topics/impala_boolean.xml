@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="boolean">
+
+  <title>BOOLEAN Data Type</title>
+  <titlealts audience="PDF"><navtitle>BOOLEAN</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      A data type used in <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph> statements, representing a
+      single true/false choice.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+    <p>
+      In the column definition of a <codeph>CREATE TABLE</codeph> statement:
+    </p>
+
+<codeblock><varname>column_name</varname> BOOLEAN</codeblock>
+
+    <p>
+      <b>Range:</b> <codeph>TRUE</codeph> or <codeph>FALSE</codeph>. Do not use quotation marks around the
+      <codeph>TRUE</codeph> and <codeph>FALSE</codeph> literal values. You can write the literal values in
+      uppercase, lowercase, or mixed case. The values queried from a table are always returned in lowercase,
+      <codeph>true</codeph> or <codeph>false</codeph>.
+    </p>
+
+    <p>
+      <b>Conversions:</b> Impala does not automatically convert any other type to <codeph>BOOLEAN</codeph>. All
+      conversions must use an explicit call to the <codeph>CAST()</codeph> function.
+    </p>
+
+    <p>
+      You can use <codeph>CAST()</codeph> to convert
+<!--
+      <codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>,
+      <codeph>INT</codeph>, <codeph>BIGINT</codeph>, <codeph>FLOAT</codeph>, or <codeph>DOUBLE</codeph>
+-->
+      any integer or floating-point type to
+      <codeph>BOOLEAN</codeph>: a value of 0 represents <codeph>false</codeph>, and any non-zero value is converted
+      to <codeph>true</codeph>.
+    </p>
+
+<codeblock>SELECT CAST(42 AS BOOLEAN) AS nonzero_int, CAST(99.44 AS BOOLEAN) AS nonzero_decimal,
+  CAST(000 AS BOOLEAN) AS zero_int, CAST(0.0 AS BOOLEAN) AS zero_decimal;
++-------------+-----------------+----------+--------------+
+| nonzero_int | nonzero_decimal | zero_int | zero_decimal |
++-------------+-----------------+----------+--------------+
+| true        | true            | false    | false        |
++-------------+-----------------+----------+--------------+
+</codeblock>
+
+    <p>
+      When you cast the opposite way, from <codeph>BOOLEAN</codeph> to a numeric type,
+      the result becomes either 1 or 0:
+    </p>
+
+<codeblock>SELECT CAST(true AS INT) AS true_int, CAST(true AS DOUBLE) AS true_double,
+  CAST(false AS INT) AS false_int, CAST(false AS DOUBLE) AS false_double;
++----------+-------------+-----------+--------------+
+| true_int | true_double | false_int | false_double |
++----------+-------------+-----------+--------------+
+| 1        | 1           | 0         | 0            |
++----------+-------------+-----------+--------------+
+</codeblock>
+
+    <p rev="1.4.0">
+<!-- BOOLEAN-to-DECIMAL casting requested in IMPALA-991. As of Sept. 2014, designated "won't fix". -->
+      You can cast <codeph>DECIMAL</codeph> values to <codeph>BOOLEAN</codeph>, with the same treatment of zero and
+      non-zero values as the other numeric types. You cannot cast a <codeph>BOOLEAN</codeph> to a
+      <codeph>DECIMAL</codeph>.
+    </p>
+
+    <p>
+      You cannot cast a <codeph>STRING</codeph> value to <codeph>BOOLEAN</codeph>, although you can cast a
+      <codeph>BOOLEAN</codeph> value to <codeph>STRING</codeph>, returning <codeph>'1'</codeph> for
+      <codeph>true</codeph> values and <codeph>'0'</codeph> for <codeph>false</codeph> values.
+    </p>
+
+    <p>
+      Although you can cast a <codeph>TIMESTAMP</codeph> to a <codeph>BOOLEAN</codeph> or a
+      <codeph>BOOLEAN</codeph> to a <codeph>TIMESTAMP</codeph>, the results are unlikely to be useful. Any non-zero
+      <codeph>TIMESTAMP</codeph> (that is, any value other than <codeph>1970-01-01 00:00:00</codeph>) becomes
+      <codeph>TRUE</codeph> when converted to <codeph>BOOLEAN</codeph>, while <codeph>1970-01-01 00:00:00</codeph>
+      becomes <codeph>FALSE</codeph>. A value of <codeph>FALSE</codeph> becomes <codeph>1970-01-01
+      00:00:00</codeph> when converted to <codeph>BOOLEAN</codeph>, and <codeph>TRUE</codeph> becomes one second
+      past this epoch date, that is, <codeph>1970-01-01 00:00:01</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/null_null_arguments"/>
+
+    <p conref="../shared/impala_common.xml#common/partitioning_blurb"/>
+
+    <p>
+      Do not use a <codeph>BOOLEAN</codeph> column as a partition key. Although you can create such a table,
+      subsequent operations produce errors:
+    </p>
+
+<codeblock>[localhost:21000] &gt; create table truth_table (assertion string) partitioned by (truth boolean);
+[localhost:21000] &gt; insert into truth_table values ('Pigs can fly',false);
+ERROR: AnalysisException: INSERT into table with BOOLEAN partition column (truth) is not supported: partitioning.truth_table
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>SELECT 1 &lt; 2;
+SELECT 2 = 5;
+SELECT 100 &lt; NULL, 100 &gt; NULL;
+CREATE TABLE assertions (claim STRING, really BOOLEAN);
+INSERT INTO assertions VALUES
+  ("1 is less than 2", 1 &lt; 2),
+  ("2 is the same as 5", 2 = 5),
+  ("Grass is green", true),
+  ("The moon is made of green cheese", false);
+SELECT claim FROM assertions WHERE really = TRUE;
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/hbase_ok"/>
+
+    <p conref="../shared/impala_common.xml#common/parquet_ok"/>
+
+    <p conref="../shared/impala_common.xml#common/text_bulky"/>
+
+<!-- <p conref="../shared/impala_common.xml#common/compatibility_blurb"/> -->
+
+<!-- <p conref="../shared/impala_common.xml#common/internals_blurb"/> -->
+
+<!-- <p conref="../shared/impala_common.xml#common/added_in_20"/> -->
+
+    <p conref="../shared/impala_common.xml#common/column_stats_constant"/>
+
+<!-- <p conref="../shared/impala_common.xml#common/restrictions_blurb"/> -->
+
+<!-- <p conref="../shared/impala_common.xml#common/related_info"/> -->
+
+    <p>
+      <b>Related information:</b> <xref href="impala_literals.xml#boolean_literals"/>,
+      <xref href="impala_operators.xml#operators"/>,
+      <xref href="impala_conditional_functions.xml#conditional_functions"/>
+    </p>
+  </conbody>
+</concept>

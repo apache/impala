@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="schema_objects">
+
+  <title>Impala Schema Objects and Object Names</title>
+  <titlealts audience="PDF"><navtitle>Schema Objects and Object Names</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">schema objects</indexterm>
+      With Impala, you work with schema objects that are familiar to database users: primarily databases, tables, views,
+      and functions. The SQL syntax to work with these objects is explained in
+      <xref href="impala_langref_sql.xml#langref_sql"/>. This section explains the conceptual knowledge you need to
+      work with these objects and the various ways to specify their names.
+    </p>
+
+    <p>
+      Within a table, partitions can also be considered a kind of object. Partitioning is an important subject for
+      Impala, with its own documentation section covering use cases and performance considerations. See
+      <xref href="impala_partitioning.xml#partitioning"/> for details.
+    </p>
+
+    <p>
+      Impala does not have a counterpart of the <q>tablespace</q> notion from some database systems. By default,
+      all the data files for a database, table, or partition are located within nested folders within the HDFS file
+      system. You can also specify a particular HDFS location for a given Impala table or partition. The raw data
+      for these objects is represented as a collection of data files, providing the flexibility to load data by
+      simply moving files into the expected HDFS location.
+    </p>
+
+    <p>
+      Information about the schema objects is held in the
+      <xref href="impala_hadoop.xml#intro_metastore">metastore</xref> database. This database is shared between
+      Impala and Hive, allowing each to create, drop, and query each other's databases, tables, and so on. When
+      Impala makes a change to schema objects through a <codeph>CREATE</codeph>, <codeph>ALTER</codeph>,
+      <codeph>DROP</codeph>, <codeph>INSERT</codeph>, or <codeph>LOAD DATA</codeph> statement, it broadcasts those
+      changes to all nodes in the cluster through the <xref href="impala_components.xml#intro_catalogd">catalog
+      service</xref>. When you make such changes through Hive or directly through manipulating HDFS files, you use
+      the <xref href="impala_refresh.xml#refresh">REFRESH</xref> or
+      <xref href="impala_invalidate_metadata.xml#invalidate_metadata">INVALIDATE METADATA</xref> statements on the
+      Impala side to recognize the newly loaded data, new tables, and so on.
+    </p>
+
+    <p outputclass="toc"/>
+  </conbody>
+</concept>

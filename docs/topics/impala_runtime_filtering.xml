@@ -1,0 +1,506 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="runtime_filtering" rev="2.5.0">
+
+  <title id="runtime_filters">Runtime Filtering for Impala Queries (<keyword keyref="impala25"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>Runtime Filtering</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.5.0">
+      <indexterm audience="Cloudera">runtime filtering</indexterm>
+      <term>Runtime filtering</term> is a wide-ranging optimization feature available in
+      <keyword keyref="impala25_full"/> and higher. When only a fraction of the data in a table is
+      needed for a query against a partitioned table or to evaluate a join condition,
+      Impala determines the appropriate conditions while the query is running, and
+      broadcasts that information to all the <cmdname>impalad</cmdname> nodes that are reading the table
+      so that they can avoid unnecessary I/O to read partition data, and avoid
+      unnecessary network transmission by sending only the subset of rows that match the join keys
+      across the network.
+    </p>
+
+    <p>
+      This feature is primarily used to optimize queries against large partitioned tables
+      (under the name <term>dynamic partition pruning</term>) and joins of large tables.
+      The information in this section includes concepts, internals, and troubleshooting
+      information for the entire runtime filtering feature.
+      For specific tuning steps for partitioned tables,
+      <!-- and join queries, -->
+      see
+      <xref href="impala_partitioning.xml#dynamic_partition_pruning"/>.
+      <!-- and <xref href="impala_joins.xml#joins"/>. -->
+    </p>
+
+    <note type="important" rev="2.6.0 CDH-41184">
+      <p rev="2.6.0 CDH-41184">
+        When this feature made its debut in CDH 5.7 / Impala 2.5,
+        the default setting was <codeph>RUNTIME_FILTER_MODE=LOCAL</codeph>.
+        Now the default is <codeph>RUNTIME_FILTER_MODE=GLOBAL</codeph> in <keyword keyref="impala26_full"/> and higher,
+        which enables more wide-ranging and ambitious query optimization without requiring you to
+        explicitly set any query options.
+      </p>
+    </note>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
+
+  <concept id="runtime_filtering_concepts">
+    <title>Background Information for Runtime Filtering</title>
+    <conbody>
+      <p>
+        To understand how runtime filtering works at a detailed level, you must
+        be familiar with some terminology from the field of distributed database technology:
+      </p>
+      <ul>
+        <li>
+          <p>
+            What a <term>plan fragment</term> is.
+            Impala decomposes each query into smaller units of work that are distributed across the cluster.
+            Wherever possible, a data block is read, filtered, and aggregated by plan fragments executing
+            on the same host. For some operations, such as joins and combining intermediate results into
+            a final result set, data is transmitted across the network from one DataNode to another.
+          </p>
+        </li>
+        <li>
+          <p>
+            What <codeph>SCAN</codeph> and <codeph>HASH JOIN</codeph> plan nodes are, and their role in computing query results:
+          </p>
+          <p>
+            In the Impala query plan, a <term>scan node</term> performs the I/O to read from the underlying data files.
+            Although this is an expensive operation from the traditional database perspective, Hadoop clusters and Impala are
+            optimized to do this kind of I/O in a highly parallel fashion. The major potential cost savings come from using
+            the columnar Parquet format (where Impala can avoid reading data for unneeded columns) and partitioned tables
+            (where Impala can avoid reading data for unneeded partitions).
+          </p>
+          <p>
+            Most Impala joins use the
+            <xref href="https://en.wikipedia.org/wiki/Hash_join" scope="external" format="html"><term>hash join</term></xref>
+            mechanism. (It is only fairly recently that Impala
+            started using the nested-loop join technique, for certain kinds of non-equijoin queries.)
+            In a hash join, when evaluating join conditions from two tables, Impala constructs a hash table in memory with all
+            the different column values from the table on one side of the join.
+            Then, for each row from the table on the other side of the join, Impala tests whether the relevant column values
+            are in this hash table or not.
+          </p>
+          <p>
+            A <term>hash join node</term> constructs such an in-memory hash table, then performs the comparisons to
+            identify which rows match the relevant join conditions
+            and should be included in the result set (or at least sent on to the subsequent intermediate stage of
+            query processing). Because some of the input for a hash join might be transmitted across the network from another host,
+            it is especially important from a performance perspective to prune out ahead of time any data that is known to be
+            irrelevant.
+          </p>
+          <p>
+            The more distinct values are in the columns used as join keys, the larger the in-memory hash table and
+            thus the more memory required to process the query.
+          </p>
+        </li>
+        <li>
+          <p>
+            The difference between a <term>broadcast join</term> and a <term>shuffle join</term>.
+            (The Hadoop notion of a shuffle join is sometimes referred to in Impala as a <term>partitioned join</term>.)
+            In a broadcast join, the table from one side of the join (typically the smaller table)
+            is sent in its entirety to all the hosts involved in the query. Then each host can compare its
+            portion of the data from the other (larger) table against the full set of possible join keys.
+            In a shuffle join, there is no obvious <q>smaller</q> table, and so the contents of both tables
+            are divided up, and corresponding portions of the data are transmitted to each host involved in the query.
+            See <xref href="impala_hints.xml#hints"/> for information about how these different kinds of
+            joins are processed.
+          </p>
+        </li>
+        <li>
+          <p>
+            The notion of the build phase and probe phase when Impala processes a join query.
+            The <term>build phase</term> is where the rows containing the join key columns, typically for the smaller table,
+            are transmitted across the network and built into an in-memory hash table data structure on one or
+            more destination nodes.
+            The <term>probe phase</term> is where data is read locally (typically from the larger table) and the join key columns
+            are compared to the values in the in-memory hash table.
+            The corresponding input sources (tables, subqueries, and so on) for these
+            phases are referred to as the <term>build side</term> and the <term>probe side</term>.
+          </p>
+        </li>
+        <li>
+          <p>
+            How to set Impala query options: interactively within an <cmdname>impala-shell</cmdname> session through
+            the <codeph>SET</codeph> command, for a JDBC or ODBC application through the <codeph>SET</codeph> statement, or
+            globally for all <cmdname>impalad</cmdname> daemons through the <codeph>default_query_options</codeph> configuration
+            setting.
+          </p>
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+
+  <concept id="runtime_filtering_internals">
+    <title>Runtime Filtering Internals</title>
+    <conbody>
+      <p>
+        The <term>filter</term> that is transmitted between plan fragments is essentially a list
+        of values for join key columns. When this list is values is transmitted in time to a scan node,
+        Impala can filter out non-matching values immediately after reading them, rather than transmitting
+        the raw data to another host to compare against the in-memory hash table on that host.
+        This data structure is implemented as a <term>Bloom filter</term>, which uses a probability-based
+        algorithm to determine all possible matching values. (The probability-based aspects means that the
+        filter might include some non-matching values, but if so, that does not cause any inaccuracy
+        in the final results.)
+      </p>
+      <p>
+        There are different kinds of filters to match the different kinds of joins (partitioned and broadcast).
+        A broadcast filter is a complete list of relevant values that can be immediately evaluated by a scan node.
+        A partitioned filter is a partial list of relevant values (based on the data processed by one host in the
+        cluster); all the partitioned filters must be combined into one (by the coordinator node) before the
+        scan nodes can use the results to accurately filter the data as it is read from storage.
+      </p>
+      <p>
+        Broadcast filters are also classified as local or global. With a local broadcast filter, the information
+        in the filter is used by a subsequent query fragment that is running on the same host that produced the filter.
+        A non-local broadcast filter must be transmitted across the network to a query fragment that is running on a
+        different host. Impala designates 3 hosts to each produce non-local broadcast filters, to guard against the
+        possibility of a single slow host taking too long. Depending on the setting of the <codeph>RUNTIME_FILTER_MODE</codeph> query option
+        (<codeph>LOCAL</codeph> or <codeph>GLOBAL</codeph>), Impala either uses a conservative optimization
+        strategy where filters are only consumed on the same host that produced them, or a more aggressive strategy
+        where filters are eligible to be transmitted across the network.
+      </p>
+
+      <note rev="2.6.0 CDH-41184 IMPALA-3333">
+        In <keyword keyref="impala26_full"/> and higher, the default for runtime filtering is the <codeph>GLOBAL</codeph> setting.
+      </note>
+
+    </conbody>
+  </concept>
+
+  <concept id="runtime_filtering_file_formats">
+    <title>File Format Considerations for Runtime Filtering</title>
+    <conbody>
+      <p>
+        Parquet tables get the most benefit from
+        the runtime filtering optimizations. Runtime filtering can speed up
+        join queries against partitioned or unpartitioned Parquet tables,
+        and single-table queries against partitioned Parquet tables.
+        See <xref href="impala_parquet.xml#parquet"/> for information about
+        using Parquet tables with Impala.
+      </p>
+      <p>
+        For other file formats (text, Avro, RCFile, and SequenceFile),
+        runtime filtering speeds up queries against partitioned tables only.
+        Because partitioned tables can use a mixture of formats, Impala produces
+        the filters in all cases, even if they are not ultimately used to
+        optimize the query.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="runtime_filtering_timing">
+    <title>Wait Intervals for Runtime Filters</title>
+    <conbody>
+      <p>
+        Because it takes time to produce runtime filters, especially for
+        partitioned filters that must be combined by the coordinator node,
+        there is a time interval above which it is more efficient for
+        the scan nodes to go ahead and construct their intermediate result sets,
+        even if that intermediate data is larger than optimal. If it only takes
+        a few seconds to produce the filters, it is worth the extra time if pruning
+        the unnecessary data can save minutes in the overall query time.
+        You can specify the maximum wait time in milliseconds using the
+        <codeph>RUNTIME_FILTER_WAIT_TIME_MS</codeph> query option.
+      </p>
+      <p>
+        By default, each scan node waits for up to 1 second (1000 milliseconds)
+        for filters to arrive. If all filters have not arrived within the
+        specified interval, the scan node proceeds, using whatever filters
+        did arrive to help avoid reading unnecessary data. If a filter arrives
+        after the scan node begins reading data, the scan node applies that
+        filter to the data that is read after the filter arrives, but not to
+        the data that was already read.
+      </p>
+      <p>
+        If the cluster is relatively busy and your workload contains many
+        resource-intensive or long-running queries, consider increasing the wait time
+        so that complicated queries do not miss opportunities for optimization.
+        If the cluster is lightly loaded and your workload contains many small queries
+        taking only a few seconds, consider decreasing the wait time to avoid the
+        1 second delay for each query.
+      </p>
+    </conbody>
+  </concept>
+
+
+  <concept id="runtime_filtering_query_options">
+    <title>Query Options for Runtime Filtering</title>
+    <conbody>
+      <p>
+        See the following sections for information about the query options that control runtime filtering:
+      </p>
+      <ul>
+        <li>
+          <p>
+            The first query option adjusts the <q>sensitivity</q> of this feature.
+            <ph rev="2.6.0 CDH-41184 IMPALA-3333">By default, it is set to the highest level (<codeph>GLOBAL</codeph>).
+            (This default applies to <keyword keyref="impala26_full"/> and higher.
+            In previous releases, the default was <codeph>LOCAL</codeph>.)</ph>
+          </p>
+          <ul>
+            <li>
+              <p>
+                <xref href="impala_runtime_filter_mode.xml#runtime_filter_mode"/>
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            The other query options are tuning knobs that you typically only adjust after doing
+            performance testing, and that you might want to change only for the duration of a single
+            expensive query:
+          </p>
+          <ul>
+            <li>
+              <p>
+                <xref href="impala_max_num_runtime_filters.xml#max_num_runtime_filters"/>
+              </p>
+            </li>
+            <li>
+              <p>
+                <xref href="impala_disable_row_runtime_filtering.xml#disable_row_runtime_filtering"/>
+              </p>
+            </li>
+            <li>
+              <p rev="2.6.0 IMPALA-3480">
+                <xref href="impala_runtime_filter_max_size.xml#runtime_filter_max_size"/> 
+              </p>
+            </li>
+            <li>
+              <p rev="2.6.0 IMPALA-3480">
+                <xref href="impala_runtime_filter_min_size.xml#runtime_filter_min_size"/> 
+              </p>
+            </li>
+            <li>
+              <p rev="2.6.0 IMPALA-3007">
+                <xref href="impala_runtime_bloom_filter_size.xml#runtime_bloom_filter_size"/>;
+                in <keyword keyref="impala26_full"/> and higher, this setting acts as a fallback when
+                statistics are not available, rather than as a directive.
+              </p>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+
+  <concept id="runtime_filtering_explain_plan">
+    <title>Runtime Filtering and Query Plans</title>
+    <conbody>
+      <p>
+        In the same way the query plan displayed by the
+        <codeph>EXPLAIN</codeph> statement includes information
+        about predicates used by each plan fragment, it also
+        includes annotations showing whether a plan fragment
+        produces or consumes a runtime filter.
+        A plan fragment that produces a filter includes an
+        annotation such as
+        <codeph>runtime filters: <varname>filter_id</varname> &lt;- <varname>table</varname>.<varname>column</varname></codeph>,
+        while a plan fragment that consumes a filter includes an annotation such as
+        <codeph>runtime filters: <varname>filter_id</varname> -&gt; <varname>table</varname>.<varname>column</varname></codeph>.
+      </p>
+
+      <p>
+        The following example shows a query that uses a single runtime filter (labelled <codeph>RF00</codeph>)
+        to prune the partitions that are scanned in one stage of the query, based on evaluating the
+        result set of a subquery:
+      </p>
+
+<codeblock conref="../shared/impala_common.xml#common/simple_dpp_example"/>
+
+      <p>
+        The query profile (displayed by the <codeph>PROFILE</codeph> command in <cmdname>impala-shell</cmdname>)
+        contains both the <codeph>EXPLAIN</codeph> plan and more detailed information about the internal
+        workings of the query. The profile output includes a section labelled the <q>filter routing table</q>,
+        with information about each filter based on its ID.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="runtime_filtering_queries">
+    <title>Examples of Queries that Benefit from Runtime Filtering</title>
+    <conbody>
+
+      <p>
+        In this example, Impala would normally do extra work to interpret the columns
+        <codeph>C1</codeph>, <codeph>C2</codeph>, <codeph>C3</codeph>, and <codeph>ID</codeph>
+        for each row in <codeph>HUGE_T1</codeph>, before checking the <codeph>ID</codeph>
+        value against the in-memory hash table constructed from all the <codeph>TINY_T2.ID</codeph>
+        values. By producing a filter containing all the <codeph>TINY_T2.ID</codeph> values
+        even before the query starts scanning the <codeph>HUGE_T1</codeph> table, Impala
+        can skip the unnecessary work to parse the column info as soon as it determines
+        that an <codeph>ID</codeph> value does not match any of the values from the other table.
+      </p>
+
+      <p>
+        The example shows <codeph>COMPUTE STATS</codeph> statements for both the tables (even
+        though that is a one-time operation after loading data into those tables) because
+        Impala relies on up-to-date statistics to
+        determine which one has more distinct <codeph>ID</codeph> values than the other.
+        That information lets Impala make effective decisions about which table to use to
+        construct the in-memory hash table, and which table to read from disk and
+        compare against the entries in the hash table.
+      </p>
+
+<codeblock rev="2.6.0 CDH-41184">
+COMPUTE STATS huge_t1;
+COMPUTE STATS tiny_t2;
+SELECT c1, c2, c3 FROM huge_t1 JOIN tiny_t2 WHERE huge_t1.id = tiny_t2.id;
+</codeblock>
+
+<!-- The greater-than comparison prevents runtime filtering from applying. Comment out for now;
+     put back if the example can be reworked in a way that does produce some filters.
+      <p>
+        In this example, <codeph>T1</codeph> is a table partitioned by year. The subquery
+        on <codeph>T2</codeph> produces a single value with the <codeph>MIN(year)</codeph> result,
+        and transmits that value as a filter to the plan fragments that are reading from <codeph>T1</codeph>.
+        Any non-matching partitions in <codeph>T1</codeph> are skipped.
+      </p>
+
+<codeblock>
+select c1 from t1 where year > (select min(year) from t2);
+</codeblock>
+-->
+
+      <p>
+        In this example, <codeph>T1</codeph> is a table partitioned by year. The subquery
+        on <codeph>T2</codeph> produces multiple values, and transmits those values as a filter to the plan
+        fragments that are reading from <codeph>T1</codeph>. Any non-matching partitions in <codeph>T1</codeph>
+        are skipped.
+      </p>
+
+<codeblock rev="2.6.0 CDH-41184">
+select c1 from t1 where year in (select distinct year from t2);
+</codeblock>
+
+      <p>
+        Now the <codeph>WHERE</codeph> clause contains an additional test that does not apply to
+        the partition key column.
+        A filter on a column that is not a partition key is called a per-row filter.
+        Because per-row filters only apply for Parquet, <codeph>T1</codeph> must be a Parquet table.
+      </p>
+
+      <p>
+        The subqueries result in two filters being transmitted to
+        the scan nodes that read from <codeph>T1</codeph>. The filter on <codeph>YEAR</codeph> helps the query eliminate
+        entire partitions based on non-matching years. The filter on <codeph>C2</codeph> lets Impala discard
+        rows with non-matching <codeph>C2</codeph> values immediately after reading them. Without runtime filtering,
+        Impala would have to keep the non-matching values in memory, assemble <codeph>C1</codeph>, <codeph>C2</codeph>,
+        and <codeph>C3</codeph> into rows in the intermediate result set, and transmit all the intermediate rows
+        back to the coordinator node, where they would be eliminated only at the very end of the query.
+      </p>
+
+<codeblock rev="2.6.0 CDH-41184">
+select c1, c2, c3 from t1
+  where year in (select distinct year from t2)
+    and c2 in (select other_column from t3);
+</codeblock>
+
+      <p>
+        This example involves a broadcast join.
+        The fact that the <codeph>ON</codeph> clause would
+        return a small number of matching rows (because there
+        are not very many rows in <codeph>TINY_T2</codeph>)
+        means that the corresponding filter is very selective.
+        Therefore, runtime filtering will probably be effective
+        in optimizing this query.
+      </p>
+
+<codeblock rev="2.6.0 CDH-41184">
+select c1 from huge_t1 join [broadcast] tiny_t2
+  on huge_t1.id = tiny_t2.id
+  where huge_t1.year in (select distinct year from tiny_t2)
+    and c2 in (select other_column from t3);
+</codeblock>
+
+      <p>
+        This example involves a shuffle or partitioned join.
+        Assume that most rows in <codeph>HUGE_T1</codeph>
+        have a corresponding row in <codeph>HUGE_T2</codeph>.
+        The fact that the <codeph>ON</codeph> clause could
+        return a large number of matching rows means that
+        the corresponding filter would not be very selective.
+        Therefore, runtime filtering might be less effective
+        in optimizing this query.
+      </p>
+
+<codeblock rev="2.6.0 CDH-41184">
+select c1 from huge_t1 join [shuffle] huge_t2
+  on huge_t1.id = huge_t2.id
+  where huge_t1.year in (select distinct year from huge_t2)
+    and c2 in (select other_column from t3);
+</codeblock>
+
+    </conbody>
+  </concept>
+
+  <concept id="runtime_filtering_tuning">
+    <title>Tuning and Troubleshooting Queries that Use Runtime Filtering</title>
+    <conbody>
+      <p>
+        These tuning and troubleshooting procedures apply to queries that are
+        resource-intensive enough, long-running enough, and frequent enough
+        that you can devote special attention to optimizing them individually.
+      </p>
+
+      <p>
+        Use the <codeph>EXPLAIN</codeph> statement and examine the <codeph>runtime filters:</codeph>
+        lines to determine whether runtime filters are being applied to the <codeph>WHERE</codeph> predicates
+        and join clauses that you expect. For example, runtime filtering does not apply to queries that use
+        the nested loop join mechanism due to non-equijoin operators.
+      </p>
+
+      <p>
+        Make sure statistics are up-to-date for all tables involved in the queries.
+        Use the <codeph>COMPUTE STATS</codeph> statement after loading data into non-partitioned tables,
+        and <codeph>COMPUTE INCREMENTAL STATS</codeph> after adding new partitions to partitioned tables.
+      </p>
+
+      <p>
+        If join queries involving large tables use unique columns as the join keys,
+        for example joining a primary key column with a foreign key column, the overhead of
+        producing and transmitting the filter might outweigh the performance benefit because
+        not much data could be pruned during the early stages of the query.
+        For such queries, consider setting the query option <codeph>RUNTIME_FILTER_MODE=OFF</codeph>.
+      </p>
+
+    </conbody>
+  </concept>
+
+  <concept id="runtime_filtering_limits">
+    <title>Limitations and Restrictions for Runtime Filtering</title>
+    <conbody>
+      <p>
+        The runtime filtering feature is most effective for the Parquet file formats.
+        For other file formats, filtering only applies for partitioned tables.
+        See <xref href="impala_runtime_filtering.xml#runtime_filtering_file_formats"/>.
+      </p>
+
+      <!-- To do: check if this restriction is lifted in 5.8 / 2.6. -->
+      <p rev="IMPALA-3054">
+        When the spill-to-disk mechanism is activated on a particular host during a query,
+        that host does not produce any filters while processing that query.
+        This limitation does not affect the correctness of results; it only reduces the
+        amount of optimization that can be applied to the query.
+      </p>
+
+    </conbody>
+  </concept>
+
+
+</concept>

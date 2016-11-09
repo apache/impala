@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="schema_design">
+
+  <title>Guidelines for Designing Impala Schemas</title>
+  <titlealts audience="PDF"><navtitle>Designing Schemas</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Planning"/>
+      <data name="Category" value="Sectionated Pages"/>
+      <data name="Category" value="Proof of Concept"/>
+      <data name="Category" value="Checklists"/>
+      <data name="Category" value="Guidelines"/>
+      <data name="Category" value="Best Practices"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Compression"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Porting"/>
+      <data name="Category" value="Proof of Concept"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The guidelines in this topic help you to construct an optimized and scalable schema, one that integrates well
+      with your existing data management processes. Use these guidelines as a checklist when doing any
+      proof-of-concept work, porting exercise, or before deploying to production.
+    </p>
+
+    <p>
+      If you are adapting an existing database or Hive schema for use with Impala, read the guidelines in this
+      section and then see <xref href="impala_porting.xml#porting"/> for specific porting and compatibility tips.
+    </p>
+
+    <p outputclass="toc inpage"/>
+
+    <section id="schema_design_text_vs_binary">
+
+      <title>Prefer binary file formats over text-based formats.</title>
+
+      <p>
+        To save space and improve memory usage and query performance, use binary file formats for any large or
+        intensively queried tables. Parquet file format is the most efficient for data warehouse-style analytic
+        queries. Avro is the other binary file format that Impala supports, that you might already have as part of
+        a Hadoop ETL pipeline.
+      </p>
+
+      <p>
+        Although Impala can create and query tables with the RCFile and SequenceFile file formats, such tables are
+        relatively bulky due to the text-based nature of those formats, and are not optimized for data
+        warehouse-style queries due to their row-oriented layout. Impala does not support <codeph>INSERT</codeph>
+        operations for tables with these file formats.
+      </p>
+
+      <p>
+        Guidelines:
+      </p>
+
+      <ul>
+        <li>
+          For an efficient and scalable format for large, performance-critical tables, use the Parquet file format.
+        </li>
+
+        <li>
+          To deliver intermediate data during the ETL process, in a format that can also be used by other Hadoop
+          components, Avro is a reasonable choice.
+        </li>
+
+        <li>
+          For convenient import of raw data, use a text table instead of RCFile or SequenceFile, and convert to
+          Parquet in a later stage of the ETL process.
+        </li>
+      </ul>
+    </section>
+
+    <section id="schema_design_compression">
+
+      <title>Use Snappy compression where practical.</title>
+
+      <p>
+        Snappy compression involves low CPU overhead to decompress, while still providing substantial space
+        savings. In cases where you have a choice of compression codecs, such as with the Parquet and Avro file
+        formats, use Snappy compression unless you find a compelling reason to use a different codec.
+      </p>
+    </section>
+
+    <section id="schema_design_numeric_types">
+
+      <title>Prefer numeric types over strings.</title>
+
+      <p>
+        If you have numeric values that you could treat as either strings or numbers (such as
+        <codeph>YEAR</codeph>, <codeph>MONTH</codeph>, and <codeph>DAY</codeph> for partition key columns), define
+        them as the smallest applicable integer types. For example, <codeph>YEAR</codeph> can be
+        <codeph>SMALLINT</codeph>, <codeph>MONTH</codeph> and <codeph>DAY</codeph> can be <codeph>TINYINT</codeph>.
+        Although you might not see any difference in the way partitioned tables or text files are laid out on disk,
+        using numeric types will save space in binary formats such as Parquet, and in memory when doing queries,
+        particularly resource-intensive queries such as joins.
+      </p>
+    </section>
+
+<!-- Alan suggests not making this recommendation.
+<section id="schema_design_decimal">
+<title>Prefer DECIMAL types over FLOAT and DOUBLE.</title>
+<p>
+</p>
+</section>
+-->
+
+    <section id="schema_design_partitioning">
+
+      <title>Partition, but do not over-partition.</title>
+
+      <p>
+        Partitioning is an important aspect of performance tuning for Impala. Follow the procedures in
+        <xref href="impala_partitioning.xml#partitioning"/> to set up partitioning for your biggest, most
+        intensively queried tables.
+      </p>
+
+      <p>
+        If you are moving to Impala from a traditional database system, or just getting started in the Big Data
+        field, you might not have enough data volume to take advantage of Impala parallel queries with your
+        existing partitioning scheme. For example, if you have only a few tens of megabytes of data per day,
+        partitioning by <codeph>YEAR</codeph>, <codeph>MONTH</codeph>, and <codeph>DAY</codeph> columns might be
+        too granular. Most of your cluster might be sitting idle during queries that target a single day, or each
+        node might have very little work to do. Consider reducing the number of partition key columns so that each
+        partition directory contains several gigabytes worth of data.
+      </p>
+
+      <p rev="parquet_block_size">
+        For example, consider a Parquet table where each data file is 1 HDFS block, with a maximum block size of 1
+        GB. (In Impala 2.0 and later, the default Parquet block size is reduced to 256 MB. For this exercise, let's
+        assume you have bumped the size back up to 1 GB by setting the query option
+        <codeph>PARQUET_FILE_SIZE=1g</codeph>.) if you have a 10-node cluster, you need 10 data files (up to 10 GB)
+        to give each node some work to do for a query. But each core on each machine can process a separate data
+        block in parallel. With 16-core machines on a 10-node cluster, a query could process up to 160 GB fully in
+        parallel. If there are only a few data files per partition, not only are most cluster nodes sitting idle
+        during queries, so are most cores on those machines.
+      </p>
+
+      <p>
+        You can reduce the Parquet block size to as low as 128 MB or 64 MB to increase the number of files per
+        partition and improve parallelism. But also consider reducing the level of partitioning so that analytic
+        queries have enough data to work with.
+      </p>
+    </section>
+
+    <section id="schema_design_compute_stats">
+
+      <title>Always compute stats after loading data.</title>
+
+      <p>
+        Impala makes extensive use of statistics about data in the overall table and in each column, to help plan
+        resource-intensive operations such as join queries and inserting into partitioned Parquet tables. Because
+        this information is only available after data is loaded, run the <codeph>COMPUTE STATS</codeph> statement
+        on a table after loading or replacing data in a table or partition.
+      </p>
+
+      <p>
+        Having accurate statistics can make the difference between a successful operation, or one that fails due to
+        an out-of-memory error or a timeout. When you encounter performance or capacity issues, always use the
+        <codeph>SHOW STATS</codeph> statement to check if the statistics are present and up-to-date for all tables
+        in the query.
+      </p>
+
+      <p>
+        When doing a join query, Impala consults the statistics for each joined table to determine their relative
+        sizes and to estimate the number of rows produced in each join stage. When doing an <codeph>INSERT</codeph>
+        into a Parquet table, Impala consults the statistics for the source table to determine how to distribute
+        the work of constructing the data files for each partition.
+      </p>
+
+      <p>
+        See <xref href="impala_compute_stats.xml#compute_stats"/> for the syntax of the <codeph>COMPUTE
+        STATS</codeph> statement, and <xref href="impala_perf_stats.xml#perf_stats"/> for all the performance
+        considerations for table and column statistics.
+      </p>
+    </section>
+
+    <section id="schema_design_explain">
+
+      <title>Verify sensible execution plans with EXPLAIN and SUMMARY.</title>
+
+      <p>
+        Before executing a resource-intensive query, use the <codeph>EXPLAIN</codeph> statement to get an overview
+        of how Impala intends to parallelize the query and distribute the work. If you see that the query plan is
+        inefficient, you can take tuning steps such as changing file formats, using partitioned tables, running the
+        <codeph>COMPUTE STATS</codeph> statement, or adding query hints. For information about all of these
+        techniques, see <xref href="impala_performance.xml#performance"/>.
+      </p>
+
+      <p>
+        After you run a query, you can see performance-related information about how it actually ran by issuing the
+        <codeph>SUMMARY</codeph> command in <cmdname>impala-shell</cmdname>. Prior to Impala 1.4, you would use
+        the <codeph>PROFILE</codeph> command, but its highly technical output was only useful for the most
+        experienced users. <codeph>SUMMARY</codeph>, new in Impala 1.4, summarizes the most useful information for
+        all stages of execution, for all nodes rather than splitting out figures for each node.
+      </p>
+    </section>
+
+<!--
+<section id="schema_design_mem_limits">
+<title>Allocate resources Between Impala and batch jobs (MapReduce, Hive, Pig).</title>
+<p>
+</p>
+</section>
+
+<section id="schema_design_cm">
+<title>Use Cloudera Manager to monitor queries and overall performance.</title>
+<p>
+</p>
+</section>
+-->
+  </conbody>
+</concept>

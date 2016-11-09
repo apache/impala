@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="seq_compression_mode" rev="2.5.0">
+
+<!-- This option is for internal use only and might go away without ever being documented. It's hidden in the DITA map. -->
+
+  <title>SEQ_COMPRESSION_MODE Query Option</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.5.0">
+      <indexterm audience="Cloudera">RM_INITIAL_MEM query option</indexterm>
+    </p>
+
+    <p>
+      <b>Type:</b>
+    </p>
+
+    <p>
+      <b>Default:</b>
+    </p>
+  </conbody>
+</concept>

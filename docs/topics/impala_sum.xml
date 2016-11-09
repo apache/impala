@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="sum">
+
+  <title>SUM Function</title>
+  <titlealts audience="PDF"><navtitle>SUM</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="Analytic Functions"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">sum() function</indexterm>
+      An aggregate function that returns the sum of a set of numbers. Its single argument can be numeric column, or
+      the numeric result of a function or expression applied to the column value. Rows with a <codeph>NULL</codeph>
+      value for the specified column are ignored. If the table is empty, or all the values supplied to
+      <codeph>MIN</codeph> are <codeph>NULL</codeph>, <codeph>SUM</codeph> returns <codeph>NULL</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>SUM([DISTINCT | ALL] <varname>expression</varname>) [OVER (<varname>analytic_clause</varname>)]</codeblock>
+
+    <p>
+      When the query contains a <codeph>GROUP BY</codeph> clause, returns one value for each combination of
+      grouping values.
+    </p>
+
+    <p>
+      <b>Return type:</b> <codeph>BIGINT</codeph> for integer arguments, <codeph>DOUBLE</codeph> for floating-point
+      arguments
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_aggregation_explanation"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_aggregation_example"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following example shows how to use <codeph>SUM()</codeph> to compute the total for all the values in the
+      table, a subset of values, or the sum for each combination of values in the <codeph>GROUP BY</codeph> clause:
+    </p>
+
+<codeblock>-- Total all the values for this column in the table.
+select sum(c1) from t1;
+-- Find the total for this column from a subset of the table.
+select sum(c1) from t1 where month = 'January' and year = '2013';
+-- Find the total from a set of numeric function results.
+select sum(length(s)) from t1;
+-- Often used with functions that return predefined values to compute a score.
+select sum(case when grade = 'A' then 1.0 when grade = 'B' then 0.75 else 0) as class_honors from test_scores;
+-- Can also be used in combination with DISTINCT and/or GROUP BY.
+-- Return more than one result.
+select month, year, sum(purchase_price) from store_stats group by month, year;
+-- Filter the input to eliminate duplicates before performing the calculation.
+select sum(distinct x) from t1;
+</codeblock>
+
+    <p rev="2.0.0">
+      The following examples show how to use <codeph>SUM()</codeph> in an analytic context. They use a table
+      containing integers from 1 to 10. Notice how the <codeph>SUM()</codeph> is reported for each input value, as
+      opposed to the <codeph>GROUP BY</codeph> clause which condenses the result set.
+<codeblock>select x, property, sum(x) <b>over (partition by property)</b> as sum from int_t where property in ('odd','even');
++----+----------+-----+
+| x  | property | sum |
++----+----------+-----+
+| 2  | even     | 30  |
+| 4  | even     | 30  |
+| 6  | even     | 30  |
+| 8  | even     | 30  |
+| 10 | even     | 30  |
+| 1  | odd      | 25  |
+| 3  | odd      | 25  |
+| 5  | odd      | 25  |
+| 7  | odd      | 25  |
+| 9  | odd      | 25  |
++----+----------+-----+
+</codeblock>
+
+Adding an <codeph>ORDER BY</codeph> clause lets you experiment with results that are cumulative or apply to a moving
+set of rows (the <q>window</q>). The following examples use <codeph>SUM()</codeph> in an analytic context
+(that is, with an <codeph>OVER()</codeph> clause) to produce a running total of all the even values,
+then a running total of all the odd values. The basic <codeph>ORDER BY x</codeph> clause implicitly
+activates a window clause of <codeph>RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</codeph>,
+which is effectively the same as <codeph>ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</codeph>,
+therefore all of these examples produce the same results:
+<codeblock>select x, property,
+  sum(x) over (partition by property <b>order by x</b>) as 'cumulative total'
+  from int_t where property in ('odd','even');
++----+----------+------------------+
+| x  | property | cumulative total |
++----+----------+------------------+
+| 2  | even     | 2                |
+| 4  | even     | 6                |
+| 6  | even     | 12               |
+| 8  | even     | 20               |
+| 10 | even     | 30               |
+| 1  | odd      | 1                |
+| 3  | odd      | 4                |
+| 5  | odd      | 9                |
+| 7  | odd      | 16               |
+| 9  | odd      | 25               |
++----+----------+------------------+
+
+select x, property,
+  sum(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>range between unbounded preceding and current row</b>
+  ) as 'cumulative total'
+from int_t where property in ('odd','even');
++----+----------+------------------+
+| x  | property | cumulative total |
++----+----------+------------------+
+| 2  | even     | 2                |
+| 4  | even     | 6                |
+| 6  | even     | 12               |
+| 8  | even     | 20               |
+| 10 | even     | 30               |
+| 1  | odd      | 1                |
+| 3  | odd      | 4                |
+| 5  | odd      | 9                |
+| 7  | odd      | 16               |
+| 9  | odd      | 25               |
++----+----------+------------------+
+
+select x, property,
+  sum(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>rows between unbounded preceding and current row</b>
+  ) as 'cumulative total'
+  from int_t where property in ('odd','even');
++----+----------+------------------+
+| x  | property | cumulative total |
++----+----------+------------------+
+| 2  | even     | 2                |
+| 4  | even     | 6                |
+| 6  | even     | 12               |
+| 8  | even     | 20               |
+| 10 | even     | 30               |
+| 1  | odd      | 1                |
+| 3  | odd      | 4                |
+| 5  | odd      | 9                |
+| 7  | odd      | 16               |
+| 9  | odd      | 25               |
++----+----------+------------------+
+</codeblock>
+
+Changing the direction of the <codeph>ORDER BY</codeph> clause causes the intermediate
+results of the cumulative total to be calculated in a different order:
+
+<codeblock>select sum(x) over (partition by property <b>order by x desc</b>) as 'cumulative total'
+  from int_t where property in ('odd','even');
++----+----------+------------------+
+| x  | property | cumulative total |
++----+----------+------------------+
+| 10 | even     | 10               |
+| 8  | even     | 18               |
+| 6  | even     | 24               |
+| 4  | even     | 28               |
+| 2  | even     | 30               |
+| 9  | odd      | 9                |
+| 7  | odd      | 16               |
+| 5  | odd      | 21               |
+| 3  | odd      | 24               |
+| 1  | odd      | 25               |
++----+----------+------------------+
+</codeblock>
+
+The following examples show how to construct a moving window, with a running total taking into account 1 row before
+and 1 row after the current row, within the same partition (all the even values or all the odd values).
+Because of a restriction in the Impala <codeph>RANGE</codeph> syntax, this type of
+moving window is possible with the <codeph>ROWS BETWEEN</codeph> clause but not the <codeph>RANGE BETWEEN</codeph>
+clause:
+<codeblock>select x, property,
+  sum(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>rows between 1 preceding and 1 following</b>
+  ) as 'moving total'
+  from int_t where property in ('odd','even');
++----+----------+--------------+
+| x  | property | moving total |
++----+----------+--------------+
+| 2  | even     | 6            |
+| 4  | even     | 12           |
+| 6  | even     | 18           |
+| 8  | even     | 24           |
+| 10 | even     | 18           |
+| 1  | odd      | 4            |
+| 3  | odd      | 9            |
+| 5  | odd      | 15           |
+| 7  | odd      | 21           |
+| 9  | odd      | 16           |
++----+----------+--------------+
+
+-- Doesn't work because of syntax restriction on RANGE clause.
+select x, property,
+  sum(x) over
+  (
+    partition by property
+    <b>order by x</b>
+    <b>range between 1 preceding and 1 following</b>
+  ) as 'moving total'
+from int_t where property in ('odd','even');
+ERROR: AnalysisException: RANGE is only supported with both the lower and upper bounds UNBOUNDED or one UNBOUNDED and the other CURRENT ROW.
+</codeblock>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+<!-- This conref appears under SUM(), AVG(), FLOAT, and DOUBLE topics. -->
+
+    <p conref="../shared/impala_common.xml#common/sum_double"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_analytic_functions.xml#analytic_functions"/>
+    </p>
+
+  </conbody>
+</concept>

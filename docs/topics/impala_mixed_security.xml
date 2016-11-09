@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="mixed_security">
+
+  <title>Using Multiple Authentication Methods with Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Authentication"/>
+      <data name="Category" value="Kerberos"/>
+      <data name="Category" value="LDAP"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Impala 2.0 and later automatically handles both Kerberos and LDAP authentication. Each
+      <cmdname>impalad</cmdname> daemon can accept both Kerberos and LDAP requests through the same port. No
+      special actions need to be taken if some users authenticate through Kerberos and some through LDAP.
+    </p>
+
+    <p>
+      Prior to Impala 2.0, you had to configure each <cmdname>impalad</cmdname> to listen on a specific port
+      depending on the kind of authentication, then configure your network load balancer to forward each kind of
+      request to a DataNode that was set up with the appropriate authentication type. Once the initial request was
+      made using either Kerberos or LDAP authentication, Impala automatically handled the process of coordinating
+      the work across multiple nodes and transmitting intermediate results back to the coordinator node.
+    </p>
+
+<!--
+    <p>
+    This technique is most suitable for larger clusters, where
+    you are already using load balancing software for high availability.
+    You configure Impala to run on a different port on the nodes configured for LDAP.
+    Then you configure the load balancing software to forward Kerberos
+    connection requests to nodes using the default port, and LDAP connection requests
+    to nodes using an alternative port for LDAP.
+    Consult the documentation for your load balancing software for how to
+    configure that type of forwarding.
+    </p>
+-->
+  </conbody>
+</concept>

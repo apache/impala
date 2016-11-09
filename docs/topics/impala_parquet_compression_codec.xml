@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="parquet_compression_codec">
+
+  <title>PARQUET_COMPRESSION_CODEC Query Option</title>
+  <titlealts audience="PDF"><navtitle>PARQUET_COMPRESSION_CODEC</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Parquet"/>
+      <data name="Category" value="File Formats"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Deprecated Features"/>
+      <data name="Category" value="Compression"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">PARQUET_COMPRESSION_CODEC query option</indexterm>
+      Deprecated. Use <codeph>COMPRESSION_CODEC</codeph> in Impala 2.0 and later. See
+      <xref href="impala_compression_codec.xml#compression_codec"/> for details.
+    </p>
+  </conbody>
+</concept>

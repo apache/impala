@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="allow_unsupported_formats">
+
+  <title>ALLOW_UNSUPPORTED_FORMATS Query Option</title>
+  <titlealts audience="PDF"><navtitle>ALLOW_UNSUPPORTED_FORMATS</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Deprecated Features"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+<!--
+The original brief explanation with not enough detail comes from the comments at:
+  http://github.sf.cloudera.com/CDH/Impala/raw/master/common/thrift/ImpalaService.thrift
+Removing that wording from here after discussions with dev team. Just recording the URL for posterity.
+-->
+
+    <p>
+      An obsolete query option from early work on support for file formats. Do not use. Might be removed in the
+      future.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+  </conbody>
+</concept>

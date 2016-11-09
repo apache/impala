@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.0.0" id="exec_single_node_rows_threshold">
+
+  <title>EXEC_SINGLE_NODE_ROWS_THRESHOLD Query Option (<keyword keyref="impala21"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>EXEC_SINGLE_NODE_ROWS_THRESHOLD</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Scalability"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.0.0">
+      <indexterm audience="Cloudera">EXEC_SINGLE_NODE_ROWS_THRESHOLD query option</indexterm>
+      This setting controls the cutoff point (in terms of number of rows scanned) below which Impala treats a query
+      as a <q>small</q> query, turning off optimizations such as parallel execution and native code generation. The
+      overhead for these optimizations is applicable for queries involving substantial amounts of data, but it
+      makes sense to skip them for queries involving tiny amounts of data. Reducing the overhead for small queries
+      allows Impala to complete them more quickly, keeping YARN resources, admission control slots, and so on
+      available for data-intensive queries.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>SET EXEC_SINGLE_NODE_ROWS_THRESHOLD=<varname>number_of_rows</varname></codeblock>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p>
+      <b>Default:</b> 100
+    </p>
+
+    <p>
+      <b>Usage notes:</b> Typically, you increase the default value to make this optimization apply to more queries.
+      If incorrect or corrupted table and column statistics cause Impala to apply this optimization
+      incorrectly to queries that actually involve substantial work, you might see the queries being slower as a
+      result of remote reads. In that case, recompute statistics with the <codeph>COMPUTE STATS</codeph>
+      or <codeph>COMPUTE INCREMENTAL STATS</codeph> statement. If there is a problem collecting accurate
+      statistics, you can turn this feature off by setting the value to -1.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/internals_blurb"/>
+
+    <p>
+      This setting applies to query fragments where the amount of data to scan can be accurately determined, either
+      through table and column statistics, or by the presence of a <codeph>LIMIT</codeph> clause. If Impala cannot
+      accurately estimate the size of the input data, this setting does not apply.
+    </p>
+
+    <p rev="2.3.0">
+      In <keyword keyref="impala23_full"/> and higher, where Impala supports the complex data types <codeph>STRUCT</codeph>,
+      <codeph>ARRAY</codeph>, and <codeph>MAP</codeph>, if a query refers to any column of those types,
+      the small-query optimization is turned off for that query regardless of the
+      <codeph>EXEC_SINGLE_NODE_ROWS_THRESHOLD</codeph> setting.
+    </p>
+
+    <p>
+      For a query that is determined to be <q>small</q>, all work is performed on the coordinator node. This might
+      result in some I/O being performed by remote reads. The savings from not distributing the query work and not
+      generating native code are expected to outweigh any overhead from the remote reads.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_210"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      A common use case is to query just a few rows from a table to inspect typical data values. In this example,
+      Impala does not parallelize the query or perform native code generation because the result set is guaranteed
+      to be smaller than the threshold value from this query option:
+    </p>
+
+<codeblock>SET EXEC_SINGLE_NODE_ROWS_THRESHOLD=500;
+SELECT * FROM enormous_table LIMIT 300;
+</codeblock>
+
+<!-- Don't have any other places that tie into this particular optimization technique yet.
+Potentially: conceptual topics about code generation, distributed queries
+
+<p conref="../shared/impala_common.xml#common/related_info"/>
+<p>
+</p>
+-->
+
+  </conbody>
+
+</concept>

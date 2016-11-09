@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="explain">
+
+  <title>EXPLAIN Statement</title>
+  <titlealts audience="PDF"><navtitle>EXPLAIN</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Reports"/>
+      <data name="Category" value="Planning"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">EXPLAIN statement</indexterm>
+      Returns the execution plan for a statement, showing the low-level mechanisms that Impala will use to read the
+      data, divide the work among nodes in the cluster, and transmit intermediate and final results across the
+      network. Use <codeph>explain</codeph> followed by a complete <codeph>SELECT</codeph> query. For example:
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>EXPLAIN { <varname>select_query</varname> | <varname>ctas_stmt</varname> | <varname>insert_stmt</varname> }
+</codeblock>
+
+    <p>
+      The <varname>select_query</varname> is a <codeph>SELECT</codeph> statement, optionally prefixed by a
+      <codeph>WITH</codeph> clause. See <xref href="impala_select.xml#select"/> for details.
+    </p>
+
+    <p>
+      The <varname>insert_stmt</varname> is an <codeph>INSERT</codeph> statement that inserts into or overwrites an
+      existing table. It can use either the <codeph>INSERT ... SELECT</codeph> or <codeph>INSERT ...
+      VALUES</codeph> syntax. See <xref href="impala_insert.xml#insert"/> for details.
+    </p>
+
+    <p>
+      The <varname>ctas_stmt</varname> is a <codeph>CREATE TABLE</codeph> statement using the <codeph>AS
+      SELECT</codeph> clause, typically abbreviated as a <q>CTAS</q> operation. See
+      <xref href="impala_create_table.xml#create_table"/> for details.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      You can interpret the output to judge whether the query is performing efficiently, and adjust the query
+      and/or the schema if not. For example, you might change the tests in the <codeph>WHERE</codeph> clause, add
+      hints to make join operations more efficient, introduce subqueries, change the order of tables in a join, add
+      or change partitioning for a table, collect column statistics and/or table statistics in Hive, or any other
+      performance tuning steps.
+    </p>
+
+    <p>
+      The <codeph>EXPLAIN</codeph> output reminds you if table or column statistics are missing from any table
+      involved in the query. These statistics are important for optimizing queries involving large tables or
+      multi-table joins. See <xref href="impala_compute_stats.xml#compute_stats"/> for how to gather statistics,
+      and <xref href="impala_perf_stats.xml#perf_stats"/> for how to use this information for query tuning.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/explain_interpret"/>
+
+    <p>
+      If you come from a traditional database background and are not familiar with data warehousing, keep in mind
+      that Impala is optimized for full table scans across very large tables. The structure and distribution of
+      this data is typically not suitable for the kind of indexing and single-row lookups that are common in OLTP
+      environments. Seeing a query scan entirely through a large table is common, not necessarily an indication of
+      an inefficient query. Of course, if you can reduce the volume of scanned data by orders of magnitude, for
+      example by using a query that affects only certain partitions within a partitioned table, then you might be
+      able to optimize a query so that it executes in seconds rather than minutes.
+    </p>
+
+    <p>
+      For more information and examples to help you interpret <codeph>EXPLAIN</codeph> output, see
+      <xref href="impala_explain_plan.xml#perf_explain"/>.
+    </p>
+
+    <p rev="1.2">
+      <b>Extended EXPLAIN output:</b>
+    </p>
+
+    <p rev="1.2">
+      For performance tuning of complex queries, and capacity planning (such as using the admission control and
+      resource management features), you can enable more detailed and informative output for the
+      <codeph>EXPLAIN</codeph> statement. In the <cmdname>impala-shell</cmdname> interpreter, issue the command
+      <codeph>SET EXPLAIN_LEVEL=<varname>level</varname></codeph>, where <varname>level</varname> is an integer
+      from 0 to 3 or corresponding mnemonic values <codeph>minimal</codeph>, <codeph>standard</codeph>,
+      <codeph>extended</codeph>, or <codeph>verbose</codeph>.
+    </p>
+
+    <p rev="1.2">
+      When extended <codeph>EXPLAIN</codeph> output is enabled, <codeph>EXPLAIN</codeph> statements print
+      information about estimated memory requirements, minimum number of virtual cores, and so on.
+      <!--
+      that you can use to fine-tune the resource management options explained in <xref href="impala_resource_management.xml#rm_options"/>.
+      (The estimated memory requirements are intentionally on the high side, to allow a margin for error,
+      to avoid cancelling a query unnecessarily if you set the <codeph>MEM_LIMIT</codeph> option to the estimated memory figure.)
+      -->
+    </p>
+
+    <p>
+      See <xref href="impala_explain_level.xml#explain_level"/> for details and examples.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      This example shows how the standard <codeph>EXPLAIN</codeph> output moves from the lowest (physical) level to
+      the higher (logical) levels. The query begins by scanning a certain amount of data; each node performs an
+      aggregation operation (evaluating <codeph>COUNT(*)</codeph>) on some subset of data that is local to that
+      node; the intermediate results are transmitted back to the coordinator node (labelled here as the
+      <codeph>EXCHANGE</codeph> node); lastly, the intermediate results are summed to display the final result.
+    </p>
+
+<codeblock id="explain_plan_simple">[impalad-host:21000] &gt; explain select count(*) from customer_address;
++----------------------------------------------------------+
+| Explain String                                           |
++----------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=42.00MB VCores=1 |
+|                                                          |
+| 03:AGGREGATE [MERGE FINALIZE]                            |
+| |  output: sum(count(*))                                 |
+| |                                                        |
+| 02:EXCHANGE [PARTITION=UNPARTITIONED]                    |
+| |                                                        |
+| 01:AGGREGATE                                             |
+| |  output: count(*)                                      |
+| |                                                        |
+| 00:SCAN HDFS [default.customer_address]                  |
+|    partitions=1/1 size=5.25MB                            |
++----------------------------------------------------------+
+</codeblock>
+
+    <p>
+      These examples show how the extended <codeph>EXPLAIN</codeph> output becomes more accurate and informative as
+      statistics are gathered by the <codeph>COMPUTE STATS</codeph> statement. Initially, much of the information
+      about data size and distribution is marked <q>unavailable</q>. Impala can determine the raw data size, but
+      not the number of rows or number of distinct values for each column without additional analysis. The
+      <codeph>COMPUTE STATS</codeph> statement performs this analysis, so a subsequent <codeph>EXPLAIN</codeph>
+      statement has additional information to use in deciding how to optimize the distributed query.
+    </p>
+
+    <!-- To do:
+      Re-run these examples with more substantial tables populated with data.
+    -->
+
+<codeblock rev="1.2">[localhost:21000] &gt; set explain_level=extended;
+EXPLAIN_LEVEL set to extended
+[localhost:21000] &gt; explain select x from t1;
+[localhost:21000] &gt; explain select x from t1;
++----------------------------------------------------------+
+| Explain String                                           |
++----------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=32.00MB VCores=1 |
+|                                                          |
+| 01:EXCHANGE [PARTITION=UNPARTITIONED]                    |
+| |  hosts=1 per-host-mem=unavailable                      |
+<b>| |  tuple-ids=0 row-size=4B cardinality=unavailable       |</b>
+| |                                                        |
+| 00:SCAN HDFS [default.t2, PARTITION=RANDOM]              |
+|    partitions=1/1 size=36B                               |
+<b>|    table stats: unavailable                              |</b>
+<b>|    column stats: unavailable                             |</b>
+|    hosts=1 per-host-mem=32.00MB                          |
+<b>|    tuple-ids=0 row-size=4B cardinality=unavailable       |</b>
++----------------------------------------------------------+
+</codeblock>
+
+<codeblock rev="1.2">[localhost:21000] &gt; compute stats t1;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 1 column(s). |
++-----------------------------------------+
+[localhost:21000] &gt; explain select x from t1;
++----------------------------------------------------------+
+| Explain String                                           |
++----------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=64.00MB VCores=1 |
+|                                                          |
+| 01:EXCHANGE [PARTITION=UNPARTITIONED]                    |
+| |  hosts=1 per-host-mem=unavailable                      |
+| |  tuple-ids=0 row-size=4B cardinality=0                 |
+| |                                                        |
+| 00:SCAN HDFS [default.t1, PARTITION=RANDOM]              |
+|    partitions=1/1 size=36B                               |
+<b>|    table stats: 0 rows total                             |</b>
+<b>|    column stats: all                                     |</b>
+|    hosts=1 per-host-mem=64.00MB                          |
+<b>|    tuple-ids=0 row-size=4B cardinality=0                 |</b>
++----------------------------------------------------------+
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/security_blurb"/>
+    <p conref="../shared/impala_common.xml#common/redaction_yes"/>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
+    <p rev="CDH-19187">
+      <!-- Doublecheck these details. Does EXPLAIN really need any permissions? -->
+      The user ID that the <cmdname>impalad</cmdname> daemon runs under,
+      typically the <codeph>impala</codeph> user, must have read
+      and execute permissions for all applicable directories in all source tables
+      for the query that is being explained.
+      (A <codeph>SELECT</codeph> operation could read files from multiple different HDFS directories
+      if the source table is partitioned.)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_select.xml#select"/>,
+      <xref href="impala_insert.xml#insert"/>,
+      <xref href="impala_create_table.xml#create_table"/>,
+      <xref href="impala_explain_plan.xml#explain_plan"/>
+    </p>
+
+  </conbody>
+</concept>

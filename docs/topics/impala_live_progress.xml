@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.3.0" id="live_progress">
+
+  <title>LIVE_PROGRESS Query Option (<keyword keyref="impala23"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>LIVE_PROGRESS</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Reports"/>
+      <data name="Category" value="impala-shell"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.3.0">
+      <indexterm audience="Cloudera">LIVE_PROGRESS query option</indexterm>
+      For queries submitted through the <cmdname>impala-shell</cmdname> command,
+      displays an interactive progress bar showing roughly what percentage of
+      processing has been completed. When the query finishes, the progress bar is erased
+      from the <cmdname>impala-shell</cmdname> console output.
+    </p>
+
+    <p>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+
+    <p conref="../shared/impala_common.xml#common/command_line_blurb"/>
+    <p>
+      You can enable this query option within <cmdname>impala-shell</cmdname>
+      by starting the shell with the <codeph>--live_progress</codeph>
+      command-line option.
+      You can still turn this setting off and on again within the shell through the
+      <codeph>SET</codeph> command.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p conref="../shared/impala_common.xml#common/live_reporting_details"/>
+    <p>
+      For a more detailed way of tracking the progress of an interactive query through
+      all phases of processing, see <xref href="impala_live_summary.xml#live_summary"/>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+    <p>
+      Because the percentage complete figure is calculated using the number of
+      issued and completed <q>scan ranges</q>, which occur while reading the table
+      data, the progress bar might reach 100% before the query is entirely finished.
+      For example, the query might do work to perform aggregations after all the
+      table data has been read. If many of your queries fall into this category,
+      consider using the <codeph>LIVE_SUMMARY</codeph> option instead for
+      more granular progress reporting.
+    </p>
+    <p conref="../shared/impala_common.xml#common/impala_shell_progress_reports_compute_stats_caveat"/>
+    <p conref="../shared/impala_common.xml#common/impala_shell_progress_reports_shell_only_caveat"/>
+
+    <p conref="../shared/impala_common.xml#common/added_in_230"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock><![CDATA[[localhost:21000] > set live_progress=true;
+LIVE_PROGRESS set to true
+[localhost:21000] > select count(*) from customer;
++----------+
+| count(*) |
++----------+
+| 150000   |
++----------+
+[localhost:21000] > select count(*) from customer t1 cross join customer t2;
+[###################################                                   ] 50%
+[######################################################################] 100%
+
+]]>
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/live_progress_live_summary_asciinema"/>
+
+  </conbody>
+</concept>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="admin">
+
+  <title>Impala Administration</title>
+  <titlealts audience="PDF"><navtitle>Administration</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Administrators"/>
+      <!-- Although there is a reasonable amount of info on the page, it could be better to use wiki-style embedding instead of linking hither and thither. -->
+      <data name="Category" value="Stub Pages"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      As an administrator, you monitor Impala's use of resources and take action when necessary to keep Impala
+      running smoothly and avoid conflicts with other Hadoop components running on the same cluster. When you
+      detect that an issue has happened or could happen in the future, you reconfigure Impala or other components
+      such as HDFS or even the hardware of the cluster itself to resolve or avoid problems.
+    </p>
+
+    <p outputclass="toc"/>
+
+    <p>
+      <b>Related tasks:</b>
+    </p>
+
+    <p>
+      As an administrator, you can expect to perform installation, upgrade, and configuration tasks for Impala on
+      all machines in a cluster. See <xref href="impala_install.xml#install"/>,
+      <xref href="impala_upgrading.xml#upgrading"/>, and <xref href="impala_config.xml#config"/> for details.
+    </p>
+
+    <p>
+      For security tasks typically performed by administrators, see <xref href="impala_security.xml#security"/>.
+    </p>
+
+    <p>
+      Administrators also decide how to allocate cluster resources so that all Hadoop components can run smoothly
+      together. For Impala, this task primarily involves:
+      <ul>
+        <li>
+          Deciding how many Impala queries can run concurrently and with how much memory, through the admission
+          control feature. See <xref href="impala_admission.xml#admission_control"/> for details.
+        </li>
+
+        <li>
+          Dividing cluster resources such as memory between Impala and other components, using YARN for overall
+          resource management, and Llama to mediate resource requests from Impala to YARN. See
+          <xref href="impala_resource_management.xml#resource_management"/> for details.
+        </li>
+      </ul>
+    </p>
+
+<!-- <p conref="../shared/impala_common.xml#common/impala_mr"/> -->
+  </conbody>
+</concept>

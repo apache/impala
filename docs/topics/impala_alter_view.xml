@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.1" id="alter_view">
+
+  <title>ALTER VIEW Statement</title>
+  <titlealts audience="PDF"><navtitle>ALTER VIEW</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="Views"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">ALTER VIEW statement</indexterm>
+      Changes the characteristics of a view. The syntax has two forms:
+    </p>
+
+    <ul>
+      <li>
+        The <codeph>AS</codeph> clause associates the view with a different query.
+      </li>
+      <li>
+        The <codeph>RENAME TO</codeph> clause changes the name of the view, moves the view to
+        a different database, or both.
+      </li>
+    </ul>
+
+    <p>
+      Because a view is purely a logical construct (an alias for a query) with no physical data behind it,
+      <codeph>ALTER VIEW</codeph> only involves changes to metadata in the metastore database, not any data files
+      in HDFS.
+    </p>
+
+<!-- View _permissions_ don't rely on underlying table. -->
+
+<!-- Could use views to grant access only to certain columns. -->
+
+<!-- Treated like a table for authorization. -->
+
+<!-- ALTER VIEW that queries another view - possibly a runtime error. -->
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname> AS <varname>select_statement</varname>
+ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname> RENAME TO [<varname>database_name</varname>.]<varname>view_name</varname></codeblock>
+
+    <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/security_blurb"/>
+    <p conref="../shared/impala_common.xml#common/redaction_yes"/>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>create table t1 (x int, y int, s string);
+create table t2 like t1;
+create view v1 as select * from t1;
+alter view v1 as select * from t2;
+alter view v1 as select x, upper(s) s from t2;</codeblock>
+
+<!-- Repeat the same blurb + example to see the definition of a view, as in CREATE VIEW. -->
+
+    <p conref="../shared/impala_common.xml#common/describe_formatted_view"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_views.xml#views"/>, <xref href="impala_create_view.xml#create_view"/>,
+      <xref href="impala_drop_view.xml#drop_view"/>
+    </p>
+  </conbody>
+</concept>

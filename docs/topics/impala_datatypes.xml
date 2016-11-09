@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="datatypes">
+
+  <title>Data Types</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">data types</indexterm>
+      Impala supports a set of data types that you can use for table columns, expression values, and function
+      arguments and return values.
+    </p>
+
+    <note>
+      Currently, Impala supports only scalar types, not composite or nested types. Accessing a table containing any
+      columns with unsupported types causes an error.
+    </note>
+
+    <p outputclass="toc"/>
+
+    <p>
+      For the notation to write literals of each of these data types, see
+      <xref href="impala_literals.xml#literals"/>.
+    </p>
+
+    <p>
+      See <xref href="impala_langref_unsupported.xml#langref_hiveql_delta"/> for differences between Impala and
+      Hive data types.
+    </p>
+  </conbody>
+</concept>

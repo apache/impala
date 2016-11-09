@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="config">
+
+  <title>Managing Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="JDBC"/>
+      <data name="Category" value="ODBC"/>
+      <data name="Category" value="Stub Pages"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      This section explains how to configure Impala to accept connections from applications that use popular
+      programming APIs:
+    </p>
+
+    <ul>
+      <li>
+        <xref href="impala_config_performance.xml#config_performance"/>
+      </li>
+
+      <li>
+        <xref href="impala_odbc.xml#impala_odbc"/>
+      </li>
+
+      <li>
+        <xref href="impala_jdbc.xml#impala_jdbc"/>
+      </li>
+    </ul>
+
+    <p>
+      This type of configuration is especially useful when using Impala in combination with Business Intelligence
+      tools, which use these standard interfaces to query different kinds of database and Big Data systems.
+    </p>
+
+    <p>
+      You can also configure these other aspects of Impala:
+    </p>
+
+    <ul>
+      <li>
+        <xref href="impala_security.xml#security"/>
+      </li>
+
+      <li>
+        <xref href="impala_config_options.xml#config_options"/>
+      </li>
+    </ul>
+  </conbody>
+</concept>

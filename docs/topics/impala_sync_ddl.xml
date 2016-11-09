@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.2.1" id="sync_ddl">
+
+  <title>SYNC_DDL Query Option</title>
+  <titlealts audience="PDF"><navtitle>SYNC_DDL</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">SYNC_DDL query option</indexterm>
+      When enabled, causes any DDL operation such as <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph>
+      to return only when the changes have been propagated to all other Impala nodes in the cluster by the Impala
+      catalog service. That way, if you issue a subsequent <codeph>CONNECT</codeph> statement in
+      <cmdname>impala-shell</cmdname> to connect to a different node in the cluster, you can be sure that other
+      node will already recognize any added or changed tables. (The catalog service automatically broadcasts the
+      DDL changes to all nodes automatically, but without this option there could be a period of inconsistency if
+      you quickly switched to another node, such as by issuing a subsequent query through a load-balancing proxy.)
+    </p>
+
+    <p>
+      Although <codeph>INSERT</codeph> is classified as a DML statement, when the <codeph>SYNC_DDL</codeph> option
+      is enabled, <codeph>INSERT</codeph> statements also delay their completion until all the underlying data and
+      metadata changes are propagated to all Impala nodes. Internally, Impala inserts have similarities with DDL
+      statements in traditional database systems, because they create metadata needed to track HDFS block locations
+      for new files and they potentially add new partitions to partitioned tables.
+    </p>
+
+    <note>
+      Because this option can introduce a delay after each write operation, if you are running a sequence of
+      <codeph>CREATE DATABASE</codeph>, <codeph>CREATE TABLE</codeph>, <codeph>ALTER TABLE</codeph>,
+      <codeph>INSERT</codeph>, and similar statements within a setup script, to minimize the overall delay you can
+      enable the <codeph>SYNC_DDL</codeph> query option only near the end, before the final DDL statement.
+    </note>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+
+    <!-- To do:
+      Example could be useful here.
+    -->
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_ddl.xml#ddl"/>
+    </p>
+
+  </conbody>
+</concept>

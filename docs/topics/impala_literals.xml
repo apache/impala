@@ -1,0 +1,384 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="literals">
+
+  <title>Literals</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">literals</indexterm>
+      Each of the Impala data types has corresponding notation for literal values of that type. You specify literal
+      values in SQL statements, such as in the <codeph>SELECT</codeph> list or <codeph>WHERE</codeph> clause of a
+      query, or as an argument to a function call. See <xref href="impala_datatypes.xml#datatypes"/> for a complete
+      list of types, ranges, and conversion rules.
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="numeric_literals">
+
+    <title>Numeric Literals</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">numeric literals</indexterm>
+        To write literals for the integer types (<codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>,
+        <codeph>INT</codeph>, and <codeph>BIGINT</codeph>), use a sequence of digits with optional leading zeros.
+      </p>
+
+      <p rev="1.4.0">
+        To write literals for the floating-point types (<codeph rev="1.4.0">DECIMAL</codeph>,
+        <codeph>FLOAT</codeph>, and <codeph>DOUBLE</codeph>), use a sequence of digits with an optional decimal
+        point (<codeph>.</codeph> character). To preserve accuracy during arithmetic expressions, Impala interprets
+        floating-point literals as the <codeph>DECIMAL</codeph> type with the smallest appropriate precision and
+        scale, until required by the context to convert the result to <codeph>FLOAT</codeph> or
+        <codeph>DOUBLE</codeph>.
+      </p>
+
+      <p>
+        Integer values are promoted to floating-point when necessary, based on the context.
+      </p>
+
+      <p>
+        You can also use exponential notation by including an <codeph>e</codeph> character. For example,
+        <codeph>1e6</codeph> is 1 times 10 to the power of 6 (1 million). A number in exponential notation is
+        always interpreted as floating-point.
+      </p>
+
+      <p rev="tk">
+        When Impala encounters a numeric literal, it considers the type to be the <q>smallest</q> that can
+        accurately represent the value. The type is promoted to larger or more accurate types if necessary, based
+        on subsequent parts of an expression.
+      </p>
+      <p>
+        For example, you can see by the types Impala defines for the following table columns
+        how it interprets the corresponding numeric literals:
+      </p>
+<codeblock>[localhost:21000] > create table ten as select 10 as x;
++-------------------+
+| summary           |
++-------------------+
+| Inserted 1 row(s) |
++-------------------+
+[localhost:21000] > desc ten;
++------+---------+---------+
+| name | type    | comment |
++------+---------+---------+
+| x    | tinyint |         |
++------+---------+---------+
+
+[localhost:21000] > create table four_k as select 4096 as x;
++-------------------+
+| summary           |
++-------------------+
+| Inserted 1 row(s) |
++-------------------+
+[localhost:21000] > desc four_k;
++------+----------+---------+
+| name | type     | comment |
++------+----------+---------+
+| x    | smallint |         |
++------+----------+---------+
+
+[localhost:21000] > create table one_point_five as select 1.5 as x;
++-------------------+
+| summary           |
++-------------------+
+| Inserted 1 row(s) |
++-------------------+
+[localhost:21000] > desc one_point_five;
++------+--------------+---------+
+| name | type         | comment |
++------+--------------+---------+
+| x    | decimal(2,1) |         |
++------+--------------+---------+
+
+[localhost:21000] > create table one_point_three_three_three as select 1.333 as x;
++-------------------+
+| summary           |
++-------------------+
+| Inserted 1 row(s) |
++-------------------+
+[localhost:21000] > desc one_point_three_three_three;
++------+--------------+---------+
+| name | type         | comment |
++------+--------------+---------+
+| x    | decimal(4,3) |         |
++------+--------------+---------+
+</codeblock>
+    </conbody>
+  </concept>
+
+  <concept id="string_literals">
+
+    <title>String Literals</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">string literals</indexterm>
+        String literals are quoted using either single or double quotation marks. You can use either kind of quotes
+        for string literals, even both kinds for different literals within the same statement.
+      </p>
+
+      <p rev="2.0.0">
+        Quoted literals are considered to be of type <codeph>STRING</codeph>. To use quoted literals in contexts
+        requiring a <codeph>CHAR</codeph> or <codeph>VARCHAR</codeph> value, <codeph>CAST()</codeph> the literal to
+        a <codeph>CHAR</codeph> or <codeph>VARCHAR</codeph> of the appropriate length.
+      </p>
+
+      <p>
+        <b>Escaping special characters:</b>
+      </p>
+
+      <p>
+        To encode special characters within a string literal, precede them with the backslash (<codeph>\</codeph>)
+        escape character:
+      </p>
+
+      <ul>
+        <li>
+          <codeph>\t</codeph> represents a tab.
+        </li>
+
+        <li>
+          <codeph>\n</codeph> represents a newline or linefeed. This might cause extra line breaks in
+          <cmdname>impala-shell</cmdname> output.
+        </li>
+
+        <li>
+          <codeph>\r</codeph> represents a carriage return. This might cause unusual formatting (making it appear
+          that some content is overwritten) in <cmdname>impala-shell</cmdname> output.
+        </li>
+
+        <li>
+          <codeph>\b</codeph> represents a backspace. This might cause unusual formatting (making it appear that
+          some content is overwritten) in <cmdname>impala-shell</cmdname> output.
+        </li>
+
+        <li>
+          <codeph>\0</codeph> represents an ASCII <codeph>nul</codeph> character (not the same as a SQL
+          <codeph>NULL</codeph>). This might not be visible in <cmdname>impala-shell</cmdname> output.
+        </li>
+
+        <li>
+          <codeph>\Z</codeph> represents a DOS end-of-file character. This might not be visible in
+          <cmdname>impala-shell</cmdname> output.
+        </li>
+
+        <li>
+          <codeph>\%</codeph> and <codeph>\_</codeph> can be used to escape wildcard characters within the string
+          passed to the <codeph>LIKE</codeph> operator.
+        </li>
+
+        <li>
+          <codeph>\</codeph> followed by 3 octal digits represents the ASCII code of a single character; for
+          example, <codeph>\101</codeph> is ASCII 65, the character <codeph>A</codeph>.
+        </li>
+
+        <li>
+          Use two consecutive backslashes (<codeph>\\</codeph>) to prevent the backslash from being interpreted as
+          an escape character.
+        </li>
+
+        <li>
+          Use the backslash to escape single or double quotation mark characters within a string literal, if the
+          literal is enclosed by the same type of quotation mark.
+        </li>
+
+        <li>
+          If the character following the <codeph>\</codeph> does not represent the start of a recognized escape
+          sequence, the character is passed through unchanged.
+        </li>
+      </ul>
+
+      <p>
+        <b>Quotes within quotes:</b>
+      </p>
+
+      <p>
+        To include a single quotation character within a string value, enclose the literal with either single or
+        double quotation marks, and optionally escape the single quote as a <codeph>\'</codeph> sequence. Earlier
+        releases required escaping a single quote inside double quotes. Continue using escape sequences in this
+        case if you also need to run your SQL code on older versions of Impala.
+      </p>
+
+      <p>
+        To include a double quotation character within a string value, enclose the literal with single quotation
+        marks, no escaping is necessary in this case. Or, enclose the literal with double quotation marks and
+        escape the double quote as a <codeph>\"</codeph> sequence.
+      </p>
+
+<codeblock>[localhost:21000] &gt; select "What\'s happening?" as single_within_double,
+                  &gt;        'I\'m not sure.' as single_within_single,
+                  &gt;        "Homer wrote \"The Iliad\"." as double_within_double,
+                  &gt;        'Homer also wrote "The Odyssey".' as double_within_single;
++----------------------+----------------------+--------------------------+---------------------------------+
+| single_within_double | single_within_single | double_within_double     | double_within_single            |
++----------------------+----------------------+--------------------------+---------------------------------+
+| What's happening?    | I'm not sure.        | Homer wrote "The Iliad". | Homer also wrote "The Odyssey". |
++----------------------+----------------------+--------------------------+---------------------------------+
+</codeblock>
+
+      <p>
+        <b>Field terminator character in CREATE TABLE:</b>
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/thorn"/>
+
+      <p>
+        <b>impala-shell considerations:</b>
+      </p>
+
+      <p>
+        When dealing with output that includes non-ASCII or non-printable characters such as linefeeds and
+        backspaces, use the <cmdname>impala-shell</cmdname> options to save to a file, turn off pretty printing, or
+        both rather than relying on how the output appears visually. See
+        <xref href="impala_shell_options.xml#shell_options"/> for a list of <cmdname>impala-shell</cmdname>
+        options.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="boolean_literals">
+
+    <title>Boolean Literals</title>
+
+    <conbody>
+
+      <p>
+        For <codeph>BOOLEAN</codeph> values, the literals are <codeph>TRUE</codeph> and <codeph>FALSE</codeph>,
+        with no quotation marks and case-insensitive.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>select true;
+select * from t1 where assertion = false;
+select case bool_col when true then 'yes' when false 'no' else 'null' end from t1;</codeblock>
+    </conbody>
+  </concept>
+
+  <concept id="timestamp_literals">
+
+    <title>Timestamp Literals</title>
+
+    <conbody>
+
+      <p conref="../shared/impala_common.xml#common/timestamp_conversions"/>
+
+      <p>
+        You can also use <codeph>INTERVAL</codeph> expressions to add or subtract from timestamp literal values,
+        such as <codeph>'1966-07-30' + INTERVAL 5 YEARS + INTERVAL 3 DAYS</codeph>. See
+        <xref href="impala_timestamp.xml#timestamp"/> for details.
+      </p>
+
+      <p>
+        Depending on your data pipeline, you might receive date and time data as text, in notation that does not
+        exactly match the format for Impala <codeph>TIMESTAMP</codeph> literals.
+        See <xref href="impala_datetime_functions.xml#datetime_functions"/> for functions that can convert
+        between a variety of string literals (including different field order, separators, and timezone notation)
+        and equivalent <codeph>TIMESTAMP</codeph> or numeric values.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="null">
+
+    <title>NULL</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">NULL</indexterm>
+        The notion of <codeph>NULL</codeph> values is familiar from all kinds of database systems, but each SQL
+        dialect can have its own behavior and restrictions on <codeph>NULL</codeph> values. For Big Data
+        processing, the precise semantics of <codeph>NULL</codeph> values are significant: any misunderstanding
+        could lead to inaccurate results or misformatted data, that could be time-consuming to correct for large
+        data sets.
+      </p>
+
+      <ul>
+        <li>
+          <codeph>NULL</codeph> is a different value than an empty string. The empty string is represented by a
+          string literal with nothing inside, <codeph>""</codeph> or <codeph>''</codeph>.
+        </li>
+
+        <li>
+          In a delimited text file, the <codeph>NULL</codeph> value is represented by the special token
+          <codeph>\N</codeph>.
+        </li>
+
+        <li>
+          When Impala inserts data into a partitioned table, and the value of one of the partitioning columns is
+          <codeph>NULL</codeph> or the empty string, the data is placed in a special partition that holds only
+          these two kinds of values. When these values are returned in a query, the result is <codeph>NULL</codeph>
+          whether the value was originally <codeph>NULL</codeph> or an empty string. This behavior is compatible
+          with the way Hive treats <codeph>NULL</codeph> values in partitioned tables. Hive does not allow empty
+          strings as partition keys, and it returns a string value such as
+          <codeph>__HIVE_DEFAULT_PARTITION__</codeph> instead of <codeph>NULL</codeph> when such values are
+          returned from a query. For example:
+<codeblock>create table t1 (i int) partitioned by (x int, y string);
+-- Select an INT column from another table, with all rows going into a special HDFS subdirectory
+-- named __HIVE_DEFAULT_PARTITION__. Depending on whether one or both of the partitioning keys
+-- are null, this special directory name occurs at different levels of the physical data directory
+-- for the table.
+insert into t1 partition(x=NULL, y=NULL) select c1 from some_other_table;
+insert into t1 partition(x, y=NULL) select c1, c2 from some_other_table;
+insert into t1 partition(x=NULL, y) select c1, c3  from some_other_table;</codeblock>
+        </li>
+
+        <li>
+          There is no <codeph>NOT NULL</codeph> clause when defining a column to prevent <codeph>NULL</codeph>
+          values in that column.
+        </li>
+
+        <li>
+          There is no <codeph>DEFAULT</codeph> clause to specify a non-<codeph>NULL</codeph> default value.
+        </li>
+
+        <li>
+          If an <codeph>INSERT</codeph> operation mentions some columns but not others, the unmentioned columns
+          contain <codeph>NULL</codeph> for all inserted rows.
+        </li>
+
+        <li rev="1.2.1">
+          <p conref="../shared/impala_common.xml#common/null_sorting_change"/>
+          <note>
+            <!-- To do: Probably a bunch of similar view-related restrictions like this that should be collected, reused, or cross-referenced under the Views topic. -->
+            Because the <codeph>NULLS FIRST</codeph> and <codeph>NULLS LAST</codeph> keywords are not currently
+            available in Hive queries, any views you create using those keywords will not be available through
+            Hive.
+          </note>
+        </li>
+
+        <li>
+          In all other contexts besides sorting with <codeph>ORDER BY</codeph>, comparing a <codeph>NULL</codeph>
+          to anything else returns <codeph>NULL</codeph>, making the comparison meaningless. For example,
+          <codeph>10 &gt; NULL</codeph> produces <codeph>NULL</codeph>, <codeph>10 &lt; NULL</codeph> also produces
+          <codeph>NULL</codeph>, <codeph>5 BETWEEN 1 AND NULL</codeph> produces <codeph>NULL</codeph>, and so on.
+        </li>
+      </ul>
+
+      <p>
+        Several built-in functions serve as shorthand for evaluating expressions and returning
+        <codeph>NULL</codeph>, 0, or some other substitution value depending on the expression result:
+        <codeph>ifnull()</codeph>, <codeph>isnull()</codeph>, <codeph>nvl()</codeph>, <codeph>nullif()</codeph>,
+        <codeph>nullifzero()</codeph>, and <codeph>zeroifnull()</codeph>. See
+        <xref href="impala_conditional_functions.xml#conditional_functions"/> for details.
+      </p>
+    </conbody>
+  </concept>
+</concept>
