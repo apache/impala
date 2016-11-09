@@ -133,7 +133,7 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) noexcept {
   if (FLAGS_disable_mem_pools) {
     // Disable pooling by sizing the chunk to fit only this allocation.
     // Make sure the alignment guarantees are respected.
-    chunk_size = std::max<int64_t>(min_size, sizeof(std::max_align_t));
+    chunk_size = std::max<int64_t>(min_size, alignof(std::max_align_t));
   } else {
     DCHECK_GE(next_chunk_size_, INITIAL_CHUNK_SIZE);
     chunk_size = max<int64_t>(min_size, next_chunk_size_);

@@ -506,7 +506,7 @@ TEST(MemPoolTest, TryAllocateAligned) {
     uint8_t* ptr = pool.TryAllocateAligned(size, alignment);
     ASSERT_TRUE(ptr != NULL);
     ASSERT_EQ(0, reinterpret_cast<uintptr_t>(ptr) % alignment);
-    alignment = alignment == sizeof(std::max_align_t) ? 1 : alignment * 2;
+    alignment = alignment == alignof(std::max_align_t) ? 1 : alignment * 2;
     size = (size + 1) % MAX_ALLOCATION_SIZE;
   }
 

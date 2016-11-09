@@ -111,10 +111,10 @@ class MemPool {
   }
 
   /// Same as TryAllocate() except a non-default alignment can be specified. It
-  /// should be a power-of-two in [1, sizeof(std::max_align_t)].
+  /// should be a power-of-two in [1, alignof(std::max_align_t)].
   uint8_t* TryAllocateAligned(int64_t size, int alignment) noexcept {
     DCHECK_GE(alignment, 1);
-    DCHECK_LE(alignment, sizeof(std::max_align_t));
+    DCHECK_LE(alignment, alignof(std::max_align_t));
     DCHECK_EQ(BitUtil::RoundUpToPowerOfTwo(alignment), alignment);
     return Allocate<true>(size, alignment);
   }
@@ -255,11 +255,11 @@ class MemPool {
     }
 
     if (!fits_in_chunk) {
-      // If we couldn't allocate a new chunk, return NULL.
-      // malloc() guarantees alignment of min(std::max_align_t, min_chunk_size),
-      // so we do not need to do anything additional to guarantee alignment.
+      // If we couldn't allocate a new chunk, return NULL. malloc() guarantees alignment
+      // of alignof(std::max_align_t), so we do not need to do anything additional to
+      // guarantee alignment.
       static_assert(
-          INITIAL_CHUNK_SIZE >= sizeof(std::max_align_t), "Min chunk size too low");
+          INITIAL_CHUNK_SIZE >= alignof(std::max_align_t), "Min chunk size too low");
       if (UNLIKELY(!FindChunk(size, CHECK_LIMIT_FIRST))) return NULL;
     }
 

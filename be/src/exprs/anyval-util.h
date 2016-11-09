@@ -179,6 +179,28 @@ class AnyValUtil {
     }
   }
 
+  /// Returns the byte alignment of *Val for type t.
+  static int AnyValAlignment(const ColumnType& t) {
+    switch (t.type) {
+      case TYPE_BOOLEAN: return alignof(BooleanVal);
+      case TYPE_TINYINT: return alignof(TinyIntVal);
+      case TYPE_SMALLINT: return alignof(SmallIntVal);
+      case TYPE_INT: return alignof(IntVal);
+      case TYPE_BIGINT: return alignof(BigIntVal);
+      case TYPE_FLOAT: return alignof(FloatVal);
+      case TYPE_DOUBLE: return alignof(DoubleVal);
+      case TYPE_STRING:
+      case TYPE_VARCHAR:
+      case TYPE_CHAR:
+        return alignof(StringVal);
+      case TYPE_TIMESTAMP: return alignof(TimestampVal);
+      case TYPE_DECIMAL: return alignof(DecimalVal);
+      default:
+        DCHECK(false) << t;
+        return 0;
+    }
+  }
+
   static std::string ToString(const StringVal& v) {
     return std::string(reinterpret_cast<char*>(v.ptr), v.len);
   }

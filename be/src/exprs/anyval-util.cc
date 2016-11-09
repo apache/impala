@@ -31,11 +31,10 @@ namespace impala {
 
 Status AllocateAnyVal(RuntimeState* state, MemPool* pool, const ColumnType& type,
     const std::string& mem_limit_exceeded_msg, AnyVal** result) {
-  int anyval_size = AnyValUtil::AnyValSize(type);
-  // Ensure the allocation is sufficiently aligned (e.g. DecimalVal has a 16-byte
-  // alignment requirement).
-  int alignment = BitUtil::RoundUpToPowerOfTwo(anyval_size);
-  *result = reinterpret_cast<AnyVal*>(pool->TryAllocateAligned(anyval_size, alignment));
+  const int anyval_size = AnyValUtil::AnyValSize(type);
+  const int anyval_alignment = AnyValUtil::AnyValAlignment(type);
+  *result =
+      reinterpret_cast<AnyVal*>(pool->TryAllocateAligned(anyval_size, anyval_alignment));
   if (*result == NULL) {
     return pool->mem_tracker()->MemLimitExceeded(
         state, mem_limit_exceeded_msg, anyval_size);
