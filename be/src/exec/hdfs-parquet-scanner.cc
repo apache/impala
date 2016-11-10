@@ -537,8 +537,9 @@ Status HdfsParquetScanner::AssembleRows(
       bool num_tuples_mismatch = c != 0 && last_num_tuples != scratch_batch_->num_tuples;
       if (UNLIKELY(!continue_execution || num_tuples_mismatch)) {
         // Skipping this row group. Free up all the resources with this row group.
-        scratch_batch_->mem_pool()->FreeAll();
+        FlushRowGroupResources(row_batch);
         scratch_batch_->num_tuples = 0;
+        DCHECK(scratch_batch_->AtEnd());
         *skip_row_group = true;
         if (num_tuples_mismatch) {
           parse_status_.MergeStatus(Substitute("Corrupt Parquet file '$0': column '$1' "

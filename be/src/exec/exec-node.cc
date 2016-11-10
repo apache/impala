@@ -429,7 +429,7 @@ Status ExecNode::ExecDebugAction(TExecNodePhase::type phase, RuntimeState* state
     return Status::OK();
   }
   if (debug_action_ == TDebugAction::MEM_LIMIT_EXCEEDED) {
-    mem_tracker()->MemLimitExceeded(state, "Debug Action: MEM_LIMIT_EXCEEDED");
+    return mem_tracker()->MemLimitExceeded(state, "Debug Action: MEM_LIMIT_EXCEEDED");
   }
   return Status::OK();
 }
