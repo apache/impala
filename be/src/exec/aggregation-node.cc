@@ -141,30 +141,23 @@ Status AggregationNode::Prepare(RuntimeState* state) {
       Expr::Prepare(build_expr_ctxs_, state, build_row_desc, expr_mem_tracker()));
   AddExprCtxsToFree(build_expr_ctxs_);
 
-  agg_fn_ctxs_.resize(aggregate_evaluators_.size());
   int j = probe_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
     SlotDescriptor* intermediate_slot_desc = intermediate_tuple_desc_->slots()[j];
     SlotDescriptor* output_slot_desc = output_tuple_desc_->slots()[j];
+    FunctionContext* agg_fn_ctx;
     RETURN_IF_ERROR(aggregate_evaluators_[i]->Prepare(state, child(0)->row_desc(),
-        intermediate_slot_desc, output_slot_desc, agg_fn_pool_.get(), &agg_fn_ctxs_[i]));
-    state->obj_pool()->Add(agg_fn_ctxs_[i]);
+        intermediate_slot_desc, output_slot_desc, agg_fn_pool_.get(), &agg_fn_ctx));
+    agg_fn_ctxs_.push_back(agg_fn_ctx);
+    state->obj_pool()->Add(agg_fn_ctx);
   }
 
+  DCHECK_EQ(agg_fn_ctxs_.size(), aggregate_evaluators_.size());
   // TODO: how many buckets?
   hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_,
       vector<ExprContext*>(), 1, true,  vector<bool>(build_expr_ctxs_.size(), true), id(),
       mem_tracker(), vector<RuntimeFilter*>(), true));
 
-  if (probe_expr_ctxs_.empty()) {
-    // create single intermediate tuple now; we need to output something
-    // even if our input is empty
-    singleton_intermediate_tuple_ = ConstructIntermediateTuple();
-    // Check for failures during AggFnEvaluator::Init().
-    RETURN_IF_ERROR(state->GetQueryStatus());
-    hash_tbl_->Insert(singleton_intermediate_tuple_);
-    output_iterator_ = hash_tbl_->Begin();
-  }
   if (!state->codegen_enabled()) {
     runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
   }
@@ -200,6 +193,15 @@ Status AggregationNode::Open(RuntimeState* state) {
   DCHECK_EQ(aggregate_evaluators_.size(), agg_fn_ctxs_.size());
   for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
     RETURN_IF_ERROR(aggregate_evaluators_[i]->Open(state, agg_fn_ctxs_[i]));
+  }
+
+  if (probe_expr_ctxs_.empty()) {
+    // Create single intermediate tuple. This must happen after
+    // opening the aggregate evaluators.
+    singleton_intermediate_tuple_ = ConstructIntermediateTuple();
+    // Check for failures during AggFnEvaluator::Init().
+    RETURN_IF_ERROR(state->GetQueryStatus());
+    hash_tbl_->Insert(singleton_intermediate_tuple_);
   }
 
   RETURN_IF_ERROR(children_[0]->Open(state));
@@ -319,10 +321,11 @@ void AggregationNode::Close(RuntimeState* state) {
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
 
   agg_expr_ctxs_.clear();
-  DCHECK(agg_fn_ctxs_.empty() || aggregate_evaluators_.size() == agg_fn_ctxs_.size());
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
-    aggregate_evaluators_[i]->Close(state);
-    if (!agg_fn_ctxs_.empty()) agg_fn_ctxs_[i]->impl()->Close();
+  for (AggFnEvaluator* aggregate_evaluator : aggregate_evaluators_) {
+    aggregate_evaluator->Close(state);
+  }
+  for (FunctionContext* agg_fn_ctx : agg_fn_ctxs_) {
+    agg_fn_ctx->impl()->Close();
   }
   if (agg_fn_pool_.get() != NULL) agg_fn_pool_->FreeAll();
 
