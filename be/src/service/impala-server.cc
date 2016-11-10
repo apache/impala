@@ -565,13 +565,13 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
   DCHECK(output != NULL);
   // Search for the query id in the active query map
   {
-    lock_guard<mutex> l(query_exec_state_map_lock_);
-    QueryExecStateMap::const_iterator exec_state = query_exec_state_map_.find(query_id);
-    if (exec_state != query_exec_state_map_.end()) {
+    shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
+    if (exec_state.get() != nullptr) {
+      lock_guard<mutex> l(*exec_state->lock());
       if (base64_encoded) {
-        exec_state->second->profile().SerializeToArchiveString(output);
+        exec_state->profile().SerializeToArchiveString(output);
       } else {
-        exec_state->second->profile().PrettyPrint(output);
+        exec_state->profile().PrettyPrint(output);
       }
       return Status::OK();
     }
