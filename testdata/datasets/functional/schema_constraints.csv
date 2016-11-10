@@ -118,11 +118,6 @@ table_name:overflow, constraint:restrict_to, table_format:text/none/none
 # seem to like this.
 table_name:widerow, constraint:exclude, table_format:hbase/none/none
 
-# Wide tables fail due to the SERDEPROPERTIES limits. See HIVE-1364.
-table_name:widetable_250_cols, constraints:exclude, table_format:hbase/none/none
-table_name:widetable_500_cols, constraints:exclude, table_format:hbase/none/none
-table_name:widetable_1000_cols, constraints:exclude, table_format:hbase/none/none
-
 # nullformat_custom is used in null-insert tests, which user insert overwrite,
 # which is not supported in hbase. The schema is also specified in HIVE_CREATE
 # with no corresponding LOAD statement.
