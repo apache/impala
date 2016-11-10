@@ -36,6 +36,7 @@ from tests.util.filesystem_utils import FILESYSTEM, ISILON_WEBHDFS_PORT
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('test_configuration')
 
+DEFAULT_CONN_TIMEOUT = 45
 
 def _get_default_nn_http_addr():
   """Return the namenode ip and webhdfs port if the default shouldn't be used"""
@@ -320,6 +321,7 @@ def conn(request):
          provided by get_db_name(), it must not exist. Classes that use both
          auto_create_db() and get_db_name() should generate a random name in
          get_db_name() and cache it.
+       - get_conn_timeout(): The timeout, in seconds, to use for this connection.
      The returned connection will have a 'db_name' property.
 
      See the 'unique_database' fixture above if you want to use Impala's custom python
@@ -327,8 +329,10 @@ def conn(request):
   """
   db_name = __call_cls_method_if_exists(request.cls, "get_db_name")
   use_unique_conn = __call_cls_method_if_exists(request.cls, "auto_create_db")
+  timeout = __call_cls_method_if_exists(request.cls, "get_conn_timeout") or \
+      DEFAULT_CONN_TIMEOUT
   if use_unique_conn:
-    with __unique_conn(db_name=db_name) as conn:
+    with __unique_conn(db_name=db_name, timeout=timeout) as conn:
       yield conn
   else:
     with __auto_closed_conn(db_name=db_name) as conn:
@@ -345,7 +349,7 @@ def __call_cls_method_if_exists(cls, method_name):
 
 
 @contextlib.contextmanager
-def __unique_conn(db_name=None):
+def __unique_conn(db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
   """Connects to Impala and creates a new database, then returns a connection to it.
      This is intended to be used in a "with" block. Upon exit, the database will be
      dropped. A database name can be provided by 'db_name', a database by that name
@@ -362,7 +366,7 @@ def __unique_conn(db_name=None):
   with __auto_closed_conn() as conn:
     with __auto_closed_cursor(conn) as cur:
       cur.execute("CREATE DATABASE %s" % db_name)
-  with __auto_closed_conn(db_name=db_name) as conn:
+  with __auto_closed_conn(db_name=db_name, timeout=timeout) as conn:
     try:
       yield conn
     finally:
@@ -378,13 +382,13 @@ def __unique_conn(db_name=None):
 
 
 @contextlib.contextmanager
-def __auto_closed_conn(db_name=None):
+def __auto_closed_conn(db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
   """Returns a connection to Impala. This is intended to be used in a "with" block. The
      connection will be closed upon exiting the block.
 
      The returned connection will have a 'db_name' property.
   """
-  conn = impala_connect(database=db_name)
+  conn = impala_connect(database=db_name, timeout=timeout)
   try:
     conn.db_name = db_name
     yield conn

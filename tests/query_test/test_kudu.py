@@ -200,6 +200,11 @@ class TestCreateExternalTable(KuduTestSuite):
 
 class TestShowCreateTable(KuduTestSuite):
 
+  @classmethod
+  def get_conn_timeout(cls):
+    # For IMPALA-4454
+    return 60 * 5 # 5 minutes
+
   def assert_show_create_equals(self, cursor, create_sql, show_create_sql):
     """Executes 'create_sql' to create a table, then runs "SHOW CREATE TABLE" and checks
        that the output is the same as 'show_create_sql'. 'create_sql' and
