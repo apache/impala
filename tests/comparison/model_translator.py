@@ -648,6 +648,12 @@ class PostgresqlSqlWriter(SqlWriter):
       return "'%s' || ''" % data_type.val
     return SqlWriter._write_data_type(self, data_type)
 
+  def _write_concat(self, func):
+    # PostgreSQL CONCAT() doesn't behave like Impala CONCAT(). PostgreSQL || does.
+    return '({concat_list})'.format(
+        concat_list=' || '.join(['({written_item})'.format(written_item=self._write(item))
+                                 for item in func.args]))
+
 
 class MySQLSqlWriter(SqlWriter):
 
