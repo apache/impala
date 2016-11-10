@@ -151,7 +151,9 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   /**
    * Evaluates the given constant expr and returns its result as a LiteralExpr.
    * Assumes expr has been analyzed. Returns constExpr if is it already a LiteralExpr.
-   * Returns null for types that do not have a LiteralExpr subclass, e.g. TIMESTAMP.
+   * Returns null for types that do not have a LiteralExpr subclass, e.g. TIMESTAMP, or
+   * in cases where the corresponding LiteralExpr is not able to represent the evaluation
+   * result, e.g., NaN or infinity.
    * TODO: Support non-scalar types.
    */
   public static LiteralExpr create(Expr constExpr, TQueryCtx queryCtx)
@@ -199,8 +201,9 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
       case FLOAT:
       case DOUBLE:
         if (val.isSetDouble_val()) {
-          result =
-              new NumericLiteral(new BigDecimal(val.double_val), constExpr.getType());
+          // A NumericLiteral cannot represent NaN, infinity or negative zero.
+          if (!NumericLiteral.isValidLiteral(val.double_val)) return null;
+          result = new NumericLiteral(new BigDecimal(val.double_val), constExpr.getType());
         }
         break;
       case DECIMAL:
