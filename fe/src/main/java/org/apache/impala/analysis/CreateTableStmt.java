@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.common.AnalysisException;
@@ -197,7 +198,7 @@ public class CreateTableStmt extends StatementBase {
 
     analyzeKuduTableProperties(analyzer);
     if (isExternal()) {
-      analyzeExternalKuduTableParams();
+      analyzeExternalKuduTableParams(analyzer);
     } else {
       analyzeManagedKuduTableParams(analyzer);
     }
@@ -238,7 +239,17 @@ public class CreateTableStmt extends StatementBase {
   /**
    * Analyzes and checks parameters specified for external Kudu tables.
    */
-  private void analyzeExternalKuduTableParams() throws AnalysisException {
+  private void analyzeExternalKuduTableParams(Analyzer analyzer)
+      throws AnalysisException {
+    if (analyzer.getAuthzConfig().isEnabled()) {
+      // Today there is no comprehensive way of enforcing a Sentry authorization policy
+      // against tables stored in Kudu. This is why only users with ALL privileges on
+      // SERVER may create external Kudu tables. See IMPALA-4000 for details.
+      String authzServer = analyzer.getAuthzConfig().getServerName();
+      Preconditions.checkNotNull(authzServer);
+      analyzer.registerPrivReq(new PrivilegeRequestBuilder().onServer(
+          authzServer).all().toRequest());
+    }
     AnalysisUtils.throwIfNull(getTblProperties().get(KuduTable.KEY_TABLE_NAME),
         String.format("Table property %s must be specified when creating " +
             "an external Kudu table.", KuduTable.KEY_TABLE_NAME));

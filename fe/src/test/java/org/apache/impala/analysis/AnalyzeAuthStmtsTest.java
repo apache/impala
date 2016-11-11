@@ -160,6 +160,13 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       AnalysisError(String.format("%s INSERT ON URI 'hdfs:////abc//123' %s myrole",
           formatArgs), "Only 'ALL' privilege may be applied at URI scope in privilege " +
           "spec.");
+      // IMPALA-4000: Insert privilege on a Kudu table
+      AnalysisError(String.format(
+          "%s SELECT ON TABLE functional_kudu.alltypessmall %s myrole", formatArgs),
+          "Kudu tables only support the ALL privilege level.");
+      AnalysisError(String.format(
+          "%s INSERT ON TABLE functional_kudu.alltypessmall %s myrole", formatArgs),
+          "Kudu tables only support the ALL privilege level.");
 
       // SELECT privilege
       AnalyzesOk(String.format("%s SELECT ON TABLE alltypessmall %s myrole", formatArgs),
@@ -196,6 +203,10 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       AnalysisError(String.format("%s SELECT (id, bool_col) ON TABLE " +
           "functional.alltypes_hive_view %s myrole", formatArgs), "Column-level " +
           "privileges on views are not supported.");
+      // IMPALA-4000: Column-level privileges on a KUDU table
+      AnalysisError(String.format("%s SELECT (id, bool_col) ON TABLE " +
+          "functional_kudu.alltypessmall %s myrole", formatArgs),
+          "Kudu tables only support the ALL privilege level.");
       // Columns/table that don't exist
       AnalysisError(String.format("%s SELECT (invalid_col) ON TABLE " +
           "functional.alltypes %s myrole", formatArgs), "Error setting column-level " +

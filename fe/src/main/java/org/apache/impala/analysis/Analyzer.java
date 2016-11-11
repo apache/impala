@@ -151,6 +151,7 @@ public class Analyzer {
   private String authErrorMsg_;
 
   // If false, privilege requests will not be registered in the analyzer.
+  // Note: it's not the purpose of this flag to control if security is enabled in general.
   private boolean enablePrivChecks_ = true;
 
   // By default, all registered semi-joined tuples are invisible, i.e., their slots

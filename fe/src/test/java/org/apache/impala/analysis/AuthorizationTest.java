@@ -903,6 +903,17 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to execute 'CREATE' on: " +
         "nodb.alltypes");
 
+    // IMPALA-4000: Only users with ALL privileges on SERVER may create external Kudu
+    // tables.
+    AuthzError("create external table tpch.kudu_tbl stored as kudu " +
+        "TBLPROPERTIES ('kudu.master_addresses'='127.0.0.1', 'kudu.table_name'='tbl')",
+        "User '%s' does not have privileges to access: server1");
+
+    // IMPALA-4000: ALL privileges on SERVER are not required to create managed tables.
+    AuthzOk("create table tpch.kudu_tbl (i int, j int, primary key (i))" +
+        " DISTRIBUTE BY HASH (i) INTO 9 BUCKETS stored as kudu TBLPROPERTIES " +
+        "('kudu.master_addresses'='127.0.0.1')");
+
     // User does not have permission to create table at the specified location..
     AuthzError("create table tpch.new_table (i int) location " +
         "'hdfs://localhost:20500/test-warehouse/alltypes'",
@@ -2154,6 +2165,8 @@ public class AuthorizationTest {
     AuthzOk(fe, context, "select * from functional.alltypesagg");
     AuthzOk(fe, context, "select * from functional.alltypes");
     AuthzOk(fe, context, "invalidate metadata");
+    AuthzOk(fe, context, "create external table tpch.kudu_tbl stored as kudu " +
+        "TBLPROPERTIES ('kudu.master_addresses'='127.0.0.1', 'kudu.table_name'='tbl')");
   }
 
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
