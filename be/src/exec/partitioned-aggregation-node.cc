@@ -275,14 +275,12 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     }
     DCHECK(serialize_stream_->has_write_block());
   }
-  if (!state->codegen_enabled()) {
-    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
-  }
+  AddCodegenDisabledMessage(state);
   return Status::OK();
 }
 
 void PartitionedAggregationNode::Codegen(RuntimeState* state) {
-  DCHECK(state->codegen_enabled());
+  DCHECK(state->ShouldCodegen());
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
   TPrefetchMode::type prefetch_mode = state_->query_options().prefetch_mode;

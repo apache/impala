@@ -80,7 +80,7 @@ Status HdfsAvroScanner::Open(ScannerContext* context) {
 Status HdfsAvroScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ExprContext*>& conjunct_ctxs, Function** decode_avro_data_fn) {
   *decode_avro_data_fn = NULL;
-  DCHECK(node->runtime_state()->codegen_enabled());
+  DCHECK(node->runtime_state()->ShouldCodegen());
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
   DCHECK(codegen != NULL);
   Function* materialize_tuple_fn = NULL;

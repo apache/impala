@@ -207,14 +207,11 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
     scan_node->SetScanRanges(scan_ranges);
   }
 
-  RuntimeState* state = runtime_state_.get();
+  RuntimeState* state = runtime_state();
   RuntimeProfile::Counter* prepare_timer =
       ADD_CHILD_TIMER(timings_profile_, "ExecTreePrepareTime", PREPARE_TIMER_NAME);
   {
     SCOPED_TIMER(prepare_timer);
-    // Until IMPALA-4233 is fixed, we still need to create the codegen object before
-    // Prepare() as ScalarFnCall::Prepare() may codegen.
-    if (state->codegen_enabled()) RETURN_IF_ERROR(state->CreateCodegen());
     RETURN_IF_ERROR(exec_tree_->Prepare(state));
   }
 
@@ -242,7 +239,14 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
     ReleaseThreadToken();
   }
 
-  if (state->codegen_enabled()) exec_tree_->Codegen(state);
+  if (state->ShouldCodegen()) {
+    RETURN_IF_ERROR(state->CreateCodegen());
+    exec_tree_->Codegen(state);
+    // It shouldn't be fatal to fail codegen. However, until IMPALA-4233 is fixed,
+    // ScalarFnCall has no fall back to interpretation when codegen fails so propagates
+    // the error status for now.
+    RETURN_IF_ERROR(state->CodegenScalarFns());
+  }
 
   // set up profile counters
   profile()->AddChild(exec_tree_->runtime_profile());
@@ -251,14 +255,14 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
   per_host_mem_usage_ =
       ADD_COUNTER(profile(), PER_HOST_PEAK_MEM_COUNTER, TUnit::BYTES);
 
-  row_batch_.reset(new RowBatch(exec_tree_->row_desc(), runtime_state_->batch_size(),
-      runtime_state_->instance_mem_tracker()));
+  row_batch_.reset(new RowBatch(exec_tree_->row_desc(), state->batch_size(),
+      state->instance_mem_tracker()));
   VLOG(2) << "plan_root=\n" << exec_tree_->DebugString();
   return Status::OK();
 }
 
 void PlanFragmentExecutor::OptimizeLlvmModule() {
-  if (!runtime_state_->codegen_enabled()) return;
+  if (!runtime_state_->ShouldCodegen()) return;
   LlvmCodeGen* codegen = runtime_state_->codegen();
   DCHECK(codegen != NULL);
   Status status = codegen->FinalizeModule();

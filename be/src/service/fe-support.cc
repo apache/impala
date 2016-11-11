@@ -85,24 +85,9 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
   DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch);
   DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx);
   vector<TExpr>& texprs = expr_batch.exprs;
-
-  // Codegen is almost always disabled in this path. The only exception is when the
-  // expression contains IR UDF which cannot be interpreted. Enable codegen in this
-  // case if codegen is not disabled in the query option. Otherwise, we will let it
-  // fail in ScalarFnCall::Prepare().
-  bool need_codegen = false;
-  for (const TExpr& texpr : texprs) {
-    if (Expr::NeedCodegen(texpr)) {
-      need_codegen = true;
-      break;
-    }
-  }
-  query_ctx.request.query_options.disable_codegen |= !need_codegen;
+  // Disable codegen advisorily to avoid unnecessary latency.
+  query_ctx.disable_codegen_hint = true;
   RuntimeState state(query_ctx);
-  if (!query_ctx.request.query_options.disable_codegen) {
-    THROW_IF_ERROR_RET(
-        state.CreateCodegen(), env, JniUtil::internal_exc_class(), result_bytes);
-  }
 
   THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
       result_bytes);
@@ -110,7 +95,6 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
   // preparing/running the exprs.
   state.InitMemTrackers(TUniqueId(), NULL, -1);
 
-  // Prepare the exprs
   vector<ExprContext*> expr_ctxs;
   for (const TExpr& texpr : texprs) {
     ExprContext* ctx;
@@ -121,9 +105,13 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
     expr_ctxs.push_back(ctx);
   }
 
-  if (!query_ctx.request.query_options.disable_codegen) {
+  // UDFs which cannot be interpreted need to be handled by codegen.
+  if (state.ScalarFnNeedsCodegen()) {
+    THROW_IF_ERROR_RET(
+        state.CreateCodegen(), env, JniUtil::internal_exc_class(), result_bytes);
     LlvmCodeGen* codegen = state.codegen();
     DCHECK(codegen != NULL);
+    state.CodegenScalarFns();
     codegen->EnableOptimizations(false);
     codegen->FinalizeModule();
   }

@@ -38,8 +38,8 @@ class TestUdfs(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestUdfs, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(
-      create_exec_option_dimension(disable_codegen_options=[False, True]))
-
+      create_exec_option_dimension(disable_codegen_options=[False, True],
+                                   exec_single_node_option=[0,100]))
     # There is no reason to run these tests using all dimensions.
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 

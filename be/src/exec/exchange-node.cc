@@ -85,15 +85,13 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
     AddExprCtxsToFree(sort_exec_exprs_);
     less_than_.reset(
         new TupleRowComparator(sort_exec_exprs_, is_asc_order_, nulls_first_));
-    if (!state->codegen_enabled()) {
-      runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
-    }
+    AddCodegenDisabledMessage(state);
   }
   return Status::OK();
 }
 
 void ExchangeNode::Codegen(RuntimeState* state) {
-  DCHECK(state->codegen_enabled());
+  DCHECK(state->ShouldCodegen());
   if (is_merging_) {
     Status codegen_status = less_than_->Codegen(state);
     runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);

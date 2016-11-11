@@ -143,14 +143,12 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
           child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
           is_not_distinct_from_, state->fragment_hash_seed(), mem_tracker(), filters_));
   build_pool_.reset(new MemPool(mem_tracker()));
-  if (!state->codegen_enabled()) {
-    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
-  }
+  AddCodegenDisabledMessage(state);
   return Status::OK();
 }
 
 void HashJoinNode::Codegen(RuntimeState* state) {
-  DCHECK(state->codegen_enabled());
+  DCHECK(state->ShouldCodegen());
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
   bool build_codegen_enabled = false;

@@ -165,7 +165,7 @@ Status ExecNode::Prepare(RuntimeState* state) {
 }
 
 void ExecNode::Codegen(RuntimeState* state) {
-  DCHECK(state->codegen_enabled());
+  DCHECK(state->ShouldCodegen());
   DCHECK(state->codegen() != NULL);
   for (int i = 0; i < children_.size(); ++i) {
     children_[i]->Codegen(state);
@@ -455,6 +455,14 @@ void ExecNode::AddExprCtxsToFree(const SortExecExprs& sort_exec_exprs) {
   AddExprCtxsToFree(sort_exec_exprs.sort_tuple_slot_expr_ctxs());
   AddExprCtxsToFree(sort_exec_exprs.lhs_ordering_expr_ctxs());
   AddExprCtxsToFree(sort_exec_exprs.rhs_ordering_expr_ctxs());
+}
+
+void ExecNode::AddCodegenDisabledMessage(RuntimeState* state) {
+  if (state->CodegenDisabledByQueryOption()) {
+    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
+  } else if (state->CodegenDisabledByHint()) {
+    runtime_profile()->AddCodegenMsg(false, "disabled due to optimization hints");
+  }
 }
 
 // Codegen for EvalConjuncts.  The generated signature is

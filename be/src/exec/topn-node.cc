@@ -78,16 +78,12 @@ Status TopNNode::Prepare(RuntimeState* state) {
           *tuple_row_less_than_));
   materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   insert_batch_timer_ = ADD_TIMER(runtime_profile(), "InsertBatchTime");
-  if (!state->codegen_enabled()) {
-    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
-  }
-
-runtime_profile()->AddCodegenMsg(false);
+  AddCodegenDisabledMessage(state);
   return Status::OK();
 }
 
 void TopNNode::Codegen(RuntimeState* state) {
-  DCHECK(state->codegen_enabled());
+  DCHECK(state->ShouldCodegen());
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
 

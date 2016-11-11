@@ -102,7 +102,7 @@ public class Planner {
     if (isSmallQuery) {
       // Execute on a single node and disable codegen for small results
       ctx_.getQueryOptions().setNum_nodes(1);
-      ctx_.getQueryOptions().setDisable_codegen(true);
+      ctx_.getQueryCtx().disable_codegen_hint = true;
       if (maxRowsProcessed < ctx_.getQueryOptions().batch_size ||
           maxRowsProcessed < 1024 && ctx_.getQueryOptions().batch_size == 0) {
         // Only one scanner thread for small queries

@@ -314,6 +314,11 @@ struct TQueryCtx {
 
   // Milliseconds since UNIX epoch at the start of query execution.
   13: required i64 start_unix_millis
+
+  // Hint to disable codegen. Set by planner for single-node optimization or by the
+  // backend in NativeEvalConstExprs() in FESupport. This flag is only advisory to
+  // avoid the overhead of codegen and can be ignored if codegen is needed functionally.
+  14: optional bool disable_codegen_hint = false;
 }
 
 // Context to collect information, which is shared among all instances of that plan

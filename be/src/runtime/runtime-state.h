@@ -42,6 +42,7 @@ class LlvmCodeGen;
 class MemTracker;
 class ObjectPool;
 class RuntimeFilterBank;
+class ScalarFnCall;
 class Status;
 class TimestampValue;
 class TQueryOptions;
@@ -155,11 +156,47 @@ class RuntimeState {
   /// Returns runtime state profile
   RuntimeProfile* runtime_profile() { return &profile_; }
 
-  /// Returns true if codegen is enabled for this query.
-  bool codegen_enabled() const { return !query_options().disable_codegen; }
-
   /// Returns the LlvmCodeGen object for this fragment instance.
   LlvmCodeGen* codegen() { return codegen_.get(); }
+
+  /// Add ScalarFnCall expression 'udf' to be codegen'd later if it's not disabled by
+  /// query option. This is for cases in which the UDF cannot be interpreted or if the
+  /// plan fragment doesn't contain any codegen enabled operator.
+  void AddScalarFnToCodegen(ScalarFnCall* udf) { scalar_fns_to_codegen_.push_back(udf); }
+
+  /// Returns true if there are ScalarFnCall expressions in the fragments which can't be
+  /// interpreted. This should only be used after the Prepare() phase in which all
+  /// expressions' Prepare() are invoked.
+  bool ScalarFnNeedsCodegen() const { return !scalar_fns_to_codegen_.empty(); }
+
+  /// Returns true if there is a hint to disable codegen. This can be true for single node
+  /// optimization or expression evaluation request from FE to BE (see fe-support.cc).
+  /// Note that this internal flag is advisory and it may be ignored if the fragment has
+  /// any UDF which cannot be interpreted. See ScalarFnCall::Prepare() for details.
+  inline bool CodegenHasDisableHint() const {
+    return query_ctx().disable_codegen_hint;
+  }
+
+  /// Returns true iff there is a hint to disable codegen and all expressions in the
+  /// fragment can be interpreted. This should only be used after the Prepare() phase
+  /// in which all expressions' Prepare() are invoked.
+  inline bool CodegenDisabledByHint() const {
+    return CodegenHasDisableHint() && !ScalarFnNeedsCodegen();
+  }
+
+  /// Returns true if codegen is disabled by query option.
+  inline bool CodegenDisabledByQueryOption() const {
+    return query_options().disable_codegen;
+  }
+
+  /// Returns true if codegen should be enabled for this fragment. Codegen is enabled
+  /// if all the following conditions hold:
+  /// 1. it's enabled by query option
+  /// 2. it's not disabled by internal hints or there are expressions in the fragment
+  ///    which cannot be interpreted.
+  inline bool ShouldCodegen() const {
+    return !CodegenDisabledByQueryOption() && !CodegenDisabledByHint();
+  }
 
   /// Takes ownership of a scan node's reader context and plan fragment executor will call
   /// UnregisterReaderContexts() to unregister it when the fragment is closed. The IO
@@ -257,6 +294,12 @@ class RuntimeState {
   /// Create a codegen object accessible via codegen() if it doesn't exist already.
   Status CreateCodegen();
 
+  /// Codegen all ScalarFnCall expressions in 'scalar_fns_to_codegen_'. If codegen fails
+  /// for any expressions, return immediately with the error status. Once IMPALA-4233 is
+  /// fixed, it's not fatal to fail codegen if the expression can be interpreted.
+  /// TODO: Fix IMPALA-4233
+  Status CodegenScalarFns();
+
  private:
   /// Allow TestEnv to set block_mgr manually for testing.
   friend class TestEnv;
@@ -291,6 +334,9 @@ class RuntimeState {
 
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
+
+  /// Contains all ScalarFnCall expressions which need to be codegen'd.
+  vector<ScalarFnCall*> scalar_fns_to_codegen_;
 
   /// Thread resource management object for this fragment's execution.  The runtime
   /// state is responsible for returning this pool to the thread mgr.

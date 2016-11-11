@@ -54,6 +54,7 @@ class ScalarFnCall: public Expr {
 
  protected:
   friend class Expr;
+  friend class RuntimeState;
 
   ScalarFnCall(const TExprNode& node);
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& desc,
@@ -123,8 +124,13 @@ class ScalarFnCall: public Expr {
 
   /// Loads the native or IR function 'symbol' from HDFS and puts the result in *fn.
   /// If the function is loaded from an IR module, it cannot be called until the module
-  /// has been JIT'd (i.e. after Prepare() has completed).
-  Status GetFunction(RuntimeState* state, const std::string& symbol, void** fn);
+  /// has been JIT'd (i.e. after GetCodegendComputeFn() has been called).
+  Status GetFunction(LlvmCodeGen* codegen, const std::string& symbol, void** fn);
+
+  /// Loads the Prepare() and Close() functions for this ScalarFnCall. They could be
+  /// native or IR functions. To load IR functions, the codegen object must have
+  /// been created and any external LLVM module must have been linked already.
+  Status LoadPrepareAndCloseFn(LlvmCodeGen* codegen);
 
   /// Evaluates the non-constant children exprs. Used in the interpreted path.
   void EvaluateNonConstantChildren(ExprContext* context, const TupleRow* row);

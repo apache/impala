@@ -184,6 +184,9 @@ class ExecNode {
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
   MemTracker* expr_mem_tracker() { return expr_mem_tracker_.get(); }
 
+  /// Add codegen disabled message if codegen is disabled for this ExecNode.
+  void AddCodegenDisabledMessage(RuntimeState* state);
+
   /// Extract node id from p->name().
   static int GetNodeIdFromProfile(RuntimeProfile* p);
 

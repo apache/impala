@@ -30,6 +30,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr.h"
+#include "exprs/scalar-fn-call.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/descriptors.h"
 #include "runtime/data-stream-mgr.h"
@@ -187,6 +188,14 @@ Status RuntimeState::CreateCodegen() {
       obj_pool_.get(), PrintId(fragment_instance_id()), &codegen_));
   codegen_->EnableOptimizations(true);
   profile_.AddChild(codegen_->runtime_profile());
+  return Status::OK();
+}
+
+Status RuntimeState::CodegenScalarFns() {
+  for (ScalarFnCall* scalar_fn : scalar_fns_to_codegen_) {
+    Function* fn;
+    RETURN_IF_ERROR(scalar_fn->GetCodegendComputeFn(codegen_.get(), &fn));
+  }
   return Status::OK();
 }
 
