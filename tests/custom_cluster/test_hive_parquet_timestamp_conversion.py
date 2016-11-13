@@ -93,8 +93,10 @@ class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
         WHERE h.timestamp_col != FROM_UTC_TIMESTAMP(i.timestamp_col, '%s')
         """ % tz_name)\
         .get_data()
-    expected_row_count = 0 if tz_name in ("UTC", "GMT") else 10000
-    assert len(data.split('\n')) == expected_row_count
+    if tz_name in ("UTC", "GMT"):
+      assert len(data) == 0
+    else:
+      assert len(data.split('\n')) == 10000
     # A value should either stay null or stay not null.
     data = self.execute_query_expect_success(self.client, """
         SELECT h.id, h.day, h.timestamp_col, i.timestamp_col
