@@ -35,4 +35,5 @@ fi
 cd ${IMPALA_BE_DIR}
 . ${IMPALA_HOME}/bin/set-classpath.sh
 
+export CTEST_OUTPUT_ON_FAILURE=1
 make test ARGS="${BE_TEST_ARGS}"

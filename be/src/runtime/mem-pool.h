@@ -187,9 +187,10 @@ class MemPool {
         allocated_bytes(0) {}
   };
 
-  /// A static field used as non-NULL pointer for zero length allocations.
-  /// NULL is reserved for allocation failures.
-  static uint32_t zero_length_region_;
+  /// A static field used as non-NULL pointer for zero length allocations. NULL is
+  /// reserved for allocation failures. It must be as aligned as max_align_t for
+  /// TryAllocateAligned().
+  static uint32_t zero_length_region_ alignas(std::max_align_t);
 
   /// chunk from which we served the last Allocate() call;
   /// always points to the last chunk that contains allocated data;
