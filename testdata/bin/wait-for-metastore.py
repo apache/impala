@@ -50,7 +50,7 @@ hive_client = ThriftHiveMetastore.Client(protocol)
 
 # Try to connect to the Hive metastore
 now = time.time()
-TIMEOUT_SECONDS = 30.0
+TIMEOUT_SECONDS = 300.0
 while time.time() - now < TIMEOUT_SECONDS:
   try:
     hive_transport.open()
