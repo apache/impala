@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
+import org.apache.impala.catalog.HdfsCompression;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
@@ -280,12 +281,25 @@ public class FileSystemUtil {
   }
 
   /**
-   * Returns true if the filesystem might override getFileBlockLocations().
+   * Returns true if the file corresponding to 'fileStatus' is a valid data file as
+   * per Impala's partitioning rules. A fileStatus is considered invalid if its a
+   * directory/hidden file/LZO index file. LZO index files are skipped because they are
+   * read by the scanner directly. Currently Impala doesn't allow subdirectories in the
+   * partition paths.
    */
-  public static boolean hasGetFileBlockLocations(FileSystem fs) {
+  public static boolean isValidDataFile(FileStatus fileStatus) {
+    String fileName = fileStatus.getPath().getName();
+    return !(fileStatus.isDirectory() || FileSystemUtil.isHiddenFile(fileName) ||
+        HdfsCompression.fromFileName(fileName) == HdfsCompression.LZO_INDEX);
+  }
+
+  /**
+   * Returns true if the filesystem supports storage UUIDs in BlockLocation calls.
+   */
+  public static boolean supportsStorageIds(FileSystem fs) {
     // Common case.
     if (isDistributedFileSystem(fs)) return true;
-    // Blacklist FileSystems that are known to not implement getFileBlockLocations().
+    // Blacklist FileSystems that are known to not to include storage UUIDs.
     return !(fs instanceof S3AFileSystem || fs instanceof LocalFileSystem);
   }
 
@@ -406,6 +420,16 @@ public class FileSystemUtil {
     } catch (IOException e) {
       return false;
     }
+  }
+
+  /**
+   * Returns true if Path 'p' is a descendant of Path 'parent', false otherwise.
+   */
+  public static boolean isDescendantPath(Path p, Path parent) {
+    if (p == null || parent == null) return false;
+    while (!p.isRoot() && p.depth() != parent.depth()) p = p.getParent();
+    if (p.isRoot()) return false;
+    return p.equals(parent);
   }
 
   /**
