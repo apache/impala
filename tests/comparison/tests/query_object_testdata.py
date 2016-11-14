@@ -17,20 +17,34 @@
 
 from collections import namedtuple
 
-from fake_query import FakeColumn, FakeFirstValue, FakeQuery, FakeSelectClause, FakeTable
+from fake_query import (
+    FakeColumn,
+    FakeFirstValue,
+    FakeQuery,
+    FakeSelectClause,
+    FakeTable)
+from tests.comparison.common import TableExprList
 from tests.comparison.db_types import Char, Int
 from tests.comparison.funcs import AggCount
-from tests.comparison.query import FromClause, OrderByClause
+from tests.comparison.query import (
+    FromClause,
+    InsertClause,
+    InsertStatement,
+    OrderByClause,
+    ValuesClause,
+    ValuesRow,
+    WithClause,
+    WithClauseInlineView)
 
 
 QueryTest = namedtuple(
-    # A QueryTest object contains a Query and all data to verify about it as other
-    # attributes. This allows a new Query to be added without need to modify tests
-    # themselves. The various tests cherry-pick which test attributes they need to
+    # A QueryTest object contains a SELECT query and all data to verify about it
+    # as other attributes. This allows a new query to be added without need to modify
+    # tests themselves. The various tests cherry-pick which test attributes they need to
     # verify against the Query.
     #
     # If you add a new test, add a new attribute, or perhaps reuse one or more
-    # attributes.
+    # existing attributes.
     #
     # If you add a new test case, add a new item to QUERY_TEST_CASESs array.
     #
@@ -41,12 +55,18 @@ QueryTest = namedtuple(
         'testid',
         # Query object, formed via FakeQuery
         'query',
-        # textual form of FakeQuery
+        # textual form of query in Impala dialect
         'impala_query_string',
-        # hash representing various item counts (see SelectItem property methods)
+        # textual form of query in PostgreSQL dialect
+        'postgres_query_string',
+        # dictionary representing various item counts (see SelectItem property methods)
         'select_item_counts',
     ]
 )
+
+InsertStatementTest = namedtuple('InsertStatementTest',
+                                 ['testid', 'query', 'impala_query_string',
+                                  'postgres_query_string'])
 
 
 # FakeTables must be declared for use by queries. Tables may be reused as needed for
@@ -59,9 +79,29 @@ SIMPLE_TABLE = FakeTable(
     ]
 )
 
+KUDU_TABLE = FakeTable(
+    'kudu_table',
+    [
+        FakeColumn('int_col', Int, is_primary_key=True),
+        FakeColumn('char_col', Char),
+    ]
+)
 
-# All tests involving queries should be written to use this dataset.
-QUERY_TEST_CASES = [
+# This can't be used inline because we need its table expressions later.
+SIMPLE_WITH_CLAUSE = WithClause(
+    TableExprList([
+        WithClauseInlineView(
+            FakeQuery(
+                select_clause=FakeSelectClause(SIMPLE_TABLE.cols[0]),
+                from_clause=FromClause(SIMPLE_TABLE)
+            ),
+            'with_view'
+        )
+    ])
+)
+
+# All tests involving SELECT queries should be written to use this data set.
+SELECT_QUERY_TEST_CASES = [
     QueryTest(
         testid='select col from table',
         query=FakeQuery(
@@ -72,6 +112,12 @@ QUERY_TEST_CASES = [
             'SELECT\n'
             'fake_table.int_col,\n'
             'TRIM(fake_table.char_col)\n'
+            'FROM fake_table'
+        ),
+        postgres_query_string=(
+            'SELECT\n'
+            'fake_table.int_col,\n'
+            'fake_table.char_col\n'
             'FROM fake_table'
         ),
         select_item_counts={
@@ -89,6 +135,11 @@ QUERY_TEST_CASES = [
             from_clause=FromClause(SIMPLE_TABLE),
         ),
         impala_query_string=(
+            'SELECT\n'
+            'COUNT(fake_table.int_col)\n'
+            'FROM fake_table'
+        ),
+        postgres_query_string=(
             'SELECT\n'
             'COUNT(fake_table.int_col)\n'
             'FROM fake_table'
@@ -116,6 +167,11 @@ QUERY_TEST_CASES = [
             'FIRST_VALUE(fake_table.int_col) OVER (ORDER BY fake_table.int_col ASC)\n'
             'FROM fake_table'
         ),
+        postgres_query_string=(
+            'SELECT\n'
+            'FIRST_VALUE(fake_table.int_col) OVER (ORDER BY fake_table.int_col ASC)\n'
+            'FROM fake_table'
+        ),
         select_item_counts={
             'items': 1,
             'basic_items': 0,
@@ -123,4 +179,278 @@ QUERY_TEST_CASES = [
             'analytic_items': 1,
         },
     ),
+]
+
+INSERT_QUERY_TEST_CASES = [
+    InsertStatementTest(
+        testid='insert into table select cols',
+        query=InsertStatement(
+            insert_clause=InsertClause(KUDU_TABLE),
+            select_query=FakeQuery(
+                select_clause=FakeSelectClause(*SIMPLE_TABLE.cols),
+                from_clause=FromClause(SIMPLE_TABLE)
+            ),
+        ),
+        impala_query_string=(
+            'INSERT INTO kudu_table\n'
+            'SELECT\n'
+            'fake_table.int_col,\n'
+            'TRIM(fake_table.char_col)\n'
+            'FROM fake_table'
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table\n'
+            'SELECT\n'
+            'fake_table.int_col,\n'
+            'fake_table.char_col\n'
+            'FROM fake_table'
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert into table column permutations select cols',
+        query=InsertStatement(
+            insert_clause=InsertClause(KUDU_TABLE, column_list=KUDU_TABLE.cols),
+            select_query=FakeQuery(
+                select_clause=FakeSelectClause(*SIMPLE_TABLE.cols),
+                from_clause=FromClause(SIMPLE_TABLE)
+            ),
+        ),
+        impala_query_string=(
+            'INSERT INTO kudu_table (int_col, char_col)\n'
+            'SELECT\n'
+            'fake_table.int_col,\n'
+            'TRIM(fake_table.char_col)\n'
+            'FROM fake_table'
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table (int_col, char_col)\n'
+            'SELECT\n'
+            'fake_table.int_col,\n'
+            'fake_table.char_col\n'
+            'FROM fake_table'
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert into table partial column permutation select 1 col',
+        query=InsertStatement(
+            insert_clause=InsertClause(KUDU_TABLE,
+                                       column_list=[KUDU_TABLE.cols[0]]),
+            select_query=FakeQuery(
+                select_clause=FakeSelectClause(SIMPLE_TABLE.cols[0]),
+                from_clause=FromClause(SIMPLE_TABLE)
+            ),
+        ),
+        impala_query_string=(
+            'INSERT INTO kudu_table (int_col)\n'
+            'SELECT\n'
+            'fake_table.int_col\n'
+            'FROM fake_table'
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table (int_col)\n'
+            'SELECT\n'
+            'fake_table.int_col\n'
+            'FROM fake_table'
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert into table select 1 col',
+        query=InsertStatement(
+            insert_clause=InsertClause(KUDU_TABLE),
+            select_query=FakeQuery(
+                select_clause=FakeSelectClause(SIMPLE_TABLE.cols[0]),
+                from_clause=FromClause(SIMPLE_TABLE)
+            ),
+        ),
+        impala_query_string=(
+            'INSERT INTO kudu_table\n'
+            'SELECT\n'
+            'fake_table.int_col\n'
+            'FROM fake_table'
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table\n'
+            'SELECT\n'
+            'fake_table.int_col\n'
+            'FROM fake_table'
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert 2 value rows',
+        query=InsertStatement(
+            insert_clause=InsertClause(KUDU_TABLE),
+            values_clause=ValuesClause((
+                ValuesRow((Int(1), Char('a'))),
+                ValuesRow((Int(2), Char('b'))),
+            )),
+        ),
+        impala_query_string=(
+            'INSERT INTO kudu_table\n'
+            "VALUES (1, 'a'), (2, 'b')"
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table\n'
+            "VALUES (1, 'a' || ''), (2, 'b' || '')"
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert 1 value',
+        query=InsertStatement(
+            insert_clause=InsertClause(KUDU_TABLE),
+            values_clause=ValuesClause((
+                ValuesRow((Int(1),)),
+            )),
+        ),
+        impala_query_string=(
+            'INSERT INTO kudu_table\n'
+            'VALUES (1)'
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table\n'
+            'VALUES (1)'
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert value row with full column permutation',
+        query=InsertStatement(
+            insert_clause=InsertClause(KUDU_TABLE, column_list=KUDU_TABLE.cols),
+            values_clause=ValuesClause((
+                ValuesRow((Int(1), Char('a'))),
+            )),
+        ),
+        impala_query_string=(
+            'INSERT INTO kudu_table (int_col, char_col)\n'
+            "VALUES (1, 'a')"
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table (int_col, char_col)\n'
+            "VALUES (1, 'a' || '')"
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert value row with partial column permutation',
+        query=InsertStatement(
+            insert_clause=InsertClause(KUDU_TABLE,
+                                       column_list=(KUDU_TABLE.cols[0],)),
+            values_clause=ValuesClause((
+                ValuesRow((Int(1),)),
+            )),
+        ),
+        impala_query_string=(
+            'INSERT INTO kudu_table (int_col)\n'
+            "VALUES (1)"
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table (int_col)\n'
+            "VALUES (1)"
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert values seleted from with clause',
+        query=InsertStatement(
+            with_clause=SIMPLE_WITH_CLAUSE,
+            insert_clause=InsertClause(KUDU_TABLE,
+                                       column_list=(KUDU_TABLE.cols[0],)),
+            select_query=FakeQuery(
+                select_clause=FakeSelectClause(*SIMPLE_WITH_CLAUSE.table_exprs[0].cols),
+                from_clause=FromClause(SIMPLE_WITH_CLAUSE.table_exprs[0])
+            ),
+        ),
+        impala_query_string=(
+            'WITH with_view AS (SELECT\n'
+            'fake_table.int_col\n'
+            'FROM fake_table)\n'
+            'INSERT INTO kudu_table (int_col)\n'
+            'SELECT\n'
+            'with_view.int_col\n'
+            'FROM with_view'
+        ),
+        postgres_query_string=(
+            'WITH with_view AS (SELECT\n'
+            'fake_table.int_col\n'
+            'FROM fake_table)\n'
+            'INSERT INTO kudu_table (int_col)\n'
+            'SELECT\n'
+            'with_view.int_col\n'
+            'FROM with_view'
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert into table select cols ignore conflicts',
+        query=InsertStatement(
+            insert_clause=InsertClause(KUDU_TABLE),
+            select_query=FakeQuery(
+                select_clause=FakeSelectClause(*SIMPLE_TABLE.cols),
+                from_clause=FromClause(SIMPLE_TABLE)
+            ),
+            conflict_action=InsertStatement.CONFLICT_ACTION_IGNORE
+        ),
+        impala_query_string=(
+            'INSERT INTO kudu_table\n'
+            'SELECT\n'
+            'fake_table.int_col,\n'
+            'TRIM(fake_table.char_col)\n'
+            'FROM fake_table'
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table\n'
+            'SELECT\n'
+            'fake_table.int_col,\n'
+            'fake_table.char_col\n'
+            'FROM fake_table\n'
+            'ON CONFLICT DO NOTHING'
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert 2 value rows ignore conflicts',
+        query=InsertStatement(
+            insert_clause=InsertClause(KUDU_TABLE),
+            values_clause=ValuesClause((
+                ValuesRow((Int(1), Char('a'))),
+                ValuesRow((Int(2), Char('b'))),
+            )),
+            conflict_action=InsertStatement.CONFLICT_ACTION_IGNORE
+        ),
+        impala_query_string=(
+            'INSERT INTO kudu_table\n'
+            "VALUES (1, 'a'), (2, 'b')"
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table\n'
+            "VALUES (1, 'a' || ''), (2, 'b' || '')\n"
+            'ON CONFLICT DO NOTHING'
+        ),
+    ),
+    InsertStatementTest(
+        testid='insert values seleted from with clause ignore conflicts',
+        query=InsertStatement(
+            with_clause=SIMPLE_WITH_CLAUSE,
+            insert_clause=InsertClause(KUDU_TABLE,
+                                       column_list=(KUDU_TABLE.cols[0],)),
+            select_query=FakeQuery(
+                select_clause=FakeSelectClause(*SIMPLE_WITH_CLAUSE.table_exprs[0].cols),
+                from_clause=FromClause(SIMPLE_WITH_CLAUSE.table_exprs[0])
+            ),
+            conflict_action=InsertStatement.CONFLICT_ACTION_IGNORE
+        ),
+        impala_query_string=(
+            'WITH with_view AS (SELECT\n'
+            'fake_table.int_col\n'
+            'FROM fake_table)\n'
+            'INSERT INTO kudu_table (int_col)\n'
+            'SELECT\n'
+            'with_view.int_col\n'
+            'FROM with_view'
+        ),
+        postgres_query_string=(
+            'WITH with_view AS (SELECT\n'
+            'fake_table.int_col\n'
+            'FROM fake_table)\n'
+            'INSERT INTO kudu_table (int_col)\n'
+            'SELECT\n'
+            'with_view.int_col\n'
+            'FROM with_view\n'
+            'ON CONFLICT DO NOTHING'
+        ),
+    )
 ]
