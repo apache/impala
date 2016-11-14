@@ -174,7 +174,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         result = new NullLiteral();
         break;
       case BOOLEAN:
-        if (val.isBool_val()) result = new BoolLiteral(val.bool_val);
+        if (val.isSetBool_val()) result = new BoolLiteral(val.bool_val);
         break;
       case TINYINT:
         if (val.isSetByte_val()) {

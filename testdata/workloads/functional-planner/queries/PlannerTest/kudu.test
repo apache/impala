@@ -272,3 +272,12 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
 ====
+# IMPALA-4479: Test proper folding of constant boolean exprs.
+select * from functional_kudu.alltypes
+where bool_col = (true and false)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   kudu predicates: bool_col = FALSE
+====
