@@ -30,7 +30,7 @@
 set -euo pipefail
 
 echo "Compiling"
-if ! ./buildall.sh -notests -tidy -so -noclean 1>/dev/null 2>/dev/null
+if ! ./buildall.sh -skiptests -tidy -so -noclean 1>/dev/null 2>/dev/null
 then
   echo "WARNING: compile failed" >&2
 fi

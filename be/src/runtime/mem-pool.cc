@@ -37,7 +37,7 @@ const int MemPool::MAX_CHUNK_SIZE;
 
 const char* MemPool::LLVM_CLASS_NAME = "class.impala::MemPool";
 const int MemPool::DEFAULT_ALIGNMENT;
-uint32_t MemPool::zero_length_region_ = MEM_POOL_POISON;
+uint32_t MemPool::zero_length_region_ alignas(std::max_align_t) = MEM_POOL_POISON;
 
 MemPool::MemPool(MemTracker* mem_tracker)
   : current_chunk_idx_(-1),
