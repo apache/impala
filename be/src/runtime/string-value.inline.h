@@ -47,7 +47,9 @@ static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, 
           SSEUtil::CHARS_PER_128_BIT_REGISTER, xmm1,
           SSEUtil::CHARS_PER_128_BIT_REGISTER);
       if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
-        return s1[chars_match] - s2[chars_match];
+        // Match strncmp() behavior, which interprets characters as unsigned char.
+        return static_cast<unsigned char>(s1[chars_match]) -
+            static_cast<unsigned char>(s2[chars_match]);
       }
       len -= SSEUtil::CHARS_PER_128_BIT_REGISTER;
       s1 += SSEUtil::CHARS_PER_128_BIT_REGISTER;
