@@ -249,12 +249,20 @@ enum TImpalaQueryOptions {
   ENABLE_EXPR_REWRITES
 }
 
-// The summary of an insert.
+// The summary of a DML statement.
+// TODO: Rename to reflect that this is for all DML.
 struct TInsertResult {
   // Number of modified rows per partition. Only applies to HDFS and Kudu tables.
   // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with
   // the root in an unpartitioned table being the empty string.
   1: required map<string, i64> rows_modified
+
+  // Number of row operations attempted but not completed due to non-fatal errors
+  // reported by the storage engine that Impala treats as warnings. Only applies to Kudu
+  // tables. This includes errors due to duplicate/missing primary keys, nullability
+  // constraint violations, and primary keys in uncovered partition ranges.
+  // TODO: Provide a detailed breakdown of these counts by error. IMPALA-4416.
+  2: optional i64 num_row_errors
 }
 
 // Response from a call to PingImpalaService

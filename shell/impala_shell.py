@@ -106,8 +106,8 @@ class ImpalaShell(cmd.Cmd):
   # Variable names are prefixed with the following string
   VAR_PREFIXES = [ 'VAR', 'HIVEVAR' ]
   DEFAULT_DB = 'default'
-  # Regex applied to all tokens of a query to detect the query type.
-  INSERT_REGEX = re.compile("^insert$", re.I)
+  # Regex applied to all tokens of a query to detect DML statements.
+  DML_REGEX = re.compile("^(insert|upsert|update|delete)$", re.I)
   # Seperator for queries in the history file.
   HISTORY_FILE_QUERY_DELIM = '_IMP_DELIM_'
 
@@ -772,7 +772,7 @@ class ImpalaShell(cmd.Cmd):
     return self._execute_stmt(query)
 
   def do_profile(self, args):
-    """Prints the runtime profile of the last INSERT or SELECT query executed."""
+    """Prints the runtime profile of the last DML statement or SELECT query executed."""
     if len(args) > 0:
       print_to_stderr("'profile' does not accept any arguments")
       return CmdStatus.ERROR
@@ -856,13 +856,13 @@ class ImpalaShell(cmd.Cmd):
                                              "#Rows", "Est. #Rows", "Peak Mem",
                                              "Est. Peak Mem", "Detail"])
 
-  def _execute_stmt(self, query, is_insert=False, print_web_link=False):
+  def _execute_stmt(self, query, is_dml=False, print_web_link=False):
     """ The logic of executing any query statement
 
     The client executes the query and the query_handle is returned immediately,
     even as the client waits for the query to finish executing.
 
-    If the query was not an insert, the results are fetched from the client
+    If the query was not dml, the results are fetched from the client
     as they are streamed in, through the use of a generator.
 
     The execution time is printed and the query is closed if it hasn't been already
@@ -892,10 +892,10 @@ class ImpalaShell(cmd.Cmd):
       # Reset the progress stream.
       self.progress_stream.clear()
 
-      if is_insert:
+      if is_dml:
         # retrieve the error log
         warning_log = self.imp_client.get_warning_log(self.last_query_handle)
-        num_rows = self.imp_client.close_insert(self.last_query_handle)
+        (num_rows, num_row_errors) = self.imp_client.close_dml(self.last_query_handle)
       else:
         # impalad does not support the fetching of metadata for certain types of queries.
         if not self.imp_client.expect_result_metadata(query.query):
@@ -920,13 +920,21 @@ class ImpalaShell(cmd.Cmd):
 
       if warning_log:
         self._print_if_verbose(warning_log)
-      # print insert when is_insert is true (which is 1)
-      # print fetch when is_insert is false (which is 0)
-      verb = ["Fetch", "Insert"][is_insert]
-      self._print_if_verbose("%sed %d row(s) in %2.2fs" % (verb, num_rows,
-                                                               end_time - start_time))
+      # print 'Modified' when is_dml is true (i.e. 1), or 'Fetched' otherwise.
+      verb = ["Fetched", "Modified"][is_dml]
+      time_elapsed = end_time - start_time
 
-      if not is_insert:
+      # Add the number of row errors if this DML and the operation supports it.
+      # num_row_errors is None if the DML operation doesn't return it.
+      if is_dml and num_row_errors is not None:
+        error_report = ", %d row error(s)" % (num_row_errors)
+      else:
+        error_report = ""
+
+      self._print_if_verbose("%s %d row(s)%s in %2.2fs" %\
+          (verb, num_rows, error_report, time_elapsed))
+
+      if not is_dml:
         self.imp_client.close_query(self.last_query_handle, self.query_handle_closed)
       self.query_handle_closed = True
 
@@ -989,12 +997,12 @@ class ImpalaShell(cmd.Cmd):
     # to deal with escaped quotes in string literals
     lexer = shlex.shlex(query.query.lstrip(), posix=True)
     lexer.escapedquotes += "'"
-    # Because the WITH clause may precede INSERT or SELECT queries,
+    # Because the WITH clause may precede DML or SELECT queries,
     # just checking the first token is insufficient.
-    is_insert = False
+    is_dml = False
     tokens = list(lexer)
-    if filter(self.INSERT_REGEX.match, tokens): is_insert = True
-    return self._execute_stmt(query, is_insert=is_insert)
+    if filter(self.DML_REGEX.match, tokens): is_dml = True
+    return self._execute_stmt(query, is_dml=is_dml)
 
   def do_use(self, args):
     """Executes a USE... query"""
@@ -1020,11 +1028,23 @@ class ImpalaShell(cmd.Cmd):
   def do_desc(self, args):
     return self.do_describe(args)
 
-  def do_insert(self, args):
-    """Executes an INSERT query"""
-    query = self.imp_client.create_beeswax_query("insert %s" % args,
+  def __do_dml(self, stmt, args):
+    """Executes a DML query"""
+    query = self.imp_client.create_beeswax_query("%s %s" % (stmt, args),
                                                  self.set_query_options)
-    return self._execute_stmt(query, is_insert=True, print_web_link=True)
+    return self._execute_stmt(query, is_dml=True, print_web_link=True)
+
+  def do_upsert(self, args):
+    return self.__do_dml("upsert", args)
+
+  def do_update(self, args):
+    return self.__do_dml("update", args)
+
+  def do_delete(self, args):
+    return self.__do_dml("delete", args)
+
+  def do_insert(self, args):
+    return self.__do_dml("insert", args)
 
   def do_explain(self, args):
     """Explain the query execution plan"""

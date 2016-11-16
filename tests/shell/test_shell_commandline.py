@@ -462,6 +462,43 @@ class TestImpalaShell(ImpalaTestSuite):
     results = run_impala_shell_cmd('--query="show tables"')
     self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
 
+  def test_insert_status(self, unique_database):
+    run_impala_shell_cmd('--query="create table %s.insert_test (id int)"' %
+        unique_database)
+    results = run_impala_shell_cmd('--query="insert into %s.insert_test values (1)"' %
+        unique_database)
+    assert "Modified 1 row(s)" in results.stderr
+
+  def _validate_dml_stmt(self, stmt, expected_rows_modified, expected_row_errors):
+    results = run_impala_shell_cmd('--query="%s"' % (stmt))
+    expected_output = "Modified %d row(s), %d row error(s)" %\
+        (expected_rows_modified, expected_row_errors)
+    assert expected_output in results.stderr
+
+  def test_kudu_dml_reporting(self, unique_database):
+    db = unique_database
+    run_impala_shell_cmd('--query="create table %s.dml_test (id int primary key, '\
+        'age int) distribute by hash(id) into 2 buckets stored as kudu"' % db)
+
+    self._validate_dml_stmt("insert into %s.dml_test (id) values (7), (7)" % db, 1, 1)
+    self._validate_dml_stmt("insert into %s.dml_test (id) values (7)" % db, 0, 1)
+    self._validate_dml_stmt("upsert into %s.dml_test (id) values (7), (7)" % db, 2, 0)
+    self._validate_dml_stmt("update %s.dml_test set age = 1 where id = 7" % db, 1, 0)
+    self._validate_dml_stmt("delete from %s.dml_test where id = 7" % db, 1, 0)
+
+    # UPDATE/DELETE where there are no matching rows; there are no errors because the
+    # scan produced no rows.
+    self._validate_dml_stmt("update %s.dml_test set age = 1 where id = 8" % db, 0, 0)
+    self._validate_dml_stmt("delete from %s.dml_test where id = 7" % db, 0, 0)
+
+    # WITH clauses, only apply to INSERT and UPSERT
+    self._validate_dml_stmt(\
+        "with y as (values(7)) insert into %s.dml_test (id) select * from y" % db, 1, 0)
+    self._validate_dml_stmt(\
+        "with y as (values(7)) insert into %s.dml_test (id) select * from y" % db, 0, 1)
+    self._validate_dml_stmt(\
+        "with y as (values(7)) upsert into %s.dml_test (id) select * from y" % db, 1, 0)
+
   def test_missing_query_file(self):
     result = run_impala_shell_cmd('-f nonexistent.sql', expect_success=False)
     assert "Could not open file 'nonexistent.sql'" in result.stderr

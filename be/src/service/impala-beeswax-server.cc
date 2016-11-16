@@ -520,13 +520,22 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
       // Note that when IMPALA-87 is fixed (INSERT without FROM clause) we might
       // need to revisit this, since that might lead us to insert a row without a
       // coordinator, depending on how we choose to drive the table sink.
+      int64_t num_row_errors = 0;
+      bool has_kudu_stats = false;
       if (exec_state->coord() != NULL) {
         for (const PartitionStatusMap::value_type& v:
              exec_state->coord()->per_partition_status()) {
           const pair<string, TInsertPartitionStatus> partition_status = v;
           insert_result->rows_modified[partition_status.first] =
               partition_status.second.num_modified_rows;
+
+          if (partition_status.second.__isset.stats &&
+              partition_status.second.stats.__isset.kudu_stats) {
+            has_kudu_stats = true;
+          }
+          num_row_errors += partition_status.second.stats.kudu_stats.num_row_errors;
         }
+        if (has_kudu_stats) insert_result->__set_num_row_errors(num_row_errors);
       }
     }
   }
