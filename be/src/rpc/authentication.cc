@@ -521,6 +521,32 @@ void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   }
 }
 
+namespace {
+
+// SASL requires mutexes for thread safety, but doesn't implement
+// them itself. So, we have to hook them up to our mutex implementation.
+static void* SaslMutexAlloc() {
+  return static_cast<void*>(new mutex());
+}
+static void SaslMutexFree(void* m) {
+  delete static_cast<mutex*>(m);
+}
+static int SaslMutexLock(void* m) {
+  static_cast<mutex*>(m)->lock();
+  return 0; // indicates success.
+}
+static int SaslMutexUnlock(void* m) {
+  static_cast<mutex*>(m)->unlock();
+  return 0; // indicates success.
+}
+
+void SaslSetMutex() {
+  sasl_set_mutex(&SaslMutexAlloc, &SaslMutexLock, &SaslMutexUnlock, &SaslMutexFree);
+}
+
+}
+
+
 Status InitAuth(const string& appname) {
   // We only set up Sasl things if we are indeed going to be using Sasl.
   // Checking of these flags for sanity is done later, but this check is good
@@ -601,6 +627,7 @@ Status InitAuth(const string& appname) {
       LDAP_EXT_CALLBACKS[3].id = SASL_CB_LIST_END;
     }
 
+    SaslSetMutex();
     try {
       // We assume all impala processes are both server and client.
       sasl::TSaslServer::SaslInit(GENERAL_CALLBACKS, appname);
@@ -993,7 +1020,6 @@ Status AuthManager::Init() {
       kerberos_internal_principal = FLAGS_be_principal;
     }
   }
-
   // This is written from the perspective of the daemons - thus "internal"
   // means "I am used for communication with other daemons, both as a client
   // and as a server".  "External" means that "I am used when being a server
