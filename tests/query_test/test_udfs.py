@@ -78,23 +78,24 @@ class TestUdfs(ImpalaTestSuite):
     vector.get_value('exec_option')['disable_codegen'] = 1
     self.run_test_case('QueryTest/udf-errors', vector, use_db=unique_database)
 
-  def test_udf_invalid_symbol(self, vector):
+  def test_udf_invalid_symbol(self, vector, unique_database):
     """ IMPALA-1642: Impala crashes if the symbol for a Hive UDF doesn't exist
         Crashing is non-deterministic so we run the UDF several times."""
-    drop_fn_stmt = "drop function if exists default.fn_invalid_symbol(STRING)"
-    create_fn_stmt = ("create function default.fn_invalid_symbol(STRING) returns "
-        "STRING LOCATION '%s' SYMBOL='not.a.Symbol'" %
-        get_fs_path('/test-warehouse/impala-hive-udfs.jar'))
-    query = "select default.fn_invalid_symbol('test')"
+    drop_fn_stmt = (
+        "drop function if exists `{0}`.fn_invalid_symbol(STRING)".format(unique_database))
+    create_fn_stmt = (
+        "create function `{0}`.fn_invalid_symbol(STRING) returns "
+        "STRING LOCATION '{1}' SYMBOL='not.a.Symbol'".format(
+            unique_database,
+            get_fs_path('/test-warehouse/impala-hive-udfs.jar')))
+    query = "select `{0}`.fn_invalid_symbol('test')".format(unique_database)
 
     self.client.execute(drop_fn_stmt)
-    try:
-      self.client.execute(create_fn_stmt)
-      for _ in xrange(5):
-        ex = self.execute_query_expect_failure(self.client, query)
-        assert "Unable to find class" in str(ex)
-    finally:
-      self.client.execute(drop_fn_stmt)
+    self.client.execute(create_fn_stmt)
+    for _ in xrange(5):
+      ex = self.execute_query_expect_failure(self.client, query)
+      assert "Unable to find class" in str(ex)
+    self.client.execute(drop_fn_stmt)
 
   def test_java_udfs(self, vector, unique_database):
     self.run_test_case('QueryTest/load-java-udfs', vector, use_db=unique_database)
@@ -153,7 +154,8 @@ class TestUdfs(ImpalaTestSuite):
         os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs.jar')
     new_udf = os.path.join(
         os.environ['IMPALA_HOME'], 'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
-    udf_dst = get_fs_path('/test-warehouse/impala-hive-udfs2.jar')
+    udf_dst = get_fs_path(
+        '/test-warehouse/impala-hive-udfs2-{0}.jar'.format(unique_database))
 
     drop_fn_stmt = (
         'drop function if exists `{0}`.`udf_update_test_drop`()'.format(unique_database))
@@ -185,7 +187,8 @@ class TestUdfs(ImpalaTestSuite):
         os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs.jar')
     new_udf = os.path.join(
         os.environ['IMPALA_HOME'], 'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
-    udf_dst = get_fs_path('/test-warehouse/impala-hive-udfs3.jar')
+    udf_dst = get_fs_path(
+        '/test-warehouse/impala-hive-udfs3-{0}.jar'.format(unique_database))
     old_function_name = "udf_update_test_create1"
     new_function_name = "udf_update_test_create2"
 
@@ -220,13 +223,16 @@ class TestUdfs(ImpalaTestSuite):
     self.__run_query_all_impalads(
         exec_options, query_template.format(old_function_name), ["New UDF"])
 
-  def test_drop_function_while_running(self, vector):
-    self.client.execute("drop function if exists default.drop_while_running(BIGINT)")
-    self.client.execute("create function default.drop_while_running(BIGINT) returns "\
-        "BIGINT LOCATION '%s' SYMBOL='Identity'" %
-        get_fs_path('/test-warehouse/libTestUdfs.so'))
-    query = \
-        "select default.drop_while_running(l_orderkey) from tpch.lineitem limit 10000";
+  def test_drop_function_while_running(self, vector, unique_database):
+    self.client.execute("drop function if exists `{0}`.drop_while_running(BIGINT)"
+                        .format(unique_database))
+    self.client.execute(
+        "create function `{0}`.drop_while_running(BIGINT) returns "
+        "BIGINT LOCATION '{1}' SYMBOL='Identity'".format(
+            unique_database,
+            get_fs_path('/test-warehouse/libTestUdfs.so')))
+    query = ("select `{0}`.drop_while_running(l_orderkey) from tpch.lineitem limit 10000"
+             .format(unique_database))
 
     # Run this query asynchronously.
     handle = self.execute_query_async(query, vector.get_value('exec_option'),
@@ -238,7 +244,8 @@ class TestUdfs(ImpalaTestSuite):
     assert len(results.data) == 1
 
     # Drop the function while the original query is running.
-    self.client.execute("drop function default.drop_while_running(BIGINT)")
+    self.client.execute(
+        "drop function `{0}`.drop_while_running(BIGINT)".format(unique_database))
 
     # Fetch the rest of the rows, this should still be able to run the UDF
     results = self.client.fetch(query, handle, -1)
