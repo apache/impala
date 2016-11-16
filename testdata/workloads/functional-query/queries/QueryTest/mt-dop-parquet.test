@@ -24,3 +24,17 @@ limit 10
 ---- TYPES
 bigint,bigint
 ====
+---- QUERY
+# IMPALA-4458: Test proper resource cleanup for cancelled fragments.
+# This test is duplicated from nested-types-subplan.test
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from tpch_nested_parquet.customer c, c.c_orders o
+where c_custkey = 1
+limit 3
+---- RESULTS
+1,regex:.*,regex:.*,regex:.*
+1,regex:.*,regex:.*,regex:.*
+1,regex:.*,regex:.*,regex:.*
+---- TYPES
+bigint,string,bigint,string
+====

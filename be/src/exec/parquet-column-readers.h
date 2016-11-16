@@ -227,8 +227,8 @@ class ParquetColumnReader {
   /// Returns true if this column reader has reached the end of the row group.
   inline bool RowGroupAtEnd() { return rep_level_ == HdfsParquetScanner::ROW_GROUP_END; }
 
-  /// Transfers the remaining resources backing tuples to the given row batch,
-  /// and frees up other resources.
+  /// If 'row_batch' is non-NULL, transfers the remaining resources backing tuples to it,
+  /// and frees up other resources. If 'row_batch' is NULL frees all resources instead.
   virtual void Close(RowBatch* row_batch) = 0;
 
  protected:
@@ -343,10 +343,12 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   }
 
   virtual void Close(RowBatch* row_batch) {
-    if (decompressed_data_pool_.get() != NULL) {
+    if (row_batch != nullptr) {
       row_batch->tuple_data_pool()->AcquireData(decompressed_data_pool_.get(), false);
+    } else {
+      decompressed_data_pool_->FreeAll();
     }
-    if (decompressor_.get() != NULL) decompressor_->Close();
+    if (decompressor_ != nullptr) decompressor_->Close();
   }
 
   int64_t total_len() const { return metadata_->total_compressed_size; }

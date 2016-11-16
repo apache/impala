@@ -229,25 +229,31 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 }
 
 void HdfsParquetScanner::Close(RowBatch* row_batch) {
-  if (row_batch != NULL) {
+  if (row_batch != nullptr) {
     FlushRowGroupResources(row_batch);
     row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
     if (scan_node_->HasRowBatchQueue()) {
       static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(row_batch);
     }
   } else {
-    if (template_tuple_pool_.get() != NULL) template_tuple_pool_->FreeAll();
-    if (!FLAGS_enable_partitioned_hash_join ||
-        !FLAGS_enable_partitioned_aggregation) {
+    if (template_tuple_pool_ != nullptr) template_tuple_pool_->FreeAll();
+    dictionary_pool_.get()->FreeAll();
+    context_->ReleaseCompletedResources(nullptr, true);
+    for (ParquetColumnReader* col_reader: column_readers_) col_reader->Close(nullptr);
+    if (!FLAGS_enable_partitioned_hash_join || !FLAGS_enable_partitioned_aggregation) {
       // With the legacy aggs/joins the tuple ptrs of the scratch batch are allocated
       // from the scratch batch's mem pool. We can get into this case if Open() fails.
       scratch_batch_->mem_pool()->FreeAll();
     }
   }
+  if (level_cache_pool_ != nullptr) {
+    level_cache_pool_->FreeAll();
+    level_cache_pool_.reset();
+  }
 
   // Verify all resources (if any) have been transferred.
-  DCHECK_EQ(template_tuple_pool_.get()->total_allocated_bytes(), 0);
-  DCHECK_EQ(dictionary_pool_.get()->total_allocated_bytes(), 0);
+  DCHECK_EQ(template_tuple_pool_->total_allocated_bytes(), 0);
+  DCHECK_EQ(dictionary_pool_->total_allocated_bytes(), 0);
   DCHECK_EQ(scratch_batch_->mem_pool()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
 
@@ -273,12 +279,7 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
   if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
   scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
 
-  if (level_cache_pool_.get() != NULL) {
-    level_cache_pool_->FreeAll();
-    level_cache_pool_.reset();
-  }
-
-  if (schema_resolver_.get() != NULL) schema_resolver_.reset();
+  if (schema_resolver_.get() != nullptr) schema_resolver_.reset();
 
   for (int i = 0; i < filter_ctxs_.size(); ++i) {
     const FilterStats* stats = filter_ctxs_[i]->stats;

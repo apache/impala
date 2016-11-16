@@ -254,9 +254,11 @@ class ScannerContext {
     /// never set to NULL, even if it contains 0 bytes.
     Status GetNextBuffer(int64_t read_past_size = 0);
 
-    /// If 'batch' is not NULL, attaches all completed io buffers and the boundary mem
-    /// pool to batch.  If 'done' is set, releases the completed resources.
-    /// If 'batch' is NULL then contains_tuple_data_ should be false.
+    /// If 'batch' is not NULL and 'contains_tuple_data_' is true, attaches all completed
+    /// io buffers and the boundary mem pool to 'batch'. If 'done' is set, all in-flight
+    /// resources are also attached or released.
+    /// If 'batch' is NULL then 'done' must be true. Such a call will release all
+    /// completed and in-flight resources.
     void ReleaseCompletedResources(RowBatch* batch, bool done);
 
     /// Error-reporting functions.
@@ -275,14 +277,13 @@ class ScannerContext {
   /// from all streams to 'batch'. Attaching only completed resources ensures that buffers
   /// (and their cleanup) trail the rows that reference them (row batches are consumed and
   /// cleaned up in order by the rest of the query).
-  /// If a NULL 'batch' is passed, then it tries to release whatever resource can be
-  /// released, ie. completed io buffers if 'done' is not set, and the mem pool if 'done'
-  /// is set. In that case, contains_tuple_data_ should be false.
-  //
   /// If 'done' is true, this is the final call for the current streams and any pending
   /// resources in each stream are also passed to the row batch. Callers which want to
   /// clear the streams from the context should also call ClearStreams().
-  //
+  ///
+  /// A NULL 'batch' may be passed to free all resources. It is only valid to pass a NULL
+  /// 'batch' when also passing 'done'.
+  ///
   /// This must be called with 'done' set when the scanner is complete and no longer needs
   /// any resources (e.g. tuple memory, io buffers) returned from the current streams.
   /// After calling with 'done' set, this should be called again if new streams are

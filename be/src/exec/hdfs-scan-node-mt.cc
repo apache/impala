@@ -118,6 +118,7 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
 
 void HdfsScanNodeMt::Close(RuntimeState* state) {
   if (is_closed()) return;
+  if (scanner_.get() != nullptr) scanner_->Close(nullptr);
   scanner_.reset();
   scanner_ctx_.reset();
   HdfsScanNodeBase::Close(state);
