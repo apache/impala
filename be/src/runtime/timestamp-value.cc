@@ -93,7 +93,7 @@ void TimestampValue::UtcToLocal() {
         static_cast<unsigned short>(temp.tm_mday));
     time_ = time_duration(temp.tm_hour, temp.tm_min, temp.tm_sec,
         time().fractional_seconds());
-  } catch (std::exception& from_boost) {
+  } catch (std::exception& /* from Boost */) {
     *this = ptime(not_a_date_time);
   }
 }
@@ -118,7 +118,7 @@ ptime TimestampValue::UnixTimeToPtime(time_t unix_time) const {
   }
   try {
     return ptime_from_tm(temp_tm);
-  } catch (std::exception& e) {
+  } catch (std::exception&) {
     return ptime(not_a_date_time);
   }
 }

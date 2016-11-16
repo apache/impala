@@ -15,28 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.catalog;
+#ifndef UTIL_BACKEND_CONFIG_H_
+#define UTIL_BACKEND_CONFIG_H_
 
-import org.apache.impala.common.Id;
-import org.apache.impala.common.IdGenerator;
+#include "common/status.h"
+#include "util/jni-util.h"
 
-public class TableId extends Id<TableId> {
-  // Construction only allowed via an IdGenerator.
-  protected TableId(int id) {
-    super(id);
-  }
+namespace impala {
 
-  public static IdGenerator<TableId> createGenerator() {
-    return new IdGenerator<TableId>() {
-      @Override
-      public TableId getNextId() { return new TableId(nextId_++); }
-      @Override
-      public TableId getMaxId() { return new TableId(nextId_ - 1); }
-    };
-  }
-
-  /**
-   * Returns an invalid table id intended for temporary use, e.g., for CTAS.
-   */
-  public static TableId createInvalidId() { return new TableId(INVALID_ID); }
+/// Builds the TBackendGflags object to pass to JNI. This is used to pass the gflag
+/// configs to the Frontend and the Catalog.
+Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes);
 }
+
+#endif

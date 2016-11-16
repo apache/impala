@@ -137,7 +137,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
 }
 
 Status TmpFileMgr::NewFile(FileGroup* file_group, const DeviceId& device_id,
-    const TUniqueId& query_id, File** new_file) {
+    const TUniqueId& query_id, unique_ptr<File>* new_file) {
   DCHECK(initialized_);
   DCHECK_GE(device_id, 0);
   DCHECK_LT(device_id, tmp_dirs_.size());
@@ -153,7 +153,7 @@ Status TmpFileMgr::NewFile(FileGroup* file_group, const DeviceId& device_id,
   path new_file_path(tmp_dirs_[device_id].path());
   new_file_path /= file_name.str();
 
-  *new_file = new File(this, file_group, device_id, new_file_path.string());
+  new_file->reset(new File(this, file_group, device_id, new_file_path.string()));
   return Status::OK();
 }
 
@@ -275,10 +275,10 @@ TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, int64_t bytes_limit)
 
 Status TmpFileMgr::FileGroup::NewFile(const DeviceId& device_id,
     const TUniqueId& query_id, File** new_file) {
-  TmpFileMgr::File* tmp_file;
+  unique_ptr<TmpFileMgr::File> tmp_file;
   RETURN_IF_ERROR(tmp_file_mgr_->NewFile(this, device_id, query_id, &tmp_file));
-  tmp_files_.emplace_back(tmp_file);
-  if (new_file != NULL) *new_file = tmp_file;
+  if (new_file != NULL) *new_file = tmp_file.get();
+  tmp_files_.emplace_back(std::move(tmp_file));
   return Status::OK();
 }
 

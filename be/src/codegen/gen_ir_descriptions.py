@@ -59,8 +59,8 @@ ir_functions = [
    "_ZN6impala26PartitionedAggregationNode22ProcessBatchNoGroupingEPNS_8RowBatchE"],
   ["PART_AGG_NODE_PROCESS_BATCH_STREAMING",
    "_ZN6impala26PartitionedAggregationNode21ProcessBatchStreamingEbNS_13TPrefetchMode4typeEPNS_8RowBatchES4_PNS_12HashTableCtxEPi"],
-  ["PART_AGG_NODE_GET_EXPR_CTX",
-   "_ZNK6impala26PartitionedAggregationNode17GetAggExprContextEi"],
+  ["PART_AGG_NODE_GET_EXPR_CTXS",
+   "_ZNK6impala26PartitionedAggregationNode18GetAggExprContextsEi"],
   ["AVG_UPDATE_BIGINT",
    "_ZN6impala18AggregateFunctions9AvgUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE"],
   ["AVG_UPDATE_DOUBLE",
@@ -200,9 +200,9 @@ ir_functions = [
   ["TOPN_NODE_INSERT_BATCH",
    "_ZN6impala8TopNNode11InsertBatchEPNS_8RowBatchE"],
   ["MEMPOOL_ALLOCATE",
-   "_ZN6impala7MemPool8AllocateILb0EEEPhl"],
+   "_ZN6impala7MemPool8AllocateILb0EEEPhli"],
   ["MEMPOOL_CHECKED_ALLOCATE",
-   "_ZN6impala7MemPool8AllocateILb1EEEPhl"]
+   "_ZN6impala7MemPool8AllocateILb1EEEPhli"]
 ]
 
 enums_preamble = '\

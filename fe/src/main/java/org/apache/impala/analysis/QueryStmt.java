@@ -233,10 +233,8 @@ public abstract class QueryStmt extends StatementBase {
    * the order-by and result expressions. Those SlotRefs in the ordering and result exprs
    * are substituted with SlotRefs into the new tuple. This simplifies sorting logic for
    * total (no limit) sorts.
-   * Done after analyzeAggregation() since ordering and result exprs may refer to
-   * the outputs of aggregation. Invoked for UnionStmt as well since
-   * TODO: We could do something more sophisticated than simply copying input
-   * slotrefs - e.g. compute some order-by expressions.
+   * Done after analyzeAggregation() since ordering and result exprs may refer to the
+   * outputs of aggregation.
    */
   protected void createSortTupleInfo(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(evaluateOrderBy_);
@@ -249,35 +247,22 @@ public abstract class QueryStmt extends StatementBase {
       }
     }
 
-    // sourceSlots contains the slots from the input row to materialize.
-    Set<SlotRef> sourceSlots = Sets.newHashSet();
-    TreeNode.collect(resultExprs_, Predicates.instanceOf(SlotRef.class), sourceSlots);
-    TreeNode.collect(sortInfo_.getOrderingExprs(), Predicates.instanceOf(SlotRef.class),
-        sourceSlots);
+    ExprSubstitutionMap smap = sortInfo_.createSortTupleInfo(resultExprs_, analyzer);
 
-    TupleDescriptor sortTupleDesc = analyzer.getDescTbl().createTupleDescriptor("sort");
-    List<Expr> sortTupleExprs = Lists.newArrayList();
-    sortTupleDesc.setIsMaterialized(true);
-    // substOrderBy is the mapping from slot refs in the input row to slot refs in the
-    // materialized sort tuple.
-    ExprSubstitutionMap substOrderBy = new ExprSubstitutionMap();
-    for (SlotRef origSlotRef: sourceSlots) {
-      SlotDescriptor origSlotDesc = origSlotRef.getDesc();
-      SlotDescriptor materializedDesc =
-          analyzer.copySlotDescriptor(origSlotDesc, sortTupleDesc);
-      SlotRef cloneRef = new SlotRef(materializedDesc);
-      substOrderBy.put(origSlotRef, cloneRef);
+    for (int i = 0; i < smap.size(); ++i) {
+      Preconditions.checkState(smap.getLhs().get(i) instanceof SlotRef);
+      Preconditions.checkState(smap.getRhs().get(i) instanceof SlotRef);
+      SlotRef inputSlotRef = (SlotRef) smap.getLhs().get(i);
+      SlotRef outputSlotRef = (SlotRef) smap.getRhs().get(i);
       if (hasLimit()) {
-        analyzer.registerValueTransfer(origSlotRef.getSlotId(), cloneRef.getSlotId());
+        analyzer.registerValueTransfer(
+            inputSlotRef.getSlotId(), outputSlotRef.getSlotId());
       } else {
-        analyzer.createAuxEquivPredicate(cloneRef, origSlotRef);
+        analyzer.createAuxEquivPredicate(outputSlotRef, inputSlotRef);
       }
-      sortTupleExprs.add(origSlotRef);
     }
 
-    resultExprs_ = Expr.substituteList(resultExprs_, substOrderBy, analyzer, false);
-    sortInfo_.substituteOrderingExprs(substOrderBy, analyzer);
-    sortInfo_.setMaterializedTupleInfo(sortTupleDesc, sortTupleExprs);
+    substituteResultExprs(smap, analyzer);
   }
 
   /**

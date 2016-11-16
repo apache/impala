@@ -17,38 +17,25 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
- * Class describing between predicates. After successful analysis, we rewrite
- * the between predicate to a conjunctive/disjunctive compound predicate
- * to be handed to the backend.
+ * Class describing a BETWEEN predicate. This predicate needs to be rewritten into a
+ * CompoundPredicate for it to be executable, i.e., it is illegal to call toThrift()
+ * on this predicate because there is no BE implementation.
  */
 public class BetweenPredicate extends Predicate {
 
   private final boolean isNotBetween_;
 
-  // After successful analysis, we rewrite this between predicate
-  // into a conjunctive/disjunctive compound predicate.
-  private CompoundPredicate rewrittenPredicate_;
-
-  // Children of the BetweenPredicate, since this.children should hold the children
-  // of the rewritten predicate to make sure toThrift() picks up the right ones.
-  private ArrayList<Expr> originalChildren_ = Lists.newArrayList();
-
   // First child is the comparison expr which should be in [lowerBound, upperBound].
   public BetweenPredicate(Expr compareExpr, Expr lowerBound, Expr upperBound,
       boolean isNotBetween) {
-    originalChildren_.add(compareExpr);
-    originalChildren_.add(lowerBound);
-    originalChildren_.add(upperBound);
-    this.isNotBetween_ = isNotBetween;
+    children_.add(compareExpr);
+    children_.add(lowerBound);
+    children_.add(upperBound);
+    isNotBetween_ = isNotBetween;
   }
 
   /**
@@ -57,102 +44,42 @@ public class BetweenPredicate extends Predicate {
   protected BetweenPredicate(BetweenPredicate other) {
     super(other);
     isNotBetween_ = other.isNotBetween_;
-    originalChildren_ = Expr.cloneList(other.originalChildren_);
-    if (other.rewrittenPredicate_ != null) {
-      rewrittenPredicate_ = (CompoundPredicate) other.rewrittenPredicate_.clone();
-    }
   }
-
-  public CompoundPredicate getRewrittenPredicate() {
-    Preconditions.checkState(isAnalyzed_);
-    return rewrittenPredicate_;
-  }
-  public ArrayList<Expr> getOriginalChildren() { return originalChildren_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
-    if (originalChildren_.get(0) instanceof Subquery &&
-        (originalChildren_.get(1) instanceof Subquery ||
-         originalChildren_.get(2) instanceof Subquery)) {
+    if (children_.get(0) instanceof Subquery &&
+        (children_.get(1) instanceof Subquery || children_.get(2) instanceof Subquery)) {
       throw new AnalysisException("Comparison between subqueries is not " +
-          "supported in a between predicate: " + toSqlImpl());
+          "supported in a BETWEEN predicate: " + toSqlImpl());
     }
-    analyzer.castAllToCompatibleType(originalChildren_);
-
-    // Rewrite between predicate into a conjunctive/disjunctive compound predicate.
-    if (isNotBetween_) {
-      // Rewrite into disjunction.
-      Predicate lower = new BinaryPredicate(BinaryPredicate.Operator.LT,
-          originalChildren_.get(0), originalChildren_.get(1));
-      Predicate upper = new BinaryPredicate(BinaryPredicate.Operator.GT,
-          originalChildren_.get(0), originalChildren_.get(2));
-      rewrittenPredicate_ =
-          new CompoundPredicate(CompoundPredicate.Operator.OR, lower, upper);
-    } else {
-      // Rewrite into conjunction.
-      Predicate lower = new BinaryPredicate(BinaryPredicate.Operator.GE,
-          originalChildren_.get(0), originalChildren_.get(1));
-      Predicate upper = new BinaryPredicate(BinaryPredicate.Operator.LE,
-          originalChildren_.get(0), originalChildren_.get(2));
-      rewrittenPredicate_ =
-          new CompoundPredicate(CompoundPredicate.Operator.AND, lower, upper);
-    }
-
-    try {
-      rewrittenPredicate_.analyze(analyzer);
-      fn_ = rewrittenPredicate_.fn_;
-    } catch (AnalysisException e) {
-      // We should have already guaranteed that analysis will succeed.
-      Preconditions.checkState(false, "Analysis failed in rewritten between predicate");
-    }
-
-    // Make sure toThrift() picks up the children of the rewritten predicate.
-    children_ = rewrittenPredicate_.getChildren();
-    // Since the only child is a CompoundPredicate expressing the comparison,
-    // the cost of the comparison is fully captured by the children's cost.
-    evalCost_ = getChildCosts();
+    analyzer.castAllToCompatibleType(children_);
     isAnalyzed_ = true;
   }
 
-  @Override
-  public List<Expr> getConjuncts() {
-    return rewrittenPredicate_.getConjuncts();
-  }
+  public boolean isNotBetween() { return isNotBetween_; }
 
   @Override
   protected void toThrift(TExprNode msg) {
-    rewrittenPredicate_.toThrift(msg);
+    throw new IllegalStateException(
+        "BetweenPredicate needs to be rewritten into a CompoundPredicate.");
   }
 
   @Override
   public String toSqlImpl() {
     String notStr = (isNotBetween_) ? "NOT " : "";
-    return originalChildren_.get(0).toSql() + " " + notStr + "BETWEEN " +
-        originalChildren_.get(1).toSql() + " AND " + originalChildren_.get(2).toSql();
+    return children_.get(0).toSql() + " " + notStr + "BETWEEN " +
+        children_.get(1).toSql() + " AND " + children_.get(2).toSql();
   }
 
-  /**
-   * Also substitute the exprs in originalChildren when cloning.
-   */
   @Override
-  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
-      throws AnalysisException {
-    BetweenPredicate clone = (BetweenPredicate) super.substituteImpl(smap, analyzer);
-    Preconditions.checkNotNull(clone);
-    clone.originalChildren_ =
-        Expr.substituteList(originalChildren_, smap, analyzer, false);
-    return clone;
+  public boolean equals(Object obj) {
+    if (!super.equals(obj)) return false;
+    return isNotBetween_ == ((BetweenPredicate)obj).isNotBetween_;
   }
 
   @Override
   public Expr clone() { return new BetweenPredicate(this); }
-
-  @Override
-  public Expr reset() {
-    super.reset();
-    originalChildren_ = Expr.resetList(originalChildren_);
-    return this;
-  }
 }

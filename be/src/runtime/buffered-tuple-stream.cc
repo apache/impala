@@ -22,7 +22,6 @@
 
 #include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
-#include "runtime/row-batch.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "util/bit-util.h"
@@ -51,12 +50,8 @@ BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     const RowDescriptor& row_desc, BufferedBlockMgr* block_mgr,
     BufferedBlockMgr::Client* client, bool use_initial_small_buffers, bool read_write,
     const set<SlotId>& ext_varlen_slots)
-  : use_small_buffers_(use_initial_small_buffers),
-    delete_on_read_(false),
-    read_write_(read_write),
-    state_(state),
+  : state_(state),
     desc_(row_desc),
-    has_nullable_tuple_(row_desc.IsAnyTupleNullable()),
     block_mgr_(block_mgr),
     block_mgr_client_(client),
     total_byte_size_(0),
@@ -71,12 +66,16 @@ BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     write_block_(NULL),
     num_pinned_(0),
     num_small_blocks_(0),
-    closed_(false),
     num_rows_(0),
-    pinned_(true),
     pin_timer_(NULL),
     unpin_timer_(NULL),
-    get_new_block_timer_(NULL) {
+    get_new_block_timer_(NULL),
+    read_write_(read_write),
+    has_nullable_tuple_(row_desc.IsAnyTupleNullable()),
+    use_small_buffers_(use_initial_small_buffers),
+    delete_on_read_(false),
+    closed_(false),
+    pinned_(true) {
   read_block_null_indicators_size_ = -1;
   write_block_null_indicators_size_ = -1;
   max_null_indicators_size_ = -1;
@@ -191,9 +190,13 @@ Status BufferedTupleStream::SwitchToIoBuffers(bool* got_buffer) {
   return status;
 }
 
-void BufferedTupleStream::Close() {
+void BufferedTupleStream::Close(RowBatch* batch, RowBatch::FlushMode flush) {
   for (BufferedBlockMgr::Block* block : blocks_) {
-    block->Delete();
+    if (batch != NULL && block->is_pinned()) {
+      batch->AddBlock(block, flush);
+    } else {
+      block->Delete();
+    }
   }
   blocks_.clear();
   num_pinned_ = 0;
@@ -284,8 +287,8 @@ Status BufferedTupleStream::NewWriteBlock(
 
 Status BufferedTupleStream::NewWriteBlockForRow(
     int64_t row_size, bool* got_block) noexcept {
-  int64_t block_len;
-  int64_t null_indicators_size;
+  int64_t block_len = 0;
+  int64_t null_indicators_size = 0;
   if (use_small_buffers_) {
     *got_block = false;
     if (blocks_.size() < NUM_SMALL_BLOCKS) {
@@ -645,11 +648,11 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
   batch->CommitRows(rows_to_fill);
   rows_returned_ += rows_to_fill;
   *eos = (rows_returned_ == num_rows_);
-  if ((!pinned_ || delete_on_read_) &&
-      rows_returned_curr_block + rows_to_fill == (*read_block_)->num_rows()) {
-    // No more data in this block. Mark this batch as needing to return so
-    // the caller can pass the rows up the operator tree.
-    batch->MarkNeedToReturn();
+  if ((!pinned_ || delete_on_read_)
+      && rows_returned_curr_block + rows_to_fill == (*read_block_)->num_rows()) {
+    // No more data in this block. The batch must be immediately returned up the operator
+    // tree and deep copied so that NextReadBlock() can reuse the read block's buffer.
+    batch->MarkNeedsDeepCopy();
   }
   if (FILL_INDICES) DCHECK_EQ(indices->size(), rows_to_fill);
   DCHECK_LE(read_ptr_, read_end_ptr_);

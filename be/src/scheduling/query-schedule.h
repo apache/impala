@@ -35,7 +35,7 @@
 namespace impala {
 
 class Coordinator;
-struct MtFragmentExecParams;
+struct FragmentExecParams;
 
 /// map from scan node id to a list of scan ranges
 typedef std::map<TPlanNodeId, std::vector<TScanRangeParams>> PerNodeScanRanges;
@@ -44,22 +44,6 @@ typedef std::map<TPlanNodeId, std::vector<TScanRangeParams>> PerNodeScanRanges;
 /// records scan range assignment for a single fragment
 typedef std::unordered_map<TNetworkAddress, PerNodeScanRanges>
     FragmentScanRangeAssignment;
-
-/// execution parameters for a single fragment; used to assemble the
-/// TPlanFragmentInstanceCtx;
-/// hosts.size() == instance_ids.size()
-struct FragmentExecParams {
-  std::vector<TNetworkAddress> hosts; // execution backends
-  std::vector<TUniqueId> instance_ids;
-  std::vector<TPlanFragmentDestination> destinations;
-  std::map<PlanNodeId, int> per_exch_num_senders;
-  FragmentScanRangeAssignment scan_range_assignment;
-  /// In its role as a data sender, a fragment instance is assigned a "sender id" to
-  /// uniquely identify it to a receiver. The id that a particular fragment instance
-  /// is assigned ranges from [sender_id_base, sender_id_base + N - 1], where
-  /// N = hosts.size (i.e. N = number of fragment instances)
-  int sender_id_base;
-};
 
 /// execution parameters for a single fragment instance; used to assemble the
 /// TPlanFragmentInstanceCtx
@@ -75,12 +59,12 @@ struct FInstanceExecParams {
   /// uniquely identify it to a receiver. -1 = invalid.
   int sender_id;
 
-  /// the parent MtFragmentExecParams
-  const MtFragmentExecParams& fragment_exec_params;
+  /// the parent FragmentExecParams
+  const FragmentExecParams& fragment_exec_params;
   const TPlanFragment& fragment() const;
 
   FInstanceExecParams(const TUniqueId& instance_id, const TNetworkAddress& host,
-      int per_fragment_instance_idx, const MtFragmentExecParams& fragment_exec_params)
+      int per_fragment_instance_idx, const FragmentExecParams& fragment_exec_params)
     : instance_id(instance_id), host(host),
       per_fragment_instance_idx(per_fragment_instance_idx),
       sender_id(-1),
@@ -88,7 +72,7 @@ struct FInstanceExecParams {
 };
 
 /// Execution parameters shared between fragment instances
-struct MtFragmentExecParams {
+struct FragmentExecParams {
   /// output destinations of this fragment
   std::vector<TPlanFragmentDestination> destinations;
 
@@ -105,8 +89,11 @@ struct MtFragmentExecParams {
   std::vector<FragmentIdx> input_fragments;
   std::vector<FInstanceExecParams> instance_exec_params;
 
-  MtFragmentExecParams(const TPlanFragment& fragment)
+  FragmentExecParams(const TPlanFragment& fragment)
     : is_coord_fragment(false), fragment(fragment) {}
+
+  // extract instance indices from instance_exec_params.instance_id
+  std::vector<int> GetInstanceIdxs() const;
 };
 
 /// A QuerySchedule contains all necessary information for a query coordinator to
@@ -122,6 +109,11 @@ class QuerySchedule {
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
       const TQueryOptions& query_options, RuntimeProfile* summary_profile,
       RuntimeProfile::EventSequence* query_events);
+
+  /// Verifies that the schedule is well-formed (and DCHECKs if it isn't):
+  /// - all fragments have a FragmentExecParams
+  /// - all scan ranges are assigned
+  void Validate() const;
 
   const TUniqueId& query_id() const { return query_id_; }
   const TQueryExecRequest& request() const { return request_; }
@@ -165,30 +157,24 @@ class QuerySchedule {
   TUniqueId GetNextInstanceId();
 
   const TPlanFragment& GetContainingFragment(PlanNodeId node_id) const {
-    return mt_fragment_exec_params_[GetFragmentIdx(node_id)].fragment;
+    FragmentIdx fragment_idx = GetFragmentIdx(node_id);
+    DCHECK_LT(fragment_idx, fragment_exec_params_.size());
+    return fragment_exec_params_[fragment_idx].fragment;
   }
-
-  /// Map node ids to the index of their node inside their plan.nodes list.
-  /// TODO-MT: remove; only needed for the ST path
-  int32_t GetNodeIdx(PlanNodeId id) const { return plan_node_to_plan_node_idx_[id]; }
 
   const TPlanNode& GetNode(PlanNodeId id) const {
     const TPlanFragment& fragment = GetContainingFragment(id);
     return fragment.plan.nodes[plan_node_to_plan_node_idx_[id]];
   }
 
-  std::vector<FragmentExecParams>* exec_params() { return &fragment_exec_params_; }
-  const std::vector<FragmentExecParams>& exec_params() const {
+  const std::vector<FragmentExecParams>& fragment_exec_params() const {
     return fragment_exec_params_;
   }
-  const std::vector<MtFragmentExecParams>& mt_fragment_exec_params() const {
-    return mt_fragment_exec_params_;
+  const FragmentExecParams& GetFragmentExecParams(FragmentIdx idx) const {
+    return fragment_exec_params_[idx];
   }
-  const MtFragmentExecParams& GetFragmentExecParams(FragmentIdx idx) const {
-    return mt_fragment_exec_params_[idx];
-  }
-  MtFragmentExecParams* GetFragmentExecParams(FragmentIdx idx) {
-    return &mt_fragment_exec_params_[idx];
+  FragmentExecParams* GetFragmentExecParams(FragmentIdx idx) {
+    return &fragment_exec_params_[idx];
   }
 
   const FInstanceExecParams& GetCoordInstanceExecParams() const;
@@ -211,6 +197,8 @@ class QuerySchedule {
 
   /// The query options from the TClientRequest
   const TQueryOptions& query_options_;
+
+  /// TODO: move these into QueryState
   RuntimeProfile* summary_profile_;
   RuntimeProfile::EventSequence* query_events_;
 
@@ -220,20 +208,13 @@ class QuerySchedule {
   /// Maps from plan node id to its index in plan.nodes. Filled in c'tor.
   std::vector<int32_t> plan_node_to_plan_node_idx_;
 
-  /// vector is indexed by fragment index from TQueryExecRequest.fragments;
-  /// populated by Scheduler::Schedule()
+  // populated in Init() and Scheduler::Schedule()
+  // (SimpleScheduler::ComputeFInstanceExecParams()), indexed by fragment idx
+  // (TPlanFragment.idx)
   std::vector<FragmentExecParams> fragment_exec_params_;
-
-  // populated by Scheduler::Schedule (SimpleScheduler::ComputeMtFInstanceExecParams())
-  // indexed by fragment idx (TPlanFragment.idx)
-  std::vector<MtFragmentExecParams> mt_fragment_exec_params_;
 
   /// The set of hosts that the query will run on excluding the coordinator.
   boost::unordered_set<TNetworkAddress> unique_hosts_;
-
-  /// Number of backends executing plan fragments on behalf of this query.
-  /// TODO-MT: remove
-  int64_t num_fragment_instances_;
 
   /// Total number of scan ranges of this query.
   int64_t num_scan_ranges_;
@@ -247,10 +228,10 @@ class QuerySchedule {
   /// Indicates if the query has been admitted for execution.
   bool is_admitted_;
 
-  /// Populate mt_fragment_exec_params_ from request_.mt_plan_exec_info.
+  /// Populate fragment_exec_params_ from request_.plan_exec_info.
   /// Sets is_coord_fragment and input_fragments.
   /// Also populates plan_node_to_fragment_idx_ and plan_node_to_plan_node_idx_.
-  void MtInit();
+  void Init();
 };
 
 }

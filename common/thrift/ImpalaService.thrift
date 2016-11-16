@@ -243,6 +243,10 @@ enum TImpalaQueryOptions {
   // Unspecified or a limit of -1 means no limit;
   // Otherwise specified in the same way as MEM_LIMIT.
   SCRATCH_LIMIT
+
+  // Indicates whether the FE should rewrite Exprs for optimization purposes.
+  // It's sometimes useful to disable rewrites for testing, e.g., expr-test.cc.
+  ENABLE_EXPR_REWRITES
 }
 
 // The summary of an insert.

@@ -72,7 +72,7 @@ class BitUtil {
 
   /// Returns 'value' rounded up to the nearest multiple of 'factor' when factor is
   /// a power of two
-  static inline int RoundUpToPowerOf2(int value, int factor) {
+  static inline int64_t RoundUpToPowerOf2(int64_t value, int64_t factor) {
     DCHECK((factor > 0) && ((factor & (factor - 1)) == 0));
     return (value + (factor - 1)) & ~(factor - 1);
   }

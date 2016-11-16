@@ -231,7 +231,7 @@ BaseSequenceScanner::FileHeader* HdfsRCFileScanner::AllocateFileHeader() {
   return new RcFileHeader;
 }
 
-void HdfsRCFileScanner::ResetRowGroup() {
+Status HdfsRCFileScanner::ResetRowGroup() {
   num_rows_ = 0;
   row_pos_ = 0;
   key_length_ = 0;
@@ -249,13 +249,14 @@ void HdfsRCFileScanner::ResetRowGroup() {
 
   // We are done with this row group, pass along external buffers if necessary.
   if (!reuse_row_group_buffer_) {
-    AttachPool(data_buffer_pool_.get(), true);
+    RETURN_IF_ERROR(AttachPool(data_buffer_pool_.get(), true));
     row_group_buffer_size_ = 0;
   }
+  return Status::OK();
 }
 
 Status HdfsRCFileScanner::ReadRowGroup() {
-  ResetRowGroup();
+  RETURN_IF_ERROR(ResetRowGroup());
 
   while (num_rows_ == 0) {
     RETURN_IF_ERROR(ReadRowGroupHeader());
@@ -453,7 +454,7 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
 }
 
 Status HdfsRCFileScanner::ProcessRange() {
-  ResetRowGroup();
+  RETURN_IF_ERROR(ResetRowGroup());
 
   // HdfsRCFileScanner effectively does buffered IO, in that it reads all the
   // materialized columns into a row group buffer.

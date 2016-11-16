@@ -53,13 +53,13 @@ then
   cd "${IMPALA_HOME}/tests/test-hive-udfs"
   "${IMPALA_HOME}/bin/mvn-quiet.sh" package
   cp target/test-hive-udfs-1.0.jar "${IMPALA_HOME}/testdata/udfs/impala-hive-udfs.jar"
-  # Change one of the Java files to make a new jar for testing
-  # purposes, then change it back
+  # Change one of the Java files to make a new jar for testing purposes, then change it
+  # back
   find . -type f -name 'TestUpdateUdf.java' -execdir \
-       bash -c "sed -i s/'Old UDF'/'New UDF'/g '{}'" \;
+       bash -c "sed -i s/'Text(\"Old UDF\")'/'Text(\"New UDF\")'/g '{}'" \;
   "${IMPALA_HOME}/bin/mvn-quiet.sh" package
   find . -type f -name 'TestUpdateUdf.java' -execdir \
-       bash -c "sed -i s/'New UDF'/'Old UDF'/g '{}'" \;
+       bash -c "sed -i s/'Text(\"New UDF\")'/'Text(\"Old UDF\")'/g '{}'" \;
   popd
 fi
 

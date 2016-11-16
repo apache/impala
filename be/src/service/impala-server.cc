@@ -207,8 +207,6 @@ const char* ImpalaServer::SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION = "42000";
 const char* ImpalaServer::SQLSTATE_GENERAL_ERROR = "HY000";
 const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 
-const int MAX_NM_MISSED_HEARTBEATS = 5;
-
 // Work item for ImpalaServer::cancellation_thread_pool_.
 class CancellationWork {
  public:
@@ -221,7 +219,7 @@ class CancellationWork {
 
   const TUniqueId& query_id() const { return query_id_; }
   const Status& cause() const { return cause_; }
-  const bool unregister() const { return unregister_; }
+  bool unregister() const { return unregister_; }
 
   bool operator<(const CancellationWork& other) const {
     return query_id_ < other.query_id_;
@@ -567,13 +565,13 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
   DCHECK(output != NULL);
   // Search for the query id in the active query map
   {
-    lock_guard<mutex> l(query_exec_state_map_lock_);
-    QueryExecStateMap::const_iterator exec_state = query_exec_state_map_.find(query_id);
-    if (exec_state != query_exec_state_map_.end()) {
+    shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
+    if (exec_state.get() != nullptr) {
+      lock_guard<mutex> l(*exec_state->lock());
       if (base64_encoded) {
-        exec_state->second->profile().SerializeToArchiveString(output);
+        exec_state->profile().SerializeToArchiveString(output);
       } else {
-        exec_state->second->profile().PrettyPrint(output);
+        exec_state->profile().PrettyPrint(output);
       }
       return Status::OK();
     }
@@ -634,14 +632,14 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* res
   return Status::OK();
 }
 
-void ImpalaServer::LogFileFlushThread() {
+[[noreturn]] void ImpalaServer::LogFileFlushThread() {
   while (true) {
     sleep(5);
     profile_logger_->Flush();
   }
 }
 
-void ImpalaServer::AuditEventLoggerFlushThread() {
+[[noreturn]] void ImpalaServer::AuditEventLoggerFlushThread() {
   while (true) {
     sleep(5);
     Status status = audit_event_logger_->Flush();
@@ -655,7 +653,7 @@ void ImpalaServer::AuditEventLoggerFlushThread() {
   }
 }
 
-void ImpalaServer::LineageLoggerFlushThread() {
+[[noreturn]] void ImpalaServer::LineageLoggerFlushThread() {
   while (true) {
     sleep(5);
     Status status = lineage_logger_->Flush();
@@ -779,7 +777,7 @@ Status ImpalaServer::ExecuteInternal(
   exec_state->reset(new QueryExecState(query_ctx, exec_env_, exec_env_->frontend(),
       this, session_state));
 
-  (*exec_state)->query_events()->MarkEvent("Start execution");
+  (*exec_state)->query_events()->MarkEvent("Query submitted");
 
   TExecRequest result;
   {
@@ -1159,6 +1157,7 @@ void ImpalaServer::SessionState::ToThrift(const TUniqueId& session_id,
   // proxy user is authorized to delegate as this user.
   if (!do_as_user.empty()) state->__set_delegated_user(do_as_user);
   state->network_address = network_address;
+  state->__set_kudu_latest_observed_ts(kudu_latest_observed_ts);
 }
 
 void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
@@ -1598,9 +1597,14 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   }
 
   // Save the query fragments so that the plan can be visualised.
-  fragments = exec_state.exec_request().query_exec_request.fragments;
+  for (const TPlanExecInfo& plan_exec_info:
+      exec_state.exec_request().query_exec_request.plan_exec_info) {
+    fragments.insert(fragments.end(),
+        plan_exec_info.fragments.begin(), plan_exec_info.fragments.end());
+  }
   all_rows_returned = exec_state.eos();
   last_active_time = exec_state.last_active();
+  request_pool = exec_state.request_pool();
 }
 
 bool ImpalaServer::QueryStateRecordLessThan::operator() (
@@ -1618,13 +1622,15 @@ void ImpalaServer::ConnectionStart(
     shared_ptr<SessionState> session_state;
     session_state.reset(new SessionState);
     session_state->closed = false;
-    session_state->start_time = TimestampValue::LocalTime();
+    session_state->start_time_ms = UnixMillis();
     session_state->last_accessed_ms = UnixMillis();
     session_state->database = "default";
     session_state->session_timeout = FLAGS_idle_session_timeout;
     session_state->session_type = TSessionType::BEESWAX;
     session_state->network_address = connection_context.network_address;
     session_state->default_query_options = default_query_options_;
+    session_state->kudu_latest_observed_ts = 0;
+
     // If the username was set by a lower-level transport, use it.
     if (!connection_context.username.empty()) {
       session_state->connected_user = connection_context.username;
@@ -1675,7 +1681,7 @@ void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
   session_timeout_cv_.notify_one();
 }
 
-void ImpalaServer::ExpireSessions() {
+[[noreturn]] void ImpalaServer::ExpireSessions() {
   while (true) {
     {
       unique_lock<mutex> timeout_lock(session_timeout_lock_);
@@ -1726,7 +1732,7 @@ void ImpalaServer::ExpireSessions() {
   }
 }
 
-void ImpalaServer::ExpireQueries() {
+[[noreturn]] void ImpalaServer::ExpireQueries() {
   while (true) {
     // The following block accomplishes three things:
     //

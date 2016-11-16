@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import static java.lang.String.format;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,14 +32,14 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
+import org.apache.impala.rewrite.ExprRewriter;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import org.slf4j.LoggerFactory;
-
-import static java.lang.String.format;
 
 /**
  * Abstract super class for statements that modify existing data like
@@ -90,17 +92,12 @@ public abstract class ModifyStmt extends StatementBase {
   // position in the target table. Set in createSourceStmt() during analysis.
   protected ArrayList<Integer> referencedColumns_;
 
-  // On tables with a primary key, ignore key not found errors.
-  protected final boolean ignoreNotFound_;
-
   public ModifyStmt(List<String> targetTablePath, FromClause fromClause,
-      List<Pair<SlotRef, Expr>> assignmentExprs,
-      Expr wherePredicate, boolean ignoreNotFound) {
+      List<Pair<SlotRef, Expr>> assignmentExprs, Expr wherePredicate) {
     targetTablePath_ = Preconditions.checkNotNull(targetTablePath);
     fromClause_ = Preconditions.checkNotNull(fromClause);
     assignments_ = Preconditions.checkNotNull(assignmentExprs);
     wherePredicate_ = wherePredicate;
-    ignoreNotFound_ = ignoreNotFound;
   }
 
   /**
@@ -158,6 +155,8 @@ public abstract class ModifyStmt extends StatementBase {
     // Validates the assignments_ and creates the sourceStmt_.
     if (sourceStmt_ == null) createSourceStmt(analyzer);
     sourceStmt_.analyze(analyzer);
+    // Add target table to descriptor table.
+    analyzer.getDescTbl().setTargetTable(table_);
   }
 
   @Override
@@ -284,8 +283,18 @@ public abstract class ModifyStmt extends StatementBase {
     }
   }
 
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
+    Preconditions.checkState(isAnalyzed());
+    for (Pair<SlotRef, Expr> assignment: assignments_) {
+      assignment.second = rewriter.rewrite(assignment.second, analyzer_);
+    }
+    sourceStmt_.rewriteExprs(rewriter);
+  }
+
   public QueryStmt getQueryStmt() { return sourceStmt_; }
   public abstract DataSink createDataSink();
+  @Override
   public abstract String toSql();
 
 

@@ -16,9 +16,11 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
+#
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
+
+: ${REMOTE_LOAD:=}
 
 # Create a cache pool and encryption keys for tests
 
@@ -27,13 +29,23 @@ CACHEADMIN_ARGS=""
 
 # If we're kerberized, we need to become hdfs for this:
 if ${CLUSTER_DIR}/admin is_kerberized; then
-  PREVIOUS_PRINCIPAL=`klist | grep ^Default | awk '{print $3}'`
-  PREVIOUS_USER=`echo ${PREVIOUS_PRINCIPAL} | awk -F/ '{print $1}'`
-  CACHEADMIN_ARGS="-group supergroup -owner ${PREVIOUS_USER}"
-  kinit -k -t ${KRB5_KTNAME} ${MINIKDC_PRINC_HDFS}
+  if [[ -n "${REMOTE_LOAD:-}" ]]; then
+    echo "REMOTE_LOAD: $REMOTE_LOAD"
+    echo "Remote cluster testing is not supported with Kerberos"
+    exit 1
+  else
+    PREVIOUS_PRINCIPAL=`klist | grep ^Default | awk '{print $3}'`
+    PREVIOUS_USER=`echo ${PREVIOUS_PRINCIPAL} | awk -F/ '{print $1}'`
+    CACHEADMIN_ARGS="-group supergroup -owner ${PREVIOUS_USER}"
+    kinit -k -t ${KRB5_KTNAME} ${MINIKDC_PRINC_HDFS}
+  fi
 fi
 
-if [[ $TARGET_FILESYSTEM == hdfs ]]; then  # Otherwise assume KMS isn't setup.
+# TODO: Investigate how to setup encryption keys for running HDFS encryption tests
+# against a remote cluster, rather than the local mini-cluster (i.e., when REMOTE_LOAD
+# is true. See: https://issues.cloudera.org/browse/IMPALA-4344)
+
+if [[ $TARGET_FILESYSTEM == hdfs && -z "$REMOTE_LOAD" ]]; then  # Otherwise assume KMS isn't setup.
   # Create encryption keys for HDFS encryption tests. Keys are stored by the KMS.
   EXISTING_KEYS=$(hadoop key list)
   for KEY in testkey{1,2}; do
@@ -44,7 +56,13 @@ if [[ $TARGET_FILESYSTEM == hdfs ]]; then  # Otherwise assume KMS isn't setup.
   done
 fi
 
-# Create test cache pool
+if [[ -n "${REMOTE_LOAD:-}" ]]; then
+  # Create test cache pool if HADOOP_USER_NAME has a non-zero length
+  if [[ -n "${HADOOP_USER_NAME:-}" ]]; then
+      CACHEADMIN_ARGS="${CACHEADMIN_ARGS} -owner ${USER}"
+  fi
+fi
+
 if hdfs cacheadmin -listPools testPool | grep testPool &>/dev/null; then
   hdfs cacheadmin -removePool testPool
 fi

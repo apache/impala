@@ -51,8 +51,7 @@ using namespace apache::thrift;
 using namespace parquet;
 using std::min;
 
-// Some code is replicated to make this more stand-alone.
-const uint8_t PARQUET_VERSION_NUMBER[] = {'P', 'A', 'R', '1'};
+using impala::PARQUET_VERSION_NUMBER;
 
 boost::shared_ptr<TProtocol> CreateDeserializeProtocol(
     boost::shared_ptr<TMemoryBuffer> mem, bool compact) {
@@ -221,6 +220,7 @@ int main(int argc, char** argv) {
   uint8_t* buffer = reinterpret_cast<uint8_t*>(malloc(file_len));
   size_t bytes_read = fread(buffer, 1, file_len, file);
   assert(bytes_read == file_len);
+  (void)bytes_read;
 
   // Check file starts and ends with magic bytes
   assert(

@@ -39,6 +39,7 @@
 using namespace impala;
 using namespace impala_udf;
 using namespace llvm;
+using std::move;
 
 // typedef for builtin aggregate functions. Unfortunately, these type defs don't
 // really work since the actual builtin is implemented not in terms of the base
@@ -144,13 +145,19 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   RETURN_IF_ERROR(
       Expr::Prepare(input_expr_ctxs_, state, desc, agg_fn_pool->mem_tracker()));
 
-  ObjectPool* obj_pool = state->obj_pool();
   for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
-    staging_input_vals_.push_back(
-        CreateAnyVal(obj_pool, input_expr_ctxs_[i]->root()->type()));
+    AnyVal* staging_input_val;
+    RETURN_IF_ERROR(
+        AllocateAnyVal(state, agg_fn_pool, input_expr_ctxs_[i]->root()->type(),
+            "Could not allocate aggregate expression input value", &staging_input_val));
+    staging_input_vals_.push_back(staging_input_val);
   }
-  staging_intermediate_val_ = CreateAnyVal(obj_pool, intermediate_type());
-  staging_merge_input_val_ = CreateAnyVal(obj_pool, intermediate_type());
+  RETURN_IF_ERROR(AllocateAnyVal(state, agg_fn_pool, intermediate_type(),
+      "Could not allocate aggregate expression intermediate value",
+      &staging_intermediate_val_));
+  RETURN_IF_ERROR(AllocateAnyVal(state, agg_fn_pool, intermediate_type(),
+      "Could not allocate aggregate expression merge input value",
+      &staging_merge_input_val_));
 
   if (is_merge_) {
     DCHECK_EQ(staging_input_vals_.size(), 1) << "Merge should only have 1 input.";
@@ -223,9 +230,12 @@ Status AggFnEvaluator::Open(RuntimeState* state, FunctionContext* agg_fn_ctx) {
   // on them).
   vector<AnyVal*> constant_args(input_expr_ctxs_.size());
   for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
-    constant_args[i] = input_expr_ctxs_[i]->root()->GetConstVal(input_expr_ctxs_[i]);
+    ExprContext* input_ctx = input_expr_ctxs_[i];
+    AnyVal* const_val;
+    RETURN_IF_ERROR(input_ctx->root()->GetConstVal(state, input_ctx, &const_val));
+    constant_args[i] = const_val;
   }
-  agg_fn_ctx->impl()->SetConstantArgs(constant_args);
+  agg_fn_ctx->impl()->SetConstantArgs(move(constant_args));
   return Status::OK();
 }
 
@@ -301,8 +311,7 @@ inline void AggFnEvaluator::SetDstSlot(FunctionContext* ctx, const AnyVal* src,
           // This code seems to trip up clang causing it to generate code that crashes.
           // Be careful when modifying this. See IMPALA-959 for more details.
           // I suspect an issue with xmm registers not reading from aligned memory.
-          memcpy(slot, &reinterpret_cast<const DecimalVal*>(src)->val4,
-              dst_slot_desc->type().GetByteSize());
+          memcpy(slot, &reinterpret_cast<const DecimalVal*>(src)->val16, 16);
 #else
           DCHECK(false) << "Not implemented.";
 #endif
@@ -318,6 +327,8 @@ inline void AggFnEvaluator::SetDstSlot(FunctionContext* ctx, const AnyVal* src,
 // This function would be replaced in codegen.
 void AggFnEvaluator::Init(FunctionContext* agg_fn_ctx, Tuple* dst) {
   DCHECK(init_fn_ != NULL);
+  for (ExprContext* ctx : input_expr_ctxs_) DCHECK(ctx->opened());
+
   if (intermediate_type().type == TYPE_CHAR) {
     // For type char, we want to initialize the staging_intermediate_val_ with
     // a pointer into the tuple (the UDA should not be allocating it).

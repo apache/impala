@@ -51,6 +51,8 @@ namespace impala {
 /// TYPE_DOUBLE/DoubleVal: { i8, double }
 /// TYPE_STRING/StringVal: { i64, i8* }
 /// TYPE_TIMESTAMP/TimestampVal: { i64, i64 }
+/// TYPE_DECIMAL/DecimalVal (isn't lowered):
+/// %"struct.impala_udf::DecimalVal" { {i8}, [15 x i8], {i128} }
 //
 /// TODO:
 /// - unit tests
@@ -78,14 +80,14 @@ class CodegenAnyVal {
   /// result will not be a pointer in this case).
   //
   /// 'name' optionally specifies the name of the returned value.
-  static llvm::Value* CreateCall(LlvmCodeGen* cg, LlvmCodeGen::LlvmBuilder* builder,
+  static llvm::Value* CreateCall(LlvmCodeGen* cg, LlvmBuilder* builder,
       llvm::Function* fn, llvm::ArrayRef<llvm::Value*> args, const char* name = "",
       llvm::Value* result_ptr = NULL);
 
   /// Same as above but wraps the result in a CodegenAnyVal.
-  static CodegenAnyVal CreateCallWrapped(LlvmCodeGen* cg,
-      LlvmCodeGen::LlvmBuilder* builder, const ColumnType& type, llvm::Function* fn,
-      llvm::ArrayRef<llvm::Value*> args, const char* name = "");
+  static CodegenAnyVal CreateCallWrapped(LlvmCodeGen* cg, LlvmBuilder* builder,
+      const ColumnType& type, llvm::Function* fn, llvm::ArrayRef<llvm::Value*> args,
+      const char* name = "");
 
   /// Returns the lowered AnyVal type associated with 'type'.
   /// E.g.: TYPE_BOOLEAN (which corresponds to a BooleanVal) => i16
@@ -116,8 +118,8 @@ class CodegenAnyVal {
   /// E.g.: TYPE_DOUBLE (lowered DoubleVal: { i8, double }) => { 0, 0 }
   /// This returns a CodegenAnyVal, rather than the unwrapped Value*, because the actual
   /// value still needs to be set.
-  static CodegenAnyVal GetNonNullVal(LlvmCodeGen* codegen,
-      LlvmCodeGen::LlvmBuilder* builder, const ColumnType& type, const char* name = "");
+  static CodegenAnyVal GetNonNullVal(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      const ColumnType& type, const char* name = "");
 
   /// Creates a wrapper around a lowered *Val value.
   //
@@ -132,14 +134,14 @@ class CodegenAnyVal {
   /// must be of the correct lowered type.
   //
   /// If 'name' is specified, it will be used when generated instructions that set value_.
-  CodegenAnyVal(LlvmCodeGen* codegen, LlvmCodeGen::LlvmBuilder* builder,
-                const ColumnType& type, llvm::Value* value = NULL, const char* name = "");
+  CodegenAnyVal(LlvmCodeGen* codegen, LlvmBuilder* builder, const ColumnType& type,
+      llvm::Value* value = NULL, const char* name = "");
 
   /// Returns the current type-lowered value.
-  llvm::Value* value() { return value_; }
+  llvm::Value* GetLoweredValue() const { return value_; }
 
   /// Gets the 'is_null' field of the *Val.
-  llvm::Value* GetIsNull(const char* name = "is_null");
+  llvm::Value* GetIsNull(const char* name = "is_null") const;
 
   /// Get the 'val' field of the *Val. Do not call if this represents a StringVal or
   /// TimestampVal. If this represents a DecimalVal, returns 'val4', 'val8', or 'val16'
@@ -180,18 +182,17 @@ class CodegenAnyVal {
   void SetDate(llvm::Value* date);
   void SetTimeOfDay(llvm::Value* time_of_day);
 
-  /// Allocas and stores this value in an unlowered pointer, and returns the pointer. This
-  /// *Val should be non-null.
-  llvm::Value* GetUnloweredPtr();
+  /// Stores this value in an alloca allocation, and returns the pointer, which has the
+  /// lowered type. This *Val should be non-null. The output variable is called 'name'.
+  llvm::Value* GetLoweredPtr(const std::string& name = "") const;
+
+  /// Stores this value in an alloca allocation, and returns the pointer, which has the
+  /// unlowered type. This *Val should be non-null. The output variable is called 'name'.
+  llvm::Value* GetUnloweredPtr(const std::string& name = "") const;
 
   /// Set this *Val's value based on 'raw_val'. 'raw_val' should be a native type,
   /// StringValue, or TimestampValue.
   void SetFromRawValue(llvm::Value* raw_val);
-
-  /// Set this *Val's value based on void* 'raw_ptr'. 'raw_ptr' should be a pointer to a
-  /// native type, StringValue, or TimestampValue (i.e. the value returned by an
-  /// interpreted compute fn).
-  void SetFromRawPtr(llvm::Value* raw_ptr);
 
   /// Converts this *Val's value to a native type, StringValue, TimestampValue, etc.
   /// This should only be used if this *Val is not null.
@@ -235,9 +236,23 @@ class CodegenAnyVal {
   /// this < 'other', 0 if this == 'other', > 0 if this > 'other'.
   llvm::Value* Compare(CodegenAnyVal* other, const char* name = "result");
 
+  /// Generate code to branch to 'null_block' if this value is NULL. The branch terminates
+  /// the current BasicBlock, so a new BasicBlock for the non-NULL case is also created,
+  /// and builder's insert position is set to the start of the non-NULL block.
+  ///
+  /// This corresponds to the C++ code:
+  /// if (val.is_null) goto null_block;
+  ///
+  /// non_null_block:
+  ///   <-- Builder insert position after this function returns.
+  /// ...
+  /// null_block:
+  /// ...
+  void CodegenBranchIfNull(LlvmBuilder* builder, llvm::BasicBlock* null_block);
+
   /// Ctor for created an uninitialized CodegenAnYVal that can be assigned to later.
   CodegenAnyVal()
-    : type_(INVALID_TYPE), value_(NULL), name_(NULL), codegen_(NULL), builder_(NULL) { }
+    : type_(INVALID_TYPE), value_(NULL), name_(NULL), codegen_(NULL), builder_(NULL) {}
 
  private:
   ColumnType type_;
@@ -245,7 +260,7 @@ class CodegenAnyVal {
   const char* name_;
 
   LlvmCodeGen* codegen_;
-  LlvmCodeGen::LlvmBuilder* builder_;
+  LlvmBuilder* builder_;
 
   /// Helper function for getting the top (most significant) half of 'v'.
   /// 'v' should have width = 'num_bits' * 2 and be an integer type.

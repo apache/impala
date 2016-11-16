@@ -17,14 +17,13 @@
 
 package org.apache.impala.hive.executor;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hive.ql.udf.UDFAcos;
 import org.apache.hadoop.hive.ql.udf.UDFAscii;
 import org.apache.hadoop.hive.ql.udf.UDFAsin;
@@ -57,12 +56,6 @@ import org.apache.hadoop.hive.ql.udf.UDFUnhex;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.protocol.TProtocolFactory;
-import org.junit.Test;
-
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
@@ -71,6 +64,13 @@ import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.THiveUdfExecutorCtorParams;
 import org.apache.impala.util.UnsafeUtil;
+import org.apache.kudu.client.shaded.com.google.common.base.Joiner;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.junit.Assert;
+import org.junit.Test;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -92,16 +92,6 @@ public class UdfExecutorTest {
   long allocate(int byteSize) {
     long ptr = UnsafeUtil.UNSAFE.allocateMemory(byteSize);
     allocations_.add(ptr);
-    return ptr;
-  }
-
-  // Creates a string value object (in the native heap) for v.
-  long createStringValue(String v) {
-    byte[] array = v.getBytes();
-    long ptr = allocate(16);
-    UnsafeUtil.UNSAFE.putInt(ptr + 8, 0);
-    ImpalaStringWritable sw = new ImpalaStringWritable(ptr);
-    sw.set(array, 0, array.length);
     return ptr;
   }
 
@@ -163,14 +153,23 @@ public class UdfExecutorTest {
   Writable createBigInt(long v) { return createObject(PrimitiveType.BIGINT, v); }
   Writable createFloat(float v) { return createObject(PrimitiveType.FLOAT, v); }
   Writable createDouble(double v) { return createObject(PrimitiveType.DOUBLE, v); }
+
   Writable createBytes(String v) {
-    ImpalaBytesWritable w = new ImpalaBytesWritable(createStringValue(v));
-    return w;
+    long ptr = allocate(16);
+    UnsafeUtil.UNSAFE.putInt(ptr + 8, 0);
+    ImpalaBytesWritable tw = new ImpalaBytesWritable(ptr);
+    byte[] array = v.getBytes();
+    tw.set(array, 0, array.length);
+    return tw;
   }
 
   Writable createText(String v) {
-    ImpalaTextWritable w = new ImpalaTextWritable(createStringValue(v));
-    return w;
+    long ptr = allocate(16);
+    UnsafeUtil.UNSAFE.putInt(ptr + 8, 0);
+    ImpalaTextWritable tw = new ImpalaTextWritable(ptr);
+    byte[] array = v.getBytes();
+    tw.set(array, 0, array.length);
+    return tw;
   }
 
   // Returns the primitive type for w
@@ -281,55 +280,104 @@ public class UdfExecutorTest {
     // between runs.
     for (int i = 0; i < 10; ++i) {
       long r = e.evaluateForTesting(inputArgs);
-      if (validate) {
-        switch (expectedType.getPrimitiveType()) {
-          case BOOLEAN: {
-            boolean v = UnsafeUtil.UNSAFE.getByte(r) != 0;
-            assertTrue(v == ((ImpalaBooleanWritable)expectedValue).get());
-            break;
+      if (!validate) continue;
+      List<String> errMsgs = Lists.newArrayList();
+      switch (expectedType.getPrimitiveType()) {
+        case BOOLEAN: {
+          boolean expected = ((ImpalaBooleanWritable)expectedValue).get();
+          boolean actual = UnsafeUtil.UNSAFE.getByte(r) != 0;
+          if (expected != actual) {
+            errMsgs.add("Expected bool: " + expected);
+            errMsgs.add("Actual bool:   " + actual);
           }
-          case TINYINT:
-            assertEquals(UnsafeUtil.UNSAFE.getByte(r),
-                ((ImpalaTinyIntWritable)expectedValue).get());
-            break;
-          case SMALLINT:
-            assertEquals(UnsafeUtil.UNSAFE.getShort(r),
-                ((ImpalaSmallIntWritable)expectedValue).get());
-            break;
-          case INT:
-            assertEquals(UnsafeUtil.UNSAFE.getInt(r),
-                ((ImpalaIntWritable)expectedValue).get());
-            break;
-          case BIGINT:
-            assertEquals(UnsafeUtil.UNSAFE.getLong(r),
-                ((ImpalaBigIntWritable)expectedValue).get());
-            break;
-          case FLOAT:
-            assertEquals(UnsafeUtil.UNSAFE.getFloat(r),
-                ((ImpalaFloatWritable)expectedValue).get(), 0);
-            break;
-          case DOUBLE:
-            assertEquals(UnsafeUtil.UNSAFE.getDouble(r),
-                ((ImpalaDoubleWritable)expectedValue).get(), 0);
-            break;
-          case STRING: {
-            byte[] expectedBytes = null;
-            if (expectedValue instanceof ImpalaBytesWritable) {
-              expectedBytes = ((ImpalaBytesWritable)expectedValue).getBytes();
-            } else if (expectedValue instanceof ImpalaTextWritable) {
-              expectedBytes = ((ImpalaTextWritable)expectedValue).getBytes();
-            } else if (expectedValue instanceof String) {
-              expectedBytes = ((String)expectedValue).getBytes();
-            } else {
-              Preconditions.checkState(false);
-            }
-            ImpalaStringWritable sw = new ImpalaStringWritable(r);
-            assertArrayEquals(sw.getBytes(), expectedBytes);
-            break;
-          }
-          default:
-            Preconditions.checkArgument(false);
+          break;
         }
+        case TINYINT: {
+          int expected = ((ImpalaTinyIntWritable)expectedValue).get();
+          int actual = UnsafeUtil.UNSAFE.getByte(r);
+          if (expected != actual) {
+            errMsgs.add("Expected tinyint: " + expected);
+            errMsgs.add("Actual tinyint:   " + actual);
+          }
+          break;
+        }
+        case SMALLINT: {
+          int expected = ((ImpalaSmallIntWritable)expectedValue).get();
+          int actual = UnsafeUtil.UNSAFE.getShort(r);
+          if (expected != actual) {
+            errMsgs.add("Expected smallint: " + expected);
+            errMsgs.add("Actual smallint:   " + actual);
+          }
+          break;
+        }
+        case INT: {
+          int expected = ((ImpalaIntWritable)expectedValue).get();
+          int actual = UnsafeUtil.UNSAFE.getInt(r);
+          if (expected != actual) {
+            errMsgs.add("Expected int: " + expected);
+            errMsgs.add("Actual int:   " + actual);
+          }
+          break;
+        }
+        case BIGINT: {
+          long expected = ((ImpalaBigIntWritable)expectedValue).get();
+          long actual = UnsafeUtil.UNSAFE.getLong(r);
+          if (expected != actual) {
+            errMsgs.add("Expected bigint: " + expected);
+            errMsgs.add("Actual bigint:   " + actual);
+          }
+          break;
+        }
+        case FLOAT: {
+          float expected = ((ImpalaFloatWritable)expectedValue).get();
+          float actual = UnsafeUtil.UNSAFE.getFloat(r);
+          if (expected != actual) {
+            errMsgs.add("Expected float: " + expected);
+            errMsgs.add("Actual float:   " + actual);
+          }
+          break;
+        }
+        case DOUBLE:
+          double expected = ((ImpalaDoubleWritable)expectedValue).get();
+          double actual = UnsafeUtil.UNSAFE.getDouble(r);
+          if (expected != actual) {
+            errMsgs.add("Expected double: " + expected);
+            errMsgs.add("Actual double:   " + actual);
+          }
+          break;
+        case STRING: {
+          byte[] expectedBytes = null;
+          if (expectedValue instanceof ImpalaBytesWritable) {
+            expectedBytes = ((ImpalaBytesWritable)expectedValue).getBytes();
+          } else if (expectedValue instanceof ImpalaTextWritable) {
+            expectedBytes = ((ImpalaTextWritable)expectedValue).getBytes();
+          } else if (expectedValue instanceof String) {
+            expectedBytes = ((String)expectedValue).getBytes();
+          } else {
+            Preconditions.checkState(false);
+          }
+          ImpalaStringWritable sw = new ImpalaStringWritable(r);
+          if (Arrays.equals(expectedBytes, sw.getBytes())) break;
+
+          errMsgs.add("Expected string: " + Bytes.toString(expectedBytes));
+          errMsgs.add("Actual string:   " + Bytes.toString(sw.getBytes()));
+          errMsgs.add("Expected bytes:  " + Arrays.toString(expectedBytes));
+          errMsgs.add("Actual bytes:    " + Arrays.toString(sw.getBytes()));
+          break;
+        }
+        default:
+          Preconditions.checkArgument(false);
+      }
+
+      // Check if there was a mismatch and print a detailed error log.
+      if (!errMsgs.isEmpty()) {
+        errMsgs.add("Eval iteration:  " + i);
+        errMsgs.add("Return type:     " + expectedType.toSql());
+        List<String> argTypeStrs = Lists.newArrayList();
+        for (Object arg: args) argTypeStrs.add(arg.getClass().getSimpleName());
+        errMsgs.add("Argument types:  " + Joiner.on(",").join(argTypeStrs));
+        errMsgs.add("Resolved method: " + e.getMethod().toGenericString());
+        Assert.fail("\n" + Joiner.on("\n").join(errMsgs));
       }
     }
   }

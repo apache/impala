@@ -420,7 +420,13 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
   const string& str = output.str();
 
   const string& headers = BuildHeaderString(response, content_type);
+
+  // printf with a non-literal format string is a security concern, but BuildHeaderString
+  // returns a limited set of strings and all members of that set are safe.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
   sq_printf(connection, headers.c_str(), (int)str.length());
+#pragma clang diagnostic pop
 
   // Make sure to use sq_write for printing the body; sq_printf truncates at 8kb
   sq_write(connection, str.c_str(), str.length());

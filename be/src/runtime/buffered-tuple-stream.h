@@ -23,13 +23,13 @@
 
 #include "common/status.h"
 #include "runtime/buffered-block-mgr.h"
+#include "runtime/row-batch.h"
 
 namespace impala {
 
 class BufferedBlockMgr;
 class RuntimeProfile;
 class RuntimeState;
-class RowBatch;
 class RowDescriptor;
 class SlotDescriptor;
 class TupleRow;
@@ -128,7 +128,7 @@ class TupleRow;
 /// Memory lifetime of rows read from stream:
 /// If the stream is pinned, it is valid to access any tuples returned via
 /// GetNext() or GetRows() until the stream is unpinned. If the stream is unpinned, and
-/// the batch returned from GetNext() has the need_to_return flag set, any tuple memory
+/// the batch returned from GetNext() has the needs_deep_copy flag set, any tuple memory
 /// returned so far from the stream may be freed on the next call to GetNext().
 ///
 /// Manual construction of rows with AllocateRow():
@@ -180,11 +180,11 @@ class BufferedTupleStream {
 
     uint64_t block() const {
       return (data & BLOCK_MASK);
-    };
+    }
 
     uint64_t offset() const {
       return (data & OFFSET_MASK) >> OFFSET_SHIFT;
-    };
+    }
 
     uint64_t idx() const {
       return (data & IDX_MASK) >> IDX_SHIFT;
@@ -305,8 +305,11 @@ class BufferedTupleStream {
   /// *got_rows is false if the stream could not be pinned.
   Status GetRows(boost::scoped_ptr<RowBatch>* batch, bool* got_rows);
 
-  /// Must be called once at the end to cleanup all resources. Idempotent.
-  void Close();
+  /// Must be called once at the end to cleanup all resources. If 'batch' is non-NULL,
+  /// attaches any pinned blocks to the batch and deletes unpinned blocks. Otherwise
+  /// deletes all blocks. Does nothing if the stream was already closed. The 'flush'
+  /// mode is forwarded to RowBatch::AddBlock() when attaching blocks.
+  void Close(RowBatch* batch, RowBatch::FlushMode flush);
 
   /// Number of rows in the stream.
   int64_t num_rows() const { return num_rows_; }
@@ -321,6 +324,7 @@ class BufferedTupleStream {
   /// If ignore_current is true, the write_block_ memory is not included.
   int64_t bytes_in_mem(bool ignore_current) const;
 
+  bool is_closed() const { return closed_; }
   bool is_pinned() const { return pinned_; }
   int blocks_pinned() const { return num_pinned_; }
   int blocks_unpinned() const { return blocks_.size() - num_pinned_ - num_small_blocks_; }
@@ -342,25 +346,11 @@ class BufferedTupleStream {
   friend class MultiNullableTupleStreamTest_TestComputeRowSize_Test;
   friend class SimpleTupleStreamTest_TestGetRowsOverflow_Test;
 
-  /// If true, this stream is still using small buffers.
-  bool use_small_buffers_;
-
-  /// If true, blocks are deleted after they are read.
-  bool delete_on_read_;
-
-  /// If true, read and write operations may be interleaved. Otherwise all calls
-  /// to AddRow() must occur before calling PrepareForRead() and subsequent calls to
-  /// GetNext().
-  const bool read_write_;
-
   /// Runtime state instance used to check for cancellation. Not owned.
   RuntimeState* const state_;
 
   /// Description of rows stored in the stream.
   const RowDescriptor& desc_;
-
-  /// Whether any tuple in the rows is nullable.
-  const bool has_nullable_tuple_;
 
   /// Sum of the fixed length portion of all the tuples in desc_.
   int fixed_tuple_row_size_;
@@ -444,21 +434,35 @@ class BufferedTupleStream {
   /// The total number of small blocks in blocks_;
   int num_small_blocks_;
 
-  bool closed_; // Used for debugging.
-
   /// Number of rows stored in the stream.
   int64_t num_rows_;
+
+  /// Counters added by this object to the parent runtime profile.
+  RuntimeProfile::Counter* pin_timer_;
+  RuntimeProfile::Counter* unpin_timer_;
+  RuntimeProfile::Counter* get_new_block_timer_;
+
+  /// If true, read and write operations may be interleaved. Otherwise all calls
+  /// to AddRow() must occur before calling PrepareForRead() and subsequent calls to
+  /// GetNext().
+  const bool read_write_;
+
+  /// Whether any tuple in the rows is nullable.
+  const bool has_nullable_tuple_;
+
+  /// If true, this stream is still using small buffers.
+  bool use_small_buffers_;
+
+  /// If true, blocks are deleted after they are read.
+  bool delete_on_read_;
+
+  bool closed_; // Used for debugging.
 
   /// If true, this stream has been explicitly pinned by the caller. This changes the
   /// memory management of the stream. The blocks are not unpinned until the caller calls
   /// UnpinAllBlocks(). If false, only the write_block_ and/or read_block_ are pinned
   /// (both are if read_write_ is true).
   bool pinned_;
-
-  /// Counters added by this object to the parent runtime profile.
-  RuntimeProfile::Counter* pin_timer_;
-  RuntimeProfile::Counter* unpin_timer_;
-  RuntimeProfile::Counter* get_new_block_timer_;
 
   /// The slow path for AddRow() that is called if there is not sufficient space in
   /// the current block.

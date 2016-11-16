@@ -22,6 +22,7 @@
 # This script requires Python 2.6+.
 
 import json
+import os
 import os.path
 import sys
 from hashlib import md5
@@ -29,6 +30,8 @@ from time import sleep
 from urllib import urlopen, URLopener
 
 NUM_TRIES = 3
+
+PYPI_MIRROR = os.environ.get("PYPI_MIRROR", "https://pypi.python.org")
 
 def check_md5sum(filename, expected_md5):
   actual_md5 = md5(open(filename).read()).hexdigest()
@@ -55,6 +58,8 @@ def download_package(pkg_name, pkg_version):
   '''Download the required package. Sometimes the download can be flaky, so we use the
   retry decorator.'''
   pkg_type = 'sdist' # Don't download wheel archives for now
+  # This JSON endpoint is not provided by PyPI mirrors so we always need to get this
+  # from pypi.python.org.
   pkg_info = json.loads(urlopen('https://pypi.python.org/pypi/%s/json' % pkg_name).read())
 
   downloader = URLopener()
@@ -65,8 +70,9 @@ def download_package(pkg_name, pkg_version):
       if os.path.isfile(filename) and check_md5sum(filename, expected_md5):
         print "File with matching md5sum already exists, skipping %s" % filename
         return True
-      print "Downloading %s from %s " % (filename, pkg['url'])
-      downloader.retrieve(pkg['url'], filename)
+      pkg_url = "{0}/packages/{1}".format(PYPI_MIRROR, pkg['path'])
+      print "Downloading %s from %s" % (filename, pkg_url)
+      downloader.retrieve(pkg_url, filename)
       actual_md5 = md5(open(filename).read()).hexdigest()
       if check_md5sum(filename, expected_md5):
         return True

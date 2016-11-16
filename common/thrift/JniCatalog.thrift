@@ -111,10 +111,10 @@ struct TDropStatsParams {
   // Fully qualified name of the target table
   1: required CatalogObjects.TTableName table_name
 
-  // If set, delete the stats only for a particular partition, but do not recompute the
+  // If set, delete the stats only for specified partitions, but do not recompute the
   // stats for the whole table. This is set only for
   // DROP INCREMENTAL STATS <table> PARTITION(...)
-  2: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
+  2: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
 }
 
 // Parameters of CREATE FUNCTION commands
@@ -194,8 +194,8 @@ struct TAlterTableDropColParams {
 
 // Parameters for ALTER TABLE DROP PARTITION commands
 struct TAlterTableDropPartitionParams {
-  // The partition spec (list of keys and values) to add.
-  1: required list<CatalogObjects.TPartitionKeyValue> partition_spec
+  // The partition set used to drop partitions.
+  1: required list<list<CatalogObjects.TPartitionKeyValue>> partition_set
 
   // If true, no error is raised if no partition with the specified spec exists.
   2: required bool if_exists
@@ -222,18 +222,18 @@ struct TAlterTableSetTblPropertiesParams {
   // Map of property names to property values.
   2: required map<string, string> properties
 
-  // If set, alters the properties of the given partition, otherwise
+  // If set, alters the properties of the given partitions, otherwise
   // those of the table.
-  3: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
+  3: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
 }
 
-// Parameters for ALTER TABLE SET [PARTITION partitionSpec] FILEFORMAT commands.
+// Parameters for ALTER TABLE SET [PARTITION partitionSet] FILEFORMAT commands.
 struct TAlterTableSetFileFormatParams {
   // New file format.
   1: required CatalogObjects.THdfsFileFormat file_format
 
-  // An optional partition spec, set if modifying the fileformat of a partition.
-  2: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
+  // An optional partition set, set if modifying the fileformat of the partitions.
+  2: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
 }
 
 // Parameters for ALTER TABLE SET [PARTITION partitionSpec] location commands.
@@ -270,14 +270,14 @@ struct TAlterTableUpdateStatsParams {
   6: optional bool is_incremental
 }
 
-// Parameters for ALTER TABLE SET [PARTITION partitionSpec] CACHED|UNCACHED
+// Parameters for ALTER TABLE SET [PARTITION partitionSet] CACHED|UNCACHED
 struct TAlterTableSetCachedParams {
   // Details on what operation to perform (cache or uncache)
   1: required THdfsCachingOp cache_op
 
-  // An optional partition spec, set if marking a partition as cached/uncached
+  // An optional partition set, set if marking the partitions as cached/uncached
   // rather than a table.
-  2: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
+  2: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
 }
 
 // Parameters for all ALTER TABLE commands.

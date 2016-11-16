@@ -1110,15 +1110,20 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Otherwise returns null.
    */
   public SlotRef unwrapSlotRef(boolean implicitOnly) {
-    if (this instanceof SlotRef) {
-      return (SlotRef) this;
-    } else if (this instanceof CastExpr
-        && (!implicitOnly || ((CastExpr) this).isImplicit())
-        && getChild(0) instanceof SlotRef) {
-      return (SlotRef) getChild(0);
-    } else {
-      return null;
+    Expr unwrappedExpr = unwrapExpr(implicitOnly);
+    if (unwrappedExpr instanceof SlotRef) return (SlotRef) unwrappedExpr;
+    return null;
+  }
+
+  /**
+   * Returns the first child if this Expr is a CastExpr. Otherwise, returns 'this'.
+   */
+  public Expr unwrapExpr(boolean implicitOnly) {
+    if (this instanceof CastExpr
+        && (!implicitOnly || ((CastExpr) this).isImplicit())) {
+      return children_.get(0);
     }
+    return this;
   }
 
   /**

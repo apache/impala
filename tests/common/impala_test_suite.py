@@ -169,14 +169,14 @@ class ImpalaTestSuite(BaseTestSuite):
     self.client.set_configuration({'sync_ddl': sync_ddl})
     self.client.execute("drop database if exists `" + db_name + "` cascade")
 
-  def __restore_query_options(self, query_options_changed):
+  def __restore_query_options(self, query_options_changed, impalad_client):
     """
     Restore the list of modified query options to their default values.
     """
     # Populate the default query option if it's empty.
     if not self.default_query_options:
       try:
-        query_options = self.client.get_default_configuration()
+        query_options = impalad_client.get_default_configuration()
         for query_option in query_options:
           self.default_query_options[query_option.key.upper()] = query_option.value
       except Exception as e:
@@ -190,7 +190,7 @@ class ImpalaTestSuite(BaseTestSuite):
       default_val = self.default_query_options[query_option]
       query_str = 'SET '+ query_option + '=' + default_val + ';'
       try:
-        self.client.execute(query_str)
+        impalad_client.execute(query_str)
       except Exception as e:
         LOG.info('Unexpected exception when executing ' + query_str + ' : ' + str(e))
 
@@ -211,7 +211,8 @@ class ImpalaTestSuite(BaseTestSuite):
       # Strip newlines so we can split error message into multiple lines
       expected_str = expected_str.replace('\n', '')
       if expected_str in actual_str: return
-    assert False, 'Unexpected exception string: %s' % actual_str
+    assert False, 'Unexpected exception string. Expected: %s\nNot found in actual: %s' % \
+      (expected_str, actual_str)
 
   def __verify_results_and_errors(self, vector, test_section, result, use_db):
     """Verifies that both results and error sections are as expected. Rewrites both
@@ -235,7 +236,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
 
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
-      encoding=None, wait_secs_between_stmts=None):
+      encoding=None):
     """
     Runs the queries in the specified test based on the vector values
 
@@ -318,8 +319,6 @@ class ImpalaTestSuite(BaseTestSuite):
           if set_pattern_match != None:
             query_options_changed.append(set_pattern_match.groups()[0])
           result = self.__execute_query(target_impalad_client, query, user=user)
-          if wait_secs_between_stmts:
-            time.sleep(wait_secs_between_stmts)
       except Exception as e:
         if 'CATCH' in test_section:
           self.__verify_exceptions(test_section['CATCH'], str(e), use_db)
@@ -327,7 +326,7 @@ class ImpalaTestSuite(BaseTestSuite):
         raise
       finally:
         if len(query_options_changed) > 0:
-          self.__restore_query_options(query_options_changed)
+          self.__restore_query_options(query_options_changed, target_impalad_client)
 
       if 'CATCH' in test_section:
         assert test_section['CATCH'].strip() == ''
@@ -468,24 +467,23 @@ class ImpalaTestSuite(BaseTestSuite):
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
 
-  def exec_and_compare_hive_and_impala_hs2(self, stmt):
+  def exec_and_compare_hive_and_impala_hs2(self, stmt, compare = lambda x, y: x == y):
     """Compare Hive and Impala results when executing the same statment over HS2"""
     # execute_using_jdbc expects a Query object. Convert the query string into a Query
     # object
     query = Query()
     query.query_str = stmt
     # Run the statement targeting Hive
-    exec_opts = JdbcQueryExecConfig(impalad=HIVE_HS2_HOST_PORT)
+    exec_opts = JdbcQueryExecConfig(impalad=HIVE_HS2_HOST_PORT, transport='SASL')
     hive_results = execute_using_jdbc(query, exec_opts).data
 
     # Run the statement targeting Impala
-    exec_opts = JdbcQueryExecConfig(impalad=IMPALAD_HS2_HOST_PORT)
+    exec_opts = JdbcQueryExecConfig(impalad=IMPALAD_HS2_HOST_PORT, transport='NOSASL')
     impala_results = execute_using_jdbc(query, exec_opts).data
 
     # Compare the results
     assert (impala_results is not None) and (hive_results is not None)
-    for impala, hive in zip(impala_results, hive_results):
-      assert impala == hive
+    assert compare(impala_results, hive_results)
 
   def load_query_test_file(self, workload, file_name, valid_section_names=None,
       encoding=None):

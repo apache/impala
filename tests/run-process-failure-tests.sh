@@ -25,11 +25,11 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 # Disable HEAPCHECK for the process failure tests because they can cause false positives.
 export HEAPCHECK=
 
-RESULTS_DIR=${IMPALA_HOME}/tests/results
-mkdir -p ${RESULTS_DIR}
+RESULTS_DIR="${IMPALA_LOGS_DIR}/process_failure_tests"
+mkdir -p "${RESULTS_DIR}"
 
-cd ${IMPALA_HOME}/tests
-. ${IMPALA_HOME}/bin/set-classpath.sh &> /dev/null
+cd "${IMPALA_HOME}/tests"
+. "${IMPALA_HOME}/bin/set-classpath.sh" &> /dev/null
 impala-py.test experiments/test_process_failures.py \
-    --junitxml="${RESULTS_DIR}/TEST-impala-proc-failure.xml" \
-    --resultlog="${RESULTS_DIR}/TEST-impala-proc-failure.log" "$@"
+    --junitxml="\"${RESULTS_DIR}/TEST-impala-proc-failure.xml\"" \
+    --resultlog="\"${RESULTS_DIR}/TEST-impala-proc-failure.log\"" "$@"

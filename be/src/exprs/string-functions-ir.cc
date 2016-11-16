@@ -670,8 +670,8 @@ void StringFunctions::ParseUrlPrepare(
   DCHECK_EQ(ctx->GetArgType(1)->type, FunctionContext::TYPE_STRING);
   StringVal* part = reinterpret_cast<StringVal*>(ctx->GetConstantArg(1));
   if (part->is_null) return;
-  UrlParser::UrlPart* url_part = new UrlParser::UrlPart;
-  *url_part = UrlParser::GetUrlPart(StringValue::FromStringVal(*part));
+  auto url_part = make_unique<UrlParser::UrlPart>(
+      UrlParser::GetUrlPart(StringValue::FromStringVal(*part)));
   if (*url_part == UrlParser::INVALID) {
     stringstream ss;
     ss << "Invalid URL part: " << AnyValUtil::ToString(*part) << endl
@@ -680,7 +680,7 @@ void StringFunctions::ParseUrlPrepare(
     ctx->SetError(ss.str().c_str());
     return;
   }
-  ctx->SetFunctionState(scope, url_part);
+  ctx->SetFunctionState(scope, url_part.release());
 }
 
 StringVal StringFunctions::ParseUrl(

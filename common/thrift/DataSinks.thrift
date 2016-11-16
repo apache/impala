@@ -33,6 +33,7 @@ enum TDataSinkType {
 enum TSinkAction {
   INSERT,
   UPDATE,
+  UPSERT,
   DELETE
 }
 
@@ -73,9 +74,6 @@ struct TKuduTableSink {
   // sink and holds the index of the corresponsding column in the Kudu schema,
   // e.g. 'exprs[i]' references 'kudu_table.column(referenced_cols[i])'
   1: optional list<i32> referenced_columns;
-
-  // Defines if duplicate or not found keys should be ignored
-  2: optional bool ignore_not_found_or_duplicate;
 }
 
 // Sink to create the build side of a JoinNode.

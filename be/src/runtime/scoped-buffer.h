@@ -20,7 +20,7 @@
 
 #include "runtime/mem-tracker.h"
 
-namespace {
+namespace impala {
 
 /// A scoped memory allocation that is tracked against a MemTracker.
 /// The allocation is automatically freed when the ScopedBuffer object goes out of scope.

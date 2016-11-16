@@ -25,9 +25,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.junit.After;
-import org.junit.Assert;
-
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnDef;
@@ -57,6 +54,9 @@ import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
+import org.junit.After;
+import org.junit.Assert;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -162,8 +162,8 @@ public class FrontendTestBase {
     Preconditions.checkState(createTableStmt.getPartitionColumnDefs().isEmpty());
     Db db = catalog_.getDb(createTableStmt.getDb());
     Preconditions.checkNotNull(db, "Test tables must be created in an existing db.");
-    HdfsTable dummyTable = new HdfsTable(null, null, db, createTableStmt.getTbl(),
-        createTableStmt.getOwner());
+    HdfsTable dummyTable = new HdfsTable(null, db,
+        createTableStmt.getTbl(), createTableStmt.getOwner());
     List<ColumnDef> columnDefs = createTableStmt.getColumnDefs();
     for (int i = 0; i < columnDefs.size(); ++i) {
       ColumnDef colDef = columnDefs.get(i);
@@ -183,7 +183,9 @@ public class FrontendTestBase {
     CreateViewStmt createViewStmt = (CreateViewStmt) AnalyzesOk(createViewSql);
     Db db = catalog_.getDb(createViewStmt.getDb());
     Preconditions.checkNotNull(db, "Test views must be created in an existing db.");
-    QueryStmt viewStmt = (QueryStmt) AnalyzesOk(createViewStmt.getInlineViewDef());
+    // Do not analyze the stmt to avoid applying rewrites that would alter the view
+    // definition. We want to model real views as closely as possible.
+    QueryStmt viewStmt = (QueryStmt) ParsesOk(createViewStmt.getInlineViewDef());
     View dummyView = View.createTestView(db, createViewStmt.getTbl(), viewStmt);
     db.addTable(dummyView);
     testTables_.add(dummyView);

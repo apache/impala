@@ -131,7 +131,7 @@ Status CompoundPredicate::CodegenComputeFn(
   RETURN_IF_ERROR(children()[1]->GetCodegendComputeFn(codegen, &rhs_function));
 
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
   Value* args[2];
   Function* function = CreateIrFunctionPrototype(codegen, "CompoundPredicate", &args);
 
@@ -140,8 +140,7 @@ Status CompoundPredicate::CodegenComputeFn(
 
   // Control blocks for aggregating results
   BasicBlock* lhs_null_block = BasicBlock::Create(context, "lhs_null", function);
-  BasicBlock* lhs_not_null_block =
-      BasicBlock::Create(context, "lhs_not_null", function);
+  BasicBlock* lhs_not_null_block = BasicBlock::Create(context, "lhs_not_null", function);
   BasicBlock* lhs_null_rhs_not_null_block =
       BasicBlock::Create(context, "lhs_null_rhs_not_null", function);
   BasicBlock* lhs_not_null_rhs_null_block =
@@ -232,7 +231,7 @@ Status CompoundPredicate::CodegenComputeFn(
   CodegenAnyVal ret(codegen, &builder, TYPE_BOOLEAN, NULL, "ret");
   ret.SetIsNull(is_null_phi);
   ret.SetVal(val_phi);
-  builder.CreateRet(ret.value());
+  builder.CreateRet(ret.GetLoweredValue());
 
   *fn = codegen->FinalizeFunction(function);
   DCHECK(*fn != NULL);

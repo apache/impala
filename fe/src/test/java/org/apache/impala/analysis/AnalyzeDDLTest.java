@@ -25,9 +25,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-import junit.framework.Assert;
-
-import org.apache.impala.analysis.CreateTableStmt;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.ColumnStats;
@@ -45,20 +48,14 @@ import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.util.MetaStoreUtil;
+import org.junit.Test;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.fs.permission.FsPermission;
-
-import org.junit.Test;
+import junit.framework.Assert;
 
 public class AnalyzeDDLTest extends FrontendTestBase {
 
@@ -80,21 +77,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       AnalysisError("alter table functional_hbase.alltypesagg " + kw +
           " partition (i=1)", "Table is not partitioned: functional_hbase.alltypesagg");
 
-      // Duplicate partition key name
-      AnalysisError("alter table functional.alltypes " + kw +
-          " partition(year=2050, year=2051)", "Duplicate partition key name: year");
-      // Not a partition column
-      AnalysisError("alter table functional.alltypes " + kw +
-          " partition(year=2050, int_col=1)",
-          "Column 'int_col' is not a partition column in table: functional.alltypes");
-
-      // NULL partition keys
-      AnalyzesOk("alter table functional.alltypes " + kw +
-          " partition(year=NULL, month=1)");
-      AnalyzesOk("alter table functional.alltypes " + kw +
-          " partition(year=NULL, month=NULL)");
-      AnalyzesOk("alter table functional.alltypes " + kw +
-          " partition(year=ascii(null), month=ascii(NULL))");
       // Empty string partition keys
       AnalyzesOk("alter table functional.insert_string_partitioned " + kw +
           " partition(s2='')");
@@ -102,41 +84,13 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       AnalyzesOk("alter table functional.alltypes " + kw +
           " partition(year=-1, month=cast((10+5*4) as INT))");
 
-      // Arbitrary exprs as partition key values. Non-constant exprs should fail.
-      AnalysisError("alter table functional.alltypes " + kw +
-          " partition(year=2050, month=int_col)",
-          "Non-constant expressions are not supported as static partition-key values " +
-          "in 'month=int_col'.");
-      AnalysisError("alter table functional.alltypes " + kw +
-          " partition(year=cast(int_col as int), month=12)",
-          "Non-constant expressions are not supported as static partition-key values " +
-          "in 'year=CAST(int_col AS INT)'.");
-
-      // Not a valid column
-      AnalysisError("alter table functional.alltypes " + kw +
-          " partition(year=2050, blah=1)",
-          "Partition column 'blah' not found in table: functional.alltypes");
-
-      // Data types don't match
-      AnalysisError(
-          "alter table functional.insert_string_partitioned " + kw +
-          " partition(s2=1234)",
-          "Value of partition spec (column=s2) has incompatible type: 'SMALLINT'. " +
-          "Expected type: 'STRING'.");
-
-      // Loss of precision
-      AnalysisError(
-          "alter table functional.alltypes " + kw +
-          " partition(year=100000000000, month=10)",
-          "Partition key value may result in loss of precision.\nWould need to cast" +
-          " '100000000000' to 'INT' for partition column: year");
-
-
       // Table/Db does not exist
       AnalysisError("alter table db_does_not_exist.alltypes " + kw +
-          " partition (i=1)", "Database does not exist: db_does_not_exist");
+          " partition (i=1)", "Could not resolve table reference: " +
+          "'db_does_not_exist.alltypes'");
       AnalysisError("alter table functional.table_does_not_exist " + kw +
-          " partition (i=1)", "Table does not exist: functional.table_does_not_exist");
+          " partition (i=1)", "Could not resolve table reference: " +
+          "'functional.table_does_not_exist'");
 
       // Cannot ALTER TABLE a view.
       AnalysisError("alter table functional.alltypes_view " + kw +
@@ -146,7 +100,59 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           " partition(year=2050, month=10)",
           "ALTER TABLE not allowed on a table produced by a data source: " +
           "functional.alltypes_datasource");
+
+      // NULL partition keys
+      AnalyzesOk("alter table functional.alltypes " + kw +
+          " partition(year=NULL, month=1)");
+      AnalyzesOk("alter table functional.alltypes " + kw +
+          " partition(year=NULL, month=NULL)");
+      AnalyzesOk("alter table functional.alltypes " + kw +
+          " partition(year=ascii(null), month=ascii(NULL))");
     }
+
+    // Data types don't match
+    AnalysisError("alter table functional.insert_string_partitioned add" +
+                  " partition(s2=1234)",
+                  "Value of partition spec (column=s2) has incompatible type: " +
+                  "'SMALLINT'. Expected type: 'STRING'.");
+    AnalysisError("alter table functional.insert_string_partitioned drop" +
+                  " partition(s2=1234)",
+                  "operands of type STRING and SMALLINT are not comparable: s2 = 1234");
+
+    // Loss of precision
+    AnalysisError(
+        "alter table functional.alltypes add " +
+        "partition(year=100000000000, month=10) ",
+        "Partition key value may result in loss of precision.\nWould need to cast " +
+        "'100000000000' to 'INT' for partition column: year");
+
+    // Duplicate partition key name
+    AnalysisError("alter table functional.alltypes add " +
+        "partition(year=2050, year=2051)", "Duplicate partition key name: year");
+
+    // Arbitrary exprs as partition key values. Non-constant exprs should fail.
+    AnalysisError("alter table functional.alltypes add " +
+        "partition(year=2050, month=int_col) ",
+        "Non-constant expressions are not supported as static partition-key " +
+        "values in 'month=int_col'.");
+    AnalysisError("alter table functional.alltypes add " +
+        "partition(year=cast(int_col as int), month=12) ",
+        "Non-constant expressions are not supported as static partition-key " +
+        "values in 'year=CAST(int_col AS INT)'.");
+
+    // Not a partition column
+    AnalysisError("alter table functional.alltypes drop " +
+        "partition(year=2050, int_col=1)",
+        "Partition exprs cannot contain non-partition column(s): int_col = 1.");
+
+    // Arbitrary exprs as partition key values. Non-partition columns should fail.
+    AnalysisError("alter table functional.alltypes drop " +
+        "partition(year=2050, month=int_col) ",
+        "Partition exprs cannot contain non-partition column(s): month = int_col.");
+    AnalysisError("alter table functional.alltypes drop " +
+        "partition(year=cast(int_col as int), month=12) ",
+        "Partition exprs cannot contain non-partition column(s): " +
+        "year = CAST(int_col AS INT).");
 
     // IF NOT EXISTS properly checks for partition existence
     AnalyzesOk("alter table functional.alltypes add " +
@@ -155,19 +161,62 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "partition(year=2010, month=10)",
         "Partition spec already exists: (year=2010, month=10).");
     AnalyzesOk("alter table functional.alltypes add if not exists " +
-        " partition(year=2010, month=10)");
+        "partition(year=2010, month=10)");
     AnalyzesOk("alter table functional.alltypes add if not exists " +
-        " partition(year=2010, month=10) location " +
+        "partition(year=2010, month=10) location " +
         "'/test-warehouse/alltypes/year=2010/month=10'");
 
     // IF EXISTS properly checks for partition existence
+    // with a fully specified partition.
     AnalyzesOk("alter table functional.alltypes drop " +
         "partition(year=2010, month=10)");
     AnalysisError("alter table functional.alltypes drop " +
         "partition(year=2050, month=10)",
-        "Partition spec does not exist: (year=2050, month=10).");
+        "No matching partition(s) found.");
     AnalyzesOk("alter table functional.alltypes drop if exists " +
         "partition(year=2050, month=10)");
+
+    // NULL partition keys
+    AnalysisError("alter table functional.alltypes drop " +
+      "partition(year=NULL, month=1)",
+      "No matching partition(s) found.");
+    AnalysisError("alter table functional.alltypes drop " +
+      "partition(year=NULL, month is NULL)",
+      "No matching partition(s) found.");
+
+    // Drop partition using predicates
+    // IF EXISTS is added here
+    AnalyzesOk("alter table functional.alltypes drop " +
+        "partition(year<2011, month!=10)");
+    AnalysisError("alter table functional.alltypes drop " +
+        "partition(1=1, month=10)",
+        "Invalid partition expr 1 = 1. " +
+        "A partition spec may not contain constant predicates.");
+    AnalyzesOk("alter table functional.alltypes drop " +
+        "partition(year>1050, month=10)");
+    AnalyzesOk("alter table functional.alltypes drop " +
+        "partition(year>1050 and month=10)");
+    AnalyzesOk("alter table functional.alltypes drop " +
+        "partition(month=10)");
+    AnalyzesOk("alter table functional.alltypes drop " +
+        "partition(month+2000=year)");
+    AnalyzesOk("alter table functional.alltypes drop " +
+      "partition(year>9050, month=10)");
+    AnalyzesOk("alter table functional.alltypes drop if exists " +
+        "partition(year>9050, month=10)");
+
+    // Not a valid column
+    AnalysisError("alter table functional.alltypes add " +
+        "partition(year=2050, blah=1)",
+        "Partition column 'blah' not found in table: functional.alltypes");
+    AnalysisError("alter table functional.alltypes drop " +
+        "partition(year=2050, blah=1)",
+        "Could not resolve column/field reference: 'blah'");
+
+    // Not a partition column
+    AnalysisError("alter table functional.alltypes add " +
+      "partition(year=2050, int_col=1) ",
+      "Column 'int_col' is not a partition column in table: functional.alltypes");
 
     // Caching ops
     AnalyzesOk("alter table functional.alltypes add " +
@@ -188,25 +237,25 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Valid URIs.
     AnalyzesOk("alter table functional.alltypes add " +
-        " partition(year=2050, month=10) location " +
+        "partition(year=2050, month=10) location " +
         "'/test-warehouse/alltypes/year=2010/month=10'");
     AnalyzesOk("alter table functional.alltypes add " +
-        " partition(year=2050, month=10) location " +
+        "partition(year=2050, month=10) location " +
         "'hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=10'");
     AnalyzesOk("alter table functional.alltypes add " +
-        " partition(year=2050, month=10) location " +
+        "partition(year=2050, month=10) location " +
         "'s3n://bucket/test-warehouse/alltypes/year=2010/month=10'");
     AnalyzesOk("alter table functional.alltypes add " +
-        " partition(year=2050, month=10) location " +
+        "partition(year=2050, month=10) location " +
         "'file:///test-warehouse/alltypes/year=2010/month=10'");
 
     // Invalid URIs.
     AnalysisError("alter table functional.alltypes add " +
-        " partition(year=2050, month=10) location " +
+        "partition(year=2050, month=10) location " +
         "'foofs://bar/test-warehouse/alltypes/year=2010/month=10'",
         "No FileSystem for scheme: foofs");
     AnalysisError("alter table functional.alltypes add " +
-        " partition(year=2050, month=10) location '  '",
+        "partition(year=2050, month=10) location '  '",
         "URI path cannot be empty.");
   }
 
@@ -245,14 +294,19 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes add columns (i int)",
-        "Database does not exist: db_does_not_exist");
+        "Could not resolve table reference: 'db_does_not_exist.alltypes'");
     AnalysisError("alter table functional.table_does_not_exist add columns (i int)",
-        "Table does not exist: functional.table_does_not_exist");
+        "Could not resolve table reference: 'functional.table_does_not_exist'");
 
     // Cannot ALTER TABLE a view.
     AnalysisError("alter table functional.alltypes_view " +
         "add columns (c1 string comment 'hi')",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE a nested collection.
+    AnalysisError("alter table allcomplextypes.int_array_col " +
+        "add columns (c1 string comment 'hi')",
+        createAnalyzer("functional"),
+        "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     // Cannot ALTER TABLE produced by a data source.
     AnalysisError("alter table functional.alltypes_datasource " +
         "add columns (c1 string comment 'hi')",
@@ -281,13 +335,17 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes drop column col1",
-        "Database does not exist: db_does_not_exist");
+        "Could not resolve table reference: 'db_does_not_exist.alltypes'");
     AnalysisError("alter table functional.table_does_not_exist drop column col1",
-        "Table does not exist: functional.table_does_not_exist");
+        "Could not resolve table reference: 'functional.table_does_not_exist'");
 
     // Cannot ALTER TABLE a view.
     AnalysisError("alter table functional.alltypes_view drop column int_col",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE a nested collection.
+    AnalysisError("alter table allcomplextypes.int_array_col drop column int_col",
+        createAnalyzer("functional"),
+        "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     // Cannot ALTER TABLE produced by a data source.
     AnalysisError("alter table functional.alltypes_datasource drop column int_col",
         "ALTER TABLE not allowed on a table produced by a data source: " +
@@ -327,14 +385,19 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes change c1 c2 int",
-        "Database does not exist: db_does_not_exist");
+        "Could not resolve table reference: 'db_does_not_exist.alltypes'");
     AnalysisError("alter table functional.table_does_not_exist change c1 c2 double",
-        "Table does not exist: functional.table_does_not_exist");
+        "Could not resolve table reference: 'functional.table_does_not_exist'");
 
     // Cannot ALTER TABLE a view.
     AnalysisError("alter table functional.alltypes_view " +
         "change column int_col int_col2 int",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE a nested collection.
+    AnalysisError("alter table allcomplextypes.int_array_col " +
+        "change column int_col int_col2 int",
+        createAnalyzer("functional"),
+        "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     // Cannot ALTER TABLE produced by a data source.
     AnalysisError("alter table functional.alltypes_datasource " +
         "change column int_col int_col2 int",
@@ -356,13 +419,19 @@ public class AnalyzeDDLTest extends FrontendTestBase {
                "set location '/a/b'");
     AnalyzesOk("alter table functional.alltypes PARTITION (month=11, year=2010) " +
                "set fileformat parquetfile");
+    AnalyzesOk("alter table functional.alltypes PARTITION (month<=11, year=2010) " +
+               "set fileformat parquetfile");
     AnalyzesOk("alter table functional.stringpartitionkey PARTITION " +
                "(string_col='partition1') set fileformat parquet");
     AnalyzesOk("alter table functional.stringpartitionkey PARTITION " +
                "(string_col='PaRtiTion1') set location '/a/b/c'");
     AnalyzesOk("alter table functional.alltypes PARTITION (year=2010, month=11) " +
                "set tblproperties('a'='1')");
+    AnalyzesOk("alter table functional.alltypes PARTITION (year<=2010, month=11) " +
+               "set tblproperties('a'='1')");
     AnalyzesOk("alter table functional.alltypes PARTITION (year=2010, month=11) " +
+               "set serdeproperties ('a'='2')");
+    AnalyzesOk("alter table functional.alltypes PARTITION (year<=2010, month=11) " +
                "set serdeproperties ('a'='2')");
 
     {
@@ -411,6 +480,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
               + "serdeproperties ('key'='" + long_property_value + "')",
           "Property value length must be <= " + MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH
               + ": " + (MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH + 1));
+
+      AnalysisError(
+          "alter table functional.alltypes set tblproperties('storage_handler'='1')",
+          "Changing the 'storage_handler' table property is not supported to protect " +
+          "against metadata corruption.");
     }
 
     // Arbitrary exprs as partition key values. Constant exprs are ok.
@@ -420,33 +494,33 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypes PARTITION " +
                "(year=cast(100*20+10 as INT), month=cast(2+9 as INT)) " +
                "set location '/a/b'");
-    // Arbitrary exprs as partition key values. Non-constant exprs should fail.
+
+    // Arbitrary exprs as partition key values. One-partition-column-bound exprs are ok.
+    AnalyzesOk("alter table functional.alltypes PARTITION " +
+               "(Year*2=Year+2010, month=11) set fileformat sequencefile");
+
+    // Arbitrary exprs as partition key values. Non-partition-column exprs.
     AnalysisError("alter table functional.alltypes PARTITION " +
-                  "(Year=2050, month=int_col) set fileformat sequencefile",
-                  "Non-constant expressions are not supported as static partition-key " +
-                  "values in 'month=int_col'.");
-    AnalysisError("alter table functional.alltypes PARTITION " +
-                  "(Year=2050, month=int_col) set location '/a/b'",
-                  "Non-constant expressions are not supported as static partition-key " +
-                  "values in 'month=int_col'.");
+                  "(int_col=3) set fileformat sequencefile",
+                  "Partition exprs cannot contain non-partition column(s): int_col = 3.");
+
+    // Partition expr matches more than one partition in set location statement.
+    AnalysisError("alter table functional.alltypes PARTITION (year!=20) " +
+                  "set location '/a/b'",
+                  "Partition expr in set location statements can only match " +
+                  "one partition. Too many matched partitions year=2009/month=1," +
+                  "year=2009/month=2,year=2009/month=3");
 
     // Partition spec does not exist
     AnalysisError("alter table functional.alltypes PARTITION (year=2014, month=11) " +
                   "set location '/a/b'",
-                  "Partition spec does not exist: (year=2014, month=11)");
+                  "No matching partition(s) found.");
     AnalysisError("alter table functional.alltypes PARTITION (year=2014, month=11) " +
                   "set tblproperties('a'='1')",
-                  "Partition spec does not exist: (year=2014, month=11)");
-    AnalysisError("alter table functional.alltypes PARTITION (year=2010) " +
-                  "set tblproperties('a'='1')",
-                  "Items in partition spec must exactly match the partition columns " +
-                  "in the table definition: functional.alltypes (1 vs 2)");
-    AnalysisError("alter table functional.alltypes PARTITION (year=2010, year=2010) " +
-                  "set location '/a/b'",
-                  "Duplicate partition key name: year");
+                  "No matching partition(s) found.");
     AnalysisError("alter table functional.alltypes PARTITION (month=11, year=2014) " +
                   "set fileformat sequencefile",
-                  "Partition spec does not exist: (month=11, year=2014)");
+                  "No matching partition(s) found.");
     AnalysisError("alter table functional.alltypesnopart PARTITION (month=1) " +
                   "set fileformat sequencefile",
                   "Table is not partitioned: functional.alltypesnopart");
@@ -455,34 +529,32 @@ public class AnalyzeDDLTest extends FrontendTestBase {
                   "Table is not partitioned: functional.alltypesnopart");
     AnalysisError("alter table functional.stringpartitionkey PARTITION " +
                   "(string_col='partition2') set location '/a/b'",
-                  "Partition spec does not exist: (string_col='partition2')");
+                  "No matching partition(s) found.");
     AnalysisError("alter table functional.stringpartitionkey PARTITION " +
                   "(string_col='partition2') set fileformat sequencefile",
-                  "Partition spec does not exist: (string_col='partition2')");
+                  "No matching partition(s) found.");
     AnalysisError("alter table functional.alltypes PARTITION " +
                  "(year=cast(10*20+10 as INT), month=cast(5*3 as INT)) " +
                   "set location '/a/b'",
-                  "Partition spec does not exist: " +
-                  "(year=CAST(10 * 20 + 10 AS INT), month=CAST(5 * 3 AS INT))");
+                  "No matching partition(s) found.");
     AnalysisError("alter table functional.alltypes PARTITION " +
                   "(year=cast(10*20+10 as INT), month=cast(5*3 as INT)) " +
                   "set fileformat sequencefile",
-                  "Partition spec does not exist: " +
-                  "(year=CAST(10 * 20 + 10 AS INT), month=CAST(5 * 3 AS INT))");
+                  "No matching partition(s) found.");
 
     // Table/Db does not exist
     AnalysisError("alter table db_does_not_exist.alltypes set fileformat sequencefile",
-        "Database does not exist: db_does_not_exist");
+        "Could not resolve table reference: 'db_does_not_exist.alltypes'");
     AnalysisError("alter table functional.table_does_not_exist set fileformat rcfile",
-        "Table does not exist: functional.table_does_not_exist");
+        "Could not resolve table reference: 'functional.table_does_not_exist'");
     AnalysisError("alter table db_does_not_exist.alltypes set location '/a/b'",
-        "Database does not exist: db_does_not_exist");
+        "Could not resolve table reference: 'db_does_not_exist.alltypes'");
     AnalysisError("alter table functional.table_does_not_exist set location '/a/b'",
-        "Table does not exist: functional.table_does_not_exist");
+        "Could not resolve table reference: 'functional.table_does_not_exist'");
     AnalysisError("alter table functional.no_tbl partition(i=1) set location '/a/b'",
-        "Table does not exist: functional.no_tbl");
+        "Could not resolve table reference: 'functional.no_tbl'");
     AnalysisError("alter table no_db.alltypes partition(i=1) set fileformat textfile",
-        "Database does not exist: no_db");
+        "Could not resolve table reference: 'no_db.alltypes'");
 
     // Valid location
     AnalyzesOk("alter table functional.alltypes set location " +
@@ -505,6 +577,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Cannot ALTER TABLE a view.
     AnalysisError("alter table functional.alltypes_view set fileformat sequencefile",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE a nested collection.
+    AnalysisError("alter table allcomplextypes.int_array_col set fileformat sequencefile",
+        createAnalyzer("functional"),
+        "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     // Cannot ALTER TABLE produced by a data source.
     AnalysisError("alter table functional.alltypes_datasource set fileformat parquet",
         "ALTER TABLE not allowed on a table produced by a data source: " +
@@ -521,6 +597,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypesnopart set cached in 'testPool'");
     AnalyzesOk("alter table functional.alltypes set cached in 'testPool'");
     AnalyzesOk("alter table functional.alltypes partition(year=2010, month=12) " +
+        "set cached in 'testPool'");
+    AnalyzesOk("alter table functional.alltypes partition(year<=2010, month<=12) " +
         "set cached in 'testPool'");
 
     // Replication factor
@@ -540,6 +618,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "ALTER TABLE SET not currently supported on HBase tables.");
     AnalysisError("alter table functional.view_view set cached in 'testPool'",
         "ALTER TABLE not allowed on a view: functional.view_view");
+    AnalysisError("alter table allcomplextypes.int_array_col set cached in 'testPool'",
+        createAnalyzer("functional"),
+        "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
 
     AnalysisError("alter table functional.alltypes set cached in 'badPool'",
         "The specified cache pool does not exist: badPool");
@@ -563,17 +644,17 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional.alltypestiny partition (year=2009,month=1) " +
         "set location '/test-warehouse/new_location'",
         "Target partition is cached, please uncache before changing the location " +
-        "using: ALTER TABLE functional.alltypestiny PARTITION (year=2009, month=1) " +
+        "using: ALTER TABLE functional.alltypestiny PARTITION (year = 2009, month = 1) " +
         "SET UNCACHED");
 
     // Table/db/partition do not exist
     AnalysisError("alter table baddb.alltypestiny set cached in 'testPool'",
-        "Database does not exist: baddb");
+        "Could not resolve table reference: 'baddb.alltypestiny'");
     AnalysisError("alter table functional.badtbl set cached in 'testPool'",
-        "Table does not exist: functional.badtbl");
+        "Could not resolve table reference: 'functional.badtbl'");
     AnalysisError("alter table functional.alltypestiny partition(year=9999, month=1) " +
         "set cached in 'testPool'",
-        "Partition spec does not exist: (year=9999, month=1).");
+        "No matching partition(s) found.");
   }
 
   @Test
@@ -644,7 +725,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Table does not exist.
     AnalysisError("alter table bad_tbl set column stats int_col ('numNulls'='2')",
-        "Table does not exist: default.bad_tbl");
+        "Could not resolve table reference: 'bad_tbl'");
     // Column does not exist.
     AnalysisError(
         "alter table functional.alltypes set column stats bad_col ('numNulls'='2')",
@@ -654,6 +735,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError(
         "alter table functional.alltypes_view set column stats int_col ('numNulls'='2')",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot set column stats of a nested collection.
+    AnalysisError(
+        "alter table allcomplextypes.int_array_col " +
+        "set column stats int_col ('numNulls'='2')",
+        createAnalyzer("functional"),
+        "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     // Cannot set column stats of partition columns.
     AnalysisError(
         "alter table functional.alltypes set column stats month ('numDVs'='10')",
@@ -833,6 +920,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Cannot ALTER TABLE a view.
     AnalysisError("alter table functional.alltypes_view rename to new_alltypes",
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
+    // Cannot ALTER TABLE a nested collection.
+    AnalysisError("alter table allcomplextypes.int_array_col rename to new_alltypes",
+        createAnalyzer("functional"),
+        "Database does not exist: allcomplextypes");
 
     // It should be okay to rename an HBase table.
     AnalyzesOk("alter table functional_hbase.alltypes rename to new_alltypes");
@@ -845,13 +936,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   public void TestAlterTableRecoverPartitions() throws CatalogException {
     AnalyzesOk("alter table functional.alltypes recover partitions");
     AnalysisError("alter table baddb.alltypes recover partitions",
-        "Database does not exist: baddb");
+        "Could not resolve table reference: 'baddb.alltypes'");
     AnalysisError("alter table functional.badtbl recover partitions",
-        "Table does not exist: functional.badtbl");
+        "Could not resolve table reference: 'functional.badtbl'");
     AnalysisError("alter table functional.alltypesnopart recover partitions",
         "Table is not partitioned: functional.alltypesnopart");
     AnalysisError("alter table functional.view_view recover partitions",
         "ALTER TABLE not allowed on a view: functional.view_view");
+    AnalysisError("alter table allcomplextypes.int_array_col recover partitions",
+        createAnalyzer("functional"),
+        "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     AnalysisError("alter table functional_hbase.alltypes recover partitions",
         "ALTER TABLE RECOVER PARTITIONS must target an HDFS table: " +
         "functional_hbase.alltypes");
@@ -956,10 +1050,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Cannot compute stats on a database.
     AnalysisError("compute stats tbl_does_not_exist",
-        "Table does not exist: default.tbl_does_not_exist");
+        "Could not resolve table reference: 'tbl_does_not_exist'");
     // Cannot compute stats on a view.
     AnalysisError("compute stats functional.alltypes_view",
-        "COMPUTE STATS not supported for view functional.alltypes_view");
+        "COMPUTE STATS not supported for view: functional.alltypes_view");
 
     AnalyzesOk("compute stats functional_avro_snap.alltypes");
     // Test mismatched column definitions and Avro schema (HIVE-6308, IMPALA-867).
@@ -989,28 +1083,26 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     checkComputeStatsStmt("compute incremental stats functional.alltypes");
     checkComputeStatsStmt(
         "compute incremental stats functional.alltypes partition(year=2010, month=10)");
+    checkComputeStatsStmt(
+        "compute incremental stats functional.alltypes partition(year<=2010)");
 
     AnalysisError(
         "compute incremental stats functional.alltypes partition(year=9999, month=10)",
-        "Partition spec does not exist: (year=9999, month=10)");
-    AnalysisError(
-        "compute incremental stats functional.alltypes partition(year=2010)",
-        "Items in partition spec must exactly match the partition columns in the table " +
-        "definition: functional.alltypes (1 vs 2)");
+        "No matching partition(s) found.");
     AnalysisError(
         "compute incremental stats functional.alltypes partition(year=2010, month)",
-        "Syntax error");
+        "Partition expr requires return type 'BOOLEAN'. Actual type is 'INT'.");
 
     // Test that NULL partitions generates a valid query
     checkComputeStatsStmt("compute incremental stats functional.alltypesagg " +
-        "partition(year=2010, month=1, day=NULL)");
+        "partition(year=2010, month=1, day is NULL)");
 
     AnalysisError("compute incremental stats functional_hbase.alltypes " +
         "partition(year=2010, month=1)", "COMPUTE INCREMENTAL ... PARTITION not " +
         "supported for non-HDFS table functional_hbase.alltypes");
 
     AnalysisError("compute incremental stats functional.view_view",
-        "COMPUTE STATS not supported for view functional.view_view");
+        "COMPUTE STATS not supported for view: functional.view_view");
   }
 
 
@@ -1018,9 +1110,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   public void TestDropIncrementalStats() throws AnalysisException {
     AnalyzesOk(
         "drop incremental stats functional.alltypes partition(year=2010, month=10)");
+    AnalyzesOk(
+        "drop incremental stats functional.alltypes partition(year<=2010, month=10)");
     AnalysisError(
         "drop incremental stats functional.alltypes partition(year=9999, month=10)",
-        "Partition spec does not exist: (year=9999, month=10)");
+        "No matching partition(s) found.");
   }
 
 
@@ -1030,10 +1124,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Table does not exist
     AnalysisError("drop stats tbl_does_not_exist",
-        "Table does not exist: default.tbl_does_not_exist");
+        "Could not resolve table reference: 'tbl_does_not_exist'");
     // Database does not exist
     AnalysisError("drop stats no_db.no_tbl",
-        "Database does not exist: no_db");
+        "Could not resolve table reference: 'no_db.no_tbl'");
 
     AnalysisError("drop stats functional.alltypes partition(year=2010, month=10)",
         "Syntax error");
@@ -1347,11 +1441,47 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         " stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col, " +
         "bigint_col, float_col, double_col, date_string_col, string_col " +
         "from functional.alltypestiny");
+    AnalyzesOk("create table t primary key (id) distribute by range (id) " +
+        "(partition values < 10, partition 20 <= values < 30, partition value = 50) " +
+        "stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col, " +
+        "bigint_col, float_col, double_col, date_string_col, string_col " +
+        "from functional.alltypestiny");
+    AnalyzesOk("create table t primary key (id) distribute by hash (id) into 3 buckets, "+
+        "range (id) (partition values < 10, partition 10 <= values < 20, " +
+        "partition value = 30) stored as kudu as select id, bool_col, tinyint_col, " +
+        "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
+        "string_col from functional.alltypestiny");
     // CTAS in an external Kudu table
     AnalysisError("create external table t stored as kudu " +
         "tblproperties('kudu.table_name'='t') as select id, int_col from " +
         "functional.alltypestiny", "CREATE TABLE AS SELECT is not supported for " +
         "external Kudu tables.");
+
+    // CTAS into Kudu tables with unsupported types
+    AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
+        " stored as kudu as select id, timestamp_col from functional.alltypestiny",
+        "Cannot create table 't': Type TIMESTAMP is not supported in Kudu");
+    AnalysisError("create table t primary key (cs) distribute by hash into 3 buckets" +
+        " stored as kudu as select cs from functional.chars_tiny",
+        "Cannot create table 't': Type CHAR(5) is not supported in Kudu");
+    AnalysisError("create table t primary key (vc) distribute by hash into 3 buckets" +
+        " stored as kudu as select vc from functional.chars_tiny",
+        "Cannot create table 't': Type VARCHAR(32) is not supported in Kudu");
+    AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
+        " stored as kudu as select c1 as id from functional.decimal_tiny",
+        "Cannot create table 't': Type DECIMAL(10,4) is not supported in Kudu");
+    AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
+        " stored as kudu as select id, s from functional.complextypes_fileformat",
+        "Expr 's' in select list returns a complex type 'STRUCT<f1:STRING,f2:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
+        " stored as kudu as select id, m from functional.complextypes_fileformat",
+        "Expr 'm' in select list returns a complex type 'MAP<STRING,BIGINT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    AnalysisError("create table t primary key (id) distribute by hash into 3 buckets" +
+        " stored as kudu as select id, a from functional.complextypes_fileformat",
+        "Expr 'a' in select list returns a complex type 'ARRAY<INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
   }
 
   @Test
@@ -1715,11 +1845,39 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "distribute by hash(x) into 8 buckets stored as kudu");
     AnalyzesOk("create table tab (x int, y int, primary key(x, y)) " +
         "distribute by hash(y) into 8 buckets stored as kudu");
+    AnalyzesOk("create table tab (x int, y string, primary key (x)) distribute by " +
+        "hash (x) into 3 buckets, range (x) (partition values < 1, partition " +
+        "1 <= values < 10, partition 10 <= values < 20, partition value = 30) " +
+        "stored as kudu");
+    AnalyzesOk("create table tab (x int, y int, primary key (x, y)) distribute by " +
+        "range (x, y) (partition value = (2001, 1), partition value = (2002, 1), " +
+        "partition value = (2003, 2)) stored as kudu");
+    // Non-literal boundary values in range partitions
+    AnalyzesOk("create table tab (x int, y int, primary key (x)) distribute by " +
+        "range (x) (partition values < 1 + 1, partition (1+3) + 2 < values < 10, " +
+        "partition factorial(4) < values < factorial(5), " +
+        "partition value = factorial(6)) stored as kudu");
+    AnalyzesOk("create table tab (x int, y int, primary key(x, y)) distribute by " +
+        "range(x, y) (partition value = (1+1, 2+2), partition value = ((1+1+1)+1, 10), " +
+        "partition value = (cast (30 as int), factorial(5))) stored as kudu");
+    AnalysisError("create table tab (x int primary key) distribute by range (x) " +
+        "(partition values < x + 1) stored as kudu", "Only constant values are allowed " +
+        "for range-partition bounds: x + 1");
+    AnalysisError("create table tab (x int primary key) distribute by range (x) " +
+        "(partition values <= isnull(null, null)) stored as kudu", "Range partition " +
+        "values cannot be NULL. Range partition: 'PARTITION VALUES <= " +
+        "isnull(NULL, NULL)'");
+    AnalysisError("create table tab (x int primary key) distribute by range (x) " +
+        "(partition values <= (select count(*) from functional.alltypestiny)) " +
+        "stored as kudu", "Only constant values are allowed for range-partition " +
+        "bounds: (SELECT count(*) FROM functional.alltypestiny)");
     // Multilevel partitioning. Data is split into 3 buckets based on 'x' and each
-    // bucket is partitioned into 4 tablets based on the split points of 'y'.
+    // bucket is partitioned into 4 tablets based on the range partitions of 'y'.
     AnalyzesOk("create table tab (x int, y string, primary key(x, y)) " +
-        "distribute by hash(x) into 3 buckets, range(y) split rows " +
-        "(('aa'), ('bb'), ('cc')) stored as kudu");
+        "distribute by hash(x) into 3 buckets, range(y) " +
+        "(partition values < 'aa', partition 'aa' <= values < 'bb', " +
+        "partition 'bb' <= values < 'cc', partition 'cc' <= values) " +
+        "stored as kudu");
     // Key column in upper case
     AnalyzesOk("create table tab (x int, y int, primary key (X)) " +
         "distribute by hash (x) into 8 buckets stored as kudu");
@@ -1734,15 +1892,19 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Column names in distribute params should also be case-insensitive.
     AnalyzesOk("create table tab (a int, b int, c int, d int, primary key(a, b, c, d))" +
         "distribute by hash (a, B, c) into 8 buckets, " +
-        "range (A) split rows ((1),(2),(3)) stored as kudu");
+        "range (A) (partition values < 1, partition 1 <= values < 2, " +
+        "partition 2 <= values < 3, partition 3 <= values < 4, partition 4 <= values) " +
+        "stored as kudu");
     // Allowing range distribution on a subset of the primary keys
     AnalyzesOk("create table tab (id int, name string, valf float, vali bigint, " +
-        "primary key (id, name)) distribute by range (name) split rows (('abc')) " +
-        "stored as kudu");
-    // Null values in SPLIT ROWS
+        "primary key (id, name)) distribute by range (name) " +
+        "(partition 'aa' < values <= 'bb') stored as kudu");
+    // Null values in range partition values
     AnalysisError("create table tab (id int, name string, primary key(id, name)) " +
-        "distribute by hash (id) into 3 buckets, range (name) split rows ((null),(1)) " +
-        "stored as kudu", "Split values cannot be NULL. Split row: (NULL)");
+        "distribute by hash (id) into 3 buckets, range (name) " +
+        "(partition value = null, partition value = 1) stored as kudu",
+        "Range partition values cannot be NULL. Range partition: 'PARTITION " +
+        "VALUE = NULL'");
     // Primary key specified in tblproperties
     AnalysisError(String.format("create table tab (x int) distribute by hash (x) " +
         "into 8 buckets stored as kudu tblproperties ('%s' = 'x')",
@@ -1765,32 +1927,53 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (x int, primary key (x, x)) distribute by hash (x) " +
         "into 8 buckets stored as kudu",
         "Column 'x' is listed multiple times as a PRIMARY KEY.");
-    // Each split row size should equals to the number of range columns.
+    // Number of range partition boundary values should be equal to the number of range
+    // columns.
     AnalysisError("create table tab (a int, b int, c int, d int, primary key(a, b, c)) " +
-        "distribute by range(a) split rows ((1,'extra_val'),(2),(3)) stored as kudu",
-        "SPLIT ROWS has different size than number of projected key columns: 1. " +
-        "Split row: (1, 'extra_val')");
+        "distribute by range(a) (partition value = (1, 2), " +
+        "partition value = 3, partition value = 4) stored as kudu",
+        "Number of specified range partition values is different than the number of " +
+        "distribution columns: (2 vs 1). Range partition: 'PARTITION VALUE = (1,2)'");
     // Key ranges must match the column types.
     AnalysisError("create table tab (a int, b int, c int, d int, primary key(a, b, c)) " +
-        "distribute by hash (a, b, c) into 8 buckets, " +
-        "range (a) split rows ((1), ('abc'), (3)) stored as kudu",
-        "Split value 'abc' (type: STRING) is not type compatible with column 'a'" +
-        " (type: INT).");
+        "distribute by hash (a, b, c) into 8 buckets, range (a) " +
+        "(partition value = 1, partition value = 'abc', partition 3 <= values) " +
+        "stored as kudu", "Range partition value 'abc' (type: STRING) is not type " +
+        "compatible with distribution column 'a' (type: INT).");
+    AnalysisError("create table tab (a tinyint primary key) distribute by range (a) " +
+        "(partition value = 128) stored as kudu", "Range partition value 128 " +
+        "(type: SMALLINT) is not type compatible with distribution column 'a' " +
+        "(type: TINYINT)");
+    AnalysisError("create table tab (a smallint primary key) distribute by range (a) " +
+        "(partition value = 32768) stored as kudu", "Range partition value 32768 " +
+        "(type: INT) is not type compatible with distribution column 'a' " +
+        "(type: SMALLINT)");
+    AnalysisError("create table tab (a int primary key) distribute by range (a) " +
+        "(partition value = 2147483648) stored as kudu", "Range partition value " +
+        "2147483648 (type: BIGINT) is not type compatible with distribution column 'a' " +
+        "(type: INT)");
+    AnalysisError("create table tab (a bigint primary key) distribute by range (a) " +
+        "(partition value = 9223372036854775808) stored as kudu", "Range partition " +
+        "value 9223372036854775808 (type: DECIMAL(19,0)) is not type compatible with " +
+        "distribution column 'a' (type: BIGINT)");
+    // Test implicit casting/folding of partition values.
+    AnalyzesOk("create table tab (a int primary key) distribute by range (a) " +
+        "(partition value = false, partition value = true) stored as kudu");
     // Non-key column used in DISTRIBUTE BY
     AnalysisError("create table tab (a int, b string, c bigint, primary key (a)) " +
-        "distribute by range (b) split rows (('abc')) stored as kudu",
-        "Column 'b' in 'RANGE (b) SPLIT ROWS (('abc'))' is not a key column. " +
+        "distribute by range (b) (partition value = 'abc') stored as kudu",
+        "Column 'b' in 'RANGE (b) (PARTITION VALUE = 'abc')' is not a key column. " +
         "Only key columns can be used in DISTRIBUTE BY.");
-    // No float split keys
+    // No float range partition values
     AnalysisError("create table tab (a int, b int, c int, d int, primary key (a, b, c))" +
         "distribute by hash (a, b, c) into 8 buckets, " +
-        "range (a) split rows ((1.2), ('abc'), (3)) stored as kudu",
-        "Split value 1.2 (type: DECIMAL(2,1)) is not type compatible with column 'a' " +
-        "(type: INT).");
+        "range (a) (partition value = 1.2, partition value = 2) stored as kudu",
+        "Range partition value 1.2 (type: DECIMAL(2,1)) is not type compatible with " +
+        "distribution column 'a' (type: INT).");
     // Non-existing column used in DISTRIBUTE BY
     AnalysisError("create table tab (a int, b int, primary key (a, b)) " +
-        "distribute by range(unknown_column) split rows (('abc')) stored as kudu",
-        "Column 'unknown_column' in 'RANGE (unknown_column) SPLIT ROWS (('abc'))' " +
+        "distribute by range(unknown_column) (partition value = 'abc') stored as kudu",
+        "Column 'unknown_column' in 'RANGE (unknown_column) (PARTITION VALUE = 'abc')' " +
         "is not a key column. Only key columns can be used in DISTRIBUTE BY");
     // Kudu table name is specified in tblproperties
     AnalyzesOk("create table tab (x int primary key) distribute by hash (x) " +
@@ -1799,8 +1982,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "'kudu.master_addresses' = '127.0.0.1:8080, 127.0.0.1:8081')");
     // No port is specified in kudu master address
     AnalyzesOk("create table tdata_no_port (id int primary key, name string, " +
-        "valf float, vali bigint) DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30)) " +
-        "STORED AS KUDU tblproperties('kudu.master_addresses'='127.0.0.1')");
+        "valf float, vali bigint) distribute by range(id) (partition values <= 10, " +
+        "partition 10 < values <= 30, partition 30 < values) " +
+        "stored as kudu tblproperties('kudu.master_addresses'='127.0.0.1')");
     // Not using the STORED AS KUDU syntax to specify a Kudu table
     AnalysisError("create table tab (x int primary key) tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')",
@@ -1832,6 +2016,25 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (x int primary key) " +
         "partitioned by (y int) stored as kudu", "PARTITIONED BY cannot be used " +
         "in Kudu tables.");
+
+    // Test unsupported Kudu types
+    List<String> unsupportedTypes = Lists.newArrayList(
+        "DECIMAL(9,0)", "TIMESTAMP", "VARCHAR(20)", "CHAR(20)",
+        "STRUCT<F1:INT,F2:STRING>", "ARRAY<INT>", "MAP<STRING,STRING>");
+    for (String t: unsupportedTypes) {
+      String expectedError = String.format(
+          "Cannot create table 'tab': Type %s is not supported in Kudu", t);
+
+      // Unsupported type is PK and partition col
+      String stmt = String.format("create table tab (x %s primary key) " +
+          "distribute by hash(x) into 3 buckets stored as kudu", t);
+      AnalysisError(stmt, expectedError);
+
+      // Unsupported type is not PK/partition col
+      stmt = String.format("create table tab (x int primary key, y %s) " +
+          "distribute by hash(x) into 3 buckets stored as kudu", t);
+      AnalysisError(stmt, expectedError);
+    }
   }
 
   @Test
@@ -2848,32 +3051,38 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Test empty table
     AnalyzesOk(String.format("show files in functional.emptytable"));
 
-    String[] partitions = new String[] { "", "partition(month=10, year=2010)" };
+    String[] partitions = new String[] {
+        "",
+        "partition(month=10, year=2010)",
+        "partition(month>10, year<2011, year>2008)"};
     for (String partition: partitions) {
       AnalyzesOk(String.format("show files in functional.alltypes %s", partition));
       // Database/table doesn't exist.
       AnalysisError(String.format("show files in baddb.alltypes %s", partition),
-          "Database does not exist: baddb");
+          "Could not resolve table reference: 'baddb.alltypes'");
       AnalysisError(String.format("show files in functional.badtbl %s", partition),
-          "Table does not exist: functional.badtbl");
+          "Could not resolve table reference: 'functional.badtbl'");
       // Cannot show files on a non hdfs table.
       AnalysisError(String.format("show files in functional.alltypes_view %s",
           partition),
           "SHOW FILES not applicable to a non hdfs table: functional.alltypes_view");
+      AnalysisError(String.format("show files in allcomplextypes.int_array_col %s",
+          partition), createAnalyzer("functional"),
+          "SHOW FILES not applicable to a non hdfs table: allcomplextypes.int_array_col");
     }
 
     // Not a partition column.
     AnalysisError("show files in functional.alltypes partition(year=2010,int_col=1)",
-        "Column 'int_col' is not a partition column in table: functional.alltypes");
+        "Partition exprs cannot contain non-partition column(s): int_col = 1.");
     // Not a valid column.
     AnalysisError("show files in functional.alltypes partition(year=2010,day=1)",
-        "Partition column 'day' not found in table: functional.alltypes");
+        "Could not resolve column/field reference: 'day'");
     // Table is not partitioned.
     AnalysisError("show files in functional.tinyinttable partition(int_col=1)",
         "Table is not partitioned: functional.tinyinttable");
     // Partition spec does not exist
     AnalysisError("show files in functional.alltypes partition(year=2010,month=NULL)",
-        "Partition spec does not exist: (year=2010, month=NULL)");
+        "No matching partition(s) found.");
   }
 
   @Test

@@ -95,25 +95,25 @@ public class BuiltinsDb extends Db {
   private static final Map<Type, String> SAMPLE_SERIALIZE_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
-             "24ReservoirSampleSerializeIN10impala_udf10BooleanValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
+             "24ReservoirSampleSerializeIN10impala_udf10BooleanValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.TINYINT,
-             "24ReservoirSampleSerializeIN10impala_udf10TinyIntValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
+             "24ReservoirSampleSerializeIN10impala_udf10TinyIntValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.SMALLINT,
-             "24ReservoirSampleSerializeIN10impala_udf11SmallIntValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
+             "24ReservoirSampleSerializeIN10impala_udf11SmallIntValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.INT,
-             "24ReservoirSampleSerializeIN10impala_udf6IntValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
+             "24ReservoirSampleSerializeIN10impala_udf6IntValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.BIGINT,
-             "24ReservoirSampleSerializeIN10impala_udf9BigIntValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
+             "24ReservoirSampleSerializeIN10impala_udf9BigIntValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.FLOAT,
-             "24ReservoirSampleSerializeIN10impala_udf8FloatValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
+             "24ReservoirSampleSerializeIN10impala_udf8FloatValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.DOUBLE,
-             "24ReservoirSampleSerializeIN10impala_udf9DoubleValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
+             "24ReservoirSampleSerializeIN10impala_udf9DoubleValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.STRING,
-             "24ReservoirSampleSerializeIN10impala_udf9StringValEEEKS3_PNS2_15FunctionContextERS4_")
+             "24ReservoirSampleSerializeIN10impala_udf9StringValEEES3_PNS2_15FunctionContextERKS3_")
         .put(Type.TIMESTAMP,
-             "24ReservoirSampleSerializeIN10impala_udf12TimestampValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
+             "24ReservoirSampleSerializeIN10impala_udf12TimestampValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.DECIMAL,
-             "24ReservoirSampleSerializeIN10impala_udf10DecimalValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
+             "24ReservoirSampleSerializeIN10impala_udf10DecimalValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .build();
 
   private static final Map<Type, String> SAMPLE_MERGE_SYMBOL =

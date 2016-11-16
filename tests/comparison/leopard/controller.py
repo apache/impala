@@ -20,7 +20,6 @@
 from time import sleep, localtime, strftime
 from tests.comparison.query_profile import DefaultProfile, ImpalaNestedTypesProfile
 from schedule_item import ScheduleItem
-from fabric.api import sudo, settings
 from threading import Thread
 import os
 import pickle
@@ -46,6 +45,7 @@ DATABASE_NAME = 'randomness'
 POSTGRES_DATABASE_NAME = 'randomness'
 
 LOG = logging.getLogger('Controller')
+
 
 class Controller(object):
   '''This class controls the query generator. Generates new schedule_items regularly and
@@ -103,14 +103,13 @@ class Controller(object):
     if 'TARGET_HOST_USERNAME' not in os.environ:
       exit('TARGET_HOST_USERNAME environment variable not set')
     if 'DOCKER_IMAGE_NAME' not in os.environ:
-      print 'DOCKER_IMAGE_NAME environment variable not set'
+      exit('DOCKER_IMAGE_NAME environment variable not set')
 
   def start_new_jobs(self):
     '''Check the schedule directory for new items. If a new item is present, start a new
     job (if maximum concurrency level has not been reached). Each job gets it's own
     thread.
     '''
-    from job import Job
 
     finished_jobs = set(os.listdir(PATH_TO_FINISHED_JOBS))
     for job_id in os.listdir(PATH_TO_SCHEDULE):

@@ -69,23 +69,33 @@ public abstract class AlterTableStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    table_ = analyzer.getTable(tableName_, Privilege.ALTER);
+    // Resolve and analyze this table ref so we can evaluate partition predicates.
+    TableRef tableRef = new TableRef(tableName_.toPath(), null, Privilege.ALTER);
+    tableRef = analyzer.resolveTableRef(tableRef);
+    Preconditions.checkNotNull(tableRef);
+    tableRef.analyze(analyzer);
+    if (tableRef instanceof InlineViewRef) {
+      throw new AnalysisException(String.format(
+          "ALTER TABLE not allowed on a view: %s", tableName_));
+    }
+    if (tableRef instanceof CollectionTableRef) {
+      throw new AnalysisException(String.format(
+          "ALTER TABLE not allowed on a nested collection: %s", tableName_));
+    }
+    Preconditions.checkState(tableRef instanceof BaseTableRef);
+    table_ = tableRef.getTable();
     if (table_ instanceof KuduTable
         && !(this instanceof AlterTableSetTblProperties)
         && !(this instanceof AlterTableSetColumnStats)
         && !(this instanceof AlterTableOrViewRenameStmt)) {
       throw new AnalysisException(String.format(
-          "ALTER TABLE not allowed on Kudu table: %s", table_.getFullName()));
-    }
-    if (table_ instanceof View) {
-      throw new AnalysisException(String.format(
-          "ALTER TABLE not allowed on a view: %s", table_.getFullName()));
+          "ALTER TABLE not allowed on Kudu table: %s", tableName_));
     }
     if (table_ instanceof DataSourceTable
         && !(this instanceof AlterTableSetColumnStats)) {
       throw new AnalysisException(String.format(
           "ALTER TABLE not allowed on a table produced by a data source: %s",
-          table_.getFullName()));
+          tableName_));
     }
   }
 }

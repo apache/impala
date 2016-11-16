@@ -35,7 +35,7 @@ class TQueryOptions;
 // the DCHECK.
 #define QUERY_OPTS_TABLE\
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),\
-      TImpalaQueryOptions::SCRATCH_LIMIT + 1);\
+      TImpalaQueryOptions::ENABLE_EXPR_REWRITES + 1);\
   QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED)\
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR)\
   QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)\
@@ -85,7 +85,8 @@ class TQueryOptions;
   QUERY_OPT_FN(runtime_filter_max_size, RUNTIME_FILTER_MAX_SIZE)\
   QUERY_OPT_FN(prefetch_mode, PREFETCH_MODE)\
   QUERY_OPT_FN(strict_mode, STRICT_MODE)\
-  QUERY_OPT_FN(scratch_limit, SCRATCH_LIMIT);
+  QUERY_OPT_FN(scratch_limit, SCRATCH_LIMIT)\
+  QUERY_OPT_FN(enable_expr_rewrites, ENABLE_EXPR_REWRITES);
 
 
 /// Converts a TQueryOptions struct into a map of key, value pairs.

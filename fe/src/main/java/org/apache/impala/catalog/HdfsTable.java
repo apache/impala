@@ -45,9 +45,6 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.util.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
@@ -61,13 +58,13 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.THdfsFileBlock;
 import org.apache.impala.thrift.THdfsPartition;
-import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionKeyValue;
@@ -86,13 +83,13 @@ import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.TAccessLevelUtil;
 import org.apache.impala.util.TResultRowBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableMap;
 
 /**
  * Internal representation of table-related metadata of a file-resident table on a
@@ -177,12 +174,6 @@ public class HdfsTable extends Table {
 
   // Store all the partition ids of an HdfsTable.
   private HashSet<Long> partitionIds_ = Sets.newHashSet();
-
-  // Maximum size (in bytes) of incremental stats the catalog is allowed to serialize per
-  // table. This limit is set as a safety check, to prevent the JVM from hitting a
-  // maximum array limit of 1GB (or OOM) while building the thrift objects to send to
-  // impalads.
-  public static final long MAX_INCREMENTAL_STATS_SIZE_BYTES = 200 * 1024 * 1024;
 
   // Estimate (in bytes) of the incremental stats size per column per partition
   public static final long STATS_SIZE_PER_COLUMN_BYTES = 400;
@@ -275,9 +266,9 @@ public class HdfsTable extends Table {
     }
   }
 
-  public HdfsTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
+  public HdfsTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       Db db, String name, String owner) {
-    super(id, msTbl, db, name, owner);
+    super(msTbl, db, name, owner);
     partitionLocationCompressor_ =
         new HdfsPartitionLocationCompressor(numClusteringCols_);
   }
@@ -636,6 +627,20 @@ public class HdfsTable extends Table {
   }
 
   /**
+   * Gets hdfs partitions by the given partition set.
+   */
+  public List<HdfsPartition> getPartitionsFromPartitionSet(
+      List<List<TPartitionKeyValue>> partitionSet) {
+    List<HdfsPartition> partitions = Lists.newArrayList();
+    for (List<TPartitionKeyValue> kv : partitionSet) {
+      HdfsPartition partition =
+          getPartitionFromThriftPartitionSpec(kv);
+      if (partition != null) partitions.add(partition);
+    }
+    return partitions;
+  }
+
+  /**
    * Create columns corresponding to fieldSchemas. Throws a TableLoadingException if the
    * metadata is incompatible with what we support.
    */
@@ -976,6 +981,20 @@ public class HdfsTable extends Table {
   }
 
   /**
+   * Drops the given partitions from this table. Cleans up its metadata from all the
+   * mappings used to speed up partition pruning/lookup. Also updates partitions column
+   * statistics. Returns the list of partitions that were dropped.
+   */
+  public List<HdfsPartition> dropPartitions(List<HdfsPartition> partitions) {
+    ArrayList<HdfsPartition> droppedPartitions = Lists.newArrayList();
+    for (HdfsPartition partition: partitions) {
+      HdfsPartition hdfsPartition = dropPartition(partition);
+      if (hdfsPartition != null) droppedPartitions.add(hdfsPartition);
+    }
+    return droppedPartitions;
+  }
+
+  /**
    * Adds or replaces the default partition.
    */
   public void addDefaultPartition(StorageDescriptor storageDescriptor)
@@ -1158,7 +1177,7 @@ public class HdfsTable extends Table {
       partitionNames.add(partition.getPartitionName());
     }
     partitionsToRemove.addAll(dirtyPartitions);
-    for (HdfsPartition partition: partitionsToRemove) dropPartition(partition);
+    dropPartitions(partitionsToRemove);
     // Load dirty partitions from Hive Metastore
     loadPartitionsFromMetastore(dirtyPartitions, client);
 
@@ -1577,10 +1596,10 @@ public class HdfsTable extends Table {
   }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
+  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
     // Create thrift descriptors to send to the BE.  The BE does not
     // need any information below the THdfsPartition level.
-    TTableDescriptor tableDesc = new TTableDescriptor(id_.asInt(), TTableType.HDFS_TABLE,
+    TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
         getTColumnDescriptors(), numClusteringCols_, name_, db_.getName());
     tableDesc.setHdfsTable(getTHdfsTable(false, referencedPartitions));
     return tableDesc;
@@ -1603,7 +1622,7 @@ public class HdfsTable extends Table {
    * partitions). To prevent the catalog from hitting an OOM error while trying to
    * serialize large partition incremental stats, we estimate the stats size and filter
    * the incremental stats data from partition objects if the estimate exceeds
-   * MAX_INCREMENTAL_STATS_SIZE_BYTES.
+   * --inc_stats_size_limit_bytes
    */
   private THdfsTable getTHdfsTable(boolean includeFileDesc, Set<Long> refPartitions) {
     // includeFileDesc implies all partitions should be included (refPartitions == null).
@@ -1613,7 +1632,7 @@ public class HdfsTable extends Table {
     long statsSizeEstimate =
         numPartitions * getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
     boolean includeIncrementalStats =
-        (statsSizeEstimate < MAX_INCREMENTAL_STATS_SIZE_BYTES);
+        (statsSizeEstimate < BackendConfig.INSTANCE.getIncStatsMaxSize());
     Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
     for (HdfsPartition partition: partitionMap_.values()) {
       long id = partition.getId();
@@ -1904,7 +1923,7 @@ public class HdfsTable extends Table {
    * Returns files info for all partitions, if partition spec is null, ordered
    * by partition.
    */
-  public TResultSet getFiles(List<TPartitionKeyValue> partitionSpec)
+  public TResultSet getFiles(List<List<TPartitionKeyValue>> partitionSet)
       throws CatalogException {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
@@ -1914,16 +1933,14 @@ public class HdfsTable extends Table {
     resultSchema.addToColumns(new TColumn("Partition", Type.STRING.toThrift()));
     result.setRows(Lists.<TResultRow>newArrayList());
 
-    List<HdfsPartition> orderedPartitions = null;
-    if (partitionSpec == null) {
+    List<HdfsPartition> orderedPartitions;
+    if (partitionSet == null) {
       orderedPartitions = Lists.newArrayList(partitionMap_.values());
-      Collections.sort(orderedPartitions);
     } else {
-      // Get the HdfsPartition object for the given partition spec.
-      HdfsPartition partition = getPartitionFromThriftPartitionSpec(partitionSpec);
-      Preconditions.checkState(partition != null);
-      orderedPartitions = Lists.newArrayList(partition);
+      // Get a list of HdfsPartition objects for the given partition set.
+      orderedPartitions = getPartitionsFromPartitionSet(partitionSet);
     }
+    Collections.sort(orderedPartitions);
 
     for (HdfsPartition p: orderedPartitions) {
       List<FileDescriptor> orderedFds = Lists.newArrayList(p.getFileDescriptors());

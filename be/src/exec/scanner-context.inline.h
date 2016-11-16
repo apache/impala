@@ -23,7 +23,7 @@
 #include "exec/read-write-util.h"
 #include "runtime/string-buffer.h"
 
-using namespace impala;
+namespace impala {
 
 /// Macro to return false if condition is false. Only defined for this file.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
@@ -168,4 +168,5 @@ inline bool ScannerContext::Stream::ReadZLong(int64_t* value, Status* status) {
 
 #undef RETURN_IF_FALSE
 
+} // namespace impala
 #endif

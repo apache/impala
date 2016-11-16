@@ -79,7 +79,7 @@ class HdfsFsCache {
   boost::mutex lock_;  // protects fs_map_
   HdfsFsMap fs_map_;
 
-  HdfsFsCache() { };
+  HdfsFsCache() { }
   HdfsFsCache(HdfsFsCache const& l); // disable copy ctor
   HdfsFsCache& operator=(HdfsFsCache const& l); // disable assignment
 };

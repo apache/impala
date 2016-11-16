@@ -84,7 +84,7 @@ void MemTestMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst
   dst->val += src.val;
 }
 
-const BigIntVal MemTestSerialize(FunctionContext* context, const BigIntVal& total) {
+BigIntVal MemTestSerialize(FunctionContext* context, const BigIntVal& total) {
   if (total.is_null) return BigIntVal(0);
   context->Free(total.val);
   return total;
@@ -116,4 +116,53 @@ const DoubleVal TruncSumSerialize(FunctionContext* context, const DoubleVal& tot
 
 BigIntVal TruncSumFinalize(FunctionContext* context, const DoubleVal& total) {
   return BigIntVal(static_cast<int64_t>(total.val));
+}
+
+// Defines aggregate function for testing constant argument handling. The UDA returns
+// true if its second argument is constant for all calls to Update().
+void ArgIsConstInit(FunctionContext* context, BooleanVal* is_const) {
+  *is_const = BooleanVal(context->IsArgConstant(1));
+}
+
+void ArgIsConstUpdate(FunctionContext* context, const IntVal& val,
+    const IntVal& const_arg, BooleanVal* is_const) {}
+
+void ArgIsConstMerge(FunctionContext* context, const BooleanVal& src, BooleanVal* dst) {
+  dst->val |= src.val;
+}
+
+// Defines aggregate function for testing NULL handling. Returns NULL if an even number
+// of non-NULL inputs are consumed or 1 if an odd number of non-NULL inputs are consumed.
+void ToggleNullInit(FunctionContext* context, IntVal* total) {
+  *total = IntVal::null();
+}
+
+void ToggleNullUpdate(FunctionContext* context, const IntVal& val, IntVal* total) {
+  if (total->is_null) {
+    *total = IntVal(1);
+  } else {
+    *total = IntVal::null();
+  }
+}
+
+void ToggleNullMerge(FunctionContext* context, const IntVal& src, IntVal* dst) {
+  if (src.is_null != dst->is_null) {
+    *dst = IntVal(1);
+  } else {
+    *dst = IntVal::null();
+  }
+}
+
+// Defines aggregate function for testing input NULL handling. Returns the number of NULL
+// input values.
+void CountNullsInit(FunctionContext* context, BigIntVal* total) {
+  *total = BigIntVal(0);
+}
+
+void CountNullsUpdate(FunctionContext* context, const BigIntVal& val, BigIntVal* total) {
+  if (val.is_null) ++total->val;
+}
+
+void CountNullsMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst) {
+  dst->val += src.val;
 }

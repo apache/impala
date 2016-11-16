@@ -17,6 +17,8 @@
 
 #include "exec/partitioned-hash-join-builder.h"
 
+#include <numeric>
+
 #include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
@@ -435,7 +437,7 @@ void PhjBuilder::CloseAndDeletePartitions() {
   hash_partitions_.clear();
   null_aware_partition_ = NULL;
   for (unique_ptr<BufferedTupleStream>& stream : spilled_partition_probe_streams_) {
-    stream->Close();
+    stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
   spilled_partition_probe_streams_.clear();
 }
@@ -578,14 +580,10 @@ void PhjBuilder::Partition::Close(RowBatch* batch) {
     hash_tbl_->Close();
   }
 
-  // Transfer ownership of build_rows_ to batch if batch is not NULL.
-  // Otherwise, close the stream here.
+  // Transfer ownership of 'build_rows_' memory to 'batch' if 'batch' is not NULL.
+  // Flush out the resources to free up memory for subsequent partitions.
   if (build_rows_ != NULL) {
-    if (batch == NULL) {
-      build_rows_->Close();
-    } else {
-      batch->AddTupleStream(build_rows_.release());
-    }
+    build_rows_->Close(batch, RowBatch::FlushMode::FLUSH_RESOURCES);
     build_rows_.reset();
   }
 }

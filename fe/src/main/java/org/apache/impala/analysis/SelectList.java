@@ -19,6 +19,9 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.rewrite.ExprRewriter;
+
 import com.google.common.collect.Lists;
 
 /**
@@ -80,6 +83,14 @@ public class SelectList {
         analyzer.addWarning("PLAN hint not recognized: " + hint);
       }
       analyzer.setIsStraightJoin();
+    }
+  }
+
+  public void rewriteExprs(ExprRewriter rewriter, Analyzer analyzer)
+      throws AnalysisException {
+    for (SelectListItem item: items_) {
+      if (item.isStar()) continue;
+      item.setExpr(rewriter.rewrite(item.getExpr(), analyzer));
     }
   }
 

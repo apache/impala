@@ -408,10 +408,11 @@ def build_load_statement(load_template, db_name, db_suffix, table_name):
                                          db_name=db_name,
                                          db_suffix=db_suffix)
   else:
+    base_load_dir = os.getenv("REMOTE_LOAD", os.getenv("IMPALA_HOME"))
     load_template = load_template.format(table_name=table_name,
                                          db_name=db_name,
                                          db_suffix=db_suffix,
-                                         impala_home = os.environ['IMPALA_HOME'])
+                                         impala_home = base_load_dir)
   return load_template
 
 def build_hbase_create_stmt(db_name, table_name, column_families):

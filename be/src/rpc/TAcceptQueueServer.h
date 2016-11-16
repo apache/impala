@@ -19,8 +19,8 @@
 // This file was copied from apache::thrift::server::TThreadedServer.cpp v0.9.0, with the
 // significant changes noted inline below.
 
-#ifndef _THRIFT_SERVER_TACCEPTQUEUESERVER_H_
-#define _THRIFT_SERVER_TACCEPTQUEUESERVER_H_ 1
+#ifndef IMPALA_RPC_TACCEPTQUEUESERVER_H
+#define IMPALA_RPC_TACCEPTQUEUESERVER_H
 
 #include <thrift/concurrency/Monitor.h>
 #include <thrift/concurrency/Thread.h>
@@ -165,4 +165,4 @@ TAcceptQueueServer::TAcceptQueueServer(const boost::shared_ptr<Processor>& proce
 } // namespace thrift
 } // namespace apache
 
-#endif // #ifndef _THRIFT_SERVER_TACCEPTQUEUESERVER_H_
+#endif // #ifndef IMPALA_RPC_TACCEPTQUEUESERVER_H

@@ -60,7 +60,7 @@ class MetricDefs {
   /// Contains the map of all TMetricDefs, non-const for testing
   MetricDefsConstants metric_defs_;
 
-  MetricDefs() { };
+  MetricDefs() { }
   DISALLOW_COPY_AND_ASSIGN(MetricDefs);
 };
 
@@ -190,8 +190,8 @@ class SimpleMetric : public Metric {
     document->AddMember(key_.c_str(), val, document->GetAllocator());
   }
 
-  const TUnit::type unit() const { return unit_; }
-  const TMetricKind::type kind() const { return metric_kind; }
+  TUnit::type unit() const { return unit_; }
+  TMetricKind::type kind() const { return metric_kind; }
 
  protected:
   /// Called to compute value_ if necessary during calls to value(). The more natural

@@ -1009,6 +1009,34 @@ bigint
 1
 ====
 ---- QUERY
+# IMPALA-4336: Test proper result expr casting when unnesting union operands.
+select double_col from alltypestiny union all (select 80 union all select 90)
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0
+0
+0
+0
+10.1
+10.1
+10.1
+10.1
+80
+90
+---- TYPES
+DOUBLE
+=====
+---- QUERY
+# IMPALA-4336: Test proper result expr casting when unnesting union operands.
+select double_col from alltypestiny union distinct (select 80 union all select 90)
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0
+10.1
+80
+90
+---- TYPES
+DOUBLE
+=====
+---- QUERY
 # Regression test for IMPALA-2948. When fast partition key scan is enabled,
 # make sure union nodes formed contain correct constant expressions even if
 # there are unmaterialized slots.

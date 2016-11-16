@@ -28,7 +28,9 @@ from kudu.schema import (
     INT64,
     INT8,
     SchemaBuilder,
-    STRING)
+    STRING,
+    BINARY,
+    UNIXTIME_MICROS)
 from kudu.client import Partitioning
 from random import choice, sample
 from string import ascii_lowercase, digits

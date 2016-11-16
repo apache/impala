@@ -31,10 +31,10 @@
 
 #include "common/names.h"
 
-DEFINE_int32(kudu_session_timeout_seconds, 60, "Timeout set on the Kudu session. "
-    "How long to wait before considering a write failed.");
 DEFINE_int32(kudu_mutation_buffer_size, 100 * 1024 * 1024, "The size (bytes) of the "
     "Kudu client buffer for mutations.");
+
+DECLARE_int32(kudu_operation_timeout_ms);
 
 using kudu::client::KuduColumnSchema;
 using kudu::client::KuduSchema;
@@ -61,9 +61,9 @@ KuduTableSink::KuduTableSink(const RowDescriptor& row_desc,
       select_list_texprs_(select_list_texprs),
       sink_action_(tsink.table_sink.action),
       kudu_table_sink_(tsink.table_sink.kudu_table_sink),
-      kudu_error_counter_(NULL),
-      rows_written_(NULL),
-      rows_written_rate_(NULL) {
+      total_rows_(NULL),
+      num_row_errors_(NULL),
+      rows_processed_rate_(NULL) {
   DCHECK(KuduIsAvailable());
 }
 
@@ -96,15 +96,19 @@ Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
   TInsertPartitionStatus root_status;
   root_status.__set_num_modified_rows(0L);
   root_status.__set_id(-1L);
+  TKuduDmlStats kudu_dml_stats;
+  kudu_dml_stats.__set_num_row_errors(0L);
+  root_status.__set_stats(TInsertStats());
+  root_status.stats.__set_kudu_stats(kudu_dml_stats);
   state->per_partition_status()->insert(make_pair(ROOT_PARTITION_KEY, root_status));
 
   // Add counters
-  kudu_error_counter_ = ADD_COUNTER(profile(), "TotalKuduFlushErrors", TUnit::UNIT);
-  rows_written_ = ADD_COUNTER(profile(), "RowsWritten", TUnit::UNIT);
+  total_rows_ = ADD_COUNTER(profile(), "TotalNumRows", TUnit::UNIT);
+  num_row_errors_ = ADD_COUNTER(profile(), "NumRowErrors", TUnit::UNIT);
   kudu_apply_timer_ = ADD_TIMER(profile(), "KuduApplyTimer");
-  rows_written_rate_ = profile()->AddDerivedCounter(
-      "RowsWrittenRate", TUnit::UNIT_PER_SECOND,
-      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_written_,
+  rows_processed_rate_ = profile()->AddDerivedCounter(
+      "RowsProcessedRate", TUnit::UNIT_PER_SECOND,
+      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, total_rows_,
       profile()->total_time_counter()));
 
   return Status::OK();
@@ -112,19 +116,13 @@ Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
 
 Status KuduTableSink::Open(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, state));
-
-  kudu::client::KuduClientBuilder b;
-  for (const string& address: table_desc_->kudu_master_addresses()) {
-    b.add_master_server_addr(address);
-  }
-
-  KUDU_RETURN_IF_ERROR(b.Build(&client_), "Unable to create Kudu client");
+  RETURN_IF_ERROR(CreateKuduClient(table_desc_->kudu_master_addresses(), &client_));
 
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc_->table_name(), &table_),
       "Unable to open Kudu table");
 
   session_ = client_->NewSession();
-  session_->SetTimeoutMillis(FLAGS_kudu_session_timeout_seconds * 1000);
+  session_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms);
 
   // KuduSession Set* methods here and below return a status for API compatibility.
   // As long as the Kudu client is statically linked, these shouldn't fail and thus these
@@ -167,6 +165,8 @@ kudu::client::KuduWriteOperation* KuduTableSink::NewWriteOp() {
     return table_->NewInsert();
   } else if (sink_action_ == TSinkAction::UPDATE) {
     return table_->NewUpdate();
+  } else if (sink_action_ == TSinkAction::UPSERT) {
+    return table_->NewUpsert();
   } else {
     DCHECK(sink_action_ == TSinkAction::DELETE) << "Sink type not supported: "
         << sink_action_;
@@ -178,31 +178,49 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
   ExprContext::FreeLocalAllocations(output_expr_ctxs_);
   RETURN_IF_ERROR(state->CheckQueryState());
+  const KuduSchema& table_schema = table_->schema();
 
   // Collect all write operations and apply them together so the time in Apply() can be
   // easily timed.
   vector<unique_ptr<kudu::client::KuduWriteOperation>> write_ops;
 
-  int rows_added = 0;
+  // Count the number of rows with nulls in non-nullable columns, i.e. null constraint
+  // violations.
+  int num_null_violations = 0;
+
   // Since everything is set up just forward everything to the writer.
   for (int i = 0; i < batch->num_rows(); ++i) {
     TupleRow* current_row = batch->GetRow(i);
     unique_ptr<kudu::client::KuduWriteOperation> write(NewWriteOp());
+    bool add_row = true;
 
     for (int j = 0; j < output_expr_ctxs_.size(); ++j) {
+      // For INSERT, output_expr_ctxs_ will contain all columns of the table in order.
+      // For UPDATE and UPSERT, output_expr_ctxs_ only contains the columns that the op
+      // applies to, i.e. columns explicitly mentioned in the query, and
+      // referenced_columns is then used to map to actual column positions.
       int col = kudu_table_sink_.referenced_columns.empty() ?
           j : kudu_table_sink_.referenced_columns[j];
 
       void* value = output_expr_ctxs_[j]->GetValue(current_row);
 
-      // If the value is NULL and no explicit column references are provided, the column
-      // should be ignored, else it's explicitly set to NULL.
+      // If the value is NULL, we only need to explicitly set it for UPDATE and UPSERT.
+      // For INSERT, it can be ignored as unspecified cols will be implicitly set to NULL.
       if (value == NULL) {
-        if (!kudu_table_sink_.referenced_columns.empty()) {
+        if (table_schema.Column(j).is_nullable()) {
           KUDU_RETURN_IF_ERROR(write->mutable_row()->SetNull(col),
               "Could not add Kudu WriteOp.");
+          continue;
+        } else {
+          // This row violates the nullability constraints of the column, do not attempt
+          // to write this row because it is already known to be an error and the Kudu
+          // error will be difficult to interpret later (error code isn't specific).
+          ++num_null_violations;
+          state->LogError(ErrorMsg::Init(TErrorCode::KUDU_NULL_CONSTRAINT_VIOLATION,
+              table_desc_->table_name()));
+          add_row = false;
+          break; // skip remaining columns for this row
         }
-        continue;
       }
 
       PrimitiveType type = output_expr_ctxs_[j]->root()->type().type;
@@ -254,18 +272,22 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
           return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(type));
       }
     }
-    write_ops.push_back(move(write));
+    if (add_row) write_ops.push_back(move(write));
   }
 
   {
     SCOPED_TIMER(kudu_apply_timer_);
     for (auto&& write: write_ops) {
       KUDU_RETURN_IF_ERROR(session_->Apply(write.release()), "Error applying Kudu Op.");
-      ++rows_added;
     }
   }
 
-  COUNTER_ADD(rows_written_, rows_added);
+  // Increment for all rows received by the sink, including errors.
+  COUNTER_ADD(total_rows_, batch->num_rows());
+  // Add the number of null constraint violations to the number of row errors, which
+  // isn't reported by Kudu in CheckForErrors() because those rows were never
+  // successfully added to the KuduSession.
+  COUNTER_ADD(num_row_errors_, num_null_violations);
   RETURN_IF_ERROR(CheckForErrors(state));
   return Status::OK();
 }
@@ -288,31 +310,27 @@ Status KuduTableSink::CheckForErrors(RuntimeState* state) {
   // them accordingly.
   for (int i = 0; i < errors.size(); ++i) {
     kudu::Status e = errors[i]->status();
-    // If the sink has the option "ignore_not_found_or_duplicate" set, duplicate key or
-    // key already present errors from Kudu in INSERT, UPDATE, or DELETE operations will
-    // be ignored.
-    if (!kudu_table_sink_.ignore_not_found_or_duplicate ||
-        ((sink_action_ == TSinkAction::DELETE && !e.IsNotFound()) ||
-            (sink_action_ == TSinkAction::UPDATE && !e.IsNotFound()) ||
-            (sink_action_ == TSinkAction::INSERT && !e.IsAlreadyPresent()))) {
+    if (e.IsNotFound()) {
+      // Kudu does not yet have a way to programmatically differentiate between 'row not
+      // found' and 'tablet not found' (e.g. PK in a non-covered range) and both have the
+      // IsNotFound error code.
+      state->LogError(ErrorMsg::Init(TErrorCode::KUDU_NOT_FOUND,
+          table_desc_->table_name(), e.ToString()), 2);
+    } else if (e.IsAlreadyPresent()) {
+      state->LogError(ErrorMsg::Init(TErrorCode::KUDU_KEY_ALREADY_PRESENT,
+          table_desc_->table_name()), 2);
+    } else {
       if (status.ok()) {
         status = Status(strings::Substitute(
             "Kudu error(s) reported, first error: $0", e.ToString()));
       }
-    }
-    if (e.IsNotFound()) {
-      state->LogError(ErrorMsg::Init(TErrorCode::KUDU_KEY_NOT_FOUND,
-          table_desc_->table_name()));
-    } else if (e.IsAlreadyPresent()) {
-      state->LogError(ErrorMsg::Init(TErrorCode::KUDU_KEY_ALREADY_PRESENT,
-          table_desc_->table_name()));
-    } else {
       state->LogError(ErrorMsg::Init(TErrorCode::KUDU_SESSION_ERROR,
-          table_desc_->table_name(), e.ToString()));
+          table_desc_->table_name(), e.ToString()), 2);
     }
     delete errors[i];
   }
-  COUNTER_ADD(kudu_error_counter_, errors.size());
+
+  COUNTER_ADD(num_row_errors_, errors.size());
   return status;
 }
 
@@ -325,8 +343,12 @@ Status KuduTableSink::FlushFinal(RuntimeState* state) {
     VLOG_RPC << "Ignoring Flush() error status: " << flush_status.ToString();
   }
   Status status = CheckForErrors(state);
-  (*state->per_partition_status())[ROOT_PARTITION_KEY].__set_num_modified_rows(
-      rows_written_->value() - kudu_error_counter_->value());
+  TInsertPartitionStatus& insert_status =
+      (*state->per_partition_status())[ROOT_PARTITION_KEY];
+  insert_status.__set_num_modified_rows(
+      total_rows_->value() - num_row_errors_->value());
+  insert_status.stats.kudu_stats.__set_num_row_errors(num_row_errors_->value());
+  insert_status.__set_kudu_latest_observed_ts(client_->GetLatestObservedTimestamp());
   return status;
 }
 

@@ -250,7 +250,8 @@ class DiskIoRequestContext {
 
   /// The number of buffers that are being used for this reader. This is the sum
   /// of all buffers in ScanRange queues and buffers currently being read into (i.e. about
-  /// to be queued).
+  /// to be queued). This includes both IOMgr-allocated buffers and client-provided
+  /// buffers.
   AtomicInt32 num_used_buffers_;
 
   /// The total number of ready buffers across all ranges.  Ready buffers are buffers

@@ -101,8 +101,7 @@ void LikePredicate::LikePrepareInternal(FunctionContext* context,
       opts.set_case_sensitive(case_sensitive);
       state->regex_.reset(new RE2(re_pattern, opts));
       if (!state->regex_->ok()) {
-        context->SetError(
-            strings::Substitute("Invalid regex: $0", pattern_val.ptr).c_str());
+        context->SetError(Substitute("Invalid regex: $0", pattern_str).c_str());
       }
     }
   }
@@ -164,9 +163,8 @@ void LikePredicate::RegexPrepareInternal(FunctionContext* context,
       opts.set_case_sensitive(case_sensitive);
       state->regex_.reset(new RE2(pattern_str, opts));
       if (!state->regex_->ok()) {
-        stringstream error;
-        error << "Invalid regex expression" << pattern->ptr;
-        context->SetError(error.str().c_str());
+        context->SetError(
+            Substitute("Invalid regex expression: '$0'", pattern_str).c_str());
       }
       state->function_ = ConstantRegexFnPartial;
     }
@@ -202,8 +200,8 @@ void LikePredicate::RegexpLikePrepare(FunctionContext* context,
     string pattern_str(reinterpret_cast<const char*>(pattern->ptr), pattern->len);
     state->regex_.reset(new RE2(pattern_str, opts));
     if (!state->regex_->ok()) {
-      error << "Invalid regex expression" << pattern->ptr;
-      context->SetError(error.str().c_str());
+      context->SetError(
+          Substitute("Invalid regex expression: '$0'", pattern_str).c_str());
     }
   }
 }
@@ -226,11 +224,10 @@ BooleanVal LikePredicate::RegexpLikeInternal(FunctionContext* context,
     string re_pattern(reinterpret_cast<const char*>(pattern.ptr), pattern.len);
     re2::RE2 re(re_pattern, opts);
     if (re.ok()) {
-      return RE2::PartialMatch(re2::StringPiece(
-          reinterpret_cast<const char*>(val.ptr), val.len), re);
+      return RE2::PartialMatch(
+          re2::StringPiece(reinterpret_cast<const char*>(val.ptr), val.len), re);
     } else {
-      context->SetError(
-          strings::Substitute("Invalid regex: $0", pattern.ptr).c_str());
+      context->SetError(Substitute("Invalid regex: $0", re_pattern).c_str());
       return BooleanVal(false);
     }
   }
@@ -353,12 +350,15 @@ BooleanVal LikePredicate::RegexMatch(FunctionContext* context,
         return RE2::FullMatch(re2::StringPiece(
             reinterpret_cast<const char*>(operand_value.ptr), operand_value.len), re);
       } else {
-        return RE2::PartialMatch(re2::StringPiece(
-            reinterpret_cast<const char*>(operand_value.ptr), operand_value.len), re);
+        return RE2::PartialMatch(
+            re2::StringPiece(
+                reinterpret_cast<const char*>(operand_value.ptr), operand_value.len),
+            re);
       }
     } else {
-      context->SetError(
-          strings::Substitute("Invalid regex: $0", pattern_value.ptr).c_str());
+      string pattern_str(
+          reinterpret_cast<const char*>(pattern_value.ptr), pattern_value.len);
+      context->SetError(Substitute("Invalid regex: $0", pattern_str).c_str());
       return BooleanVal(false);
     }
   }

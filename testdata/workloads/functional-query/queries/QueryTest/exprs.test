@@ -803,6 +803,35 @@ NULL
 boolean
 ====
 ---- QUERY
+# In predicate with strings
+select int_col, string_col from alltypesagg
+where string_col in ('212', '768', '1242', '124141', '0000', '99999')
+order by int_col limit 20
+---- RESULTS
+212,'212'
+212,'212'
+212,'212'
+212,'212'
+212,'212'
+212,'212'
+212,'212'
+212,'212'
+212,'212'
+212,'212'
+768,'768'
+768,'768'
+768,'768'
+768,'768'
+768,'768'
+768,'768'
+768,'768'
+768,'768'
+768,'768'
+768,'768'
+---- TYPES
+int,string
+====
+---- QUERY
 select count(*) from alltypesagg
 where true in (bool_col, tinyint_col)
 ---- RESULTS

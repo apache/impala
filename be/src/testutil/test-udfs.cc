@@ -56,11 +56,7 @@ IntVal AllTypes(
 StringVal NoArgs(FunctionContext* context) {
   const char* result = "string";
   StringVal ret(context, strlen(result));
-  // TODO: llvm 3.3 seems to have a bug if we use memcpy here making
-  // the IR udf crash. This is fixed in 3.3.1. Fix this when we upgrade.
-  //memcpy(ret.ptr, result, strlen(result));
-  // IMPALA-775
-  for (int i = 0; i < strlen(result); ++i) ret.ptr[i] = result[i];
+  memcpy(ret.ptr, result, strlen(result));
   return ret;
 }
 

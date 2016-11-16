@@ -63,7 +63,6 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       done_(false),
       all_ranges_started_(false),
       thread_avail_cb_id_(-1),
-      rm_callback_id_(-1),
       max_num_scanner_threads_(CpuInfo::num_cores()) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
   if (max_materialized_row_batches_ <= 0) {

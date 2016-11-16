@@ -21,9 +21,9 @@
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
+#include "gen-cpp/Exprs_types.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
-#include "gen-cpp/Exprs_types.h"
 
 #include "common/names.h"
 
@@ -385,7 +385,7 @@ Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   Value* args[2];
   *fn = CreateIrFunctionPrototype(codegen, "Literal", &args);
   BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);
-  LlvmCodeGen::LlvmBuilder builder(entry_block);
+  LlvmBuilder builder(entry_block);
 
   CodegenAnyVal v = CodegenAnyVal::GetNonNullVal(codegen, &builder, type_);
   switch (type_.type) {
@@ -414,7 +414,8 @@ Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
     case TYPE_VARCHAR:
     case TYPE_CHAR:
       v.SetLen(builder.getInt32(value_.string_val.len));
-      v.SetPtr(codegen->CastPtrToLlvmPtr(codegen->ptr_type(), value_.string_val.ptr));
+      v.SetPtr(codegen->GetStringConstant(
+          &builder, value_.string_val.ptr, value_.string_val.len));
       break;
     case TYPE_DECIMAL:
       switch (type().GetByteSize()) {
@@ -438,7 +439,7 @@ Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
       return Status(ss.str());
   }
 
-  builder.CreateRet(v.value());
+  builder.CreateRet(v.GetLoweredValue());
   *fn = codegen->FinalizeFunction(*fn);
   ir_compute_fn_ = *fn;
   return Status::OK();

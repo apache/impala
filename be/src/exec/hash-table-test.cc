@@ -475,7 +475,7 @@ class HashTableTest : public testing::Test {
       EXPECT_EQ(hash_table->EmptyBuckets(), table_size - build_row_val - 1);
 
       passes = ht_ctx->EvalAndHashProbe(row);
-      hash = ht_ctx->expr_values_cache()->CurExprValuesHash();
+      (void)ht_ctx->expr_values_cache()->CurExprValuesHash();
       EXPECT_TRUE(passes);
       iter = hash_table->FindProbeRow(ht_ctx.get());
       EXPECT_FALSE(iter.AtEnd());

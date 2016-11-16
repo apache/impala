@@ -98,6 +98,7 @@ const string POOL_MAX_QUEUED_METRIC_KEY_FORMAT =
 
 // Profile query events
 const string QUERY_EVENT_SUBMIT_FOR_ADMISSION = "Submit for admission";
+const string QUERY_EVENT_QUEUED = "Queued";
 const string QUERY_EVENT_COMPLETED_ADMISSION = "Completed admission";
 
 // Profile info strings
@@ -469,6 +470,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
       PROFILE_INFO_VAL_QUEUED);
   schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_QUEUE_DETAIL,
       not_admitted_reason);
+  schedule->query_events()->MarkEvent(QUERY_EVENT_QUEUED);
 
   int64_t queue_wait_timeout_ms = FLAGS_queue_wait_timeout_ms;
   if (pool_cfg.__isset.queue_timeout_ms) {

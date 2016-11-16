@@ -202,7 +202,7 @@ const vector<TNetworkAddress>& Plan::referenced_datanodes() const {
   return referenced_datanodes_;
 }
 
-const vector<TScanRangeLocations>& Plan::scan_range_locations() const {
+const vector<TScanRangeLocationList>& Plan::scan_range_locations() const {
   return scan_range_locations_;
 }
 
@@ -211,14 +211,14 @@ void Plan::AddTableScan(const TableName& table_name) {
   const vector<Block>& blocks = table.blocks;
   for (int i = 0; i < blocks.size(); ++i) {
     const Block& block = blocks[i];
-    TScanRangeLocations scan_range_locations;
-    BuildTScanRangeLocations(table_name, block, i, &scan_range_locations);
+    TScanRangeLocationList scan_range_locations;
+    BuildTScanRangeLocationList(table_name, block, i, &scan_range_locations);
     scan_range_locations_.push_back(scan_range_locations);
   }
 }
 
-void Plan::BuildTScanRangeLocations(const TableName& table_name, const Block& block,
-    int block_idx, TScanRangeLocations* scan_range_locations) {
+void Plan::BuildTScanRangeLocationList(const TableName& table_name, const Block& block,
+    int block_idx, TScanRangeLocationList* scan_range_locations) {
   const vector<int>& replica_idxs = block.replica_host_idxs;
   const vector<bool>& is_cached = block.replica_host_idx_is_cached;
   DCHECK_EQ(replica_idxs.size(), is_cached.size());

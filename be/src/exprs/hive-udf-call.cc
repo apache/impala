@@ -54,6 +54,8 @@ struct JniContext {
   uint8_t output_null_value;
   bool warning_logged;
 
+  /// AnyVal to evaluate the expression into. Only used as temporary storage during
+  /// expression evaluation.
   AnyVal* output_anyval;
 
   JniContext()
@@ -62,13 +64,10 @@ struct JniContext {
       input_nulls_buffer(NULL),
       output_value_buffer(NULL),
       warning_logged(false),
-      output_anyval(NULL) {
-  }
+      output_anyval(NULL) {}
 };
 
-HiveUdfCall::HiveUdfCall(const TExprNode& node)
-  : Expr(node),
-    input_buffer_size_(0) {
+HiveUdfCall::HiveUdfCall(const TExprNode& node) : Expr(node), input_buffer_size_(0) {
   DCHECK_EQ(node.node_type, TExprNodeType::FUNCTION_CALL);
   DCHECK_EQ(node.fn.binary_type, TFunctionBinaryType::JAVA);
   DCHECK(executor_cl_ != NULL) << "Init() was not called!";
@@ -232,8 +231,8 @@ Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
   RETURN_ERROR_IF_EXC(env);
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, jni_ctx->executor, &jni_ctx->executor));
 
-  jni_ctx->output_anyval = CreateAnyVal(type_);
-
+  RETURN_IF_ERROR(AllocateAnyVal(state, ctx->pool_.get(), type_,
+      "Could not allocate JNI output value", &jni_ctx->output_anyval));
   return Status::OK();
 }
 
@@ -264,10 +263,7 @@ void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
         delete[] jni_ctx->output_value_buffer;
         jni_ctx->output_value_buffer = NULL;
       }
-      if (jni_ctx->output_anyval != NULL) {
-        delete jni_ctx->output_anyval;
-        jni_ctx->output_anyval = NULL;
-      }
+      jni_ctx->output_anyval = NULL;
       delete jni_ctx;
     } else {
       DCHECK(!ctx->opened_);
@@ -326,7 +322,16 @@ DoubleVal HiveUdfCall::GetDoubleVal(ExprContext* ctx, const TupleRow* row) {
 
 StringVal HiveUdfCall::GetStringVal(ExprContext* ctx, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_STRING);
-  return *reinterpret_cast<StringVal*>(Evaluate(ctx, row));
+  StringVal result = *reinterpret_cast<StringVal*>(Evaluate(ctx, row));
+
+  // Copy the string into a local allocation with the usual lifetime for expr results.
+  // Needed because the UDF output buffer is owned by the Java UDF executor and may be
+  // freed or reused by the next call into the Java UDF executor.
+  FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
+  uint8_t* local_alloc = fn_ctx->impl()->AllocateLocal(result.len);
+  memcpy(local_alloc, result.ptr, result.len);
+  result.ptr = local_alloc;
+  return result;
 }
 
 TimestampVal HiveUdfCall::GetTimestampVal(ExprContext* ctx, const TupleRow* row) {

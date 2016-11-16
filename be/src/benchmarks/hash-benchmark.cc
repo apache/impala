@@ -343,7 +343,7 @@ Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
   prototype.AddArgument(
       LlvmCodeGen::NamedVariable("results", codegen->GetPtrType(TYPE_INT)));
 
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  LlvmBuilder builder(codegen->context());
   Value* args[3];
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
 

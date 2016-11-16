@@ -157,15 +157,16 @@ bool BloomFilter::BucketFind(
 namespace {
 // Computes out[i] |= in[i] for the arrays 'in' and 'out' of length 'n' using AVX
 // instructions. 'n' must be a multiple of 32.
-void __attribute__((target("avx"))) OrEqualArrayAvx(size_t n, const char* in, char* out) {
-  constexpr size_t REGISTER_SIZE = sizeof(__m256d);
-  DCHECK_EQ(n % REGISTER_SIZE, 0) << "Invalid Bloom Filter directory size";
-  const double* simd_in = reinterpret_cast<const double*>(in);
-  double* simd_out = reinterpret_cast<double*>(out);
-  const size_t simd_size = n / REGISTER_SIZE;
-  for (size_t i = 0; i < simd_size; i += REGISTER_SIZE / sizeof(simd_in[0])) {
-    _mm256_storeu_pd(simd_out + i,
-        _mm256_or_pd(_mm256_loadu_pd(simd_out + i), _mm256_loadu_pd(simd_in + i)));
+void __attribute__((target("avx")))
+OrEqualArrayAvx(size_t n, const char* __restrict__ in, char* __restrict__ out) {
+  constexpr size_t AVX_REGISTER_BYTES = sizeof(__m256d);
+  DCHECK_EQ(n % AVX_REGISTER_BYTES, 0) << "Invalid Bloom Filter directory size";
+  const char* const in_end = in + n;
+  for (; in != in_end; (in += AVX_REGISTER_BYTES), (out += AVX_REGISTER_BYTES)) {
+    const double* double_in = reinterpret_cast<const double*>(in);
+    double* double_out = reinterpret_cast<double*>(out);
+    _mm256_storeu_pd(double_out,
+        _mm256_or_pd(_mm256_loadu_pd(double_out), _mm256_loadu_pd(double_in)));
   }
 }
 } //namespace
@@ -173,14 +174,19 @@ void __attribute__((target("avx"))) OrEqualArrayAvx(size_t n, const char* in, ch
 void BloomFilter::Or(const TBloomFilter& in, TBloomFilter* out) {
   DCHECK(out != NULL);
   DCHECK_EQ(in.log_heap_space, out->log_heap_space);
+  if (&in == out) return;
   out->always_true |= in.always_true;
   if (out->always_true) {
     out->directory.resize(0);
     return;
   }
+  DCHECK_EQ(in.directory.size(), out->directory.size())
+      << "Equal log heap space " << in.log_heap_space
+      << ", but different directory sizes: " << in.directory.size() << ", "
+      << out->directory.size();
   // The trivial loop out[i] |= in[i] should auto-vectorize with gcc at -O3, but it is not
   // written in a way that is very friendly to auto-vectorization. Instead, we manually
-  // vectorize, increasing the speed by up to 184x.
+  // vectorize, increasing the speed by up to 56x.
   //
   // TODO: Tune gcc flags to auto-vectorize the trivial loop instead of hand-vectorizing
   // it. This might not be possible.
@@ -188,17 +194,17 @@ void BloomFilter::Or(const TBloomFilter& in, TBloomFilter* out) {
     OrEqualArrayAvx(in.directory.size(), &in.directory[0], &out->directory[0]);
   } else {
     const __m128i* simd_in = reinterpret_cast<const __m128i*>(&in.directory[0]);
+    const __m128i* const simd_in_end =
+        reinterpret_cast<const __m128i*>(&in.directory[0] + in.directory.size());
     __m128i* simd_out = reinterpret_cast<__m128i*>(&out->directory[0]);
-    const size_t simd_size =
-        (in.directory.size() * sizeof(in.directory[0])) / sizeof(simd_in[0]);
     // in.directory has a size (in bytes) that is a multiple of 32. Since sizeof(__m128i)
     // == 16, we can do two _mm_or_si128's in each iteration without checking array
     // bounds.
-    for (size_t i = 0; i < simd_size; i += 2) {
-      _mm_storeu_si128(simd_out + i,
-          _mm_or_si128(_mm_loadu_si128(simd_out + i), _mm_loadu_si128(simd_in + i)));
-      _mm_storeu_si128(simd_out + i + 1, _mm_or_si128(_mm_loadu_si128(simd_out + i + 1),
-                                             _mm_loadu_si128(simd_in + i + 1)));
+    while (simd_in != simd_in_end) {
+      for (int i = 0; i < 2; ++i, ++simd_in, ++simd_out) {
+        _mm_storeu_si128(
+            simd_out, _mm_or_si128(_mm_loadu_si128(simd_out), _mm_loadu_si128(simd_in)));
+      }
     }
   }
 }

@@ -27,6 +27,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
+
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -192,16 +193,27 @@ public class CompoundPredicate extends Predicate {
    * Creates a conjunctive predicate from a list of exprs.
    */
   public static Expr createConjunctivePredicate(List<Expr> conjuncts) {
-    Expr conjunctivePred = null;
-    for (Expr expr: conjuncts) {
-      if (conjunctivePred == null) {
-        conjunctivePred = expr;
+    return createCompoundTree(conjuncts, Operator.AND);
+  }
+
+  /**
+   * Creates a disjunctive predicate from a list of exprs.
+   */
+  public static Expr createDisjunctivePredicate(List<Expr> disjuncts) {
+    return createCompoundTree(disjuncts, Operator.OR);
+  }
+
+  private static Expr createCompoundTree(List<Expr> exprs, Operator op) {
+    Preconditions.checkState(op == Operator.AND || op == Operator.OR);
+    Expr result = null;
+    for (Expr expr: exprs) {
+      if (result == null) {
+        result = expr;
         continue;
       }
-      conjunctivePred = new CompoundPredicate(CompoundPredicate.Operator.AND,
-          expr, conjunctivePred);
+      result = new CompoundPredicate(op, result, expr);
     }
-    return conjunctivePred;
+    return result;
   }
 
   @Override

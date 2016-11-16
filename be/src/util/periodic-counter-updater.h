@@ -102,7 +102,7 @@ class PeriodicCounterUpdater {
 
   /// Loop for periodic counter update thread.  This thread wakes up once in a while
   /// and updates all the added rate counters and sampling counters.
-  void UpdateLoop();
+  [[noreturn]] void UpdateLoop();
 
   /// Thread performing asynchronous updates.
   boost::scoped_ptr<boost::thread> update_thread_;

@@ -80,8 +80,11 @@ struct ScopedAvroSchemaElement {
   DISALLOW_COPY_AND_ASSIGN(ScopedAvroSchemaElement);
 };
 
-ColumnType AvroSchemaToColumnType(const avro_schema_t& schema);
-
+/// Converts an Avro schema column to an Impala type. Returns an error status if the Avro
+/// schema does not map to a valid Impala type. 'column_name' is used only for error
+/// messages.
+Status AvroSchemaToColumnType(
+    const avro_schema_t& schema, const std::string& column_name, ColumnType* column_type);
 }
 
 #endif

@@ -124,7 +124,7 @@ TEST_F(LlvmCodeGenTest, BadIRFile) {
 // The random int in there is the address of jitted_counter
 Function* CodegenInnerLoop(LlvmCodeGen* codegen, int64_t* jitted_counter, int delta) {
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
 
   LlvmCodeGen::FnPrototype fn_prototype(codegen, "JittedInnerLoop", codegen->void_type());
   Function* jitted_loop_call = fn_prototype.GeneratePrototype();
@@ -173,10 +173,10 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   ASSERT_OK(LlvmCodeGenTest::CreateFromFile(&pool, module_file.c_str(), &codegen));
   EXPECT_TRUE(codegen.get() != NULL);
 
-  Function* loop_call = codegen->GetFunction(loop_call_name);
+  Function* loop_call = codegen->GetFunction(loop_call_name, false);
   EXPECT_TRUE(loop_call != NULL);
   EXPECT_TRUE(loop_call->arg_empty());
-  Function* loop = codegen->GetFunction(loop_name);
+  Function* loop = codegen->GetFunction(loop_name, false);
   EXPECT_TRUE(loop != NULL);
   EXPECT_EQ(loop->arg_size(), 1);
 
@@ -261,7 +261,7 @@ Function* CodegenStringTest(LlvmCodeGen* codegen) {
 
   LlvmCodeGen::FnPrototype prototype(codegen, "StringTest", codegen->GetType(TYPE_INT));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("str", string_val_ptr_type));
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  LlvmBuilder builder(codegen->context());
 
   Value* str;
   Function* interop_fn = prototype.GeneratePrototype(&builder, &str);
@@ -340,7 +340,7 @@ TEST_F(LlvmCodeGenTest, MemcpyTest) {
   prototype.AddArgument(LlvmCodeGen::NamedVariable("src", codegen->ptr_type()));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("n", codegen->GetType(TYPE_INT)));
 
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  LlvmBuilder builder(codegen->context());
 
   char src[] = "abcd";
   char dst[] = "aaaa";
@@ -396,9 +396,9 @@ TEST_F(LlvmCodeGenTest, HashTest) {
 
     // Create a codegen'd function that hashes all the types and returns the results.
     // The tuple/values to hash are baked into the codegen for simplicity.
-    LlvmCodeGen::FnPrototype prototype(codegen.get(), "HashTest",
-        codegen->GetType(TYPE_INT));
-    LlvmCodeGen::LlvmBuilder builder(codegen->context());
+    LlvmCodeGen::FnPrototype prototype(
+        codegen.get(), "HashTest", codegen->GetType(TYPE_INT));
+    LlvmBuilder builder(codegen->context());
 
     // Test both byte-size specific hash functions and the generic loop hash function
     Function* fn_fixed = prototype.GeneratePrototype(&builder, NULL);

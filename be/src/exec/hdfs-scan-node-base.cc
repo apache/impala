@@ -277,8 +277,8 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
     }
     file_desc->splits.push_back(
         AllocateScanRange(file_desc->fs, file_desc->filename.c_str(), split.length,
-            split.offset, split.partition_id, params.volume_id,
-            try_cache, expected_local, file_desc->mtime));
+            split.offset, split.partition_id, params.volume_id, expected_local,
+            DiskIoMgr::BufferOpts(try_cache, file_desc->mtime)));
   }
 
   // Update server wide metrics for number of scan ranges and ranges that have
@@ -554,9 +554,9 @@ bool HdfsScanNodeBase::WaitForRuntimeFilters(int32_t time_ms) {
   return false;
 }
 
-DiskIoMgr::ScanRange* HdfsScanNodeBase::AllocateScanRange(
-    hdfsFS fs, const char* file, int64_t len, int64_t offset, int64_t partition_id,
-    int disk_id, bool try_cache, bool expected_local, int64_t mtime,
+DiskIoMgr::ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
+    int64_t len, int64_t offset, int64_t partition_id, int disk_id, bool expected_local,
+    const DiskIoMgr::BufferOpts& buffer_opts,
     const DiskIoMgr::ScanRange* original_split) {
   DCHECK_GE(disk_id, -1);
   // Require that the scan range is within [0, file_length). While this cannot be used
@@ -573,15 +573,20 @@ DiskIoMgr::ScanRange* HdfsScanNodeBase::AllocateScanRange(
         new ScanRangeMetadata(partition_id, original_split));
   DiskIoMgr::ScanRange* range =
       runtime_state_->obj_pool()->Add(new DiskIoMgr::ScanRange());
-  range->Reset(fs, file, len, offset, disk_id, try_cache, expected_local,
-      mtime, metadata);
+  range->Reset(fs, file, len, offset, disk_id, expected_local, buffer_opts, metadata);
   return range;
+}
+
+DiskIoMgr::ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
+    int64_t len, int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
+    bool expected_local, int mtime, const DiskIoMgr::ScanRange* original_split) {
+  return AllocateScanRange(fs, file, len, offset, partition_id, disk_id, expected_local,
+      DiskIoMgr::BufferOpts(try_cache, mtime), original_split);
 }
 
 Status HdfsScanNodeBase::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges,
     int num_files_queued) {
-  RETURN_IF_ERROR(
-      runtime_state_->io_mgr()->AddScanRanges(reader_context_, ranges));
+  RETURN_IF_ERROR(runtime_state_->io_mgr()->AddScanRanges(reader_context_, ranges));
   num_unqueued_files_.Add(-num_files_queued);
   DCHECK_GE(num_unqueued_files_.Load(), 0);
   return Status::OK();
@@ -635,7 +640,10 @@ Status HdfsScanNodeBase::CreateAndOpenScanner(HdfsPartitionDescriptor* partition
   Status status = ExecDebugAction(TExecNodePhase::PREPARE_SCANNER, runtime_state_);
   if (status.ok()) {
     status = scanner->get()->Open(context);
-    if (!status.ok()) scanner->get()->Close(scanner->get()->batch());
+    if (!status.ok()) {
+      RowBatch* batch = (HasRowBatchQueue()) ? scanner->get()->batch() : NULL;
+      scanner->get()->Close(batch);
+    }
   } else {
     context->ClearStreams();
   }

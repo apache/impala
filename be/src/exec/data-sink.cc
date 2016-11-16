@@ -112,9 +112,18 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
   return Status::OK();
 }
 
-void DataSink::MergeInsertStats(const TInsertStats& src_stats,
+void DataSink::MergeDmlStats(const TInsertStats& src_stats,
     TInsertStats* dst_stats) {
   dst_stats->bytes_written += src_stats.bytes_written;
+  if (src_stats.__isset.kudu_stats) {
+    if (!dst_stats->__isset.kudu_stats) dst_stats->__set_kudu_stats(TKuduDmlStats());
+    if (!dst_stats->kudu_stats.__isset.num_row_errors) {
+      dst_stats->kudu_stats.__set_num_row_errors(0);
+    }
+
+    dst_stats->kudu_stats.__set_num_row_errors(
+        dst_stats->kudu_stats.num_row_errors + src_stats.kudu_stats.num_row_errors);
+  }
   if (src_stats.__isset.parquet_stats) {
     if (dst_stats->__isset.parquet_stats) {
       MergeMapValues<string, int64_t>(src_stats.parquet_stats.per_column_size,
@@ -125,7 +134,7 @@ void DataSink::MergeInsertStats(const TInsertStats& src_stats,
   }
 }
 
-string DataSink::OutputInsertStats(const PartitionStatusMap& stats,
+string DataSink::OutputDmlStats(const PartitionStatusMap& stats,
     const string& prefix) {
   const char* indent = "  ";
   stringstream ss;
@@ -148,6 +157,10 @@ string DataSink::OutputInsertStats(const PartitionStatusMap& stats,
 
     if (!val.second.__isset.stats) continue;
     const TInsertStats& stats = val.second.stats;
+    if (stats.__isset.kudu_stats) {
+      ss << "NumRowErrors: " << stats.kudu_stats.num_row_errors << endl;
+    }
+
     ss << indent << "BytesWritten: "
        << PrettyPrinter::Print(stats.bytes_written, TUnit::BYTES);
     if (stats.__isset.parquet_stats) {

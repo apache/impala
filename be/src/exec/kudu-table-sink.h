@@ -44,13 +44,13 @@ namespace impala {
 /// because Kudu currently has some 8MB buffer limits.
 ///
 /// Kudu doesn't have transactions yet, so some rows may fail to write while others are
-/// successful. The Kudu client reports errors, some of which may be considered to be
-/// expected: rows that fail to be written/updated/deleted due to a key conflict while
-/// the IGNORE option is specified, and these will not result in the sink returning an
-/// error. These errors when IGNORE is not specified, or any other kind of error
-/// reported by Kudu result in the sink returning an error status. The first non-ignored
-/// error is returned in the sink's Status. All reported errors (ignored or not) will be
-/// logged via the RuntimeState.
+/// successful. The Kudu client reports errors, some of which are treated as warnings and
+/// will not fail the query: PK already exists on INSERT, key not found on UPDATE/DELETE,
+/// NULL in a non-nullable column, and PK specifying rows in an uncovered range.
+/// The number of rows that cannot be modified due to these errors is reported in the
+/// TInsertPartitionStatus report sent by the DataSink to the coordinator.
+/// Any other kind of error reported by Kudu results in the sink returning an error
+/// status. All reported errors (ignored or not) will be logged via the RuntimeState.
 class KuduTableSink : public DataSink {
  public:
   KuduTableSink(const RowDescriptor& row_desc,
@@ -100,10 +100,9 @@ class KuduTableSink : public DataSink {
   std::vector<ExprContext*> output_expr_ctxs_;
 
   /// The Kudu client, table and session.
-  /// This uses 'std::tr1::shared_ptr' as that is the type expected by Kudu.
-  std::tr1::shared_ptr<kudu::client::KuduClient> client_;
-  std::tr1::shared_ptr<kudu::client::KuduTable> table_;
-  std::tr1::shared_ptr<kudu::client::KuduSession> session_;
+  kudu::client::sp::shared_ptr<kudu::client::KuduClient> client_;
+  kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
+  kudu::client::sp::shared_ptr<kudu::client::KuduSession> session_;
 
   /// Used to specify the type of write operation (INSERT/UPDATE/DELETE).
   TSinkAction::type sink_action_;
@@ -111,19 +110,22 @@ class KuduTableSink : public DataSink {
   /// Captures parameters passed down from the frontend
   TKuduTableSink kudu_table_sink_;
 
-  /// Total number of errors returned from Kudu.
-  RuntimeProfile::Counter* kudu_error_counter_;
-
   /// Time spent applying Kudu operations. In normal circumstances, Apply() should be
   /// negligible because it is asynchronous with AUTO_FLUSH_BACKGROUND enabled.
   /// Significant time spent in Apply() may indicate that Kudu cannot buffer and send
   /// rows as fast as the sink can write them.
   RuntimeProfile::Counter* kudu_apply_timer_;
 
-  /// Total number of rows written including errors.
-  RuntimeProfile::Counter* rows_written_;
-  RuntimeProfile::Counter* rows_written_rate_;
+  /// Total number of rows processed, i.e. rows written to Kudu and also rows with
+  /// errors.
+  RuntimeProfile::Counter* total_rows_;
 
+  /// The number of rows with errors.
+  RuntimeProfile::Counter* num_row_errors_;
+
+  /// Rate at which the sink consumes and processes rows, i.e. writing rows to Kudu or
+  /// skipping rows that are known to violate nullability constraints.
+  RuntimeProfile::Counter* rows_processed_rate_;
 };
 
 }  // namespace impala

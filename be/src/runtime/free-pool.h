@@ -35,8 +35,8 @@ namespace impala {
 
 /// Implementation of a free pool to recycle allocations. The pool is broken
 /// up into 64 lists, one for each power of 2. Each allocation is rounded up
-/// to the next power of 2. When the allocation is freed, it is added to the
-/// corresponding free list.
+/// to the next power of 2 (or 8 bytes, whichever is larger). When the
+/// allocation is freed, it is added to the corresponding free list.
 /// Each allocation has an 8 byte header that immediately precedes the actual
 /// allocation. If the allocation is owned by the user, the header contains
 /// the ptr to the list that it should be added to on Free().
@@ -70,6 +70,9 @@ class FreePool {
     if (UNLIKELY(size == 0)) return mem_pool_->EmptyAllocPtr();
     ++net_allocations_;
     if (FLAGS_disable_mem_pools) return reinterpret_cast<uint8_t*>(malloc(size));
+    /// MemPool allocations are 8-byte aligned, so making allocations < 8 bytes
+    /// doesn't save memory and eliminates opportunities to recycle allocations.
+    size = std::max<int64_t>(8, size);
     int free_list_idx = Bits::Log2Ceiling64(size);
     DCHECK_LT(free_list_idx, NUM_LISTS);
     FreeListNode* allocation = lists_[free_list_idx].next;

@@ -63,13 +63,14 @@ Status CaseExpr::Open(RuntimeState* state, ExprContext* ctx,
     return fn_ctx->impl()->state()->GetQueryStatus();
   }
   fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, case_state);
-  if (has_case_expr_) {
-    case_state->case_val = CreateAnyVal(state->obj_pool(), children_[0]->type());
-    case_state->when_val = CreateAnyVal(state->obj_pool(), children_[1]->type());
-  } else {
-    case_state->case_val = CreateAnyVal(state->obj_pool(), TYPE_BOOLEAN);
-    case_state->when_val = CreateAnyVal(state->obj_pool(), children_[0]->type());
-  }
+
+  const ColumnType& case_val_type = has_case_expr_ ? children_[0]->type() : TYPE_BOOLEAN;
+  RETURN_IF_ERROR(AllocateAnyVal(state, ctx->pool_.get(), case_val_type,
+      "Could not allocate expression value", &case_state->case_val));
+  const ColumnType& when_val_type =
+      has_case_expr_ ? children_[1]->type() : children_[0]->type();
+  RETURN_IF_ERROR(AllocateAnyVal(state, ctx->pool_.get(), when_val_type,
+      "Could not allocate expression value", &case_state->when_val));
   return Status::OK();
 }
 
@@ -195,7 +196,7 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
   }
 
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
 
   Value* args[2];
   Function* function = CreateIrFunctionPrototype(codegen, "CaseExpr", &args);

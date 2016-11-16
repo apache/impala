@@ -43,9 +43,9 @@ public class IncompleteTable extends Table {
   // its metadata loaded).
   private ImpalaException cause_;
 
-  private IncompleteTable(TableId id, Db db, String name,
+  private IncompleteTable(Db db, String name,
       ImpalaException cause) {
-    super(id, null, db, name, null);
+    super(null, db, name, null);
     cause_ = cause;
   }
 
@@ -65,7 +65,7 @@ public class IncompleteTable extends Table {
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
+  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
     throw new IllegalStateException(cause_);
   }
 
@@ -82,7 +82,6 @@ public class IncompleteTable extends Table {
   @Override
   public TTable toThrift() {
     TTable table = new TTable(db_.getName(), name_);
-    table.setId(id_.asInt());
     if (cause_ != null) {
       table.setLoad_status(new TStatus(TErrorCode.INTERNAL_ERROR,
           Lists.newArrayList(JniUtil.throwableToString(cause_),
@@ -122,13 +121,12 @@ public class IncompleteTable extends Table {
     }
   }
 
-  public static IncompleteTable createUninitializedTable(TableId id, Db db,
-      String name) {
-    return new IncompleteTable(id, db, name, null);
+  public static IncompleteTable createUninitializedTable(Db db, String name) {
+    return new IncompleteTable(db, name, null);
   }
 
-  public static IncompleteTable createFailedMetadataLoadTable(TableId id, Db db,
-      String name, ImpalaException e) {
-    return new IncompleteTable(id, db, name, e);
+  public static IncompleteTable createFailedMetadataLoadTable(Db db, String name,
+      ImpalaException e) {
+    return new IncompleteTable(db, name, e);
   }
 }

@@ -34,8 +34,8 @@ using namespace impala;
 // For computing tuple mem layouts.
 static scoped_ptr<Frontend> fe;
 
-TEST(RowBatchTest, AcquireStateWithMarkAtCapacity) {
-  // Test that AcquireState() can be correctly called with MarkAtCapacity() on the
+TEST(RowBatchTest, AcquireStateWithMarkFlushResources) {
+  // Test that AcquireState() can be correctly called with MarkFlushResources() on the
   // source batch.
   ObjectPool pool;
   DescriptorTblBuilder builder(fe.get(), &pool);
@@ -48,9 +48,10 @@ TEST(RowBatchTest, AcquireStateWithMarkAtCapacity) {
   MemTracker tracker;
   {
     RowBatch src(row_desc, 1024, &tracker);
-    src.AddRow(); src.CommitLastRow();
-    // Calls MarkAtCapacity().
-    src.MarkNeedToReturn();
+    src.AddRow();
+    src.CommitLastRow();
+    // Calls MarkFlushResources().
+    src.MarkNeedsDeepCopy();
 
     // Note InitialCapacity(), not capacity(). Latter will DCHECK.
     RowBatch dest(row_desc, src.InitialCapacity(), &tracker);
@@ -60,9 +61,10 @@ TEST(RowBatchTest, AcquireStateWithMarkAtCapacity) {
   // Confirm the bad pattern causes an error.
   {
     RowBatch src(row_desc, 1024, &tracker);
-    src.AddRow(); src.CommitLastRow();
-    // Calls MarkAtCapacity().
-    src.MarkNeedToReturn();
+    src.AddRow();
+    src.CommitLastRow();
+    // Calls MarkFlushResources().
+    src.MarkNeedsDeepCopy();
     RowBatch bad_dest(row_desc, src.capacity(), &tracker);
     IMPALA_ASSERT_DEBUG_DEATH(bad_dest.AcquireState(&src), "");
   }

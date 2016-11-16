@@ -133,6 +133,14 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
     }
   }
 
+  if (node.__isset.summary_stats_counters) {
+    for (const TSummaryStatsCounter& val: node.summary_stats_counters) {
+      profile->summary_stats_map_[val.name] =
+          pool->Add(new SummaryStatsCounter(
+              val.unit, val.total_num_values, val.min_value, val.max_value, val.sum));
+    }
+  }
+
   profile->child_counter_map_ = node.child_counters_map;
   profile->info_strings_ = node.info_strings;
   profile->info_strings_display_order_ = node.info_strings_display_order;
@@ -282,6 +290,21 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
         it = time_series_counter_map_.find(c.name);
       } else {
         it->second->samples_.SetSamples(c.period_ms, c.values);
+      }
+    }
+  }
+
+  {
+    lock_guard<SpinLock> l(summary_stats_map_lock_);
+    for (int i = 0; i < node.summary_stats_counters.size(); ++i) {
+      const TSummaryStatsCounter& c = node.summary_stats_counters[i];
+      SummaryStatsCounterMap::iterator it = summary_stats_map_.find(c.name);
+      if (it == summary_stats_map_.end()) {
+        summary_stats_map_[c.name] =
+            pool_->Add(new SummaryStatsCounter(
+                c.unit, c.total_num_values, c.min_value, c.max_value, c.sum));
+      } else {
+        it->second->SetStats(c);
       }
     }
   }
@@ -651,6 +674,28 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
     }
   }
 
+  {
+    lock_guard<SpinLock> l(summary_stats_map_lock_);
+    // Print all SummaryStatsCounters as following:
+    // <Name>: (Avg: <value> ; Min: <min_value> ; Max: <max_value> ;
+    // Number of samples: <total>)
+    for (const SummaryStatsCounterMap::value_type& v: summary_stats_map_) {
+      if (v.second->TotalNumValues() == 0) {
+        // No point printing all the stats if number of samples is zero.
+        stream << prefix << "  - " << v.first << ": "
+               << PrettyPrinter::Print(v.second->value(), v.second->unit(), true)
+               << " (Number of samples: " << v.second->TotalNumValues() << ")" << endl;
+      } else {
+        stream << prefix << "   - " << v.first << ": (Avg: "
+               << PrettyPrinter::Print(v.second->value(), v.second->unit(), true)
+               << " ; Min: "
+               << PrettyPrinter::Print(v.second->MinValue(), v.second->unit(), true)
+               << " ; Max: "
+               << PrettyPrinter::Print(v.second->MaxValue(), v.second->unit(), true)
+               << " ; Number of samples: " << v.second->TotalNumValues() << ")" << endl;
+      }
+    }
+  }
   RuntimeProfile::PrintChildCounters(
       prefix, ROOT_COUNTER, counter_map, child_counter_map, s);
 
@@ -760,11 +805,23 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   {
     lock_guard<SpinLock> l(time_series_counter_map_lock_);
     if (time_series_counter_map_.size() != 0) {
-      node.__set_time_series_counters(vector<TTimeSeriesCounter>());
-      node.time_series_counters.resize(time_series_counter_map_.size());
+      node.__set_time_series_counters(
+          vector<TTimeSeriesCounter>(time_series_counter_map_.size()));
       int idx = 0;
       for (const TimeSeriesCounterMap::value_type& val: time_series_counter_map_) {
         val.second->ToThrift(&node.time_series_counters[idx++]);
+      }
+    }
+  }
+
+  {
+    lock_guard<SpinLock> l(summary_stats_map_lock_);
+    if (summary_stats_map_.size() != 0) {
+      node.__set_summary_stats_counters(
+          vector<TSummaryStatsCounter>(summary_stats_map_.size()));
+      int idx = 0;
+      for (const SummaryStatsCounterMap::value_type& val: summary_stats_map_) {
+        val.second->ToThrift(&node.summary_stats_counters[idx++], val.first);
       }
     }
   }
@@ -896,6 +953,18 @@ void RuntimeProfile::PrintChildCounters(const string& prefix,
   }
 }
 
+RuntimeProfile::SummaryStatsCounter* RuntimeProfile::AddSummaryStatsCounter(
+    const string& name, TUnit::type unit, const std::string& parent_counter_name) {
+  DCHECK_EQ(is_averaged_profile_, false);
+  lock_guard<SpinLock> l(summary_stats_map_lock_);
+  if (summary_stats_map_.find(name) != summary_stats_map_.end()) {
+    return summary_stats_map_[name];
+  }
+  SummaryStatsCounter* counter = pool_->Add(new SummaryStatsCounter(unit));
+  summary_stats_map_[name] = counter;
+  return counter;
+}
+
 RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddTimeSeriesCounter(
     const string& name, TUnit::type unit, DerivedCounterFunction fn) {
   DCHECK(fn != NULL);
@@ -943,6 +1012,56 @@ void RuntimeProfile::EventSequence::ToThrift(TEventSequence* seq) const {
     seq->labels.push_back(ev.first);
     seq->timestamps.push_back(ev.second);
   }
+}
+
+void RuntimeProfile::SummaryStatsCounter::ToThrift(TSummaryStatsCounter* counter,
+    const std::string& name) {
+  lock_guard<SpinLock> l(lock_);
+  counter->name = name;
+  counter->unit = unit_;
+  counter->sum = sum_;
+  counter->total_num_values = total_num_values_;
+  counter->min_value = min_;
+  counter->max_value = max_;
+}
+
+void RuntimeProfile::SummaryStatsCounter::UpdateCounter(int64_t new_value) {
+  lock_guard<SpinLock> l(lock_);
+
+  ++total_num_values_;
+  sum_ += new_value;
+  value_.Store(sum_ / total_num_values_);
+
+  if (new_value < min_) min_ = new_value;
+  if (new_value > max_) max_ = new_value;
+}
+
+void RuntimeProfile::SummaryStatsCounter::SetStats(const TSummaryStatsCounter& counter) {
+  // We drop this input if it looks malformed.
+  if (counter.total_num_values < 0) return;
+  lock_guard<SpinLock> l(lock_);
+  unit_ = counter.unit;
+  sum_ = counter.sum;
+  total_num_values_ = counter.total_num_values;
+  min_ = counter.min_value;
+  max_ = counter.max_value;
+
+  value_.Store(total_num_values_ == 0 ? 0 : sum_ / total_num_values_);
+}
+
+int64_t RuntimeProfile::SummaryStatsCounter::MinValue() {
+  lock_guard<SpinLock> l(lock_);
+  return min_;
+}
+
+int64_t RuntimeProfile::SummaryStatsCounter::MaxValue() {
+  lock_guard<SpinLock> l(lock_);
+  return max_;
+}
+
+int32_t RuntimeProfile::SummaryStatsCounter::TotalNumValues() {
+  lock_guard<SpinLock> l(lock_);
+  return total_num_values_;
 }
 
 }

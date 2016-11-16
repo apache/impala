@@ -129,9 +129,9 @@ public class HBaseTable extends Table {
   // (see IMPALA-4211).
   private HColumnDescriptor[] columnFamilies_ = null;
 
-  protected HBaseTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTbl,
+  protected HBaseTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       Db db, String name, String owner) {
-    super(id, msTbl, db, name, owner);
+    super(msTbl, db, name, owner);
   }
 
   /**
@@ -662,9 +662,9 @@ public class HBaseTable extends Table {
   }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
+  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
     TTableDescriptor tableDescriptor =
-        new TTableDescriptor(id_.asInt(), TTableType.HBASE_TABLE,
+        new TTableDescriptor(tableId, TTableType.HBASE_TABLE,
             getTColumnDescriptors(), numClusteringCols_, hbaseTableName_, db_.getName());
     tableDescriptor.setHbaseTable(getTHBaseTable());
     return tableDescriptor;

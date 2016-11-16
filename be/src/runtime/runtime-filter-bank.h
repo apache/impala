@@ -100,7 +100,7 @@ class RuntimeFilterBank {
   BloomFilter* AllocateScratchBloomFilter(int32_t filter_id);
 
   /// Default hash seed to use when computing hashed values to insert into filters.
-  static const int32_t DefaultHashSeed() { return 1234; }
+  static int32_t DefaultHashSeed() { return 1234; }
 
   /// Releases all memory allocated for BloomFilters.
   void Close();

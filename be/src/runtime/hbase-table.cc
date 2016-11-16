@@ -57,7 +57,7 @@ void HBaseTable::Close(RuntimeState* state) {
         TErrorCode::GENERAL, "HBaseTable::Close(): Error creating JNIEnv"));
   } else {
     env->CallObjectMethod(table_, table_close_id_);
-    Status s = JniUtil::GetJniExceptionMsg(env, "HBaseTable::Close(): ");
+    Status s = JniUtil::GetJniExceptionMsg(env, true, "HBaseTable::Close(): ");
     if (!s.ok()) state->LogError(s.msg());
     s = JniUtil::FreeGlobalRef(env, table_);
     if (!s.ok()) state->LogError(s.msg());

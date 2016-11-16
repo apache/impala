@@ -71,10 +71,14 @@ namespace llvm {
 
 namespace impala {
 
-class CodegenAnyVal;
 class CodegenSymbolEmitter;
 class SubExprElimination;
 class TupleDescriptor;
+
+/// Define builder subclass in case we want to change the template arguments later
+class LlvmBuilder : public llvm::IRBuilder<> {
+  using llvm::IRBuilder<>::IRBuilder;
+};
 
 /// LLVM code generator.  This is the top level object to generate jitted code.
 //
@@ -156,9 +160,6 @@ class LlvmCodeGen {
   /// entire module is dumped, including what was loaded from precompiled IR.
   /// If false, only output IR for functions which were generated.
   std::string GetIR(bool full_module) const;
-
-  /// Typedef builder in case we want to change the template arguments later
-  typedef llvm::IRBuilder<> LlvmBuilder;
 
   /// Utility struct that wraps a variable name and llvm type.
   struct NamedVariable {
@@ -330,18 +331,22 @@ class LlvmCodeGen {
   /// recursively. Returns NULL if there is any error.
   ///
   /// If 'clone' is true, a clone of the function will be returned. Clones should be used
-  /// iff the caller will modify the returned function. This avoids clobbering the
-  /// function in case other users need it, but we don't clone if we can avoid it to
-  /// reduce compilation time.
+  /// iff the caller will modify the returned function so that the original unmodified
+  /// function remains available. Avoid cloning if possible to reduce compilation time.
   ///
   /// TODO: Return Status instead.
   llvm::Function* GetFunction(IRFunction::Type ir_type, bool clone);
 
   /// Return the function with the symbol name 'symbol' from the module. The returned
-  /// function and its callee will be recursively materialized. The returned function
-  /// isn't cloned. Returns NULL if there is any error.
+  /// function and its callee will be recursively materialized. Returns NULL if there is
+  /// any error.
+  ///
+  /// If 'clone' is true, a clone of the function will be returned. Clones should be used
+  /// iff the caller will modify the returned function so that the original unmodified
+  /// function remains available. Avoid cloning if possible to reduce compilation time.
+  ///
   /// TODO: Return Status instead.
-  llvm::Function* GetFunction(const string& symbol);
+  llvm::Function* GetFunction(const string& symbol, bool clone);
 
   /// Returns the hash function with signature:
   ///   int32_t Hash(int8_t* data, int len, int32_t seed);
@@ -359,11 +364,16 @@ class LlvmCodeGen {
   /// struct allocated.  The allocated variable is scoped to the function.
   //
   /// This should always be used instead of calling LlvmBuilder::CreateAlloca directly.
-  /// LLVM doesn't optimize alloca's occuring in the middle of functions very well (e.g, an
-  /// alloca may end up in a loop, potentially blowing the stack).
+  /// LLVM doesn't optimize alloca's occurring in the middle of functions very well (e.g,
+  /// an alloca may end up in a loop, potentially blowing the stack).
   llvm::AllocaInst* CreateEntryBlockAlloca(llvm::Function* f, const NamedVariable& var);
+  llvm::AllocaInst* CreateEntryBlockAlloca(
+      const LlvmBuilder& builder, llvm::Type* type, const char* name = "");
+
+  /// Same as above, except allocates an array of 'type' with 'num_entries' entries
+  /// and alignment 'alignment'.
   llvm::AllocaInst* CreateEntryBlockAlloca(const LlvmBuilder& builder, llvm::Type* type,
-                                           const char* name = "");
+      int num_entries, int alignment, const char* name = "");
 
   /// Utility to create two blocks in 'fn' for if/else codegen.  if_block and else_block
   /// are return parameters.  insert_before is optional and if set, the two blocks
@@ -387,6 +397,9 @@ class LlvmCodeGen {
   /// values less than or equal to 64-bits, 'high_bits' is not used. This function
   /// can generate constant up to 128-bit wide. 'byte_size' must be power of 2.
   llvm::Value* GetIntConstant(int byte_size, uint64_t low_bits, uint64_t high_bits);
+
+  /// Initialise a constant global string and returns an i8* pointer to it.
+  llvm::Value* GetStringConstant(LlvmBuilder* builder, char* data, int len);
 
   /// Returns true/false constants (bool type)
   llvm::Value* true_value() { return true_value_; }
@@ -434,8 +447,8 @@ class LlvmCodeGen {
   /// Codegens IR to load array[idx] and returns the loaded value. 'array' should be a
   /// C-style array (e.g. i32*) or an IR array (e.g. [10 x i32]). This function does not
   /// do bounds checking.
-  llvm::Value* CodegenArrayAt(LlvmBuilder*, llvm::Value* array, int idx,
-      const char* name = "");
+  llvm::Value* CodegenArrayAt(
+      LlvmBuilder*, llvm::Value* array, int idx, const char* name = "");
 
   /// Loads a module at 'file' and links it to the module associated with
   /// this LlvmCodeGen object. The module must be on the local filesystem.

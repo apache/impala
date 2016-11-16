@@ -349,7 +349,7 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   prototype.AddArgument("total_string_lengths", int_ptr_type);
   prototype.AddArgument("num_non_null_string_values", int_ptr_type);
 
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
   Value* args[8];
   *fn = prototype.GeneratePrototype(&builder, args);
   Value* opaque_tuple_arg = args[0];
@@ -363,6 +363,9 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
 
   // Cast the opaque Tuple* argument to the generated struct type
   Type* tuple_struct_type = desc.GetLlvmStruct(codegen);
+  if (tuple_struct_type == NULL) {
+    return Status("CodegenMaterializeExprs(): failed to generate tuple desc");
+  }
   PointerType* tuple_type = codegen->GetPtrType(tuple_struct_type);
   Value* tuple = builder.CreateBitCast(opaque_tuple_arg, tuple_type, "tuple");
 

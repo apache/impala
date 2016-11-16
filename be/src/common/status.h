@@ -209,7 +209,7 @@ class Status {
   /// Returns the error message associated with a non-successful status.
   const ErrorMsg& msg() const {
     DCHECK(msg_ != NULL);
-    return *msg_;
+    return *msg_; // NOLINT: clang-tidy thinks this might deref a nullptr
   }
 
   /// Add a detail string. Calling this method is only defined on a non-OK message
@@ -257,10 +257,10 @@ class Status {
 };
 
 /// some generally useful macros
-#define RETURN_IF_ERROR(stmt)                                     \
-  do {                                                            \
-    Status __status__ = (stmt);                                   \
-    if (UNLIKELY(!__status__.ok())) return std::move(__status__); \
+#define RETURN_IF_ERROR(stmt)                          \
+  do {                                                 \
+    Status __status__ = (stmt);                        \
+    if (UNLIKELY(!__status__.ok())) return __status__; \
   } while (false)
 
 #define ABORT_IF_ERROR(stmt) \

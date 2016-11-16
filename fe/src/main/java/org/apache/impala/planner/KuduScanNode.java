@@ -43,11 +43,11 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
-import org.apache.impala.thrift.TScanRangeLocations;
+import org.apache.impala.thrift.TScanRangeLocationList;
+import org.apache.impala.util.KuduUtil;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
-import org.apache.kudu.client.KuduClient.KuduClientBuilder;
 import org.apache.kudu.client.KuduPredicate;
 import org.apache.kudu.client.KuduPredicate.ComparisonOp;
 import org.apache.kudu.client.KuduScanToken;
@@ -106,8 +106,7 @@ public class KuduScanNode extends ScanNode {
     analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
     conjuncts_ = orderConjunctsByCost(conjuncts_);
 
-    try (KuduClient client =
-         new KuduClientBuilder(kuduTable_.getKuduMasterHosts()).build()) {
+    try (KuduClient client = KuduUtil.createKuduClient(kuduTable_.getKuduMasterHosts())) {
       org.apache.kudu.client.KuduTable rpcTable =
           client.openTable(kuduTable_.getKuduTableName());
       validateSchema(rpcTable);
@@ -118,13 +117,16 @@ public class KuduScanNode extends ScanNode {
       // Materialize the slots of the remaining conjuncts (i.e. those not pushed to Kudu)
       analyzer.materializeSlots(conjuncts_);
 
+      // Compute mem layout before the scan range locations because creation of the Kudu
+      // scan tokens depends on having a mem layout.
+      computeMemLayout(analyzer);
+
       // Creates Kudu scan tokens and sets the scan range locations.
       computeScanRangeLocations(analyzer, client, rpcTable);
     } catch (Exception e) {
       throw new ImpalaRuntimeException("Unable to initialize the Kudu scan node", e);
     }
 
-    computeMemLayout(analyzer);
     computeStats(analyzer);
   }
 
@@ -180,7 +182,7 @@ public class KuduScanNode extends ScanNode {
             token.toString(), e);
       }
 
-      TScanRangeLocations locs = new TScanRangeLocations();
+      TScanRangeLocationList locs = new TScanRangeLocationList();
       locs.setScan_range(scanRange);
       locs.locations = locations;
       scanRanges_.add(locs);
@@ -189,15 +191,15 @@ public class KuduScanNode extends ScanNode {
 
   /**
    * Returns KuduScanTokens for this scan given the projected columns and predicates that
-   * will be pushed to Kudu.
+   * will be pushed to Kudu. The projected Kudu columns are ordered by offset in an
+   * Impala tuple to make the Impala and Kudu tuple layouts identical.
    */
   private List<KuduScanToken> createScanTokens(KuduClient client,
       org.apache.kudu.client.KuduTable rpcTable) {
     List<String> projectedCols = Lists.newArrayList();
-    for (SlotDescriptor desc: getTupleDesc().getSlots()) {
-      if (desc.isMaterialized()) projectedCols.add(desc.getColumn().getName());
+    for (SlotDescriptor desc: getTupleDesc().getSlotsOrderedByOffset()) {
+      projectedCols.add(desc.getColumn().getName());
     }
-
     KuduScanTokenBuilder tokenBuilder = client.newScanTokenBuilder(rpcTable);
     tokenBuilder.setProjectedColumnNames(projectedCols);
     for (KuduPredicate predicate: kuduPredicates_) tokenBuilder.addPredicate(predicate);

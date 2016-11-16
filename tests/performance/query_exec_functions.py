@@ -245,7 +245,7 @@ def execute_using_jdbc(query, query_config):
   cmd = query_config.jdbc_client_cmd + " -q \"%s\"" % query_string
   return run_query_capture_results(cmd, query, exit_on_error=False)
 
-def parse_jdbc_query_results(stdout, stderr):
+def parse_jdbc_query_results(stdout, stderr, query):
   """
   Parse query execution results for the Impala JDBC client
 
@@ -260,10 +260,10 @@ def parse_jdbc_query_results(stdout, stderr):
       time_taken = float(('%s.%s') % (match.group(1), match.group(2)))
       break
   result_data = re.findall(r'\[START\]----\n(.*?)\n----\[END\]', stdout, re.DOTALL)[0]
-  return create_exec_result(time_taken, result_data)
+  return create_exec_result(time_taken, result_data, query)
 
-def create_exec_result(time_taken, result_data):
-  exec_result = HiveQueryResult()
+def create_exec_result(time_taken, result_data, query):
+  exec_result = HiveQueryResult(query)
   if result_data:
     LOG.debug('Data:\n%s\n' % result_data)
     exec_result.data = result_data
@@ -296,7 +296,7 @@ def run_query_capture_results(cmd, query, exit_on_error):
     exec_result.query_error = msg
     return exec_result
   # The command completed
-  exec_result = parse_jdbc_query_results(stdout, stderr)
+  exec_result = parse_jdbc_query_results(stdout, stderr, query)
   exec_result.query = query
   exec_result.start_time = start_time
   return exec_result

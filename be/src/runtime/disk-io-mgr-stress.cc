@@ -73,7 +73,7 @@ DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk,
 
   io_mgr_.reset(new DiskIoMgr(
       num_disks, num_threads_per_disk, MIN_READ_BUFFER_SIZE, MAX_READ_BUFFER_SIZE));
-  Status status = io_mgr_->Init(&dummy_tracker_);
+  Status status = io_mgr_->Init(&mem_tracker_);
   CHECK(status.ok());
 
   // Initialize some data files.  It doesn't really matter how many there are.
@@ -87,6 +87,7 @@ DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk,
   }
 
   clients_ = new Client[num_clients_];
+  client_mem_trackers_.resize(num_clients_);
   for (int i = 0; i < num_clients_; ++i) {
     NewClient(i);
   }
@@ -127,7 +128,8 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 
         // Validate the bytes read
         CHECK_LE(file_offset + len, expected.size());
-        CHECK_EQ(strncmp(buffer->buffer(), &expected.c_str()[file_offset], len), 0);
+        CHECK_EQ(strncmp(reinterpret_cast<char*>(buffer->buffer()),
+                     &expected.c_str()[file_offset], len), 0);
 
         // Copy the bytes from this read into the result buffer.
         memcpy(read_buffer + file_offset, buffer->buffer(), buffer->len());
@@ -228,13 +230,15 @@ void DiskIoMgrStress::NewClient(int i) {
     int range_len = rand() % (MAX_READ_LEN - MIN_READ_LEN) + MIN_READ_LEN;
     range_len = min(range_len, file_len - assigned_len);
 
-    DiskIoMgr::ScanRange* range = new DiskIoMgr::ScanRange();;
-    range->Reset(NULL, files_[client.file_idx].filename.c_str(), range_len,
-        assigned_len, 0, false, false, DiskIoMgr::ScanRange::NEVER_CACHE);
+    DiskIoMgr::ScanRange* range = new DiskIoMgr::ScanRange();
+    range->Reset(NULL, files_[client.file_idx].filename.c_str(), range_len, assigned_len,
+        0, false, DiskIoMgr::BufferOpts::Uncached());
     client.scan_ranges.push_back(range);
     assigned_len += range_len;
   }
-  Status status = io_mgr_->RegisterContext(&client.reader, NULL);
+
+  client_mem_trackers_[i].reset(new MemTracker(-1, "", &mem_tracker_));
+  Status status = io_mgr_->RegisterContext(&client.reader, client_mem_trackers_[i].get());
   CHECK(status.ok());
   status = io_mgr_->AddScanRanges(client.reader, client.scan_ranges);
   CHECK(status.ok());

@@ -1,8 +1,5 @@
 ====
 ---- QUERY
-create database if not exists native_function_test;
-use native_function_test;
-
 drop function if exists agg_memtest(bigint);
 
 create aggregate function agg_memtest(bigint) returns bigint

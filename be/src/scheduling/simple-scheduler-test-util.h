@@ -231,11 +231,11 @@ class Plan {
 
   const std::vector<TNetworkAddress>& referenced_datanodes() const;
 
-  const std::vector<TScanRangeLocations>& scan_range_locations() const;
+  const std::vector<TScanRangeLocationList>& scan_range_locations() const;
 
   /// Add a scan of table 'table_name' to the plan. This method will populate the internal
-  /// list of TScanRangeLocations and can be called multiple times for the same table to
-  /// schedule additional scans.
+  /// list of TScanRangeLocationList and can be called multiple times for the same table
+  /// to schedule additional scans.
   void AddTableScan(const TableName& table_name);
 
  private:
@@ -252,11 +252,11 @@ class Plan {
   std::unordered_map<int, int> host_idx_to_datanode_idx_;
 
   /// List of all scan range locations, which can be passed to the SimpleScheduler.
-  std::vector<TScanRangeLocations> scan_range_locations_;
+  std::vector<TScanRangeLocationList> scan_range_locations_;
 
-  /// Initialize a TScanRangeLocations object in place.
-  void BuildTScanRangeLocations(const TableName& table_name, const Block& block,
-      int block_idx, TScanRangeLocations* scan_range_locations);
+  /// Initialize a TScanRangeLocationList object in place.
+  void BuildTScanRangeLocationList(const TableName& table_name, const Block& block,
+      int block_idx, TScanRangeLocationList* scan_range_locations);
 
   void BuildScanRange(const TableName& table_name, const Block& block, int block_idx,
       TScanRange* scan_range);

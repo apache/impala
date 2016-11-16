@@ -391,6 +391,10 @@ class TestDdlStatements(TestDdlBase):
     assert properties['p2'] == 'val3'
     assert properties[''] == ''
 
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_partition_ddl_predicates(self, vector, unique_database):
+    self.run_test_case('QueryTest/partition-ddl-predicates', vector,
+        use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
 # IMPALA-2002: Tests repeated adding/dropping of .jar and .so in the lib cache.
 class TestLibCache(TestDdlBase):

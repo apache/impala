@@ -51,3 +51,27 @@ class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):
           'kudu.table_name'='%s')
           """ % (table_name, KUDU_MASTER_HOSTS, kudu_table.name))
       cursor.execute("DROP TABLE %s" % table_name)
+
+
+class TestKuduClientTimeout(CustomClusterTestSuite, KuduTestSuite):
+  """Kudu tests that set the Kudu client operation timeout to 1ms and expect
+     specific timeout exceptions. While we expect all exercised operations to take at
+     least 1ms, it is possible that some may not and thus the test could be flaky. If
+     this turns out to be the case, specific tests may need to be re-considered or
+     removed."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args="-kudu_operation_timeout_ms=1")
+  def test_impalad_timeout(self, vector):
+    """Check impalad behavior when -kudu_operation_timeout_ms is too low."""
+    self.run_test_case('QueryTest/kudu-timeouts-impalad', vector)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(catalogd_args="-kudu_operation_timeout_ms=1")
+  def test_catalogd_timeout(self, vector):
+    """Check catalogd behavior when -kudu_operation_timeout_ms is too low."""
+    self.run_test_case('QueryTest/kudu-timeouts-catalogd', vector)

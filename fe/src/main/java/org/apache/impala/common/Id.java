@@ -27,14 +27,12 @@ import com.google.common.collect.Lists;
  * Integer ids that cannot accidentally be compared with ints.
  */
 public class Id<IdType extends Id<IdType>> implements Comparable<Id<IdType>> {
-  static protected int INVALID_ID = -1;
   protected final int id_;
 
   public Id(int id) {
     this.id_ = id;
   }
 
-  public boolean isValid() { return id_ != INVALID_ID; }
   public int asInt() { return id_; }
 
   @Override

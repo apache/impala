@@ -40,8 +40,6 @@
 
 namespace impala {
 
-class Coordinator;
-
 namespace test {
 class SchedulerWrapper;
 }
@@ -199,7 +197,7 @@ class SimpleScheduler : public Scheduler {
     /// scan range and its replica locations.
     void RecordScanRangeAssignment(const TBackendDescriptor& backend, PlanNodeId node_id,
         const vector<TNetworkAddress>& host_list,
-        const TScanRangeLocations& scan_range_locations,
+        const TScanRangeLocationList& scan_range_locations,
         FragmentScanRangeAssignment* assignment);
 
     const BackendConfig& backend_config() const { return backend_config_; }
@@ -331,11 +329,11 @@ class SimpleScheduler : public Scheduler {
   Status GetRequestPool(const std::string& user, const TQueryOptions& query_options,
       std::string* pool) const;
 
-  /// Compute the assignment of scan ranges to hosts for each scan node in 'schedule'.
+  /// Compute the assignment of scan ranges to hosts for each scan node in
+  /// the schedule's TQueryExecRequest.plan_exec_info.
   /// Unpartitioned fragments are assigned to the coordinator. Populate the schedule's
   /// fragment_exec_params_ with the resulting scan range assignment.
-  Status ComputeScanRangeAssignment(const TQueryExecRequest& exec_request,
-      QuerySchedule* schedule);
+  Status ComputeScanRangeAssignment(QuerySchedule* schedule);
 
   /// Process the list of scan ranges of a single plan node and compute scan range
   /// assignments (returned in 'assignment'). The result is a mapping from hosts to their
@@ -397,50 +395,49 @@ class SimpleScheduler : public Scheduler {
   /// assignment:              Output parameter, to which new assignments will be added.
   Status ComputeScanRangeAssignment(const BackendConfig& backend_config,
       PlanNodeId node_id, const TReplicaPreference::type* node_replica_preference,
-      bool node_random_replica, const std::vector<TScanRangeLocations>& locations,
+      bool node_random_replica, const std::vector<TScanRangeLocationList>& locations,
       const std::vector<TNetworkAddress>& host_list, bool exec_at_coord,
       const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
       FragmentScanRangeAssignment* assignment);
 
-  /// Populate fragment_exec_params_ in schedule.
-  void ComputeFragmentExecParams(const TQueryExecRequest& exec_request,
-      QuerySchedule* schedule);
-
-  /// Compute the assignment of scan ranges to hosts for each scan node in
-  /// the schedule's TQueryExecRequest.mt_plan_exec_info.
-  /// Unpartitioned fragments are assigned to the coordinator. Populate the schedule's
-  /// mt_fragment_exec_params_ with the resulting scan range assignment.
-  Status MtComputeScanRangeAssignment(QuerySchedule* schedule);
-
-  /// Compute the MtFragmentExecParams for all plans in the schedule's
-  /// TQueryExecRequest.mt_plan_exec_info.
+  /// Compute the FragmentExecParams for all plans in the schedule's
+  /// TQueryExecRequest.plan_exec_info.
   /// This includes the routing information (destinations, per_exch_num_senders,
   /// sender_id)
-  void MtComputeFragmentExecParams(QuerySchedule* schedule);
+  void ComputeFragmentExecParams(QuerySchedule* schedule);
 
   /// Recursively create FInstanceExecParams and set per_node_scan_ranges for
   /// fragment_params and its input fragments via a depth-first traversal.
   /// All fragments are part of plan_exec_info.
-  void MtComputeFragmentExecParams(const TPlanExecInfo& plan_exec_info,
-      MtFragmentExecParams* fragment_params, QuerySchedule* schedule);
+  void ComputeFragmentExecParams(const TPlanExecInfo& plan_exec_info,
+      FragmentExecParams* fragment_params, QuerySchedule* schedule);
+
+  /// Create instances of the fragment corresponding to fragment_params, which contains
+  /// a Union node.
+  /// UnionNodes are special because they can consume multiple partitioned inputs,
+  /// as well as execute multiple scans in the same fragment.
+  /// Fragments containing a UnionNode are executed on the union of hosts of all
+  /// scans in the fragment as well as the hosts of all its input fragments (s.t.
+  /// a UnionNode with partitioned joins or grouping aggregates as children runs on
+  /// at least as many hosts as the input to those children).
+  /// TODO: is this really necessary? If not, revise.
+  void CreateUnionInstances(
+      FragmentExecParams* fragment_params, QuerySchedule* schedule);
 
   /// Create instances of the fragment corresponding to fragment_params to run on the
   /// selected replica hosts of the scan ranges of the node with id scan_id.
   /// The maximum number of instances is the value of query option mt_dop.
-  /// This attempts to load balance among instances by computing the average number
-  /// of bytes per instances and then in a single pass assigning scan ranges to each
+  /// For HDFS, this attempts to load balance among instances by computing the average
+  /// number of bytes per instances and then in a single pass assigning scan ranges to each
   /// instances to roughly meet that average.
-  void MtCreateScanInstances(PlanNodeId scan_id,
-      MtFragmentExecParams* fragment_params, QuerySchedule* schedule);
+  /// For all other storage mgrs, it load-balances the number of splits per instance.
+  void CreateScanInstances(PlanNodeId scan_id,
+      FragmentExecParams* fragment_params, QuerySchedule* schedule);
 
-  /// For each instance of the single input fragment of the fragment corresponding to
-  /// fragment_params, create an instance for this fragment.
-  void MtCreateMirrorInstances(MtFragmentExecParams* fragment_params,
-      QuerySchedule* schedule);
-
-  /// For each fragment in exec_request, computes hosts on which to run the instances
-  /// and stores result in fragment_exec_params_.hosts.
-  void ComputeFragmentHosts(const TQueryExecRequest& exec_request,
+  /// For each instance of fragment_params's input fragment, create a collocated
+  /// instance for fragment_params's fragment.
+  /// Expects that fragment_params only has a single input fragment.
+  void CreateCollocatedInstances(FragmentExecParams* fragment_params,
       QuerySchedule* schedule);
 
   /// Return the id of the leftmost node of any of the given types in 'plan', or
@@ -450,14 +447,9 @@ class SimpleScheduler : public Scheduler {
   /// Same for scan nodes.
   PlanNodeId FindLeftmostScan(const TPlan& plan);
 
-  /// Return the index (w/in exec_request.fragments) of fragment that sends its output to
-  /// exec_request.fragment[fragment_idx]'s leftmost ExchangeNode.
-  /// Return INVALID_PLAN_NODE_ID if the leftmost node is not an exchange node.
-  int FindLeftmostInputFragment(int fragment_idx, const TQueryExecRequest& exec_request);
-
   /// Add all hosts the given scan is executed on to scan_hosts.
-  void GetScanHosts(TPlanNodeId scan_id, const TQueryExecRequest& exec_request,
-      const FragmentExecParams& params, std::vector<TNetworkAddress>* scan_hosts);
+  void GetScanHosts(TPlanNodeId scan_id, const FragmentExecParams& params,
+      std::vector<TNetworkAddress>* scan_hosts);
 
   /// Return true if 'plan' contains a node of the given type.
   bool ContainsNode(const TPlan& plan, TPlanNodeType::type type);
@@ -465,11 +457,6 @@ class SimpleScheduler : public Scheduler {
   /// Return all ids of nodes in 'plan' of any of the given types.
   void FindNodes(const TPlan& plan, const std::vector<TPlanNodeType::type>& types,
       std::vector<TPlanNodeId>* results);
-
-  /// Returns the index (w/in exec_request.fragments) of fragment that sends its output
-  /// to the given exchange in the given fragment index.
-  int FindSenderFragment(TPlanNodeId exch_id, int fragment_idx,
-      const TQueryExecRequest& exec_request);
 
   friend class impala::test::SchedulerWrapper;
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentDeterministicNonCached);

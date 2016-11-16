@@ -20,9 +20,12 @@ package org.apache.impala.analysis;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.avro.Schema;
+import org.apache.avro.SchemaParseException;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TTableName;
@@ -36,9 +39,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
-
-import org.apache.avro.Schema;
-import org.apache.avro.SchemaParseException;
 
 /**
  * Represents a CREATE TABLE statement.
@@ -265,6 +265,15 @@ public class CreateTableStmt extends StatementBase {
     if (!getTblProperties().containsKey(KuduTable.KEY_TABLE_NAME)) {
       getTblProperties().put(KuduTable.KEY_TABLE_NAME,
           KuduUtil.getDefaultCreateKuduTableName(getDb(), getTbl()));
+    }
+    // Check column types are valid Kudu types
+    for (ColumnDef col: getColumnDefs()) {
+      try {
+        KuduUtil.fromImpalaType(col.getType());
+      } catch (ImpalaRuntimeException e) {
+        throw new AnalysisException(String.format(
+            "Cannot create table '%s': %s", getTbl(), e.getMessage()));
+      }
     }
     AnalysisUtils.throwIfNotNull(getTblProperties().get(KuduTable.KEY_KEY_COLUMNS),
         String.format("PRIMARY KEY must be used instead of the table property '%s'.",

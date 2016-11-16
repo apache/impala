@@ -189,10 +189,15 @@ class HdfsScanNodeBase : public ScanNode {
   /// If not NULL, the 'original_split' pointer is stored for reference in the scan range
   /// metadata of the scan range that is to be allocated.
   /// This is thread safe.
-  DiskIoMgr::ScanRange* AllocateScanRange(
-      hdfsFS fs, const char* file, int64_t len, int64_t offset, int64_t partition_id,
-      int disk_id, bool try_cache, bool expected_local, int64_t mtime,
+  DiskIoMgr::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
+      int64_t offset, int64_t partition_id, int disk_id, bool expected_local,
+      const DiskIoMgr::BufferOpts& buffer_opts,
       const DiskIoMgr::ScanRange* original_split = NULL);
+
+  /// Old API for compatibility with text scanners (e.g. LZO text scanner).
+  DiskIoMgr::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
+      int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
+      bool expected_local, int mtime, const DiskIoMgr::ScanRange* original_split = NULL);
 
   /// Adds ranges to the io mgr queue. 'num_files_queued' indicates how many file's scan
   /// ranges have been added completely.  A file's scan ranges are added completely if no

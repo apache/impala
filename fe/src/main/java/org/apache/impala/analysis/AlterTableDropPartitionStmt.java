@@ -29,18 +29,18 @@ import com.google.common.base.Preconditions;
  */
 public class AlterTableDropPartitionStmt extends AlterTableStmt {
   private final boolean ifExists_;
-  private final PartitionSpec partitionSpec_;
+  private final PartitionSet partitionSet_;
 
   // Setting this value causes dropped partition(s) to be permanently
   // deleted. For example, for HDFS tables it skips the trash mechanism
   private final boolean purgePartition_;
 
   public AlterTableDropPartitionStmt(TableName tableName,
-      PartitionSpec partitionSpec, boolean ifExists, boolean purgePartition) {
+      PartitionSet partitionSet, boolean ifExists, boolean purgePartition) {
     super(tableName);
-    Preconditions.checkNotNull(partitionSpec);
-    partitionSpec_ = partitionSpec;
-    partitionSpec_.setTableName(tableName);
+    Preconditions.checkNotNull(partitionSet);
+    partitionSet_ = partitionSet;
+    partitionSet_.setTableName(tableName);
     ifExists_ = ifExists;
     purgePartition_ = purgePartition;
   }
@@ -52,7 +52,7 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
     StringBuilder sb = new StringBuilder("ALTER TABLE " + getTbl());
     sb.append(" DROP ");
     if (ifExists_) sb.append("IF EXISTS ");
-    sb.append(" DROP " + partitionSpec_.toSql());
+    sb.append(" DROP " + partitionSet_.toSql());
     if (purgePartition_) sb.append(" PURGE");
     return sb.toString();
   }
@@ -62,8 +62,8 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.DROP_PARTITION);
     TAlterTableDropPartitionParams addPartParams = new TAlterTableDropPartitionParams();
-    addPartParams.setPartition_spec(partitionSpec_.toThrift());
-    addPartParams.setIf_exists(ifExists_);
+    addPartParams.setPartition_set(partitionSet_.toThrift());
+    addPartParams.setIf_exists(!partitionSet_.getPartitionShouldExist());
     addPartParams.setPurge(purgePartition_);
     params.setDrop_partition_params(addPartParams);
     return params;
@@ -72,8 +72,8 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    if (!ifExists_) partitionSpec_.setPartitionShouldExist();
-    partitionSpec_.setPrivilegeRequirement(Privilege.ALTER);
-    partitionSpec_.analyze(analyzer);
+    if (!ifExists_) partitionSet_.setPartitionShouldExist();
+    partitionSet_.setPrivilegeRequirement(Privilege.ALTER);
+    partitionSet_.analyze(analyzer);
   }
 }

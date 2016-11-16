@@ -228,6 +228,7 @@ import org.apache.impala.analysis.SqlParserSymbols;
     keywordMap.put("union", new Integer(SqlParserSymbols.KW_UNION));
     keywordMap.put("update", new Integer(SqlParserSymbols.KW_UPDATE));
     keywordMap.put("update_fn", new Integer(SqlParserSymbols.KW_UPDATE_FN));
+    keywordMap.put("upsert", new Integer(SqlParserSymbols.KW_UPSERT));
     keywordMap.put("use", new Integer(SqlParserSymbols.KW_USE));
     keywordMap.put("using", new Integer(SqlParserSymbols.KW_USING));
     keywordMap.put("values", new Integer(SqlParserSymbols.KW_VALUES));

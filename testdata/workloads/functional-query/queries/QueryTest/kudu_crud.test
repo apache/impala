@@ -2,7 +2,7 @@
 ---- QUERY
 -- Invalid hostname
 create table tdata_bogus_host (id int primary key, name string, valf float, vali bigint)
-  DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30)) STORED AS KUDU
+  DISTRIBUTE BY RANGE (PARTITION 10 <= VALUES <= 30) STORED AS KUDU
   TBLPROPERTIES('kudu.master_addresses' = 'bogus host name')
 ---- CATCH
 Couldn't resolve this master's address bogus host name:7051
@@ -11,33 +11,36 @@ Couldn't resolve this master's address bogus host name:7051
 -- Non-existing host
 create table tdata_non_existing_host
 (id int primary key, name string, valf float, vali bigint)
-  DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30)) STORED AS KUDU
+  DISTRIBUTE BY RANGE (PARTITION 10 <= VALUES <= 30) STORED AS KUDU
   TBLPROPERTIES('kudu.master_addresses' = 'bogus.host.name')
 ---- CATCH
 Couldn't resolve this master's address bogus.host.name:7051
 ====
 ---- QUERY
 create table tdata
-  (id int primary key, name string, valf float, vali bigint, valv varchar(20), valb boolean)
-  DISTRIBUTE BY RANGE SPLIT ROWS ((10), (30)) STORED AS KUDU
+  (id int primary key, name string, valf float, vali bigint, valv string, valb boolean)
+  DISTRIBUTE BY RANGE (PARTITION VALUES < 10, PARTITION 10 <= VALUES < 30,
+  PARTITION 30 <= VALUES) STORED AS KUDU
 ---- RESULTS
 ====
 ---- QUERY
 insert into tdata values
-(1, "martin", 1.0, 232232323, cast('a' as VARCHAR(20)), true),
-(2, "david", cast(1.0 as float), 99398493939, cast('b' as VARCHAR(20)), false),
-(3, "todd", cast(1.0 as float), 993393939, cast('c' as VARCHAR(20)), true)
+(1, "martin", 1.0, 232232323, cast('a' as string), true),
+(2, "david", cast(1.0 as float), 99398493939, cast('b' as string), false),
+(3, "todd", cast(1.0 as float), 993393939, "c", true)
 ---- RESULTS
 : 3
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 3.*
+NumModifiedRows: 3
+NumRowErrors: 0
 ====
 ---- QUERY
 update tdata set vali=43 where id = 1
 ---- RESULTS
 # TODO: Verify row count after fixing IMPALA-3713 (Here and UPDATE/DELETE below)
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -50,11 +53,13 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ====
 ====
 ---- QUERY
-# Try updating a varchar col. with a value that is bigger than it's size (truncated).
-update tdata set valv=cast('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as VARCHAR(20)) where id = 1
+# Try updating a string col where casting a value that is bigger than the varchar in the
+# cast. The value gets truncated and stored to the string col.
+update tdata set valv=cast('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as varchar(20)) where id = 1
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -69,7 +74,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 update tdata set valb=false where id = 1
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -84,7 +90,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 update tdata set vali=43 where id > 1
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 2.*
+NumModifiedRows: 2
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -99,7 +106,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 update tdata set name='unknown' where name = 'martin'
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -112,12 +120,13 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ====
 ---- QUERY
 insert into tdata values
-(40, "he", cast(0.0 as float), 43, cast('e' as VARCHAR(20)), false),
-(120, "she", cast(0.0 as float), 99, cast('f' as VARCHAR(20)), true)
+(40, "he", cast(0.0 as float), 43, cast('e' as string), false),
+(120, "she", cast(0.0 as float), 99, cast('f' as string), true)
 ---- RESULTS
 : 2
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 2.*
+NumModifiedRows: 2
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -134,7 +143,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 update tdata set name=null where id = 40
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from tdata
@@ -150,7 +160,8 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ---- QUERY
 update tdata set name='he' where id = 40
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ---- RESULTS
 ====
 ---- QUERY
@@ -167,11 +178,12 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
 ---- QUERY
 # Make sure we can insert empty strings into string columns and that we can scan them
 # back.
-insert into tdata values (320, '', 2.0, 932, cast('' as VARCHAR(20)), false)
+insert into tdata values (320, '', 2.0, 932, cast('' as string), false)
 ---- RESULTS
 : 1
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select id, name, valv, valb from tdata where id = 320;
@@ -183,7 +195,7 @@ INT,STRING,STRING,BOOLEAN
 ---- QUERY
 -- Test that string case is ignored
 create table ignore_column_case (Id int, NAME string, vAlf float, vali bigint,
-  primary key (Id, NAME)) DISTRIBUTE BY RANGE SPLIT ROWS ((10, 'b'), (30, 'a'))
+  primary key (Id, NAME)) DISTRIBUTE BY RANGE (PARTITION VALUE = (1, 'Martin'))
   STORED AS KUDU
 ---- RESULTS
 ====
@@ -192,7 +204,8 @@ insert into ignore_column_case values (1, 'Martin', 1.0, 10);
 ---- RESULTS
 : 1
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 select ID, nAmE, VALF, VALI from ignore_column_case where NaMe = 'Martin';
@@ -203,60 +216,109 @@ INT,STRING,FLOAT,BIGINT
 ====
 ---- QUERY
 insert into tdata values
-(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
+(666, "The Devil", cast(1.2 as float), 43, cast('z' as string), true)
 ---- RESULTS
 : 1
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 insert into tdata values
 (666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
----- CATCH
-Kudu error(s) reported, first error: Already present
-====
----- QUERY
-insert ignore into tdata values
-(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
 ---- RESULTS
 : 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 0.*
+NumModifiedRows: 0
+NumRowErrors: 1
 ====
 ---- QUERY
 -- Updating the same record many times: cross join produces 7 identical updates
 update a set a.name='Satan' from tdata a, tdata b where a.id = 666
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 7.*
+NumModifiedRows: 7
+NumRowErrors: 0
 ====
 ---- QUERY
--- Does not exercise any error path in the sink because updating the same record multiple
--- times is valid. Makes sure IGNORE works.
-update ignore a set a.name='Satan' from tdata a, tdata b where a.id = 666
----- RESULTS
----- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 7.*
-====
----- QUERY
--- Using a cross join to generate the same delete twice. After the first delete succeeded,
--- trying to execute the second delete will fail because the record does not exist.
 delete a from tdata a, tdata b where a.id = 666
----- CATCH
-Kudu error(s) reported, first error: Not found: key not found
-====
----- QUERY
--- Re-insert the data
-insert into tdata values
-(666, "The Devil", cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true)
----- RESULTS
-: 1
-====
----- QUERY
-delete ignore a from tdata a, tdata b where a.id = 666
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 1.*
+NumModifiedRows: 1
+NumRowErrors: 6
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+40,'he',0,43,'e',false
+120,'she',0,99,'f',true
+320,'',2,932,'',false
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false
+2,'david',1,43,'b',false
+3,'todd',1,43,'c',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+upsert into table tdata values (40, 'they', 1, 43, cast('e' as VARCHAR(20)), false),
+(1, NULL, 1, 0, cast('a' as VARCHAR(20)), true)
+---- RESULTS
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+40,'they',1,43,'e',false
+120,'she',0,99,'f',true
+320,'',2,932,'',false
+1,'NULL',1,0,'a',true
+2,'david',1,43,'b',false
+3,'todd',1,43,'c',true
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+upsert into table tdata (id, valf) values (2, NULL), (120, 20), (0, 0)
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+40,'they',1,43,'e',false
+120,'she',20,99,'f',true
+320,'',2,932,'',false
+1,'NULL',1,0,'a',true
+2,'david',NULL,43,'b',false
+3,'todd',1,43,'c',true
+0,'NULL',0,NULL,'NULL',NULL
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+upsert into table tdata (valb, name, id)
+select false as valb, 'he' as name, id from tdata where id < 2
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+40,'they',1,43,'e',false
+120,'she',20,99,'f',true
+320,'',2,932,'',false
+1,'he',1,0,'a',false
+2,'david',NULL,43,'b',false
+3,'todd',1,43,'c',true
+0,'he',0,NULL,'NULL',false
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN
+====
+---- QUERY
+upsert into table tdata (id, name) values (null, '')
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 1
 ====
 ---- QUERY
 # IMPALA-3454: A delete that requires a rewrite may not get the Kudu column order correct
@@ -277,7 +339,8 @@ insert into impala_3454 values
 delete from impala_3454 where key_1 < (select max(key_2) from impala_3454)
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 2.*
+NumModifiedRows: 2
+NumRowErrors: 0
 ====
 ---- QUERY
 select * from impala_3454
@@ -288,47 +351,129 @@ TINYINT,BIGINT
 ====
 ---- QUERY
 CREATE TABLE kudu_test_tbl PRIMARY KEY(id)
-DISTRIBUTE BY RANGE(id) SPLIT ROWS ((100000000))
+DISTRIBUTE BY RANGE(id) (PARTITION VALUES < 100, PARTITION 100 <= VALUES <= 10000)
 STORED AS KUDU AS
 SELECT * FROM functional_kudu.alltypes WHERE id < 100;
 ---- RESULTS
 'Inserted 100 row(s)'
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 100.*
-====
----- QUERY
-INSERT IGNORE INTO kudu_test_tbl
-SELECT * FROM functional_kudu.alltypes WHERE id < 100;
----- RESULTS
-: 0
----- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 0.*
+NumModifiedRows: 100
+NumRowErrors: 0
 ====
 ---- QUERY
 INSERT INTO kudu_test_tbl
 SELECT * FROM functional_kudu.alltypes WHERE id < 100;
----- CATCH
-Kudu error(s) reported, first error: Already present: key already present
+---- RESULTS
+: 0
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 100
 ====
 ---- QUERY
-INSERT IGNORE INTO kudu_test_tbl
+INSERT INTO kudu_test_tbl
 SELECT * FROM functional_kudu.alltypes;
 ---- RESULTS
 : 7200
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 7200.*
+NumModifiedRows: 7200
+NumRowErrors: 100
 ====
 ---- QUERY
 # Test a larger UPDATE
 UPDATE kudu_test_tbl SET int_col = -1;
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 7300.*
+NumModifiedRows: 7300
+NumRowErrors: 0
 ====
 ---- QUERY
 # Test a larger DELETE
 DELETE FROM kudu_test_tbl WHERE id > -1;
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumModifiedRows: 7300.*
+NumModifiedRows: 7300
+NumRowErrors: 0
+====
+---- QUERY
+# Insert rows that are not covered by any of the existing range partitions
+# Only the row at 10000 is inserted.
+INSERT INTO kudu_test_tbl SELECT cast(id + 10000 as int), bool_col, tinyint_col,
+  smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
+  timestamp_col, year, month
+FROM functional_kudu.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 7299
+====
+---- QUERY
+# Try to delete a row with a primary key value that is not covered by the existing range
+# partitions. This doesn't actually end up selecting any rows to modify.
+DELETE FROM kudu_test_tbl WHERE id = 10001
+---- RESULTS
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
+====
+---- QUERY
+# Try to update a row with a primary key value that is not covered by the existing range
+# partitions. This doesn't actually end up selecting any rows to modify.
+UPDATE kudu_test_tbl SET int_col = 10 WHERE id = 10001
+---- RESULTS
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
+====
+---- QUERY
+# IMPALA-2521: clustered insert into table.
+create table impala_2521
+(id bigint primary key, name string, zip int)
+distribute by hash into 3 buckets stored as kudu
+---- RESULTS
+====
+---- QUERY
+insert into impala_2521 /*+ clustered */
+select id, name, maxzip as zip
+from (
+select tinyint_col as id, cast(max(int_col) + 1 as int) as maxzip, string_col as name
+from functional_kudu.alltypessmall group by id, name
+) as sub;
+---- RESULTS
+: 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 10
+NumRowErrors: 0
+====
+---- QUERY
+select * from impala_2521
+---- RESULTS
+0,'0',1
+1,'1',2
+2,'2',3
+3,'3',4
+4,'4',5
+5,'5',6
+6,'6',7
+7,'7',8
+8,'8',9
+9,'9',10
+---- TYPES
+BIGINT,STRING,INT
+====
+---- QUERY
+# Table with all supported types as primary key and distribution columns
+create table allkeytypes (i1 tinyint, i2 smallint, i3 int, i4 bigint, name string,
+  valf float, vald double, primary key (i1, i2, i3, i4, name)) distribute by
+  hash into 3 buckets, range (partition value = (1,1,1,1,'1'),
+  partition value = (2,2,2,2,'2'), partition value = (3,3,3,3,'3')) stored as kudu
+---- RESULTS
+====
+---- QUERY
+insert into allkeytypes select cast(id as tinyint), smallint_col, int_col,
+  cast (bigint_col/10 as bigint), string_col, float_col, double_col
+  from functional.alltypes where id > 0 and id < 10
+---- RESULTS
+: 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumRowErrors: 6
 ====

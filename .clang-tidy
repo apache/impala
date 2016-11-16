@@ -1,0 +1,94 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+---
+Checks: "-*,clang*,\
+-clang-analyzer-alpha*,\
+-clang-analyzer-core.CallAndMessage,\
+-clang-analyzer-core.NonNullParamChecker,\
+-clang-analyzer-core.NullDereference,\
+-clang-analyzer-core.UndefinedBinaryOperatorResult,\
+-clang-analyzer-core.uninitialized.ArraySubscript,\
+-clang-analyzer-core.uninitialized.Assign,\
+-clang-analyzer-core.uninitialized.Branch,\
+-clang-analyzer-deadcode.DeadStores,\
+-clang-analyzer-unix.Malloc,\
+-clang-analyzer-unix.MallocSizeof,\
+-clang-diagnostic-c++98*,\
+-clang-diagnostic-cast-align,\
+-clang-diagnostic-class-varargs,\
+-clang-diagnostic-conversion,\
+-clang-diagnostic-covered-switch-default,\
+-clang-diagnostic-disabled-macro-expansion,\
+-clang-diagnostic-documentation-html,\
+-clang-diagnostic-documentation-unknown-command,\
+-clang-diagnostic-double-promotion,\
+-clang-diagnostic-exit-time-destructors,\
+-clang-diagnostic-float-conversion,\
+-clang-diagnostic-float-equal,\
+-clang-diagnostic-global-constructors,\
+-clang-diagnostic-gnu-anonymous-struct,\
+-clang-diagnostic-header-hygiene,\
+-clang-diagnostic-implicit-fallthrough,\
+-clang-diagnostic-mismatched-tags,\
+-clang-diagnostic-missing-prototypes,\
+-clang-diagnostic-missing-variable-declarations,\
+-clang-diagnostic-nested-anon-types,\
+-clang-diagnostic-old-style-cast,\
+-clang-diagnostic-overlength-strings,\
+-clang-diagnostic-packed,\
+-clang-diagnostic-padded,\
+-clang-diagnostic-return-type-c-linkage,\
+-clang-diagnostic-shadow,\
+-clang-diagnostic-shorten-64-to-32,\
+-clang-diagnostic-sign-compare,\
+-clang-diagnostic-sign-conversion,\
+-clang-diagnostic-switch-enum,\
+-clang-diagnostic-undefined-reinterpret-cast,\
+-clang-diagnostic-unreachable-code,\
+-clang-diagnostic-unreachable-code-return,\
+-clang-diagnostic-unused-command-line-argument,\
+-clang-diagnostic-unused-local-typedef,\
+-clang-diagnostic-unused-parameter,\
+-clang-diagnostic-used-but-marked-unused,\
+-clang-diagnostic-vla-extension,\
+-clang-diagnostic-weak-vtables"
+
+# Ignore warnings in gutil
+
+HeaderFilterRegex: "be/src/\
+(benchmarks\
+|bufferpool\
+|catalog\
+|codegen\
+|common\
+|exec\
+|experiments\
+|exprs\
+|resourcebroker\
+|rpc\
+|runtime\
+|scheduling\
+|service\
+|statestore\
+|testutil\
+|thirdparty\
+|transport\
+|udf\
+|udf_samples\
+|util)"
+
+AnalyzeTemporaryDtors: true

@@ -30,7 +30,7 @@ namespace impala {
 class CompoundPredicate: public Predicate {
  public:
   static BooleanVal Not(FunctionContext* context, const BooleanVal&);
-  
+
  protected:
   CompoundPredicate(const TExprNode& node) : Predicate(node) { }
 

@@ -27,7 +27,7 @@ namespace impala {
 
 class SchedulerTest : public testing::Test {
  protected:
-  SchedulerTest() { srand(0); };
+  SchedulerTest() { srand(0); }
 };
 
 /// Smoke test to schedule a single table with a single scan range over a single host.

@@ -17,21 +17,20 @@
 
 #include "exec/partitioned-aggregation-node.h"
 
-#include <algorithm>
 #include <math.h>
+#include <algorithm>
 #include <set>
 #include <sstream>
-#include <gutil/strings/substitute.h>
-#include <thrift/protocol/TDebugProtocol.h>
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "exec/hash-table.inline.h"
 #include "exprs/agg-fn-evaluator.h"
 #include "exprs/anyval-util.h"
-#include "exprs/expr.h"
 #include "exprs/expr-context.h"
+#include "exprs/expr.h"
 #include "exprs/slot-ref.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
@@ -40,8 +39,8 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
-#include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
+#include "runtime/tuple.h"
 #include "udf/udf-internal.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
@@ -150,21 +149,20 @@ Status PartitionedAggregationNode::Init(const TPlanNode& tnode, RuntimeState* st
       Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &grouping_expr_ctxs_));
   for (int i = 0; i < tnode.agg_node.aggregate_functions.size(); ++i) {
     AggFnEvaluator* evaluator;
-    RETURN_IF_ERROR(AggFnEvaluator::Create(
-        pool_, tnode.agg_node.aggregate_functions[i], &evaluator));
+    RETURN_IF_ERROR(
+        AggFnEvaluator::Create(pool_, tnode.agg_node.aggregate_functions[i], &evaluator));
     aggregate_evaluators_.push_back(evaluator);
-    ExprContext* agg_expr_ctx;
-    if (evaluator->input_expr_ctxs().size() == 1) {
-      agg_expr_ctx = evaluator->input_expr_ctxs()[0];
+    ExprContext* const* agg_expr_ctxs;
+    if (evaluator->input_expr_ctxs().size() > 0) {
+      agg_expr_ctxs = evaluator->input_expr_ctxs().data();
     } else {
-      // CodegenUpdateSlot() can only support aggregate operator with only one ExprContext
-      // so it doesn't support operator such as group_concat. There are also aggregate
-      // operators with no ExprContext (e.g. count(*)). In cases above, 'agg_expr_ctxs_'
-      // will contain NULL for that entry.
+      // Some aggregate functions have no input expressions and therefore no ExprContext
+      // (e.g. count(*)). In those cases, 'agg_expr_ctxs_' will contain NULL for that
+      // entry.
       DCHECK(evaluator->agg_op() == AggFnEvaluator::OTHER || evaluator->is_count_star());
-      agg_expr_ctx = NULL;
+      agg_expr_ctxs = NULL;
     }
-    agg_expr_ctxs_.push_back(agg_expr_ctx);
+    agg_expr_ctxs_.push_back(agg_expr_ctxs);
   }
   return Status::OK();
 }
@@ -253,14 +251,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     needs_serialize_ |= aggregate_evaluators_[i]->SupportsSerialize();
   }
 
-  if (grouping_expr_ctxs_.empty()) {
-    // Create single output tuple; we need to output something even if our input is empty.
-    singleton_output_tuple_ =
-        ConstructSingletonOutputTuple(agg_fn_ctxs_, mem_pool_.get());
-    // Check for failures during AggFnEvaluator::Init().
-    RETURN_IF_ERROR(state_->GetQueryStatus());
-    singleton_output_tuple_returned_ = false;
-  } else {
+  if (!grouping_expr_ctxs_.empty()) {
     RETURN_IF_ERROR(HashTableCtx::Create(state, build_expr_ctxs_, grouping_expr_ctxs_,
         true, vector<bool>(build_expr_ctxs_.size(), true), state->fragment_hash_seed(),
         MAX_PARTITION_DEPTH, 1, mem_tracker(), &ht_ctx_));
@@ -312,6 +303,16 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   DCHECK_EQ(aggregate_evaluators_.size(), agg_fn_ctxs_.size());
   for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
     RETURN_IF_ERROR(aggregate_evaluators_[i]->Open(state, agg_fn_ctxs_[i]));
+  }
+
+  if (grouping_expr_ctxs_.empty()) {
+    // Create the single output tuple for this non-grouping agg. This must happen after
+    // opening the aggregate evaluators.
+    singleton_output_tuple_ =
+        ConstructSingletonOutputTuple(agg_fn_ctxs_, mem_pool_.get());
+    // Check for failures during AggFnEvaluator::Init().
+    RETURN_IF_ERROR(state_->GetQueryStatus());
+    singleton_output_tuple_returned_ = false;
   }
 
   RETURN_IF_ERROR(children_[0]->Open(state));
@@ -382,19 +383,20 @@ Status PartitionedAggregationNode::HandleOutputStrings(RowBatch* row_batch,
   if (!needs_finalize_ && !needs_serialize_) return Status::OK();
   // String data returned by Serialize() or Finalize() is from local expr allocations in
   // the agg function contexts, and will be freed on the next GetNext() call by
-  // FreeLocalAllocations(). The data either needs to be copied out or sent up the plan
-  // tree via MarkNeedToReturn(). (See IMPALA-3311)
+  // FreeLocalAllocations(). The data either needs to be copied out now or sent up the
+  // plan and copied out by a blocking ancestor. (See IMPALA-3311)
   for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
     const SlotDescriptor* slot_desc = aggregate_evaluators_[i]->output_slot_desc();
     DCHECK(!slot_desc->type().IsCollectionType()) << "producing collections NYI";
     if (!slot_desc->type().IsVarLenStringType()) continue;
     if (IsInSubplan()) {
       // Copy string data to the row batch's pool. This is more efficient than
-      // MarkNeedToReturn() in a subplan since we are likely producing many small batches.
-      RETURN_IF_ERROR(CopyStringData(slot_desc, row_batch, first_row_idx,
-              row_batch->tuple_data_pool()));
+      // MarkNeedsDeepCopy() in a subplan since we are likely producing many small
+      // batches.
+      RETURN_IF_ERROR(CopyStringData(
+          slot_desc, row_batch, first_row_idx, row_batch->tuple_data_pool()));
     } else {
-      row_batch->MarkNeedToReturn();
+      row_batch->MarkNeedsDeepCopy();
       break;
     }
   }
@@ -524,7 +526,7 @@ Status PartitionedAggregationNode::GetRowsFromPartition(RuntimeState* state,
 
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   partition_eos_ = ReachedLimit();
-  if (output_iterator_.AtEnd()) row_batch->MarkNeedToReturn();
+  if (output_iterator_.AtEnd()) row_batch->MarkNeedsDeepCopy();
 
   return Status::OK();
 }
@@ -672,14 +674,7 @@ void PartitionedAggregationNode::CleanupHashTbl(
 
 Status PartitionedAggregationNode::Reset(RuntimeState* state) {
   DCHECK(!is_streaming_preagg_) << "Cannot reset preaggregation";
-  if (grouping_expr_ctxs_.empty()) {
-    // Re-create the single output tuple for this non-grouping agg.
-    singleton_output_tuple_ =
-        ConstructSingletonOutputTuple(agg_fn_ctxs_, mem_pool_.get());
-    // Check for failures during AggFnEvaluator::Init().
-    RETURN_IF_ERROR(state_->GetQueryStatus());
-    singleton_output_tuple_returned_ = false;
-  } else {
+  if (!grouping_expr_ctxs_.empty()) {
     child_eos_ = false;
     partition_eos_ = false;
     // Reset the HT and the partitions for this grouping agg.
@@ -718,7 +713,9 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
   if (agg_fn_pool_.get() != NULL) agg_fn_pool_->FreeAll();
   if (mem_pool_.get() != NULL) mem_pool_->FreeAll();
   if (ht_ctx_.get() != NULL) ht_ctx_->Close();
-  if (serialize_stream_.get() != NULL) serialize_stream_->Close();
+  if (serialize_stream_.get() != NULL) {
+    serialize_stream_->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+  }
 
   if (block_mgr_client_ != NULL) {
     state->block_mgr()->ClearReservations(block_mgr_client_);
@@ -840,14 +837,14 @@ Status PartitionedAggregationNode::Partition::SerializeStreamForSpilling() {
       parent->CleanupHashTbl(agg_fn_ctxs, it);
       hash_tbl->Close();
       hash_tbl.reset();
-      aggregated_row_stream->Close();
+      aggregated_row_stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
       RETURN_IF_ERROR(status);
       return parent->state_->block_mgr()->MemLimitTooLowError(parent->block_mgr_client_,
           parent->id());
     }
     DCHECK(status.ok());
 
-    aggregated_row_stream->Close();
+    aggregated_row_stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
     aggregated_row_stream.swap(parent->serialize_stream_);
     // Recreate the serialize_stream (and reserve 1 buffer) now in preparation for
     // when we need to spill again. We need to have this available before we need
@@ -943,10 +940,12 @@ void PartitionedAggregationNode::Partition::Close(bool finalize_rows) {
       // should have been finalized/serialized in Spill().
       parent->CleanupHashTbl(agg_fn_ctxs, hash_tbl->Begin(parent->ht_ctx_.get()));
     }
-    aggregated_row_stream->Close();
+    aggregated_row_stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
   if (hash_tbl.get() != NULL) hash_tbl->Close();
-  if (unaggregated_row_stream.get() != NULL) unaggregated_row_stream->Close();
+  if (unaggregated_row_stream.get() != NULL) {
+    unaggregated_row_stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+  }
 
   for (int i = 0; i < agg_fn_ctxs.size(); ++i) {
     agg_fn_ctxs[i]->impl()->Close();
@@ -1058,32 +1057,31 @@ void PartitionedAggregationNode::InitAggSlots(
       intermediate_tuple_desc_->slots().begin() + grouping_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++slot_desc) {
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
+    // To minimize branching on the UpdateTuple path, initialize the result value so that
+    // the Add() UDA function can ignore the NULL bit of its destination value. E.g. for
+    // SUM(), if we initialize the destination value to 0 (with the NULL bit set), we can
+    // just start adding to the destination value (rather than repeatedly checking the
+    // destination NULL bit. The codegen'd version of UpdateSlot() exploits this to
+    // eliminate a branch per value.
+    //
+    // For boolean and numeric types, the default values are false/0, so the nullable
+    // aggregate functions SUM() and AVG() produce the correct result. For MIN()/MAX(),
+    // initialize the value to max/min possible value for the same effect.
     evaluator->Init(agg_fn_ctxs[i], intermediate_tuple);
-    // Codegen specific path for min/max.
-    // To minimize branching on the UpdateTuple path, initialize the result value
-    // so that UpdateTuple doesn't have to check if the aggregation
-    // dst slot is null.
-    // TODO: remove when we don't use the irbuilder for codegen here.  This optimization
-    // will no longer be necessary when all aggregates are implemented with the UDA
-    // interface.
-    if ((*slot_desc)->type().type != TYPE_STRING &&
-        (*slot_desc)->type().type != TYPE_VARCHAR &&
-        (*slot_desc)->type().type != TYPE_TIMESTAMP &&
-        (*slot_desc)->type().type != TYPE_CHAR) {
+
+    AggFnEvaluator::AggregationOp agg_op = evaluator->agg_op();
+    if ((agg_op == AggFnEvaluator::MIN || agg_op == AggFnEvaluator::MAX)
+        && !evaluator->intermediate_type().IsStringType()
+        && !evaluator->intermediate_type().IsTimestampType()) {
       ExprValue default_value;
       void* default_value_ptr = NULL;
-      switch (evaluator->agg_op()) {
-        case AggFnEvaluator::MIN:
-          default_value_ptr = default_value.SetToMax((*slot_desc)->type());
-          RawValue::Write(default_value_ptr, intermediate_tuple, *slot_desc, NULL);
-          break;
-        case AggFnEvaluator::MAX:
-          default_value_ptr = default_value.SetToMin((*slot_desc)->type());
-          RawValue::Write(default_value_ptr, intermediate_tuple, *slot_desc, NULL);
-          break;
-        default:
-          break;
+      if (evaluator->agg_op() == AggFnEvaluator::MIN) {
+        default_value_ptr = default_value.SetToMax((*slot_desc)->type());
+      } else {
+        DCHECK_EQ(evaluator->agg_op(), AggFnEvaluator::MAX);
+        default_value_ptr = default_value.SetToMin((*slot_desc)->type());
       }
+      RawValue::Write(default_value_ptr, intermediate_tuple, *slot_desc, NULL);
     }
   }
 }
@@ -1333,7 +1331,7 @@ Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stre
       batch.Reset();
     } while (!eos);
   }
-  input_stream->Close();
+  input_stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   return Status::OK();
 }
 
@@ -1449,111 +1447,123 @@ Status PartitionedAggregationNode::QueryMaintenance(RuntimeState* state) {
 // void UpdateSlot(FunctionContext* agg_fn_ctx, ExprContext* agg_expr_ctx,
 //     AggTuple* agg_tuple, char** row)
 //
-// The IR for sum(double_col) is:
+// The IR for sum(double_col), which is constructed directly with the IRBuilder, is:
 //
 // define void @UpdateSlot(%"class.impala_udf::FunctionContext"* %agg_fn_ctx,
-//                         %"class.impala::ExprContext"* %agg_expr_ctx,
-//                         { i8, [7 x i8], double }* %agg_tuple,
-//                         %"class.impala::TupleRow"* %row) #34 {
-//
+//    %"class.impala::ExprContext"** %agg_expr_ctxs,
+//    { i8, [7 x i8], double }* %agg_tuple, %"class.impala::TupleRow"* %row) #34 {
 // entry:
-//   %src = call { i8, double } @GetSlotRef(%"class.impala::ExprContext"* %agg_expr_ctx,
-//       %"class.impala::TupleRow"* %row)
-//   %0 = extractvalue { i8, double } %src, 0
-//   %is_null = trunc i8 %0 to i1
-//   br i1 %is_null, label %ret, label %src_not_null
-//
-// src_not_null:                                     ; preds = %entry
+//   %expr_ctx_ptr = getelementptr %"class.impala::ExprContext"*,
+//      %"class.impala::ExprContext"** %agg_expr_ctxs, i32 0
+//   %expr_ctx = load %"class.impala::ExprContext"*,
+//      %"class.impala::ExprContext"** %expr_ctx_ptr
+//   %input0 = call { i8, double } @GetSlotRef(%"class.impala::ExprContext"* %expr_ctx,
+//      %"class.impala::TupleRow"* %row)
 //   %dst_slot_ptr = getelementptr inbounds { i8, [7 x i8], double },
 //       { i8, [7 x i8], double }* %agg_tuple, i32 0, i32 2
-//   call void @SetNotNull({ i8, [7 x i8], double }* %agg_tuple)
 //   %dst_val = load double, double* %dst_slot_ptr
-//   %val = extractvalue { i8, double } %src, 1
+//   %0 = extractvalue { i8, double } %input0, 0
+//   %is_null = trunc i8 %0 to i1
+//   br i1 %is_null, label %ret, label %not_null
+//
+// ret:                                              ; preds = %not_null, %entry
+//   ret void
+//
+// not_null:                                         ; preds = %entry
+//   %val = extractvalue { i8, double } %input0, 1
 //   %1 = fadd double %dst_val, %val
+//   %2 = bitcast { i8, [7 x i8], double }* %agg_tuple to i8*
+//   %null_byte_ptr = getelementptr i8, i8* %2, i32 0
+//   %null_byte = load i8, i8* %null_byte_ptr
+//   %null_bit_cleared = and i8 %null_byte, -2
+//   store i8 %null_bit_cleared, i8* %null_byte_ptr
 //   store double %1, double* %dst_slot_ptr
 //   br label %ret
-//
-// ret:                                              ; preds = %src_not_null, %entry
-//   ret void
 // }
 //
-// The IR for ndv(double_col) is:
+// The IR for min(timestamp_col), which uses the UDA interface, is:
 //
 // define void @UpdateSlot(%"class.impala_udf::FunctionContext"* %agg_fn_ctx,
-//                         %"class.impala::ExprContext"* %agg_expr_ctx,
-//                         { i8, [7 x i8], %"struct.impala::StringValue" }* %agg_tuple,
-//                         %"class.impala::TupleRow"* %row) #34 {
+//      %"class.impala::ExprContext"** %agg_expr_ctxs,
+//      { i8, [7 x i8], %"class.impala::TimestampValue" }* %agg_tuple,
+//      %"class.impala::TupleRow"* %row) #34 {
 // entry:
-//   %dst_lowered_ptr = alloca { i64, i8* }
-//   %src_lowered_ptr = alloca { i8, double }
-//   %src = call { i8, double } @GetSlotRef(%"class.impala::ExprContext"* %agg_expr_ctx,
-//       %"class.impala::TupleRow"* %row)
-//   %0 = extractvalue { i8, double } %src, 0
-//   %is_null = trunc i8 %0 to i1
-//   br i1 %is_null, label %ret, label %src_not_null
-//
-// src_not_null:                                     ; preds = %entry
-//   %dst_slot_ptr = getelementptr inbounds { i8, [7 x i8], %"struct.impala::StringValue" },
-//       { i8, [7 x i8], %"struct.impala::StringValue" }* %agg_tuple, i32 0, i32 2
-//   call void @SetNotNull({ i8, [7 x i8], %"struct.impala::StringValue" }* %agg_tuple)
-//   %dst_val =
-//       load %"struct.impala::StringValue", %"struct.impala::StringValue"* %dst_slot_ptr
-//   store { i8, double } %src, { i8, double }* %src_lowered_ptr
-//   %src_unlowered_ptr =
-//       bitcast { i8, double }* %src_lowered_ptr to %"struct.impala_udf::DoubleVal"*
-//   %ptr = extractvalue %"struct.impala::StringValue" %dst_val, 0
-//   %dst = insertvalue { i64, i8* } zeroinitializer, i8* %ptr, 1
-//   %len = extractvalue %"struct.impala::StringValue" %dst_val, 1
-//   %1 = extractvalue { i64, i8* } %dst, 0
-//   %2 = zext i32 %len to i64
-//   %3 = shl i64 %2, 32
-//   %4 = and i64 %1, 4294967295
-//   %5 = or i64 %4, %3
-//   %dst1 = insertvalue { i64, i8* } %dst, i64 %5, 0
-//   store { i64, i8* } %dst1, { i64, i8* }* %dst_lowered_ptr
-//   %dst_unlowered_ptr =
-//       bitcast { i64, i8* }* %dst_lowered_ptr to %"struct.impala_udf::StringVal"*
-//   call void @HllUpdate(%"class.impala_udf::FunctionContext"* %agg_fn_ctx,
-//                        %"struct.impala_udf::DoubleVal"* %src_unlowered_ptr,
-//                        %"struct.impala_udf::StringVal"* %dst_unlowered_ptr)
-//   %anyval_result = load { i64, i8* }, { i64, i8* }* %dst_lowered_ptr
-//   %6 = extractvalue { i64, i8* } %anyval_result, 0
-//   %7 = ashr i64 %6, 32
-//   %8 = trunc i64 %7 to i32
-//   %9 = insertvalue %"struct.impala::StringValue" zeroinitializer, i32 %8, 1
-//   %10 = extractvalue { i64, i8* } %anyval_result, 1
-//   %11 = insertvalue %"struct.impala::StringValue" %9, i8* %10, 0
-//   store %"struct.impala::StringValue" %11, %"struct.impala::StringValue"* %dst_slot_ptr
+//   %dst_lowered_ptr = alloca { i64, i64 }
+//   %input_lowered_ptr = alloca { i64, i64 }
+//   %expr_ctx_ptr = getelementptr %"class.impala::ExprContext"*,
+//        %"class.impala::ExprContext"** %agg_expr_ctxs, i32 0
+//   %expr_ctx = load %"class.impala::ExprContext"*,
+//        %"class.impala::ExprContext"** %expr_ctx_ptr
+//   %input0 = call { i64, i64 } @GetSlotRef(%"class.impala::ExprContext"* %expr_ctx,
+//        %"class.impala::TupleRow"* %row)
+//   %dst_slot_ptr = getelementptr inbounds { i8, [7 x i8],
+//        %"class.impala::TimestampValue" }, { i8, [7 x i8],
+//        %"class.impala::TimestampValue" }* %agg_tuple, i32 0, i32 2
+//   %dst_val = load %"class.impala::TimestampValue",
+//        %"class.impala::TimestampValue"* %dst_slot_ptr
+//   %0 = bitcast { i8, [7 x i8], %"class.impala::TimestampValue" }* %agg_tuple to i8*
+//   %null_byte_ptr = getelementptr i8, i8* %0, i32 0
+//   %null_byte = load i8, i8* %null_byte_ptr
+//   %null_mask = and i8 %null_byte, 1
+//   %is_null = icmp ne i8 %null_mask, 0
+//   %is_null_ext = zext i1 %is_null to i64
+//   %1 = or i64 0, %is_null_ext
+//   %dst = insertvalue { i64, i64 } zeroinitializer, i64 %1, 0
+//   %time_of_day = extractvalue %"class.impala::TimestampValue" %dst_val, 0, 0, 0, 0
+//   %dst1 = insertvalue { i64, i64 } %dst, i64 %time_of_day, 1
+//   %date = extractvalue %"class.impala::TimestampValue" %dst_val, 1, 0, 0
+//   %2 = extractvalue { i64, i64 } %dst1, 0
+//   %3 = zext i32 %date to i64
+//   %4 = shl i64 %3, 32
+//   %5 = and i64 %2, 4294967295
+//   %6 = or i64 %5, %4
+//   %dst2 = insertvalue { i64, i64 } %dst1, i64 %6, 0
+//   store { i64, i64 } %input0, { i64, i64 }* %input_lowered_ptr
+//   %input_unlowered_ptr = bitcast { i64, i64 }* %input_lowered_ptr
+//        to %"struct.impala_udf::TimestampVal"*
+//   store { i64, i64 } %dst2, { i64, i64 }* %dst_lowered_ptr
+//   %dst_unlowered_ptr = bitcast { i64, i64 }* %dst_lowered_ptr
+//        to %"struct.impala_udf::TimestampVal"*
+//   call void
+//        @_ZN6impala18AggregateFunctions3MinIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_.2(
+//        %"class.impala_udf::FunctionContext"* %agg_fn_ctx,
+//        %"struct.impala_udf::TimestampVal"* %input_unlowered_ptr,
+//        %"struct.impala_udf::TimestampVal"* %dst_unlowered_ptr)
+//   %anyval_result = load { i64, i64 }, { i64, i64 }* %dst_lowered_ptr
+//   %7 = extractvalue { i64, i64 } %anyval_result, 1
+//   %8 = insertvalue %"class.impala::TimestampValue" zeroinitializer, i64 %7, 0, 0, 0, 0
+//   %9 = extractvalue { i64, i64 } %anyval_result, 0
+//   %10 = ashr i64 %9, 32
+//   %11 = trunc i64 %10 to i32
+//   %12 = insertvalue %"class.impala::TimestampValue" %8, i32 %11, 1, 0, 0
+//   %13 = extractvalue { i64, i64 } %anyval_result, 0
+//   %result_is_null = trunc i64 %13 to i1
+//   %14 = bitcast { i8, [7 x i8], %"class.impala::TimestampValue" }* %agg_tuple to i8*
+//   %null_byte_ptr3 = getelementptr i8, i8* %14, i32 0
+//   %null_byte4 = load i8, i8* %null_byte_ptr3
+//   %null_bit_cleared = and i8 %null_byte4, -2
+//   %15 = sext i1 %result_is_null to i8
+//   %null_bit = and i8 %15, 1
+//   %null_bit_set = or i8 %null_bit_cleared, %null_bit
+//   store i8 %null_bit_set, i8* %null_byte_ptr3
+//   store %"class.impala::TimestampValue" %12,
+//        %"class.impala::TimestampValue"* %dst_slot_ptr
 //   br label %ret
 //
-// ret:                                              ; preds = %src_not_null, %entry
+// ret:                                              ; preds = %entry
 //   ret void
 // }
+//
 Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
     AggFnEvaluator* evaluator, SlotDescriptor* slot_desc, Function** fn) {
-  // TODO: Fix this DCHECK and Init() once CodegenUpdateSlot() can handle AggFnEvaluator
-  // with multiple input expressions (e.g. group_concat).
-  DCHECK_EQ(evaluator->input_expr_ctxs().size(), 1);
-  ExprContext* agg_expr_ctx = evaluator->input_expr_ctxs()[0];
-  Expr* agg_expr = agg_expr_ctx->root();
-
-  // TODO: implement timestamp
-  if (agg_expr->type().type == TYPE_TIMESTAMP &&
-      evaluator->agg_op() != AggFnEvaluator::AVG) {
-    return Status("PartitionedAggregationNode::CodegenUpdateSlot(): timestamp input type "
-        "NYI");
-  }
-
-  Function* agg_expr_fn;
-  RETURN_IF_ERROR(agg_expr->GetCodegendComputeFn(codegen, &agg_expr_fn));
-
   PointerType* fn_ctx_type =
       codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME);
-  PointerType* expr_ctx_type = codegen->GetPtrType(ExprContext::LLVM_CLASS_NAME);
+  PointerType* expr_ctxs_type =
+      codegen->GetPtrPtrType(codegen->GetType(ExprContext::LLVM_CLASS_NAME));
   StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
   if (tuple_struct == NULL) {
     return Status("PartitionedAggregationNode::CodegenUpdateSlot(): failed to generate "
-        "intermediate tuple desc");
+                  "intermediate tuple desc");
   }
   PointerType* tuple_ptr_type = codegen->GetPtrType(tuple_struct);
   PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
@@ -1561,129 +1571,129 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
   // Create UpdateSlot prototype
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateSlot", codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_fn_ctx", fn_ctx_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_expr_ctx", expr_ctx_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_expr_ctxs", expr_ctxs_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_tuple", tuple_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  LlvmBuilder builder(codegen->context());
   Value* args[4];
   *fn = prototype.GeneratePrototype(&builder, &args[0]);
   Value* agg_fn_ctx_arg = args[0];
-  Value* agg_expr_ctx_arg = args[1];
+  Value* agg_expr_ctxs_arg = args[1];
   Value* agg_tuple_arg = args[2];
   Value* row_arg = args[3];
 
-  BasicBlock* src_not_null_block =
-      BasicBlock::Create(codegen->context(), "src_not_null", *fn);
-  BasicBlock* ret_block = BasicBlock::Create(codegen->context(), "ret", *fn);
+  DCHECK_GE(evaluator->input_expr_ctxs().size(), 1);
+  vector<CodegenAnyVal> input_vals;
+  for (int i = 0; i < evaluator->input_expr_ctxs().size(); ++i) {
+    ExprContext* agg_expr_ctx = evaluator->input_expr_ctxs()[i];
+    Expr* agg_expr = agg_expr_ctx->root();
+    Function* agg_expr_fn;
+    RETURN_IF_ERROR(agg_expr->GetCodegendComputeFn(codegen, &agg_expr_fn));
+    DCHECK(agg_expr_fn != NULL);
 
-  // Call expr function to get src slot value
-  Value* agg_expr_fn_args[] = { agg_expr_ctx_arg, row_arg };
-  CodegenAnyVal src = CodegenAnyVal::CreateCallWrapped(
-      codegen, &builder, agg_expr->type(), agg_expr_fn, agg_expr_fn_args, "src");
-
-  Value* src_is_null = src.GetIsNull();
-  builder.CreateCondBr(src_is_null, ret_block, src_not_null_block);
-
-  // Src slot is not null, update dst_slot
-  builder.SetInsertPoint(src_not_null_block);
-  Value* dst_ptr = builder.CreateStructGEP(NULL, agg_tuple_arg, slot_desc->llvm_field_idx(),
-      "dst_slot_ptr");
-  Value* result = NULL;
-
-  if (slot_desc->is_nullable()) {
-    // Dst is NULL, just update dst slot to src slot and clear null bit
-    Function* clear_null_fn = slot_desc->GetUpdateNullFn(codegen, false);
-    builder.CreateCall(clear_null_fn, ArrayRef<Value*>({agg_tuple_arg}));
+    // Call expr function with the matching expr context to get src slot value.
+    Value* expr_ctx_ptr = builder.CreateInBoundsGEP(
+        agg_expr_ctxs_arg, codegen->GetIntConstant(TYPE_INT, i), "expr_ctx_ptr");
+    Value* expr_ctx = builder.CreateLoad(expr_ctx_ptr, "expr_ctx");
+    string input_name = Substitute("input$0", i);
+    input_vals.push_back(
+        CodegenAnyVal::CreateCallWrapped(codegen, &builder, agg_expr->type(), agg_expr_fn,
+            ArrayRef<Value*>({expr_ctx, row_arg}), input_name.c_str()));
   }
 
-  // Update the slot
-  Value* dst_value = builder.CreateLoad(dst_ptr, "dst_val");
-  switch (evaluator->agg_op()) {
-    case AggFnEvaluator::COUNT:
-      if (evaluator->is_merge()) {
-        result = builder.CreateAdd(dst_value, src.GetVal(), "count_sum");
+  AggFnEvaluator::AggregationOp agg_op = evaluator->agg_op();
+  const ColumnType& dst_type = evaluator->intermediate_type();
+  bool dst_is_int_or_float_or_bool = dst_type.IsIntegerType()
+      || dst_type.IsFloatingPointType() || dst_type.IsBooleanType();
+  bool dst_is_numeric_or_bool = dst_is_int_or_float_or_bool || dst_type.IsDecimalType();
+
+  BasicBlock* ret_block = BasicBlock::Create(codegen->context(), "ret", *fn);
+
+  // Emit the code to compute 'result' and set the NULL indicator if needed. First check
+  // for special cases where we can emit a very simple instruction sequence, then fall
+  // back to the general-purpose approach of calling the cross-compiled builtin UDA.
+  CodegenAnyVal& src = input_vals[0];
+  // 'dst_slot_ptr' points to the slot in the aggregate tuple to update.
+  Value* dst_slot_ptr = builder.CreateStructGEP(
+      NULL, agg_tuple_arg, slot_desc->llvm_field_idx(), "dst_slot_ptr");
+  Value* result = NULL;
+  Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
+  if (agg_op == AggFnEvaluator::COUNT) {
+    src.CodegenBranchIfNull(&builder, ret_block);
+    if (evaluator->is_merge()) {
+      result = builder.CreateAdd(dst_value, src.GetVal(), "count_sum");
+    } else {
+      result = builder.CreateAdd(
+          dst_value, codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
+    }
+    DCHECK(!slot_desc->is_nullable());
+  } else if ((agg_op == AggFnEvaluator::MIN || agg_op == AggFnEvaluator::MAX)
+      && dst_is_numeric_or_bool) {
+    bool is_min = agg_op == AggFnEvaluator::MIN;
+    src.CodegenBranchIfNull(&builder, ret_block);
+    Function* min_max_fn = codegen->CodegenMinMax(slot_desc->type(), is_min);
+    Value* min_max_args[] = {dst_value, src.GetVal()};
+    result =
+        builder.CreateCall(min_max_fn, min_max_args, is_min ? "min_value" : "max_value");
+    // Dst may have been NULL, make sure to unset the NULL bit.
+    DCHECK(slot_desc->is_nullable());
+    slot_desc->CodegenSetNullIndicator(
+        codegen, &builder, agg_tuple_arg, codegen->false_value());
+  } else if (agg_op == AggFnEvaluator::SUM && dst_is_int_or_float_or_bool) {
+    src.CodegenBranchIfNull(&builder, ret_block);
+    if (dst_type.IsFloatingPointType()) {
+      result = builder.CreateFAdd(dst_value, src.GetVal());
+    } else {
+      result = builder.CreateAdd(dst_value, src.GetVal());
+    }
+    // Dst may have been NULL, make sure to unset the NULL bit.
+    DCHECK(slot_desc->is_nullable());
+    slot_desc->CodegenSetNullIndicator(
+        codegen, &builder, agg_tuple_arg, codegen->false_value());
+  } else {
+    // The remaining cases are implemented using the UDA interface.
+    // Create intermediate argument 'dst' from 'dst_value'
+    CodegenAnyVal dst = CodegenAnyVal::GetNonNullVal(codegen, &builder, dst_type, "dst");
+
+    // For a subset of builtins we generate a different code sequence that exploits two
+    // properties of the builtins. First, NULL input values can be skipped. Second, the
+    // value of the slot was initialized in the right way in InitAggSlots() (e.g. 0 for
+    // SUM) that we get the right result if UpdateSlot() pretends that the NULL bit of
+    // 'dst' is unset. Empirically this optimisation makes TPC-H Q1 5-10% faster.
+    bool special_null_handling = !evaluator->intermediate_type().IsStringType()
+        && !evaluator->intermediate_type().IsTimestampType()
+        && (agg_op == AggFnEvaluator::MIN || agg_op == AggFnEvaluator::MAX
+               || agg_op == AggFnEvaluator::SUM || agg_op == AggFnEvaluator::AVG
+               || agg_op == AggFnEvaluator::NDV);
+    if (slot_desc->is_nullable()) {
+      if (special_null_handling) {
+        src.CodegenBranchIfNull(&builder, ret_block);
+        slot_desc->CodegenSetNullIndicator(
+            codegen, &builder, agg_tuple_arg, codegen->false_value());
       } else {
-        result = builder.CreateAdd(dst_value,
-            codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
+        dst.SetIsNull(slot_desc->CodegenIsNull(codegen, &builder, agg_tuple_arg));
       }
-      break;
-    case AggFnEvaluator::MIN: {
-      Function* min_fn = codegen->CodegenMinMax(slot_desc->type(), true);
-      Value* min_args[] = { dst_value, src.GetVal() };
-      result = builder.CreateCall(min_fn, min_args, "min_value");
-      break;
     }
-    case AggFnEvaluator::MAX: {
-      Function* max_fn = codegen->CodegenMinMax(slot_desc->type(), false);
-      Value* max_args[] = { dst_value, src.GetVal() };
-      result = builder.CreateCall(max_fn, max_args, "max_value");
-      break;
+    dst.SetFromRawValue(dst_value);
+
+    // Call the UDA to update/merge 'src' into 'dst', with the result stored in
+    // 'updated_dst_val'.
+    CodegenAnyVal updated_dst_val;
+    RETURN_IF_ERROR(CodegenCallUda(
+        codegen, &builder, evaluator, agg_fn_ctx_arg, input_vals, dst, &updated_dst_val));
+    result = updated_dst_val.ToNativeValue();
+
+    if (slot_desc->is_nullable() && !special_null_handling) {
+      // Set NULL bit in the slot based on the return value.
+      Value* result_is_null = updated_dst_val.GetIsNull("result_is_null");
+      slot_desc->CodegenSetNullIndicator(
+          codegen, &builder, agg_tuple_arg, result_is_null);
     }
-    case AggFnEvaluator::SUM:
-      if (slot_desc->type().type != TYPE_DECIMAL) {
-        if (slot_desc->type().type == TYPE_FLOAT ||
-            slot_desc->type().type == TYPE_DOUBLE) {
-          result = builder.CreateFAdd(dst_value, src.GetVal());
-        } else {
-          result = builder.CreateAdd(dst_value, src.GetVal());
-        }
-        break;
-      }
-      DCHECK_EQ(slot_desc->type().type, TYPE_DECIMAL);
-      // Fall through to xcompiled case
-    case AggFnEvaluator::AVG:
-    case AggFnEvaluator::NDV: {
-      // Get xcompiled update/merge function from IR module
-      const string& symbol = evaluator->is_merge() ?
-                             evaluator->merge_symbol() : evaluator->update_symbol();
-      const ColumnType& dst_type = evaluator->intermediate_type();
-      Function* ir_fn = codegen->GetFunction(symbol);
-      DCHECK(ir_fn != NULL);
-
-      // Clone and replace constants.
-      ir_fn = codegen->CloneFunction(ir_fn);
-      vector<FunctionContext::TypeDesc> arg_types;
-      arg_types.push_back(AnyValUtil::ColumnTypeToTypeDesc(agg_expr->type()));
-      Expr::InlineConstants(AnyValUtil::ColumnTypeToTypeDesc(dst_type), arg_types,
-          codegen, ir_fn);
-
-      // Create pointer to src to pass to ir_fn. We must use the unlowered type.
-      Value* src_lowered_ptr = codegen->CreateEntryBlockAlloca(
-          *fn, LlvmCodeGen::NamedVariable("src_lowered_ptr", src.value()->getType()));
-      builder.CreateStore(src.value(), src_lowered_ptr);
-      Type* unlowered_ptr_type =
-          CodegenAnyVal::GetUnloweredPtrType(codegen, agg_expr->type());
-      Value* src_unlowered_ptr =
-          builder.CreateBitCast(src_lowered_ptr, unlowered_ptr_type, "src_unlowered_ptr");
-
-      // Create intermediate argument 'dst' from 'dst_value'
-      CodegenAnyVal dst = CodegenAnyVal::GetNonNullVal(
-          codegen, &builder, dst_type, "dst");
-      dst.SetFromRawValue(dst_value);
-      // Create pointer to dst to pass to ir_fn. We must use the unlowered type.
-      Value* dst_lowered_ptr = codegen->CreateEntryBlockAlloca(
-          *fn, LlvmCodeGen::NamedVariable("dst_lowered_ptr", dst.value()->getType()));
-      builder.CreateStore(dst.value(), dst_lowered_ptr);
-      unlowered_ptr_type = CodegenAnyVal::GetUnloweredPtrType(codegen, dst_type);
-      Value* dst_unlowered_ptr =
-          builder.CreateBitCast(dst_lowered_ptr, unlowered_ptr_type, "dst_unlowered_ptr");
-
-      // Call 'ir_fn'
-      builder.CreateCall(ir_fn,
-          ArrayRef<Value*>({agg_fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr}));
-
-      // Convert StringVal intermediate 'dst_arg' back to StringValue
-      Value* anyval_result = builder.CreateLoad(dst_lowered_ptr, "anyval_result");
-      result = CodegenAnyVal(codegen, &builder, dst_type, anyval_result).ToNativeValue();
-      break;
-    }
-    default:
-      DCHECK(false) << "bad aggregate operator: " << evaluator->agg_op();
   }
 
   // TODO: Store to register in the loop and store once to memory at the end of the loop.
-  builder.CreateStore(result, dst_ptr);
+  builder.CreateStore(result, dst_slot_ptr);
   builder.CreateBr(ret_block);
 
   builder.SetInsertPoint(ret_block);
@@ -1697,6 +1707,58 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
   return Status::OK();
 }
 
+Status PartitionedAggregationNode::CodegenCallUda(LlvmCodeGen* codegen,
+    LlvmBuilder* builder, AggFnEvaluator* evaluator, Value* agg_fn_ctx,
+    const vector<CodegenAnyVal>& input_vals, const CodegenAnyVal& dst,
+    CodegenAnyVal* updated_dst_val) {
+  DCHECK_EQ(evaluator->input_expr_ctxs().size(), input_vals.size());
+  const string& symbol =
+      evaluator->is_merge() ? evaluator->merge_symbol() : evaluator->update_symbol();
+  const ColumnType& dst_type = evaluator->intermediate_type();
+
+  // TODO: to support actual UDAs, not just builtin functions using the UDA interface,
+  // we need to load the function at this point.
+  Function* uda_fn = codegen->GetFunction(symbol, true);
+  DCHECK(uda_fn != NULL);
+
+  vector<FunctionContext::TypeDesc> arg_types;
+  for (int i = 0; i < evaluator->input_expr_ctxs().size(); ++i) {
+    arg_types.push_back(AnyValUtil::ColumnTypeToTypeDesc(
+        evaluator->input_expr_ctxs()[i]->root()->type()));
+  }
+  Expr::InlineConstants(
+      AnyValUtil::ColumnTypeToTypeDesc(dst_type), arg_types, codegen, uda_fn);
+
+  // Set up arguments for call to UDA, which are the FunctionContext*, followed by
+  // pointers to all input values, followed by a pointer to the destination value.
+  vector<Value*> uda_fn_args;
+  uda_fn_args.push_back(agg_fn_ctx);
+
+  // Create pointers to input args to pass to uda_fn. We must use the unlowered type,
+  // e.g. IntVal, because the UDA interface expects the values to be passed as const
+  // references to the classes.
+  for (int i = 0; i < evaluator->input_expr_ctxs().size(); ++i) {
+    uda_fn_args.push_back(input_vals[i].GetUnloweredPtr("input_unlowered_ptr"));
+  }
+
+  // Create pointer to dst to pass to uda_fn. We must use the unlowered type for the
+  // same reason as above.
+  Value* dst_lowered_ptr = dst.GetLoweredPtr("dst_lowered_ptr");
+  Type* dst_unlowered_ptr_type = CodegenAnyVal::GetUnloweredPtrType(codegen, dst_type);
+  Value* dst_unlowered_ptr = builder->CreateBitCast(
+      dst_lowered_ptr, dst_unlowered_ptr_type, "dst_unlowered_ptr");
+  uda_fn_args.push_back(dst_unlowered_ptr);
+
+  // Call 'uda_fn'
+  builder->CreateCall(uda_fn, uda_fn_args);
+
+  // Convert intermediate 'dst_arg' back to the native type.
+  Value* anyval_result = builder->CreateLoad(dst_lowered_ptr, "anyval_result");
+
+  *updated_dst_val = CodegenAnyVal(codegen, builder, dst_type, anyval_result);
+  return Status::OK();
+}
+
 // IR codegen for the UpdateTuple loop.  This loop is query specific and based on the
 // aggregate functions.  The function signature must match the non- codegen'd UpdateTuple
 // exactly.
@@ -1705,78 +1767,60 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
 //
 // ; Function Attrs: alwaysinline
 // define void @UpdateTuple(%"class.impala::PartitionedAggregationNode"* %this_ptr,
-//                          %"class.impala_udf::FunctionContext"** %agg_fn_ctxs,
-//                          %"class.impala::Tuple"* %tuple,
-//                          %"class.impala::TupleRow"* %row,
-//                          i1 %is_merge) #34 {
+//      %"class.impala_udf::FunctionContext"** %agg_fn_ctxs, %"class.impala::Tuple"*
+//      %tuple,
+//      %"class.impala::TupleRow"* %row, i1 %is_merge) #34 {
 // entry:
 //   %tuple1 =
-//       bitcast %"class.impala::Tuple"* %tuple to { i8, [7 x i8], i64, i64, double }*
+//      bitcast %"class.impala::Tuple"* %tuple to { i8, [7 x i8], i64, i64, double }*
 //   %src_slot = getelementptr inbounds { i8, [7 x i8], i64, i64, double },
-//       { i8, [7 x i8], i64, i64, double }* %tuple1, i32 0, i32 2
+//      { i8, [7 x i8], i64, i64, double }* %tuple1, i32 0, i32 2
 //   %count_star_val = load i64, i64* %src_slot
 //   %count_star_inc = add i64 %count_star_val, 1
 //   store i64 %count_star_inc, i64* %src_slot
 //   %0 = getelementptr %"class.impala_udf::FunctionContext"*,
-//       %"class.impala_udf::FunctionContext"** %agg_fn_ctxs, i32 1
+//      %"class.impala_udf::FunctionContext"** %agg_fn_ctxs, i32 1
 //   %agg_fn_ctx = load %"class.impala_udf::FunctionContext"*,
-//       %"class.impala_udf::FunctionContext"** %0
-//   %1 = call %"class.impala::ExprContext"*
-//       @_ZNK6impala26PartitionedAggregationNode17GetAggExprContextEi(
-//           %"class.impala::PartitionedAggregationNode"* %this_ptr, i32 1)
+//      %"class.impala_udf::FunctionContext"** %0
+//   %1 = call %"class.impala::ExprContext"**
+//      @_ZNK6impala26PartitionedAggregationNode18GetAggExprContextsEi(
+//      %"class.impala::PartitionedAggregationNode"* %this_ptr, i32 1)
 //   call void @UpdateSlot(%"class.impala_udf::FunctionContext"* %agg_fn_ctx,
-//                         %"class.impala::ExprContext"* %1,
-//                         { i8, [7 x i8], i64, i64, double }* %tuple1,
-//                         %"class.impala::TupleRow"* %row)
+//      %"class.impala::ExprContext"** %1, { i8, [7 x i8], i64, i64, double }* %tuple1,
+//      %"class.impala::TupleRow"* %row)
 //   %2 = getelementptr %"class.impala_udf::FunctionContext"*,
-//       %"class.impala_udf::FunctionContext"** %agg_fn_ctxs, i32 2
+//      %"class.impala_udf::FunctionContext"** %agg_fn_ctxs, i32 2
 //   %agg_fn_ctx2 = load %"class.impala_udf::FunctionContext"*,
-//       %"class.impala_udf::FunctionContext"** %2
-//   %3 = call %"class.impala::ExprContext"*
-//       @_ZNK6impala26PartitionedAggregationNode17GetAggExprContextEi(
-//           %"class.impala::PartitionedAggregationNode"* %this_ptr, i32 2)
-//   call void @UpdateSlot.3(%"class.impala_udf::FunctionContext"* %agg_fn_ctx2,
-//                          %"class.impala::ExprContext"* %3,
-//                          { i8, [7 x i8], i64, i64, double }* %tuple1,
-//                          %"class.impala::TupleRow"* %row)
+//      %"class.impala_udf::FunctionContext"** %2
+//   %3 = call %"class.impala::ExprContext"**
+//      @_ZNK6impala26PartitionedAggregationNode18GetAggExprContextsEi(
+//      %"class.impala::PartitionedAggregationNode"* %this_ptr, i32 2)
+//   call void @UpdateSlot.4(%"class.impala_udf::FunctionContext"* %agg_fn_ctx2,
+//      %"class.impala::ExprContext"** %3, { i8, [7 x i8], i64, i64, double }* %tuple1,
+//      %"class.impala::TupleRow"* %row)
 //   ret void
 // }
-Status PartitionedAggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen,
-    Function** fn) {
+Status PartitionedAggregationNode::CodegenUpdateTuple(
+    LlvmCodeGen* codegen, Function** fn) {
   SCOPED_TIMER(codegen->codegen_timer());
 
-  int j = grouping_expr_ctxs_.size();
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
-    SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[j];
-    AggFnEvaluator* evaluator = aggregate_evaluators_[i];
-
-    // Don't codegen things that aren't builtins (for now)
-    if (!evaluator->is_builtin()) {
-      return Status("PartitionedAggregationNode::CodegenUpdateTuple(): UDA codegen NYI");
-    }
-
-    bool supported = true;
-    AggFnEvaluator::AggregationOp op = evaluator->agg_op();
-    PrimitiveType type = slot_desc->type().type;
-    // Char and timestamp intermediates aren't supported
-    if (type == TYPE_TIMESTAMP || type == TYPE_CHAR) supported = false;
-    // Only AVG and NDV support string intermediates
-    if ((type == TYPE_STRING || type == TYPE_VARCHAR) &&
-        !(op == AggFnEvaluator::AVG || op == AggFnEvaluator::NDV)) {
-      supported = false;
-    }
-    if (!supported) {
-      stringstream ss;
-      ss << "Could not codegen PartitionedAggregationNode::UpdateTuple because "
-         << "intermediate type " << slot_desc->type() << " is not yet supported for "
-         << "aggregate function \"" << evaluator->fn_name() << "()\"";
-      return Status(ss.str());
+  for (const SlotDescriptor* slot_desc : intermediate_tuple_desc_->slots()) {
+    if (slot_desc->type().type == TYPE_CHAR) {
+      return Status("PartitionedAggregationNode::CodegenUpdateTuple(): cannot codegen"
+                    "CHAR in aggregations");
     }
   }
 
   if (intermediate_tuple_desc_->GetLlvmStruct(codegen) == NULL) {
     return Status("PartitionedAggregationNode::CodegenUpdateTuple(): failed to generate "
-        "intermediate tuple desc");
+                  "intermediate tuple desc");
+  }
+
+  for (AggFnEvaluator* evaluator : aggregate_evaluators_) {
+    // Don't codegen things that aren't builtins (for now)
+    if (!evaluator->is_builtin()) {
+      return Status("PartitionedAggregationNode::CodegenUpdateTuple(): UDA codegen NYI");
+    }
   }
 
   // Get the types to match the UpdateTuple signature
@@ -1799,7 +1843,7 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen,
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("is_merge", codegen->boolean_type()));
 
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  LlvmBuilder builder(codegen->context());
   Value* args[5];
   *fn = prototype.GeneratePrototype(&builder, &args[0]);
   Value* this_arg = args[0];
@@ -1811,13 +1855,13 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen,
   // TODO: get rid of this by using right type in function signature
   tuple_arg = builder.CreateBitCast(tuple_arg, tuple_ptr, "tuple");
 
-  Function* get_expr_ctx_fn =
-      codegen->GetFunction(IRFunction::PART_AGG_NODE_GET_EXPR_CTX, false);
-  DCHECK(get_expr_ctx_fn != NULL);
+  Function* get_expr_ctxs_fn =
+      codegen->GetFunction(IRFunction::PART_AGG_NODE_GET_EXPR_CTXS, false);
+  DCHECK(get_expr_ctxs_fn != NULL);
 
   // Loop over each expr and generate the IR for that slot.  If the expr is not
   // count(*), generate a helper IR function to update the slot and call that.
-  j = grouping_expr_ctxs_.size();
+  int j = grouping_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[j];
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
@@ -1837,9 +1881,9 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen,
       Value* agg_fn_ctx = builder.CreateLoad(agg_fn_ctx_ptr, "agg_fn_ctx");
       // Call GetExprCtx() to get the expression context.
       DCHECK(agg_expr_ctxs_[i] != NULL);
-      Value* get_expr_ctx_args[] = { this_arg, codegen->GetIntConstant(TYPE_INT, i) };
-      Value* agg_expr_ctx = builder.CreateCall(get_expr_ctx_fn, get_expr_ctx_args);
-      Value* update_slot_args[] = { agg_fn_ctx, agg_expr_ctx, tuple_arg, row_arg };
+      Value* get_expr_ctxs_args[] = {this_arg, codegen->GetIntConstant(TYPE_INT, i)};
+      Value* agg_expr_ctxs = builder.CreateCall(get_expr_ctxs_fn, get_expr_ctxs_args);
+      Value* update_slot_args[] = {agg_fn_ctx, agg_expr_ctxs, tuple_arg, row_arg};
       builder.CreateCall(update_slot_fn, update_slot_args);
     }
   }
@@ -1848,8 +1892,8 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen,
   // CodegenProcessBatch() does the final optimizations.
   *fn = codegen->FinalizeFunction(*fn);
   if (*fn == NULL) {
-    return Status("PartitionedAggregationNode::CodegeUpdateTuple(): codegen'd "
-        "UpdateTuple() function failed verification, see log");
+    return Status("PartitionedAggregationNode::CodegenUpdateTuple(): codegen'd "
+                  "UpdateTuple() function failed verification, see log");
   }
   return Status::OK();
 }

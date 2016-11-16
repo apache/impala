@@ -182,8 +182,8 @@ int OldHashTable::AddBloomFilters() {
 // Helper function to store a value into the results buffer if the expr
 // evaluated to NULL.  We don't want (NULL, 1) to hash to the same as (0,1) so
 // we'll pick a more random value.
-static void CodegenAssignNullValue(LlvmCodeGen* codegen,
-    LlvmCodeGen::LlvmBuilder* builder, Value* dst, const ColumnType& type) {
+static void CodegenAssignNullValue(
+    LlvmCodeGen* codegen, LlvmBuilder* builder, Value* dst, const ColumnType& type) {
   uint64_t fnv_seed = HashUtil::FNV_SEED;
 
   if (type.type == TYPE_STRING || type.type == TYPE_VARCHAR) {
@@ -288,7 +288,7 @@ Function* OldHashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
   Value* args[2];
   Function* fn = prototype.GeneratePrototype(&builder, args);
 
@@ -429,7 +429,7 @@ Function* OldHashTable::CodegenHashCurrentRow(LlvmCodeGen* codegen) {
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
 
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
   Value* this_arg;
   Function* fn = prototype.GeneratePrototype(&builder, &this_arg);
 
@@ -612,7 +612,7 @@ Function* OldHashTable::CodegenEquals(LlvmCodeGen* codegen) {
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
   Value* args[2];
   Function* fn = prototype.GeneratePrototype(&builder, args);
   Value* row = args[1];

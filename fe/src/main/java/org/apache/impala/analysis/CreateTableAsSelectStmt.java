@@ -17,8 +17,8 @@
 
 package org.apache.impala.analysis;
 
-import java.util.List;
 import java.util.EnumSet;
+import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Db;
@@ -26,10 +26,11 @@ import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.TableId;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.THdfsFileFormat;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -79,8 +80,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
         pkvs.add(new PartitionKeyValue(key, null));
       }
     }
-    insertStmt_ = new InsertStmt(null, createStmt.getTblName(), false, pkvs,
-        null, queryStmt, null, false);
+    insertStmt_ = InsertStmt.createInsert(
+        null, createStmt.getTblName(), false, pkvs, null, queryStmt, null);
   }
 
   public QueryStmt getQueryStmt() { return insertStmt_.getQueryStmt(); }
@@ -187,12 +188,6 @@ public class CreateTableAsSelectStmt extends StatementBase {
       // user specified a location for the table this will be a no-op.
       msTbl.getSd().setLocation(analyzer.getCatalog().getTablePath(msTbl).toString());
 
-      // Create a "temp" table based off the given metastore.api.Table object. Normally,
-      // the CatalogService assigns all table IDs, but in this case we need to assign the
-      // "temp" table an ID locally. This table ID cannot conflict with any table in the
-      // SelectStmt (or the BE will be very confused). To ensure the ID is unique within
-      // this query, just assign it the invalid table ID. The CatalogServer will assign
-      // this table a proper ID once it is created there as part of the CTAS execution.
       Table tmpTable = null;
       if (KuduTable.isKuduTable(msTbl)) {
         tmpTable = KuduTable.createCtasTarget(db, msTbl, createStmt_.getColumnDefs(),
@@ -200,7 +195,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
       } else {
         // TODO: Creating a tmp table using load() is confusing.
         // Refactor it to use a 'createCtasTarget()' function similar to Kudu table.
-        tmpTable = Table.fromMetastoreTable(TableId.createInvalidId(), db, msTbl);
+        tmpTable = Table.fromMetastoreTable(db, msTbl);
         tmpTable.load(true, client.getHiveClient(), msTbl);
       }
       Preconditions.checkState(tmpTable != null &&
@@ -213,6 +208,12 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
     // Finally, run analysis on the insert statement.
     insertStmt_.analyze(analyzer);
+  }
+
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
+    Preconditions.checkState(isAnalyzed());
+    insertStmt_.rewriteExprs(rewriter);
   }
 
   @Override

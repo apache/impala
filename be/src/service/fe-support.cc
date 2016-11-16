@@ -178,6 +178,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
     type = LibCache::TYPE_JAR;
   } else {
     DCHECK(false) << params.fn_binary_type;
+    type = LibCache::TYPE_JAR; // Set type to something for the case where DCHECK is off.
   }
 
   // Builtin functions are loaded directly from the running process
@@ -335,20 +336,6 @@ Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad(
   return result_bytes;
 }
 
-extern "C"
-JNIEXPORT jbyteArray JNICALL
-Java_org_apache_impala_service_FeSupport_NativeGetStartupOptions(JNIEnv* env,
-    jclass caller_class) {
-  TStartupOptions options;
-  ExecEnv* exec_env = ExecEnv::GetInstance();
-  ImpalaServer* impala_server = exec_env->impala_server();
-  options.__set_compute_lineage(impala_server->IsLineageLoggingEnabled());
-  jbyteArray result_bytes = NULL;
-  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &options, &result_bytes), env,
-                     JniUtil::internal_exc_class(), result_bytes);
-  return result_bytes;
-}
-
 namespace impala {
 
 static JNINativeMethod native_methods[] = {
@@ -371,10 +358,6 @@ static JNINativeMethod native_methods[] = {
   {
     (char*)"NativePrioritizeLoad", (char*)"([B)[B",
     (void*)::Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad
-  },
-  {
-    (char*)"NativeGetStartupOptions", (char*)"()[B",
-    (void*)::Java_org_apache_impala_service_FeSupport_NativeGetStartupOptions
   },
 };
 

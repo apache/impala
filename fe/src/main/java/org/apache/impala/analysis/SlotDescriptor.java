@@ -25,6 +25,7 @@ import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TSlotDescriptor;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -140,9 +141,7 @@ public class SlotDescriptor {
   }
 
   public Path getPath() { return path_; }
-
   public boolean isScanSlot() { return path_ != null && path_.isRootedAtTable(); }
-
   public Column getColumn() { return !isScanSlot() ? null : path_.destColumn(); }
 
   public ColumnStats getStats() {

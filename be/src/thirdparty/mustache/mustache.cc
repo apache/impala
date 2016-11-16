@@ -275,6 +275,8 @@ int EvaluateSubstitution(const string& document, const int idx,
       // TODO: Triple {{{ means don't escape
       (*out) << context->GetString();
     }
+  } else if (context->IsInt64()) {
+    (*out) << context->GetInt64();
   } else if (context->IsInt()) {
     (*out) << context->GetInt();
   } else if (context->IsDouble()) {

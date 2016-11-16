@@ -19,10 +19,9 @@ package org.apache.impala.analysis;
 
 import static org.junit.Assert.fail;
 
-import org.junit.Test;
-
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.junit.Test;
 
 
 public class ExprTest {

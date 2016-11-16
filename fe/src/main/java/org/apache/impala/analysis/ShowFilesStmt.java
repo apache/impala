@@ -27,8 +27,6 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 
 /**
  * Representation of a SHOW FILES statement.
@@ -38,52 +36,60 @@ import com.google.common.collect.Lists;
  *
  */
 public class ShowFilesStmt extends StatementBase {
-  private TableName tableName_;
+  private final TableName tableName_;
 
   // Show files for all the partitions if this is null.
-  private final PartitionSpec partitionSpec_;
+  private final PartitionSet partitionSet_;
 
   // Set during analysis.
   protected Table table_;
 
-  public ShowFilesStmt(TableName tableName, PartitionSpec partitionSpec) {
+  public ShowFilesStmt(TableName tableName, PartitionSet partitionSet) {
     this.tableName_ = tableName;
-    this.partitionSpec_ = partitionSpec;
+    this.partitionSet_ = partitionSet;
   }
 
   @Override
   public String toSql() {
     StringBuilder strBuilder = new StringBuilder();
     strBuilder.append("SHOW FILES IN " + tableName_.toString());
-    if (partitionSpec_ != null) strBuilder.append(" " + partitionSpec_.toSql());
+    if (partitionSet_ != null) strBuilder.append(" " + partitionSet_.toSql());
     return strBuilder.toString();
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (!tableName_.isFullyQualified()) {
-      tableName_ = new TableName(analyzer.getDefaultDb(), tableName_.getTbl());
+    // Resolve and analyze table ref to register privilege and audit events
+    // and to allow us to evaluate partition predicates.
+    TableRef tableRef = new TableRef(tableName_.toPath(), null, Privilege.VIEW_METADATA);
+    tableRef = analyzer.resolveTableRef(tableRef);
+    if (tableRef instanceof InlineViewRef ||
+        tableRef instanceof CollectionTableRef) {
+      throw new AnalysisException(String.format(
+          "SHOW FILES not applicable to a non hdfs table: %s", tableName_));
     }
-    table_ = analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
+    table_ = tableRef.getTable();
+    Preconditions.checkNotNull(table_);
     if (!(table_ instanceof HdfsTable)) {
       throw new AnalysisException(String.format(
-          "SHOW FILES not applicable to a non hdfs table: %s", table_.getFullName()));
+          "SHOW FILES not applicable to a non hdfs table: %s", tableName_));
     }
+    tableRef.analyze(analyzer);
 
     // Analyze the partition spec, if one was specified.
-    if (partitionSpec_ != null) {
-      partitionSpec_.setTableName(tableName_);
-      partitionSpec_.setPartitionShouldExist();
-      partitionSpec_.setPrivilegeRequirement(Privilege.VIEW_METADATA);
-      partitionSpec_.analyze(analyzer);
+    if (partitionSet_ != null) {
+      partitionSet_.setTableName(table_.getTableName());
+      partitionSet_.setPartitionShouldExist();
+      partitionSet_.setPrivilegeRequirement(Privilege.VIEW_METADATA);
+      partitionSet_.analyze(analyzer);
     }
   }
 
   public TShowFilesParams toThrift() {
     TShowFilesParams params = new TShowFilesParams();
-    params.setTable_name(new TTableName(tableName_.getDb(), tableName_.getTbl()));
-    if (partitionSpec_ != null) {
-      params.setPartition_spec(partitionSpec_.toThrift());
+    params.setTable_name(new TTableName(table_.getDb().getName(), table_.getName()));
+    if (partitionSet_ != null) {
+      params.setPartition_set(partitionSet_.toThrift());
     }
     return params;
   }

@@ -31,7 +31,7 @@
 // on libhdfs.
 #include "udf/udf-internal.h"
 
-#if IMPALA_UDF_SDK_BUILD
+#if defined(IMPALA_UDF_SDK_BUILD) && IMPALA_UDF_SDK_BUILD
 // For the SDK build, we are building the .lib that the developers would use to
 // write UDFs. They want to link against this to run their UDFs in a test environment.
 // Pulling in free-pool is very undesirable since it pulls in many other libraries.
@@ -109,11 +109,16 @@ class RuntimeState {
 
 using namespace impala;
 using namespace impala_udf;
+using std::pair;
 
+const int FunctionContextImpl::VARARGS_BUFFER_ALIGNMENT;
 const char* FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME =
     "class.impala_udf::FunctionContext";
 
 static const int MAX_WARNINGS = 1000;
+
+static_assert(__BYTE_ORDER == __LITTLE_ENDIAN,
+    "DecimalVal memory layout assumes little-endianness");
 
 FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool,
     const FunctionContext::TypeDesc& return_type,
@@ -138,14 +143,11 @@ FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool
   ctx->impl_->intermediate_type_ = intermediate_type;
   ctx->impl_->return_type_ = return_type;
   ctx->impl_->arg_types_ = arg_types;
-  // UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'
-  // that require 16-byte memory alignment.
-  ctx->impl_->varargs_buffer_ =
-      reinterpret_cast<uint8_t*>(aligned_malloc(varargs_buffer_size, 16));
+  ctx->impl_->varargs_buffer_ = reinterpret_cast<uint8_t*>(
+      aligned_malloc(varargs_buffer_size, VARARGS_BUFFER_ALIGNMENT));
   ctx->impl_->varargs_buffer_size_ = varargs_buffer_size;
   ctx->impl_->debug_ = debug;
-  VLOG_ROW << "Created FunctionContext: " << ctx
-           << " with pool " << ctx->impl_->pool_;
+  VLOG_ROW << "Created FunctionContext: " << ctx << " with pool " << ctx->impl_->pool_;
   return ctx;
 }
 
@@ -252,7 +254,7 @@ const char* FunctionContext::effective_user() const {
 
 FunctionContext::UniqueId FunctionContext::query_id() const {
   UniqueId id;
-#if IMPALA_UDF_SDK_BUILD
+#if defined(IMPALA_UDF_SDK_BUILD) && IMPALA_UDF_SDK_BUILD
   id.hi = id.lo = 0;
 #else
   id.hi = impl_->state_->query_id().hi;
@@ -450,18 +452,22 @@ void FunctionContextImpl::FreeLocalAllocations() noexcept {
   local_allocations_.clear();
 }
 
-void FunctionContextImpl::SetConstantArgs(const vector<AnyVal*>& constant_args) {
+void FunctionContextImpl::SetConstantArgs(vector<AnyVal*>&& constant_args) {
   constant_args_ = constant_args;
+}
+
+void FunctionContextImpl::SetNonConstantArgs(
+    vector<pair<Expr*, AnyVal*>>&& non_constant_args) {
+  non_constant_args_ = non_constant_args;
 }
 
 // Note: this function crashes LLVM's JIT in expr-test if it's xcompiled. Do not move to
 // expr-ir.cc. This could probably use further investigation.
-StringVal::StringVal(FunctionContext* context, int len) noexcept
-  : len(len), ptr(NULL) {
+StringVal::StringVal(FunctionContext* context, int len) noexcept : len(len), ptr(NULL) {
   if (UNLIKELY(len > StringVal::MAX_LENGTH)) {
     std::cout << "MAX_LENGTH, Trying to allocate " << len;
     context->SetError("String length larger than allowed limit of "
-        "1 GB character data.");
+                      "1 GB character data.");
     len = 0;
     is_null = true;
   } else {

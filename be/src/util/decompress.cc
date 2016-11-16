@@ -279,7 +279,7 @@ Status BzipDecompressor::ProcessBlock(bool output_preallocated, int64_t input_le
   }
 
   int ret = BZ_OUTBUFF_FULL;
-  unsigned int outlen;
+  unsigned int outlen = static_cast<unsigned int>(buffer_length_);
   // TODO: IMPALA-3073 Verify if compressed block could be multistream. If yes, we need
   // to support it and shouldn't stop decompressing while ret == BZ_STREAM_END.
   while (ret == BZ_OUTBUFF_FULL) {

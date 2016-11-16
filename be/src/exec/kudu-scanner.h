@@ -63,12 +63,6 @@ class KuduScanner {
   /// Does this by adding sets of rows to 'row_batch' instead of adding one-by-one.
   Status HandleEmptyProjection(RowBatch* row_batch, bool* batch_done);
 
-  /// Set 'slot' to Null in 'tuple'.
-  void SetSlotToNull(Tuple* tuple, const SlotDescriptor& slot);
-
-  /// Returns true if 'slot' is Null in 'tuple'.
-  bool IsSlotNull(Tuple* tuple, const SlotDescriptor& slot);
-
   /// Decodes rows previously fetched from kudu, now in 'cur_rows_' into a RowBatch.
   ///  - 'batch' is the batch that will point to the new tuples.
   ///  - *tuple_mem should be the location to output tuples.
@@ -82,25 +76,10 @@ class KuduScanner {
   /// Closes the current kudu::client::KuduScanner.
   void CloseCurrentClientScanner();
 
-  /// Given a tuple, copies the values of those columns that require additional memory
-  /// from memory owned by the kudu::client::KuduScanner into memory owned by the
-  /// RowBatch. Assumes that the other columns are already materialized.
-  Status RelocateValuesFromKudu(Tuple* tuple, MemPool* mem_pool);
-
-  /// Transforms a kudu row into an Impala row. Columns that don't require auxiliary
-  /// memory are copied to the tuple directly. String columns are stored as a reference to
-  /// the memory of the RowPtr and need to be relocated later.
-  Status KuduRowToImpalaTuple(const kudu::client::KuduScanBatch::RowPtr& row,
-      RowBatch* row_batch, Tuple* tuple);
-
   inline Tuple* next_tuple(Tuple* t) const {
     uint8_t* mem = reinterpret_cast<uint8_t*>(t);
     return reinterpret_cast<Tuple*>(mem + scan_node_->tuple_desc()->byte_size());
   }
-
-  /// Returns the tuple idx into the row for this scan node to output to.
-  /// Currently this is always 0.
-  int tuple_idx() const { return 0; }
 
   KuduScanNode* scan_node_;
   RuntimeState* state_;
@@ -120,13 +99,6 @@ class KuduScanner {
 
   /// The scanner's cloned copy of the conjuncts to apply.
   vector<ExprContext*> conjunct_ctxs_;
-
-  /// List of string slots that need relocation for their auxiliary memory.
-  std::vector<SlotDescriptor*> string_slots_;
-
-  /// Number of string slots that need relocation (i.e. size of string_slots_), stored
-  /// separately to avoid calling vector::size() in the hot path (IMPALA-3348).
-  int num_string_slots_;
 };
 
 } /// namespace impala

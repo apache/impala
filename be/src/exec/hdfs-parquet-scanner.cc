@@ -108,13 +108,14 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
           footer_range = scan_node->AllocateScanRange(files[i]->fs,
               files[i]->filename.c_str(), footer_size, footer_start,
               split_metadata->partition_id, footer_split->disk_id(),
-              footer_split->try_cache(), footer_split->expected_local(), files[i]->mtime,
-              split);
+              footer_split->expected_local(),
+              DiskIoMgr::BufferOpts(footer_split->try_cache(), files[i]->mtime), split);
         } else {
           // If we did not find the last split, we know it is going to be a remote read.
-          footer_range = scan_node->AllocateScanRange(files[i]->fs,
-              files[i]->filename.c_str(), footer_size, footer_start,
-              split_metadata->partition_id, -1, false, false, files[i]->mtime, split);
+          footer_range =
+              scan_node->AllocateScanRange(files[i]->fs, files[i]->filename.c_str(),
+                  footer_size, footer_start, split_metadata->partition_id, -1, false,
+                  DiskIoMgr::BufferOpts::Uncached(), split);
         }
 
         footer_ranges.push_back(footer_range);
@@ -150,6 +151,7 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
       metadata_range_(NULL),
       dictionary_pool_(new MemPool(scan_node->mem_tracker())),
       assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
+      process_footer_timer_stats_(NULL),
       num_cols_counter_(NULL),
       num_row_groups_counter_(NULL),
       codegend_process_scratch_batch_fn_(NULL) {
@@ -164,6 +166,9 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TUnit::UNIT);
   num_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroups", TUnit::UNIT);
+  process_footer_timer_stats_ =
+      ADD_SUMMARY_STATS_TIMER(
+          scan_node_->runtime_profile(), "FooterProcessingTime");
 
   codegend_process_scratch_batch_fn_ = reinterpret_cast<ProcessScratchBatchFn>(
       scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET));
@@ -184,12 +189,21 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 
   DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
 
+  // Each scan node can process multiple splits. Each split processes the footer once.
+  // We use a timer to measure the time taken to ProcessFooter() per split and add
+  // this time to the averaged timer.
+  MonotonicStopWatch single_footer_process_timer;
+  single_footer_process_timer.Start();
   // First process the file metadata in the footer.
-  Status status = ProcessFooter();
+  Status footer_status = ProcessFooter();
+  single_footer_process_timer.Stop();
+
+  process_footer_timer_stats_->UpdateCounter(single_footer_process_timer.ElapsedTime());
+
   // Release I/O buffers immediately to make sure they are cleaned up
   // in case we return a non-OK status anywhere below.
   context_->ReleaseCompletedResources(NULL, true);
-  RETURN_IF_ERROR(status);
+  RETURN_IF_ERROR(footer_status);
 
   // Parse the file schema into an internal representation for schema resolution.
   schema_resolver_.reset(new ParquetSchemaResolver(*scan_node_->hdfs_table(),
@@ -523,8 +537,9 @@ Status HdfsParquetScanner::AssembleRows(
       bool num_tuples_mismatch = c != 0 && last_num_tuples != scratch_batch_->num_tuples;
       if (UNLIKELY(!continue_execution || num_tuples_mismatch)) {
         // Skipping this row group. Free up all the resources with this row group.
-        scratch_batch_->mem_pool()->FreeAll();
+        FlushRowGroupResources(row_batch);
         scratch_batch_->num_tuples = 0;
+        DCHECK(scratch_batch_->AtEnd());
         *skip_row_group = true;
         if (num_tuples_mismatch) {
           parse_status_.MergeStatus(Substitute("Corrupt Parquet file '$0': column '$1' "
@@ -828,8 +843,8 @@ Status HdfsParquetScanner::ProcessFooter() {
   uint8_t* metadata_size_ptr = magic_number_ptr - sizeof(int32_t);
   uint32_t metadata_size = *reinterpret_cast<uint32_t*>(metadata_size_ptr);
   uint8_t* metadata_ptr = metadata_size_ptr - metadata_size;
-  // If the metadata was too big, we need to stitch it before deserializing it.
-  // In that case, we stitch the data in this buffer.
+  // If the metadata was too big, we need to read it into a contiguous buffer before
+  // deserializing it.
   ScopedBuffer metadata_buffer(scan_node_->mem_tracker());
 
   DCHECK(metadata_range_ != NULL);
@@ -841,45 +856,34 @@ Status HdfsParquetScanner::ProcessFooter() {
     DCHECK(file_desc != NULL);
     // The start of the metadata is:
     // file_length - 4-byte metadata size - footer-size - metadata size
-    int64_t metadata_start = file_desc->file_length -
-      sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER) - metadata_size;
-    int64_t metadata_bytes_to_read = metadata_size;
+    int64_t metadata_start = file_desc->file_length - sizeof(int32_t)
+        - sizeof(PARQUET_VERSION_NUMBER) - metadata_size;
     if (metadata_start < 0) {
       return Status(Substitute("File '$0' is invalid. Invalid metadata size in file "
           "footer: $1 bytes. File size: $2 bytes.", filename(), metadata_size,
           file_desc->file_length));
     }
-    // IoMgr can only do a fixed size Read(). The metadata could be larger
-    // so we stitch it here.
-    // TODO: consider moving this stitching into the scanner context. The scanner
-    // context usually handles the stitching but no other scanner need this logic
-    // now.
 
     if (!metadata_buffer.TryAllocate(metadata_size)) {
       return Status(Substitute("Could not allocate buffer of $0 bytes for Parquet "
           "metadata for file '$1'.", metadata_size, filename()));
     }
     metadata_ptr = metadata_buffer.buffer();
-    int64_t copy_offset = 0;
     DiskIoMgr* io_mgr = scan_node_->runtime_state()->io_mgr();
 
-    while (metadata_bytes_to_read > 0) {
-      int64_t to_read = ::min<int64_t>(io_mgr->max_read_buffer_size(),
-          metadata_bytes_to_read);
-      DiskIoMgr::ScanRange* range = scan_node_->AllocateScanRange(
-          metadata_range_->fs(), filename(), to_read, metadata_start + copy_offset, -1,
-          metadata_range_->disk_id(), metadata_range_->try_cache(),
-          metadata_range_->expected_local(), file_desc->mtime);
+    // Read the header into the metadata buffer.
+    DiskIoMgr::ScanRange* metadata_range = scan_node_->AllocateScanRange(
+        metadata_range_->fs(), filename(), metadata_size, metadata_start, -1,
+        metadata_range_->disk_id(), metadata_range_->expected_local(),
+        DiskIoMgr::BufferOpts::ReadInto(metadata_buffer.buffer(), metadata_size));
 
-      DiskIoMgr::BufferDescriptor* io_buffer = NULL;
-      RETURN_IF_ERROR(io_mgr->Read(scan_node_->reader_context(), range, &io_buffer));
-      memcpy(metadata_ptr + copy_offset, io_buffer->buffer(), io_buffer->len());
-      io_buffer->Return();
-
-      metadata_bytes_to_read -= to_read;
-      copy_offset += to_read;
-    }
-    DCHECK_EQ(metadata_bytes_to_read, 0);
+    DiskIoMgr::BufferDescriptor* io_buffer;
+    RETURN_IF_ERROR(
+        io_mgr->Read(scan_node_->reader_context(), metadata_range, &io_buffer));
+    DCHECK_EQ(io_buffer->buffer(), metadata_buffer.buffer());
+    DCHECK_EQ(io_buffer->len(), metadata_size);
+    DCHECK(io_buffer->eosr());
+    io_buffer->Return();
   }
 
   // Deserialize file header
@@ -1140,14 +1144,13 @@ Status HdfsParquetScanner::InitColumns(
         static_cast<ScanRangeMetadata*>(metadata_range_->meta_data())->original_split;
 
     // Determine if the column is completely contained within a local split.
-    bool column_range_local = split_range->expected_local() &&
-                              col_start >= split_range->offset() &&
-                              col_end <= split_range->offset() + split_range->len();
-
-    DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(
-        metadata_range_->fs(), filename(), col_len, col_start, scalar_reader->col_idx(),
-        split_range->disk_id(), split_range->try_cache(), column_range_local,
-        file_desc->mtime);
+    bool col_range_local = split_range->expected_local()
+        && col_start >= split_range->offset()
+        && col_end <= split_range->offset() + split_range->len();
+    DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(metadata_range_->fs(),
+        filename(), col_len, col_start, scalar_reader->col_idx(), split_range->disk_id(),
+        col_range_local,
+        DiskIoMgr::BufferOpts(split_range->try_cache(), file_desc->mtime));
     col_ranges.push_back(col_range);
 
     // Get the stream that will be used for this column

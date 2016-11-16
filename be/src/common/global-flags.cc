@@ -108,10 +108,24 @@ DEFINE_int32(fault_injection_rpc_type, 0, "A fault injection option that specifi
     "which rpc call will be injected with the delay. Effective in debug builds only.");
 #endif
 
+// Used for testing the path where the Kudu client is stubbed.
 DEFINE_bool(disable_kudu, false, "If true, Kudu features will be disabled.");
+
+// Timeout (ms) used in the FE for admin and metadata operations (set on the KuduClient),
+// and in the BE for scans and writes (set on the KuduScanner and KuduSession
+// accordingly).
+DEFINE_int32(kudu_operation_timeout_ms, 3 * 60 * 1000, "Timeout (milliseconds) set for "
+    "all Kudu operations. This must be a positive value, and there is no way to disable "
+    "timeouts.");
 
 DEFINE_bool(enable_accept_queue_server, true,
     "If true, uses a modified version of "
     "TThreadedServer that accepts connections as quickly as possible and hands them off "
     "to a thread pool to finish setup, reducing the chances that connections time out "
     "waiting to be accepted.");
+
+DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
+    "incremental stats the catalog is allowed to serialize per table. "
+    "This limit is set as a safety check, to prevent the JVM from "
+    "hitting a maximum array limit of 1GB (or OOM) while building "
+    "the thrift objects to send to impalads. By default, it's set to 200MB");

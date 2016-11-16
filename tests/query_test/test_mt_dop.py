@@ -31,17 +31,60 @@ class TestMtDop(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestMtDop, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(TestDimension('mt_dop', *MT_DOP_VALUES))
-    # IMPALA-4332: The MT scheduler does not work for Kudu or HBase tables.
-    cls.TestMatrix.add_constraint(\
-        lambda v: v.get_value('table_format').file_format != 'hbase')
-    cls.TestMatrix.add_constraint(\
-        lambda v: v.get_value('table_format').file_format != 'kudu')
 
   @classmethod
   def get_workload(cls):
     return 'functional-query'
 
   def test_mt_dop(self, vector):
-    new_vector = deepcopy(vector)
-    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
-    self.run_test_case('QueryTest/mt-dop', new_vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    self.run_test_case('QueryTest/mt-dop', vector)
+
+  def test_compute_stats(self, unique_database, vector):
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    file_format = vector.get_value('table_format').file_format
+    fq_table_name = "%s.mt_dop" % unique_database
+
+    # Different formats need different DDL for creating a test table, and also
+    # have different expected results for compute stats.
+    expected_results = None
+    if file_format == 'kudu':
+      # CREATE TABLE LIKE is currently not supported for Kudu tables.
+      self.execute_query("create external table %s stored as kudu "
+        "tblproperties('kudu.table_name'='impala::functional_kudu.alltypes')"
+        % fq_table_name)
+      expected_results = "Updated 1 partition(s) and 13 column(s)."
+    elif file_format == 'hbase':
+      self.execute_query(
+        "create external table %s like functional_hbase.alltypes" % fq_table_name)
+      expected_results = "Updated 1 partition(s) and 13 column(s)."
+    else:
+      # Create a second table in the same format pointing to the same data files.
+      # This function switches to the format-specific DB in 'vector'.
+      table_loc = self._get_table_location("alltypes", vector)
+      self.execute_query_using_client(self.client,
+        "create external table %s like alltypes location '%s'"
+        % (fq_table_name, table_loc), vector)
+      # Recover partitions for HDFS tables.
+      self.execute_query("alter table %s recover partitions" % fq_table_name)
+      expected_results = "Updated 24 partition(s) and 11 column(s)."
+
+    results = self.execute_query("compute stats %s" % fq_table_name,
+      vector.get_value('exec_option'))
+    assert expected_results in results.data
+
+class TestMtDopParquet(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestMtDopParquet, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(TestDimension('mt_dop', *MT_DOP_VALUES))
+    cls.TestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_parquet(self, vector):
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    self.run_test_case('QueryTest/mt-dop-parquet', vector)

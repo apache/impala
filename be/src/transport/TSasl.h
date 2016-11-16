@@ -18,8 +18,8 @@
  * under the License.
  */
 
-#ifndef _THRIFT_TRANSPORT_TSASL_H_
-#define _THRIFT_TRANSPORT_TSASL_H_ 1
+#ifndef IMPALA_TRANSPORT_TSASL_H
+#define IMPALA_TRANSPORT_TSASL_H
 
 #include <string>
 #include <map>
@@ -38,7 +38,10 @@
 
 #include <thrift/transport/TTransportException.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wheader-hygiene"
 using namespace apache::thrift::transport;
+#pragma clang diagnostic pop
 
 namespace sasl {
 class SaslException : public TTransportException {
@@ -186,4 +189,4 @@ class TSaslServer : public sasl::TSasl {
   bool serverStarted;
 };
 }
-#endif /* _THRIFT_TRANSPORT_TSALS_H_ */
+#endif /* IMPALA_TRANSPORT_TSASL_H */

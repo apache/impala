@@ -39,6 +39,8 @@ set(SRC_FILES
   ImpalaHiveServer2Service.cpp
   beeswax_constants.cpp
   beeswax_types.cpp
+  BackendGflags_constants.cpp
+  BackendGflags_types.cpp
   BeeswaxService.cpp
   TCLIService.cpp
   TCLIService_constants.cpp

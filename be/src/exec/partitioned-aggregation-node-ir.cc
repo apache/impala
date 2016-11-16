@@ -26,7 +26,7 @@
 
 using namespace impala;
 
-ExprContext* PartitionedAggregationNode::GetAggExprContext(int i) const {
+ExprContext* const* PartitionedAggregationNode::GetAggExprContexts(int i) const {
   return agg_expr_ctxs_[i];
 }
 

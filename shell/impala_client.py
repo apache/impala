@@ -450,7 +450,7 @@ class ImpalaClient(object):
 
   def expect_result_metadata(self, query_str):
     """ Given a query string, return True if impalad expects result metadata"""
-    excluded_query_types = ['use', 'alter', 'drop']
+    excluded_query_types = ['use', 'drop']
     if True in set(map(query_str.startswith, excluded_query_types)):
       return False
     return True

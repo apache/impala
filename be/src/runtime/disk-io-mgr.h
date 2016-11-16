@@ -140,12 +140,15 @@ class MemTracker;
 /// regardless of how many concurrent readers are running.
 //
 /// Buffer Management:
-/// Buffers are allocated by the IoMgr as necessary to service reads. These buffers
-/// are directly returned to the caller. The caller must call Return() on the buffer
-/// when it is done, at which point the buffer will be recycled for another read. In error
-/// cases, the IoMgr will recycle the buffers more promptly but regardless, the caller
-/// must always call Return()
-//
+/// Buffers for reads are either a) allocated by the IoMgr and transferred to the caller,
+/// b) cached HDFS buffers if the scan range uses HDFS caching, or c) provided by the
+/// caller when constructing the scan range.
+///
+/// As a caller reads from a scan range, these buffers are wrapped in BufferDescriptors
+/// and returned to the caller. The caller must always call Return() on the buffer
+/// descriptor when it when it is done to allow recycling of the buffer descriptor and
+/// the associated buffer (if there is an IoMgr-allocated or HDFS cached buffer).
+///
 /// Caching support:
 /// Scan ranges contain metadata on whether or not it is cached on the DN. In that
 /// case, we use the HDFS APIs to read the cached data without doing any copies. For these
@@ -232,7 +235,7 @@ class DiskIoMgr {
   class BufferDescriptor {
    public:
     ScanRange* scan_range() { return scan_range_; }
-    char* buffer() { return buffer_; }
+    uint8_t* buffer() { return buffer_; }
     int64_t buffer_len() { return buffer_len_; }
     int64_t len() { return len_; }
     bool eosr() { return eosr_; }
@@ -240,10 +243,11 @@ class DiskIoMgr {
     /// Returns the offset within the scan range that this buffer starts at
     int64_t scan_range_offset() const { return scan_range_offset_; }
 
-    /// Transfer ownership of buffer memory from 'mem_tracker_' to 'dst' and
-    /// set 'mem_tracker_' to 'dst'.  'mem_tracker_' and 'dst' must be non-NULL.
-    /// Does not check memory limits on 'dst': the caller should check the memory limit
-    /// if a different memory limit may apply to 'dst'.
+    /// Transfer ownership of buffer memory from 'mem_tracker_' to 'dst' and set
+    /// 'mem_tracker_' to 'dst'. 'mem_tracker_' and 'dst' must be non-NULL. Does not
+    /// check memory limits on 'dst': the caller should check the memory limit if a
+    /// different memory limit may apply to 'dst'. If the buffer was a client-provided
+    /// buffer, transferring is not allowed.
     /// TODO: IMPALA-3209: revisit this as part of scanner memory usage revamp.
     void TransferOwnership(MemTracker* dst);
 
@@ -257,14 +261,25 @@ class DiskIoMgr {
     friend class DiskIoRequestContext;
     BufferDescriptor(DiskIoMgr* io_mgr);
 
-    bool is_cached() { return scan_range_->cached_buffer_ != NULL; }
+    /// Return true if this is a cached buffer owned by HDFS.
+    bool is_cached() const {
+      return scan_range_->external_buffer_tag_
+          == ScanRange::ExternalBufferTag::CACHED_BUFFER;
+    }
+
+    /// Return true if this is a buffer owner by the client that was provided when
+    /// constructing the scan range.
+    bool is_client_buffer() const {
+      return scan_range_->external_buffer_tag_
+          == ScanRange::ExternalBufferTag::CLIENT_BUFFER;
+    }
 
     /// Reset the buffer descriptor to an uninitialized state.
     void Reset();
 
     /// Resets the buffer descriptor state for a new reader, range and data buffer.
     /// The buffer memory should already be accounted against MemTracker
-    void Reset(DiskIoRequestContext* reader, ScanRange* range, char* buffer,
+    void Reset(DiskIoRequestContext* reader, ScanRange* range, uint8_t* buffer,
         int64_t buffer_len, MemTracker* mem_tracker);
 
     DiskIoMgr* const io_mgr_;
@@ -280,7 +295,7 @@ class DiskIoMgr {
     ScanRange* scan_range_;
 
     /// buffer with the read contents
-    char* buffer_;
+    uint8_t* buffer_;
 
     /// length of buffer_. For buffers from cached reads, the length is 0.
     int64_t buffer_len_;
@@ -318,6 +333,9 @@ class DiskIoMgr {
     RequestType::type request_type() const { return request_type_; }
 
    protected:
+    RequestRange(RequestType::type request_type)
+      : fs_(NULL), offset_(-1), len_(-1), disk_id_(-1), request_type_(request_type) {}
+
     /// Hadoop filesystem that contains file_, or set to NULL for local filesystem.
     hdfsFS fs_;
 
@@ -337,25 +355,76 @@ class DiskIoMgr {
     RequestType::type request_type_;
   };
 
+  /// Param struct for different combinations of buffering.
+  struct BufferOpts {
+   public:
+    // Set options for a read into an IoMgr-allocated or HDFS-cached buffer. Caching is
+    // enabled if 'try_cache' is true, the file is in the HDFS cache and 'mtime' matches
+    // the modified time of the cached file in the HDFS cache.
+    BufferOpts(bool try_cache, int64_t mtime)
+      : try_cache_(try_cache),
+        mtime_(mtime),
+        client_buffer_(NULL),
+        client_buffer_len_(-1) {}
+
+    /// Set options for an uncached read into an IoMgr-allocated buffer.
+    static BufferOpts Uncached() {
+      return BufferOpts(false, NEVER_CACHE, NULL, -1);
+    }
+
+    /// Set options to read the entire scan range into 'client_buffer'. The length of the
+    /// buffer, 'client_buffer_len', must fit the entire scan range. HDFS caching is not
+    /// enabled in this case.
+    static BufferOpts ReadInto(uint8_t* client_buffer, int64_t client_buffer_len) {
+      return BufferOpts(false, NEVER_CACHE, client_buffer, client_buffer_len);
+    }
+
+   private:
+    friend class ScanRange;
+
+    BufferOpts(
+        bool try_cache, int64_t mtime, uint8_t* client_buffer, int64_t client_buffer_len)
+      : try_cache_(try_cache),
+        mtime_(mtime),
+        client_buffer_(client_buffer),
+        client_buffer_len_(client_buffer_len) {}
+
+    /// If 'mtime_' is set to NEVER_CACHE, the file handle will never be cached, because
+    /// the modification time won't match.
+    const static int64_t NEVER_CACHE = -1;
+
+    /// If true, read from HDFS cache if possible.
+    const bool try_cache_;
+
+    /// Last modified time of the file associated with the scan range. If set to
+    /// NEVER_CACHE, caching is disabled.
+    const int64_t mtime_;
+
+    /// A destination buffer provided by the client, NULL and -1 if no buffer.
+    uint8_t* const client_buffer_;
+    const int64_t client_buffer_len_;
+  };
+
   /// ScanRange description. The caller must call Reset() to initialize the fields
   /// before calling AddScanRanges(). The private fields are used internally by
   /// the IoMgr.
   class ScanRange : public RequestRange {
    public:
-
-    /// If the mtime is set to NEVER_CACHE, the file handle should never be cached.
-    const static int64_t NEVER_CACHE = -1;
-
     /// The initial queue capacity for this.  Specify -1 to use IoMgr default.
     ScanRange(int initial_capacity = -1);
 
     virtual ~ScanRange();
 
-    /// Resets this scan range object with the scan range description.  The scan range
-    /// must fall within the file bounds (offset >= 0 and offset + len <= file_length).
-    /// Resets this scan range object with the scan range description.
+    /// Resets this scan range object with the scan range description. The scan range
+    /// is for bytes [offset, offset + len) in 'file' on 'fs' (which is NULL for the
+    /// local filesystem). The scan range must fall within the file bounds (offset >= 0
+    /// and offset + len <= file_length). 'disk_id' is the disk queue to add the range
+    /// to. If 'expected_local' is true, a warning is generated if the read did not
+    /// come from a local disk. 'buffer_opts' specifies buffer management options -
+    /// see the DiskIoMgr class comment and the BufferOpts comments for details.
+    /// 'meta_data' is an arbitrary client-provided pointer for any auxiliary data.
     void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
-        bool try_cache, bool expected_local, int64_t mtime, void* metadata = NULL);
+        bool expected_local, const BufferOpts& buffer_opts, void* meta_data = NULL);
 
     void* meta_data() const { return meta_data_; }
     bool try_cache() const { return try_cache_; }
@@ -410,9 +479,9 @@ class DiskIoMgr {
     /// Closes the file for this range. This function only modifies state in this range.
     void Close();
 
-    /// Reads from this range into 'buffer'. Buffer is preallocated. Returns the number
-    /// of bytes read. Updates range to keep track of where in the file we are.
-    Status Read(char* buffer, int64_t* bytes_read, bool* eosr);
+    /// Reads from this range into 'buffer', which has length 'buffer_len' bytes. Returns
+    /// the number of bytes read. The read position in this scan range is updated.
+    Status Read(uint8_t* buffer, int64_t buffer_len, int64_t* bytes_read, bool* eosr);
 
     /// Reads from the DN cache. On success, sets cached_buffer_ to the DN buffer
     /// and *read_succeeded to true.
@@ -450,9 +519,24 @@ class DiskIoMgr {
       HdfsCachedFileHandle* hdfs_file_;
     };
 
-    /// If non-null, this is DN cached buffer. This means the cached read succeeded
-    /// and all the bytes for the range are in this buffer.
-    struct hadoopRzBuffer* cached_buffer_;
+    /// Tagged union that holds a buffer for the cases when there is a buffer allocated
+    /// externally from DiskIoMgr that is associated with the scan range.
+    enum class ExternalBufferTag { CLIENT_BUFFER, CACHED_BUFFER, NO_BUFFER };
+    ExternalBufferTag external_buffer_tag_;
+    union {
+      /// Valid if the 'external_buffer_tag_' is CLIENT_BUFFER.
+      struct {
+        /// Client-provided buffer to read the whole scan range into.
+        uint8_t* data;
+
+        /// Length of the client-provided buffer.
+        int64_t len;
+      } client_buffer_;
+
+      /// Valid and non-NULL if the external_buffer_tag_ is CACHED_BUFFER, which means
+      /// that a cached read succeeded and all the bytes for the range are in this buffer.
+      struct hadoopRzBuffer* cached_buffer_;
+    };
 
     /// Lock protecting fields below.
     /// This lock should not be taken during Open/Read/Close.
@@ -564,7 +648,7 @@ class DiskIoMgr {
   ///    the reader will be cancelled and MEM_LIMIT_EXCEEDED will be returned via
   ///    GetNext().
   Status RegisterContext(DiskIoRequestContext** request_context,
-      MemTracker* reader_mem_tracker = NULL);
+      MemTracker* reader_mem_tracker);
 
   /// Unregisters context from the disk IoMgr. This must be called for every
   /// RegisterContext() regardless of cancellation and must be called in the
@@ -590,8 +674,10 @@ class DiskIoMgr {
   /// (i.e. the caller should not/cannot call GetNextRange for these ranges).
   /// This can be used to do synchronous reads as well as schedule dependent ranges,
   /// as in the case for columnar formats.
-  Status AddScanRanges(DiskIoRequestContext* reader, const std::vector<ScanRange*>& ranges,
-      bool schedule_immediately = false);
+  Status AddScanRanges(DiskIoRequestContext* reader,
+      const std::vector<ScanRange*>& ranges, bool schedule_immediately = false);
+  Status AddScanRange(
+      DiskIoRequestContext* reader, ScanRange* range, bool schedule_immediately = false);
 
   /// Add a WriteRange for the writer. This is non-blocking and schedules the context
   /// on the IoMgr disk queue. Does not create any files.
@@ -609,6 +695,8 @@ class DiskIoMgr {
   /// is read. This can be called while there are outstanding ScanRanges and is
   /// thread safe. Multiple threads can be calling Read() per reader at a time.
   /// range *cannot* have already been added via AddScanRanges.
+  /// This can only be used if the scan range fits in a single IO buffer (i.e. is smaller
+  /// than max_read_buffer_size()) or if reading into a client-provided buffer.
   Status Read(DiskIoRequestContext* reader, ScanRange* range, BufferDescriptor** buffer);
 
   /// Determine which disk queue this file should be assigned to.  Returns an index into
@@ -751,7 +839,7 @@ class DiskIoMgr {
   ///  free_buffers_[10] => list of free buffers with size 1 MB
   ///  free_buffers_[13] => list of free buffers with size 8 MB
   ///  free_buffers_[n]  => list of free buffers with size 2^n * 1024 B
-  std::vector<std::list<char*>> free_buffers_;
+  std::vector<std::list<uint8_t*>> free_buffers_;
 
   /// List of free buffer desc objects that can be handed out to clients
   std::list<BufferDescriptor*> free_buffer_descs_;
@@ -787,8 +875,8 @@ class DiskIoMgr {
   /// Gets a BufferDescriptor initialized with the provided parameters. The object may be
   /// recycled or newly allocated. Does not do anything aside from initialize the
   /// descriptor's fields.
-  BufferDescriptor* GetBufferDesc(DiskIoRequestContext* reader,
-      MemTracker* mem_tracker, ScanRange* range, char* buffer, int64_t buffer_size);
+  BufferDescriptor* GetBufferDesc(DiskIoRequestContext* reader, MemTracker* mem_tracker,
+      ScanRange* range, uint8_t* buffer, int64_t buffer_size);
 
   /// Returns the buffer desc and underlying buffer to the disk IoMgr. This also updates
   /// the reader and disk queue state.
@@ -849,6 +937,13 @@ class DiskIoMgr {
   /// Reads the specified scan range and calls HandleReadFinished when done.
   void ReadRange(DiskQueue* disk_queue, DiskIoRequestContext* reader,
       ScanRange* range);
+
+  /// Try to allocate the next buffer for the scan range, returning the new buffer
+  /// if successful. If 'reader' is cancelled, cancels the range and returns NULL.
+  /// If there is memory pressure and buffers are already queued, adds the range
+  /// to the blocked ranges and returns NULL.
+  BufferDescriptor* TryAllocateNextBufferForRange(DiskQueue* disk_queue,
+      DiskIoRequestContext* reader, ScanRange* range, int64_t buffer_size);
 };
 
 }

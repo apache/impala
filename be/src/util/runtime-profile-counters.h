@@ -46,6 +46,8 @@ namespace impala {
   #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) \
       (profile)->AddTimeSeriesCounter(name, src_counter)
   #define ADD_TIMER(profile, name) (profile)->AddCounter(name, TUnit::TIME_NS)
+  #define ADD_SUMMARY_STATS_TIMER(profile, name) \
+      (profile)->AddSummaryStatsCounter(name, TUnit::TIME_NS)
   #define ADD_CHILD_TIMER(profile, name, parent) \
       (profile)->AddCounter(name, TUnit::TIME_NS, parent)
   #define SCOPED_TIMER(c) \
@@ -65,6 +67,7 @@ namespace impala {
   #define ADD_COUNTER(profile, name, unit) NULL
   #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) NULL
   #define ADD_TIMER(profile, name) NULL
+  #define ADD_SUMMARY_STATS_TIMER(profile, name) NULL
   #define ADD_CHILD_TIMER(profile, name, parent) NULL
   #define SCOPED_TIMER(c)
   #define CANCEL_SAFE_SCOPED_TIMER(c)
@@ -181,17 +184,9 @@ class RuntimeProfile::AveragedCounter : public RuntimeProfile::Counter {
 
   /// The value for this counter should be updated through UpdateCounter().
   /// Set() and Add() should not be used.
-  virtual void Set(double value) {
-    DCHECK(false);
-  }
-
-  virtual void Set(int64_t value) {
-    DCHECK(false);
-  }
-
-  virtual void Add(int64_t delta) {
-    DCHECK(false);
-  }
+  virtual void Set(double value) { DCHECK(false); }
+  virtual void Set(int64_t value) { DCHECK(false); }
+  virtual void Add(int64_t delta) { DCHECK(false); }
 
  private:
   /// Map from counters to their existing values. Modified via UpdateCounter().
@@ -202,6 +197,63 @@ class RuntimeProfile::AveragedCounter : public RuntimeProfile::Counter {
   /// DOUBLE_VALUE, current_int_sum_ otherwise.
   double current_double_sum_;
   int64_t current_int_sum_;
+};
+
+/// This counter records multiple values and keeps a track of the minimum, maximum and
+/// average value of all the values seen so far.
+/// Unlike the AveragedCounter, this only keeps track of statistics of raw values
+/// whereas the AveragedCounter maintains an average of counters.
+/// value() stores the average.
+class RuntimeProfile::SummaryStatsCounter : public RuntimeProfile::Counter {
+ public:
+  SummaryStatsCounter(TUnit::type unit, int32_t total_num_values,
+      int64_t min_value, int64_t max_value, int64_t sum)
+   : Counter(unit),
+     total_num_values_(total_num_values),
+     min_(min_value),
+     max_(max_value),
+     sum_(sum) {
+    value_.Store(total_num_values == 0 ? 0 : sum / total_num_values);
+  }
+
+  SummaryStatsCounter(TUnit::type unit)
+   : Counter(unit),
+     total_num_values_(0),
+     min_(numeric_limits<int64_t>::max()),
+     max_(numeric_limits<int64_t>::min()),
+     sum_(0) {
+  }
+
+  int64_t MinValue();
+  int64_t MaxValue();
+  int32_t TotalNumValues();
+
+  /// Update sum_ with the new value and also update the min and the max values
+  /// seen so far.
+  void UpdateCounter(int64_t new_value);
+
+  /// The value for this counter should be updated through UpdateCounter() or SetStats().
+  /// Set() and Add() should not be used.
+  virtual void Set(double value) { DCHECK(false); }
+  virtual void Set(int64_t value) { DCHECK(false); }
+  virtual void Add(int64_t delta) { DCHECK(false); }
+
+  /// Overwrites the existing counter with 'counter'
+  void SetStats(const TSummaryStatsCounter& counter);
+
+  void ToThrift(TSummaryStatsCounter* counter, const std::string& name);
+
+ private:
+  /// The total number of values seen so far.
+  int32_t total_num_values_;
+
+  /// Summary statistics of values seen so far.
+  int64_t min_;
+  int64_t max_;
+  int64_t sum_;
+
+  // Protects min_, max_, sum_, total_num_values_ and value_.
+  SpinLock lock_;
 };
 
 /// A set of counters that measure thread info, such as total time, user time, sys time.

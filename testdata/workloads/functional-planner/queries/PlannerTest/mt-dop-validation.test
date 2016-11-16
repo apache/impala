@@ -70,23 +70,23 @@ PLAN-ROOT SINK
 |
 02:TOP-N [LIMIT=10]
 |  order by: count(int_col) ASC, bigint_col ASC
-|  hosts=3 per-host-mem=unavailable
+|  hosts=3 per-host-mem=160B
 |  tuple-ids=2 row-size=16B cardinality=10
 |
 04:AGGREGATE [FINALIZE]
 |  output: count:merge(int_col)
 |  group by: bigint_col
-|  hosts=3 per-host-mem=unavailable
+|  hosts=3 per-host-mem=128.00MB
 |  tuple-ids=1 row-size=16B cardinality=unavailable
 |
 03:EXCHANGE [HASH(bigint_col)]
-|  hosts=3 per-host-mem=unavailable
+|  hosts=3 per-host-mem=0B
 |  tuple-ids=1 row-size=16B cardinality=unavailable
 |
 01:AGGREGATE [STREAMING]
 |  output: count(int_col)
 |  group by: bigint_col
-|  hosts=3 per-host-mem=unavailable
+|  hosts=3 per-host-mem=128.00MB
 |  tuple-ids=1 row-size=16B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
@@ -94,7 +94,7 @@ PLAN-ROOT SINK
    predicates: id < 10
    table stats: unavailable
    column stats: unavailable
-   hosts=3 per-host-mem=unavailable
+   hosts=3 per-host-mem=16.00MB
    tuple-ids=0 row-size=16B cardinality=unavailable
 ====
 # Single-table scan/filter/analysic should work.
@@ -136,16 +136,16 @@ PLAN-ROOT SINK
 |  partition by: int_col
 |  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  hosts=3 per-host-mem=unavailable
+|  hosts=3 per-host-mem=0B
 |  tuple-ids=3,2 row-size=16B cardinality=unavailable
 |
 01:SORT
 |  order by: int_col ASC NULLS FIRST, id ASC
-|  hosts=3 per-host-mem=unavailable
+|  hosts=3 per-host-mem=0B
 |  tuple-ids=3 row-size=8B cardinality=unavailable
 |
 03:EXCHANGE [HASH(int_col)]
-|  hosts=3 per-host-mem=unavailable
+|  hosts=3 per-host-mem=0B
 |  tuple-ids=0 row-size=8B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
@@ -153,7 +153,7 @@ PLAN-ROOT SINK
    predicates: id < 10
    table stats: unavailable
    column stats: unavailable
-   hosts=3 per-host-mem=unavailable
+   hosts=3 per-host-mem=16.00MB
    tuple-ids=0 row-size=8B cardinality=unavailable
 ====
 # Nested-loop join in a subplan should work.
@@ -216,39 +216,39 @@ PLAN-ROOT SINK
 |  tuple-ids=2,1,0 row-size=562B cardinality=1500000
 |
 01:SUBPLAN
-|  hosts=3 per-host-mem=unavailable
+|  hosts=3 per-host-mem=0B
 |  tuple-ids=2,1,0 row-size=562B cardinality=1500000
 |
 |--08:NESTED LOOP JOIN [CROSS JOIN]
-|  |  hosts=3 per-host-mem=unavailable
+|  |  hosts=3 per-host-mem=254B
 |  |  tuple-ids=2,1,0 row-size=562B cardinality=100
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |     parent-subplan=01
-|  |     hosts=3 per-host-mem=unavailable
+|  |     hosts=3 per-host-mem=0B
 |  |     tuple-ids=0 row-size=254B cardinality=1
 |  |
 |  04:SUBPLAN
-|  |  hosts=3 per-host-mem=unavailable
+|  |  hosts=3 per-host-mem=0B
 |  |  tuple-ids=2,1 row-size=308B cardinality=100
 |  |
 |  |--07:NESTED LOOP JOIN [CROSS JOIN]
-|  |  |  hosts=3 per-host-mem=unavailable
+|  |  |  hosts=3 per-host-mem=124B
 |  |  |  tuple-ids=2,1 row-size=308B cardinality=10
 |  |  |
 |  |  |--05:SINGULAR ROW SRC
 |  |  |     parent-subplan=04
-|  |  |     hosts=3 per-host-mem=unavailable
+|  |  |     hosts=3 per-host-mem=0B
 |  |  |     tuple-ids=1 row-size=124B cardinality=1
 |  |  |
 |  |  06:UNNEST [o.o_lineitems]
 |  |     parent-subplan=04
-|  |     hosts=3 per-host-mem=unavailable
+|  |     hosts=3 per-host-mem=0B
 |  |     tuple-ids=2 row-size=0B cardinality=10
 |  |
 |  03:UNNEST [c.c_orders o]
 |     parent-subplan=01
-|     hosts=3 per-host-mem=unavailable
+|     hosts=3 per-host-mem=0B
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
@@ -258,7 +258,7 @@ PLAN-ROOT SINK
    predicates on o_lineitems: l_linenumber < 3
    table stats: 150000 rows total
    columns missing stats: c_orders
-   hosts=3 per-host-mem=unavailable
+   hosts=3 per-host-mem=88.00MB
    tuple-ids=0 row-size=254B cardinality=15000
 ====
 # Hash-join in a subplan should work.
@@ -312,31 +312,31 @@ PLAN-ROOT SINK
 |  tuple-ids=1,0,2 row-size=286B cardinality=1500000
 |
 01:SUBPLAN
-|  hosts=3 per-host-mem=unavailable
+|  hosts=3 per-host-mem=0B
 |  tuple-ids=1,0,2 row-size=286B cardinality=1500000
 |
 |--06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o1.o_orderkey = o2.o_orderkey + 2
-|  |  hosts=3 per-host-mem=unavailable
+|  |  hosts=3 per-host-mem=0B
 |  |  tuple-ids=1,0,2 row-size=286B cardinality=10
 |  |
 |  |--04:UNNEST [c.c_orders o2]
 |  |     parent-subplan=01
-|  |     hosts=3 per-host-mem=unavailable
+|  |     hosts=3 per-host-mem=0B
 |  |     tuple-ids=2 row-size=0B cardinality=10
 |  |
 |  05:NESTED LOOP JOIN [CROSS JOIN]
-|  |  hosts=3 per-host-mem=unavailable
+|  |  hosts=3 per-host-mem=270B
 |  |  tuple-ids=1,0 row-size=278B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |     parent-subplan=01
-|  |     hosts=3 per-host-mem=unavailable
+|  |     hosts=3 per-host-mem=0B
 |  |     tuple-ids=0 row-size=270B cardinality=1
 |  |
 |  03:UNNEST [c.c_orders o1]
 |     parent-subplan=01
-|     hosts=3 per-host-mem=unavailable
+|     hosts=3 per-host-mem=0B
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
@@ -345,6 +345,6 @@ PLAN-ROOT SINK
    predicates on o1: o1.o_orderkey < 5
    table stats: 150000 rows total
    columns missing stats: c_orders, c_orders
-   hosts=3 per-host-mem=unavailable
+   hosts=3 per-host-mem=88.00MB
    tuple-ids=0 row-size=270B cardinality=150000
 ====

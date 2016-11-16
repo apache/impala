@@ -61,6 +61,12 @@ namespace impala {
 
 const string PlanFragmentExecutor::PER_HOST_PEAK_MEM_COUNTER = "PerHostPeakMemUsage";
 
+namespace {
+const string OPEN_TIMER_NAME = "OpenTime";
+const string PREPARE_TIMER_NAME = "PrepareTime";
+const string EXEC_TIMER_NAME = "ExecTime";
+}
+
 PlanFragmentExecutor::PlanFragmentExecutor(
     ExecEnv* exec_env, const ReportStatusCallback& report_status_cb)
   : exec_env_(exec_env),
@@ -118,10 +124,10 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
 
   // total_time_counter() is in the runtime_state_ so start it up now.
   SCOPED_TIMER(profile()->total_time_counter());
-  timings_profile_ =
-      obj_pool()->Add(new RuntimeProfile(obj_pool(), "PlanFragmentExecutor"));
+  timings_profile_ = obj_pool()->Add(
+      new RuntimeProfile(obj_pool(), "Fragment Instance Lifecycle Timings"));
   profile()->AddChild(timings_profile_);
-  SCOPED_TIMER(ADD_TIMER(timings_profile_, "PrepareTime"));
+  SCOPED_TIMER(ADD_TIMER(timings_profile_, PREPARE_TIMER_NAME));
 
   // reservation or a query option.
   int64_t bytes_limit = -1;
@@ -202,7 +208,8 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
   }
 
   RuntimeState* state = runtime_state_.get();
-  RuntimeProfile::Counter* prepare_timer = ADD_TIMER(profile(), "ExecTreePrepareTime");
+  RuntimeProfile::Counter* prepare_timer =
+      ADD_CHILD_TIMER(timings_profile_, "ExecTreePrepareTime", PREPARE_TIMER_NAME);
   {
     SCOPED_TIMER(prepare_timer);
     // Until IMPALA-4233 is fixed, we still need to create the codegen object before
@@ -283,7 +290,7 @@ void PlanFragmentExecutor::PrintVolumeIds(
 
 Status PlanFragmentExecutor::Open() {
   SCOPED_TIMER(profile()->total_time_counter());
-  SCOPED_TIMER(ADD_TIMER(timings_profile_, "OpenTime"));
+  SCOPED_TIMER(ADD_TIMER(timings_profile_, OPEN_TIMER_NAME));
   VLOG_QUERY << "Open(): instance_id=" << runtime_state_->fragment_instance_id();
   Status status = OpenInternal();
   UpdateStatus(status);
@@ -306,25 +313,29 @@ Status PlanFragmentExecutor::OpenInternal() {
     // make sure the thread started up, otherwise ReportProfile() might get into a race
     // with StopReportThread()
     report_thread_started_cv_.wait(l);
-    report_thread_active_ = true;
   }
 
   OptimizeLlvmModule();
 
   {
-    SCOPED_TIMER(ADD_TIMER(timings_profile_, "ExecTreeOpenTime"));
+    SCOPED_TIMER(ADD_CHILD_TIMER(timings_profile_, "ExecTreeOpenTime", OPEN_TIMER_NAME));
     RETURN_IF_ERROR(exec_tree_->Open(runtime_state_.get()));
   }
   return sink_->Open(runtime_state_.get());
 }
 
 Status PlanFragmentExecutor::Exec() {
-  SCOPED_TIMER(ADD_TIMER(timings_profile_, "ExecTime"));
+  Status status;
   {
-    lock_guard<mutex> l(status_lock_);
-    RETURN_IF_ERROR(status_);
+    // Must go out of scope before FragmentComplete(), otherwise counter will not be
+    // updated by time final profile is sent, and will always be 0.
+    SCOPED_TIMER(ADD_TIMER(timings_profile_, EXEC_TIMER_NAME));
+    {
+      lock_guard<mutex> l(status_lock_);
+      RETURN_IF_ERROR(status_);
+    }
+    status = ExecInternal();
   }
-  Status status = ExecInternal();
 
   // If there's no error, ExecInternal() completed the fragment instance's execution.
   if (status.ok()) {
@@ -341,7 +352,7 @@ Status PlanFragmentExecutor::Exec() {
 
 Status PlanFragmentExecutor::ExecInternal() {
   RuntimeProfile::Counter* plan_exec_timer =
-      ADD_TIMER(timings_profile_, "ExecTreeExecTime");
+      ADD_CHILD_TIMER(timings_profile_, "ExecTreeExecTime", EXEC_TIMER_NAME);
   bool exec_tree_complete = false;
   do {
     Status status;
@@ -369,6 +380,7 @@ void PlanFragmentExecutor::ReportProfile() {
   DCHECK(!report_status_cb_.empty());
   unique_lock<mutex> l(report_thread_lock_);
   // tell Open() that we started
+  report_thread_active_ = true;
   report_thread_started_cv_.notify_one();
 
   // Jitter the reporting time of remote fragments by a random amount between
@@ -492,6 +504,12 @@ void PlanFragmentExecutor::Cancel() {
     VLOG_QUERY << "Cancel() called before Prepare()";
     return;
   }
+
+  // Ensure that the sink is closed from both sides. Although in ordinary executions we
+  // rely on the consumer to do this, in error cases the consumer may not be able to send
+  // CloseConsumer() (see IMPALA-4348 for an example).
+  if (root_sink_ != nullptr) root_sink_->CloseConsumer();
+
   DCHECK(runtime_state_ != NULL);
   VLOG_QUERY << "Cancel(): instance_id=" << runtime_state_->fragment_instance_id();
   runtime_state_->set_is_cancelled(true);

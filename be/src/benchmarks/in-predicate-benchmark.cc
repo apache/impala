@@ -161,8 +161,9 @@
 #include <gutil/strings/substitute.h>
 
 #include "exprs/in-predicate.h"
-#include "exprs/in-predicate-ir.cc"
 
+#include "runtime/decimal-value.h"
+#include "runtime/string-value.h"
 #include "udf/udf-test-harness.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
@@ -172,6 +173,7 @@
 using namespace impala;
 using namespace impala_udf;
 using namespace strings;
+using std::move;
 
 namespace impala {
 
@@ -222,8 +224,8 @@ class InPredicateBenchmark {
 
     vector<AnyVal*> constant_args;
     constant_args.push_back(NULL);
-    for (AnyVal* p: data.anyval_ptrs) constant_args.push_back(p);
-    UdfTestHarness::SetConstantArgs(ctx, constant_args);
+    for (AnyVal* p : data.anyval_ptrs) constant_args.push_back(p);
+    UdfTestHarness::SetConstantArgs(ctx, move(constant_args));
 
     InPredicate::SetLookupPrepare<T, SetType>(ctx, FunctionContext::FRAGMENT_LOCAL);
     data.state = *reinterpret_cast<InPredicate::SetLookupState<SetType>*>(

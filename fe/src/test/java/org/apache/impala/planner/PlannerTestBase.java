@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +35,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.ColumnLineageGraph;
+import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
@@ -55,13 +57,15 @@ import org.apache.impala.thrift.THdfsScanNode;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
-import org.apache.impala.thrift.TScanRangeLocations;
+import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TTableDescriptor;
+import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTupleDescriptor;
 import org.apache.impala.thrift.TUpdateMembershipRequest;
 import org.apache.impala.util.MembershipSnapshot;
@@ -130,9 +134,11 @@ public class PlannerTestBase extends FrontendTestBase {
     planMap_.clear();
     tupleMap_.clear();
     tableMap_.clear();
-    for (TPlanFragment frag: execRequest.fragments) {
-      for (TPlanNode node: frag.plan.nodes) {
-        planMap_.put(node.node_id, node);
+    for (TPlanExecInfo execInfo: execRequest.plan_exec_info) {
+      for (TPlanFragment frag: execInfo.fragments) {
+        for (TPlanNode node: frag.plan.nodes) {
+          planMap_.put(node.node_id, node);
+        }
       }
     }
     if (execRequest.isSetDesc_tbl()) {
@@ -191,24 +197,28 @@ public class PlannerTestBase extends FrontendTestBase {
     long insertTableId = -1;
     // Collect all partitions that are referenced by a scan range.
     Set<THdfsPartition> scanRangePartitions = Sets.newHashSet();
-    if (execRequest.per_node_scan_ranges != null) {
-      for (Map.Entry<Integer, List<TScanRangeLocations>> entry:
-           execRequest.per_node_scan_ranges.entrySet()) {
-        if (entry.getValue() == null) {
-          continue;
-        }
-        for (TScanRangeLocations locations: entry.getValue()) {
-          if (locations.scan_range.isSetHdfs_file_split()) {
-            THdfsFileSplit split = locations.scan_range.getHdfs_file_split();
-            THdfsPartition partition = findPartition(entry.getKey(), split);
-            scanRangePartitions.add(partition);
+    for (TPlanExecInfo execInfo: execRequest.plan_exec_info) {
+      if (execInfo.per_node_scan_ranges != null) {
+        for (Map.Entry<Integer, List<TScanRangeLocationList>> entry:
+             execInfo.per_node_scan_ranges.entrySet()) {
+          if (entry.getValue() == null) {
+            continue;
+          }
+          for (TScanRangeLocationList locationList: entry.getValue()) {
+            if (locationList.scan_range.isSetHdfs_file_split()) {
+              THdfsFileSplit split = locationList.scan_range.getHdfs_file_split();
+              THdfsPartition partition = findPartition(entry.getKey(), split);
+              scanRangePartitions.add(partition);
+            }
           }
         }
       }
     }
+
     if (execRequest.isSetFinalize_params()) {
       insertTableId = execRequest.getFinalize_params().getTable_id();
     }
+
     boolean first = true;
     // Iterate through all partitions of the descriptor table and verify all partitions
     // are referenced.
@@ -238,64 +248,62 @@ public class PlannerTestBase extends FrontendTestBase {
    */
   private StringBuilder printScanRangeLocations(TQueryExecRequest execRequest) {
     StringBuilder result = new StringBuilder();
-    if (execRequest.per_node_scan_ranges == null) {
-      return result;
-    }
-    for (Map.Entry<Integer, List<TScanRangeLocations>> entry:
-        execRequest.per_node_scan_ranges.entrySet()) {
-      result.append("NODE " + entry.getKey().toString() + ":\n");
-      if (entry.getValue() == null) {
-        continue;
-      }
+    for (TPlanExecInfo execInfo: execRequest.plan_exec_info) {
+      if (execInfo.per_node_scan_ranges == null) continue;
+      for (Map.Entry<Integer, List<TScanRangeLocationList>> entry:
+          execInfo.per_node_scan_ranges.entrySet()) {
+        result.append("NODE " + entry.getKey().toString() + ":\n");
+        if (entry.getValue() == null) continue;
 
-      for (TScanRangeLocations locations: entry.getValue()) {
-        // print scan range
-        result.append("  ");
-        if (locations.scan_range.isSetHdfs_file_split()) {
-          THdfsFileSplit split = locations.scan_range.getHdfs_file_split();
-          THdfsTable table = findTable(entry.getKey());
-          THdfsPartition partition = table.getPartitions().get(split.partition_id);
-          THdfsPartitionLocation location = partition.getLocation();
-          String file_location = location.getSuffix();
-          if (location.prefix_index != -1) {
-            file_location =
-                table.getPartition_prefixes().get(location.prefix_index) + file_location;
+        for (TScanRangeLocationList locations: entry.getValue()) {
+          // print scan range
+          result.append("  ");
+          if (locations.scan_range.isSetHdfs_file_split()) {
+            THdfsFileSplit split = locations.scan_range.getHdfs_file_split();
+            THdfsTable table = findTable(entry.getKey());
+            THdfsPartition partition = table.getPartitions().get(split.partition_id);
+            THdfsPartitionLocation location = partition.getLocation();
+            String file_location = location.getSuffix();
+            if (location.prefix_index != -1) {
+              file_location =
+                  table.getPartition_prefixes().get(location.prefix_index) + file_location;
+            }
+            Path filePath = new Path(file_location, split.file_name);
+            filePath = cleanseFilePath(filePath);
+            result.append("HDFS SPLIT " + filePath.toString() + " "
+                + Long.toString(split.offset) + ":" + Long.toString(split.length));
           }
-          Path filePath = new Path(file_location, split.file_name);
-          filePath = cleanseFilePath(filePath);
-          result.append("HDFS SPLIT " + filePath.toString() + " "
-              + Long.toString(split.offset) + ":" + Long.toString(split.length));
-        }
-        if (locations.scan_range.isSetHbase_key_range()) {
-          THBaseKeyRange keyRange = locations.scan_range.getHbase_key_range();
-          Integer hostIdx = locations.locations.get(0).host_idx;
-          TNetworkAddress networkAddress = execRequest.getHost_list().get(hostIdx);
-          result.append("HBASE KEYRANGE ");
-          result.append("port=" + networkAddress.port + " ");
-          if (keyRange.isSetStartKey()) {
-            result.append(HBaseScanNode.printKey(keyRange.getStartKey().getBytes()));
-          } else {
-            result.append("<unbounded>");
+          if (locations.scan_range.isSetHbase_key_range()) {
+            THBaseKeyRange keyRange = locations.scan_range.getHbase_key_range();
+            Integer hostIdx = locations.locations.get(0).host_idx;
+            TNetworkAddress networkAddress = execRequest.getHost_list().get(hostIdx);
+            result.append("HBASE KEYRANGE ");
+            result.append("port=" + networkAddress.port + " ");
+            if (keyRange.isSetStartKey()) {
+              result.append(HBaseScanNode.printKey(keyRange.getStartKey().getBytes()));
+            } else {
+              result.append("<unbounded>");
+            }
+            result.append(":");
+            if (keyRange.isSetStopKey()) {
+              result.append(HBaseScanNode.printKey(keyRange.getStopKey().getBytes()));
+            } else {
+              result.append("<unbounded>");
+            }
           }
-          result.append(":");
-          if (keyRange.isSetStopKey()) {
-            result.append(HBaseScanNode.printKey(keyRange.getStopKey().getBytes()));
-          } else {
-            result.append("<unbounded>");
-          }
-        }
 
-        if (locations.scan_range.isSetKudu_scan_token()) {
-          Preconditions.checkNotNull(kuduClient_,
-              "Test should not be invoked on platforms that do not support Kudu.");
-          try {
-            result.append(KuduScanToken.stringifySerializedToken(
-                locations.scan_range.kudu_scan_token.array(), kuduClient_));
-          } catch (IOException e) {
-            throw new IllegalStateException("Unable to parse Kudu scan token", e);
+          if (locations.scan_range.isSetKudu_scan_token()) {
+            Preconditions.checkNotNull(kuduClient_,
+                "Test should not be invoked on platforms that do not support Kudu.");
+            try {
+              result.append(KuduScanToken.stringifySerializedToken(
+                  locations.scan_range.kudu_scan_token.array(), kuduClient_));
+            } catch (IOException e) {
+              throw new IllegalStateException("Unable to parse Kudu scan token", e);
+            }
           }
+          result.append("\n");
         }
-        result.append("\n");
       }
     }
     return result;
@@ -402,6 +410,7 @@ public class PlannerTestBase extends FrontendTestBase {
     // Test single node plan, scan range locations, and column lineage.
     TExecRequest singleNodeExecRequest =
         testPlan(testCase, Section.PLAN, queryCtx, errorLog, actualOutput);
+    validateTableIds(singleNodeExecRequest);
     checkScanRangeLocations(testCase, singleNodeExecRequest, errorLog, actualOutput);
     checkColumnLineage(testCase, singleNodeExecRequest, errorLog, actualOutput);
     checkLimitCardinality(query, singleNodeExecRequest, errorLog);
@@ -409,6 +418,51 @@ public class PlannerTestBase extends FrontendTestBase {
     testPlan(testCase, Section.DISTRIBUTEDPLAN, queryCtx, errorLog, actualOutput);
     // test parallel plans
     testPlan(testCase, Section.PARALLELPLANS, queryCtx, errorLog, actualOutput);
+  }
+
+  /**
+   * Validate that all tables in the descriptor table of 'request' have a unique id and
+   * those are properly referenced by tuple descriptors and table sink.
+   */
+  private void validateTableIds(TExecRequest request) {
+    if (request == null || !request.isSetQuery_exec_request()) return;
+    TQueryExecRequest execRequest = request.query_exec_request;
+    HashSet<Integer> seenTableIds = Sets.newHashSet();
+    if (execRequest.isSetDesc_tbl()) {
+      TDescriptorTable descTbl = execRequest.desc_tbl;
+      if (descTbl.isSetTableDescriptors()) {
+        for (TTableDescriptor tableDesc: descTbl.tableDescriptors) {
+          if (seenTableIds.contains(tableDesc.id)) {
+            throw new IllegalStateException("Failed to verify table id for table: " +
+                tableDesc.getDbName() + "." + tableDesc.getTableName() +
+                ".\nTable id: " + tableDesc.id + " already used.");
+          }
+          seenTableIds.add(tableDesc.id);
+        }
+      }
+
+      if (descTbl.isSetTupleDescriptors()) {
+        for (TTupleDescriptor tupleDesc: descTbl.tupleDescriptors) {
+          if (tupleDesc.isSetTableId() && !seenTableIds.contains(tupleDesc.tableId)) {
+            throw new IllegalStateException("TableDescriptor does not include table id" +
+                "of:\n" + tupleDesc.toString());
+          }
+        }
+      }
+    }
+
+    if (execRequest.isSetPlan_exec_info() && !execRequest.plan_exec_info.isEmpty()) {
+      TPlanFragment firstPlanFragment = execRequest.plan_exec_info.get(0).fragments.get(0);
+      if (firstPlanFragment.isSetOutput_sink()
+          && firstPlanFragment.output_sink.isSetTable_sink()) {
+        TTableSink tableSink = firstPlanFragment.output_sink.table_sink;
+        if (!seenTableIds.contains(tableSink.target_table_id)
+            || tableSink.target_table_id != DescriptorTable.TABLE_SINK_ID) {
+          throw new IllegalStateException("Table sink id error for target table:\n" +
+              tableSink.toString());
+        }
+      }
+    }
   }
 
   /**
@@ -503,7 +557,7 @@ public class PlannerTestBase extends FrontendTestBase {
     // Query exec request may not be set for DDL, e.g., CTAS.
     String locationsStr = null;
     if (execRequest != null && execRequest.isSetQuery_exec_request()) {
-      if (execRequest.query_exec_request.fragments == null) return;
+      if (execRequest.query_exec_request.plan_exec_info == null) return;
       buildMaps(execRequest.query_exec_request);
       // If we optimize the partition key scans, we may get all the partition key values
       // from the metadata and don't reference any table. Skip the check in this case.
@@ -565,27 +619,29 @@ public class PlannerTestBase extends FrontendTestBase {
     if (execRequest == null) return;
     if (!execRequest.isSetQuery_exec_request()
         || execRequest.query_exec_request == null
-        || execRequest.query_exec_request.fragments == null) {
+        || execRequest.query_exec_request.plan_exec_info == null) {
       return;
     }
-    for (TPlanFragment planFragment : execRequest.query_exec_request.fragments) {
-      if (!planFragment.isSetPlan() || planFragment.plan == null) continue;
-      for (TPlanNode node : planFragment.plan.nodes) {
-        if (!node.isSetLimit() || -1 == node.limit) continue;
-        if (!node.isSetEstimated_stats() || node.estimated_stats == null) continue;
-        if (node.limit < node.estimated_stats.cardinality) {
-          StringBuilder limitCardinalityError = new StringBuilder();
-          limitCardinalityError.append("Query: " + query + "\n");
-          limitCardinalityError.append(
-              "Expected cardinality estimate less than or equal to LIMIT: "
-              + node.limit + "\n");
-          limitCardinalityError.append(
-              "Actual cardinality estimate: "
-              + node.estimated_stats.cardinality + "\n");
-          limitCardinalityError.append(
-              "In node id "
-              + node.node_id + "\n");
-          errorLog.append(limitCardinalityError.toString());
+    for (TPlanExecInfo execInfo : execRequest.query_exec_request.plan_exec_info) {
+      for (TPlanFragment planFragment : execInfo.fragments) {
+        if (!planFragment.isSetPlan() || planFragment.plan == null) continue;
+        for (TPlanNode node : planFragment.plan.nodes) {
+          if (!node.isSetLimit() || -1 == node.limit) continue;
+          if (!node.isSetEstimated_stats() || node.estimated_stats == null) continue;
+          if (node.limit < node.estimated_stats.cardinality) {
+            StringBuilder limitCardinalityError = new StringBuilder();
+            limitCardinalityError.append("Query: " + query + "\n");
+            limitCardinalityError.append(
+                "Expected cardinality estimate less than or equal to LIMIT: "
+                + node.limit + "\n");
+            limitCardinalityError.append(
+                "Actual cardinality estimate: "
+                + node.estimated_stats.cardinality + "\n");
+            limitCardinalityError.append(
+                "In node id "
+                + node.node_id + "\n");
+            errorLog.append(limitCardinalityError.toString());
+          }
         }
       }
     }

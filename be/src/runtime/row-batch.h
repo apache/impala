@@ -33,7 +33,6 @@
 
 namespace impala {
 
-class BufferedTupleStream;
 template <typename K, typename V> class FixedSizeHashTable;
 class MemTracker;
 class RowBatchSerializeTest;
@@ -42,7 +41,6 @@ class TRowBatch;
 class Tuple;
 class TupleRow;
 class TupleDescriptor;
-
 
 /// A RowBatch encapsulates a batch of rows, each composed of a number of tuples.
 /// The maximum number of rows is fixed at the time of construction.
@@ -76,6 +74,14 @@ class TupleDescriptor;
 /// auxiliary memory up to a soft cap. (See at_capacity_mem_usage_ comment).
 class RowBatch {
  public:
+  /// Flag indicating whether the resources attached to a RowBatch need to be flushed.
+  /// Defined here as a convenience for other modules that need to communicate flushing
+  /// modes.
+  enum class FlushMode {
+    FLUSH_RESOURCES,
+    NO_FLUSH_RESOURCES,
+  };
+
   /// Create RowBatch for a maximum of 'capacity' rows of tuples specified
   /// by 'row_desc'.
   /// tracker cannot be NULL.
@@ -129,10 +135,10 @@ class RowBatch {
   /// auxiliary memory attached to the row batch.
   bool ALWAYS_INLINE AtCapacity() {
     DCHECK_LE(num_rows_, capacity_);
-    // Check AtCapacity() conditions enforced in MarkNeedToReturn() and AddTupleStream()
-    if (need_to_return_) DCHECK_EQ(num_rows_, capacity_);
-    if (num_tuple_streams() > 0) DCHECK_EQ(num_rows_, capacity_);
-    DCHECK((num_tuple_streams() == 0 && !need_to_return_) || num_rows_ == capacity_);
+    // Check AtCapacity() condition enforced in MarkNeedsDeepCopy() and
+    // MarkFlushResources().
+    DCHECK((!needs_deep_copy_ && flush_ == FlushMode::NO_FLUSH_RESOURCES)
+        || num_rows_ == capacity_);
     int64_t mem_usage = auxiliary_mem_usage_ + tuple_data_pool_.total_allocated_bytes();
     return num_rows_ == capacity_ || mem_usage >= AT_CAPACITY_MEM_USAGE;
   }
@@ -202,7 +208,6 @@ class RowBatch {
   MemPool* tuple_data_pool() { return &tuple_data_pool_; }
   int num_io_buffers() const { return io_buffers_.size(); }
   int num_blocks() const { return blocks_.size(); }
-  int num_tuple_streams() const { return tuple_streams_.size(); }
 
   /// Resets the row batch, returning all resources it has accumulated.
   void Reset();
@@ -210,23 +215,45 @@ class RowBatch {
   /// Add io buffer to this row batch.
   void AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer);
 
-  /// Add tuple stream to this row batch. The row batch takes ownership of the stream
-  /// and will call Close() on the stream and delete it when freeing resources.
-  void AddTupleStream(BufferedTupleStream* stream);
-
   /// Adds a block to this row batch. The block must be pinned. The blocks must be
-  /// deleted when freeing resources.
-  void AddBlock(BufferedBlockMgr::Block* block);
+  /// deleted when freeing resources. The block's memory remains accounted against
+  /// the original owner, even when the ownership of batches is transferred. If the
+  /// original owner wants the memory to be released, it should call this with 'mode'
+  /// FLUSH_RESOURCES (see MarkFlushResources() for further explanation).
+  /// TODO: after IMPALA-3200, make the ownership transfer model consistent between
+  /// Blocks and I/O buffers.
+  void AddBlock(BufferedBlockMgr::Block* block, FlushMode flush);
 
-  /// Called to indicate that resources backing this row batch will be cleaned up after
-  /// the next GetNext() call and the batch must be returned up the operator tree.
-  /// This is used to control memory management for streaming rows.
-  void MarkNeedToReturn() {
-    need_to_return_ = true;
-    MarkAtCapacity();
+  /// Used by an operator to indicate that it cannot produce more rows until the
+  /// resources that it has attached to the row batch are freed or acquired by an
+  /// ancestor operator. After this is called, the batch is at capacity and no more rows
+  /// can be added. The "flush" mark is transferred by TransferResourceOwnership(). This
+  /// ensures that batches are flushed by streaming operators all the way up the operator
+  /// tree. Blocking operators can still accumulate batches with this flag.
+  /// TODO: IMPALA-3200: blocking operators should acquire all memory resources including
+  /// attached blocks/buffers, so that MarkFlushResources() can guarantee that the
+  /// resources will not be accounted against the original operator (this is currently
+  /// not true for Blocks, which can't be transferred).
+  void MarkFlushResources() {
+    DCHECK_LE(num_rows_, capacity_);
+    capacity_ = num_rows_;
+    flush_ = FlushMode::FLUSH_RESOURCES;
   }
 
-  bool need_to_return() { return need_to_return_; }
+  /// Called to indicate that some resources backing this batch were not attached and
+  /// will be cleaned up after the next GetNext() call. This means that the batch must
+  /// be returned up the operator tree. Blocking operators must deep-copy any rows from
+  /// this batch or preceding batches.
+  ///
+  /// This is a stronger version of MarkFlushResources(), because blocking operators
+  /// are not allowed to accumulate batches with the 'needs_deep_copy' flag.
+  /// TODO: IMPALA-4179: always attach backing resources and remove this flag.
+  void MarkNeedsDeepCopy() {
+    MarkFlushResources(); // No more rows should be added to the batch.
+    needs_deep_copy_ = true;
+  }
+
+  bool needs_deep_copy() { return needs_deep_copy_; }
 
   /// Transfer ownership of resources to dest.  This includes tuple data in mem
   /// pool and io buffers.
@@ -334,15 +361,6 @@ class RowBatch {
   void SerializeInternal(int64_t size, DedupMap* distinct_tuples,
       TRowBatch* output_batch);
 
-  /// Close owned tuple streams and delete if needed.
-  void CloseTupleStreams();
-
-  /// Mark that no more rows should be added to the batch.
-  void MarkAtCapacity() {
-    DCHECK_LE(num_rows_, capacity_);
-    capacity_ = num_rows_;
-  }
-
   /// All members below need to be handled in RowBatch::AcquireState()
 
   // Class members that are accessed on performance-critical paths should appear
@@ -351,9 +369,15 @@ class RowBatch {
   int num_rows_;  // # of committed rows
   int capacity_;  // the value of num_rows_ at which batch is considered full.
 
+  /// If FLUSH_RESOURCES, the resources attached to this batch should be freed or
+  /// acquired by a new owner as soon as possible. See MarkFlushResources(). If
+  /// FLUSH_RESOURCES, AtCapacity() is also true.
+  FlushMode flush_;
+
   /// If true, this batch references unowned memory that will be cleaned up soon.
-  /// See MarkNeedToReturn().
-  bool need_to_return_;
+  /// See MarkNeedsDeepCopy(). If true, 'flush_' is FLUSH_RESOURCES and
+  /// AtCapacity() is true.
+  bool needs_deep_copy_;
 
   const int num_tuples_per_row_;
 
@@ -396,9 +420,6 @@ class RowBatch {
   /// (i.e. they are not ref counted) so most row batches don't own any.
   std::vector<DiskIoMgr::BufferDescriptor*> io_buffers_;
 
-  /// Tuple streams currently owned by this row batch.
-  std::vector<BufferedTupleStream*> tuple_streams_;
-
   /// Blocks attached to this row batch. The underlying memory and block manager client
   /// are owned by the BufferedBlockMgr.
   std::vector<BufferedBlockMgr::Block*> blocks_;
@@ -412,7 +433,6 @@ class RowBatch {
   /// allocated to the right size.
   std::string compression_scratch_;
 };
-
 }
 
 /// Macros for iterating through '_row_batch', starting at '_start_row_idx'.

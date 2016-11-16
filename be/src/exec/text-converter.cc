@@ -128,19 +128,13 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   if (tuple_type == NULL) return NULL;
   PointerType* tuple_ptr_type = tuple_type->getPointerTo();
 
-  Function* set_null_fn = slot_desc->GetUpdateNullFn(codegen, true);
-  if (set_null_fn == NULL) {
-    LOG(ERROR) << "Could not codegen WriteSlot because slot update codegen failed.";
-    return NULL;
-  }
-
   LlvmCodeGen::FnPrototype prototype(
       codegen, "WriteSlot", codegen->GetType(TYPE_BOOLEAN));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple_arg", tuple_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("data", codegen->ptr_type()));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("len", codegen->GetType(TYPE_INT)));
 
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  LlvmBuilder builder(codegen->context());
   Value* args[3];
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
 
@@ -267,13 +261,13 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
 
     // Parse failed, set slot to null and return false
     builder.SetInsertPoint(parse_failed_block);
-    builder.CreateCall(set_null_fn, ArrayRef<Value*>({args[0]}));
+    slot_desc->CodegenSetNullIndicator(codegen, &builder, args[0], codegen->true_value());
     builder.CreateRet(codegen->false_value());
   }
 
   // Case where data is \N or len == 0 and it is not a string col
   builder.SetInsertPoint(set_null_block);
-  builder.CreateCall(set_null_fn, ArrayRef<Value*>({args[0]}));
+  slot_desc->CodegenSetNullIndicator(codegen, &builder, args[0], codegen->true_value());
   builder.CreateRet(codegen->true_value());
 
   return codegen->FinalizeFunction(fn);

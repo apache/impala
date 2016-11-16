@@ -48,7 +48,7 @@ TEST(FreePoolTest, Basic) {
   for (int i = 0; i < 10; ++i) {
     uint8_t* p2 = pool.Allocate(1);
     *p2 = 111;
-    ASSERT_EQ(p1, p2);
+    EXPECT_EQ(p1, p2);
     EXPECT_EQ(mem_pool.total_allocated_bytes(), 16);
     pool.Free(p2);
   }
@@ -64,44 +64,52 @@ TEST(FreePoolTest, Basic) {
   pool.Free(p2);
   pool.Free(p3);
 
-  // We know have 2 1 byte allocations. Make a two byte allocation.
+  // We know have 2 1 byte allocations, which were rounded up to 8 bytes. Make an 8
+  // byte allocation, which can reuse one of the existing ones.
   uint8_t* p4 = pool.Allocate(2);
   memset(p4, 2, 123);
-  EXPECT_EQ(mem_pool.total_allocated_bytes(), 48);
-  EXPECT_TRUE(p4 != p1);
-  EXPECT_TRUE(p4 != p2);
-  EXPECT_TRUE(p4 != p3);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 32);
+  EXPECT_TRUE(p4 == p1 || p4 == p2 || p4 == p3);
   pool.Free(p4);
+
+  // Make a 9 byte allocation, which requires a new allocation.
+  uint8_t* p5 = pool.Allocate(9);
+  memset(p5, 9, 123);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 56);
+  pool.Free(p5);
+  EXPECT_TRUE(p5 != p1);
+  EXPECT_TRUE(p5 != p2);
+  EXPECT_TRUE(p5 != p3);
 
   // Everything's freed. Try grabbing the ones that have been allocated.
   p1 = pool.Allocate(1);
   *p1 = 123;
   p2 = pool.Allocate(1);
   *p2 = 123;
-  p3 = pool.Allocate(2);
-  memset(p3, 123, 2);
-  EXPECT_EQ(mem_pool.total_allocated_bytes(), 48);
+  p5 = pool.Allocate(9);
+  memset(p5, 123, 9);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 56);
 
   // Make another 1 byte allocation.
   p4 = pool.Allocate(1);
   *p4 = 1;
-  EXPECT_EQ(mem_pool.total_allocated_bytes(), 64);
+  EXPECT_EQ(mem_pool.total_allocated_bytes(), 72);
 
   mem_pool.FreeAll();
 
   // Try making allocations larger than 1GB.
-  uint8_t* p5 = pool.Allocate(1LL << 32);
-  EXPECT_TRUE(p5 != NULL);
+  uint8_t* p6 = pool.Allocate(1LL << 32);
+  EXPECT_TRUE(p6 != NULL);
   for (int64_t i = 0; i < (1LL << 32); i += (1 << 29)) {
-    *(p5 + i) = i;
+    *(p6 + i) = i;
   }
   EXPECT_EQ(mem_pool.total_allocated_bytes(), (1LL << 32) + 8);
 
   // Test zero-byte allocation.
-  p5 = pool.Allocate(0);
-  EXPECT_TRUE(p5 != NULL);
+  p6 = pool.Allocate(0);
+  EXPECT_TRUE(p6 != NULL);
   EXPECT_EQ(mem_pool.total_allocated_bytes(), (1LL << 32) + 8);
-  pool.Free(p5);
+  pool.Free(p6);
 
   mem_pool.FreeAll();
 }
@@ -191,6 +199,7 @@ TEST(FreePoolTest, ReAlloc) {
   uint8_t* ptr5 = pool.Reallocate(ptr4, 1024);
   EXPECT_TRUE(ptr4 == ptr5);
   EXPECT_EQ(mem_pool.total_allocated_bytes(), 1024 + 8 + 2048 + 8 + (1LL << 32) + 8);
+  pool.Free(ptr5);
 
   mem_pool.FreeAll();
 }

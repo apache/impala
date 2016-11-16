@@ -24,14 +24,14 @@ import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.THdfsFileFormat;
 
 /**
- * Represents an ALTER TABLE [PARTITION partitionSpec] SET FILEFORMAT statement.
+ * Represents an ALTER TABLE [PARTITION partitionSet] SET FILEFORMAT statement.
  */
 public class AlterTableSetFileFormatStmt extends AlterTableSetStmt {
   private final THdfsFileFormat fileFormat_;
 
   public AlterTableSetFileFormatStmt(TableName tableName,
-      PartitionSpec partitionSpec, THdfsFileFormat fileFormat) {
-    super(tableName, partitionSpec);
+      PartitionSet partitionSet, THdfsFileFormat fileFormat) {
+    super(tableName, partitionSet);
     this.fileFormat_ = fileFormat;
   }
 
@@ -43,8 +43,8 @@ public class AlterTableSetFileFormatStmt extends AlterTableSetStmt {
     params.setAlter_type(TAlterTableType.SET_FILE_FORMAT);
     TAlterTableSetFileFormatParams fileFormatParams =
         new TAlterTableSetFileFormatParams(fileFormat_);
-    if (getPartitionSpec() != null) {
-      fileFormatParams.setPartition_spec(getPartitionSpec().toThrift());
+    if (getPartitionSet() != null) {
+      fileFormatParams.setPartition_set(getPartitionSet().toThrift());
     }
     params.setSet_file_format_params(fileFormatParams);
     return params;

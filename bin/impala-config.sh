@@ -56,7 +56,7 @@ fi
 # native-toolchain build when publishing its build artifacts. This should be changed when
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed.
-: ${IMPALA_TOOLCHAIN_BUILD_ID=249-2267164200}
+: ${IMPALA_TOOLCHAIN_BUILD_ID=264-e9d44349ba}
 
 # This flag is used in $IMPALA_HOME/cmake_modules/toolchain.cmake.
 # If it's 0, Impala will be built with the compiler in the toolchain directory.
@@ -265,7 +265,7 @@ export IMPALA_GFLAGS_VERSION=2.0
 export IMPALA_GLOG_VERSION=0.3.2-p2
 export IMPALA_GPERFTOOLS_VERSION=2.5
 export IMPALA_GTEST_VERSION=1.6.0
-export IMPALA_KUDU_VERSION=1.0.0-RC1
+export IMPALA_KUDU_VERSION=88b023
 export IMPALA_LLVM_VERSION=3.8.0-p1
 export IMPALA_LLVM_ASAN_VERSION=3.8.0-p1
 # Debug builds should use the release+asserts build to get additional coverage.

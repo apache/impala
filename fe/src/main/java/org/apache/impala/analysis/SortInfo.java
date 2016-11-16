@@ -16,11 +16,15 @@
 // under the License.
 
 package org.apache.impala.analysis;
+import org.apache.impala.common.TreeNode;
 
 import java.util.List;
+import java.util.Set;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Encapsulates all the information needed to compute ORDER BY
@@ -34,7 +38,7 @@ public class SortInfo {
   private final List<Boolean> isAscOrder_;
   // True if "NULLS FIRST", false if "NULLS LAST", null if not specified.
   private final List<Boolean> nullsFirstParams_;
-  // The single tuple that is materialized, sorted and output by a sort operator
+  // The single tuple that is materialized, sorted, and output by a sort operator
   // (i.e. SortNode or TopNNode)
   private TupleDescriptor sortTupleDesc_;
   // Input expressions materialized into sortTupleDesc_. One expr per slot in
@@ -63,8 +67,14 @@ public class SortInfo {
     }
   }
 
+  /**
+   * Sets sortTupleDesc_, which is the internal row representation to be materialized and
+   * sorted. The source exprs of the slots in sortTupleDesc_ are changed to those in
+   * tupleSlotExprs.
+   */
   public void setMaterializedTupleInfo(
       TupleDescriptor tupleDesc, List<Expr> tupleSlotExprs) {
+    Preconditions.checkState(tupleDesc.getSlots().size() == tupleSlotExprs.size());
     sortTupleDesc_ = tupleDesc;
     sortTupleSlotExprs_ = tupleSlotExprs;
     for (int i = 0; i < sortTupleDesc_.getSlots().size(); ++i) {
@@ -113,6 +123,11 @@ public class SortInfo {
     analyzer.materializeSlots(substMaterializedExprs);
   }
 
+  /**
+   * Replaces orderingExprs_ according to smap. This needs to be called to make sure that
+   * the ordering exprs refer to the new tuple materialized by this sort instead of the
+   * original input.
+   */
   public void substituteOrderingExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
     orderingExprs_ = Expr.substituteList(orderingExprs_, smap, analyzer, false);
   }
@@ -128,4 +143,50 @@ public class SortInfo {
 
   @Override
   public SortInfo clone() { return new SortInfo(this); }
+
+  /**
+   * Create a tuple descriptor for the single tuple that is materialized, sorted, and
+   * output by the sort node. Done by materializing slot refs in the order-by and given
+   * result expressions. Those slot refs in the ordering and result exprs are substituted
+   * with slot refs into the new tuple. This simplifies the sorting logic for total and
+   * top-n sorts. The substitution map is returned.
+   * TODO: We could do something more sophisticated than simply copying input slot refs -
+   * e.g. compute some order-by expressions.
+   */
+  public ExprSubstitutionMap createSortTupleInfo(
+      List<Expr> resultExprs, Analyzer analyzer) {
+    // sourceSlots contains the slots from the sort input to materialize.
+    Set<SlotRef> sourceSlots = Sets.newHashSet();
+
+    TreeNode.collect(resultExprs, Predicates.instanceOf(SlotRef.class), sourceSlots);
+    TreeNode.collect(orderingExprs_, Predicates.instanceOf(SlotRef.class), sourceSlots);
+
+    // The descriptor for the tuples on which the sort operates.
+    TupleDescriptor sortTupleDesc = analyzer.getDescTbl().createTupleDescriptor("sort");
+    sortTupleDesc.setIsMaterialized(true);
+
+    List<Expr> sortTupleExprs = Lists.newArrayList();
+
+    // substOrderBy is the mapping from slot refs in the sort node's input to slot refs in
+    // the materialized sort tuple. Each slot ref in the input gets cloned and builds up
+    // the tuple operated on and returned by the sort node.
+    ExprSubstitutionMap substOrderBy = new ExprSubstitutionMap();
+    for (SlotRef origSlotRef: sourceSlots) {
+      SlotDescriptor origSlotDesc = origSlotRef.getDesc();
+      SlotDescriptor materializedDesc =
+          analyzer.copySlotDescriptor(origSlotDesc, sortTupleDesc);
+      SlotRef cloneRef = new SlotRef(materializedDesc);
+      substOrderBy.put(origSlotRef, cloneRef);
+      sortTupleExprs.add(origSlotRef);
+    }
+
+    // The ordering exprs still point to the old slot refs and need to be replaced with
+    // ones that point to the slot refs into the sort's output tuple.
+    substituteOrderingExprs(substOrderBy, analyzer);
+
+    // Update the tuple descriptor used to materialize the input of the sort.
+    setMaterializedTupleInfo(sortTupleDesc, sortTupleExprs);
+
+    return substOrderBy;
+  }
 }

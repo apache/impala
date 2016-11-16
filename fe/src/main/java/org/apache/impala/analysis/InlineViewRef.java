@@ -21,14 +21,15 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.rewrite.ExprRewriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -92,7 +93,8 @@ public class InlineViewRef extends TableRef {
    * C'tor for creating inline views that replace a local or catalog view ref.
    */
   public InlineViewRef(View view, TableRef origTblRef) {
-    super(view.getTableName().toPath(), origTblRef.getExplicitAlias());
+    super(view.getTableName().toPath(), origTblRef.getExplicitAlias(),
+        origTblRef.getPrivilege());
     queryStmt_ = view.getQueryStmt().clone();
     queryStmt_.reset();
     if (view.isLocalView()) queryStmt_.reset();
@@ -141,7 +143,7 @@ public class InlineViewRef extends TableRef {
     // Catalog views refs require special analysis settings for authorization.
     boolean isCatalogView = (view_ != null && !view_.isLocalView());
     if (isCatalogView) {
-      analyzer.registerAuthAndAuditEvent(view_, analyzer);
+      analyzer.registerAuthAndAuditEvent(view_, priv_);
       if (inlineViewAnalyzer_.isExplain()) {
         // If the user does not have privileges on the view's definition
         // then we report a masked authorization error so as not to reveal
@@ -259,6 +261,13 @@ public class InlineViewRef extends TableRef {
     result.setIsMaterialized(false);
     result.setType(new StructType(fields));
     return result;
+  }
+
+  @Override
+  public void rewriteExprs(ExprRewriter rewriter, Analyzer analyzer)
+      throws AnalysisException {
+    super.rewriteExprs(rewriter, analyzer);
+    queryStmt_.rewriteExprs(rewriter);
   }
 
   @Override

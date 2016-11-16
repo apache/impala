@@ -21,12 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
@@ -36,7 +30,6 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
@@ -54,8 +47,15 @@ import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TSentryAdminCheckRequest;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -79,26 +79,30 @@ public class JniCatalog {
     return new TUniqueId(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
   }
 
-  public JniCatalog(boolean loadInBackground, int numMetadataLoadingThreads,
-      String sentryServiceConfig, int impalaLogLevel, int otherLogLevel,
-      boolean allowAuthToLocal, String kerberosPrincipal) throws InternalException {
-    BackendConfig.setAuthToLocal(allowAuthToLocal);
-    Preconditions.checkArgument(numMetadataLoadingThreads > 0);
+  public JniCatalog(byte[] thriftBackendConfig) throws InternalException,
+      ImpalaException, TException {
+    TBackendGflags cfg = new TBackendGflags();
+    JniUtil.deserializeThrift(protocolFactory_, cfg, thriftBackendConfig);
+
+    BackendConfig.create(cfg);
+
+    Preconditions.checkArgument(cfg.num_metadata_loading_threads > 0);
     // This trick saves having to pass a TLogLevel enum, which is an object and more
     // complex to pass through JNI.
-    GlogAppender.Install(TLogLevel.values()[impalaLogLevel],
-        TLogLevel.values()[otherLogLevel]);
+    GlogAppender.Install(TLogLevel.values()[cfg.impala_log_lvl],
+        TLogLevel.values()[cfg.non_impala_java_vlog]);
 
     // Check if the Sentry Service is configured. If so, create a configuration object.
     SentryConfig sentryConfig = null;
-    if (!Strings.isNullOrEmpty(sentryServiceConfig)) {
-      sentryConfig = new SentryConfig(sentryServiceConfig);
+    if (!Strings.isNullOrEmpty(cfg.sentry_config)) {
+      sentryConfig = new SentryConfig(cfg.sentry_config);
       sentryConfig.loadConfig();
     }
     LOG.info(JniUtil.getJavaVersion());
 
-    catalog_ = new CatalogServiceCatalog(loadInBackground,
-        numMetadataLoadingThreads, sentryConfig, getServiceId(), kerberosPrincipal);
+    catalog_ = new CatalogServiceCatalog(cfg.load_catalog_in_background,
+        cfg.num_metadata_loading_threads, sentryConfig, getServiceId(), cfg.principal,
+        cfg.local_library_path);
     try {
       catalog_.reset();
     } catch (CatalogException e) {

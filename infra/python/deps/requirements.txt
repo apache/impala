@@ -82,7 +82,7 @@ texttable == 0.8.3
 # functional and determines the expected kudu-python version. The version must be listed
 # in the format below including # and spacing. Keep this formatting! The kudu-python
 # version in download_requirements must be kept in sync with this version.
-# kudu-python==0.2.0
+# kudu-python==0.3.0
   Cython == 0.23.4
   numpy == 1.10.4
 

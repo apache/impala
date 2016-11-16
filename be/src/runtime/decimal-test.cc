@@ -22,6 +22,7 @@
 #include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
 #include "runtime/decimal-value.inline.h"
+#include "runtime/types.h"
 #include "testutil/gtest-util.h"
 #include "util/string-parser.h"
 
@@ -794,6 +795,23 @@ TEST(DecimalArithmetic, RandTesting) {
     EXPECT_TRUE(dec1.Compare(t1.scale, dec1, t1.scale) == 0);
     EXPECT_TRUE(dec2.Compare(t2.scale, dec2, t2.scale) == 0);
   }
+}
+
+TEST(DecimalValidation, PrecisionScaleValidation) {
+  // Valid precision and scale.
+  EXPECT_TRUE(ColumnType::ValidateDecimalParams(1, 0));
+  EXPECT_TRUE(ColumnType::ValidateDecimalParams(1, 1));
+  EXPECT_TRUE(ColumnType::ValidateDecimalParams(38, 38));
+  EXPECT_TRUE(ColumnType::ValidateDecimalParams(38, 0));
+
+  // Out of range precision or scale.
+  EXPECT_FALSE(ColumnType::ValidateDecimalParams(3, -1));
+  EXPECT_FALSE(ColumnType::ValidateDecimalParams(0, 0));
+  EXPECT_FALSE(ColumnType::ValidateDecimalParams(39, 0));
+  EXPECT_FALSE(ColumnType::ValidateDecimalParams(38, 39));
+
+  // Incompatible precision and scale.
+  EXPECT_FALSE(ColumnType::ValidateDecimalParams(15, 16));
 }
 
 }

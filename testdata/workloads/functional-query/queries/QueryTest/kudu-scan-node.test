@@ -47,3 +47,11 @@ SELECT * FROM impala_2635_t1 UNION ALL SELECT * FROM impala_2635_t2;
 ---- TYPES
 BIGINT, STRING
 ====
+---- QUERY
+# IMPALA-4408: Test Kudu scans where all materialized slots are non-nullable.
+select count(int_col) from functional_kudu.tinyinttable
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====

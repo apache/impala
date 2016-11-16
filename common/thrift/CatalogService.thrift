@@ -145,7 +145,7 @@ struct TDdlExecResponse {
   2: optional bool new_table_created;
 
   // Result of DDL operation to be returned to the client. Currently only set
-  // by COMPUTE STATS.
+  // by COMPUTE STATS and ALTER TABLE.
   3: optional Results.TResultSet result_set
 }
 

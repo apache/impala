@@ -71,9 +71,9 @@ public class View extends Table {
   // Set if this View is from a WITH clause with column labels.
   private List<String> colLabels_;
 
-  public View(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable,
+  public View(org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
-    super(id, msTable, db, name, owner);
+    super(msTable, db, name, owner);
     isLocalView_ = false;
   }
 
@@ -82,17 +82,17 @@ public class View extends Table {
    * list of column labels.
    */
   public View(String alias, QueryStmt queryStmt, List<String> colLabels) {
-    super(null, null, null, alias, null);
+    super(null, null, alias, null);
     isLocalView_ = true;
     queryStmt_ = queryStmt;
     colLabels_ = colLabels;
   }
 
   /**
-   * Creates a view for testig purposes.
+   * Creates a view for testing purposes.
    */
   private View(Db db, String name, QueryStmt queryStmt) {
-    super(null, null, db, name, null);
+    super(null, db, name, null);
     isLocalView_ = false;
     queryStmt_ = queryStmt;
     colLabels_ = null;
@@ -190,7 +190,7 @@ public class View extends Table {
   public boolean hasColLabels() { return colLabels_ != null; }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
+  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
     throw new IllegalStateException("Cannot call toThriftDescriptor() on a view.");
   }
 

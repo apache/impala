@@ -41,12 +41,14 @@ enum UdaExecutionMode {
 template<typename RESULT, typename INTERMEDIATE>
 class UdaTestHarnessBase {
  public:
+  virtual ~UdaTestHarnessBase() = default;
+
   typedef void (*InitFn)(FunctionContext* context, INTERMEDIATE* result);
 
   typedef void (*MergeFn)(FunctionContext* context, const INTERMEDIATE& src,
       INTERMEDIATE* dst);
 
-  typedef const INTERMEDIATE (*SerializeFn)(FunctionContext* context,
+  typedef INTERMEDIATE (*SerializeFn)(FunctionContext* context,
       const INTERMEDIATE& type);
 
   typedef RESULT (*FinalizeFn)(FunctionContext* context, const INTERMEDIATE& value);
@@ -142,6 +144,8 @@ class UdaTestHarnessBase {
 template<typename RESULT, typename INTERMEDIATE, typename INPUT>
 class UdaTestHarness : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
  public:
+  virtual ~UdaTestHarness() = default;
+
   typedef void (*UpdateFn)(FunctionContext* context, const INPUT& input,
       INTERMEDIATE* result);
 

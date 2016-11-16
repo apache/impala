@@ -77,9 +77,8 @@ ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {
   return os;
 }
 
-SlotDescriptor::SlotDescriptor(
-    const TSlotDescriptor& tdesc, const TupleDescriptor* parent,
-    const TupleDescriptor* collection_item_descriptor)
+SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc,
+    const TupleDescriptor* parent, const TupleDescriptor* collection_item_descriptor)
   : id_(tdesc.id),
     type_(ColumnType::FromThrift(tdesc.slotType)),
     parent_(parent),
@@ -89,10 +88,7 @@ SlotDescriptor::SlotDescriptor(
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
     slot_idx_(tdesc.slotIdx),
     slot_size_(type_.GetSlotSize()),
-    llvm_field_idx_(-1),
-    is_null_fn_(NULL),
-    set_not_null_fn_(NULL),
-    set_null_fn_(NULL) {
+    llvm_field_idx_(-1) {
   DCHECK_NE(type_.type, TYPE_STRUCT);
   DCHECK(parent_ != NULL) << tdesc.parent;
   if (type_.IsCollectionType()) {
@@ -570,60 +566,79 @@ void DescriptorTbl::GetTupleDescs(vector<TupleDescriptor*>* descs) const {
   }
 }
 
-// Generate function to set a slot to be null or not-null.  The resulting IR
-// for SetNotNull looks like:
-// (in this case the tuple contains only a nullable double)
-// define void @SetNotNull({ i8, double }* %tuple) {
-// entry:
-//   %null_byte_ptr = getelementptr inbounds { i8, double }* %tuple, i32 0, i32 0
-//   %null_byte = load i8* %null_byte_ptr
-//   %0 = and i8 %null_byte, -2
-//   store i8 %0, i8* %null_byte_ptr
-//   ret void
-// }
-Function* SlotDescriptor::GetUpdateNullFn(LlvmCodeGen* codegen, bool set_null) const {
-  if (set_null && set_null_fn_ != NULL) return set_null_fn_;
-  if (!set_null && set_not_null_fn_ != NULL) return set_not_null_fn_;
+Value* SlotDescriptor::CodegenIsNull(
+    LlvmCodeGen* codegen, LlvmBuilder* builder, Value* tuple) const {
+  return CodegenIsNull(codegen, builder, null_indicator_offset_, tuple);
+}
 
-  StructType* tuple_type = parent()->GetLlvmStruct(codegen);
-  PointerType* tuple_ptr_type = tuple_type->getPointerTo();
-  LlvmCodeGen::FnPrototype prototype(codegen, (set_null) ? "SetNull" :"SetNotNull",
-      codegen->void_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
+// Example IR for getting the first null bit:
+//  %0 = bitcast { i8, [7 x i8], %"class.impala::TimestampValue" }* %agg_tuple to i8*
+//  %null_byte_ptr = getelementptr i8, i8* %0, i32 0
+//  %null_byte = load i8, i8* %null_byte_ptr
+//  %null_mask = and i8 %null_byte, 1
+//  %is_null = icmp ne i8 %null_mask, 0
+Value* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    const NullIndicatorOffset& null_indicator_offset, Value* tuple) {
+  Value* null_byte =
+      CodegenGetNullByte(codegen, builder, null_indicator_offset, tuple, NULL);
+  Constant* mask =
+      ConstantInt::get(codegen->tinyint_type(), null_indicator_offset.bit_mask);
+  Value* null_mask = builder->CreateAnd(null_byte, mask, "null_mask");
+  Constant* zero = ConstantInt::get(codegen->tinyint_type(), 0);
+  return builder->CreateICmpNE(null_mask, zero, "is_null");
+}
 
-  LlvmCodeGen::LlvmBuilder builder(codegen->context());
-  Value* tuple_arg;
-  Function* fn = prototype.GeneratePrototype(&builder, &tuple_arg);
+// Example IR for setting the first null bit to a non-constant 'is_null' value:
+//  %14 = bitcast { i8, [7 x i8], %"class.impala::TimestampValue" }* %agg_tuple to i8*
+//  %null_byte_ptr3 = getelementptr i8, i8* %14, i32 0
+//  %null_byte4 = load i8, i8* %null_byte_ptr3
+//  %null_bit_cleared = and i8 %null_byte4, -2
+//  %15 = sext i1 %result_is_null to i8
+//  %null_bit = and i8 %15, 1
+//  %null_bit_set = or i8 %null_bit_cleared, %null_bit
+//  store i8 %null_bit_set, i8* %null_byte_ptr3
+void SlotDescriptor::CodegenSetNullIndicator(
+    LlvmCodeGen* codegen, LlvmBuilder* builder, Value* tuple, Value* is_null) const {
+  DCHECK_EQ(is_null->getType(), codegen->boolean_type());
+  Value* null_byte_ptr;
+  Value* null_byte =
+      CodegenGetNullByte(codegen, builder, null_indicator_offset_, tuple, &null_byte_ptr);
+  Constant* mask =
+      ConstantInt::get(codegen->tinyint_type(), null_indicator_offset_.bit_mask);
+  Constant* not_mask =
+      ConstantInt::get(codegen->tinyint_type(), ~null_indicator_offset_.bit_mask);
 
-  Value* tuple_int8_ptr =
-      builder.CreateBitCast(tuple_arg, codegen->ptr_type(), "tuple_int8_ptr");
-  Value* null_byte_offset =
-      ConstantInt::get(codegen->int_type(), null_indicator_offset_.byte_offset);
-  Value* null_byte_ptr =
-      builder.CreateInBoundsGEP(tuple_int8_ptr, null_byte_offset, "null_byte_ptr");
-  Value* null_byte = builder.CreateLoad(null_byte_ptr, "null_byte");
-
+  ConstantInt* constant_is_null = dyn_cast<ConstantInt>(is_null);
   Value* result = NULL;
-  if (set_null) {
-    Value* null_set = codegen->GetIntConstant(
-        TYPE_TINYINT, null_indicator_offset_.bit_mask);
-    result = builder.CreateOr(null_byte, null_set);
+  if (constant_is_null != NULL) {
+    if (constant_is_null->isOne()) {
+      result = builder->CreateOr(null_byte, mask, "null_bit_set");
+    } else {
+      DCHECK(constant_is_null->isZero());
+      result = builder->CreateAnd(null_byte, not_mask, "null_bit_cleared");
+    }
   } else {
-    Value* null_clear_val =
-        codegen->GetIntConstant(TYPE_TINYINT, ~null_indicator_offset_.bit_mask);
-    result = builder.CreateAnd(null_byte, null_clear_val);
+    // Avoid branching by computing the new byte as:
+    // (null_byte & ~mask) | (-null & mask);
+    Value* byte_with_cleared_bit =
+        builder->CreateAnd(null_byte, not_mask, "null_bit_cleared");
+    Value* sign_extended_null = builder->CreateSExt(is_null, codegen->tinyint_type());
+    Value* bit_only = builder->CreateAnd(sign_extended_null, mask, "null_bit");
+    result = builder->CreateOr(byte_with_cleared_bit, bit_only, "null_bit_set");
   }
 
-  builder.CreateStore(result, null_byte_ptr);
-  builder.CreateRetVoid();
+  builder->CreateStore(result, null_byte_ptr);
+}
 
-  fn = codegen->FinalizeFunction(fn);
-  if (set_null) {
-    set_null_fn_ = fn;
-  } else {
-    set_not_null_fn_ = fn;
-  }
-  return fn;
+Value* SlotDescriptor::CodegenGetNullByte(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    const NullIndicatorOffset& null_indicator_offset, Value* tuple,
+    Value** null_byte_ptr) {
+  Constant* byte_offset =
+      ConstantInt::get(codegen->int_type(), null_indicator_offset.byte_offset);
+  Value* tuple_bytes = builder->CreateBitCast(tuple, codegen->ptr_type());
+  Value* byte_ptr = builder->CreateInBoundsGEP(tuple_bytes, byte_offset, "null_byte_ptr");
+  if (null_byte_ptr != NULL) *null_byte_ptr = byte_ptr;
+  return builder->CreateLoad(byte_ptr, "null_byte");
 }
 
 StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {

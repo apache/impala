@@ -50,7 +50,7 @@ Status PhjBuilder::ProcessBuildBatch(
         // append it to the null_aware partition. We will need it later.
         if (UNLIKELY(
                 !AppendRow(null_aware_partition_->build_rows(), build_row, &status))) {
-          return std::move(status);
+          return status;
         }
       }
       continue;
@@ -71,7 +71,7 @@ Status PhjBuilder::ProcessBuildBatch(
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     Partition* partition = hash_partitions_[partition_idx];
     if (UNLIKELY(!AppendRow(partition->build_rows(), build_row, &status))) {
-      return std::move(status);
+      return status;
     }
   }
   return Status::OK();

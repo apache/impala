@@ -24,11 +24,21 @@ set(GCC_ROOT $ENV{IMPALA_TOOLCHAIN}/gcc-$ENV{IMPALA_GCC_VERSION})
 # Use the appropriate LLVM version to build ASAN.
 set(LLVM_ASAN_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_ASAN_VERSION})
 
-set(CMAKE_C_COMPILER ${LLVM_ASAN_ROOT}/bin/clang)
+set(LLVM_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_VERSION})
+
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
+  set(CMAKE_C_COMPILER ${LLVM_ASAN_ROOT}/bin/clang)
+else()
+  set(CMAKE_C_COMPILER ${LLVM_ROOT}/bin/clang)
+endif()
 
 # Use clang to build unless overridden by environment.
 if($ENV{IMPALA_CXX_COMPILER} STREQUAL "default")
-  set(CMAKE_CXX_COMPILER ${LLVM_ASAN_ROOT}/bin/clang++)
+  if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
+    set(CMAKE_CXX_COMPILER ${LLVM_ASAN_ROOT}/bin/clang++)
+  else()
+    set(CMAKE_CXX_COMPILER ${LLVM_ROOT}/bin/clang++)
+  endif()
 else()
   set(CMAKE_CXX_COMPILER $ENV{IMPALA_CXX_COMPILER})
 endif()

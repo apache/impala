@@ -52,6 +52,16 @@ struct TTimeSeriesCounter {
   4: required list<i64> values
 }
 
+// Thrift version of RuntimeProfile::SummaryStatsCounter.
+struct TSummaryStatsCounter {
+  1: required string name
+  2: required Metrics.TUnit unit
+  3: required i64 sum
+  4: required i64 total_num_values
+  5: required i64 min_value
+  6: required i64 max_value
+}
+
 // A single runtime profile
 struct TRuntimeProfileNode {
   1: required string name
@@ -80,6 +90,9 @@ struct TRuntimeProfileNode {
 
   // List of time series counters
   10: optional list<TTimeSeriesCounter> time_series_counters
+
+  // List of summary stats counters
+  11: optional list<TSummaryStatsCounter> summary_stats_counters
 }
 
 // A flattened tree of runtime profiles, obtained by an

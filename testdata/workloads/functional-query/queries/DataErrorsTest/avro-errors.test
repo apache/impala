@@ -24,3 +24,11 @@ float
 Problem parsing file $NAMENODE/test-warehouse/bad_avro_snap_floats_avro_snap/truncated_float.avro at 159
 File '$NAMENODE/test-warehouse/bad_avro_snap_floats_avro_snap/truncated_float.avro' is corrupt: truncated data block at offset 159
 ====
+---- QUERY
+select * from bad_avro_decimal_schema
+---- TYPES
+string,decimal
+---- RESULTS
+---- ERRORS
+Column 'value': invalid Avro decimal type with precision = '5' scale = '7'
+====

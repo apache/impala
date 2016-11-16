@@ -29,6 +29,7 @@
 #include <iomanip>
 #include <map>
 #include <signal.h>
+#include <sstream>
 
 #include "common/logging.h"
 #include "common/version.h"
@@ -41,14 +42,11 @@ using boost::filesystem::create_directories;
 using boost::filesystem::is_regular_file;
 using boost::filesystem::path;
 using boost::filesystem::remove;
-using boost::system::error_code;
 
 DECLARE_string(log_dir);
 DECLARE_string(minidump_path);
 DECLARE_int32(max_minidumps);
 DECLARE_int32(minidump_size_limit_hint_kb);
-
-#define MINIDUMP_LOG_BUF_SIZE 256
 
 namespace impala {
 
@@ -127,7 +125,7 @@ static void CheckAndRemoveMinidumps(int max_minidumps) {
   glob(pattern.c_str(), GLOB_TILDE, NULL, &result);
   for (size_t i = 0; i < result.gl_pathc; ++i) {
     const path minidump_path(result.gl_pathv[i]);
-    error_code err;
+    boost::system::error_code err;
     bool is_file = is_regular_file(minidump_path, err);
     // is_regular_file() calls stat() eventually, which can return errors, e.g. if the
     // file permissions prevented access or the path was wrong (see 'man 2 stat' for
@@ -178,7 +176,7 @@ static void CheckAndRemoveMinidumps(int max_minidumps) {
   DCHECK_GT(files_to_delete, 0);
   auto to_delete = timestamp_to_path.begin();
   for (int i = 0; i < files_to_delete; ++i, ++to_delete) {
-    error_code err;
+    boost::system::error_code err;
     remove(to_delete->second, err);
     if (!err) {
       LOG(INFO) << "Removed old minidump file : " << to_delete->second;
@@ -209,7 +207,7 @@ Status RegisterMinidump(const char* cmd_line_path) {
 
   // Create the directory if it is not there. The minidump doesn't get written if there is
   // no directory.
-  error_code err;
+  boost::system::error_code err;
   create_directories(FLAGS_minidump_path, err);
   if (err) {
     stringstream ss;

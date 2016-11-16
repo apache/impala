@@ -98,8 +98,8 @@ inline bool BitReader_8byte::GetValue(int num_bits, T* v) {
     ++offset_;
     bit_offset_ -= 64;
     // Read bits of v that crossed into new byte offset
-    *v |= BitUtil::TrailingBits(
-        buffer_[offset_], bit_offset_) << (num_bits - bit_offset_);
+    *v |= BitUtil::TrailingBits(buffer_[offset_], bit_offset_)
+        << (num_bits - bit_offset_);
   }
   DCHECK_LT(bit_offset_, 64);
   return true;

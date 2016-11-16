@@ -17,143 +17,120 @@
 
 package org.apache.impala.util;
 
-import java.io.StringReader;
+import static java.lang.String.format;
+
 import java.util.HashSet;
 import java.util.List;
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonReader;
 
-import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.thrift.TDistributeByRangeParam;
-import org.apache.impala.thrift.TRangeLiteral;
-import org.apache.impala.thrift.TRangeLiteralList;
-import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
+import org.apache.impala.common.Pair;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TExpr;
+import org.apache.impala.thrift.TExprNode;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduClient.KuduClientBuilder;
 import org.apache.kudu.client.PartialRow;
+import org.apache.kudu.client.RangePartitionBound;
 
-import static java.lang.String.format;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 public class KuduUtil {
 
-  private static final String SPLIT_KEYS_ERROR_MESSAGE = "Error parsing splits keys.";
   private static final String KUDU_TABLE_NAME_PREFIX = "impala::";
 
   /**
-   * Parses split keys from statements.
-   *
-   * Split keys are expected to be in json, as an array of arrays, in the form:
-   * '[[value1_col1, value1_col2, ...], [value2_col1, value2_col2, ...], ...]'
-   *
-   * Each inner array corresponds to a split key and should have one matching entry for
-   * each key column specified in 'schema'.
+   * Creates a KuduClient with the specified Kudu master addresses (as a comma-separated
+   * list of host:port pairs). The 'admin operation timeout' and the 'operation timeout'
+   * are set to BackendConfig.getKuduClientTimeoutMs(). The 'admin operations timeout' is
+   * used for operations like creating/deleting tables. The 'operation timeout' is used
+   * when fetching tablet metadata.
    */
-  public static List<PartialRow> parseSplits(Schema schema, String kuduSplits)
+  public static KuduClient createKuduClient(String kuduMasters) {
+    KuduClientBuilder b = new KuduClient.KuduClientBuilder(kuduMasters);
+    b.defaultAdminOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
+    b.defaultOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
+    return b.build();
+  }
+
+  /**
+   * Creates a PartialRow from a list of range partition boundary values.
+   */
+  private static PartialRow parseRangePartitionBoundaryValues(Schema schema,
+      List<String> rangePartitionColumns, List<TExpr> boundaryValues)
       throws ImpalaRuntimeException {
-
-    // If there are no splits return early.
-    if (kuduSplits == null || kuduSplits.isEmpty()) return ImmutableList.of();
-
-    ImmutableList.Builder<PartialRow> splitRows = ImmutableList.builder();
-
-    // ...Otherwise parse the splits. We're expecting splits in the format of a list of
-    // lists of keys. We only support specifying splits for int and string keys
-    // (currently those are the only type of keys allowed in Kudu too).
-    try {
-      JsonReader jr = Json.createReader(new StringReader(kuduSplits));
-      JsonArray keysList = jr.readArray();
-      for (int i = 0; i < keysList.size(); i++) {
-        PartialRow splitRow = new PartialRow(schema);
-        JsonArray compoundKey = keysList.getJsonArray(i);
-        if (compoundKey.size() != schema.getPrimaryKeyColumnCount()) {
-          throw new ImpalaRuntimeException(SPLIT_KEYS_ERROR_MESSAGE +
-              " Wrong number of keys.");
-        }
-        for (int j = 0; j < compoundKey.size(); j++) {
-          setKey(schema.getColumnByIndex(j).getType(), compoundKey, j, splitRow);
-        }
-        splitRows.add(splitRow);
-      }
-    } catch (ImpalaRuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new ImpalaRuntimeException(SPLIT_KEYS_ERROR_MESSAGE + " Problem parsing json"
-          + ": " + e.getMessage(), e);
+    Preconditions.checkState(rangePartitionColumns.size() == boundaryValues.size());
+    PartialRow bound = new PartialRow(schema);
+    for (int i = 0; i < boundaryValues.size(); ++i) {
+      String colName = rangePartitionColumns.get(i);
+      ColumnSchema col = schema.getColumn(colName);
+      Preconditions.checkNotNull(col);
+      setKey(col.getType(), boundaryValues.get(i), schema.getColumnIndex(colName),
+          colName, bound);
     }
-
-    return splitRows.build();
+    return bound;
   }
 
   /**
-   * Given the TDistributeByRangeParam from the CREATE statement, creates the
-   * appropriate split rows.
+   * Builds and returns a range-partition bound used in the creation of a Kudu
+   * table. The range-partition bound consists of a PartialRow with the boundary
+   * values and a RangePartitionBound indicating if the bound is inclusive or exclusive.
+   * Throws an ImpalaRuntimeException if an error occurs while parsing the boundary
+   * values.
    */
-  public static List<PartialRow> parseSplits(Schema schema,
-      TDistributeByRangeParam param) throws ImpalaRuntimeException {
-    ImmutableList.Builder<PartialRow> splitRows = ImmutableList.builder();
-    for (TRangeLiteralList literals : param.getSplit_rows()) {
-      PartialRow splitRow = new PartialRow(schema);
-      List<TRangeLiteral> literalValues = literals.getValues();
-      for (int i = 0; i < literalValues.size(); ++i) {
-        String colName = param.getColumns().get(i);
-        ColumnSchema col = schema.getColumn(colName);
-        setKey(col.getType(), literalValues.get(i), schema.getColumnIndex(colName),
-            colName, splitRow);
-      }
-      splitRows.add(splitRow);
+  public static Pair<PartialRow, RangePartitionBound> buildRangePartitionBound(
+      Schema schema, List<String> rangePartitionColumns, List<TExpr> boundaryValues,
+      boolean isInclusiveBound) throws ImpalaRuntimeException {
+    if (boundaryValues == null || boundaryValues.isEmpty()) {
+      // TODO: Do we need to set the bound type?
+      return new Pair<PartialRow, RangePartitionBound>(new PartialRow(schema),
+          RangePartitionBound.INCLUSIVE_BOUND);
     }
-    return splitRows.build();
+    PartialRow bound =
+        parseRangePartitionBoundaryValues(schema, rangePartitionColumns, boundaryValues);
+    RangePartitionBound boundType = null;
+    if (isInclusiveBound) {
+      boundType = RangePartitionBound.INCLUSIVE_BOUND;
+    } else {
+      boundType = RangePartitionBound.EXCLUSIVE_BOUND;
+    }
+    return new Pair<PartialRow, RangePartitionBound>(bound, boundType);
   }
 
   /**
-   * Sets the value in 'key' at 'pos', given the json representation.
+   * Sets the value 'boundaryVal' in 'key' at 'pos'. Checks if 'boundaryVal' has the
+   * expected data type.
    */
-  private static void setKey(org.apache.kudu.Type type, JsonArray array, int pos,
-      PartialRow key) throws ImpalaRuntimeException {
-    switch (type) {
-      case INT8: key.addByte(pos, (byte) array.getInt(pos)); break;
-      case INT16: key.addShort(pos, (short) array.getInt(pos)); break;
-      case INT32: key.addInt(pos, array.getInt(pos)); break;
-      case INT64: key.addLong(pos, array.getJsonNumber(pos).longValue()); break;
-      case STRING: key.addString(pos, array.getString(pos)); break;
-      default:
-        throw new ImpalaRuntimeException("Key columns not supported for type: "
-            + type.toString());
-    }
-  }
-
-  /**
-   * Sets the value in 'key' at 'pos', given the range literal.
-   */
-  private static void setKey(org.apache.kudu.Type type, TRangeLiteral literal, int pos,
+  private static void setKey(org.apache.kudu.Type type, TExpr boundaryVal, int pos,
       String colName, PartialRow key) throws ImpalaRuntimeException {
+    Preconditions.checkState(boundaryVal.getNodes().size() == 1);
+    TExprNode literal = boundaryVal.getNodes().get(0);
     switch (type) {
       case INT8:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
-        key.addByte(pos, (byte) literal.getInt_literal());
+        key.addByte(pos, (byte) literal.getInt_literal().getValue());
         break;
       case INT16:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
-        key.addShort(pos, (short) literal.getInt_literal());
+        key.addShort(pos, (short) literal.getInt_literal().getValue());
         break;
       case INT32:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
-        key.addInt(pos, (int) literal.getInt_literal());
+        key.addInt(pos, (int) literal.getInt_literal().getValue());
         break;
       case INT64:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
-        key.addLong(pos, literal.getInt_literal());
+        key.addLong(pos, literal.getInt_literal().getValue());
         break;
       case STRING:
         checkCorrectType(literal.isSetString_literal(), type, colName, literal);
-        key.addString(pos, literal.getString_literal());
+        key.addString(pos, literal.getString_literal().getValue());
         break;
       default:
         throw new ImpalaRuntimeException("Key columns not supported for type: "
@@ -166,11 +143,11 @@ public class KuduUtil {
    * indicating problems with the type of the literal of the range literal.
    */
   private static void checkCorrectType(boolean correctType, org.apache.kudu.Type t,
-      String colName, TRangeLiteral literal) throws ImpalaRuntimeException {
+      String colName, TExprNode boundaryVal) throws ImpalaRuntimeException {
     if (correctType) return;
     throw new ImpalaRuntimeException(
-        format("Expected %s literal for column '%s' got '%s'", t.getName(), colName,
-            toString(literal)));
+        format("Expected '%s' literal for column '%s' got '%s'", t.getName(), colName,
+            Type.fromThrift(boundaryVal.getType()).toSql()));
   }
 
   /**
@@ -206,7 +183,7 @@ public class KuduUtil {
       throws ImpalaRuntimeException {
     if (!t.isScalarType()) {
       throw new ImpalaRuntimeException(format(
-          "Non-scalar type %s is not supported in Kudu", t.toSql()));
+          "Type %s is not supported in Kudu", t.toSql()));
     }
     ScalarType s = (ScalarType) t;
     switch (s.getPrimitiveType()) {
@@ -215,9 +192,7 @@ public class KuduUtil {
       case INT: return org.apache.kudu.Type.INT32;
       case BIGINT: return org.apache.kudu.Type.INT64;
       case BOOLEAN: return org.apache.kudu.Type.BOOL;
-      case CHAR: return org.apache.kudu.Type.STRING;
       case STRING: return org.apache.kudu.Type.STRING;
-      case VARCHAR: return org.apache.kudu.Type.STRING;
       case DOUBLE: return org.apache.kudu.Type.DOUBLE;
       case FLOAT: return org.apache.kudu.Type.FLOAT;
         /* Fall through below */
@@ -228,6 +203,8 @@ public class KuduUtil {
       case DATE:
       case DATETIME:
       case DECIMAL:
+      case CHAR:
+      case VARCHAR:
       default:
         throw new ImpalaRuntimeException(format(
             "Type %s is not supported in Kudu", s.toSql()));
@@ -247,16 +224,7 @@ public class KuduUtil {
       case STRING: return Type.STRING;
       default:
         throw new ImpalaRuntimeException(String.format(
-            "Kudu type %s is not supported in Impala", t));
+            "Kudu type '%s' is not supported in Impala", t.getName()));
     }
-  }
-
-  /**
-   * Returns the string value of the RANGE literal.
-   */
-  static String toString(TRangeLiteral l) throws ImpalaRuntimeException {
-    if (l.isSetString_literal()) return String.valueOf(l.string_literal);
-    if (l.isSetInt_literal()) return String.valueOf(l.int_literal);
-    throw new ImpalaRuntimeException("Unsupported type for RANGE literal.");
   }
 }

@@ -83,7 +83,7 @@ Status HdfsAvroScanner::Codegen(HdfsScanNodeBase* node,
   DCHECK(node->runtime_state()->codegen_enabled());
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
   DCHECK(codegen != NULL);
-  Function* materialize_tuple_fn;
+  Function* materialize_tuple_fn = NULL;
   RETURN_IF_ERROR(CodegenMaterializeTuple(node, codegen, &materialize_tuple_fn));
   DCHECK(materialize_tuple_fn != NULL);
   RETURN_IF_ERROR(CodegenDecodeAvroData(codegen, materialize_tuple_fn,
@@ -385,12 +385,15 @@ Status HdfsAvroScanner::VerifyTypesMatch(const AvroSchemaElement& table_schema,
     return Status::OK();
   }
 
-  ColumnType reader_type = AvroSchemaToColumnType(table_schema.schema);
-  ColumnType writer_type = AvroSchemaToColumnType(file_schema.schema);
+  ColumnType reader_type;
+  RETURN_IF_ERROR(AvroSchemaToColumnType(table_schema.schema, field_name, &reader_type));
+  ColumnType writer_type;
+  RETURN_IF_ERROR(AvroSchemaToColumnType(file_schema.schema, field_name, &writer_type));
   bool match = VerifyTypesMatch(reader_type, writer_type);
   if (match) return Status::OK();
   return Status(TErrorCode::AVRO_SCHEMA_RESOLUTION_ERROR, field_name,
-      avro_type_name(table_schema.schema->type), avro_type_name(file_schema.schema->type));
+      avro_type_name(table_schema.schema->type),
+      avro_type_name(file_schema.schema->type));
 }
 
 Status HdfsAvroScanner::VerifyTypesMatch(SlotDescriptor* slot_desc, avro_obj_t* schema) {
@@ -405,10 +408,12 @@ Status HdfsAvroScanner::VerifyTypesMatch(SlotDescriptor* slot_desc, avro_obj_t* 
   // TODO: update if/when we have TYPE_STRUCT primitive type
   if (schema->type == AVRO_RECORD) {
     return Status(TErrorCode::AVRO_SCHEMA_METADATA_MISMATCH, col_name,
-      slot_desc->type().DebugString(), avro_type_name(schema->type));
+        slot_desc->type().DebugString(), avro_type_name(schema->type));
   }
 
-  bool match = VerifyTypesMatch(slot_desc->type(), AvroSchemaToColumnType(schema));
+  ColumnType file_type;
+  RETURN_IF_ERROR(AvroSchemaToColumnType(schema, col_name, &file_type));
+  bool match = VerifyTypesMatch(slot_desc->type(), file_type);
   if (match) return Status::OK();
   return Status(TErrorCode::AVRO_SCHEMA_METADATA_MISMATCH, col_name,
       slot_desc->type().DebugString(), avro_type_name(schema->type));
@@ -557,7 +562,7 @@ Status HdfsAvroScanner::ProcessRange() {
     }
 
     if (decompressor_.get() != NULL && !decompressor_->reuse_output_buffer()) {
-      AttachPool(data_buffer_pool_.get(), true);
+      RETURN_IF_ERROR(AttachPool(data_buffer_pool_.get(), true));
     }
     RETURN_IF_ERROR(ReadSync());
   }
@@ -636,6 +641,7 @@ bool HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
         success = MaterializeTuple(element, pool, data, data_end, tuple);
         break;
       default:
+        success = false;
         DCHECK(false) << "Unsupported SchemaElement: " << type;
     }
     if (UNLIKELY(!success)) {
@@ -770,10 +776,10 @@ void HdfsAvroScanner::SetStatusValueOverflow(TErrorCode::type error_code, int64_
 // bail_out:           ; preds = %read_field11, %end_field3, %read_field2, %end_field,
 //   ret i1 false      ;         %read_field, %entry
 // }
-Status HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNodeBase* node,
-    LlvmCodeGen* codegen, Function** materialize_tuple_fn) {
+Status HdfsAvroScanner::CodegenMaterializeTuple(
+    HdfsScanNodeBase* node, LlvmCodeGen* codegen, Function** materialize_tuple_fn) {
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
 
   Type* this_type = codegen->GetType(HdfsAvroScanner::LLVM_CLASS_NAME);
   DCHECK(this_type != NULL);
@@ -847,8 +853,7 @@ Status HdfsAvroScanner::CodegenReadRecord(
   }
   DCHECK_EQ(record.schema->type, AVRO_RECORD);
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder =
-      reinterpret_cast<LlvmCodeGen::LlvmBuilder*>(void_builder);
+  LlvmBuilder* builder = reinterpret_cast<LlvmBuilder*>(void_builder);
 
   // Codegen logic for parsing each field and, if necessary, populating a slot with the
   // result.
@@ -905,9 +910,8 @@ Status HdfsAvroScanner::CodegenReadRecord(
       // Write null field IR
       builder->SetInsertPoint(null_block);
       if (slot_idx != HdfsScanNode::SKIP_COLUMN) {
-        Function* set_null_fn = slot_desc->GetUpdateNullFn(codegen, true);
-        DCHECK(set_null_fn != NULL);
-        builder->CreateCall(set_null_fn, ArrayRef<Value*>({tuple_val}));
+        slot_desc->CodegenSetNullIndicator(
+            codegen, builder, tuple_val, codegen->true_value());
       }
       // LLVM requires all basic blocks to end with a terminating instruction
       builder->CreateBr(end_field_block);
@@ -918,7 +922,7 @@ Status HdfsAvroScanner::CodegenReadRecord(
 
     // Write read_field_block IR
     builder->SetInsertPoint(read_field_block);
-    Value* ret_val;
+    Value *ret_val = nullptr;
     if (field->schema->type == AVRO_RECORD) {
       BasicBlock* insert_before_block =
           (null_block != NULL) ? null_block : end_field_block;
@@ -938,11 +942,10 @@ Status HdfsAvroScanner::CodegenReadRecord(
 }
 
 Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
-    SlotDescriptor* slot_desc, LlvmCodeGen* codegen, void* void_builder,
-    Value* this_val, Value* pool_val, Value* tuple_val, Value* data_val,
-    Value* data_end_val, Value** ret_val) {
-  LlvmCodeGen::LlvmBuilder* builder =
-      reinterpret_cast<LlvmCodeGen::LlvmBuilder*>(void_builder);
+    SlotDescriptor* slot_desc, LlvmCodeGen* codegen, void* void_builder, Value* this_val,
+    Value* pool_val, Value* tuple_val, Value* data_val, Value* data_end_val,
+    Value** ret_val) {
+  LlvmBuilder* builder = reinterpret_cast<LlvmBuilder*>(void_builder);
   Function* read_field_fn;
   switch (element.schema->type) {
     case AVRO_BOOLEAN:

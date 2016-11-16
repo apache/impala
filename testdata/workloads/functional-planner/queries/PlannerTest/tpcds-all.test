@@ -55,7 +55,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.date_dim dt]
    partitions=1/1 files=1 size=9.84MB
-   predicates: dt.d_moy = 12, (dt.d_date_sk BETWEEN 2451149 AND 2451179 OR dt.d_date_sk BETWEEN 2451514 AND 2451544 OR dt.d_date_sk BETWEEN 2451880 AND 2451910 OR dt.d_date_sk BETWEEN 2452245 AND 2452275 OR dt.d_date_sk BETWEEN 2452610 AND 2452640)
+   predicates: dt.d_moy = 12, (dt.d_date_sk >= 2451149 AND dt.d_date_sk <= 2451179 OR dt.d_date_sk >= 2451514 AND dt.d_date_sk <= 2451544 OR dt.d_date_sk >= 2451880 AND dt.d_date_sk <= 2451910 OR dt.d_date_sk >= 2452245 AND dt.d_date_sk <= 2452275 OR dt.d_date_sk >= 2452610 AND dt.d_date_sk <= 2452640)
    runtime filters: RF000 -> dt.d_date_sk
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -99,7 +99,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.date_dim dt]
    partitions=1/1 files=1 size=9.84MB
-   predicates: dt.d_moy = 12, (dt.d_date_sk BETWEEN 2451149 AND 2451179 OR dt.d_date_sk BETWEEN 2451514 AND 2451544 OR dt.d_date_sk BETWEEN 2451880 AND 2451910 OR dt.d_date_sk BETWEEN 2452245 AND 2452275 OR dt.d_date_sk BETWEEN 2452610 AND 2452640)
+   predicates: dt.d_moy = 12, (dt.d_date_sk >= 2451149 AND dt.d_date_sk <= 2451179 OR dt.d_date_sk >= 2451514 AND dt.d_date_sk <= 2451544 OR dt.d_date_sk >= 2451880 AND dt.d_date_sk <= 2451910 OR dt.d_date_sk >= 2452245 AND dt.d_date_sk <= 2452275 OR dt.d_date_sk >= 2452610 AND dt.d_date_sk <= 2452640)
    runtime filters: RF000 -> dt.d_date_sk
 ---- PARALLELPLANS
 PLAN-ROOT SINK
@@ -151,7 +151,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.date_dim dt]
    partitions=1/1 files=1 size=9.84MB
-   predicates: dt.d_moy = 12, (dt.d_date_sk BETWEEN 2451149 AND 2451179 OR dt.d_date_sk BETWEEN 2451514 AND 2451544 OR dt.d_date_sk BETWEEN 2451880 AND 2451910 OR dt.d_date_sk BETWEEN 2452245 AND 2452275 OR dt.d_date_sk BETWEEN 2452610 AND 2452640)
+   predicates: dt.d_moy = 12, (dt.d_date_sk >= 2451149 AND dt.d_date_sk <= 2451179 OR dt.d_date_sk >= 2451514 AND dt.d_date_sk <= 2451544 OR dt.d_date_sk >= 2451880 AND dt.d_date_sk <= 2451910 OR dt.d_date_sk >= 2452245 AND dt.d_date_sk <= 2452275 OR dt.d_date_sk >= 2452610 AND dt.d_date_sk <= 2452640)
    runtime filters: RF000 -> dt.d_date_sk
 ====
 # TPCDS-Q7
@@ -1209,7 +1209,7 @@ PLAN-ROOT SINK
 |  |
 |  |--01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom BETWEEN 1 AND 3 OR date_dim.d_dom BETWEEN 25 AND 28)
+|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
 |  |
 |  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -1271,7 +1271,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom BETWEEN 1 AND 3 OR date_dim.d_dom BETWEEN 25 AND 28)
+|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
@@ -1347,7 +1347,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom BETWEEN 1 AND 3 OR date_dim.d_dom BETWEEN 25 AND 28)
+|  |     predicates: date_dim.d_year IN (1998, 1998 + 1, 1998 + 2), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk

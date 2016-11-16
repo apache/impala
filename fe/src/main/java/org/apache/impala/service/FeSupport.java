@@ -45,7 +45,6 @@ import org.apache.impala.thrift.TPrioritizeLoadResponse;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TStatus;
-import org.apache.impala.thrift.TStartupOptions;
 import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolLookupResult;
 import org.apache.impala.thrift.TTable;
@@ -83,9 +82,6 @@ public class FeSupport {
   // we make make all RPCs in the BE layer instead of calling the Catalog Server
   // using Java Thrift bindings.
   public native static byte[] NativePrioritizeLoad(byte[] thriftReq);
-
-  // Return select BE startup options as a serialized TStartupOptions
-  public native static byte[] NativeGetStartupOptions();
 
   /**
    * Locally caches the jar at the specified HDFS location.
@@ -260,20 +256,6 @@ public class FeSupport {
     } catch (TException e) {
       // this should never happen
       throw new InternalException("Error processing request: " + e.getMessage(), e);
-    }
-  }
-
-  public static TStartupOptions GetStartupOptions() throws InternalException {
-    try {
-      byte[] result = NativeGetStartupOptions();
-      Preconditions.checkNotNull(result);
-      TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
-      TStartupOptions options = new TStartupOptions();
-      deserializer.deserialize(options, result);
-      return options;
-    } catch (TException e) {
-      throw new InternalException("Error retrieving startup options: " + e.getMessage(),
-          e);
     }
   }
 

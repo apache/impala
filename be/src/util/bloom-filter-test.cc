@@ -60,6 +60,26 @@ bool BfFind(BloomFilter& bf, uint32_t h) {
   }
 }
 
+// Computes union of 'x' and 'y'. Computes twice with AVX enabled and disabled and
+// verifies both produce the same result. 'success' is set to true if both union
+// computations returned the same result and set to false otherwise.
+TBloomFilter BfUnion(const BloomFilter& x, const BloomFilter& y, bool* success) {
+  TBloomFilter thrift_x, thrift_y;
+  BloomFilter::ToThrift(&x, &thrift_x);
+  BloomFilter::ToThrift(&y, &thrift_y);
+  BloomFilter::Or(thrift_x, &thrift_y);
+  {
+    CpuInfo::TempDisable t1(CpuInfo::AVX);
+    CpuInfo::TempDisable t2(CpuInfo::AVX2);
+    TBloomFilter thrift_x2, thrift_y2;
+    BloomFilter::ToThrift(&x, &thrift_x2);
+    BloomFilter::ToThrift(&y, &thrift_y2);
+    BloomFilter::Or(thrift_x2, &thrift_y2);
+    *success = thrift_y.directory == thrift_y2.directory;
+  }
+  return thrift_y;
+}
+
 }  // namespace
 
 namespace impala {
@@ -160,7 +180,8 @@ TEST(BloomFilter, FindInvalid) {
 
 // Test that MaxNdv() and MinLogSpace() are dual
 TEST(BloomFilter, MinSpaceMaxNdv) {
-  for (double fpp = 0.25; fpp >= 1.0 / (1ull << 63); fpp /= 2) {
+  for (int log2fpp = -2; log2fpp >= -63; --log2fpp) {
+    const double fpp = pow(2, log2fpp);
     for (int given_log_space = 8; given_log_space < 30; ++given_log_space) {
       const size_t derived_ndv = BloomFilter::MaxNdv(given_log_space, fpp);
       int derived_log_space = BloomFilter::MinLogSpace(derived_ndv, fpp);
@@ -205,7 +226,7 @@ TEST(BloomFilter, MinSpaceEdgeCase) {
 // Check that MinLogSpace() and FalsePositiveProb() are dual
 TEST(BloomFilter, MinSpaceForFpp) {
   for (size_t ndv = 10000; ndv < 100 * 1000 * 1000; ndv *= 1.01) {
-    for (double fpp = 0.1; fpp > pow(2, -20); fpp *= 0.99) {
+    for (double fpp = 0.1; fpp > pow(2, -20); fpp *= 0.99) { // NOLINT: loop on double
       // When contructing a Bloom filter, we can request a particular fpp by calling
       // MinLogSpace().
       const int min_log_space = BloomFilter::MinLogSpace(ndv, fpp);
@@ -252,34 +273,20 @@ TEST(BloomFilter, ThriftOr) {
   for (int i = 60; i < 80; ++i) BfInsert(bf2, i);
   for (int i = 0; i < 10; ++i) BfInsert(bf1, i);
 
-  TBloomFilter bf1_thrift;
-  TBloomFilter bf2_thrift;
-
-  // Create TBloomFilter with BloomFilter values.
-  BloomFilter::ToThrift(&bf1, &bf1_thrift);
-  BloomFilter::ToThrift(&bf2, &bf2_thrift);
-
-  // Or the TBloomFilters.
-  BloomFilter::Or(bf1_thrift, &bf2_thrift);
-
-  // Apply aggregated TBloomFilter to BloomFilter to verify values with BfFind().
-  BloomFilter bf3(bf2_thrift);
-  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(bf3, i));
-  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(bf3, i));
+  bool success;
+  BloomFilter bf3(BfUnion(bf1, bf2, &success));
+  ASSERT_TRUE(success) << "SIMD BloomFilter::Union error";
+  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(bf3, i)) << i;
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(bf3, i)) << i;
 
   // Insert another value to aggregated BloomFilter.
   for (int i = 11; i < 50; ++i) BfInsert(bf3, i);
 
-  // Convert to TBloomFilter again and do Or().
-  TBloomFilter bf3_thrift;
-  BloomFilter::ToThrift(&bf3, &bf3_thrift);
-
-  BloomFilter::Or(bf1_thrift, &bf3_thrift);
-
   // Apply TBloomFilter back to BloomFilter and verify if aggregation was correct.
-  BloomFilter bf4(bf3_thrift);
-  for (int i = 11; i < 50; ++i) ASSERT_TRUE(BfFind(bf4, i));
-  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(bf4, i));
+  BloomFilter bf4(BfUnion(bf1, bf3, &success));
+  ASSERT_TRUE(success) << "SIMD BloomFilter::Union error";
+  for (int i = 11; i < 50; ++i) ASSERT_TRUE(BfFind(bf4, i)) << i;
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(bf4, i)) << i;
   ASSERT_FALSE(BfFind(bf4, 81));
 }
 

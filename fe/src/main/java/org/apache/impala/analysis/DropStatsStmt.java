@@ -18,10 +18,10 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDropStatsParams;
 import org.apache.impala.thrift.TTableName;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -31,28 +31,29 @@ import com.google.common.base.Preconditions;
 public class DropStatsStmt extends StatementBase {
   protected final TableName tableName_;
 
-  // If non-null, only drop the statistics for a given partition
-  PartitionSpec partitionSpec_ = null;
-
   // Set during analysis
-  protected String dbName_;
+  protected TableRef tableRef_;
+
+  // If non-null, only drop the statistics for a given partition
+  private final PartitionSet partitionSet_;
 
   /**
    * Constructor for building the DROP TABLE/VIEW statement
    */
   public DropStatsStmt(TableName tableName) {
     this.tableName_ = tableName;
+    this.partitionSet_ = null;
   }
 
-  public DropStatsStmt(TableName tableName, PartitionSpec partSpec) {
+  public DropStatsStmt(TableName tableName, PartitionSet partitionSet) {
     this.tableName_ = tableName;
-    this.partitionSpec_ = partSpec;
+    this.partitionSet_ = partitionSet;
   }
 
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("DROP ");
-    if (partitionSpec_ == null) {
+    if (partitionSet_ == null) {
       sb.append(" STATS ");
       if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
       sb.append(tableName_.toSql());
@@ -60,7 +61,7 @@ public class DropStatsStmt extends StatementBase {
       sb.append(" INCREMENTAL STATS ");
       if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
       sb.append(tableName_.toSql());
-      sb.append(partitionSpec_.toSql());
+      sb.append(partitionSet_.toSql());
     }
     return sb.toString();
   }
@@ -68,9 +69,8 @@ public class DropStatsStmt extends StatementBase {
   public TDropStatsParams toThrift() {
     TDropStatsParams params = new TDropStatsParams();
     params.setTable_name(new TTableName(getDb(), getTbl()));
-
-    if (partitionSpec_ != null) {
-      params.setPartition_spec(partitionSpec_.toThrift());
+    if (partitionSet_ != null) {
+      params.setPartition_set(partitionSet_.toThrift());
     }
     return params;
   }
@@ -81,14 +81,25 @@ public class DropStatsStmt extends StatementBase {
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    dbName_ = analyzer.getTargetDbName(tableName_);
-    Table table = analyzer.getTable(tableName_, Privilege.ALTER);
-    Preconditions.checkNotNull(table);
-    if (partitionSpec_ != null) {
-      partitionSpec_.setTableName(tableName_);
-      partitionSpec_.setPrivilegeRequirement(Privilege.ALTER);
-      partitionSpec_.setPartitionShouldExist();
-      partitionSpec_.analyze(analyzer);
+    // Resolve and analyze table ref to register privilege and audit events
+    // and to allow us to evaluate partition predicates.
+    tableRef_ = new TableRef(tableName_.toPath(), null, Privilege.ALTER);
+    tableRef_ = analyzer.resolveTableRef(tableRef_);
+    Preconditions.checkNotNull(tableRef_);
+    if (tableRef_ instanceof InlineViewRef) {
+      throw new AnalysisException(
+          String.format("DROP STATS not allowed on a view: %s", tableName_));
+    }
+    if (tableRef_ instanceof CollectionTableRef) {
+      throw new AnalysisException(
+          String.format("DROP STATS not allowed on a nested collection: %s", tableName_));
+    }
+    tableRef_.analyze(analyzer);
+    if (partitionSet_ != null) {
+      partitionSet_.setTableName(tableRef_.getTable().getTableName());
+      partitionSet_.setPrivilegeRequirement(Privilege.ALTER);
+      partitionSet_.setPartitionShouldExist();
+      partitionSet_.analyze(analyzer);
     }
   }
 
@@ -97,8 +108,8 @@ public class DropStatsStmt extends StatementBase {
    * the target drop table resides in.
    */
   public String getDb() {
-    Preconditions.checkNotNull(dbName_);
-    return dbName_;
+    Preconditions.checkNotNull(tableRef_);
+    return tableRef_.getTable().getDb().getName();
   }
 
   public String getTbl() { return tableName_.getTbl(); }

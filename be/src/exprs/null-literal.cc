@@ -101,7 +101,7 @@ Status NullLiteral::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** 
   Value* args[2];
   *fn = CreateIrFunctionPrototype(codegen, "NullLiteral", &args);
   BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);
-  LlvmCodeGen::LlvmBuilder builder(entry_block);
+  LlvmBuilder builder(entry_block);
 
   Value* v = CodegenAnyVal::GetNullVal(codegen, type());
   builder.CreateRet(v);

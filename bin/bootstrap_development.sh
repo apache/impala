@@ -76,5 +76,5 @@ pushd "$(dirname $0)/.."
 export IMPALA_HOME="$(pwd)"
 export MAX_PYTEST_FAILURES=0
 source bin/impala-config.sh
-./buildall.sh -noclean -format -testdata
+./buildall.sh -noclean -format -testdata -build_shared_libs
 popd

@@ -103,23 +103,39 @@ ScopedAvroSchemaElement::~ScopedAvroSchemaElement() {
   avro_schema_decref(element_.schema);
 }
 
-ColumnType AvroSchemaToColumnType(const avro_schema_t& schema) {
+Status AvroSchemaToColumnType(
+    const avro_schema_t& schema, const string& column_name, ColumnType* column_type) {
   switch (schema->type) {
     case AVRO_BYTES:
     case AVRO_STRING:
-      return TYPE_STRING;
-    case AVRO_INT32: return TYPE_INT;
-    case AVRO_INT64: return TYPE_BIGINT;
-    case AVRO_FLOAT: return TYPE_FLOAT;
-    case AVRO_DOUBLE: return TYPE_DOUBLE;
-    case AVRO_BOOLEAN: return TYPE_BOOLEAN;
-    case AVRO_DECIMAL:
-      return ColumnType::CreateDecimalType(
-          avro_schema_decimal_precision(schema), avro_schema_decimal_scale(schema));
+      *column_type = TYPE_STRING;
+      return Status::OK();
+    case AVRO_INT32:
+      *column_type = TYPE_INT;
+      return Status::OK();
+    case AVRO_INT64:
+      *column_type = TYPE_BIGINT;
+      return Status::OK();
+    case AVRO_FLOAT:
+      *column_type = TYPE_FLOAT;
+      return Status::OK();
+    case AVRO_DOUBLE:
+      *column_type = TYPE_DOUBLE;
+      return Status::OK();
+    case AVRO_BOOLEAN:
+      *column_type = TYPE_BOOLEAN;
+      return Status::OK();
+    case AVRO_DECIMAL: {
+      int precision = avro_schema_decimal_precision(schema);
+      int scale = avro_schema_decimal_scale(schema);
+      if (!ColumnType::ValidateDecimalParams(precision, scale)) {
+        return Status(TErrorCode::AVRO_INVALID_DECIMAL, column_name, precision, scale);
+      }
+      *column_type = ColumnType::CreateDecimalType(precision, scale);
+      return Status::OK();
+    }
     default:
-      DCHECK(false) << "NYI: " << avro_type_name(schema->type);
-      return INVALID_TYPE;
+      return Status(TErrorCode::AVRO_UNSUPPORTED_TYPE, column_name, avro_type_name(schema->type));
   }
 }
-
 }

@@ -205,7 +205,7 @@ Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, Function** fn) {
   prototype.AddArgument("lhs", tuple_row_type);
   prototype.AddArgument("rhs", tuple_row_type);
 
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
   Value* args[4];
   *fn = prototype.GeneratePrototype(&builder, args);
   Value* lhs_ctxs_arg = args[0];

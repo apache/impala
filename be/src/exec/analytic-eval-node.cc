@@ -105,7 +105,7 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
 
 AnalyticEvalNode::~AnalyticEvalNode() {
   // Check that we didn't leak any memory.
-  DCHECK(input_stream_ == NULL);
+  DCHECK(input_stream_ == NULL || input_stream_->is_closed());
 }
 
 Status AnalyticEvalNode::Init(const TPlanNode& tnode, RuntimeState* state) {
@@ -191,9 +191,9 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Open(state));
   DCHECK(client_ != NULL);
   DCHECK(input_stream_ == NULL);
-  input_stream_ = new BufferedTupleStream(state, child(0)->row_desc(),
-      state->block_mgr(), client_, false /* use_initial_small_buffers */,
-      true /* read_write */);
+  input_stream_.reset(
+      new BufferedTupleStream(state, child(0)->row_desc(), state->block_mgr(), client_,
+          false /* use_initial_small_buffers */, true /* read_write */));
   RETURN_IF_ERROR(input_stream_->Init(id(), runtime_profile(), true));
   bool got_write_buffer;
   RETURN_IF_ERROR(input_stream_->PrepareForWrite(&got_write_buffer));
@@ -769,7 +769,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
   VLOG_FILE << id() << " GetNext: " << DebugStateString();
-  DCHECK(input_stream_ != NULL); // input_stream_ is NULL if we already hit eos.
+  DCHECK(!input_stream_->is_closed()); // input_stream_ is closed if we already hit eos.
 
   if (ReachedLimit()) {
     // TODO: This transfer is simple and correct, but not necessarily efficient. We
@@ -777,9 +777,10 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     // over multiple Reset()/Open()/GetNext()* cycles.
     row_batch->tuple_data_pool()->AcquireData(prev_tuple_pool_.get(), false);
     row_batch->tuple_data_pool()->AcquireData(curr_tuple_pool_.get(), false);
-    DCHECK(input_stream_ != NULL);
-    row_batch->AddTupleStream(input_stream_);
-    input_stream_ = NULL;
+    DCHECK(!input_stream_->is_closed());
+    // Flush resources in case we are in a subplan and need to allocate more blocks
+    // when the node is reopened.
+    input_stream_->Close(row_batch, RowBatch::FlushMode::FLUSH_RESOURCES);
     *eos = true;
     return Status::OK();
   } else {
@@ -797,8 +798,9 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     // over multiple Reset()/Open()/GetNext()* cycles.
     row_batch->tuple_data_pool()->AcquireData(prev_tuple_pool_.get(), false);
     row_batch->tuple_data_pool()->AcquireData(curr_tuple_pool_.get(), false);
-    row_batch->AddTupleStream(input_stream_);
-    input_stream_ = NULL;
+    // Flush resources in case we are in a subplan and need to allocate more blocks
+    // when the node is reopened.
+    input_stream_->Close(row_batch, RowBatch::FlushMode::FLUSH_RESOURCES);
     *eos = true;
   } else if (prev_pool_last_result_idx_ != -1 &&
       prev_pool_last_result_idx_ < input_stream_->rows_returned() &&
@@ -840,7 +842,9 @@ Status AnalyticEvalNode::Reset(RuntimeState* state) {
   }
   mem_pool_->Clear();
   // The following members will be re-created in Open().
-  DCHECK(input_stream_ == NULL); // input_stream_ should have been attached to last batch.
+  // input_stream_ should have been closed by last GetNext() call.
+  DCHECK(input_stream_ == NULL || input_stream_->is_closed());
+  input_stream_.reset();
   curr_tuple_ = NULL;
   child_tuple_cmp_row_ = NULL;
   dummy_result_tuple_ = NULL;
@@ -853,11 +857,9 @@ Status AnalyticEvalNode::Reset(RuntimeState* state) {
 void AnalyticEvalNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (client_ != NULL) state->block_mgr()->ClearReservations(client_);
+  // We may need to clean up input_stream_ if an error occurred at some point.
   if (input_stream_ != NULL) {
-    // We may need to clean up input_stream_ if an error occurred at some point.
-    input_stream_->Close();
-    delete input_stream_;
-    input_stream_ = NULL;
+    input_stream_->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
 
   // Close all evaluators and fn ctxs. If an error occurred in Init or Prepare there may

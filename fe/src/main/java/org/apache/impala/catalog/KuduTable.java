@@ -23,10 +23,15 @@ import java.util.Set;
 
 import javax.xml.bind.DatatypeConverter;
 
+import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.DistributeParam;
-import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TDistributeByHashParam;
@@ -40,26 +45,20 @@ import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.TResultRowBuilder;
-import org.apache.impala.service.CatalogOpExecutor;
+import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduException;
+import org.apache.kudu.client.LocatedTablet;
+import org.apache.kudu.client.PartitionSchema;
+import org.apache.kudu.client.PartitionSchema.HashBucketSchema;
+import org.apache.kudu.client.PartitionSchema.RangeSchema;
+import org.apache.log4j.Logger;
+import org.apache.thrift.TException;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-
-import org.apache.hadoop.hive.common.StatsSetupConst;
-import org.apache.hadoop.hive.metastore.IMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
-import org.apache.kudu.ColumnSchema;
-import org.apache.kudu.client.KuduClient;
-import org.apache.kudu.client.KuduException;
-import org.apache.kudu.client.LocatedTablet;
-import org.apache.kudu.client.PartitionSchema.HashBucketSchema;
-import org.apache.kudu.client.PartitionSchema.RangeSchema;
-import org.apache.kudu.client.PartitionSchema;
-import org.apache.log4j.Logger;
-import org.apache.thrift.TException;
 
 /**
  * Representation of a Kudu table in the catalog cache.
@@ -94,8 +93,6 @@ public class KuduTable extends Table {
   // Key to specify the number of tablet replicas.
   public static final String KEY_TABLET_REPLICAS = "kudu.num_tablet_replicas";
 
-  public static final long KUDU_RPC_TIMEOUT_MS = 50000;
-
   // Table name in the Kudu storage engine. It may not neccessarily be the same as the
   // table name specified in the CREATE TABLE statement; the latter
   // is stored in Table.name_. Reasons why KuduTable.kuduTableName_ and Table.name_ may
@@ -115,9 +112,9 @@ public class KuduTable extends Table {
   // supported.
   private final List<DistributeParam> distributeBy_ = Lists.newArrayList();
 
-  protected KuduTable(TableId id, org.apache.hadoop.hive.metastore.api.Table msTable,
+  protected KuduTable(org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
-    super(id, msTable, db, name, owner);
+    super(msTable, db, name, owner);
     kuduTableName_ = msTable.getParameters().get(KuduTable.KEY_TABLE_NAME);
     kuduMasters_ = msTable.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
   }
@@ -172,12 +169,12 @@ public class KuduTable extends Table {
     numRows_ = getRowCount(msTable_.getParameters());
 
     // Connect to Kudu to retrieve table metadata
-    try (KuduClient kuduClient = new KuduClient.KuduClientBuilder(
-        getKuduMasterHosts()).build()) {
+    try (KuduClient kuduClient = KuduUtil.createKuduClient(getKuduMasterHosts())) {
       kuduTable = kuduClient.openTable(kuduTableName_);
     } catch (KuduException e) {
-      LOG.error("Error accessing Kudu table " + kuduTableName_);
-      throw new TableLoadingException(e.getMessage());
+      throw new TableLoadingException(String.format(
+          "Error opening Kudu table '%s', Kudu error: %s",
+          kuduTableName_, e.getMessage()));
     }
     Preconditions.checkNotNull(kuduTable);
 
@@ -187,7 +184,6 @@ public class KuduTable extends Table {
       loadDistributeByParams(kuduTable);
       loadAllColumnStats(msClient);
     } catch (ImpalaRuntimeException e) {
-      LOG.error("Error loading metadata for Kudu table: " + kuduTableName_);
       throw new TableLoadingException("Error loading metadata for Kudu table " +
           kuduTableName_, e);
     }
@@ -261,8 +257,7 @@ public class KuduTable extends Table {
   public static KuduTable createCtasTarget(Db db,
       org.apache.hadoop.hive.metastore.api.Table msTbl, List<ColumnDef> columnDefs,
       List<String> primaryKeyColumnNames, List<DistributeParam> distributeParams) {
-    KuduTable tmpTable = new KuduTable(TableId.createInvalidId(), msTbl, db,
-        msTbl.getTableName(), msTbl.getOwner());
+    KuduTable tmpTable = new KuduTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     int pos = 0;
     for (ColumnDef colDef: columnDefs) {
       tmpTable.addColumn(new Column(colDef.getColName(), colDef.getType(), pos++));
@@ -308,8 +303,8 @@ public class KuduTable extends Table {
   }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
-    TTableDescriptor desc = new TTableDescriptor(id_.asInt(), TTableType.KUDU_TABLE,
+  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
+    TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.KUDU_TABLE,
         getTColumnDescriptors(), numClusteringCols_, kuduTableName_, db_.getName());
     desc.setKuduTable(getTKuduTable());
     return desc;
@@ -327,6 +322,10 @@ public class KuduTable extends Table {
     return tbl;
   }
 
+  public boolean isPrimaryKeyColumn(String name) {
+    return primaryKeyColumnNames_.contains(name);
+  }
+
   public TResultSet getTableStats() throws ImpalaRuntimeException {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
@@ -338,11 +337,10 @@ public class KuduTable extends Table {
     resultSchema.addToColumns(new TColumn("Leader Replica", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("# Replicas", Type.INT.toThrift()));
 
-    try (KuduClient client = new KuduClient.KuduClientBuilder(
-        getKuduMasterHosts()).build()) {
+    try (KuduClient client = KuduUtil.createKuduClient(getKuduMasterHosts())) {
       org.apache.kudu.client.KuduTable kuduTable = client.openTable(kuduTableName_);
       List<LocatedTablet> tablets =
-          kuduTable.getTabletsLocations(KUDU_RPC_TIMEOUT_MS);
+          kuduTable.getTabletsLocations(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
       for (LocatedTablet tab: tablets) {
         TResultRowBuilder builder = new TResultRowBuilder();
         builder.add("-1");   // The Kudu client API doesn't expose tablet row counts.
@@ -363,7 +361,7 @@ public class KuduTable extends Table {
       }
 
     } catch (Exception e) {
-      throw new ImpalaRuntimeException("Could not communicate with Kudu.", e);
+      throw new ImpalaRuntimeException("Error accessing Kudu for table stats.", e);
     }
     return result;
   }

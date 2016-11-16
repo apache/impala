@@ -41,7 +41,8 @@ class ObjectPool;
 /// corresponding rate based counter.  This thread wakes up at fixed intervals and updates
 /// all of the rate counters.
 /// Thread-safe.
-class RuntimeProfile {
+class RuntimeProfile { // NOLINT: This struct is not packed, but there are not so many
+                       // of them that it makes a performance difference
  public:
   class Counter {
    public:
@@ -94,6 +95,7 @@ class RuntimeProfile {
   class DerivedCounter;
   class EventSequence;
   class HighWaterMarkCounter;
+  class SummaryStatsCounter;
   class ThreadCounters;
   class TimeSeriesCounter;
 
@@ -159,8 +161,13 @@ class RuntimeProfile {
   Counter* AddCounter(const std::string& name, TUnit::type unit,
       const std::string& parent_counter_name = "");
 
+  /// Adds a counter that tracks the min, max and average values to the runtime profile.
+  /// Otherwise, same behavior as AddCounter().
+  SummaryStatsCounter* AddSummaryStatsCounter(const std::string& name, TUnit::type unit,
+      const std::string& parent_counter_name = "");
+
   /// Adds a high water mark counter to the runtime profile. Otherwise, same behavior
-  /// as AddCounter()
+  /// as AddCounter().
   HighWaterMarkCounter* AddHighWaterMarkCounter(const std::string& name,
       TUnit::type unit, const std::string& parent_counter_name = "");
 
@@ -395,6 +402,12 @@ class RuntimeProfile {
 
   /// Protects time_series_counter_map_.
   mutable SpinLock time_series_counter_map_lock_;
+
+  typedef std::map<std::string, SummaryStatsCounter*> SummaryStatsCounterMap;
+  SummaryStatsCounterMap summary_stats_map_;
+
+  /// Protects summary_stats_map_.
+  mutable SpinLock summary_stats_map_lock_;
 
   Counter counter_total_time_;
 

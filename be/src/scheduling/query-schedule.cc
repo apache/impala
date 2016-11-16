@@ -50,39 +50,16 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     query_options_(query_options),
     summary_profile_(summary_profile),
     query_events_(query_events),
-    num_fragment_instances_(0),
     num_scan_ranges_(0),
     next_instance_id_(query_id),
     is_admitted_(false) {
-  fragment_exec_params_.resize(request.fragments.size());
-  bool is_mt_execution = request.query_ctx.request.query_options.mt_dop > 0;
-
-  if (is_mt_execution) {
-    /// TODO-MT: remove else branch and move MtInit() logic here
-    MtInit();
-  } else {
-    // Build two maps to map node ids to their fragments as well as to the offset in their
-    // fragment's plan's nodes list.
-    for (int i = 0; i < request.fragments.size(); ++i) {
-      int node_idx = 0;
-      for (const TPlanNode& node: request.fragments[i].plan.nodes) {
-        if (plan_node_to_fragment_idx_.size() < node.node_id + 1) {
-          plan_node_to_fragment_idx_.resize(node.node_id + 1);
-          plan_node_to_plan_node_idx_.resize(node.node_id + 1);
-        }
-        DCHECK_EQ(plan_node_to_fragment_idx_.size(), plan_node_to_plan_node_idx_.size());
-        plan_node_to_fragment_idx_[node.node_id] = i;
-        plan_node_to_plan_node_idx_[node.node_id] = node_idx;
-        ++node_idx;
-      }
-    }
-  }
+  Init();
 }
 
-void QuerySchedule::MtInit() {
-  // extract TPlanFragments and order by fragment id
+void QuerySchedule::Init() {
+  // extract TPlanFragments and order by fragment idx
   vector<const TPlanFragment*> fragments;
-  for (const TPlanExecInfo& plan_exec_info: request_.mt_plan_exec_info) {
+  for (const TPlanExecInfo& plan_exec_info: request_.plan_exec_info) {
     for (const TPlanFragment& fragment: plan_exec_info.fragments) {
       fragments.push_back(&fragment);
     }
@@ -90,41 +67,34 @@ void QuerySchedule::MtInit() {
   sort(fragments.begin(), fragments.end(),
       [](const TPlanFragment* a, const TPlanFragment* b) { return a->idx < b->idx; });
 
-  DCHECK_EQ(mt_fragment_exec_params_.size(), 0);
+  // this must only be called once
+  DCHECK_EQ(fragment_exec_params_.size(), 0);
   for (const TPlanFragment* fragment: fragments) {
-    mt_fragment_exec_params_.emplace_back(*fragment);
+    fragment_exec_params_.emplace_back(*fragment);
   }
 
   // mark coordinator fragment
-  const TPlanFragment& coord_fragment = request_.mt_plan_exec_info[0].fragments[0];
-  if (coord_fragment.partition.type == TPartitionType::UNPARTITIONED) {
-    mt_fragment_exec_params_[coord_fragment.idx].is_coord_fragment = true;
-    next_instance_id_.lo = 1;  // generated instance ids start at 1
+  const TPlanFragment& root_fragment = request_.plan_exec_info[0].fragments[0];
+  if (request_.stmt_type == TStmtType::QUERY) {
+    fragment_exec_params_[root_fragment.idx].is_coord_fragment = true;
+    // the coordinator instance gets index 0, generated instance ids start at 1
+    next_instance_id_.lo = 1;
   }
 
-  // compute input fragments and find max node id
+  // find max node id
   int max_node_id = 0;
-  for (const TPlanExecInfo& plan_exec_info: request_.mt_plan_exec_info) {
+  for (const TPlanExecInfo& plan_exec_info: request_.plan_exec_info) {
     for (const TPlanFragment& fragment: plan_exec_info.fragments) {
       for (const TPlanNode& node: fragment.plan.nodes) {
         max_node_id = max(node.node_id, max_node_id);
       }
-    }
-
-    // fragments[i] sends its output to fragments[dest_fragment_idx[i-1]]
-    for (int i = 1; i < plan_exec_info.fragments.size(); ++i) {
-      const TPlanFragment& fragment = plan_exec_info.fragments[i];
-      FragmentIdx dest_idx =
-          plan_exec_info.fragments[plan_exec_info.dest_fragment_idx[i - 1]].idx;
-      MtFragmentExecParams& dest_params = mt_fragment_exec_params_[dest_idx];
-      dest_params.input_fragments.push_back(fragment.idx);
     }
   }
 
   // populate plan_node_to_fragment_idx_ and plan_node_to_plan_node_idx_
   plan_node_to_fragment_idx_.resize(max_node_id + 1);
   plan_node_to_plan_node_idx_.resize(max_node_id + 1);
-  for (const TPlanExecInfo& plan_exec_info: request_.mt_plan_exec_info) {
+  for (const TPlanExecInfo& plan_exec_info: request_.plan_exec_info) {
     for (const TPlanFragment& fragment: plan_exec_info.fragments) {
       for (int i = 0; i < fragment.plan.nodes.size(); ++i) {
         const TPlanNode& node = fragment.plan.nodes[i];
@@ -133,8 +103,72 @@ void QuerySchedule::MtInit() {
       }
     }
   }
+
+  // compute input fragments
+  for (const TPlanExecInfo& plan_exec_info: request_.plan_exec_info) {
+    // each fragment sends its output to the fragment containing the destination node
+    // of its output sink
+    for (const TPlanFragment& fragment: plan_exec_info.fragments) {
+      if (!fragment.output_sink.__isset.stream_sink) continue;
+      PlanNodeId dest_node_id = fragment.output_sink.stream_sink.dest_node_id;
+      FragmentIdx dest_idx = plan_node_to_fragment_idx_[dest_node_id];
+      FragmentExecParams& dest_params = fragment_exec_params_[dest_idx];
+      dest_params.input_fragments.push_back(fragment.idx);
+    }
+  }
 }
 
+void QuerySchedule::Validate() const {
+  // all fragments have a FragmentExecParams
+  int num_fragments = 0;
+  for (const TPlanExecInfo& plan_exec_info: request_.plan_exec_info) {
+    for (const TPlanFragment& fragment: plan_exec_info.fragments) {
+      DCHECK_LT(fragment.idx, fragment_exec_params_.size());
+      DCHECK_EQ(fragment.idx, fragment_exec_params_[fragment.idx].fragment.idx);
+      ++num_fragments;
+    }
+  }
+  DCHECK_EQ(num_fragments, fragment_exec_params_.size());
+
+  // we assigned the correct number of scan ranges per (host, node id):
+  // assemble a map from host -> (map from node id -> #scan ranges)
+  unordered_map<TNetworkAddress, map<TPlanNodeId, int>> count_map;
+  for (const FragmentExecParams& fp: fragment_exec_params_) {
+    for (const FInstanceExecParams& ip: fp.instance_exec_params) {
+      auto host_it = count_map.find(ip.host);
+      if (host_it == count_map.end()) {
+        count_map.insert(make_pair(ip.host, map<TPlanNodeId, int>()));
+        host_it = count_map.find(ip.host);
+      }
+      map<TPlanNodeId, int>& node_map = host_it->second;
+
+      for (const PerNodeScanRanges::value_type& instance_entry: ip.per_node_scan_ranges) {
+        TPlanNodeId node_id = instance_entry.first;
+        auto count_entry = node_map.find(node_id);
+        if (count_entry == node_map.end()) {
+          node_map.insert(make_pair(node_id, 0));
+          count_entry = node_map.find(node_id);
+        }
+        count_entry->second += instance_entry.second.size();
+      }
+    }
+  }
+
+  for (const FragmentExecParams& fp: fragment_exec_params_) {
+    for (const FragmentScanRangeAssignment::value_type& assignment_entry:
+        fp.scan_range_assignment) {
+      const TNetworkAddress& host = assignment_entry.first;
+      DCHECK_GT(count_map.count(host), 0);
+      map<TPlanNodeId, int>& node_map = count_map.find(host)->second;
+      for (const PerNodeScanRanges::value_type& node_assignment:
+          assignment_entry.second) {
+        TPlanNodeId node_id = node_assignment.first;
+        DCHECK_GT(node_map.count(node_id), 0);
+        DCHECK_EQ(node_map[node_id], node_assignment.second.size());
+      }
+    }
+  }
+}
 
 int64_t QuerySchedule::GetClusterMemoryEstimate() const {
   DCHECK_GT(unique_hosts_.size(), 0);
@@ -199,15 +233,8 @@ const TPlanFragment& FInstanceExecParams::fragment() const {
 
 int QuerySchedule::GetNumFragmentInstances() const {
   int result = 0;
-  if (mt_fragment_exec_params_.empty()) {
-    DCHECK(!fragment_exec_params_.empty());
-    for (const FragmentExecParams& fragment_exec_params : fragment_exec_params_) {
-      result += fragment_exec_params.hosts.size();
-    }
-  } else {
-    for (const MtFragmentExecParams& fragment_exec_params : mt_fragment_exec_params_) {
-      result += fragment_exec_params.instance_exec_params.size();
-    }
+  for (const FragmentExecParams& fragment_exec_params : fragment_exec_params_) {
+    result += fragment_exec_params.instance_exec_params.size();
   }
   return result;
 }
@@ -215,37 +242,35 @@ int QuerySchedule::GetNumFragmentInstances() const {
 const TPlanFragment* QuerySchedule::GetCoordFragment() const {
   // Only have coordinator fragment for statements that return rows.
   if (request_.stmt_type != TStmtType::QUERY) return nullptr;
-  bool is_mt_exec = request_.query_ctx.request.query_options.mt_dop > 0;
-  const TPlanFragment* fragment = is_mt_exec
-      ? &request_.mt_plan_exec_info[0].fragments[0] : &request_.fragments[0];
-
-    return fragment;
+  const TPlanFragment* fragment = &request_.plan_exec_info[0].fragments[0];
+  DCHECK_EQ(fragment->partition.type, TPartitionType::UNPARTITIONED);
+  return fragment;
 }
+
 
 void QuerySchedule::GetTPlanFragments(vector<const TPlanFragment*>* fragments) const {
   fragments->clear();
-  bool is_mt_exec = request_.query_ctx.request.query_options.mt_dop > 0;
-  if (is_mt_exec) {
-    for (const TPlanExecInfo& plan_info: request_.mt_plan_exec_info) {
-      for (const TPlanFragment& fragment: plan_info.fragments) {
-        fragments->push_back(&fragment);
-      }
-    }
-  } else {
-    for (const TPlanFragment& fragment: request_.fragments) {
+  for (const TPlanExecInfo& plan_info: request_.plan_exec_info) {
+    for (const TPlanFragment& fragment: plan_info.fragments) {
       fragments->push_back(&fragment);
     }
   }
 }
 
 const FInstanceExecParams& QuerySchedule::GetCoordInstanceExecParams() const {
-  const TPlanFragment& coord_fragment =  request_.mt_plan_exec_info[0].fragments[0];
-  DCHECK_EQ(coord_fragment.partition.type, TPartitionType::UNPARTITIONED);
-  const MtFragmentExecParams* fragment_params =
-      &mt_fragment_exec_params_[coord_fragment.idx];
-  DCHECK(fragment_params != nullptr);
-  DCHECK_EQ(fragment_params->instance_exec_params.size(), 1);
-  return fragment_params->instance_exec_params[0];
+  DCHECK_EQ(request_.stmt_type, TStmtType::QUERY);
+  const TPlanFragment& coord_fragment =  request_.plan_exec_info[0].fragments[0];
+  const FragmentExecParams& fragment_params = fragment_exec_params_[coord_fragment.idx];
+  DCHECK_EQ(fragment_params.instance_exec_params.size(), 1);
+  return fragment_params.instance_exec_params[0];
+}
+
+vector<int> FragmentExecParams::GetInstanceIdxs() const {
+  vector<int> result;
+  for (const FInstanceExecParams& instance_params: instance_exec_params) {
+    result.push_back(GetInstanceIdx(instance_params.instance_id));
+  }
+  return result;
 }
 
 }

@@ -37,6 +37,11 @@ Status CheckKuduAvailability();
 /// Convenience function for the bool equivalent of CheckKuduAvailability().
 bool KuduIsAvailable();
 
+/// Creates a new KuduClient using the specified master adresses. If any error occurs,
+/// 'client' is not set and an error status is returned.
+Status CreateKuduClient(const std::vector<std::string>& master_addrs,
+    kudu::client::sp::shared_ptr<kudu::client::KuduClient>* client);
+
 /// Returns a debug string for the KuduSchema.
 std::string KuduSchemaDebugString(const kudu::client::KuduSchema& schema);
 

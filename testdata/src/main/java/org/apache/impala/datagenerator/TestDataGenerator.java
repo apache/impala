@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
+import java.util.TimeZone;
 
 class TestDataGenerator {
   // 2 years
@@ -151,6 +152,10 @@ class TestDataGenerator {
     if (args.length != 1) {
       System.err.println("Usage: " + "TestDataGenerator BaseOutputDirectory");
     }
+
+    // The TimeZone should be the same no matter what the TimeZone is of the computer
+    // running this code, in order to ensure the generated data is always the same.
+    TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"));
 
     // Generate AllTypes
     String dirName = args[0] + "/AllTypes";

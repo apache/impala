@@ -1,0 +1,25 @@
+====
+---- QUERY
+# TODO: improve error messages (here and below) when KUDU-1734 is resolved
+describe functional_kudu.alltypes
+---- CATCH
+Error opening Kudu table 'impala::functional_kudu.alltypes'
+====
+---- QUERY
+show create table functional_kudu.alltypes
+---- CATCH
+Error opening Kudu table 'impala::functional_kudu.alltypes'
+====
+---- QUERY
+create table test_kudu (x int primary key)
+distribute by hash(x) into 3 buckets stored as kudu
+---- CATCH
+Error creating Kudu table
+====
+---- QUERY
+create external table test_kudu
+stored as kudu
+tblproperties('kudu.table_name'='doesnt_matter_this_times_out')
+---- CATCH
+Error loading schema of table 'doesnt_matter_this_times_out'
+====

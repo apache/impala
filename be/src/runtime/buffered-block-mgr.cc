@@ -671,25 +671,16 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
     DiskIoMgr::ScanRange* scan_range =
         obj_pool_.Add(new DiskIoMgr::ScanRange());
     scan_range->Reset(NULL, block->write_range_->file(), block->write_range_->len(),
-        block->write_range_->offset(), block->write_range_->disk_id(), false, block,
-        DiskIoMgr::ScanRange::NEVER_CACHE);
-    vector<DiskIoMgr::ScanRange*> ranges(1, scan_range);
-    status = io_mgr_->AddScanRanges(io_request_context_, ranges, true);
+        block->write_range_->offset(), block->write_range_->disk_id(), false,
+        DiskIoMgr::BufferOpts::ReadInto(block->buffer(), block->buffer_len()));
+    DiskIoMgr::BufferDescriptor* io_mgr_buffer;
+    status = io_mgr_->Read(io_request_context_, scan_range, &io_mgr_buffer);
     if (!status.ok()) goto error;
 
-    // Read from the io mgr buffer into the block's assigned buffer.
-    int64_t offset = 0;
-    bool buffer_eosr;
-    do {
-      DiskIoMgr::BufferDescriptor* io_mgr_buffer;
-      status = scan_range->GetNext(&io_mgr_buffer);
-      if (!status.ok()) goto error;
-      memcpy(block->buffer() + offset, io_mgr_buffer->buffer(), io_mgr_buffer->len());
-      offset += io_mgr_buffer->len();
-      buffer_eosr = io_mgr_buffer->eosr();
-      io_mgr_buffer->Return();
-    } while (!buffer_eosr);
-    DCHECK_EQ(offset, block->write_range_->len());
+    DCHECK_EQ(io_mgr_buffer->buffer(), block->buffer());
+    DCHECK_EQ(io_mgr_buffer->len(), block->valid_data_len());
+    DCHECK(io_mgr_buffer->eosr());
+    io_mgr_buffer->Return();
   }
 
   if (FLAGS_disk_spill_encryption) {
@@ -1285,7 +1276,7 @@ void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, RuntimeProfile* parent_profile,
   unique_lock<mutex> l(lock_);
   if (initialized_) return;
 
-  io_mgr->RegisterContext(&io_request_context_);
+  io_mgr->RegisterContext(&io_request_context_, NULL);
 
   profile_.reset(new RuntimeProfile(&obj_pool_, "BlockMgr"));
   parent_profile->AddChild(profile_.get());

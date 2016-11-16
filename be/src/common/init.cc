@@ -97,7 +97,7 @@ static scoped_ptr<impala::Thread> maintenance_thread;
 // time slept. If that exceeds PAUSE_WARN_THRESHOLD_MS, a warning is logged.
 static scoped_ptr<impala::Thread> pause_monitor;
 
-static void MaintenanceThread() {
+[[noreturn]] static void MaintenanceThread() {
   while (true) {
     sleep(FLAGS_logbufsecs);
 

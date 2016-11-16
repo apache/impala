@@ -116,7 +116,7 @@ void MinUpdate(FunctionContext* context, const StringVal& input, BufferVal* val)
 }
 
 // Serialize the state into the min string
-const BufferVal MinSerialize(FunctionContext* context, const BufferVal& intermediate) {
+BufferVal MinSerialize(FunctionContext* context, const BufferVal& intermediate) {
   MinState* state = reinterpret_cast<MinState*>(intermediate);
   if (state->value == NULL) return intermediate;
   // Hack to persist the intermediate state's value without leaking.

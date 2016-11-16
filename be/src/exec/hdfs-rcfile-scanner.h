@@ -320,8 +320,8 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   ///   ReadColumnBuffers
   Status ReadRowGroup();
 
-  /// Reset state for a new row group
-  void ResetRowGroup();
+  /// Reset state for a new row group. Can fail if allocating the next row batch fails.
+  Status ResetRowGroup();
 
   /// Move to next row. Calls NextField on each column that we are reading.
   /// Modifies:

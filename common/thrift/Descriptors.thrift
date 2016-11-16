@@ -58,6 +58,7 @@ struct TColumnDescriptor {
 
 // "Union" of all table types.
 struct TTableDescriptor {
+  // Query local id assigned in DescriptorTable:toThrift()
   1: required Types.TTableId id
   2: required CatalogObjects.TTableType tableType
   // Clustering/partition columns come first.

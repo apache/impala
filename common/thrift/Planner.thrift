@@ -77,9 +77,7 @@ struct TScanRangeLocation {
 }
 
 // A single scan range plus the hosts that serve it
-// TODO: rename to TScanRangeLocationList, having this differ from the above struct
-// by only a single letter has caused needless confusion
-struct TScanRangeLocations {
+struct TScanRangeLocationList {
   1: required PlanNodes.TScanRange scan_range
   // non-empty list
   2: list<TScanRangeLocation> locations

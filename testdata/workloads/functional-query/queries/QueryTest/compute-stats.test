@@ -67,6 +67,88 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
+# Adding a column shouldn't cause the stats to be dropped.
+alter table alltypes add columns (new_col int)
+---- RESULTS
+====
+---- QUERY
+show column stats alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',7505,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','TINYINT',10,-1,1,1
+'smallint_col','SMALLINT',10,-1,2,2
+'int_col','INT',10,-1,4,4
+'bigint_col','BIGINT',10,-1,8,8
+'float_col','FLOAT',10,-1,4,4
+'double_col','DOUBLE',10,-1,8,8
+'date_string_col','STRING',736,-1,8,8
+'string_col','STRING',10,-1,1,1
+'timestamp_col','TIMESTAMP',7554,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+'new_col','INT',-1,-1,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+# Changing a column shouldn't cause the stats of other columns to be dropped.
+# Check that the column's own stats aren't dropped if the type matches once
+# HIVE-15075 is resolved.
+alter table alltypes change new_col new_col2 int
+---- RESULTS
+====
+---- QUERY
+show column stats alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',7505,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','TINYINT',10,-1,1,1
+'smallint_col','SMALLINT',10,-1,2,2
+'int_col','INT',10,-1,4,4
+'bigint_col','BIGINT',10,-1,8,8
+'float_col','FLOAT',10,-1,4,4
+'double_col','DOUBLE',10,-1,8,8
+'date_string_col','STRING',736,-1,8,8
+'string_col','STRING',10,-1,1,1
+'timestamp_col','TIMESTAMP',7554,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+'new_col2','INT',-1,-1,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+# Removing a column shouldn't cause the stats to be dropped.
+alter table alltypes drop column new_col2
+---- RESULTS
+====
+---- QUERY
+show column stats alltypes
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',7505,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','TINYINT',10,-1,1,1
+'smallint_col','SMALLINT',10,-1,2,2
+'int_col','INT',10,-1,4,4
+'bigint_col','BIGINT',10,-1,8,8
+'float_col','FLOAT',10,-1,4,4
+'double_col','DOUBLE',10,-1,8,8
+'date_string_col','STRING',736,-1,8,8
+'string_col','STRING',10,-1,1,1
+'timestamp_col','TIMESTAMP',7554,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
 # drop stats from this table
 drop stats alltypes
 ====
@@ -180,6 +262,7 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 # Drop the partitions with NULL values and check for stats.
 alter table alltypes drop partition (year=NULL, month=NULL)
 ---- RESULTS
+'Dropped 1 partition(s).'
 ====
 ---- QUERY
 show column stats alltypes
@@ -205,6 +288,7 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ---- QUERY
 alter table alltypes drop partition (year=2011, month=NULL)
 ---- RESULTS
+'Dropped 1 partition(s).'
 ====
 ---- QUERY
 show column stats alltypes

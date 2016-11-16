@@ -1,10 +1,5 @@
 ====
 ---- QUERY
-create database if not exists native_function_test;
-use native_function_test;
-
-drop function if exists memtest(bigint);
-
 create function memtest(bigint) returns bigint
 location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' symbol='MemTest'
 prepare_fn='MemTestPrepare' close_fn='MemTestClose';

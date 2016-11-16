@@ -102,9 +102,9 @@ TEST(BitArray, TestBool) {
 // Writes 'num_vals' values with width 'bit_width' and reads them back.
 void TestBitArrayValues(int bit_width, int num_vals) {
   const int len = BitUtil::Ceil(bit_width * num_vals, 8);
-  const uint64_t mod = bit_width == 64? 1 : 1LL << bit_width;
+  const uint64_t mod = bit_width == 64 ? 1 : 1LL << bit_width;
 
-  uint8_t buffer[len];
+  uint8_t buffer[(len > 0) ? len : 1];
   BitWriter writer(buffer, len);
   for (int i = 0; i < num_vals; ++i) {
     bool result = writer.PutValue(i % mod, bit_width);

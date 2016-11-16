@@ -91,6 +91,7 @@ class JdbcQueryExecConfig(ImpalaQueryExecConfig):
 
     Constructed on the fly, since the impalad it points to can change.
     """
+    assert self.transport is not None
     return JdbcQueryExecConfig.JDBC_CLIENT_PATH + ' -i "%s" -t %s' % (self._impalad,
                                                                       self.transport)
 

@@ -121,12 +121,12 @@ Status KuduScanNode::Open(RuntimeState* state) {
   const KuduTableDescriptor* table_desc =
       static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
 
-  kudu::client::KuduClientBuilder b;
-  for (const string& address: table_desc->kudu_master_addresses()) {
-    b.add_master_server_addr(address);
-  }
+  RETURN_IF_ERROR(CreateKuduClient(table_desc->kudu_master_addresses(), &client_));
 
-  KUDU_RETURN_IF_ERROR(b.Build(&client_), "Unable to create Kudu client");
+  uint64_t latest_ts = static_cast<uint64_t>(
+      max<int64_t>(0, state->query_ctx().session.kudu_latest_observed_ts));
+  VLOG_RPC << "Latest observed Kudu timestamp: " << latest_ts;
+  if (latest_ts > 0) client_->SetLatestObservedTimestamp(latest_ts);
 
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc->table_name(), &table_),
       "Unable to open Kudu table");

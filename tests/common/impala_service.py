@@ -53,6 +53,10 @@ class BaseImpalaService(object):
   def read_debug_webpage(self, page_name, timeout=10, interval=1):
     return self.open_debug_webpage(page_name, timeout=timeout, interval=interval).read()
 
+  def get_debug_webpage_json(self, page_name):
+    """Returns the json for the given Impala debug webpage, eg. '/queries'"""
+    return json.loads(self.read_debug_webpage(page_name + "?json"))
+
   def get_metric_value(self, metric_name, default_value=None):
     """Returns the value of the the given metric name from the Impala debug webpage"""
     metrics = json.loads(self.read_debug_webpage('jsonmetrics?json'))

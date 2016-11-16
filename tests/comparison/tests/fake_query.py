@@ -37,17 +37,19 @@ from tests.comparison.funcs import AnalyticFirstValue
 from tests.comparison.query import Query, SelectClause, SelectItem
 
 
-def FakeColumn(name, type_):
+def FakeColumn(name, type_, is_primary_key=False):
   """
   Return a Column, the creation of which allows the user not to have to specify the
   first argument, which is the table to which the column belongs.
 
   Typical use should be when creating a FakeTable, use FakeColumns as arguments.
   """
-  return Column(None, name, type_)
+  col = Column(None, name, type_)
+  col.is_primary_key = is_primary_key
+  return col
 
 
-def FakeTable(name, fake_columns):
+def FakeTable(name, fake_columns, storage_format='TEXTFILE'):
   """
   Return a Table consisting of one or more FakeColumns. Because Columns are added via
   method, we support nesting here instead.
@@ -57,6 +59,7 @@ def FakeTable(name, fake_columns):
     raise Exception('You must supply at least one FakeColumn argument')
   for fake_column in fake_columns:
     table.add_col(fake_column)
+  table.storage_format = storage_format
   return table
 
 

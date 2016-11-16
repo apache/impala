@@ -19,45 +19,63 @@ under the License.
 {{> www/common-header.tmpl }}
 
 <h2>Sessions</h2>
-There are {{num_sessions}} active sessions.
 
-<table class='table table-bordered table-hover'>
-  <tr>
-    <th>Session Type</th>
-    <th>Open Queries</th>
-    <th>Total Queries</th>
-    <th>User</th>
-    <th>Delegated User</th>
-    <th>Session ID</th>
-    <th>Network Address</th>
-    <th>Default Database</th>
-    <th>Start Time</th>
-    <th>Last Accessed</th>
-    <th>Idle Timeout (s)</th>
-    <th>Expired</th>
-    <th>Closed</th>
-    <th>Ref count</th>
-    <th>Action</th>
-  </tr>
-{{#sessions}}
-  <tr>
-    <td>{{type}}</td>
-    <td>{{inflight_queries}}</td>
-    <td>{{total_queries}}</td>
-    <td>{{user}}</td>
-    <td>{{delegated_user}}</td>
-    <td>{{session_id}}</td>
-    <td>{{network_address}}</td>
-    <td>{{default_database}}</td>
-    <td>{{start_time}}</td>
-    <td>{{last_accessed}}</td>
-    <td>{{session_timeout}}</td>
-    <td>{{expired}}</td>
-    <td>{{closed}}</td>
-    <td>{{ref_count}}</td>
-    <td><a href='/close_session?session_id={{session_id}}'>Close Session</a></td>
-  </tr>
-{{/sessions}}
+<div class="alert alert-info" role="alert">
+<h4>There are {{num_sessions}} sessions, of which {{num_active}} are active</h4> Sessions
+may be <strong>closed</strong> either when they are idle for some time (see Idle Timeout
+below), or if they are deliberately closed, otherwise they are
+called <strong>active</strong>.</div>
+
+<table id="sessions-tbl" class='table table-bordered table-hover table-condensed'>
+  <thead>
+    <tr>
+      <th><small>Session Type</small></th>
+      <th><small>Open Queries</small></th>
+      <th><small>Total Queries</small></th>
+      <th><small>User</small></th>
+      <th><small>Delegated User</small></th>
+      <th><small>Session ID</small></th>
+      <th><small>Network Address</small></th>
+      <th><small>Default Database</small></th>
+      <th><small>Start Time</small></th>
+      <th><small>Last Accessed</small></th>
+      <th><small>Idle Timeout (s)</small></th>
+      <th><small>Expired</small></th>
+      <th><small>Closed</small></th>
+      <th><small>Ref count</small></th>
+      <th><small>Action</small></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#sessions}}
+    <tr>
+      <td><small>{{type}}</small></td>
+      <td><small>{{inflight_queries}}</small></td>
+      <td><small>{{total_queries}}</small></td>
+      <td><small>{{user}}</small></td>
+      <td><small>{{delegated_user}}</small></td>
+      <td><small>{{session_id}}</small></td>
+      <td><small>{{network_address}}</small></td>
+      <td><small>{{default_database}}</small></td>
+      <td data-order="{{start_time_sort}}"><small>{{start_time}}</small></td>
+      <td data-order="{{last_accessed_sort}}"><small>{{last_accessed}}</small></td>
+      <td><small>{{session_timeout}}</small></td>
+      <td><small>{{expired}}</small></td>
+      <td><small>{{closed}}</small></td>
+      <td><small>{{ref_count}}</small></td>
+      <td><small><a href='/close_session?session_id={{session_id}}'>Close</a></small></td>
+    </tr>
+    {{/sessions}}
+  </tbody>
 </table>
+
+<script>
+    $(document).ready(function() {
+        $('#sessions-tbl').DataTable({
+            "order": [[ 1, "desc" ]],
+            "pageLength": 100
+        });
+    });
+</script>
 
 {{> www/common-footer.tmpl }}

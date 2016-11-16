@@ -209,9 +209,9 @@ struct TShowTablesParams {
 struct TShowFilesParams {
   1: required CatalogObjects.TTableName table_name
 
-  // An optional partition spec. Set if this operation should apply to a specific
-  // partition rather than the base table.
-  2: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
+  // An optional partition set. Set if this operation should apply to a list of
+  // partitions rather than the base table.
+  2: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
 }
 
 // Parameters for SHOW [CURRENT] ROLES and SHOW ROLE GRANT GROUP <groupName> commands
@@ -347,15 +347,9 @@ struct TPlanExecInfo {
   // it is unpartitioned.
   1: required list<Planner.TPlanFragment> fragments
 
-  // Specifies the destination fragment of the output of each fragment.
-  // dest_fragment_idx.size() == fragments.size() - 1 and
-  // fragments[i] sends its output to fragments[dest_fragment_idx[i-1]]
-  // TODO: remove; TPlanFragment.output_sink.dest_node_id is sufficient
-  2: optional list<i32> dest_fragment_idx
-
   // A map from scan node ids to a list of scan range locations.
-  // The node ids refer to scan nodes in fragments[].plan_tree
-  3: optional map<Types.TPlanNodeId, list<Planner.TScanRangeLocations>>
+  // The node ids refer to scan nodes in fragments[].plan
+  2: optional map<Types.TPlanNodeId, list<Planner.TScanRangeLocationList>>
       per_node_scan_ranges
 }
 
@@ -364,57 +358,39 @@ struct TQueryExecRequest {
   // global descriptor tbl for all fragments
   1: optional Descriptors.TDescriptorTable desc_tbl
 
-  // fragments[i] may consume the output of fragments[j > i];
-  // fragments[0] is the root fragment and also the coordinator fragment, if
-  // it is unpartitioned.
-  2: optional list<Planner.TPlanFragment> fragments
-
-  // Specifies the destination fragment of the output of each fragment.
-  // parent_fragment_idx.size() == fragments.size() - 1 and
-  // fragments[i] sends its output to fragments[dest_fragment_idx[i-1]]
-  3: optional list<i32> dest_fragment_idx
-
-  // A map from scan node ids to a list of scan range locations.
-  // The node ids refer to scan nodes in fragments[].plan_tree
-  4: optional map<Types.TPlanNodeId, list<Planner.TScanRangeLocations>>
-      per_node_scan_ranges
-
-  // Multi-threaded execution: exec info for all plans; the first one materializes
-  // the query result
-  // TODO: this will eventually supercede fields fragments, dest_fragment_idx,
-  // per_node_scan_ranges
-  14: optional list<TPlanExecInfo> mt_plan_exec_info
+  // exec info for all plans; the first one materializes the query result
+  2: optional list<TPlanExecInfo> plan_exec_info
 
   // Metadata of the query result set (only for select)
-  5: optional Results.TResultSetMetadata result_set_metadata
+  3: optional Results.TResultSetMetadata result_set_metadata
 
   // Set if the query needs finalization after it executes
-  6: optional TFinalizeParams finalize_params
+  4: optional TFinalizeParams finalize_params
 
-  7: required ImpalaInternalService.TQueryCtx query_ctx
+  5: required ImpalaInternalService.TQueryCtx query_ctx
 
   // The same as the output of 'explain <query>'
-  8: optional string query_plan
+  6: optional string query_plan
 
   // The statement type governs when the coordinator can judge a query to be finished.
   // DML queries are complete after Wait(), SELECTs may not be. Generally matches
   // the stmt_type of the parent TExecRequest, but in some cases (such as CREATE TABLE
   // AS SELECT), these may differ.
-  9: required Types.TStmtType stmt_type
+  7: required Types.TStmtType stmt_type
 
   // Estimated per-host peak memory consumption in bytes. Used for resource management.
-  10: optional i64 per_host_mem_req
+  8: optional i64 per_host_mem_req
 
   // Estimated per-host CPU requirements in YARN virtual cores.
   // Used for resource management.
   // TODO: Remove this and associated code in Planner.
-  11: optional i16 per_host_vcores
+  9: optional i16 per_host_vcores
 
   // List of replica hosts.  Used by the host_idx field of TScanRangeLocation.
-  12: required list<Types.TNetworkAddress> host_list
+  10: required list<Types.TNetworkAddress> host_list
 
   // Column lineage graph
-  13: optional LineageGraph.TLineageGraph lineage_graph
+  11: optional LineageGraph.TLineageGraph lineage_graph
 }
 
 enum TCatalogOpType {
@@ -743,11 +719,6 @@ struct TGetHadoopConfigResponse {
 
 struct TGetAllHadoopConfigsResponse {
   1: optional map<string, string> configs;
-}
-
-// BE startup options
-struct TStartupOptions {
-  1: optional bool compute_lineage
 }
 
 // For creating a test descriptor table. The tuples and their memory layout are computed

@@ -1,20 +1,20 @@
 ====
 ---- QUERY
-select udf_test.hive_pi()
+select hive_pi()
 ---- RESULTS
 3.141592653589793
 ---- TYPES
 DOUBLE
 ====
 ---- QUERY
-select udf_test.hive_bin(100)
+select hive_bin(100)
 ---- RESULTS
 '1100100'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-select min(udf_test.hive_pi()) from functional.alltypesagg
+select min(hive_pi()) from functional.alltypesagg
 ---- RESULTS
 3.141592653589793
 ---- TYPES
@@ -22,49 +22,49 @@ DOUBLE
 ====
 ---- QUERY
 # Test identity functions
-select udf_test.identity(true);
+select identity(true);
 ---- TYPES
 boolean
 ---- RESULTS
 true
 ====
 ---- QUERY
-select udf_test.identity(cast(10 as tinyint));
+select identity(cast(10 as tinyint));
 ---- TYPES
 tinyint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity(cast(10 as smallint));
+select identity(cast(10 as smallint));
 ---- TYPES
 smallint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity(cast(10 as int));
+select identity(cast(10 as int));
 ---- TYPES
 int
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity(cast(10 as bigint));
+select identity(cast(10 as bigint));
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity(cast(10.0 as float));
+select identity(cast(10.0 as float));
 ---- TYPES
 float
 ---- RESULTS
 10
 ====
 ---- QUERY
-select udf_test.identity(cast(10.0 as double));
+select identity(cast(10.0 as double));
 ---- TYPES
 double
 ---- RESULTS
@@ -73,16 +73,16 @@ double
 ---- QUERY
 # IMPALA-1456. Each "identity" call below tests a different type (BytesWritable, Text,
 # and String).
-select udf_test.identity("why hello there"),
-       udf_test.identity("why", " hello there"),
-       udf_test.identity("why", " hello", " there");
+select identity("why hello there"),
+       identity("why", " hello there"),
+       identity("why", " hello", " there");
 ---- TYPES
 string, string, string
 ---- RESULTS
 'why hello there','why hello there','why hello there'
 ====
 ---- QUERY
-select udf_test.identity(NULL);
+select identity(NULL);
 ---- TYPES
 boolean
 ---- RESULTS
@@ -91,9 +91,9 @@ NULL
 ---- QUERY
 # IMPALA-1134. Each "identity" call below tests a different type (BytesWritable, Text,
 # and String). The different types are handled slightly differently.
-select length(udf_test.identity("0123456789")),
-       length(udf_test.identity("0123456789", "0123456789")),
-       length(udf_test.identity("0123456789", "0123456789", "0123456789"));
+select length(identity("0123456789")),
+       length(identity("0123456789", "0123456789")),
+       length(identity("0123456789", "0123456789", "0123456789"));
 ---- TYPES
 int, int, int
 ---- RESULTS
@@ -101,14 +101,14 @@ int, int, int
 ====
 ---- QUERY
 # IMPALA-1392: Hive UDFs that throw exceptions should return NULL
-select udf_test.throws_exception();
+select throws_exception();
 ---- TYPES
 boolean
 ---- RESULTS
 NULL
 ====
 ---- QUERY
-select udf_test.throws_exception() from functional.alltypestiny;
+select throws_exception() from functional.alltypestiny;
 ---- TYPES
 boolean
 ---- RESULTS
@@ -122,49 +122,49 @@ NULL
 NULL
 ====
 ---- QUERY
-select udf_test.hive_add(cast(1 as int), cast(2 as int));
+select hive_add(cast(1 as int), cast(2 as int));
 ---- TYPES
 int
 ---- RESULTS
 3
 ====
 ---- QUERY
-select udf_test.hive_add(udf_test.hive_add(cast(1 as int), cast(2 as int)), cast(2 as int));
+select hive_add(hive_add(cast(1 as int), cast(2 as int)), cast(2 as int));
 ---- TYPES
 int
 ---- RESULTS
 5
 ====
 ---- QUERY
-select udf_test.hive_add(cast(udf_test.hive_add(cast(1 as int), cast(2 as int)) - udf_test.hive_add(cast(2 as int), cast(1 as int)) as int), cast(2 as int));
+select hive_add(cast(hive_add(cast(1 as int), cast(2 as int)) - hive_add(cast(2 as int), cast(1 as int)) as int), cast(2 as int));
 ---- TYPES
 int
 ---- RESULTS
 2
 ====
 ---- QUERY
-select udf_test.hive_add(cast(1 as smallint), cast(2 as smallint));
+select hive_add(cast(1 as smallint), cast(2 as smallint));
 ---- TYPES
 smallint
 ---- RESULTS
 3
 ====
 ---- QUERY
-select udf_test.hive_add(cast(1.0 as float), cast(2.0 as float));
+select hive_add(cast(1.0 as float), cast(2.0 as float));
 ---- TYPES
 float
 ---- RESULTS
 3.0
 ====
 ---- QUERY
-select udf_test.hive_add(cast(1.0 as double), cast(2.0 as double));
+select hive_add(cast(1.0 as double), cast(2.0 as double));
 ---- TYPES
 double
 ---- RESULTS
 3.0
 ====
 ---- QUERY
-select udf_test.hive_add(cast(1 as boolean), cast(0 as boolean));
+select hive_add(cast(1 as boolean), cast(0 as boolean));
 ---- TYPES
 boolean
 ---- RESULTS
@@ -172,63 +172,63 @@ false
 ====
 ---- QUERY
 # Testing whether all of persistent Java udfs are accessible.
-select java_udfs_test.identity(true);
+select identity_anytype(true);
 ---- TYPES
 boolean
 ---- RESULTS
 true
 ====
 ---- QUERY
-select java_udfs_test.identity(cast(10 as tinyint));
+select identity_anytype(cast(10 as tinyint));
 ---- TYPES
 tinyint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select java_udfs_test.identity(cast(10 as smallint));
+select identity_anytype(cast(10 as smallint));
 ---- TYPES
 smallint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select java_udfs_test.identity(cast(10 as int));
+select identity_anytype(cast(10 as int));
 ---- TYPES
 int
 ---- RESULTS
 10
 ====
 ---- QUERY
-select java_udfs_test.identity(cast(10 as bigint));
+select identity_anytype(cast(10 as bigint));
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select java_udfs_test.identity(cast(10.0 as float));
+select identity_anytype(cast(10.0 as float));
 ---- TYPES
 float
 ---- RESULTS
 10
 ====
 ---- QUERY
-select java_udfs_test.identity(cast(10.0 as double));
+select identity_anytype(cast(10.0 as double));
 ---- TYPES
 double
 ---- RESULTS
 10
 ====
 ---- QUERY
-select java_udfs_test.identity("a", "b");
+select identity_anytype("a", "b");
 ---- TYPES
 string
 ---- RESULTS
 'ab'
 ====
 ---- QUERY
-select java_udfs_test.identity("a", "b", "c");
+select identity_anytype("a", "b", "c");
 ---- TYPES
 string
 ---- RESULTS
@@ -238,37 +238,37 @@ string
 # IMPALA-3378: test many Java UDFs being opened and run concurrently
 select * from
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(bool_col) union all
+ where identity(bool_col) union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(tinyint_col) > 1 union all
+ where identity(tinyint_col) > 1 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(smallint_col) > 1 union all
+ where identity(smallint_col) > 1 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(int_col) > 1 union all
+ where identity(int_col) > 1 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(bigint_col) > 1 union all
+ where identity(bigint_col) > 1 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(float_col) > 1.0 union all
+ where identity(float_col) > 1.0 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(double_col) > 1.0 union all
+ where identity(double_col) > 1.0 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(string_col) > '1' union all
+ where identity(string_col) > '1' union all
 (select max(int_col) from functional.alltypesagg
- where not udf_test.identity(bool_col) union all
+ where not identity(bool_col) union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(tinyint_col) > 2 union all
+ where identity(tinyint_col) > 2 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(smallint_col) > 2 union all
+ where identity(smallint_col) > 2 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(int_col) > 2 union all
+ where identity(int_col) > 2 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(bigint_col) > 2 union all
+ where identity(bigint_col) > 2 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(float_col) > 2.0 union all
+ where identity(float_col) > 2.0 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(double_col) > 2.0 union all
+ where identity(double_col) > 2.0 union all
 (select max(int_col) from functional.alltypesagg
- where udf_test.identity(string_col) > '2'
+ where identity(string_col) > '2'
 )))))))))))))))) v
 ---- TYPES
 INT
@@ -289,4 +289,27 @@ INT
 999
 999
 999
+====
+---- QUERY
+drop table if exists replace_string_input
+====
+---- QUERY
+create table replace_string_input as
+values('toast'), ('scone'), ('stuff'), ('sssss'), ('yes'), ('scone'), ('stuff');
+====
+---- QUERY
+# Regression test for IMPALA-4266: memory management bugs with output strings from
+# Java UDFS, exposed by using the UDF as a grouping key in an aggregation.
+# The UDF replaces "s" with "ss" in the strings.
+select distinct replace_string(_c0) as es
+from replace_string_input
+order by 1;
+---- TYPES
+string
+---- RESULTS
+'sscone'
+'ssssssssss'
+'sstuff'
+'toasst'
+'yess'
 ====

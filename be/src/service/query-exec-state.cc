@@ -379,8 +379,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
 Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     const TQueryExecRequest& query_exec_request) {
   // we always need at least one plan fragment
-  DCHECK(query_exec_request.fragments.size() > 0
-      || query_exec_request.mt_plan_exec_info.size() > 0);
+  DCHECK(query_exec_request.plan_exec_info.size() > 0);
 
   if (query_exec_request.__isset.query_plan) {
     stringstream plan_ss;
@@ -426,11 +425,6 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     }
     summary_profile_.AddInfoString(TABLES_WITH_CORRUPT_STATS_KEY, ss.str());
   }
-
-  bool is_mt_exec = query_exec_request.query_ctx.request.query_options.mt_dop > 0;
-  const TPlanFragment& fragment = is_mt_exec
-      ? query_exec_request.mt_plan_exec_info[0].fragments[0]
-      : query_exec_request.fragments[0];
 
   {
     lock_guard<mutex> l(lock_);
@@ -522,6 +516,9 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
     DCHECK(exec_request_.__isset.query_exec_request);
     RETURN_IF_ERROR(ExecQueryOrDmlRequest(exec_request_.query_exec_request));
   }
+
+  // Set the results to be reported to the client.
+  SetResultSet(catalog_op_executor_->ddl_exec_response());
   return Status::OK();
 }
 
@@ -530,6 +527,22 @@ void ImpalaServer::QueryExecState::Done() {
   // Make sure we join on wait_thread_ before we finish (and especially before this object
   // is destroyed).
   BlockOnWait();
+
+  // Update latest observed Kudu timestamp stored in the session from the coordinator.
+  // Needs to take the session_ lock which must not be taken while holding lock_, so this
+  // must happen before taking lock_ below.
+  if (coord_.get() != NULL) {
+    // This is safe to access on coord_ after Wait() has been called.
+    uint64_t latest_kudu_ts = coord_->GetLatestKuduInsertTimestamp();
+    if (latest_kudu_ts > 0) {
+      VLOG_RPC << "Updating session (id=" << session_id()  << ") with latest "
+               << "observed Kudu timestamp: " << latest_kudu_ts;
+      lock_guard<mutex> session_lock(session_->lock);
+      session_->kudu_latest_observed_ts = std::max<uint64_t>(
+          session_->kudu_latest_observed_ts, latest_kudu_ts);
+    }
+  }
+
   unique_lock<mutex> l(lock_);
   end_time_ = TimestampValue::LocalTime();
   summary_profile_.AddInfoString("End Time", end_time().DebugString());
@@ -819,17 +832,20 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
 }
 
 Status ImpalaServer::QueryExecState::Cancel(bool check_inflight, const Status* cause) {
+  if (check_inflight) {
+    // If the query is in 'inflight_queries' it means that the query has actually started
+    // executing. It is ok if the query is removed from 'inflight_queries' during
+    // cancellation, so we can release the session lock before starting the cancellation
+    // work.
+    lock_guard<mutex> session_lock(session_->lock);
+    if (session_->inflight_queries.find(query_id()) == session_->inflight_queries.end()) {
+      return Status("Query not yet running");
+    }
+  }
+
   Coordinator* coord;
   {
     lock_guard<mutex> lock(lock_);
-    if (check_inflight) {
-      lock_guard<mutex> session_lock(session_->lock);
-      if (session_->inflight_queries.find(query_id()) ==
-          session_->inflight_queries.end()) {
-        return Status("Query not yet running");
-      }
-    }
-
     // If the query is completed or cancelled, no need to update state.
     bool already_done = eos_ || query_state_ == QueryState::EXCEPTION;
     if (!already_done && cause != NULL) {
@@ -904,6 +920,13 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
   }
   query_events_->MarkEvent("DML Metastore update finished");
   return Status::OK();
+}
+
+void ImpalaServer::QueryExecState::SetResultSet(const TDdlExecResponse* ddl_resp) {
+  if (ddl_resp != NULL && ddl_resp->__isset.result_set) {
+    result_metadata_ = ddl_resp->result_set.schema;
+    request_result_set_.reset(new vector<TResultRow>(ddl_resp->result_set.rows));
+  }
 }
 
 void ImpalaServer::QueryExecState::SetResultSet(const vector<string>& results) {
@@ -1013,14 +1036,7 @@ Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats(
       exec_request_.query_options.sync_ddl));
 
   // Set the results to be reported to the client.
-  const TDdlExecResponse* ddl_resp = catalog_op_executor_->ddl_exec_response();
-  if (ddl_resp != NULL && ddl_resp->__isset.result_set) {
-    result_metadata_ = ddl_resp->result_set.schema;
-    request_result_set_.reset(new vector<TResultRow>);
-    request_result_set_->assign(
-        ddl_resp->result_set.rows.begin(), ddl_resp->result_set.rows.end());
-  }
-
+  SetResultSet(catalog_op_executor_->ddl_exec_response());
   query_events_->MarkEvent("Metastore update finished");
   return Status::OK();
 }

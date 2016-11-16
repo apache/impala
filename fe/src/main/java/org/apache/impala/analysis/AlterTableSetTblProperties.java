@@ -22,13 +22,15 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.avro.SchemaParseException;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
-
-import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.thrift.*;
+import org.apache.impala.thrift.TAlterTableParams;
+import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
+import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.util.AvroSchemaParser;
 import org.apache.impala.util.AvroSchemaUtils;
 import org.apache.impala.util.MetaStoreUtil;
@@ -45,9 +47,9 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
   private final TTablePropertyType targetProperty_;
   private final HashMap<String, String> tblProperties_;
 
-  public AlterTableSetTblProperties(TableName tableName, PartitionSpec partitionSpec,
+  public AlterTableSetTblProperties(TableName tableName, PartitionSet partitionSet,
       TTablePropertyType targetProperty, HashMap<String, String> tblProperties) {
-    super(tableName, partitionSpec);
+    super(tableName, partitionSet);
     Preconditions.checkNotNull(tblProperties);
     Preconditions.checkNotNull(targetProperty);
     targetProperty_ = targetProperty;
@@ -65,8 +67,8 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
        new TAlterTableSetTblPropertiesParams();
    tblPropertyParams.setTarget(targetProperty_);
    tblPropertyParams.setProperties(tblProperties_);
-   if (partitionSpec_ != null) {
-     tblPropertyParams.setPartition_spec(partitionSpec_.toThrift());
+   if (partitionSet_ != null) {
+     tblPropertyParams.setPartition_set(partitionSet_.toThrift());
    }
    params.setSet_tbl_properties_params(tblPropertyParams);
    return params;
@@ -77,6 +79,12 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     super.analyze(analyzer);
 
     MetaStoreUtil.checkShortPropertyMap("Property", tblProperties_);
+
+    if (tblProperties_.containsKey(hive_metastoreConstants.META_TABLE_STORAGE)) {
+      throw new AnalysisException(String.format("Changing the '%s' table property is " +
+          "not supported to protect against metadata corruption.",
+          hive_metastoreConstants.META_TABLE_STORAGE));
+    }
 
     // Check avro schema when it is set in avro.schema.url or avro.schema.literal to
     // avoid potential metadata corruption (see IMPALA-2042).

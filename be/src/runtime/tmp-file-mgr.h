@@ -192,7 +192,7 @@ class TmpFileMgr {
   /// responsible for deleting it. The file is not created - creation is deferred until
   /// the first call to File::AllocateSpace().
   Status NewFile(FileGroup* file_group, const DeviceId& device_id,
-      const TUniqueId& query_id, File** new_file);
+      const TUniqueId& query_id, std::unique_ptr<File>* new_file);
 
   /// Dir stores information about a temporary directory.
   class Dir {

@@ -1163,6 +1163,14 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "select * from functional.alltypestiny where id = (select 1) " +
         "union select * from functional.alltypestiny where id = (select 2)");
 
+    // UPSERT
+    AnalyzesOk("upsert into functional_kudu.testtbl select * from " +
+        "functional_kudu.testtbl where id in (select id from functional_kudu.testtbl " +
+        "where zip = 0)");
+    AnalyzesOk("upsert into functional_kudu.testtbl select * from " +
+        "functional_kudu.testtbl union select bigint_col, string_col, int_col from " +
+        "functional.alltypes");
+
     // CTAS with correlated subqueries
     AnalyzesOk("create table functional.test_tbl as select * from " +
         "functional.alltypes t where t.id in (select id from functional.alltypesagg " +
@@ -1276,7 +1284,7 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     AnalysisError("select * from functional.alltypestiny where (select min(id) " +
         "from functional.alltypes) between 1 and (select max(id) from " +
         "functional.alltypes)", "Comparison between subqueries is not supported " +
-        "in a between predicate: (SELECT min(id) FROM functional.alltypes) BETWEEN " +
+        "in a BETWEEN predicate: (SELECT min(id) FROM functional.alltypes) BETWEEN " +
         "1 AND (SELECT max(id) FROM functional.alltypes)");
     AnalyzesOk("select * from functional.alltypestiny where " +
         "int_col between 0 and 10 and exists (select 1)");

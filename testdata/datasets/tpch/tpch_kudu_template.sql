@@ -1,6 +1,24 @@
+---- Licensed to the Apache Software Foundation (ASF) under one
+---- or more contributor license agreements.  See the NOTICE file
+---- distributed with this work for additional information
+---- regarding copyright ownership.  The ASF licenses this file
+---- to you under the Apache License, Version 2.0 (the
+---- "License"); you may not use this file except in compliance
+---- with the License.  You may obtain a copy of the License at
+----
+----   http://www.apache.org/licenses/LICENSE-2.0
+----
+---- Unless required by applicable law or agreed to in writing,
+---- software distributed under the License is distributed on an
+---- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+---- KIND, either express or implied.  See the License for the
+---- specific language governing permissions and limitations
+---- under the License.
+
 ---- Template SQL statements to create and load TPCH tables in KUDU.
----- TODO: Change to the new syntax for CREATE TABLE statements (IMPALA-3719)
 ---- TODO: Fix the primary key column order
+---- TODO: Remove the 'kudu.master_addresses' from TBLPROPERTIES once CM properly sets
+---- the 'kudu_masters' startup option in Impala.
 ---- TODO: Remove the CREATE_KUDU sections from tpch_schema_template.sql and use
 ---- this file instead for loading TPC-H data in Kudu.
 
@@ -21,15 +39,12 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.lineitem (
   L_RECEIPTDATE STRING,
   L_SHIPINSTRUCT STRING,
   L_SHIPMODE STRING,
-  L_COMMENT STRING
+  L_COMMENT STRING,
+  PRIMARY KEY (L_ORDERKEY, L_LINENUMBER)
 )
 distribute by hash (l_orderkey) into {buckets} buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '{kudu_master}:7051',
-  'kudu.table_name' = '{target_db_name}_lineitem',
-  'kudu.key_columns' = 'l_orderkey, l_linenumber'
-);
+STORED AS KUDU
+tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.lineitem
 SELECT
@@ -53,7 +68,7 @@ FROM {source_db_name}.lineitem;
 
 ---- PART
 CREATE TABLE IF NOT EXISTS {target_db_name}.part (
-  P_PARTKEY BIGINT,
+  P_PARTKEY BIGINT PRIMARY KEY,
   P_NAME STRING,
   P_MFGR STRING,
   P_BRAND STRING,
@@ -64,12 +79,8 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.part (
   P_COMMENT STRING
 )
 distribute by hash (p_partkey) into {buckets} buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '{kudu_master}:7051',
-  'kudu.table_name' = '{target_db_name}_part',
-  'kudu.key_columns' = 'p_partkey'
-);
+STORED AS KUDU
+tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.part SELECT * FROM {source_db_name}.part;
 
@@ -79,21 +90,18 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.partsupp (
   PS_SUPPKEY BIGINT,
   PS_AVAILQTY BIGINT,
   PS_SUPPLYCOST DOUBLE,
-  PS_COMMENT STRING
+  PS_COMMENT STRING,
+  PRIMARY KEY (PS_PARTKEY, PS_SUPPKEY)
 )
 distribute by hash (ps_partkey, ps_suppkey) into {buckets} buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '{kudu_master}:7051',
-  'kudu.table_name' = '{target_db_name}_partsupp',
-  'kudu.key_columns' = 'ps_partkey, ps_suppkey'
-);
+STORED AS KUDU
+tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.partsupp SELECT * FROM {source_db_name}.partsupp;
 
 ---- SUPPLIER
 CREATE TABLE IF NOT EXISTS {target_db_name}.supplier (
-  S_SUPPKEY BIGINT,
+  S_SUPPKEY BIGINT PRIMARY KEY,
   S_NAME STRING,
   S_ADDRESS STRING,
   S_NATIONKEY BIGINT,
@@ -102,51 +110,39 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.supplier (
   S_COMMENT STRING
 )
 distribute by hash (s_suppkey) into {buckets} buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '{kudu_master}:7051',
-  'kudu.table_name' = '{target_db_name}_supplier',
-  'kudu.key_columns' = 's_suppkey'
-);
+STORED AS KUDU
+tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.supplier SELECT * FROM {source_db_name}.supplier;
 
 ---- NATION
 CREATE TABLE IF NOT EXISTS {target_db_name}.nation (
-  N_NATIONKEY BIGINT,
+  N_NATIONKEY BIGINT PRIMARY KEY,
   N_NAME STRING,
   N_REGIONKEY BIGINT,
   N_COMMENT STRING
 )
 distribute by hash (n_nationkey) into {buckets} buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '{kudu_master}:7051',
-  'kudu.table_name' = '{target_db_name}_nation',
-  'kudu.key_columns' = 'n_nationkey'
-);
+STORED AS KUDU
+tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.nation SELECT * FROM {source_db_name}.nation;
 
 ---- REGION
 CREATE TABLE IF NOT EXISTS {target_db_name}.region (
-  R_REGIONKEY BIGINT,
+  R_REGIONKEY BIGINT PRIMARY KEY,
   R_NAME STRING,
   R_COMMENT STRING
 )
 distribute by hash (r_regionkey) into {buckets} buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '{kudu_master}:7051',
-  'kudu.table_name' = '{target_db_name}_region',
-  'kudu.key_columns' = 'r_regionkey'
-);
+STORED AS KUDU
+tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.region SELECT * FROM {source_db_name}.region;
 
 ---- ORDERS
 CREATE TABLE IF NOT EXISTS {target_db_name}.orders (
-  O_ORDERKEY BIGINT,
+  O_ORDERKEY BIGINT PRIMARY KEY,
   O_CUSTKEY BIGINT,
   O_ORDERSTATUS STRING,
   O_TOTALPRICE DOUBLE,
@@ -157,18 +153,14 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.orders (
   O_COMMENT STRING
 )
 distribute by hash (o_orderkey) into {buckets} buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '{kudu_master}:7051',
-  'kudu.table_name' = '{target_db_name}_orders',
-  'kudu.key_columns' = 'o_orderkey'
-);
+STORED AS KUDU
+tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.orders SELECT * FROM {source_db_name}.orders;
 
 ---- CUSTOMER
 CREATE TABLE IF NOT EXISTS {target_db_name}.customer (
-  C_CUSTKEY BIGINT,
+  C_CUSTKEY BIGINT PRIMARY KEY,
   C_NAME STRING,
   C_ADDRESS STRING,
   C_NATIONKEY BIGINT,
@@ -178,12 +170,8 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.customer (
   C_COMMENT STRING
 )
 distribute by hash (c_custkey) into {buckets} buckets
-tblproperties(
-  'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
-  'kudu.master_addresses' = '{kudu_master}:7051',
-  'kudu.table_name' = '{target_db_name}_customer',
-  'kudu.key_columns' = 'c_custkey'
-);
+STORED AS KUDU
+tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
 INSERT INTO TABLE {target_db_name}.customer SELECT * FROM {source_db_name}.customer;
 

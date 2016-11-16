@@ -254,6 +254,12 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testKuduUpsert() {
+    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
+    runPlannerTestFile("kudu-upsert");
+  }
+
+  @Test
   public void testKuduUpdate() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     runPlannerTestFile("kudu-update");

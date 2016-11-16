@@ -54,7 +54,7 @@ import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
-import org.apache.impala.thrift.TScanRangeLocations;
+import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TStatus;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -322,7 +322,7 @@ public class DataSourceScanNode extends ScanNode {
     TNetworkAddress networkAddress = addressToTNetworkAddress("localhost:12345");
     Integer hostIndex = analyzer.getHostIndex().getIndex(networkAddress);
     scanRanges_ = Lists.newArrayList(
-        new TScanRangeLocations(
+        new TScanRangeLocationList(
             new TScanRange(), Lists.newArrayList(new TScanRangeLocation(hostIndex))));
   }
 

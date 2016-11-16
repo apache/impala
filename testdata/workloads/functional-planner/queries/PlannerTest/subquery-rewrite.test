@@ -1638,7 +1638,7 @@ where
 PLAN-ROOT SINK
 |
 05:HASH JOIN [RIGHT SEMI JOIN]
-|  hash predicates: sum(t1.id) = t.int_col
+|  hash predicates: t1.id + t2.id = t.int_col
 |
 |--00:SCAN HDFS [functional.alltypestiny t]
 |     partitions=4/4 files=4 size=460B
@@ -1732,8 +1732,8 @@ PLAN-ROOT SINK
    partitions=11/11 files=11 size=814.73KB
    runtime filters: RF001 -> tt1.int_col
 ====
-# Correlated EXISTS and NOT EXISTS subqueries with limit 0 and
-# aggregates. All predicates evaluate to FALSE. (IMPALA-1550)
+# IMPALA-1550/IMPALA-4423: Correlated EXISTS and NOT EXISTS subqueries with aggregates
+# that can be evaluated at query compile time. All predicates evaluate to FALSE.
 select 1
 from functional.alltypestiny t1
 where exists
@@ -1744,13 +1744,17 @@ and not exists
   (select count(distinct int_col)
    from functional.alltypesagg t3
    where t1.id = t3.id)
+and not exists
+  (select min(int_col)
+   from functional.alltypestiny t5
+   where t1.id = t5.id and false)
 ---- PLAN
 PLAN-ROOT SINK
 |
 00:EMPTYSET
 ====
-# Correlated EXISTS and NOT EXISTS subqueries with limit 0 and
-# aggregates. All predicates evaluate to TRUE. (IMPALA-1550)
+# IMPALA-1550/IMPALA-4423: Correlated EXISTS and NOT EXISTS subqueries with aggregates
+# that can be evaluated at query compile time. All predicates evaluate to TRUE.
 select 1
 from functional.alltypestiny t1
 where not exists
@@ -1768,7 +1772,7 @@ and not exists
 and not exists
   (select min(int_col)
    from functional.alltypestiny t5
-   where t1.id = t5.id and false)
+   where t1.id = t5.id having false)
 ---- PLAN
 PLAN-ROOT SINK
 |
@@ -2030,4 +2034,22 @@ PLAN-ROOT SINK
    partitions=24/24 files=24 size=478.45KB
    predicates: 20 >= t.bigint_col, t.string_col <= t.date_string_col
    runtime filters: RF000 -> id
+====
+# IMPALA-4423: Correlated EXISTS and NOT EXISTS subqueries with aggregates. Both
+# subqueries can be evaluated at query compile time. The first one evaluates to
+# TRUE and the second one to FALSE.
+select 1
+from functional.alltypestiny t1
+where not exists
+  (select id
+   from functional.alltypes t2
+   where t1.int_col = t2.int_col limit 0)
+and not exists
+  (select min(int_col)
+   from functional.alltypestiny t5
+   where t1.id = t5.id and false)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
 ====

@@ -20,10 +20,11 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr-value.h"
-#include "udf/udf.h"
 #include "udf/udf-internal.h" // for CollectionVal
+#include "udf/udf.h"
 
 using namespace impala_udf;
 
@@ -61,7 +62,9 @@ class ExprContext {
   /// originals but have their own MemPool and thread-local state. Clone() should be used
   /// to create an ExprContext for each execution thread that needs to evaluate
   /// 'root'. Note that clones are already opened. '*new_context' must be initialized by
-  /// the caller to NULL.
+  /// the caller to NULL. The cloned ExprContext cannot be used after the original
+  /// ExprContext is destroyed because it may reference fragment-local state from the
+  /// original.
   Status Clone(RuntimeState* state, ExprContext** new_context);
 
   /// Closes all FunctionContexts. Must be called on every ExprContext, including clones.
@@ -111,6 +114,7 @@ class ExprContext {
   }
 
   Expr* root() const { return root_; }
+  bool opened() const { return opened_; }
   bool closed() const { return closed_; }
   bool is_clone() const { return is_clone_; }
 
@@ -143,7 +147,8 @@ class ExprContext {
 
  private:
   friend class Expr;
-  /// Users of private GetValue()
+  /// Users of private GetValue() or 'pool_'.
+  friend class CaseExpr;
   friend class HiveUdfCall;
   friend class ScalarFnCall;
 

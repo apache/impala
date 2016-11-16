@@ -65,8 +65,8 @@ class KuduScanNode : public ScanNode {
   const TupleDescriptor* tuple_desc_;
 
   /// The Kudu client and table. Scanners share these instances.
-  std::tr1::shared_ptr<kudu::client::KuduClient> client_;
-  std::tr1::shared_ptr<kudu::client::KuduTable> table_;
+  kudu::client::sp::shared_ptr<kudu::client::KuduClient> client_;
+  kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
 
   /// Set of scan tokens to be deserialized into Kudu scanners.
   std::vector<std::string> scan_tokens_;

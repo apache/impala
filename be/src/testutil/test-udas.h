@@ -25,7 +25,7 @@ using namespace impala_udf;
 void MemTestInit(FunctionContext*, BigIntVal* total);
 void MemTestUpdate(FunctionContext* context, const BigIntVal& bytes, BigIntVal* total);
 void MemTestMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst);
-const BigIntVal MemTestSerialize(FunctionContext* context, const BigIntVal& total);
+BigIntVal MemTestSerialize(FunctionContext* context, const BigIntVal& total);
 BigIntVal MemTestFinalize(FunctionContext* context, const BigIntVal& total);
 
 #endif

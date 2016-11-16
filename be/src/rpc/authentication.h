@@ -28,7 +28,10 @@
 #include "transport/TSasl.h"
 #include "common/status.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wheader-hygiene"
 using namespace ::apache::thrift::transport;
+#pragma clang diagnostic pop
 
 namespace impala {
 
@@ -37,7 +40,7 @@ namespace impala {
 /// servers and clients.
 class AuthManager {
  public:
-  static AuthManager* GetInstance() { return AuthManager::auth_manager_; };
+  static AuthManager* GetInstance() { return AuthManager::auth_manager_; }
 
   /// Set up internal and external AuthProvider classes.  This does a bunch of flag
   /// checking and calls each AuthProvider->Start().

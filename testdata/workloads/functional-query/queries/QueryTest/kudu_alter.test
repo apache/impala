@@ -10,6 +10,9 @@ alter table simple set tblproperties (
   'kudu.master_addresses' = 'localhost'
 )
 ---- RESULTS
+'Updated table.'
+---- TYPES
+STRING
 ====
 ---- QUERY
 -- Show that new address is picked up
@@ -22,6 +25,9 @@ STRING,STRING,STRING
 ---- QUERY
 alter table simple set tblproperties ('kudu.master_addresses' = '127.0.0.1')
 ---- RESULTS
+'Updated table.'
+---- TYPES
+STRING
 ====
 ---- QUERY
 -- Try to use an invalid master address

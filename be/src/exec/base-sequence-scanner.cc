@@ -55,9 +55,9 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     // it is not cached.
     // TODO: add remote disk id and plumb that through to the io mgr.  It should have
     // 1 queue for each NIC as well?
-    DiskIoMgr::ScanRange* header_range = scan_node->AllocateScanRange(
-        files[i]->fs, files[i]->filename.c_str(), header_size, 0, metadata->partition_id,
-        -1, false, false, files[i]->mtime);
+    DiskIoMgr::ScanRange* header_range = scan_node->AllocateScanRange(files[i]->fs,
+        files[i]->filename.c_str(), header_size, 0, metadata->partition_id, -1, false,
+        DiskIoMgr::BufferOpts::Uncached());
     header_ranges.push_back(header_range);
   }
   // Issue the header ranges only.  ProcessSplit() will issue the files' scan ranges
@@ -152,7 +152,7 @@ Status BaseSequenceScanner::ProcessSplit() {
     static_cast<HdfsScanNode*>(scan_node_)->SetFileMetadata(
         stream_->filename(), header_);
     HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
-    scan_node_->AddDiskIoRanges(desc);
+    RETURN_IF_ERROR(scan_node_->AddDiskIoRanges(desc));
     return Status::OK();
   }
 

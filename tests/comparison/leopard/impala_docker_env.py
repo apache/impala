@@ -34,7 +34,6 @@ import os
 IMPALA_HOME = '/home/dev/Impala'
 CORE_PATH = '/tmp/core_files'
 DEFAULT_BRANCH_NAME = os.environ.get('DEFAULT_BRANCH_NAME', 'origin/master')
-DEFAULT_DOCKER_IMAGE_NAME = 'cloudera/impala-dev'
 DOCKER_USER_NAME = os.environ.get('DOCKER_USER_NAME', 'dev')
 
 # Needed for ensuring the testdata volume is properly owned. The UID/GID from the
@@ -104,8 +103,7 @@ class ImpalaDockerEnv(object):
     self.git_command = git_command
     self.host = os.environ['TARGET_HOST']
     self.host_username = os.environ['TARGET_HOST_USERNAME']
-    self.docker_image_name = os.environ.get(
-        'DOCKER_IMAGE_NAME', DEFAULT_DOCKER_IMAGE_NAME)
+    self.docker_image_name = os.environ['DOCKER_IMAGE_NAME']
 
   def stop_docker(self):
     with settings(warn_only=True, host_string=self.host, user=self.host_username):

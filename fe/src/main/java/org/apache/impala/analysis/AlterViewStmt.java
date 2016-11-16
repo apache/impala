@@ -22,6 +22,7 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.BackendConfig;
 
 import com.google.common.base.Preconditions;
 
@@ -52,7 +53,7 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
     }
 
     createColumnAndViewDefs(analyzer);
-    if (RuntimeEnv.INSTANCE.computeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
+    if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
       computeLineageGraph(analyzer);
     }
   }

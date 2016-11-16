@@ -164,17 +164,43 @@ class DelimitedTextParser {
   /// SSE(xmm) register containing the tuple search character(s).
   __m128i xmm_tuple_search_;
 
-  /// The number of delimiters contained in xmm_tuple_search_, i.e. its length.
-  int num_tuple_delims_;
-
   /// SSE(xmm) register containing the delimiter search character(s).
   __m128i xmm_delim_search_;
+
+  /// SSE(xmm) register containing the escape search character.
+  __m128i xmm_escape_search_;
+
+  /// For each col index [0, num_cols_), true if the column should be materialized.
+  /// Not owned.
+  const bool* is_materialized_col_;
+
+  /// The number of delimiters contained in xmm_tuple_search_, i.e. its length.
+  int num_tuple_delims_;
 
   /// The number of delimiters contained in xmm_delim_search_, i.e. its length.
   int num_delims_;
 
-  /// SSE(xmm) register containing the escape search character.
-  __m128i xmm_escape_search_;
+  /// Number of columns in the table (including partition columns)
+  int num_cols_;
+
+  /// Number of partition columns in the table.
+  int num_partition_keys_;
+
+  /// Index to keep track of the current column in the current file
+  int column_idx_;
+
+  /// Used for special processing of \r.
+  /// This will be the offset of the last instance of \r from the end of the
+  /// current buffer being searched unless the last row delimiter was not a \r in which
+  /// case it will be -1.  If the last character in a buffer is \r then the value
+  /// will be 0.  At the start of processing a new buffer if last_row_delim_offset_ is 0
+  /// then it is set to be one more than the size of the buffer so that if the buffer
+  /// starts with \n it is processed as \r\n.
+  int32_t last_row_delim_offset_;
+
+  /// Precomputed masks to process escape characters
+  uint16_t low_mask_[16];
+  uint16_t high_mask_[16];
 
   /// Character delimiting fields (to become slots).
   char field_delim_;
@@ -197,32 +223,6 @@ class DelimitedTextParser {
 
   /// Whether or not the previous character was the escape character
   bool last_char_is_escape_;
-
-  /// Used for special processing of \r.
-  /// This will be the offset of the last instance of \r from the end of the
-  /// current buffer being searched unless the last row delimiter was not a \r in which
-  /// case it will be -1.  If the last character in a buffer is \r then the value
-  /// will be 0.  At the start of processing a new buffer if last_row_delim_offset_ is 0
-  /// then it is set to be one more than the size of the buffer so that if the buffer
-  /// starts with \n it is processed as \r\n.
-  int32_t last_row_delim_offset_;
-
-  /// Precomputed masks to process escape characters
-  uint16_t low_mask_[16];
-  uint16_t high_mask_[16];
-
-  /// Number of columns in the table (including partition columns)
-  int num_cols_;
-
-  /// Number of partition columns in the table.
-  int num_partition_keys_;
-
-  /// For each col index [0, num_cols_), true if the column should be materialized.
-  /// Not owned.
-  const bool* is_materialized_col_;
-
-  /// Index to keep track of the current column in the current file
-  int column_idx_;
 
   /// True if the last tuple is unfinished (not ended with tuple delimiter).
   bool unfinished_tuple_;

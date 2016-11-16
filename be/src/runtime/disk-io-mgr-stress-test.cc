@@ -36,6 +36,7 @@ const bool TEST_CANCELLATION = true;
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   CpuInfo::Init();
+  OsInfo::Init();
   impala::InitThreading();
   int duration_sec = DEFAULT_DURATION_SEC;
 

@@ -230,7 +230,7 @@ void PartitionedHashJoinNode::CloseAndDeletePartitions() {
   }
   output_build_partitions_.clear();
   if (null_probe_rows_ != NULL) {
-    null_probe_rows_->Close();
+    null_probe_rows_->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
     null_probe_rows_.reset();
   }
 }
@@ -275,11 +275,8 @@ Status PartitionedHashJoinNode::ProbePartition::PrepareForRead() {
 void PartitionedHashJoinNode::ProbePartition::Close(RowBatch* batch) {
   if (IsClosed()) return;
   if (probe_rows_ != NULL) {
-    if (batch == NULL) {
-      probe_rows_->Close();
-    } else {
-      batch->AddTupleStream(probe_rows_.release());
-    }
+    // Flush out the resources to free up memory for subsequent partitions.
+    probe_rows_->Close(batch, RowBatch::FlushMode::FLUSH_RESOURCES);
     probe_rows_.reset();
   }
 }
@@ -699,7 +696,9 @@ Status PartitionedHashJoinNode::OutputNullAwareNullProbe(RuntimeState* state,
       builder_->CloseNullAwarePartition(out_batch);
       null_aware_probe_partition_->Close(out_batch);
       null_aware_probe_partition_.reset();
-      out_batch->AddTupleStream(null_probe_rows_.release());
+      // Flush out the resources to free up memory.
+      null_probe_rows_->Close(out_batch, RowBatch::FlushMode::FLUSH_RESOURCES);
+      null_probe_rows_.reset();
       return Status::OK();
     }
   }
@@ -747,7 +746,7 @@ Status PartitionedHashJoinNode::InitNullAwareProbePartition() {
 error:
   DCHECK(!status.ok());
   // Ensure the temporary 'probe_rows' stream is closed correctly on error.
-  probe_rows->Close();
+  probe_rows->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   return status;
 }
 
@@ -1048,18 +1047,25 @@ string PartitionedHashJoinNode::NodeDebugString() const {
   stringstream ss;
   ss << "PartitionedHashJoinNode (id=" << id() << " op=" << join_op_
      << " state=" << PrintState()
-     << " #hash_partitions=" << builder_->num_hash_partitions()
      << " #spilled_partitions=" << spilled_partitions_.size() << ")" << endl;
 
-  ss << "PhjBuilder: " << builder_->DebugString();
+  if (builder_ != NULL) {
+    ss << "PhjBuilder: " << builder_->DebugString();
+  }
 
   ss << "Probe hash partitions: " << probe_hash_partitions_.size() << ":" << endl;
   for (int i = 0; i < probe_hash_partitions_.size(); ++i) {
     ProbePartition* probe_partition = probe_hash_partitions_[i].get();
-    ss << "  Probe hash partition " << i << ": probe ptr=" << probe_partition
-       << "    Probe Rows: " << probe_partition->probe_rows()->num_rows()
-       << "    (Blocks pinned: " << probe_partition->probe_rows()->blocks_pinned() << ")"
-       << endl;
+    ss << "  Probe hash partition " << i << ": ";
+    if (probe_partition != NULL) {
+      ss << "probe ptr=" << probe_partition;
+      BufferedTupleStream* probe_rows = probe_partition->probe_rows();
+      if (probe_rows != NULL) {
+         ss << "    Probe Rows: " << probe_rows->num_rows()
+            << "    (Blocks pinned: " << probe_rows->blocks_pinned() << ")";
+      }
+    }
+    ss << endl;
   }
 
   if (!spilled_partitions_.empty()) {
@@ -1138,7 +1144,7 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen,
   prototype.AddArgument(LlvmCodeGen::NamedVariable("build_arg", tuple_row_ptr_type));
 
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder builder(context);
+  LlvmBuilder builder(context);
   Value* args[4];
   *fn = prototype.GeneratePrototype(&builder, args);
   Value* out_row_arg = builder.CreateBitCast(args[1], tuple_row_working_type, "out");
@@ -1150,8 +1156,9 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen,
 
   // Copy probe row
   codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, probe_tuple_row_size_);
-  Value* build_row_idx[] = { codegen->GetIntConstant(TYPE_INT, num_probe_tuples) };
-  Value* build_row_dst = builder.CreateGEP(out_row_arg, build_row_idx, "build_dst_ptr");
+  Value* build_row_idx[] = {codegen->GetIntConstant(TYPE_INT, num_probe_tuples)};
+  Value* build_row_dst =
+      builder.CreateInBoundsGEP(out_row_arg, build_row_idx, "build_dst_ptr");
 
   // Copy build row.
   BasicBlock* build_not_null_block = BasicBlock::Create(context, "build_not_null", *fn);
@@ -1170,9 +1177,8 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen,
     // to work.
     builder.SetInsertPoint(build_null_block);
     for (int i = 0; i < num_build_tuples; ++i) {
-      Value* array_idx[] =
-          { codegen->GetIntConstant(TYPE_INT, i + num_probe_tuples) };
-      Value* dst = builder.CreateGEP(out_row_arg, array_idx, "dst_tuple_ptr");
+      Value* array_idx[] = {codegen->GetIntConstant(TYPE_INT, i + num_probe_tuples)};
+      Value* dst = builder.CreateInBoundsGEP(out_row_arg, array_idx, "dst_tuple_ptr");
       builder.CreateStore(codegen->null_ptr_value(), dst);
     }
     builder.CreateRetVoid();

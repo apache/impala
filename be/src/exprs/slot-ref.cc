@@ -17,6 +17,7 @@
 
 #include "exprs/slot-ref.h"
 
+#include <limits>
 #include <sstream>
 
 #include "codegen/codegen-anyval.h"
@@ -133,11 +134,11 @@ string SlotRef::DebugString() const {
 //   br label %check_slot_null
 //
 // check_slot_null:                                  ; preds = %entry
-//   %null_ptr = getelementptr i8* %tuple_ptr, i32 0
+//   %null_byte_ptr = getelementptr i8* %tuple_ptr, i32 0
 //   %null_byte = load i8* %null_ptr
 //   %null_byte_set = and i8 %null_byte, 2
-//   %slot_is_null = icmp ne i8 %null_byte_set, 0
-//   br i1 %slot_is_null, label %ret, label %get_slot
+//   %is_null = icmp ne i8 %null_byte_set, 0
+//   br i1 %is_null, label %ret, label %get_slot
 //
 // get_slot:                                         ; preds = %check_slot_null
 //   %slot_addr = getelementptr i8* %tuple_ptr, i32 8
@@ -172,7 +173,7 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   // as the join node. When the slot is being used in the scan-node, the tuple is
   // non-nullable. Used in the join node (and above in the plan tree), it is nullable.
   // TODO: can we do something better.
-  const int64_t TUPLE_NULLABLE_MASK = 1L << 63;
+  constexpr int64_t TUPLE_NULLABLE_MASK = numeric_limits<int64_t>::min();
   int64_t unique_slot_id = slot_id_ | ((int64_t)tuple_idx_) << 32;
   DCHECK_EQ(unique_slot_id & TUPLE_NULLABLE_MASK, 0);
   if (tuple_is_nullable_) unique_slot_id |= TUPLE_NULLABLE_MASK;
@@ -188,28 +189,24 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   Value* row_ptr = args[1];
 
   Value* tuple_offset = ConstantInt::get(codegen->int_type(), tuple_idx_);
-  Value* null_byte_offset =
-    ConstantInt::get(codegen->int_type(), null_indicator_offset_.byte_offset);
   Value* slot_offset = ConstantInt::get(codegen->int_type(), slot_offset_);
-  Value* null_mask =
-      ConstantInt::get(codegen->tinyint_type(), null_indicator_offset_.bit_mask);
   Value* zero = ConstantInt::get(codegen->GetType(TYPE_TINYINT), 0);
   Value* one = ConstantInt::get(codegen->GetType(TYPE_TINYINT), 1);
 
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", *fn);
+  bool slot_is_nullable = null_indicator_offset_.bit_mask != 0;
   BasicBlock* check_slot_null_indicator_block = NULL;
-  if (null_indicator_offset_.bit_mask != 0) {
-    check_slot_null_indicator_block =
-        BasicBlock::Create(context, "check_slot_null", *fn);
+  if (slot_is_nullable) {
+    check_slot_null_indicator_block = BasicBlock::Create(context, "check_slot_null", *fn);
   }
   BasicBlock* get_slot_block = BasicBlock::Create(context, "get_slot", *fn);
   BasicBlock* ret_block = BasicBlock::Create(context, "ret", *fn);
 
-  LlvmCodeGen::LlvmBuilder builder(entry_block);
+  LlvmBuilder builder(entry_block);
   // Get the tuple offset addr from the row
   Value* cast_row_ptr = builder.CreateBitCast(
       row_ptr, PointerType::get(codegen->ptr_type(), 0), "cast_row_ptr");
-  Value* tuple_addr = builder.CreateGEP(cast_row_ptr, tuple_offset, "tuple_addr");
+  Value* tuple_addr = builder.CreateInBoundsGEP(cast_row_ptr, tuple_offset, "tuple_addr");
   // Load the tuple*
   Value* tuple_ptr = builder.CreateLoad(tuple_addr, "tuple_ptr");
 
@@ -217,32 +214,30 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   if (tuple_is_nullable_) {
     Value* tuple_is_null = builder.CreateIsNull(tuple_ptr, "tuple_is_null");
     // Check slot is null only if the null indicator bit is set
-    if (null_indicator_offset_.bit_mask == 0) {
-      builder.CreateCondBr(tuple_is_null, ret_block, get_slot_block);
-    } else {
+    if (slot_is_nullable) {
       builder.CreateCondBr(tuple_is_null, ret_block, check_slot_null_indicator_block);
+    } else {
+      builder.CreateCondBr(tuple_is_null, ret_block, get_slot_block);
     }
   } else {
-    if (null_indicator_offset_.bit_mask == 0) {
-      builder.CreateBr(get_slot_block);
-    } else {
+    if (slot_is_nullable) {
       builder.CreateBr(check_slot_null_indicator_block);
+    } else {
+      builder.CreateBr(get_slot_block);
     }
   }
 
   // Branch for tuple* != NULL.  Need to check if null-indicator is set
-  if (check_slot_null_indicator_block != NULL) {
+  if (slot_is_nullable) {
     builder.SetInsertPoint(check_slot_null_indicator_block);
-    Value* null_addr = builder.CreateGEP(tuple_ptr, null_byte_offset, "null_ptr");
-    Value* null_val = builder.CreateLoad(null_addr, "null_byte");
-    Value* slot_null_mask = builder.CreateAnd(null_val, null_mask, "null_byte_set");
-    Value* is_slot_null = builder.CreateICmpNE(slot_null_mask, zero, "slot_is_null");
+    Value* is_slot_null = SlotDescriptor::CodegenIsNull(
+        codegen, &builder, null_indicator_offset_, tuple_ptr);
     builder.CreateCondBr(is_slot_null, ret_block, get_slot_block);
   }
 
   // Branch for slot != NULL
   builder.SetInsertPoint(get_slot_block);
-  Value* slot_ptr = builder.CreateGEP(tuple_ptr, slot_offset, "slot_addr");
+  Value* slot_ptr = builder.CreateInBoundsGEP(tuple_ptr, slot_offset, "slot_addr");
   Value* val_ptr = builder.CreateBitCast(slot_ptr, codegen->GetPtrType(type_), "val_ptr");
   // Depending on the type, load the values we need
   Value* val = NULL;
@@ -312,7 +307,7 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
     result.SetIsNull(is_null_phi);
     result.SetPtr(ptr_phi);
     result.SetLen(len_phi);
-    builder.CreateRet(result.value());
+    builder.CreateRet(result.GetLoweredValue());
   } else if (type() == TYPE_TIMESTAMP) {
     DCHECK(time_of_day != NULL);
     DCHECK(date != NULL);
@@ -342,7 +337,7 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
     result.SetIsNull(is_null_phi);
     result.SetTimeOfDay(time_of_day_phi);
     result.SetDate(date_phi);
-    builder.CreateRet(result.value());
+    builder.CreateRet(result.GetLoweredValue());
   } else {
     DCHECK(val != NULL);
     PHINode* val_phi = builder.CreatePHI(val->getType(), 2, "val_phi");
@@ -359,7 +354,7 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
         CodegenAnyVal::GetNonNullVal(codegen, &builder, type(), "result");
     result.SetIsNull(is_null_phi);
     result.SetVal(val_phi);
-    builder.CreateRet(result.value());
+    builder.CreateRet(result.GetLoweredValue());
   }
 
   *fn = codegen->FinalizeFunction(*fn);

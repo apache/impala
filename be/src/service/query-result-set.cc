@@ -78,7 +78,7 @@ class HS2ColumnarResultSet : public QueryResultSet {
  public:
   HS2ColumnarResultSet(const TResultSetMetadata& metadata, TRowSet* rowset);
 
-  virtual ~HS2ColumnarResultSet(){};
+  virtual ~HS2ColumnarResultSet() {}
 
   /// Add a row of expr values
   virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales);

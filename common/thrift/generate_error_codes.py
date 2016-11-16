@@ -295,9 +295,17 @@ error_codes = (
 
   ("KUDU_KEY_ALREADY_PRESENT", 95, "Key already present in Kudu table '$0'."),
 
-  ("KUDU_KEY_NOT_FOUND", 96, "Key not found in Kudu table '$0'."),
+  ("KUDU_NOT_FOUND", 96, "Not found in Kudu table '$0': $1"),
 
-  ("KUDU_SESSION_ERROR", 97, "Error in Kudu table '$0': $1")
+  ("KUDU_SESSION_ERROR", 97, "Error in Kudu table '$0': $1"),
+
+  ("AVRO_UNSUPPORTED_TYPE", 98, "Column '$0': unsupported Avro type '$1'"),
+
+  ("AVRO_INVALID_DECIMAL", 99,
+      "Column '$0': invalid Avro decimal type with precision = '$1' scale = '$2'"),
+
+  ("KUDU_NULL_CONSTRAINT_VIOLATION", 100,
+      "Row with null value violates nullability constraint on table '$0'."),
 )
 
 import sys

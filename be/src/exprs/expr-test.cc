@@ -6044,13 +6044,12 @@ TEST_F(ExprTest, BitByteBuiltins) {
   TestValue("shiftleft(cast(1 as INT), 2)", TYPE_INT, 4);
   string pow2_30 = lexical_cast<string>(1 << 30);
   TestValue("shiftleft(" + pow2_30 + ", 2)", TYPE_INT, 0);
-  TestValue("shiftleft(" + pow2_30 + ", 1)", TYPE_INT, 1 << 31);
+  TestValue("shiftleft(" + pow2_30 + ", 1)", TYPE_INT, numeric_limits<int32_t>::min());
   TestValue("shiftleft(cast(1 as BIGINT), 2)", TYPE_BIGINT, 4);
   string pow2_62 = lexical_cast<string>(((int64_t)1) << 62);
   TestValue("shiftleft(" + pow2_62 + ", 2)", TYPE_BIGINT, 0);
   TestValue("rotateleft(" + pow2_62 + ", 2)", TYPE_BIGINT, 1);
-  TestValue("shiftleft(" + pow2_62 + ", 1)", TYPE_BIGINT,
-            ((int64_t)1) << 63);
+  TestValue("shiftleft(" + pow2_62 + ", 1)", TYPE_BIGINT, numeric_limits<int64_t>::min());
 
   // Basic right shift/rotate tests for all integer types
   TestValue("shiftright(4, 2)", TYPE_TINYINT, 1);
@@ -6125,6 +6124,9 @@ int main(int argc, char **argv) {
   ABORT_IF_ERROR(executor_->Setup());
 
   vector<string> options;
+  // Disable FE Expr rewrites to make sure the Exprs get executed exactly as specified
+  // in the tests here.
+  options.push_back("ENABLE_EXPR_REWRITES=0");
   options.push_back("DISABLE_CODEGEN=1");
   disable_codegen_ = true;
   executor_->setExecOptions(options);

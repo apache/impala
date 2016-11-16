@@ -23,7 +23,9 @@ from kudu.schema import (
     INT32,
     INT64,
     INT8,
-    STRING)
+    STRING,
+    BINARY,
+    UNIXTIME_MICROS)
 import logging
 import pytest
 import textwrap
@@ -39,12 +41,10 @@ class TestKuduOperations(KuduTestSuite):
   """
 
   def test_kudu_scan_node(self, vector, unique_database):
-    self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database,
-        wait_secs_between_stmts=1)
+    self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database)
 
   def test_kudu_crud(self, vector, unique_database):
-    self.run_test_case('QueryTest/kudu_crud', vector, use_db=unique_database,
-        wait_secs_between_stmts=1)
+    self.run_test_case('QueryTest/kudu_crud', vector, use_db=unique_database)
 
   def test_kudu_partition_ddl(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_partition_ddl', vector, use_db=unique_database)
@@ -81,8 +81,6 @@ class TestCreateExternalTable(KuduTestSuite):
 
   def test_col_types(self, cursor, kudu_client):
     """Check that a table can be created using all available column types."""
-    # TODO: The python Kudu client doesn't yet support TIMESTAMP or BYTE[], those should
-    #       be tested for graceful failure.
     kudu_types = [STRING, BOOL, DOUBLE, FLOAT, INT16, INT32, INT64, INT8]
     with self.temp_kudu_table(kudu_client, kudu_types) as kudu_table:
       impala_table_name = self.get_kudu_table_base_name(kudu_table.name)
@@ -97,6 +95,34 @@ class TestCreateExternalTable(KuduTestSuite):
           assert col_name == kudu_col.name
           assert col_type.upper() == \
               self.kudu_col_type_to_impala_col_type(kudu_col.type.type)
+
+  def test_unsupported_binary_col(self, cursor, kudu_client):
+    """Check that external tables with BINARY columns fail gracefully.
+    """
+    with self.temp_kudu_table(kudu_client, [INT32, BINARY]) as kudu_table:
+      impala_table_name = self.random_table_name()
+      try:
+        cursor.execute("""
+            CREATE EXTERNAL TABLE %s
+            STORED AS KUDU
+            TBLPROPERTIES('kudu.table_name' = '%s')""" % (impala_table_name,
+                kudu_table.name))
+      except Exception as e:
+        assert "Kudu type 'binary' is not supported in Impala" in str(e)
+
+  def test_unsupported_unixtime_col(self, cursor, kudu_client):
+    """Check that external tables with UNIXTIME_MICROS columns fail gracefully.
+    """
+    with self.temp_kudu_table(kudu_client, [INT32, UNIXTIME_MICROS]) as kudu_table:
+      impala_table_name = self.random_table_name()
+      try:
+        cursor.execute("""
+            CREATE EXTERNAL TABLE %s
+            STORED AS KUDU
+            TBLPROPERTIES('kudu.table_name' = '%s')""" % (impala_table_name,
+                kudu_table.name))
+      except Exception as e:
+        assert "Kudu type 'unixtime_micros' is not supported in Impala" in str(e)
 
   def test_drop_external_table(self, cursor, kudu_client):
     """Check that dropping an external table only affects the catalog and does not delete
@@ -174,6 +200,11 @@ class TestCreateExternalTable(KuduTestSuite):
 
 class TestShowCreateTable(KuduTestSuite):
 
+  @classmethod
+  def get_conn_timeout(cls):
+    # For IMPALA-4454
+    return 60 * 5 # 5 minutes
+
   def assert_show_create_equals(self, cursor, create_sql, show_create_sql):
     """Executes 'create_sql' to create a table, then runs "SHOW CREATE TABLE" and checks
        that the output is the same as 'show_create_sql'. 'create_sql' and
@@ -204,15 +235,16 @@ class TestShowCreateTable(KuduTestSuite):
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT PRIMARY KEY, d STRING)
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c) SPLIT ROWS ((1), (2))
-        STORED AS KUDU""",
+        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c)
+        (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
+         PARTITION 2 < VALUES) STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
           c INT,
           d STRING,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c) SPLIT ROWS (...)
+        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
@@ -233,21 +265,23 @@ class TestShowCreateTable(KuduTestSuite):
         """
         CREATE TABLE {table} (c INT, d STRING, PRIMARY KEY(c, d))
         DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS,
-        RANGE (c, d) SPLIT ROWS ((1, 'aaa'), (2, 'bbb')) STORED AS KUDU""",
+        RANGE (c, d) (PARTITION VALUE = (1, 'aaa'), PARTITION VALUE = (2, 'bbb'))
+        STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
           c INT,
           d STRING,
           PRIMARY KEY (c, d)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS, RANGE (c, d) SPLIT ROWS (...)
+        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS, RANGE (c, d) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT, d STRING, e INT, PRIMARY KEY(c, d))
-        DISTRIBUTE BY RANGE (c) SPLIT ROWS ((1), (2), (3)) STORED AS KUDU""",
+        DISTRIBUTE BY RANGE (c) (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
+        PARTITION 2 < VALUES <= 3, PARTITION 3 < VALUES) STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
           c INT,
@@ -255,7 +289,7 @@ class TestShowCreateTable(KuduTestSuite):
           e INT,
           PRIMARY KEY (c, d)
         )
-        DISTRIBUTE BY RANGE (c) SPLIT ROWS (...)
+        DISTRIBUTE BY RANGE (c) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))

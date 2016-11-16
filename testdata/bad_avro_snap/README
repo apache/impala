@@ -1,7 +1,7 @@
-These Avro files were created by modifying Impala's HdfsAvroTableWriter.
-
 String Data
 -----------
+Created by modifying Impala's HdfsAvroTableWriter.
+
 These files' schemas have a single nullable string column 's'.
 
 negative_string_len.avro: contains two values, but the second value has a negative length.
@@ -14,6 +14,15 @@ truncated_string.avro: contains one value, which is missing the last byte.
 
 Float Data
 ----------
+Created by modifying Impala's HdfsAvroTableWriter.
+
 These files' schemas have a single nullable float column 'c1'.
 
 truncated_float.avro: contains two float values. The second is missing the last byte.
+
+Bad Schema
+----------
+Created by editing the schema of a valid Avro file with vim.
+
+invalid_decimal_schema.avro: two columns, name STRING and value DECIMAL(5,7).
+  The DECIMAL value is invalid.
