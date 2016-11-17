@@ -324,6 +324,7 @@ Status PlanFragmentExecutor::OpenInternal() {
 }
 
 Status PlanFragmentExecutor::Exec() {
+  SCOPED_TIMER(profile()->total_time_counter());
   Status status;
   {
     // Must go out of scope before FragmentComplete(), otherwise counter will not be
@@ -549,6 +550,16 @@ void PlanFragmentExecutor::Close() {
     mem_usage_sampled_counter_ = NULL;
   }
   closed_ = true;
+  // Sanity timer checks
+#ifndef NDEBUG
+  int64_t total_time = profile()->total_time_counter()->value();
+  int64_t other_time = 0;
+  for (auto& name: {PREPARE_TIMER_NAME, OPEN_TIMER_NAME, EXEC_TIMER_NAME}) {
+    RuntimeProfile::Counter* counter = timings_profile_->GetCounter(name);
+    if (counter != nullptr) other_time += counter->value();
+  }
+  DCHECK_LE(other_time, total_time);
+#endif
 }
 
 }
