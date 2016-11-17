@@ -293,11 +293,11 @@ TEST_F(SchedulerTest, TestDisableCachedReads) {
 /// behavior. Remove.
 TEST_F(SchedulerTest, EmptyStatestoreMessage) {
   Cluster cluster;
+  cluster.AddHosts(2, true, true);
   cluster.AddHosts(3, false, true);
-  cluster.AddHosts(2, true, false);
 
   Schema schema(cluster);
-  schema.AddMultiBlockTable("T1", 1, ReplicaPlacement::RANDOM, 3);
+  schema.AddMultiBlockTable("T1", 1, ReplicaPlacement::REMOTE_ONLY, 3);
 
   Plan plan(schema);
   plan.AddTableScan("T1");
@@ -307,18 +307,18 @@ TEST_F(SchedulerTest, EmptyStatestoreMessage) {
 
   scheduler.Compute(&result);
   EXPECT_EQ(0, result.NumTotalAssignedBytes(0));
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
+  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(1));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(2));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(3));
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(4));
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(4));
   result.Reset();
 
   scheduler.SendEmptyUpdate();
   scheduler.Compute(&result);
-  EXPECT_EQ(0, result.NumTotalAssignedBytes(0));
+  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(2));
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(3));
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(3));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(4));
 }
 
@@ -330,7 +330,7 @@ TEST_F(SchedulerTest, TestSendUpdates) {
   for (int i=0; i < 3; ++i) cluster.AddHost(i < 2, true);
 
   Schema schema(cluster);
-  schema.AddMultiBlockTable("T1", 1, ReplicaPlacement::RANDOM, 3);
+  schema.AddMultiBlockTable("T1", 1, ReplicaPlacement::REMOTE_ONLY, 1);
 
   Plan plan(schema);
   plan.AddTableScan("T1");
@@ -339,29 +339,31 @@ TEST_F(SchedulerTest, TestSendUpdates) {
   SchedulerWrapper scheduler(plan);
 
   scheduler.Compute(&result);
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumDiskAssignedBytes(0));
-  EXPECT_EQ(0, result.NumCachedAssignedBytes(0));
-  EXPECT_EQ(0, result.NumRemoteAssignedBytes(0));
-  EXPECT_EQ(0, result.NumDiskAssignedBytes(1));
+  // Two backends are registered, so the scheduler will pick a random one.
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(0));
+  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(1));
 
   // Remove first host from scheduler.
-  scheduler.RemoveBackend(cluster.hosts()[0]);
+  scheduler.RemoveBackend(cluster.hosts()[1]);
   result.Reset();
 
   scheduler.Compute(&result);
-  EXPECT_EQ(0, result.NumDiskAssignedBytes(0));
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumDiskAssignedBytes(1));
+  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
 
   // Re-add first host from scheduler.
-  scheduler.AddBackend(cluster.hosts()[0]);
+  scheduler.AddBackend(cluster.hosts()[1]);
   result.Reset();
 
   scheduler.Compute(&result);
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumDiskAssignedBytes(0));
-  EXPECT_EQ(0, result.NumDiskAssignedBytes(1));
+  // Two backends are registered, so the scheduler will pick a random one.
+  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
+  EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
 }
 
 /// IMPALA-4329: Test scheduling with no backends.
+/// With the fix for IMPALA-4494, the scheduler will always register its local backend
+/// with itself, so scheduling with no backends will still succeed.
 TEST_F(SchedulerTest, TestEmptyBackendConfig) {
   Cluster cluster;
   cluster.AddHost(false, true);
@@ -375,9 +377,48 @@ TEST_F(SchedulerTest, TestEmptyBackendConfig) {
   Result result(plan);
   SchedulerWrapper scheduler(plan);
   Status status = scheduler.Compute(&result);
-  EXPECT_TRUE(!status.ok());
-  EXPECT_EQ(
-      status.GetDetail(), "Cannot schedule query: no registered backends available.\n");
+  EXPECT_TRUE(status.ok());
+}
+
+/// IMPALA-4494: Test scheduling with no backends but exec_at_coord.
+TEST_F(SchedulerTest, TestExecAtCoordWithEmptyBackendConfig) {
+  Cluster cluster;
+  cluster.AddHost(false, true);
+
+  Schema schema(cluster);
+  schema.AddMultiBlockTable("T", 1, ReplicaPlacement::REMOTE_ONLY, 1);
+
+  Plan plan(schema);
+  plan.AddTableScan("T");
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+  bool exec_at_coord = true;
+  Status status = scheduler.Compute(exec_at_coord, &result);
+  EXPECT_TRUE(status.ok());
+}
+
+/// IMPALA-4494: Test exec_at_coord while local backend is not registered with itself.
+TEST_F(SchedulerTest, TestExecAtCoordWithoutLocalBackend) {
+  Cluster cluster;
+  cluster.AddHosts(3, true, true);
+
+  Schema schema(cluster);
+  schema.AddMultiBlockTable("T", 1, ReplicaPlacement::LOCAL_ONLY, 1);
+
+  Plan plan(schema);
+  plan.AddTableScan("T");
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+
+  // Remove first host from scheduler. By convention this is the coordinator. The
+  // scheduler will ignore this and successfully assign the scan.
+  scheduler.RemoveBackend(cluster.hosts()[0]);
+
+  bool exec_at_coord = true;
+  Status status = scheduler.Compute(exec_at_coord, &result);
+  EXPECT_TRUE(status.ok());
 }
 
 }  // end namespace impala

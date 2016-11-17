@@ -131,6 +131,8 @@ Status SimpleScheduler::Init() {
   local_backend_descriptor_.ip_address = ip;
   LOG(INFO) << "Simple-scheduler using " << ip << " as IP address";
 
+  coord_only_backend_config_.AddBackend(local_backend_descriptor_);
+
   if (webserver_ != NULL) {
     Webserver::UrlCallback backends_callback =
         bind<void>(mem_fn(&SimpleScheduler::BackendsUrlCallback), this, _1, _2);
@@ -198,87 +200,97 @@ void SimpleScheduler::UpdateMembership(
   StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
       incoming_topic_deltas.find(IMPALA_MEMBERSHIP_TOPIC);
 
-  if (topic != incoming_topic_deltas.end()) {
-    const TTopicDelta& delta = topic->second;
+  if (topic == incoming_topic_deltas.end()) return;
+  const TTopicDelta& delta = topic->second;
 
-    // This function needs to handle both delta and non-delta updates. To minimize the
-    // time needed to hold locks, all updates are applied to a copy of backend_config_,
-    // which is then swapped into place atomically.
-    std::shared_ptr<BackendConfig> new_backend_config;
+  // If the delta transmitted by the statestore is empty we can skip processing
+  // altogether and avoid making a copy of backend_config_.
+  if (delta.is_delta && delta.topic_entries.empty() && delta.topic_deletions.empty()) {
+    return;
+  }
 
-    if (!delta.is_delta) {
-      current_membership_.clear();
-      new_backend_config = std::make_shared<BackendConfig>();
-    } else {
-      // Make a copy
-      lock_guard<mutex> lock(backend_config_lock_);
-      new_backend_config = std::make_shared<BackendConfig>(*backend_config_);
+  // This function needs to handle both delta and non-delta updates. To minimize the
+  // time needed to hold locks, all updates are applied to a copy of backend_config_,
+  // which is then swapped into place atomically.
+  std::shared_ptr<BackendConfig> new_backend_config;
+
+  if (!delta.is_delta) {
+    current_membership_.clear();
+    new_backend_config = std::make_shared<BackendConfig>();
+  } else {
+    // Make a copy
+    lock_guard<mutex> lock(backend_config_lock_);
+    new_backend_config = std::make_shared<BackendConfig>(*backend_config_);
+  }
+
+  // Process new entries to the topic
+  for (const TTopicItem& item : delta.topic_entries) {
+    TBackendDescriptor be_desc;
+    // Benchmarks have suggested that this method can deserialize
+    // ~10m messages per second, so no immediate need to consider optimization.
+    uint32_t len = item.value.size();
+    Status status = DeserializeThriftMsg(
+        reinterpret_cast<const uint8_t*>(item.value.data()), &len, false, &be_desc);
+    if (!status.ok()) {
+      VLOG(2) << "Error deserializing membership topic item with key: " << item.key;
+      continue;
     }
-
-    // Process new entries to the topic
-    for (const TTopicItem& item: delta.topic_entries) {
-      TBackendDescriptor be_desc;
-      // Benchmarks have suggested that this method can deserialize
-      // ~10m messages per second, so no immediate need to consider optimization.
-      uint32_t len = item.value.size();
-      Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
-          item.value.data()), &len, false, &be_desc);
-      if (!status.ok()) {
-        VLOG(2) << "Error deserializing membership topic item with key: " << item.key;
-        continue;
-      }
-      if (be_desc.ip_address.empty()) {
-        // Each scheduler resolves its hostname locally in SimpleScheduler::Init() and
-        // adds the IP address to local_backend_descriptor_. If it is empty, then either
-        // that code has been changed, or someone else is sending malformed packets.
-        VLOG(1) << "Ignoring subscription request with empty IP address from subscriber: "
-            << be_desc.address;
-        continue;
-      }
-      if (item.key == local_backend_id_
-          && be_desc.address != local_backend_descriptor_.address) {
-        // Someone else has registered this subscriber ID with a different address. We
-        // will try to re-register (i.e. overwrite their subscription), but there is
-        // likely a configuration problem.
-        LOG_EVERY_N(WARNING, 30) << "Duplicate subscriber registration from address: "
-            << be_desc.address;
-      }
-
-      new_backend_config->AddBackend(be_desc);
-      current_membership_.insert(make_pair(item.key, be_desc));
+    if (be_desc.ip_address.empty()) {
+      // Each scheduler resolves its hostname locally in SimpleScheduler::Init() and
+      // adds the IP address to local_backend_descriptor_. If it is empty, then either
+      // that code has been changed, or someone else is sending malformed packets.
+      VLOG(1) << "Ignoring subscription request with empty IP address from subscriber: "
+              << be_desc.address;
+      continue;
     }
-    // Process deletions from the topic
-    for (const string& backend_id: delta.topic_deletions) {
-      if (current_membership_.find(backend_id) != current_membership_.end()) {
-        new_backend_config->RemoveBackend(current_membership_[backend_id]);
-        current_membership_.erase(backend_id);
-      }
+    if (item.key == local_backend_id_
+        && be_desc.address != local_backend_descriptor_.address) {
+      // Someone else has registered this subscriber ID with a different address. We
+      // will try to re-register (i.e. overwrite their subscription), but there is
+      // likely a configuration problem.
+      LOG_EVERY_N(WARNING, 30) << "Duplicate subscriber registration from address: "
+                               << be_desc.address;
+      continue;
     }
-    SetBackendConfig(new_backend_config);
+    new_backend_config->AddBackend(be_desc);
+    current_membership_.insert(make_pair(item.key, be_desc));
+  }
 
-    // If this impalad is not in our view of the membership list, we should add it and
-    // tell the statestore.
-    if (current_membership_.find(local_backend_id_) == current_membership_.end()) {
-      VLOG(1) << "Registering local backend with statestore";
-      subscriber_topic_updates->push_back(TTopicDelta());
-      TTopicDelta& update = subscriber_topic_updates->back();
-      update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
-      update.topic_entries.push_back(TTopicItem());
+  // Process deletions from the topic
+  for (const string& backend_id : delta.topic_deletions) {
+    if (current_membership_.find(backend_id) != current_membership_.end()) {
+      new_backend_config->RemoveBackend(current_membership_[backend_id]);
+      current_membership_.erase(backend_id);
+    }
+  }
 
-      TTopicItem& item = update.topic_entries.back();
-      item.key = local_backend_id_;
-      Status status = thrift_serializer_.Serialize(
-          &local_backend_descriptor_, &item.value);
-      if (!status.ok()) {
-        LOG(WARNING) << "Failed to serialize Impala backend address for statestore topic:"
-                     << " " << status.GetDetail();
-        subscriber_topic_updates->pop_back();
-      }
+  // If the local backend is not in our view of the membership list, we should add it
+  // and tell the statestore. We also ensure that it is part of our backend config.
+  if (current_membership_.find(local_backend_id_) == current_membership_.end()) {
+    new_backend_config->AddBackend(local_backend_descriptor_);
+    VLOG(1) << "Registering local backend with statestore";
+    subscriber_topic_updates->push_back(TTopicDelta());
+    TTopicDelta& update = subscriber_topic_updates->back();
+    update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
+    update.topic_entries.push_back(TTopicItem());
+
+    TTopicItem& item = update.topic_entries.back();
+    item.key = local_backend_id_;
+    Status status = thrift_serializer_.Serialize(&local_backend_descriptor_, &item.value);
+    if (!status.ok()) {
+      LOG(WARNING) << "Failed to serialize Impala backend address for statestore topic:"
+                   << " " << status.GetDetail();
+      subscriber_topic_updates->pop_back();
     }
-    if (metrics_ != NULL) {
-      /// TODO-MT: fix this (do we even need to report it?)
-      num_fragment_instances_metric_->set_value(current_membership_.size());
-    }
+  }
+
+  DCHECK(new_backend_config->LookUpBackendIp(
+      local_backend_descriptor_.address.hostname, nullptr));
+  SetBackendConfig(new_backend_config);
+
+  if (metrics_ != NULL) {
+    /// TODO-MT: fix this (do we even need to report it?)
+    num_fragment_instances_metric_->set_value(current_membership_.size());
   }
 }
 
@@ -565,7 +577,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     const vector<TNetworkAddress>& host_list, bool exec_at_coord,
     const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
     FragmentScanRangeAssignment* assignment) {
-  if (backend_config.NumBackends() == 0) {
+  if (backend_config.NumBackends() == 0 && !exec_at_coord) {
     return Status(TErrorCode::NO_REGISTERED_BACKENDS);
   }
 
@@ -589,7 +601,8 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
   // random rank.
   bool random_replica = query_options.schedule_random_replica || node_random_replica;
 
-  AssignmentCtx assignment_ctx(backend_config, total_assignments_,
+  AssignmentCtx assignment_ctx(
+      exec_at_coord ? coord_only_backend_config_ : backend_config, total_assignments_,
       total_local_assignments_);
 
   vector<const TScanRangeLocationList*> remote_scan_range_locations;
@@ -601,6 +614,8 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
 
     // Select backend host for the current scan range.
     if (exec_at_coord) {
+      DCHECK(assignment_ctx.backend_config().LookUpBackendIp(
+          local_backend_descriptor_.address.hostname, nullptr));
       assignment_ctx.RecordScanRangeAssignment(local_backend_descriptor_, node_id,
           host_list, scan_range_locations, assignment);
     } else {
@@ -672,6 +687,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
 
   // Assign remote scans to backends.
   for (const TScanRangeLocationList* scan_range_locations: remote_scan_range_locations) {
+    DCHECK(!exec_at_coord);
     const IpAddr* backend_ip = assignment_ctx.SelectRemoteBackendHost();
     TBackendDescriptor backend;
     assignment_ctx.SelectBackendOnHost(*backend_ip, &backend);
@@ -903,7 +919,7 @@ void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
   }
 
   IpAddr backend_ip;
-  backend_config_.LookUpBackendIp(backend.address.hostname, &backend_ip);
+  DCHECK(backend_config_.LookUpBackendIp(backend.address.hostname, &backend_ip));
   DCHECK(!backend_ip.empty());
   assignment_heap_.InsertOrUpdate(backend_ip, scan_range_length,
       GetBackendRank(backend_ip));
