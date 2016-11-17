@@ -39,25 +39,23 @@ import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
-import org.apache.impala.catalog.StructField;
-import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.TDescribeTableParams;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.ColumnSchema.Encoding;
+import org.junit.Assert;
 import org.junit.Test;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-
-import junit.framework.Assert;
 
 public class AnalyzeDDLTest extends FrontendTestBase {
 
@@ -3090,14 +3088,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Single element path can only be resolved as <table>.
     DescribeTableStmt describe = (DescribeTableStmt)AnalyzesOk("describe ambig",
         createAnalyzer("ambig"));
-    Assert.assertEquals("ambig", describe.toThrift().db);
-    Assert.assertEquals("ambig", describe.toThrift().table_name, "ambig");
-    StructType colStructType = new StructType(Lists.newArrayList(
-        new StructField("ambig", new ArrayType(Type.INT))));
-    StructType tableStructType = new StructType(Lists.newArrayList(
-        new StructField("ambig", colStructType)));
-    Assert.assertEquals(tableStructType.toSql(),
-        Type.fromThrift(describe.toThrift().result_struct).toSql());
+    TDescribeTableParams tdesc = (TDescribeTableParams) describe.toThrift();
+    Assert.assertTrue(tdesc.isSetTable_name());
+    Assert.assertEquals("ambig", tdesc.table_name.getDb_name());
+    Assert.assertEquals("ambig", tdesc.table_name.getTable_name(), "ambig");
+    Assert.assertFalse(tdesc.isSetResult_struct());
 
     // Path could be resolved as either <db>.<table> or <table>.<complex field>
     AnalysisError("describe ambig.ambig", createAnalyzer("ambig"),
@@ -3106,8 +3101,13 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("describe ambig.ambig.ambig", createAnalyzer("ambig"),
         "Path is ambiguous: 'ambig.ambig.ambig'");
     // 4 element path can only be resolved to nested array.
-    AnalyzesOk("describe ambig.ambig.ambig.ambig", createAnalyzer("ambig"));
-
+    describe = (DescribeTableStmt) AnalyzesOk(
+        "describe ambig.ambig.ambig.ambig", createAnalyzer("ambig"));
+    tdesc = (TDescribeTableParams) describe.toThrift();
+    Type expectedType =
+        org.apache.impala.analysis.Path.getTypeAsStruct(new ArrayType(Type.INT));
+    Assert.assertTrue(tdesc.isSetResult_struct());
+    Assert.assertEquals(expectedType, Type.fromThrift(tdesc.getResult_struct()));
   }
 
   @Test

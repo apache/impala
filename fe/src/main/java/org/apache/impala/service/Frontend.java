@@ -20,13 +20,11 @@ package org.apache.impala.service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -35,22 +33,18 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.impala.catalog.KuduTable;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetFunctionsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.AnalysisContext;
-import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
 import org.apache.impala.analysis.CreateUdaStmt;
 import org.apache.impala.analysis.CreateUdfStmt;
+import org.apache.impala.analysis.DescribeTableStmt;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.DropDataSrcStmt;
 import org.apache.impala.analysis.DropFunctionStmt;
@@ -66,7 +60,6 @@ import org.apache.impala.analysis.ShowGrantRoleStmt;
 import org.apache.impala.analysis.ShowRolesStmt;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TruncateStmt;
-import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
@@ -85,7 +78,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog;
-import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -93,7 +86,6 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
@@ -101,7 +93,6 @@ import org.apache.impala.thrift.TCatalogOpRequest;
 import org.apache.impala.thrift.TCatalogOpType;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumn;
-import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecRequest;
@@ -110,7 +101,6 @@ import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TExecRequest;
-import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExplainResult;
 import org.apache.impala.thrift.TFinalizeParams;
 import org.apache.impala.thrift.TFunctionCategory;
@@ -122,7 +112,6 @@ import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
-import org.apache.impala.thrift.TPlanFragmentTree;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TResetMetadataRequest;
@@ -141,11 +130,13 @@ import org.apache.impala.util.MembershipSnapshot;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.impala.util.TSessionStateUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -319,11 +310,22 @@ public class Frontend {
           new TColumn("comment", Type.STRING.toThrift())));
     } else if (analysis.isDescribeTableStmt()) {
       ddl.op_type = TCatalogOpType.DESCRIBE_TABLE;
-      ddl.setDescribe_table_params(analysis.getDescribeTableStmt().toThrift());
-      metadata.setColumns(Arrays.asList(
+      DescribeTableStmt descStmt = analysis.getDescribeTableStmt();
+      ddl.setDescribe_table_params(descStmt.toThrift());
+      List<TColumn> columns = Lists.newArrayList(
           new TColumn("name", Type.STRING.toThrift()),
           new TColumn("type", Type.STRING.toThrift()),
-          new TColumn("comment", Type.STRING.toThrift())));
+          new TColumn("comment", Type.STRING.toThrift()));
+      if (descStmt.getTable() instanceof KuduTable
+          && descStmt.getOutputStyle() == TDescribeOutputStyle.MINIMAL) {
+        columns.add(new TColumn("primary_key", Type.STRING.toThrift()));
+        columns.add(new TColumn("nullable", Type.STRING.toThrift()));
+        columns.add(new TColumn("default_value", Type.STRING.toThrift()));
+        columns.add(new TColumn("encoding", Type.STRING.toThrift()));
+        columns.add(new TColumn("compression", Type.STRING.toThrift()));
+        columns.add(new TColumn("block_size", Type.STRING.toThrift()));
+      }
+      metadata.setColumns(columns);
     } else if (analysis.isAlterTableStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -773,16 +775,14 @@ public class Frontend {
    * Throws an exception if the table or db is not found or if there is an error loading
    * the table metadata.
    */
-  public TDescribeResult describeTable(String dbName, String tableName,
-      TDescribeOutputStyle outputStyle, TColumnType tResultStruct)
-          throws ImpalaException {
+  public TDescribeResult describeTable(TTableName tableName,
+      TDescribeOutputStyle outputStyle) throws ImpalaException {
+    Table table = impaladCatalog_.getTable(tableName.db_name, tableName.table_name);
     if (outputStyle == TDescribeOutputStyle.MINIMAL) {
-      StructType resultStruct = (StructType)Type.fromThrift(tResultStruct);
-      return DescribeResultFactory.buildDescribeMinimalResult(resultStruct);
+      return DescribeResultFactory.buildDescribeMinimalResult(table);
     } else {
       Preconditions.checkArgument(outputStyle == TDescribeOutputStyle.FORMATTED ||
           outputStyle == TDescribeOutputStyle.EXTENDED);
-      Table table = impaladCatalog_.getTable(dbName, tableName);
       return DescribeResultFactory.buildDescribeFormattedResult(table);
     }
   }

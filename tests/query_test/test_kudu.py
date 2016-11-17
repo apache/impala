@@ -64,6 +64,9 @@ class TestKuduOperations(KuduTestSuite):
   def test_kudu_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_stats', vector, use_db=unique_database)
 
+  def test_kudu_describe(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_describe', vector, use_db=unique_database)
+
   def test_kudu_column_options(self, cursor, kudu_client, unique_database):
     encodings = ["ENCODING PLAIN_ENCODING", ""]
     compressions = ["COMPRESSION SNAPPY", ""]
@@ -120,7 +123,7 @@ class TestCreateExternalTable(KuduTestSuite):
       with self.drop_impala_table_after_context(cursor, impala_table_name):
         cursor.execute("DESCRIBE %s" % impala_table_name)
         kudu_schema = kudu_table.schema
-        for i, (col_name, col_type, _) in enumerate(cursor):
+        for i, (col_name, col_type, _, _, _, _, _, _, _) in enumerate(cursor):
           kudu_col = kudu_schema[i]
           assert col_name == kudu_col.name
           assert col_type.upper() == \
@@ -199,7 +202,9 @@ class TestCreateExternalTable(KuduTestSuite):
                 impala_table_name, preferred_kudu_table.name))
         with self.drop_impala_table_after_context(cursor, impala_table_name):
           cursor.execute("DESCRIBE %s" % impala_table_name)
-          assert cursor.fetchall() == [("a", "bigint", "")]
+          assert cursor.fetchall() == \
+              [("a", "bigint", "", "true", "false", "", "AUTO_ENCODING",
+                "DEFAULT_COMPRESSION", "0")]
 
   def test_explicit_name_doesnt_exist(self, cursor, kudu_client):
     kudu_table_name = self.random_table_name()
@@ -432,7 +437,9 @@ class TestImpalaKuduIntegration(KuduTestSuite):
       cursor.execute("CREATE EXTERNAL TABLE %s STORED AS KUDU %s" % (
           impala_table_name, props))
       cursor.execute("DESCRIBE %s" % (impala_table_name))
-      assert cursor.fetchall() == [("a", "int", "")]
+      assert cursor.fetchall() == \
+          [("a", "int", "", "true", "false", "", "AUTO_ENCODING",
+            "DEFAULT_COMPRESSION", "0")]
 
       # Drop the underlying Kudu table and replace it with another Kudu table that has
       # the same name but different schema
@@ -448,7 +455,11 @@ class TestImpalaKuduIntegration(KuduTestSuite):
         # Kudu.
         cursor.execute("REFRESH %s" % (impala_table_name))
         cursor.execute("DESCRIBE %s" % (impala_table_name))
-        assert cursor.fetchall() == [("b", "string", ""), ("c", "string", "")]
+        assert cursor.fetchall() == \
+            [("b", "string", "", "true", "false", "", "AUTO_ENCODING",
+              "DEFAULT_COMPRESSION", "0"),
+             ("c", "string", "", "false", "true", "", "AUTO_ENCODING",
+              "DEFAULT_COMPRESSION", "0")]
 
   def test_delete_external_kudu_table(self, cursor, kudu_client):
     """Check that Impala can recover from the case where the underlying Kudu table of
@@ -462,7 +473,9 @@ class TestImpalaKuduIntegration(KuduTestSuite):
       cursor.execute("CREATE EXTERNAL TABLE %s STORED AS KUDU %s" % (
           impala_table_name, props))
       cursor.execute("DESCRIBE %s" % (impala_table_name))
-      assert cursor.fetchall() == [("a", "int", "")]
+      assert cursor.fetchall() == \
+          [("a", "int", "", "true", "false", "", "AUTO_ENCODING",
+            "DEFAULT_COMPRESSION", "0")]
       # Drop the underlying Kudu table
       kudu_client.delete_table(kudu_table.name)
       assert not kudu_client.table_exists(kudu_table.name)

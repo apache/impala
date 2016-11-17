@@ -22,10 +22,10 @@ INT,STRING,STRING,STRING,INT
 compute stats simple;
 describe simple;
 ---- RESULTS
-'id','int',''
-'name','string',''
-'valf','float',''
-'vali','bigint',''
+'id','int','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'name','string','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'valf','float','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'vali','bigint','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 ---- TYPES
-STRING,STRING,STRING
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====

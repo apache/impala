@@ -42,15 +42,18 @@ import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Role;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
-import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TBuildTestDescriptorTableParams;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDescribeDbParams;
+import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TDescribeTableParams;
 import org.apache.impala.thrift.TDescriptorTable;
@@ -82,7 +85,6 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateMembershipRequest;
-import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TSessionStateUtil;
@@ -447,9 +449,15 @@ public class JniFrontend {
     TDescribeTableParams params = new TDescribeTableParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftDescribeTableParams);
 
-    TDescribeResult result = frontend_.describeTable(
-        params.getDb(), params.getTable_name(), params.getOutput_style(),
-        params.getResult_struct());
+    Preconditions.checkState(params.isSetTable_name() ^ params.isSetResult_struct());
+    TDescribeResult result = null;
+    if (params.isSetTable_name()) {
+      result = frontend_.describeTable(params.getTable_name(), params.output_style);
+    } else {
+      Preconditions.checkState(params.output_style == TDescribeOutputStyle.MINIMAL);
+      StructType structType = (StructType)Type.fromThrift(params.result_struct);
+      result = DescribeResultFactory.buildDescribeMinimalResult(structType);
+    }
 
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
