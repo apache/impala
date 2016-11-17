@@ -375,14 +375,7 @@ public class ColumnLineageGraph {
       queryStr_ = queryCtx.request.stmt;
     }
     Preconditions.checkNotNull(queryStr_);
-    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    try {
-      timestamp_ = df.parse(queryCtx.now_string).getTime() / 1000;
-    } catch (java.text.ParseException e) {
-      LOG.error("Error parsing timestamp value: " + queryCtx.now_string +
-          " " + e.getMessage());
-      timestamp_ = new Date().getTime() / 1000;
-    }
+    timestamp_ = queryCtx.start_unix_millis / 1000;
     descTbl_ = analyzer.getDescTbl();
     user_ = analyzer.getUser().getName();
   }

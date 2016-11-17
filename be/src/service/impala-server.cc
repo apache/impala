@@ -375,10 +375,9 @@ Status ImpalaServer::LogLineageRecord(const QueryExecState& query_exec_state) {
   } else {
     return Status::OK();
   }
-  // Set the query end time in TLineageGraph
-  time_t utc_end_time;
-  query_exec_state.end_time().ToUnixTimeInUTC(&utc_end_time);
-  lineage_graph.__set_ended(utc_end_time);
+  // Set the query end time in TLineageGraph. Must use UNIX time directly rather than
+  // e.g. converting from query_exec_state.end_time() (IMPALA-4440).
+  lineage_graph.__set_ended(UnixMillis() / 1000);
   string lineage_record;
   LineageUtil::TLineageToJSON(lineage_graph, &lineage_record);
   const Status& status = lineage_logger_->AppendEntry(lineage_record);
@@ -836,6 +835,7 @@ Status ImpalaServer::ExecuteInternal(
 void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
   query_ctx->__set_pid(getpid());
   query_ctx->__set_now_string(TimestampValue::LocalTime().DebugString());
+  query_ctx->__set_start_unix_millis(UnixMillis());
   query_ctx->__set_coord_address(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
 
   // Creating a random_generator every time is not free, but

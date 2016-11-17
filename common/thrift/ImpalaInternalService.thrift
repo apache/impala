@@ -311,6 +311,9 @@ struct TQueryCtx {
   // Contains only the union of those descriptors referenced by list of fragments destined
   // for a single host. Optional for frontend tests.
   12: optional Descriptors.TDescriptorTable desc_tbl
+
+  // Milliseconds since UNIX epoch at the start of query execution.
+  13: required i64 start_unix_millis
 }
 
 // Context to collect information, which is shared among all instances of that plan

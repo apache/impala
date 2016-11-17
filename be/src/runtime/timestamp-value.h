@@ -84,11 +84,6 @@ class TimestampValue {
   /// Unix time (seconds since 1970-01-01 UTC by definition) constructors.
   /// Conversion to local time will be done if
   /// FLAGS_use_local_tz_for_unix_timestamp_conversions is true.
-  template <typename Number>
-  explicit TimestampValue(Number unix_time) {
-    *this = UnixTimeToPtime(unix_time);
-  }
-
   TimestampValue(int64_t unix_time, int64_t nanos) {
     boost::posix_time::ptime temp = UnixTimeToPtime(unix_time);
     temp += boost::posix_time::nanoseconds(nanos);
@@ -168,19 +163,6 @@ class TimestampValue {
     } else {
       *unix_time = timegm(&temp_tm);
     }
-    return true;
-  }
-
-  /// Converts to Unix time (seconds since the Unix epoch) in UTC corresponding to this
-  /// Timestamp instance.
-  /// Returns false if the conversion failed (utc_time will be undefined), otherwise
-  /// true.
-  bool ToUnixTimeInUTC(time_t* utc_time) const {
-    DCHECK(utc_time != NULL);
-    if (UNLIKELY(!HasDateAndTime())) return false;
-    const boost::posix_time::ptime temp(date_, time_);
-    tm temp_tm = boost::posix_time::to_tm(temp);
-    *utc_time = mktime(&temp_tm);
     return true;
   }
 

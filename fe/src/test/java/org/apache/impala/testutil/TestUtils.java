@@ -256,6 +256,7 @@ public class TestUtils {
         defaultDb, user, new TNetworkAddress("localhost", 0)));
     SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
     queryCtx.setNow_string(formatter.format(Calendar.getInstance().getTime()));
+    queryCtx.setStart_unix_millis(System.currentTimeMillis());
     queryCtx.setPid(1000);
     return queryCtx;
   }
