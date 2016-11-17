@@ -1402,3 +1402,32 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-4490: Only generate runtime filters for hash join nodes, even if there is an
+# otherwise suitable equality predicate.
+select 1 from functional.alltypes a
+inner join functional.alltypes b
+  on a.id = b.id
+left outer join functional.alltypes c
+  on b.id is distinct from c.id
+where b.int_col + b.bigint_col = c.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+04:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  join predicates: b.id IS DISTINCT FROM c.id
+|  predicates: b.int_col + b.bigint_col = c.int_col
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = a.id
+|  runtime filters: RF000 <- a.id
+|
+|--00:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|
+01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> b.id
+====
