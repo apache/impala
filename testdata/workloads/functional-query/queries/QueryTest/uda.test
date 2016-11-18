@@ -69,3 +69,22 @@ from functional.alltypesagg
 ---- TYPES
 bigint,bigint
 ====
+---- QUERY
+# Test that all types are exposed via the FunctionContext correctly.
+# This relies on asserts in the UDA funciton
+select agg_intermediate(int_col), count(*)
+from functional.alltypesagg
+---- RESULTS
+NULL,11000
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+# Test that all types are exposed via the FunctionContext correctly.
+# This relies on asserts in the UDA funciton
+select agg_decimal_intermediate(cast(d1 as decimal(2,1)), 2), count(*)
+from functional.decimal_tbl
+---- RESULTS
+NULL,5
+---- TYPES
+decimal,bigint

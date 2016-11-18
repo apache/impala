@@ -93,6 +93,16 @@ update_fn='ToggleNullUpdate' merge_fn='ToggleNullMerge';
 create aggregate function {database}.count_nulls(bigint)
 returns bigint location '{location}'
 update_fn='CountNullsUpdate' merge_fn='CountNullsMerge';
+
+create aggregate function {database}.agg_intermediate(int)
+returns bigint intermediate string location '{location}'
+init_fn='AggIntermediateInit' update_fn='AggIntermediateUpdate'
+merge_fn='AggIntermediateMerge' finalize_fn='AggIntermediateFinalize';
+
+create aggregate function {database}.agg_decimal_intermediate(decimal(2,1), int)
+returns decimal(6,5) intermediate decimal(4,3) location '{location}'
+init_fn='AggDecimalIntermediateInit' update_fn='AggDecimalIntermediateUpdate'
+merge_fn='AggDecimalIntermediateMerge' finalize_fn='AggDecimalIntermediateFinalize';
 """
 
   # Create test UDF functions in {database} from library {location}

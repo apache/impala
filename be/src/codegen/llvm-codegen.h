@@ -294,6 +294,23 @@ class LlvmCodeGen {
   /// functions.
   Status FinalizeModule();
 
+  /// Loads a native or IR function 'fn' with symbol 'symbol' from the builtins or
+  /// an external library and puts the result in *llvm_fn. *llvm_fn can be safely
+  /// modified in place, because it is either newly generated or cloned. The caller must
+  /// call FinalizeFunction() on 'llvm_fn' once it is done modifying it. The function has
+  /// return type 'return_type' (void if 'return_type' is NULL) and input argument types
+  /// 'arg_types'. The first 'num_fixed_args' arguments are fixed arguments, and the
+  /// remaining arguments are varargs. 'has_varargs' indicates whether the function
+  /// accepts varargs. If 'has_varargs' is true, there must be at least one vararg. If
+  /// the function is loaded from a library, 'cache_entry' is updated to point to the
+  /// library containing the function. If 'cache_entry' is set to a non-NULL value by
+  /// this function, the caller must call LibCache::DecrementUseCount() on it when done
+  /// using the function.
+  Status LoadFunction(const TFunction& fn, const std::string& symbol,
+      const ColumnType* return_type, const std::vector<ColumnType>& arg_types,
+      int num_fixed_args, bool has_varargs, llvm::Function** llvm_fn,
+      LibCacheEntry** cache_entry);
+
   /// Replaces all instructions in 'caller' that call 'target_name' with a call
   /// instruction to 'new_fn'. Returns the number of call sites updated.
   ///
@@ -485,10 +502,6 @@ class LlvmCodeGen {
   llvm::Value* CodegenArrayAt(
       LlvmBuilder*, llvm::Value* array, int idx, const char* name = "");
 
-  /// Loads a module at 'file' and links it to the module associated with
-  /// this LlvmCodeGen object. The module must be on the local filesystem.
-  Status LinkModule(const std::string& file);
-
   /// If there are more than this number of expr trees (or functions that evaluate
   /// expressions), avoid inlining avoid inlining for the exprs exceeding this threshold.
   static const int CODEGEN_INLINE_EXPRS_THRESHOLD = 100;
@@ -537,6 +550,10 @@ class LlvmCodeGen {
   /// the function and its callees recursively.
   Status LoadModuleFromMemory(std::unique_ptr<llvm::MemoryBuffer> module_ir_buf,
       std::string module_name, std::unique_ptr<llvm::Module>* module);
+
+  /// Loads a module at 'file' and links it to the module associated with
+  /// this LlvmCodeGen object. The module must be on the local filesystem.
+  Status LinkModule(const std::string& file);
 
   /// Strip global constructors and destructors from an LLVM module. We never run them
   /// anyway (they must be explicitly invoked) so it is dead code.

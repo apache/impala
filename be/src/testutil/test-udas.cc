@@ -17,6 +17,9 @@
 
 #include "testutil/test-udas.h"
 
+#include <assert.h>
+
+// Don't include Impala internal headers - real UDAs won't include them.
 #include <udf/udf.h>
 
 using namespace impala_udf;
@@ -48,17 +51,93 @@ void Agg(FunctionContext*, const StringVal&, const DoubleVal&, StringVal*) {}
 void AggInit(FunctionContext*, StringVal*){}
 void AggMerge(FunctionContext*, const StringVal&, StringVal*) {}
 StringVal AggSerialize(FunctionContext*, const StringVal& v) { return v;}
-StringVal AggFinalize(FunctionContext*, const StringVal& v) { return v;}
+StringVal AggFinalize(FunctionContext*, const StringVal& v) {
+  return v;
+}
 
-
-// Defines AggIntermediate(int) returns BIGINT intermediate CHAR(10)
-// TODO: StringVal should be replaced with BufferVal in Impala 2.0
-void AggIntermediate(FunctionContext*, const IntVal&, StringVal*) {}
-void AggIntermediateUpdate(FunctionContext*, const IntVal&, StringVal*) {}
-void AggIntermediateInit(FunctionContext*, StringVal*) {}
-void AggIntermediateMerge(FunctionContext*, const StringVal&, StringVal*) {}
-BigIntVal AggIntermediateFinalize(FunctionContext*, const StringVal&) {
+// Defines AggIntermediate(int) returns BIGINT intermediate STRING
+void AggIntermediate(FunctionContext* context, const IntVal&, StringVal*) {}
+void AggIntermediateUpdate(FunctionContext* context, const IntVal&, StringVal*) {
+  assert(context->GetNumArgs() == 1);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_INT);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_STRING);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_BIGINT);
+}
+void AggIntermediateInit(FunctionContext* context, StringVal*) {
+  assert(context->GetNumArgs() == 1);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_INT);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_STRING);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_BIGINT);
+}
+void AggIntermediateMerge(FunctionContext* context, const StringVal&, StringVal*) {
+  assert(context->GetNumArgs() == 1);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_INT);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_STRING);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_BIGINT);
+}
+BigIntVal AggIntermediateFinalize(FunctionContext* context, const StringVal&) {
+  assert(context->GetNumArgs() == 1);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_INT);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_STRING);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_BIGINT);
   return BigIntVal::null();
+}
+
+// Defines AggDecimalIntermediate(DECIMAL(1,2), INT) returns DECIMAL(5,6)
+// intermediate DECIMAL(3,4)
+// Useful to test that type parameters are plumbed through.
+void AggDecimalIntermediateUpdate(FunctionContext* context, const DecimalVal&, const IntVal&, DecimalVal*) {
+  assert(context->GetNumArgs() == 2);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetArgType(0)->precision == 2);
+  assert(context->GetArgType(0)->scale == 1);
+  assert(context->GetArgType(1)->type == FunctionContext::TYPE_INT);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetIntermediateType().precision == 4);
+  assert(context->GetIntermediateType().scale == 3);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetReturnType().precision == 6);
+  assert(context->GetReturnType().scale == 5);
+}
+void AggDecimalIntermediateInit(FunctionContext* context, DecimalVal*) {
+  assert(context->GetNumArgs() == 2);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetArgType(0)->precision == 2);
+  assert(context->GetArgType(0)->scale == 1);
+  assert(context->GetArgType(1)->type == FunctionContext::TYPE_INT);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetIntermediateType().precision == 4);
+  assert(context->GetIntermediateType().scale == 3);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetReturnType().precision == 6);
+  assert(context->GetReturnType().scale == 5);
+}
+void AggDecimalIntermediateMerge(FunctionContext* context, const DecimalVal&, DecimalVal*) {
+  assert(context->GetNumArgs() == 2);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetArgType(0)->precision == 2);
+  assert(context->GetArgType(0)->scale == 1);
+  assert(context->GetArgType(1)->type == FunctionContext::TYPE_INT);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetIntermediateType().precision == 4);
+  assert(context->GetIntermediateType().scale == 3);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetReturnType().precision == 6);
+  assert(context->GetReturnType().scale == 5);
+}
+DecimalVal AggDecimalIntermediateFinalize(FunctionContext* context, const DecimalVal&) {
+  assert(context->GetNumArgs() == 2);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetArgType(0)->precision == 2);
+  assert(context->GetArgType(0)->scale == 1);
+  assert(context->GetArgType(1)->type == FunctionContext::TYPE_INT);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetIntermediateType().precision == 4);
+  assert(context->GetIntermediateType().scale == 3);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_DECIMAL);
+  assert(context->GetReturnType().precision == 6);
+  assert(context->GetReturnType().scale == 5);
+  return DecimalVal::null();
 }
 
 // Defines MemTest(bigint) return bigint
@@ -99,22 +178,57 @@ BigIntVal MemTestFinalize(FunctionContext* context, const BigIntVal& total) {
 // Defines aggregate function for testing different intermediate/output types that
 // computes the truncated bigint sum of many floats.
 void TruncSumInit(FunctionContext* context, DoubleVal* total) {
+  // Arg types should be logical input types of UDA.
+  assert(context->GetNumArgs() == 1);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_DOUBLE);
+  assert(context->GetArgType(-1) == nullptr);
+  assert(context->GetArgType(1) == nullptr);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_DOUBLE);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_BIGINT);
   *total = DoubleVal(0);
 }
 
 void TruncSumUpdate(FunctionContext* context, const DoubleVal& val, DoubleVal* total) {
+  // Arg types should be logical input types of UDA.
+  assert(context->GetNumArgs() == 1);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_DOUBLE);
+  assert(context->GetArgType(-1) == nullptr);
+  assert(context->GetArgType(1) == nullptr);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_DOUBLE);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_BIGINT);
   total->val += val.val;
 }
 
 void TruncSumMerge(FunctionContext* context, const DoubleVal& src, DoubleVal* dst) {
+  // Arg types should be logical input types of UDA.
+  assert(context->GetNumArgs() == 1);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_DOUBLE);
+  assert(context->GetArgType(-1) == nullptr);
+  assert(context->GetArgType(1) == nullptr);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_DOUBLE);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_BIGINT);
   dst->val += src.val;
 }
 
 const DoubleVal TruncSumSerialize(FunctionContext* context, const DoubleVal& total) {
+  // Arg types should be logical input types of UDA.
+  assert(context->GetNumArgs() == 1);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_DOUBLE);
+  assert(context->GetArgType(-1) == nullptr);
+  assert(context->GetArgType(1) == nullptr);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_DOUBLE);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_BIGINT);
   return total;
 }
 
 BigIntVal TruncSumFinalize(FunctionContext* context, const DoubleVal& total) {
+  // Arg types should be logical input types of UDA.
+  assert(context->GetNumArgs() == 1);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_DOUBLE);
+  assert(context->GetArgType(-1) == nullptr);
+  assert(context->GetArgType(1) == nullptr);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_DOUBLE);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_BIGINT);
   return BigIntVal(static_cast<int64_t>(total.val));
 }
 

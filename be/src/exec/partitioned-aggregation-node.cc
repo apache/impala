@@ -1721,22 +1721,8 @@ Status PartitionedAggregationNode::CodegenCallUda(LlvmCodeGen* codegen,
     const vector<CodegenAnyVal>& input_vals, const CodegenAnyVal& dst,
     CodegenAnyVal* updated_dst_val) {
   DCHECK_EQ(evaluator->input_expr_ctxs().size(), input_vals.size());
-  const string& symbol =
-      evaluator->is_merge() ? evaluator->merge_symbol() : evaluator->update_symbol();
-  const ColumnType& dst_type = evaluator->intermediate_type();
-
-  // TODO: to support actual UDAs, not just builtin functions using the UDA interface,
-  // we need to load the function at this point.
-  Function* uda_fn = codegen->GetFunction(symbol, true);
-  DCHECK(uda_fn != NULL);
-
-  vector<FunctionContext::TypeDesc> arg_types;
-  for (int i = 0; i < evaluator->input_expr_ctxs().size(); ++i) {
-    arg_types.push_back(AnyValUtil::ColumnTypeToTypeDesc(
-        evaluator->input_expr_ctxs()[i]->root()->type()));
-  }
-  Expr::InlineConstants(
-      AnyValUtil::ColumnTypeToTypeDesc(dst_type), arg_types, codegen, uda_fn);
+  Function* uda_fn;
+  RETURN_IF_ERROR(evaluator->GetUpdateOrMergeFunction(codegen, &uda_fn));
 
   // Set up arguments for call to UDA, which are the FunctionContext*, followed by
   // pointers to all input values, followed by a pointer to the destination value.
@@ -1753,6 +1739,7 @@ Status PartitionedAggregationNode::CodegenCallUda(LlvmCodeGen* codegen,
   // Create pointer to dst to pass to uda_fn. We must use the unlowered type for the
   // same reason as above.
   Value* dst_lowered_ptr = dst.GetLoweredPtr("dst_lowered_ptr");
+  const ColumnType& dst_type = evaluator->intermediate_type();
   Type* dst_unlowered_ptr_type = CodegenAnyVal::GetUnloweredPtrType(codegen, dst_type);
   Value* dst_unlowered_ptr = builder->CreateBitCast(
       dst_lowered_ptr, dst_unlowered_ptr_type, "dst_unlowered_ptr");
@@ -1823,13 +1810,6 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
   if (intermediate_tuple_desc_->GetLlvmStruct(codegen) == NULL) {
     return Status("PartitionedAggregationNode::CodegenUpdateTuple(): failed to generate "
                   "intermediate tuple desc");
-  }
-
-  for (AggFnEvaluator* evaluator : aggregate_evaluators_) {
-    // Don't codegen things that aren't builtins (for now)
-    if (!evaluator->is_builtin()) {
-      return Status("PartitionedAggregationNode::CodegenUpdateTuple(): UDA codegen NYI");
-    }
   }
 
   // Get the types to match the UpdateTuple signature

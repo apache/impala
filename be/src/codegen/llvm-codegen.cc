@@ -70,6 +70,7 @@
 #include "util/hdfs-util.h"
 #include "util/path-builder.h"
 #include "util/runtime-profile-counters.h"
+#include "util/symbols-util.h"
 #include "util/test-info.h"
 
 #include "common/names.h"
@@ -766,8 +767,116 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
   return fn;
 }
 
-int LlvmCodeGen::ReplaceCallSites(Function* caller, Function* new_fn,
-    const string& target_name) {
+Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
+    const ColumnType* return_type, const std::vector<ColumnType>& arg_types,
+    int num_fixed_args, bool has_varargs, Function** llvm_fn,
+    LibCacheEntry** cache_entry) {
+  DCHECK_GE(arg_types.size(), num_fixed_args);
+  DCHECK(has_varargs || arg_types.size() == num_fixed_args);
+  DCHECK(!has_varargs || arg_types.size() > num_fixed_args);
+  // from_utc_timestamp() and to_utc_timestamp() have inline ASM that cannot be JIT'd.
+  // TimestampFunctions::AddSub() contains a try/catch which doesn't work in JIT'd
+  // code. Always use the interpreted version of these functions.
+  // TODO: fix these built-in functions so we don't need 'broken_builtin' below.
+  bool broken_builtin = fn.name.function_name == "from_utc_timestamp"
+      || fn.name.function_name == "to_utc_timestamp"
+      || symbol.find("AddSub") != string::npos;
+  if (fn.binary_type == TFunctionBinaryType::NATIVE
+      || (fn.binary_type == TFunctionBinaryType::BUILTIN && broken_builtin)) {
+    // In this path, we are calling a precompiled native function, either a UDF
+    // in a .so or a builtin using the UDF interface.
+    void* fn_ptr;
+    Status status = LibCache::instance()->GetSoFunctionPtr(
+        fn.hdfs_location, symbol, &fn_ptr, cache_entry);
+    if (!status.ok() && fn.binary_type == TFunctionBinaryType::BUILTIN) {
+      // Builtins symbols should exist unless there is a version mismatch.
+      status.AddDetail(
+          ErrorMsg(TErrorCode::MISSING_BUILTIN, fn.name.function_name, symbol).msg());
+    }
+    RETURN_IF_ERROR(status);
+    DCHECK(fn_ptr != NULL);
+
+    // Per the x64 ABI, DecimalVals are returned via a DecimalVal* output argument.
+    // So, the return type is void.
+    bool is_decimal = return_type != NULL && return_type->type == TYPE_DECIMAL;
+    Type* llvm_return_type = return_type == NULL || is_decimal ?
+        void_type() :
+        CodegenAnyVal::GetLoweredType(this, *return_type);
+
+    // Convert UDF function pointer to Function*. Start by creating a function
+    // prototype for it.
+    FnPrototype prototype(this, symbol, llvm_return_type);
+
+    if (is_decimal) {
+      // Per the x64 ABI, DecimalVals are returned via a DecmialVal* output argument
+      Type* output_type = CodegenAnyVal::GetUnloweredPtrType(this, *return_type);
+      prototype.AddArgument("output", output_type);
+    }
+
+    // The "FunctionContext*" argument.
+    prototype.AddArgument("ctx", GetPtrType("class.impala_udf::FunctionContext"));
+
+    // The "fixed" arguments for the UDF function, followed by the variable arguments,
+    // if any.
+    for (int i = 0; i < num_fixed_args; ++i) {
+      Type* arg_type = CodegenAnyVal::GetUnloweredPtrType(this, arg_types[i]);
+      prototype.AddArgument(Substitute("fixed_arg_$0", i), arg_type);
+    }
+
+    if (has_varargs) {
+      prototype.AddArgument("num_var_arg", GetType(TYPE_INT));
+      // Get the vararg type from the first vararg.
+      prototype.AddArgument(
+          "var_arg", CodegenAnyVal::GetUnloweredPtrType(this, arg_types[num_fixed_args]));
+    }
+
+    // Create a Function* with the generated type. This is only a function
+    // declaration, not a definition, since we do not create any basic blocks or
+    // instructions in it.
+    *llvm_fn = prototype.GeneratePrototype(NULL, NULL, false);
+
+    // Associate the dynamically loaded function pointer with the Function* we defined.
+    // This tells LLVM where the compiled function definition is located in memory.
+    execution_engine_->addGlobalMapping(*llvm_fn, fn_ptr);
+  } else if (fn.binary_type == TFunctionBinaryType::BUILTIN) {
+    // In this path, we're running a builtin with the UDF interface. The IR is
+    // in the llvm module. Builtin functions may use Expr::GetConstant(). Clone the
+    // function so that we can replace constants in the copied function.
+    *llvm_fn = GetFunction(symbol, true);
+    if (*llvm_fn == NULL) {
+      // Builtins symbols should exist unless there is a version mismatch.
+      return Status(Substitute("Builtin '$0' with symbol '$1' does not exist. Verify "
+                               "that all your impalads are the same version.",
+          fn.name.function_name, symbol));
+    }
+    // Rename the function to something more readable than the mangled name.
+    string demangled_name = SymbolsUtil::DemangleNoArgs((*llvm_fn)->getName().str());
+    (*llvm_fn)->setName(demangled_name);
+  } else {
+    // We're running an IR UDF.
+    DCHECK_EQ(fn.binary_type, TFunctionBinaryType::IR);
+
+    string local_path;
+    RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
+        fn.hdfs_location, LibCache::TYPE_IR, &local_path));
+    // Link the UDF module into this query's main module so the UDF's functions are
+    // available in the main module.
+    RETURN_IF_ERROR(LinkModule(local_path));
+
+    *llvm_fn = GetFunction(symbol, true);
+    if (*llvm_fn == NULL) {
+      return Status(Substitute("Unable to load function '$0' from LLVM module '$1'",
+          symbol, fn.hdfs_location));
+    }
+    // Rename the function to something more readable than the mangled name.
+    string demangled_name = SymbolsUtil::DemangleNoArgs((*llvm_fn)->getName().str());
+    (*llvm_fn)->setName(demangled_name);
+  }
+  return Status::OK();
+}
+
+int LlvmCodeGen::ReplaceCallSites(
+    Function* caller, Function* new_fn, const string& target_name) {
   DCHECK(!is_compiled_);
   DCHECK(caller->getParent() == module_);
   DCHECK(caller != NULL);

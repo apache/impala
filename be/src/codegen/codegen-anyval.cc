@@ -67,7 +67,7 @@ Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& type) {
   }
 }
 
-Type* CodegenAnyVal::GetLoweredPtrType(LlvmCodeGen* cg, const ColumnType& type) {
+PointerType* CodegenAnyVal::GetLoweredPtrType(LlvmCodeGen* cg, const ColumnType& type) {
   return GetLoweredType(cg, type)->getPointerTo();
 }
 
@@ -116,7 +116,7 @@ Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& type) {
   return result;
 }
 
-Type* CodegenAnyVal::GetUnloweredPtrType(LlvmCodeGen* cg, const ColumnType& type) {
+PointerType* CodegenAnyVal::GetUnloweredPtrType(LlvmCodeGen* cg, const ColumnType& type) {
   return GetUnloweredType(cg, type)->getPointerTo();
 }
 

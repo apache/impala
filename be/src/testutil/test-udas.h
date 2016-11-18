@@ -18,6 +18,7 @@
 #ifndef IMPALA_UDF_TEST_UDAS_H
 #define IMPALA_UDF_TEST_UDAS_H
 
+// Don't include Impala internal headers - real UDAs won't include them.
 #include "udf/udf.h"
 
 using namespace impala_udf;

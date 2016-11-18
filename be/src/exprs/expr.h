@@ -263,9 +263,11 @@ class Expr {
   // Any additions to this enum must be reflected in both GetConstant*() and
   // GetIrConstant().
   enum ExprConstant {
+    // RETURN_TYPE_*: properties of FunctionContext::GetReturnType().
     RETURN_TYPE_SIZE, // int
     RETURN_TYPE_PRECISION, // int
     RETURN_TYPE_SCALE, // int
+    // ARG_TYPE_* with parameter i: properties of FunctionContext::GetArgType(i).
     ARG_TYPE_SIZE, // int[]
     ARG_TYPE_PRECISION, // int[]
     ARG_TYPE_SCALE, // int[]
@@ -289,7 +291,8 @@ class Expr {
   // constants to be replaced must be inlined into the function that InlineConstants()
   // is run on (e.g. by annotating them with IR_ALWAYS_INLINE).
   //
-  // TODO: implement a loop unroller (or use LLVM's) so we can use GetConstantInt() in loops
+  // TODO: implement a loop unroller (or use LLVM's) so we can use GetConstantInt() in
+  // loops
   static int GetConstantInt(const FunctionContext& ctx, ExprConstant c, int i = -1);
 
   /// Finds all calls to Expr::GetConstantInt() in 'fn' and replaces them with the
@@ -298,8 +301,8 @@ class Expr {
   /// 'arg_types' are the argument types of the UDF or UDAF, i.e. the values of
   /// FunctionContext::GetArgType().
   static int InlineConstants(const FunctionContext::TypeDesc& return_type,
-      const std::vector<FunctionContext::TypeDesc>& arg_types,
-      LlvmCodeGen* codegen, llvm::Function* fn);
+      const std::vector<FunctionContext::TypeDesc>& arg_types, LlvmCodeGen* codegen,
+      llvm::Function* fn);
 
   static const char* LLVM_CLASS_NAME;
 

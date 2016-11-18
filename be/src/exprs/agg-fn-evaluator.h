@@ -119,8 +119,6 @@ class AggFnEvaluator {
   bool SupportsRemove() const { return remove_fn_ != NULL; }
   bool SupportsSerialize() const { return serialize_fn_ != NULL; }
   const std::string& fn_name() const { return fn_.name.function_name; }
-  const std::string& update_symbol() const { return fn_.aggregate_fn.update_fn_symbol; }
-  const std::string& merge_symbol() const { return fn_.aggregate_fn.merge_fn_symbol; }
   const SlotDescriptor* output_slot_desc() const { return output_slot_desc_; }
 
   static std::string DebugString(const std::vector<AggFnEvaluator*>& exprs);
@@ -168,14 +166,8 @@ class AggFnEvaluator {
   static void Finalize(const std::vector<AggFnEvaluator*>& evaluators,
       const std::vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst);
 
-  /// TODO: implement codegen path. These functions would return IR functions with
-  /// the same signature as the interpreted ones above.
-  /// Function* GetIrInitFn();
-  /// Function* GetIrAddFn();
-  /// Function* GetIrRemoveFn();
-  /// Function* GetIrSerializeFn();
-  /// Function* GetIrGetValueFn();
-  /// Function* GetIrFinalizeFn();
+  /// Gets the codegened update or merge function for this aggregate function.
+  Status GetUpdateOrMergeFunction(LlvmCodeGen* codegen, llvm::Function** uda_fn);
 
  private:
   const TFunction fn_;
@@ -194,6 +186,9 @@ class AggFnEvaluator {
   /// Expression contexts for this AggFnEvaluator. Empty if there is no
   /// expression (e.g. count(*)).
   std::vector<ExprContext*> input_expr_ctxs_;
+
+  /// The types of the arguments to the aggregate function.
+  const std::vector<FunctionContext::TypeDesc> arg_type_descs_;
 
   /// The enum for some of the builtins that still require special cased logic.
   AggregationOp agg_op_;
@@ -220,6 +215,12 @@ class AggFnEvaluator {
 
   /// Use Create() instead.
   AggFnEvaluator(const TExprNode& desc, bool is_analytic_fn);
+
+  /// Return the intermediate type of the aggregate function.
+  FunctionContext::TypeDesc GetIntermediateTypeDesc() const;
+
+  /// Return the output type of the aggregate function.
+  FunctionContext::TypeDesc GetOutputTypeDesc() const;
 
   /// TODO: these functions below are not extensible and we need to use codegen to
   /// generate the calls into the UDA functions (like for UDFs).

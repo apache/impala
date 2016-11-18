@@ -34,6 +34,10 @@ int FunctionContext::GetNumArgs() const {
   return impl_->arg_types_.size();
 }
 
+const FunctionContext::TypeDesc& FunctionContext::GetIntermediateType() const {
+  return impl_->intermediate_type_;
+}
+
 const FunctionContext::TypeDesc& FunctionContext::GetReturnType() const {
   return impl_->return_type_;
 }

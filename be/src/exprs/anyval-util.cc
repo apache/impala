@@ -92,17 +92,33 @@ FunctionContext::TypeDesc AnyValUtil::ColumnTypeToTypeDesc(const ColumnType& typ
   return out;
 }
 
+vector<FunctionContext::TypeDesc> AnyValUtil::ColumnTypesToTypeDescs(
+    const vector<ColumnType>& types) {
+  vector<FunctionContext::TypeDesc> type_descs;
+  for (const ColumnType& type : types) type_descs.push_back(ColumnTypeToTypeDesc(type));
+  return type_descs;
+}
+
 ColumnType AnyValUtil::TypeDescToColumnType(const FunctionContext::TypeDesc& type) {
   switch (type.type) {
-    case FunctionContext::TYPE_BOOLEAN: return ColumnType(TYPE_BOOLEAN);
-    case FunctionContext::TYPE_TINYINT: return ColumnType(TYPE_TINYINT);
-    case FunctionContext::TYPE_SMALLINT: return ColumnType(TYPE_SMALLINT);
-    case FunctionContext::TYPE_INT: return ColumnType(TYPE_INT);
-    case FunctionContext::TYPE_BIGINT: return ColumnType(TYPE_BIGINT);
-    case FunctionContext::TYPE_FLOAT: return ColumnType(TYPE_FLOAT);
-    case FunctionContext::TYPE_DOUBLE: return ColumnType(TYPE_DOUBLE);
-    case FunctionContext::TYPE_TIMESTAMP: return ColumnType(TYPE_TIMESTAMP);
-    case FunctionContext::TYPE_STRING: return ColumnType(TYPE_STRING);
+    case FunctionContext::TYPE_BOOLEAN:
+      return ColumnType(TYPE_BOOLEAN);
+    case FunctionContext::TYPE_TINYINT:
+      return ColumnType(TYPE_TINYINT);
+    case FunctionContext::TYPE_SMALLINT:
+      return ColumnType(TYPE_SMALLINT);
+    case FunctionContext::TYPE_INT:
+      return ColumnType(TYPE_INT);
+    case FunctionContext::TYPE_BIGINT:
+      return ColumnType(TYPE_BIGINT);
+    case FunctionContext::TYPE_FLOAT:
+      return ColumnType(TYPE_FLOAT);
+    case FunctionContext::TYPE_DOUBLE:
+      return ColumnType(TYPE_DOUBLE);
+    case FunctionContext::TYPE_TIMESTAMP:
+      return ColumnType(TYPE_TIMESTAMP);
+    case FunctionContext::TYPE_STRING:
+      return ColumnType(TYPE_STRING);
     case FunctionContext::TYPE_DECIMAL:
       return ColumnType::CreateDecimalType(type.precision, type.scale);
     case FunctionContext::TYPE_FIXED_BUFFER:

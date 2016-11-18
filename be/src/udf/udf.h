@@ -189,21 +189,25 @@ class FunctionContext {
   const TypeDesc& GetIntermediateType() const;
 
   /// Returns the number of arguments to this function (not including the FunctionContext*
-  /// argument).
+  /// argument or the output of a UDA).
+  /// For UDAs, returns the number of logical arguments of the aggregate function, not
+  /// the number of arguments of the C++ function being executed.
   int GetNumArgs() const;
 
   /// Returns the type information for the arg_idx-th argument (0-indexed, not including
   /// the FunctionContext* argument). Returns NULL if arg_idx is invalid.
+  /// For UDAs, returns the logical argument types of the aggregate function, not the
+  /// argument types of the C++ function being executed.
   const TypeDesc* GetArgType(int arg_idx) const;
 
-  /// Returns true if the arg_idx-th input argument (0 indexed, not including the
-  /// FunctionContext* argument) is a constant (e.g. 5, "string", 1 + 1).
+  /// Returns true if the arg_idx-th input argument (indexed in the same way as
+  /// GetArgType()) is a constant (e.g. 5, "string", 1 + 1).
   bool IsArgConstant(int arg_idx) const;
 
-  /// Returns a pointer to the value of the arg_idx-th input argument (0 indexed, not
-  /// including the FunctionContext* argument). Returns NULL if the argument is not
-  /// constant. This function can be used to obtain user-specified constants in a UDF's
-  /// Init() or Close() functions.
+  /// Returns a pointer to the value of the arg_idx-th input argument (indexed in the
+  /// same way as GetArgType()). Returns NULL if the argument is not constant. This
+  /// function can be used to obtain user-specified constants in a UDF's Init() or
+  /// Close() functions.
   AnyVal* GetConstantArg(int arg_idx) const;
 
   /// TODO: Do we need to add arbitrary key/value metadata. This would be plumbed

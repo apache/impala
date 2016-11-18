@@ -30,6 +30,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.thrift.TAggregateExpr;
+import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TFunctionBinaryType;
@@ -45,10 +46,12 @@ public class FunctionCallExpr extends Expr {
   private boolean isAnalyticFnCall_ = false;
   private boolean isInternalFnCall_ = false;
 
-  // Indicates whether this is a merge aggregation function that should use the merge
-  // instead of the update symbol. This flag also affects the behavior of
-  // resetAnalysisState() which is used during expr substitution.
-  private final boolean isMergeAggFn_;
+  // Non-null iff this is an aggregation function that executes the Merge() step. This
+  // is an analyzed clone of the FunctionCallExpr that executes the Update() function
+  // feeding into this Merge(). This is stored so that we can access the types of the
+  // original input argument exprs. Note that the nullness affects the behaviour of
+  // resetAnalysisState(), which is used during expr substitution.
+  private final FunctionCallExpr mergeAggInputFn_;
 
   // Printed in toSqlImpl(), if set. Used for merge agg fns.
   private String label_;
@@ -62,15 +65,16 @@ public class FunctionCallExpr extends Expr {
   }
 
   public FunctionCallExpr(FunctionName fnName, FunctionParams params) {
-    this(fnName, params, false);
+    this(fnName, params, null);
   }
 
-  private FunctionCallExpr(
-      FunctionName fnName, FunctionParams params, boolean isMergeAggFn) {
+  private FunctionCallExpr(FunctionName fnName, FunctionParams params,
+      FunctionCallExpr mergeAggInputFn) {
     super();
     fnName_ = fnName;
     params_ = params;
-    isMergeAggFn_ = isMergeAggFn;
+    mergeAggInputFn_ =
+        mergeAggInputFn == null ? null : (FunctionCallExpr)mergeAggInputFn.clone();
     if (params.exprs() != null) children_ = Lists.newArrayList(params_.exprs());
   }
 
@@ -99,12 +103,12 @@ public class FunctionCallExpr extends Expr {
     Preconditions.checkState(agg.isAnalyzed());
     Preconditions.checkState(agg.isAggregateFunction());
     FunctionCallExpr result = new FunctionCallExpr(
-        agg.fnName_, new FunctionParams(false, params), true);
+        agg.fnName_, new FunctionParams(false, params), agg);
     // Inherit the function object from 'agg'.
     result.fn_ = agg.fn_;
     result.type_ = agg.type_;
     // Set an explicit label based on the input agg.
-    if (agg.isMergeAggFn_) {
+    if (agg.isMergeAggFn()) {
       result.label_ = agg.label_;
     } else {
       // fn(input) becomes fn:merge(input).
@@ -123,7 +127,8 @@ public class FunctionCallExpr extends Expr {
     fnName_ = other.fnName_;
     isAnalyticFnCall_ = other.isAnalyticFnCall_;
     isInternalFnCall_ = other.isInternalFnCall_;
-    isMergeAggFn_ = other.isMergeAggFn_;
+    mergeAggInputFn_ =
+        other.mergeAggInputFn_ == null ? null : (FunctionCallExpr)other.mergeAggInputFn_.clone();
     // Clone the params in a way that keeps the children_ and the params.exprs()
     // in sync. The children have already been cloned in the super c'tor.
     if (other.params_.isStar()) {
@@ -135,7 +140,7 @@ public class FunctionCallExpr extends Expr {
     label_ = other.label_;
   }
 
-  public boolean isMergeAggFn() { return isMergeAggFn_; }
+  public boolean isMergeAggFn() { return mergeAggInputFn_ != null; }
 
   @Override
   public void resetAnalysisState() {
@@ -144,7 +149,7 @@ public class FunctionCallExpr extends Expr {
     // intermediate agg type is not the same as the output type. Preserve the original
     // fn_ such that analyze() hits the special-case code for merge agg fns that
     // handles this case.
-    if (!isMergeAggFn_) fn_ = null;
+    if (!isMergeAggFn()) fn_ = null;
   }
 
   @Override
@@ -160,7 +165,7 @@ public class FunctionCallExpr extends Expr {
   public String toSqlImpl() {
     if (label_ != null) return label_;
     // Merge agg fns should have an explicit label.
-    Preconditions.checkState(!isMergeAggFn_);
+    Preconditions.checkState(!isMergeAggFn());
     StringBuilder sb = new StringBuilder();
     sb.append(fnName_).append("(");
     if (params_.isStar()) sb.append("*");
@@ -226,7 +231,12 @@ public class FunctionCallExpr extends Expr {
   protected void toThrift(TExprNode msg) {
     if (isAggregateFunction() || isAnalyticFnCall_) {
       msg.node_type = TExprNodeType.AGGREGATE_EXPR;
-      if (!isAnalyticFnCall_) msg.setAgg_expr(new TAggregateExpr(isMergeAggFn_));
+      List<TColumnType> aggFnArgTypes = Lists.newArrayList();
+      FunctionCallExpr inputAggFn = isMergeAggFn() ? mergeAggInputFn_ : this;
+      for (Expr child: inputAggFn.children_) {
+        aggFnArgTypes.add(child.getType().toThrift());
+      }
+      msg.setAgg_expr(new TAggregateExpr(isMergeAggFn(), aggFnArgTypes));
     } else {
       msg.node_type = TExprNodeType.FUNCTION_CALL;
     }
@@ -383,7 +393,7 @@ public class FunctionCallExpr extends Expr {
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     fnName_.analyze(analyzer);
 
-    if (isMergeAggFn_) {
+    if (isMergeAggFn()) {
       // This is the function call expr after splitting up to a merge aggregation.
       // The function has already been analyzed so just do the minimal sanity
       // check here.
@@ -521,6 +531,25 @@ public class FunctionCallExpr extends Expr {
     }
     if (params.isDistinct()) {
       throw new AnalysisException("Cannot pass 'DISTINCT' to scalar function.");
+    }
+  }
+
+  /**
+   * Validate that the internal state, specifically types, is consistent between the
+   * the Update() and Merge() aggregate functions.
+   */
+  void validateMergeAggFn(FunctionCallExpr inputAggFn) {
+    Preconditions.checkState(isMergeAggFn());
+    List<Expr> copiedInputExprs = mergeAggInputFn_.getChildren();
+    List<Expr> inputExprs = inputAggFn.getChildren();
+    Preconditions.checkState(copiedInputExprs.size() == inputExprs.size());
+    for (int i = 0; i < inputExprs.size(); ++i) {
+      Type copiedInputType = copiedInputExprs.get(i).getType();
+      Type inputType = inputExprs.get(i).getType();
+      Preconditions.checkState(copiedInputType.equals(inputType),
+          String.format("Copied expr %s arg type %s differs from input expr type %s " +
+            "in original expr %s", toSql(), copiedInputType.toSql(),
+            inputType.toSql(), inputAggFn.toSql()));
     }
   }
 

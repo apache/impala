@@ -112,9 +112,14 @@ struct TStringLiteral {
   1: required string value;
 }
 
+// Additional information for aggregate functions.
 struct TAggregateExpr {
   // Indicates whether this expr is the merge() of an aggregation.
   1: required bool is_merge_agg
+
+  // The types of the input arguments to the aggregate function. May differ from the
+  // input expr types if this is the merge() of an aggregation.
+  2: required list<Types.TColumnType> arg_types;
 }
 
 // This is essentially a union over the subclasses of Expr.

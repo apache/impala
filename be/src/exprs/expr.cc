@@ -637,10 +637,10 @@ int Expr::InlineConstants(LlvmCodeGen* codegen, Function* fn) {
 }
 
 int Expr::InlineConstants(const FunctionContext::TypeDesc& return_type,
-      const std::vector<FunctionContext::TypeDesc>& arg_types, LlvmCodeGen* codegen,
-      Function* fn) {
+    const std::vector<FunctionContext::TypeDesc>& arg_types, LlvmCodeGen* codegen,
+    Function* fn) {
   int replaced = 0;
-  for (inst_iterator iter = inst_begin(fn), end = inst_end(fn); iter != end; ) {
+  for (inst_iterator iter = inst_begin(fn), end = inst_end(fn); iter != end;) {
     // Increment iter now so we don't mess it up modifying the instruction below
     Instruction* instr = &*(iter++);
 
@@ -666,7 +666,7 @@ int Expr::InlineConstants(const FunctionContext::TypeDesc& return_type,
     int i_val = static_cast<int>(i_arg->getSExtValue());
     // All supported constants are currently integers.
     call_instr->replaceAllUsesWith(ConstantInt::get(codegen->GetType(TYPE_INT),
-          GetConstantInt(return_type, arg_types, c_val, i_val)));
+        GetConstantInt(return_type, arg_types, c_val, i_val)));
     call_instr->eraseFromParent();
     ++replaced;
   }

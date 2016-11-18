@@ -227,6 +227,8 @@ class AnyValUtil {
   }
 
   static FunctionContext::TypeDesc ColumnTypeToTypeDesc(const ColumnType& type);
+  static std::vector<FunctionContext::TypeDesc> ColumnTypesToTypeDescs(
+      const std::vector<ColumnType>& types);
   // Note: constructing a ColumnType is expensive and should be avoided in query execution
   // paths (i.e. non-setup paths).
   static ColumnType TypeDescToColumnType(const FunctionContext::TypeDesc& type);

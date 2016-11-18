@@ -48,7 +48,7 @@ class TExprNode;
 ///    - Test cancellation
 ///    - Type descs in UDA test harness
 ///    - Allow more functions to be NULL in UDA test harness
-class ScalarFnCall: public Expr {
+class ScalarFnCall : public Expr {
  public:
   virtual std::string DebugString() const;
 
@@ -116,9 +116,6 @@ class ScalarFnCall: public Expr {
     DCHECK_GE(NumVarArgs(), 1);
     return children_.back()->type();
   }
-
-  /// Loads the native or IR function from HDFS and puts the result in *udf.
-  Status GetUdf(LlvmCodeGen* codegen, llvm::Function** udf);
 
   /// Loads the native or IR function 'symbol' from HDFS and puts the result in *fn.
   /// If the function is loaded from an IR module, it cannot be called until the module

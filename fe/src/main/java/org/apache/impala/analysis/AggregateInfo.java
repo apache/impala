@@ -673,7 +673,8 @@ public class AggregateInfo extends AggregateInfoBase {
    * materialized slots of the output tuple corresponds to the number of materialized
    * aggregate functions plus the number of grouping exprs. Also checks that the return
    * types of the aggregate and grouping exprs correspond to the slots in the output
-   * tuple.
+   * tuple and that the input types stored in the merge aggregation are consistent
+   * with the input exprs.
    */
   public void checkConsistency() {
     ArrayList<SlotDescriptor> slots = outputTupleDesc_.getSlots();
@@ -706,6 +707,13 @@ public class AggregateInfo extends AggregateInfoBase {
               "slot has type %s", aggExpr.toSql(), aggExpr.getType().toString(),
               slotType.toString()));
       ++slotIdx;
+    }
+    if (mergeAggInfo_ != null) {
+      // Check that the argument types in mergeAggInfo_ are consistent with input exprs.
+      for (int i = 0; i < aggregateExprs_.size(); ++i) {
+        FunctionCallExpr mergeAggExpr = mergeAggInfo_.aggregateExprs_.get(i);
+        mergeAggExpr.validateMergeAggFn(aggregateExprs_.get(i));
+      }
     }
   }
 

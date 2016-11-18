@@ -95,7 +95,7 @@ class CodegenAnyVal {
 
   /// Returns the lowered AnyVal pointer type associated with 'type'.
   /// E.g.: TYPE_BOOLEAN => i16*
-  static llvm::Type* GetLoweredPtrType(LlvmCodeGen* cg, const ColumnType& type);
+  static llvm::PointerType* GetLoweredPtrType(LlvmCodeGen* cg, const ColumnType& type);
 
   /// Returns the unlowered AnyVal type associated with 'type'.
   /// E.g.: TYPE_BOOLEAN => %"struct.impala_udf::BooleanVal"
@@ -103,7 +103,7 @@ class CodegenAnyVal {
 
   /// Returns the unlowered AnyVal pointer type associated with 'type'.
   /// E.g.: TYPE_BOOLEAN => %"struct.impala_udf::BooleanVal"*
-  static llvm::Type* GetUnloweredPtrType(LlvmCodeGen* cg, const ColumnType& type);
+  static llvm::PointerType* GetUnloweredPtrType(LlvmCodeGen* cg, const ColumnType& type);
 
   /// Return the constant type-lowered value corresponding to a null *Val.
   /// E.g.: passing TYPE_DOUBLE (corresponding to the lowered DoubleVal { i8, double })

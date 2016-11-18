@@ -310,6 +310,12 @@ string ColumnType::DebugString() const {
   }
 }
 
+vector<ColumnType> ColumnType::FromThrift(const vector<TColumnType>& ttypes) {
+  vector<ColumnType> types;
+  for (const TColumnType& ttype : ttypes) types.push_back(FromThrift(ttype));
+  return types;
+}
+
 ostream& operator<<(ostream& os, const ColumnType& type) {
   os << type.DebugString();
   return os;

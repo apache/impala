@@ -147,6 +147,8 @@ struct ColumnType {
     return result;
   }
 
+  static std::vector<ColumnType> FromThrift(const std::vector<TColumnType>& ttypes);
+
   bool operator==(const ColumnType& o) const {
     if (type != o.type) return false;
     if (children != o.children) return false;

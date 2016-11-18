@@ -76,7 +76,7 @@ void ThrowIfDateOutOfRange(const boost::gregorian::date& date) {
 
 // This function uses inline asm functions, which we believe to be from the boost library.
 // Inline asm is not currently supported by JIT, so this function should always be run in
-// the interpreted mode. This is handled in ScalarFnCall::GetUdf().
+// the interpreted mode. This is handled in LlvmCodeGen::LoadFunction().
 TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
@@ -114,7 +114,7 @@ TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
 
 // This function uses inline asm functions, which we believe to be from the boost library.
 // Inline asm is not currently supported by JIT, so this function should always be run in
-// the interpreted mode. This is handled in ScalarFnCall::GetUdf().
+// the interpreted mode. This is handled in LlvmCodeGen::LoadFunction().
 TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();

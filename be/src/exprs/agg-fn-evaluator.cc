@@ -23,8 +23,9 @@
 #include "common/logging.h"
 #include "exec/aggregation-node.h"
 #include "exprs/aggregate-functions.h"
-#include "exprs/expr-context.h"
 #include "exprs/anyval-util.h"
+#include "exprs/expr-context.h"
+#include "exprs/scalar-fn-call.h"
 #include "runtime/lib-cache.h"
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
@@ -94,6 +95,8 @@ AggFnEvaluator::AggFnEvaluator(const TExprNode& desc, bool is_analytic_fn)
     is_analytic_fn_(is_analytic_fn),
     intermediate_slot_desc_(NULL),
     output_slot_desc_(NULL),
+    arg_type_descs_(AnyValUtil::ColumnTypesToTypeDescs(
+        ColumnType::FromThrift(desc.agg_expr.arg_types))),
     cache_entry_(NULL),
     init_fn_(NULL),
     update_fn_(NULL),
@@ -198,28 +201,15 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
         &cache_entry_));
   }
   if (!fn_.aggregate_fn.remove_fn_symbol.empty()) {
-    RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
-        fn_.hdfs_location, fn_.aggregate_fn.remove_fn_symbol, &remove_fn_,
-        &cache_entry_));
+    RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
+        fn_.aggregate_fn.remove_fn_symbol, &remove_fn_, &cache_entry_));
   }
   if (!fn_.aggregate_fn.finalize_fn_symbol.empty()) {
-    RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
-        fn_.hdfs_location, fn_.aggregate_fn.finalize_fn_symbol, &finalize_fn_,
-        &cache_entry_));
+    RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
+        fn_.aggregate_fn.finalize_fn_symbol, &finalize_fn_, &cache_entry_));
   }
-
-  vector<FunctionContext::TypeDesc> arg_types;
-  for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
-    arg_types.push_back(
-        AnyValUtil::ColumnTypeToTypeDesc(input_expr_ctxs_[i]->root()->type()));
-  }
-
-  FunctionContext::TypeDesc intermediate_type =
-      AnyValUtil::ColumnTypeToTypeDesc(intermediate_slot_desc_->type());
-  FunctionContext::TypeDesc output_type =
-       AnyValUtil::ColumnTypeToTypeDesc(output_slot_desc_->type());
-  *agg_fn_ctx = FunctionContextImpl::CreateContext(
-      state, agg_fn_pool, intermediate_type, output_type, arg_types);
+  *agg_fn_ctx = FunctionContextImpl::CreateContext(state, agg_fn_pool,
+      GetIntermediateTypeDesc(), GetOutputTypeDesc(), arg_type_descs_);
   return Status::OK();
 }
 
@@ -519,6 +509,40 @@ void AggFnEvaluator::SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src
     default:
       DCHECK(false) << "NYI";
   }
+}
+
+/// Gets the update or merge function for this UDA.
+Status AggFnEvaluator::GetUpdateOrMergeFunction(LlvmCodeGen* codegen, Function** uda_fn) {
+  const string& symbol =
+      is_merge_ ? fn_.aggregate_fn.merge_fn_symbol : fn_.aggregate_fn.update_fn_symbol;
+  vector<ColumnType> fn_arg_types;
+  for (ExprContext* input_expr_ctx : input_expr_ctxs_) {
+    fn_arg_types.push_back(input_expr_ctx->root()->type());
+  }
+  // The intermediate value is passed as the last argument.
+  fn_arg_types.push_back(intermediate_type());
+  RETURN_IF_ERROR(codegen->LoadFunction(fn_, symbol, NULL, fn_arg_types,
+      fn_arg_types.size(), false, uda_fn, &cache_entry_));
+
+  // Inline constants into the function body (if there is an IR body).
+  if (!(*uda_fn)->isDeclaration()) {
+    // TODO: IMPALA-4785: we should also replace references to GetIntermediateType()
+    // with constants.
+    Expr::InlineConstants(GetOutputTypeDesc(), arg_type_descs_, codegen, *uda_fn);
+    *uda_fn = codegen->FinalizeFunction(*uda_fn);
+    if (*uda_fn == NULL) {
+      return Status(TErrorCode::UDF_VERIFY_FAILED, symbol, fn_.hdfs_location);
+    }
+  }
+  return Status::OK();
+}
+
+FunctionContext::TypeDesc AggFnEvaluator::GetIntermediateTypeDesc() const {
+  return AnyValUtil::ColumnTypeToTypeDesc(intermediate_slot_desc_->type());
+}
+
+FunctionContext::TypeDesc AggFnEvaluator::GetOutputTypeDesc() const {
+  return AnyValUtil::ColumnTypeToTypeDesc(output_slot_desc_->type());
 }
 
 string AggFnEvaluator::DebugString(const vector<AggFnEvaluator*>& exprs) {
