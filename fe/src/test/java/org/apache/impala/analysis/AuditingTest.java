@@ -223,6 +223,12 @@ public class AuditingTest extends AnalyzerTest {
     Set<TAccessEvent> accessEvents = AnalyzeAccessEvents("drop table tpch.lineitem");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
         "tpch.lineitem", TCatalogObjectType.TABLE, "DROP")));
+
+    // Dropping a table that fails loading should still result in an access event.
+    accessEvents = AnalyzeAccessEvents(
+        "drop table functional.unsupported_partition_types");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
+        "functional.unsupported_partition_types", TCatalogObjectType.TABLE, "DROP")));
   }
 
   @Test

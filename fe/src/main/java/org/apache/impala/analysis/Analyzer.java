@@ -2346,7 +2346,7 @@ public class Analyzer {
    * If addAccessEvent is true, adds an access event if the catalog access succeeded.
    */
   public Table getTable(TableName tableName, Privilege privilege, boolean addAccessEvent)
-      throws AnalysisException {
+      throws AnalysisException, TableLoadingException {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilege);
     Table table = null;
@@ -2359,13 +2359,7 @@ public class Analyzer {
       registerPrivReq(new PrivilegeRequestBuilder()
           .allOf(privilege).onTable(tableName.getDb(), tableName.getTbl()).toRequest());
     }
-    // This may trigger a metadata load, in which case we want to return the errors as
-    // AnalysisExceptions.
-    try {
-      table = getTable(tableName.getDb(), tableName.getTbl());
-    } catch (TableLoadingException e) {
-      throw new AnalysisException(e.getMessage(), e);
-    }
+    table = getTable(tableName.getDb(), tableName.getTbl());
     Preconditions.checkNotNull(table);
     if (addAccessEvent) {
       // Add an audit event for this access
@@ -2387,7 +2381,13 @@ public class Analyzer {
    */
   public Table getTable(TableName tableName, Privilege privilege)
       throws AnalysisException {
-    return getTable(tableName, privilege, true);
+    // This may trigger a metadata load, in which case we want to return the errors as
+    // AnalysisExceptions.
+    try {
+      return getTable(tableName, privilege, true);
+    } catch (TableLoadingException e) {
+      throw new AnalysisException(e.getMessage(), e);
+    }
   }
 
   /**

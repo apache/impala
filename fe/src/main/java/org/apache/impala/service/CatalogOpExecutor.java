@@ -1337,6 +1337,10 @@ public class CatalogOpExecutor {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         msClient.getHiveClient().dropTable(
             tableName.getDb(), tableName.getTbl(), true, params.if_exists, params.purge);
+      } catch (NoSuchObjectException e) {
+        throw new ImpalaRuntimeException(String.format("Table %s no longer exists in " +
+            "the Hive MetaStore. Run 'invalidate metadata %s' to update the Impala " +
+            "catalog.", tableName, tableName));
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "dropTable"), e);

@@ -1193,6 +1193,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Cannot drop a table with DROP VIEW.
     AnalysisError("drop view functional.alltypes",
         "DROP VIEW not allowed on a table: functional.alltypes");
+
+    // No analysis error for tables that can't be loaded.
+    AnalyzesOk("drop table functional.unsupported_partition_types");
   }
 
   @Test

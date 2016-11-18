@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
@@ -76,7 +77,12 @@ public abstract class PartitionSpecBase implements ParseNode {
 
     // Skip adding an audit event when analyzing partitions. The parent table should
     // be audited outside of the PartitionSpec.
-    Table table = analyzer.getTable(tableName_, privilegeRequirement_, false);
+    Table table;
+    try {
+      table = analyzer.getTable(tableName_, privilegeRequirement_, false);
+    } catch (TableLoadingException e) {
+      throw new AnalysisException(e.getMessage(), e);
+    }
 
     // Make sure the target table is partitioned.
     if (table.getMetaStoreTable().getPartitionKeysSize() == 0) {

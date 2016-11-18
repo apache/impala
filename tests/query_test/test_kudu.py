@@ -434,7 +434,7 @@ class TestDropDb(KuduTestSuite):
       unique_cursor.execute("USE DEFAULT")
       unique_cursor.execute("DROP DATABASE %s CASCADE" % db_name)
       unique_cursor.execute("SHOW DATABASES")
-      assert db_name not in unique_cursor.fetchall()
+      assert (db_name, '') not in unique_cursor.fetchall()
       assert kudu_client.table_exists(kudu_table.name)
       assert not kudu_client.table_exists(managed_table_name)
 
@@ -477,8 +477,7 @@ class TestImpalaKuduIntegration(KuduTestSuite):
 
   def test_delete_external_kudu_table(self, cursor, kudu_client):
     """Check that Impala can recover from the case where the underlying Kudu table of
-        an external table is dropped using the Kudu client. The external table can be
-        dropped using DROP TABLE IF EXISTS statement.
+        an external table is dropped using the Kudu client.
     """
     with self.temp_kudu_table(kudu_client, [INT32]) as kudu_table:
       # Create an external Kudu table
@@ -498,9 +497,10 @@ class TestImpalaKuduIntegration(KuduTestSuite):
         cursor.execute("REFRESH %s" % (impala_table_name))
       except Exception as e:
         assert err_msg in str(e)
-      cursor.execute("DROP TABLE IF EXISTS %s" % (impala_table_name))
+      cursor.execute("DROP TABLE %s" % (impala_table_name))
       cursor.execute("SHOW TABLES")
-      assert impala_table_name not in cursor.fetchall()
+      assert (impala_table_name,) not in cursor.fetchall()
+
 
   def test_delete_managed_kudu_table(self, cursor, kudu_client, unique_database):
     """Check that dropping a managed Kudu table works even if the underlying Kudu table
@@ -512,9 +512,9 @@ class TestImpalaKuduIntegration(KuduTestSuite):
     assert kudu_client.table_exists(kudu_tbl_name)
     kudu_client.delete_table(kudu_tbl_name)
     assert not kudu_client.table_exists(kudu_tbl_name)
-    cursor.execute("DROP TABLE IF EXISTS %s" % (impala_tbl_name))
-    cursor.execute("SHOW TABLES")
-    assert impala_tbl_name not in cursor.fetchall()
+    cursor.execute("DROP TABLE %s.%s" % (unique_database, impala_tbl_name))
+    cursor.execute("SHOW TABLES IN %s" % unique_database)
+    assert (impala_tbl_name,) not in cursor.fetchall()
 
 class TestKuduMemLimits(KuduTestSuite):
 
