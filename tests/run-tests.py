@@ -20,6 +20,7 @@
 # Runs the Impala query tests, first executing the tests that cannot be run in parallel
 # and then executing the remaining tests in parallel. All additional command line options
 # are passed to py.test.
+import itertools
 import multiprocessing
 import os
 import pytest
@@ -54,6 +55,7 @@ NUM_STRESS_CLIENTS = min(multiprocessing.cpu_count() * 4, 64)
 if 'NUM_STRESS_CLIENTS' in os.environ:
   NUM_STRESS_CLIENTS = int(os.environ['NUM_STRESS_CLIENTS'])
 
+
 class TestExecutor:
   def __init__(self, exit_on_error=True):
     self._exit_on_error = exit_on_error
@@ -65,29 +67,93 @@ class TestExecutor:
       sys.exit(exit_code)
     self.tests_failed = exit_code != 0 or self.tests_failed
 
-def build_test_args(log_base_name, valid_dirs, include_cmdline_args=True):
-  logging_args = LOGGING_ARGS % {'result_dir': TEST_RESULT_DIR, 'log_name': log_base_name}
-  args = '%s %s' % (build_ignore_dir_arg_list(valid_dirs=valid_dirs), logging_args)
 
-  if include_cmdline_args:
-    # sys.argv[0] is always the script name, so exclude it
-    return '%s %s' % (args, ' '.join(sys.argv[1:]))
-  return args
+def build_test_args(log_base_name, valid_dirs):
+  """
+  Modify and return the command line arguments that will be passed to py.test.
+
+  Args:
+    log_base_name: the base name for the log file to write
+    valid_dirs: a white list of sub-directories with desired tests (i.e, those
+      that will not get flagged with --ignore before py.test is called.)
+
+  Return:
+    a modified command line for py.test
+
+  For most test stages (e.g., serial, parallel), we augment the given command
+  line arguments with a list of directories to ignore. However, when running the
+  metric verification tests at the end of the test run:
+
+  - verifiers.test_verify_metrics.TestValidateMetrics.test_metrics_are_zero
+  - verifiers.test_verify_metrics.TestValidateMetrics.test_num_unused_buffers
+
+  then we instead need to filter out args that specifiy other tests (otherwise,
+  they will be run again), but still retain the basic config args.
+  """
+  logging_args = LOGGING_ARGS % {'result_dir': TEST_RESULT_DIR,
+                                 'log_name': log_base_name}
+
+  # The raw command line arguments need to be modified because of the way our
+  # repo is organized. We have several non-test directories and files in our
+  # tests/ path, which causes auto-discovery problems for pytest -- i.e., pytest
+  # will futiley try to execute them as tests, resulting in misleading failures.
+  # (There is a JIRA filed to restructure this: IMPALA-4417.)
+  #
+  # e.g. --ignore="comparison" --ignore="util" --ignore=etc...
+  ignored_dirs = build_ignore_dir_arg_list(valid_dirs=valid_dirs)
+
+  if valid_dirs != ['verifiers']:
+    # This isn't the metrics verification stage yet, so after determining the
+    # logging params and which sub-directories within tests/ to ignore, just tack
+    # on any other args from sys.argv -- excluding sys.argv[0], which of course
+    # is the script name
+    test_args = '%s %s %s' % (ignored_dirs, logging_args, ' '.join(sys.argv[1:]))
+  else:
+    # When filtering, we need to account for the fact that '--foo bar' and
+    # '--foo=bar' might be supplied by the user, as well as random options. E.g.,
+    # if the user specified the following on the command line:
+    #
+    #   'run-tests.py --arg1 value1 --random_opt --arg2=value2'
+    #
+    # we want an iterable that, if unpacked as a list, would look like:
+    #
+    #   [arg1, value1, random_opt, arg2, value2]
+    #
+    raw_args = itertools.chain(*[arg.split('=') for arg in sys.argv[1:]])
+    kept_args = []
+
+    for arg in raw_args:
+      try:
+        pytest.config.getvalue(arg.strip('-'))  # Raises ValueError if invalid arg
+        kept_args += [arg, str(raw_args.next())]
+      except ValueError:
+        # For any arg that's not a required pytest config arg, we can filter it out
+        continue
+    test_args = '%s %s %s' % (ignored_dirs, logging_args, ' '.join(kept_args))
+
+  return test_args
+
 
 def build_ignore_dir_arg_list(valid_dirs):
   """ Builds a list of directories to ignore """
   subdirs = [subdir for subdir in os.listdir(TEST_DIR) if os.path.isdir(subdir)]
   return ' '.join(['--ignore="%s"' % d for d in set(subdirs) - set(valid_dirs)])
 
+
 if __name__ == "__main__":
+  exit_on_error = '-x' in sys.argv or '--exitfirst' in sys.argv
+  test_executor = TestExecutor(exit_on_error=exit_on_error)
+
+  # If the user is just asking for --help, just print the help test and then exit.
+  if '-h' in sys.argv[1:] or '--help' in sys.argv[1:]:
+    test_executor.run_tests(sys.argv[1:])
+    sys.exit(0)
+
   os.chdir(TEST_DIR)
 
   # Create the test result directory if it doesn't already exist.
   if not os.path.exists(TEST_RESULT_DIR):
     os.makedirs(TEST_RESULT_DIR)
-
-  exit_on_error = '-x' in sys.argv or '--exitfirst' in sys.argv
-  test_executor = TestExecutor(exit_on_error=exit_on_error)
 
   # First run query tests that need to be executed serially
   args = '-m "execute_serially" %s' % build_test_args('serial', VALID_TEST_DIRS)
@@ -104,10 +170,7 @@ if __name__ == "__main__":
   test_executor.run_tests(args)
 
   # Finally, validate impalad/statestored metrics.
-  # Do not include any command-line arguments when invoking verifiers because it
-  # can lead to tests being run multiple times should someone pass in a .py file.
-  args = build_test_args(log_base_name='verify-metrics', valid_dirs=['verifiers'],
-      include_cmdline_args=False)
+  args = build_test_args(log_base_name='verify-metrics', valid_dirs=['verifiers'])
   args += ' verifiers/test_verify_metrics.py'
   test_executor.run_tests(args)
 
