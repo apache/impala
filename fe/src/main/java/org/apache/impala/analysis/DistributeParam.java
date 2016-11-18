@@ -27,6 +27,7 @@ import org.apache.impala.thrift.TDistributeByRangeParam;
 import org.apache.impala.thrift.TDistributeParam;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
@@ -200,7 +201,7 @@ public class DistributeParam implements ParseNode {
   }
 
   boolean hasColumnNames() { return !colNames_.isEmpty(); }
-
+  public List<String> getColumnNames() { return ImmutableList.copyOf(colNames_); }
   void setColumnNames(Collection<String> colNames) {
     Preconditions.checkState(colNames_.isEmpty());
     colNames_.addAll(colNames);

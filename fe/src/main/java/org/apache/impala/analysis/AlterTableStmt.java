@@ -17,15 +17,18 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Base class for all ALTER TABLE statements.
@@ -84,13 +87,6 @@ public abstract class AlterTableStmt extends StatementBase {
     }
     Preconditions.checkState(tableRef instanceof BaseTableRef);
     table_ = tableRef.getTable();
-    if (table_ instanceof KuduTable
-        && !(this instanceof AlterTableSetTblProperties)
-        && !(this instanceof AlterTableSetColumnStats)
-        && !(this instanceof AlterTableOrViewRenameStmt)) {
-      throw new AnalysisException(String.format(
-          "ALTER TABLE not allowed on Kudu table: %s", tableName_));
-    }
     if (table_ instanceof DataSourceTable
         && !(this instanceof AlterTableSetColumnStats)) {
       throw new AnalysisException(String.format(

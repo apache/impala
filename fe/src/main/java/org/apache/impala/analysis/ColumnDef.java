@@ -155,10 +155,15 @@ public class ColumnDef {
   public void setComment(String comment) { comment_ = comment; }
   public String getComment() { return comment_; }
   public boolean hasKuduOptions() {
-    return isPrimaryKey_ || isNullable_ != null || encodingVal_ != null
-        || compressionVal_ != null || defaultValue_ != null || blockSize_ != null;
+    return isPrimaryKey() || isNullabilitySet() || hasEncoding() || hasCompression()
+        || hasDefaultValue() || hasBlockSize();
   }
-  public boolean isNullable() { return isNullable_ != null && isNullable_; }
+  public boolean hasEncoding() { return encodingVal_ != null; }
+  public boolean hasCompression() { return compressionVal_ != null; }
+  public boolean hasBlockSize() { return blockSize_ != null; }
+  public boolean isNullabilitySet() { return isNullable_ != null; }
+  public boolean isNullable() { return isNullabilitySet() && isNullable_; }
+  public boolean hasDefaultValue() { return defaultValue_ != null; }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // Check whether the column name meets the Metastore's requirements.
@@ -269,15 +274,15 @@ public class ColumnDef {
   public String toString() {
     StringBuilder sb = new StringBuilder(colName_).append(" ");
     if (type_ != null) {
-      sb.append(type_);
+      sb.append(type_.toSql());
     } else {
-      sb.append(typeDef_);
+      sb.append(typeDef_.toSql());
     }
     if (isPrimaryKey_) sb.append(" PRIMARY KEY");
     if (isNullable_ != null) sb.append(isNullable_ ? " NULL" : " NOT NULL");
     if (encoding_ != null) sb.append(" ENCODING " + encoding_.toString());
     if (compression_ != null) sb.append(" COMPRESSION " + compression_.toString());
-    if (defaultValue_ != null) sb.append(" DEFAULT_VALUE " + defaultValue_.toSql());
+    if (defaultValue_ != null) sb.append(" DEFAULT " + defaultValue_.toSql());
     if (blockSize_ != null) sb.append(" BLOCK_SIZE " + blockSize_.toSql());
     if (comment_ != null) sb.append(String.format(" COMMENT '%s'", comment_));
     return sb.toString();

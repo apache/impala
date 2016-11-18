@@ -68,6 +68,7 @@ class TestKuduOperations(KuduTestSuite):
     self.run_test_case('QueryTest/kudu_describe', vector, use_db=unique_database)
 
   def test_kudu_column_options(self, cursor, kudu_client, unique_database):
+    """Test Kudu column options"""
     encodings = ["ENCODING PLAIN_ENCODING", ""]
     compressions = ["COMPRESSION SNAPPY", ""]
     nullability = ["NOT NULL", "NULL", ""]
@@ -88,6 +89,18 @@ class TestKuduOperations(KuduTestSuite):
               indx = indx + 1
               kudu_tbl_name = "impala::%s.%s" % (unique_database, impala_tbl_name)
               assert kudu_client.table_exists(kudu_tbl_name)
+
+  def test_kudu_rename_table(self, cursor, kudu_client, unique_database):
+    """Test Kudu table rename"""
+    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY) DISTRIBUTE BY HASH(a)
+        INTO 3 BUCKETS STORED AS KUDU""" % unique_database)
+    kudu_tbl_name = "impala::%s.foo" % unique_database
+    assert kudu_client.table_exists(kudu_tbl_name)
+    new_kudu_tbl_name = "blah"
+    cursor.execute("ALTER TABLE %s.foo SET TBLPROPERTIES('kudu.table_name'='%s')" % (
+        unique_database, new_kudu_tbl_name))
+    assert kudu_client.table_exists(new_kudu_tbl_name)
+    assert not kudu_client.table_exists(kudu_tbl_name)
 
 class TestCreateExternalTable(KuduTestSuite):
 

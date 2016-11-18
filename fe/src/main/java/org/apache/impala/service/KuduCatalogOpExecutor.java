@@ -31,22 +31,27 @@ import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TDistributeParam;
 import org.apache.impala.thrift.TRangePartition;
+import org.apache.impala.thrift.TRangePartitionOperationType;
 import org.apache.impala.util.KuduUtil;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.ColumnSchema.ColumnSchemaBuilder;
 import org.apache.kudu.Schema;
+import org.apache.kudu.client.AlterTableOptions;
 import org.apache.kudu.client.CreateTableOptions;
 import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.PartialRow;
 import org.apache.kudu.client.RangePartitionBound;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 
 /**
  * This is a helper for the CatalogOpExecutor to provide Kudu related DDL functionality
@@ -140,16 +145,11 @@ public class KuduCatalogOpExecutor {
           tableOpts.setRangePartitionColumns(rangePartitionColumns);
           for (TRangePartition rangePartition:
                distParam.getBy_range_param().getRange_partitions()) {
-            Preconditions.checkState(rangePartition.isSetLower_bound_values()
-                || rangePartition.isSetUpper_bound_values());
-            Pair<PartialRow, RangePartitionBound> lowerBound =
-                KuduUtil.buildRangePartitionBound(schema, rangePartitionColumns,
-                    rangePartition.getLower_bound_values(),
-                    rangePartition.isIs_lower_bound_inclusive());
-            Pair<PartialRow, RangePartitionBound> upperBound =
-                KuduUtil.buildRangePartitionBound(schema, rangePartitionColumns,
-                    rangePartition.getUpper_bound_values(),
-                    rangePartition.isIs_upper_bound_inclusive());
+            List<Pair<PartialRow, RangePartitionBound>> rangeBounds =
+                getRangePartitionBounds(rangePartition, schema, rangePartitionColumns);
+            Preconditions.checkState(rangeBounds.size() == 2);
+            Pair<PartialRow, RangePartitionBound> lowerBound = rangeBounds.get(0);
+            Pair<PartialRow, RangePartitionBound> upperBound = rangeBounds.get(1);
             tableOpts.addRangePartition(lowerBound.first, upperBound.first,
                 lowerBound.second, upperBound.second);
           }
@@ -264,6 +264,161 @@ public class KuduCatalogOpExecutor {
       // TODO: This is misleading when there are other errors, e.g. timeouts.
       throw new ImpalaRuntimeException(String.format("Kudu table '%s' does not exist " +
           "on master '%s'", kuduTableName, masterHosts), e);
+    }
+  }
+
+  /**
+   * Renames a Kudu table.
+   */
+  public static void renameTable(KuduTable tbl, String newName)
+      throws ImpalaRuntimeException {
+    Preconditions.checkState(!Strings.isNullOrEmpty(newName));
+    AlterTableOptions alterTableOptions = new AlterTableOptions();
+    alterTableOptions.renameTable(newName);
+    try (KuduClient client = KuduUtil.createKuduClient(tbl.getKuduMasterHosts())) {
+      client.alterTable(tbl.getKuduTableName(), alterTableOptions);
+    } catch (KuduException e) {
+      throw new ImpalaRuntimeException(String.format("Error renaming Kudu table " +
+      "%s to %s", tbl.getName(), newName), e);
+    }
+  }
+
+  /**
+   * Adds/drops a range partition.
+   */
+  public static void addDropRangePartition(KuduTable tbl,
+      TAlterTableAddDropRangePartitionParams params) throws ImpalaRuntimeException {
+    TRangePartition rangePartition = params.getRange_partition_spec();
+    List<Pair<PartialRow, RangePartitionBound>> rangeBounds =
+        getRangePartitionBounds(rangePartition, tbl);
+    Preconditions.checkState(rangeBounds.size() == 2);
+    Pair<PartialRow, RangePartitionBound> lowerBound = rangeBounds.get(0);
+    Pair<PartialRow, RangePartitionBound> upperBound = rangeBounds.get(1);
+    AlterTableOptions alterTableOptions = new AlterTableOptions();
+    TRangePartitionOperationType type = params.getType();
+    if (type == TRangePartitionOperationType.ADD) {
+      alterTableOptions.addRangePartition(lowerBound.first, upperBound.first,
+          lowerBound.second, upperBound.second);
+    } else {
+      alterTableOptions.dropRangePartition(lowerBound.first, upperBound.first,
+          lowerBound.second, upperBound.second);
+    }
+    try (KuduClient client = KuduUtil.createKuduClient(tbl.getKuduMasterHosts())) {
+      client.alterTable(tbl.getKuduTableName(), alterTableOptions);
+    } catch (KuduException e) {
+      if (!params.isIgnore_errors()) {
+        throw new ImpalaRuntimeException(String.format("Error %s range partition in " +
+            "table %s",
+            (type == TRangePartitionOperationType.ADD ? "adding" : "dropping"),
+            tbl.getName()), e);
+      }
+    }
+  }
+
+  private static List<Pair<PartialRow, RangePartitionBound>> getRangePartitionBounds(
+      TRangePartition rangePartition, KuduTable tbl) throws ImpalaRuntimeException {
+    return getRangePartitionBounds(rangePartition, tbl.getKuduSchema(),
+        tbl.getRangeDistributionColNames());
+  }
+
+  /**
+   * Returns the bounds of a range partition in two <PartialRow, RangePartitionBound>
+   * pairs to be used in Kudu API calls for ALTER and CREATE TABLE statements.
+   */
+  private static List<Pair<PartialRow, RangePartitionBound>> getRangePartitionBounds(
+      TRangePartition rangePartition, Schema schema,
+      List<String> rangeDistributionColNames) throws ImpalaRuntimeException {
+    Preconditions.checkNotNull(schema);
+    Preconditions.checkState(!rangeDistributionColNames.isEmpty());
+    Preconditions.checkState(rangePartition.isSetLower_bound_values()
+        || rangePartition.isSetUpper_bound_values());
+    List<Pair<PartialRow, RangePartitionBound>> rangeBounds =
+        Lists.newArrayListWithCapacity(2);
+    Pair<PartialRow, RangePartitionBound> lowerBound =
+        KuduUtil.buildRangePartitionBound(schema, rangeDistributionColNames,
+        rangePartition.getLower_bound_values(),
+        rangePartition.isIs_lower_bound_inclusive());
+    rangeBounds.add(lowerBound);
+    Pair<PartialRow, RangePartitionBound> upperBound =
+        KuduUtil.buildRangePartitionBound(schema, rangeDistributionColNames,
+        rangePartition.getUpper_bound_values(),
+        rangePartition.isIs_upper_bound_inclusive());
+    rangeBounds.add(upperBound);
+    return rangeBounds;
+  }
+
+  /**
+   * Adds a column to an existing Kudu table.
+   */
+  public static void addColumn(KuduTable tbl, List<TColumn> columns)
+      throws ImpalaRuntimeException {
+    AlterTableOptions alterTableOptions = new AlterTableOptions();
+    for (TColumn column: columns) {
+      Type type = Type.fromThrift(column.getColumnType());
+      Preconditions.checkState(type != null);
+      org.apache.kudu.Type kuduType = KuduUtil.fromImpalaType(type);
+      boolean isNullable = column.isSetIs_nullable() && column.isIs_nullable();
+      if (isNullable) {
+        if (column.isSetDefault_value()) {
+          // See KUDU-1747
+          throw new ImpalaRuntimeException(String.format("Error adding nullable " +
+              "column to Kudu table %s. Cannot specify a default value for a nullable " +
+              "column", tbl.getKuduTableName()));
+        }
+        alterTableOptions.addNullableColumn(column.getColumnName(), kuduType);
+      } else {
+        Object defaultValue = null;
+        if (column.isSetDefault_value()) {
+          defaultValue = KuduUtil.getKuduDefaultValue(column.getDefault_value(), kuduType,
+              column.getColumnName());
+        }
+        try {
+          alterTableOptions.addColumn(column.getColumnName(), kuduType, defaultValue);
+        } catch (IllegalArgumentException e) {
+          // TODO: Remove this when KUDU-1747 is fixed
+          throw new ImpalaRuntimeException("Error adding non-nullable column to " +
+              "Kudu table " + tbl.getKuduTableName(), e);
+        }
+      }
+    }
+    try (KuduClient client = KuduUtil.createKuduClient(tbl.getKuduMasterHosts())) {
+      client.alterTable(tbl.getKuduTableName(), alterTableOptions);
+    } catch (KuduException e) {
+      throw new ImpalaRuntimeException("Error adding columns to Kudu table " +
+          tbl.getKuduTableName(), e);
+    }
+  }
+
+  /**
+   * Drops a column from a Kudu table.
+   */
+  public static void dropColumn(KuduTable tbl, String colName)
+      throws ImpalaRuntimeException {
+    Preconditions.checkState(!Strings.isNullOrEmpty(colName));
+    AlterTableOptions alterTableOptions = new AlterTableOptions();
+    alterTableOptions.dropColumn(colName);
+    try (KuduClient client = KuduUtil.createKuduClient(tbl.getKuduMasterHosts())) {
+      client.alterTable(tbl.getKuduTableName(), alterTableOptions);
+    } catch (KuduException e) {
+      throw new ImpalaRuntimeException(String.format("Error dropping column %s from " +
+          "Kudu table %s", colName, tbl.getName()), e);
+    }
+  }
+
+  /**
+   * Changes the name of column.
+   */
+  public static void renameColumn(KuduTable tbl, String oldName, TColumn newCol)
+      throws ImpalaRuntimeException {
+    Preconditions.checkState(!Strings.isNullOrEmpty(oldName));
+    Preconditions.checkNotNull(newCol);
+    AlterTableOptions alterTableOptions = new AlterTableOptions();
+    alterTableOptions.renameColumn(oldName, newCol.getColumnName());
+    try (KuduClient client = KuduUtil.createKuduClient(tbl.getKuduMasterHosts())) {
+      client.alterTable(tbl.getKuduTableName(), alterTableOptions);
+    } catch (KuduException e) {
+      throw new ImpalaRuntimeException(String.format("Error renaming column %s to %s " +
+          "for Kudu table %s", oldName, newCol.getColumnName(), tbl.getName()), e);
     }
   }
 }

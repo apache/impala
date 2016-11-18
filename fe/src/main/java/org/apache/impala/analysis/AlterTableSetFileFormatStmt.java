@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetFileFormatParams;
@@ -53,5 +55,10 @@ public class AlterTableSetFileFormatStmt extends AlterTableSetStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+    Table tbl = getTargetTable();
+    if (tbl instanceof KuduTable) {
+      throw new AnalysisException("ALTER TABLE SET FILEFORMAT is not supported " +
+          "on Kudu tables: " + tbl.getFullName());
+    }
   }
 }

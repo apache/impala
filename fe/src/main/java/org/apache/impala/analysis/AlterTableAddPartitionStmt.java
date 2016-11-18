@@ -19,14 +19,16 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TAlterTableAddPartitionParams;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.permission.FsAction;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Represents an ALTER TABLE ADD PARTITION statement.
@@ -41,7 +43,7 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
       PartitionSpec partitionSpec, HdfsUri location, boolean ifNotExists,
       HdfsCachingOp cacheOp) {
     super(tableName);
-    Preconditions.checkState(partitionSpec != null);
+    Preconditions.checkNotNull(partitionSpec);
     location_ = location;
     ifNotExists_ = ifNotExists;
     partitionSpec_ = partitionSpec;
@@ -60,9 +62,7 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
       sb.append("IF NOT EXISTS ");
     }
     sb.append(" " + partitionSpec_.toSql());
-    if (location_ != null) {
-      sb.append(String.format(" LOCATION '%s'", location_));
-    }
+    if (location_ != null) sb.append(String.format(" LOCATION '%s'", location_));
     if (cacheOp_ != null) sb.append(cacheOp_.toSql());
     return sb.toString();
   }
@@ -83,16 +83,19 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+    Table table = getTargetTable();
+    if (table instanceof KuduTable) {
+      throw new AnalysisException("ALTER TABLE ADD PARTITION is not supported for " +
+          "Kudu tables: " + partitionSpec_.toSql());
+    }
     if (!ifNotExists_) partitionSpec_.setPartitionShouldNotExist();
     partitionSpec_.setPrivilegeRequirement(Privilege.ALTER);
     partitionSpec_.analyze(analyzer);
-
     if (location_ != null) {
       location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
     }
 
     boolean shouldCache = false;
-    Table table = getTargetTable();
     if (cacheOp_ != null) {
       cacheOp_.analyze(analyzer);
       shouldCache = cacheOp_.shouldCache();

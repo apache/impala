@@ -1975,6 +1975,11 @@ public class ParserTest extends FrontendTestBase {
           "ALTER TABLE TestDb.Foo %s COLUMNS (i int)", addReplace));
       ParsesOk(String.format(
           "ALTER TABLE TestDb.Foo %s COLUMNS (i int comment 'hi')", addReplace));
+      // Kudu column options
+      ParsesOk(String.format("ALTER TABLE Foo %s COLUMNS (i int PRIMARY KEY NOT NULL " +
+          "ENCODING RLE COMPRESSION SNAPPY BLOCK_SIZE 1024 DEFAULT 10, " +
+          "j string NULL ENCODING PLAIN_ENCODING COMPRESSION LZ4 BLOCK_SIZE 10 " +
+          "DEFAULT 'test')", addReplace));
 
       // Negative syntax tests
       ParserError(String.format("ALTER TABLE TestDb.Foo %s COLUMNS i int", addReplace));
@@ -2033,6 +2038,19 @@ public class ParserTest extends FrontendTestBase {
     ParserError("ALTER TABLE ADD PARTITION (i=1)");
     ParserError("ALTER TABLE ADD");
     ParserError("ALTER TABLE DROP");
+
+    // Kudu range partitions
+    String[] ifNotExistsOption = {"IF NOT EXISTS", ""};
+    for (String option: ifNotExistsOption) {
+      ParsesOk(String.format("ALTER TABLE Foo ADD %s RANGE PARTITION 10 < VALUES < 20",
+          option));
+      ParsesOk(String.format("ALTER TABLE Foo ADD %s RANGE PARTITION VALUE = 100",
+          option));
+      ParserError(String.format("ALTER TABLE Foo ADD %s RANGE PARTITION 10 < VALUES " +
+          "<= 20, PARTITION 20 < VALUES <= 30", option));
+      ParserError(String.format("ALTER TABLE Foo ADD %s (RANGE PARTITION 10 < VALUES " +
+          "<= 20)", option));
+    }
   }
 
   @Test
@@ -2078,6 +2096,21 @@ public class ParserTest extends FrontendTestBase {
       ParserError(String.format("ALTER Foo DROP PARTITION (i=1) %s", kw));
       ParserError(String.format("ALTER TABLE DROP PARTITION (i=1) %s", kw));
     }
+
+    // Kudu range partitions
+    String[] ifExistsOption = {"IF EXISTS", ""};
+    for (String option: ifExistsOption) {
+      ParsesOk(String.format("ALTER TABLE Foo DROP %s RANGE PARTITION 10 < VALUES < 20",
+          option));
+      ParsesOk(String.format("ALTER TABLE Foo DROP %s RANGE PARTITION VALUE = 100",
+          option));
+      ParserError(String.format("ALTER TABLE Foo DROP %s RANGE PARTITION 10 < VALUES " +
+          "<= 20, PARTITION 20 < VALUES <= 30", option));
+      ParserError(String.format("ALTER TABLE Foo DROP %s (RANGE PARTITION 10 < VALUES " +
+          "<= 20)", option));
+      ParserError(String.format("ALTER TABLE Foo DROP %s RANGE PARTITION VALUE = 100 " +
+          "PURGE", option));
+    }
   }
 
   @Test
@@ -2087,6 +2120,9 @@ public class ParserTest extends FrontendTestBase {
     for (String kw: columnKw) {
       ParsesOk(String.format("ALTER TABLE Foo.Bar CHANGE %s c1 c2 int", kw));
       ParsesOk(String.format("ALTER TABLE Foo CHANGE %s c1 c2 int comment 'hi'", kw));
+      // Kudu column options
+      ParsesOk(String.format("ALTER TABLE Foo CHANGE %s c1 c2 int comment 'hi' " +
+          "NULL ENCODING PLAIN_ENCODING COMPRESSION LZ4 DEFAULT 10 BLOCK_SIZE 1024", kw));
 
       // Negative syntax tests
       ParserError(String.format("ALTER TABLE Foo CHANGE %s c1 int c2", kw));

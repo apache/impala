@@ -50,14 +50,6 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.apache.impala.common.Reference;
-import org.apache.log4j.Logger;
-import org.apache.thrift.TException;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
@@ -96,6 +88,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.JniCatalogConstants;
 import org.apache.impala.thrift.TAlterTableAddPartitionParams;
+import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
 import org.apache.impala.thrift.TAlterTableAddReplaceColsParams;
 import org.apache.impala.thrift.TAlterTableChangeColParams;
 import org.apache.impala.thrift.TAlterTableDropColParams;
@@ -367,6 +360,11 @@ public class CatalogOpExecutor {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       boolean reloadMetadata = true;
       catalog_.getLock().writeLock().unlock();
+
+      if (tbl instanceof KuduTable && altersKuduTable(params.getAlter_type())) {
+        alterKuduTable(params, response, (KuduTable) tbl, newCatalogVersion);
+        return;
+      }
       switch (params.getAlter_type()) {
         case ADD_REPLACE_COLUMNS:
           TAlterTableAddReplaceColsParams addReplaceColParams =
@@ -376,7 +374,8 @@ public class CatalogOpExecutor {
           reloadTableSchema = true;
           break;
         case ADD_PARTITION:
-          TAlterTableAddPartitionParams addPartParams = params.getAdd_partition_params();
+          TAlterTableAddPartitionParams addPartParams =
+              params.getAdd_partition_params();
           // Create and add HdfsPartition object to the corresponding HdfsTable and load
           // its block metadata. Get the new table object with an updated catalog
           // version. If the partition already exists in Hive and "IfNotExists" is true,
@@ -507,6 +506,55 @@ public class CatalogOpExecutor {
         response.setResult_set(resultSet);
       }
     } // end of synchronized block
+  }
+
+  /**
+   * Returns true if the given alteration type changes the underlying table stored in
+   * Kudu in addition to the HMS table.
+   */
+  private boolean altersKuduTable(TAlterTableType type) {
+    return type == TAlterTableType.ADD_REPLACE_COLUMNS
+        || type == TAlterTableType.DROP_COLUMN
+        || type == TAlterTableType.CHANGE_COLUMN
+        || type == TAlterTableType.ADD_DROP_RANGE_PARTITION;
+  }
+
+  /**
+   * Executes the ALTER TABLE command for a Kudu table and reloads its metadata.
+   */
+  private void alterKuduTable(TAlterTableParams params, TDdlExecResponse response,
+      KuduTable tbl, long newCatalogVersion) throws ImpalaException {
+    Preconditions.checkState(Thread.holdsLock(tbl));
+    switch (params.getAlter_type()) {
+      case ADD_REPLACE_COLUMNS:
+        TAlterTableAddReplaceColsParams addReplaceColParams =
+            params.getAdd_replace_cols_params();
+        KuduCatalogOpExecutor.addColumn((KuduTable) tbl,
+            addReplaceColParams.getColumns());
+        break;
+      case DROP_COLUMN:
+        TAlterTableDropColParams dropColParams = params.getDrop_col_params();
+        KuduCatalogOpExecutor.dropColumn((KuduTable) tbl,
+            dropColParams.getCol_name());
+        break;
+      case CHANGE_COLUMN:
+        TAlterTableChangeColParams changeColParams = params.getChange_col_params();
+        KuduCatalogOpExecutor.renameColumn((KuduTable) tbl,
+            changeColParams.getCol_name(), changeColParams.getNew_col_def());
+        break;
+      case ADD_DROP_RANGE_PARTITION:
+        TAlterTableAddDropRangePartitionParams partParams =
+            params.getAdd_drop_range_partition_params();
+        KuduCatalogOpExecutor.addDropRangePartition((KuduTable) tbl, partParams);
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Unsupported ALTER TABLE operation for Kudu tables: " +
+            params.getAlter_type());
+    }
+
+    loadTableMetadata(tbl, newCatalogVersion, true, true, null);
+    addTableToCatalogUpdate(tbl, response.result);
   }
 
   /**
@@ -2144,9 +2192,22 @@ public class CatalogOpExecutor {
           tbl.getMetaStoreTable().deepCopy();
       switch (params.getTarget()) {
         case TBL_PROPERTY:
-          msTbl.getParameters().putAll(properties);
           if (KuduTable.isKuduTable(msTbl)) {
+            // If 'kudu.table_name' is specified and this is a managed table, rename
+            // the underlying Kudu table.
+            if (properties.containsKey(KuduTable.KEY_TABLE_NAME)
+                && !properties.get(KuduTable.KEY_TABLE_NAME).equals(
+                    msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME))
+                && !Table.isExternalTable(msTbl)) {
+              KuduCatalogOpExecutor.renameTable((KuduTable) tbl,
+                  properties.get(KuduTable.KEY_TABLE_NAME));
+            }
+            msTbl.getParameters().putAll(properties);
+            // Validate that the new table properties are valid and that
+            // the Kudu table is accessible.
             KuduCatalogOpExecutor.validateKuduTblExists(msTbl);
+          } else {
+            msTbl.getParameters().putAll(properties);
           }
           break;
         case SERDE_PROPERTY:

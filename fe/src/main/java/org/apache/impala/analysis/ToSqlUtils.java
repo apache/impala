@@ -223,6 +223,9 @@ public class ToSqlUtils {
           paramsSql.add(param.toSql());
         }
         kuduDistributeByParams = Joiner.on(", ").join(paramsSql);
+      } else {
+        // We shouldn't output the columns for external tables
+        colsSql = null;
       }
     }
     HdfsUri tableLocation = location == null ? null : new HdfsUri(location);

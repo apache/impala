@@ -18,6 +18,7 @@
 package org.apache.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -46,6 +47,7 @@ import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.LocatedTablet;
@@ -112,6 +114,9 @@ public class KuduTable extends Table {
   // supported.
   private final List<DistributeParam> distributeBy_ = Lists.newArrayList();
 
+  // Schema of the underlying Kudu table.
+  private org.apache.kudu.Schema kuduSchema_;
+
   protected KuduTable(org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
     super(msTable, db, name, owner);
@@ -137,6 +142,7 @@ public class KuduTable extends Table {
 
   public String getKuduTableName() { return kuduTableName_; }
   public String getKuduMasterHosts() { return kuduMasters_; }
+  public org.apache.kudu.Schema getKuduSchema() { return kuduSchema_; }
 
   public List<String> getPrimaryKeyColumnNames() {
     return ImmutableList.copyOf(primaryKeyColumnNames_);
@@ -144,6 +150,28 @@ public class KuduTable extends Table {
 
   public List<DistributeParam> getDistributeBy() {
     return ImmutableList.copyOf(distributeBy_);
+  }
+
+  /**
+   * Returns the range-based distribution of this table if it exists, null otherwise.
+   */
+  private DistributeParam getRangeDistribution() {
+    for (DistributeParam distributeParam: distributeBy_) {
+      if (distributeParam.getType() == DistributeParam.Type.RANGE) {
+        return distributeParam;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Returns the column names of the table's range-based distribution or an empty
+   * list if the table doesn't have a range-based distribution.
+   */
+  public List<String> getRangeDistributionColNames() {
+    DistributeParam rangeDistribution = getRangeDistribution();
+    if (rangeDistribution == null) return Collections.<String>emptyList();
+    return rangeDistribution.getColumnNames();
   }
 
   /**
@@ -214,7 +242,8 @@ public class KuduTable extends Table {
     List<FieldSchema> cols = msTable_.getSd().getCols();
     cols.clear();
     int pos = 0;
-    for (ColumnSchema colSchema: kuduTable.getSchema().getColumns()) {
+    kuduSchema_ = kuduTable.getSchema();
+    for (ColumnSchema colSchema: kuduSchema_.getColumns()) {
       KuduColumn kuduCol = KuduColumn.fromColumnSchema(colSchema, pos);
       Preconditions.checkNotNull(kuduCol);
       // Add the HMS column
@@ -228,13 +257,14 @@ public class KuduTable extends Table {
 
   private void loadDistributeByParams(org.apache.kudu.client.KuduTable kuduTable) {
     Preconditions.checkNotNull(kuduTable);
+    Schema tableSchema = kuduTable.getSchema();
     PartitionSchema partitionSchema = kuduTable.getPartitionSchema();
     Preconditions.checkState(!colsByPos_.isEmpty());
     distributeBy_.clear();
     for (HashBucketSchema hashBucketSchema: partitionSchema.getHashBucketSchemas()) {
       List<String> columnNames = Lists.newArrayList();
-      for (int colPos: hashBucketSchema.getColumnIds()) {
-        columnNames.add(colsByPos_.get(colPos).getName());
+      for (int colId: hashBucketSchema.getColumnIds()) {
+        columnNames.add(getColumnNameById(tableSchema, colId));
       }
       distributeBy_.add(
           DistributeParam.createHashParam(columnNames, hashBucketSchema.getNumBuckets()));
@@ -243,11 +273,21 @@ public class KuduTable extends Table {
     List<Integer> columnIds = rangeSchema.getColumns();
     if (columnIds.isEmpty()) return;
     List<String> columnNames = Lists.newArrayList();
-    for (int colPos: columnIds) columnNames.add(colsByPos_.get(colPos).getName());
+    for (int colId: columnIds) columnNames.add(getColumnNameById(tableSchema, colId));
     // We don't populate the split values because Kudu's API doesn't currently support
     // retrieving the split values for range partitions.
     // TODO: File a Kudu JIRA.
     distributeBy_.add(DistributeParam.createRangeParam(columnNames, null));
+  }
+
+  /**
+   * Returns the name of a Kudu column with id 'colId'.
+   */
+  private String getColumnNameById(Schema tableSchema, int colId) {
+    Preconditions.checkNotNull(tableSchema);
+    ColumnSchema col = tableSchema.getColumnByIndex(tableSchema.getColumnIndex(colId));
+    Preconditions.checkNotNull(col);
+    return col.getName();
   }
 
   /**
@@ -342,6 +382,12 @@ public class KuduTable extends Table {
       org.apache.kudu.client.KuduTable kuduTable = client.openTable(kuduTableName_);
       List<LocatedTablet> tablets =
           kuduTable.getTabletsLocations(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
+      if (tablets.isEmpty()) {
+        TResultRowBuilder builder = new TResultRowBuilder();
+        result.addToRows(
+            builder.add("-1").add("N/A").add("N/A").add("N/A").add("-1").get());
+        return result;
+      }
       for (LocatedTablet tab: tablets) {
         TResultRowBuilder builder = new TResultRowBuilder();
         builder.add("-1");   // The Kudu client API doesn't expose tablet row counts.
