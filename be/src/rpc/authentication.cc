@@ -36,6 +36,7 @@
 
 #include <ldap.h>
 
+#include "exec/kudu-util.h"
 #include "rpc/auth-provider.h"
 #include "rpc/thrift-server.h"
 #include "transport/TSaslClientTransport.h"
@@ -637,6 +638,13 @@ Status InitAuth(const string& appname) {
       err_msg << "Could not initialize Sasl library: " << e.what();
       return Status(err_msg.str());
     }
+
+    // Kudu client shouldn't attempt to initialize SASL which would conflict with
+    // Impala's SASL initialization. This must be called before any KuduClients are
+    // created to ensure that Kudu doesn't init SASL first, and this returns an error if
+    // Kudu has already initialized SASL.
+    KUDU_RETURN_IF_ERROR(kudu::client::DisableSaslInitialization(),
+        "Unable to disable Kudu SASL initialization.");
 
     // Add our auxprop plugin, which gives us a hook before authentication
     int rc = sasl_auxprop_add_plugin(IMPALA_AUXPROP_PLUGIN.c_str(), &ImpalaAuxpropInit);
