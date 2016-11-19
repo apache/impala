@@ -149,9 +149,7 @@ public abstract class ModifyStmt extends StatementBase {
 
     // Make sure that the user is allowed to modify the target table, since no
     // UPDATE / DELETE privilege exists, we reuse the INSERT one.
-    analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-        .onTable(table_.getDb().getName(), table_.getName())
-        .allOf(Privilege.INSERT).toRequest());
+    analyzer.registerAuthAndAuditEvent(dstTbl, Privilege.INSERT);
 
     // Validates the assignments_ and creates the sourceStmt_.
     if (sourceStmt_ == null) createSourceStmt(analyzer);

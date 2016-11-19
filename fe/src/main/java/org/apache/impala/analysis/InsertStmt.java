@@ -789,6 +789,13 @@ public class InsertStmt extends StatementBase {
   public boolean hasClusteredHint() { return hasClusteredHint_; }
   public ArrayList<Expr> getPrimaryKeyExprs() { return primaryKeyExprs_; }
 
+  public List<String> getMentionedColumns() {
+    List<String> result = Lists.newArrayList();
+    List<Column> columns = table_.getColumns();
+    for (Integer i: mentionedColumns_) result.add(columns.get(i).getName());
+    return result;
+  }
+
   public DataSink createDataSink() {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);

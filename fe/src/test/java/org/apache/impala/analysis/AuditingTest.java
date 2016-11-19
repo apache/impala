@@ -106,7 +106,7 @@ public class AuditingTest extends AnalyzerTest {
         new TAccessEvent("functional.alltypes", TCatalogObjectType.TABLE, "INSERT")));
 
     // Insert + inline-view.
-    accessEvents =  AnalyzeAccessEvents(
+    accessEvents = AnalyzeAccessEvents(
         "insert into functional.alltypes partition(month,year) " +
         "select b.* from functional.alltypesagg a join (select * from " +
         "functional_rc.alltypes) b on (a.int_col = b.int_col)");
@@ -368,6 +368,80 @@ public class AuditingTest extends AnalyzerTest {
     Assert.assertEquals(accessEvents, Sets.newHashSet(
         new TAccessEvent("_impala_builtins", TCatalogObjectType.DATABASE, "VIEW_METADATA"),
         new TAccessEvent("functional.alltypesagg", TCatalogObjectType.TABLE, "SELECT")));
+  }
+
+  @Test
+  public void TestKuduStatements() throws AuthorizationException, AnalysisException {
+    TestUtils.assumeKuduIsSupported();
+    // Select
+    Set<TAccessEvent> accessEvents =
+        AnalyzeAccessEvents("select * from functional_kudu.testtbl");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT")));
+
+    // Insert
+    accessEvents = AnalyzeAccessEvents(
+        "insert into functional_kudu.testtbl (id) select id from " +
+        "functional_kudu.alltypes");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("functional_kudu.alltypes", TCatalogObjectType.TABLE, "SELECT"),
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "INSERT")));
+
+    // Upsert
+    accessEvents = AnalyzeAccessEvents(
+        "upsert into functional_kudu.testtbl (id) select id from " +
+        "functional_kudu.alltypes");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("functional_kudu.alltypes", TCatalogObjectType.TABLE, "SELECT"),
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "INSERT")));
+
+    // Delete
+    accessEvents = AnalyzeAccessEvents(
+        "delete from functional_kudu.testtbl where id = 1");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT"),
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "INSERT")));
+
+    // Delete using a complex query
+    accessEvents = AnalyzeAccessEvents(
+        "delete c from functional_kudu.testtbl c, functional_kudu.alltypes s where " +
+        "c.id = s.id and s.int_col < 10");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT"),
+        new TAccessEvent("functional_kudu.alltypes", TCatalogObjectType.TABLE, "SELECT"),
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "INSERT")));
+
+    // Update
+    accessEvents = AnalyzeAccessEvents(
+        "update functional_kudu.testtbl set name = 'test' where id < 10");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT"),
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "INSERT")));
+
+    // Drop table
+    accessEvents = AnalyzeAccessEvents("drop table functional_kudu.testtbl");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
+        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "DROP")));
+
+    // Show create table
+    accessEvents = AnalyzeAccessEvents("show create table functional_kudu.testtbl");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
+        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "VIEW_METADATA")));
+
+    // Compute stats
+    accessEvents = AnalyzeAccessEvents("compute stats functional_kudu.testtbl");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALTER")));
+
+    // Describe
+    accessEvents = AnalyzeAccessEvents("describe functional_kudu.testtbl");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
+        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "ANY")));
+
+    // Describe formatted
+    accessEvents = AnalyzeAccessEvents("describe formatted functional_kudu.testtbl");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
+        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "VIEW_METADATA")));
   }
 
   /**

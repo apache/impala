@@ -176,17 +176,35 @@ public class Planner {
 
     ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
+      // Lineage is disabled for UPDATE AND DELETE statements
+      if (ctx_.isUpdateOrDelete()) return fragments;
       // Compute the column lineage graph
       if (ctx_.isInsertOrCtas()) {
-        Table targetTable = ctx_.getAnalysisResult().getInsertStmt().getTargetTable();
-        graph.addTargetColumnLabels(targetTable);
-        Preconditions.checkNotNull(targetTable);
-        // Lineage is not currently supported for Kudu tables (see IMPALA-4283)
-        if (targetTable instanceof KuduTable) return fragments;
+        InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
         List<Expr> exprs = Lists.newArrayList();
-        if (targetTable instanceof HBaseTable) {
+        Table targetTable = insertStmt.getTargetTable();
+        Preconditions.checkNotNull(targetTable);
+        if (targetTable instanceof KuduTable) {
+          if (ctx_.isInsert()) {
+            // For insert statements on Kudu tables, we only need to consider
+            // the labels of columns mentioned in the column list.
+            List<String> mentionedColumns = insertStmt.getMentionedColumns();
+            Preconditions.checkState(!mentionedColumns.isEmpty());
+            List<String> targetColLabels = Lists.newArrayList();
+            String tblFullName = targetTable.getFullName();
+            for (String column: mentionedColumns) {
+              targetColLabels.add(tblFullName + "." + column);
+            }
+            graph.addTargetColumnLabels(targetColLabels);
+          } else {
+            graph.addTargetColumnLabels(targetTable);
+          }
+          exprs.addAll(resultExprs);
+        } else if (targetTable instanceof HBaseTable) {
+          graph.addTargetColumnLabels(targetTable);
           exprs.addAll(resultExprs);
         } else {
+          graph.addTargetColumnLabels(targetTable);
           exprs.addAll(ctx_.getAnalysisResult().getInsertStmt().getPartitionKeyExprs());
           exprs.addAll(resultExprs.subList(0,
               targetTable.getNonClusteringColumns().size()));

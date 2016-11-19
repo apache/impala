@@ -653,7 +653,8 @@ public class PlannerTestBase extends FrontendTestBase {
     ArrayList<String> expectedLineage = testCase.getSectionContents(Section.LINEAGE);
     if (expectedLineage == null || expectedLineage.isEmpty()) return;
     TLineageGraph lineageGraph = null;
-    if (execRequest != null && execRequest.isSetQuery_exec_request()) {
+    if (execRequest == null) return;
+    if (execRequest.isSetQuery_exec_request()) {
       lineageGraph = execRequest.query_exec_request.lineage_graph;
     } else if (execRequest.isSetCatalog_op_request()) {
       lineageGraph = execRequest.catalog_op_request.lineage_graph;

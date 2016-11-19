@@ -192,10 +192,10 @@ order by b.bigint_col limit 10
 }
 ====
 # CTAS queries
-create table t as select int_col, tinyint_col from functional.alltypes
+create table lineage_test_tbl as select int_col, tinyint_col from functional.alltypes
 ---- LINEAGE
 {
-    "queryText":"create table t as select int_col, tinyint_col from functional.alltypes",
+    "queryText":"create table lineage_test_tbl as select int_col, tinyint_col from functional.alltypes",
     "hash":"f7666959b65ce1aa2a695ae90adb7c85",
     "user":"dev",
     "timestamp":1446159271,
@@ -223,7 +223,7 @@ create table t as select int_col, tinyint_col from functional.alltypes
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.t.int_col"
+            "vertexId":"default.lineage_test_tbl.int_col"
         },
         {
             "id":1,
@@ -233,7 +233,7 @@ create table t as select int_col, tinyint_col from functional.alltypes
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"default.t.tinyint_col"
+            "vertexId":"default.lineage_test_tbl.tinyint_col"
         },
         {
             "id":3,
@@ -243,13 +243,13 @@ create table t as select int_col, tinyint_col from functional.alltypes
     ]
 }
 ====
-create table t as
+create table lineage_test_tbl as
 select distinct a.int_col, a.string_col from functional.alltypes a
 inner join functional.alltypessmall b on (a.id = b.id)
 where a.year = 2009 and b.month = 2
 ---- LINEAGE
 {
-    "queryText":"create table t as\nselect distinct a.int_col, a.string_col from functional.alltypes a\ninner join functional.alltypessmall b on (a.id = b.id)\nwhere a.year = 2009 and b.month = 2",
+    "queryText":"create table lineage_test_tbl as\nselect distinct a.int_col, a.string_col from functional.alltypes a\ninner join functional.alltypessmall b on (a.id = b.id)\nwhere a.year = 2009 and b.month = 2",
     "hash":"6d83126f8e34eec31ed4e111e1c32e78",
     "user":"dev",
     "timestamp":1446159271,
@@ -290,7 +290,7 @@ where a.year = 2009 and b.month = 2
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.t.int_col"
+            "vertexId":"default.lineage_test_tbl.int_col"
         },
         {
             "id":1,
@@ -300,7 +300,7 @@ where a.year = 2009 and b.month = 2
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"default.t.string_col"
+            "vertexId":"default.lineage_test_tbl.string_col"
         },
         {
             "id":3,
@@ -330,13 +330,13 @@ where a.year = 2009 and b.month = 2
     ]
 }
 ====
-create table t as
+create table lineage_test_tbl as
 select * from
   (select * from
      (select int_col from functional.alltypestiny limit 1) v1 ) v2
 ---- LINEAGE
 {
-    "queryText":"create table t as\nselect * from\n  (select * from\n     (select int_col from functional.alltypestiny limit 1) v1 ) v2",
+    "queryText":"create table lineage_test_tbl as\nselect * from\n  (select * from\n     (select int_col from functional.alltypestiny limit 1) v1 ) v2",
     "hash":"f719f8eba46eda75e9cc560310885558",
     "user":"dev",
     "timestamp":1446159271,
@@ -355,7 +355,7 @@ select * from
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.t.int_col"
+            "vertexId":"default.lineage_test_tbl.int_col"
         },
         {
             "id":1,
@@ -366,10 +366,10 @@ select * from
 }
 ====
 # CTAS from HBase table
-create table tm as select * from functional_hbase.alltypes limit 5
+create table lineage_test_tblm as select * from functional_hbase.alltypes limit 5
 ---- LINEAGE
 {
-    "queryText":"create table tm as select * from functional_hbase.alltypes limit 5",
+    "queryText":"create table lineage_test_tblm as select * from functional_hbase.alltypes limit 5",
     "hash":"bedebc5bc72bbc6aec385c514944daae",
     "user":"dev",
     "timestamp":1446159271,
@@ -496,7 +496,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":0,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.id"
+            "vertexId":"default.lineage_test_tblm.id"
         },
         {
             "id":1,
@@ -506,7 +506,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":2,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.bigint_col"
+            "vertexId":"default.lineage_test_tblm.bigint_col"
         },
         {
             "id":3,
@@ -516,7 +516,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":4,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.bool_col"
+            "vertexId":"default.lineage_test_tblm.bool_col"
         },
         {
             "id":5,
@@ -526,7 +526,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":6,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.date_string_col"
+            "vertexId":"default.lineage_test_tblm.date_string_col"
         },
         {
             "id":7,
@@ -536,7 +536,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":8,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.double_col"
+            "vertexId":"default.lineage_test_tblm.double_col"
         },
         {
             "id":9,
@@ -546,7 +546,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":10,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.float_col"
+            "vertexId":"default.lineage_test_tblm.float_col"
         },
         {
             "id":11,
@@ -556,7 +556,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":12,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.int_col"
+            "vertexId":"default.lineage_test_tblm.int_col"
         },
         {
             "id":13,
@@ -566,7 +566,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":14,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.month"
+            "vertexId":"default.lineage_test_tblm.month"
         },
         {
             "id":15,
@@ -576,7 +576,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":16,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.smallint_col"
+            "vertexId":"default.lineage_test_tblm.smallint_col"
         },
         {
             "id":17,
@@ -586,7 +586,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":18,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.string_col"
+            "vertexId":"default.lineage_test_tblm.string_col"
         },
         {
             "id":19,
@@ -596,7 +596,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":20,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.timestamp_col"
+            "vertexId":"default.lineage_test_tblm.timestamp_col"
         },
         {
             "id":21,
@@ -606,7 +606,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":22,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.tinyint_col"
+            "vertexId":"default.lineage_test_tblm.tinyint_col"
         },
         {
             "id":23,
@@ -616,7 +616,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
         {
             "id":24,
             "vertexType":"COLUMN",
-            "vertexId":"default.tm.year"
+            "vertexId":"default.lineage_test_tblm.year"
         },
         {
             "id":25,
@@ -4452,4 +4452,480 @@ where not exists (select 1 from functional.alltypes a where v.id = a.id)
         }
     ]
 }
+====
+# Select query that accesses a Kudu table
+select count(*) from functional_kudu.alltypes k join functional.alltypes h on k.id = h.id
+where k.int_col < 10
+---- LINEAGE
+{
+    "queryText":"select count(*) from functional_kudu.alltypes k join functional.alltypes h on k.id = h.id\nwhere k.int_col < 10",
+    "hash":"7b7c92d488186d869bb6b78c97666f41",
+    "user":"dev",
+    "timestamp":1479538352,
+    "edges":[
+        {
+            "sources":[
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                1,
+                2,
+                3
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PREDICATE"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"count(*)"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_kudu.alltypes.int_col"
+        },
+        {
+            "id":2,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.id"
+        },
+        {
+            "id":3,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_kudu.alltypes.id"
+        }
+    ]
+}
+====
+# Insert into a Kudu table
+insert into functional_kudu.testtbl select id, string_col as name, int_col as zip from
+functional.alltypes a where a.id < 100
+---- LINEAGE
+{
+    "queryText":"insert into functional_kudu.testtbl select id, string_col as name, int_col as zip from\nfunctional.alltypes a where a.id < 100",
+    "hash":"87a59bac56c6ad27f7af6e71af46d552",
+    "user":"dev",
+    "timestamp":1479539012,
+    "edges":[
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                3
+            ],
+            "targets":[
+                2
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                5
+            ],
+            "targets":[
+                4
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0,
+                2,
+                4
+            ],
+            "edgeType":"PREDICATE"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_kudu.testtbl.id"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.id"
+        },
+        {
+            "id":2,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_kudu.testtbl.name"
+        },
+        {
+            "id":3,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.string_col"
+        },
+        {
+            "id":4,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_kudu.testtbl.zip"
+        },
+        {
+            "id":5,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.int_col"
+        }
+    ]
+}
+====
+# Insert into a Kudu table with a column list specified
+insert into functional_kudu.testtbl (name, id) select string_col as name, id from
+functional.alltypes where id < 10
+---- LINEAGE
+{
+    "queryText":"insert into functional_kudu.testtbl (name, id) select string_col as name, id from\nfunctional.alltypes where id < 10",
+    "hash":"0bccfdbf4118e6d5a3d94062ecb5130a",
+    "user":"dev",
+    "timestamp":1479933751,
+    "edges":[
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                3
+            ],
+            "targets":[
+                2
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0,
+                2
+            ],
+            "edgeType":"PREDICATE"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_kudu.testtbl.id"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.id"
+        },
+        {
+            "id":2,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_kudu.testtbl.name"
+        },
+        {
+            "id":3,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.string_col"
+        }
+    ]
+}
+====
+# Upsert into a Kudu table with a column list specified
+upsert into functional_kudu.testtbl (name, id) select string_col as name, id from
+functional.alltypes where id < 10
+---- LINEAGE
+{
+    "queryText":"upsert into functional_kudu.testtbl (name, id) select string_col as name, id from\nfunctional.alltypes where id < 10",
+    "hash":"f4c1e7b016e75012f7268f2f42ae5630",
+    "user":"dev",
+    "timestamp":1479933751,
+    "edges":[
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                3
+            ],
+            "targets":[
+                2
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0,
+                2
+            ],
+            "edgeType":"PREDICATE"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_kudu.testtbl.id"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.id"
+        },
+        {
+            "id":2,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_kudu.testtbl.name"
+        },
+        {
+            "id":3,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.string_col"
+        }
+    ]
+}
+====
+# CTAS a Kudu table
+create table kudu_ctas primary key (id) distribute by hash (id) into 3 buckets
+stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col,
+bigint_col, float_col, double_col, date_string_col, string_col
+from functional.alltypestiny
+---- LINEAGE
+{
+    "queryText":"create table kudu_ctas primary key (id) distribute by hash (id) into 3 buckets\nstored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col,\nbigint_col, float_col, double_col, date_string_col, string_col\nfrom functional.alltypestiny",
+    "hash":"6e3e192c7fb8bb6b22674a9b7b488b55",
+    "user":"dev",
+    "timestamp":1479933751,
+    "edges":[
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                3
+            ],
+            "targets":[
+                2
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                5
+            ],
+            "targets":[
+                4
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                7
+            ],
+            "targets":[
+                6
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                9
+            ],
+            "targets":[
+                8
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                11
+            ],
+            "targets":[
+                10
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                13
+            ],
+            "targets":[
+                12
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                15
+            ],
+            "targets":[
+                14
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                17
+            ],
+            "targets":[
+                16
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                19
+            ],
+            "targets":[
+                18
+            ],
+            "edgeType":"PROJECTION"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"default.kudu_ctas.id"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.id"
+        },
+        {
+            "id":2,
+            "vertexType":"COLUMN",
+            "vertexId":"default.kudu_ctas.bool_col"
+        },
+        {
+            "id":3,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.bool_col"
+        },
+        {
+            "id":4,
+            "vertexType":"COLUMN",
+            "vertexId":"default.kudu_ctas.tinyint_col"
+        },
+        {
+            "id":5,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.tinyint_col"
+        },
+        {
+            "id":6,
+            "vertexType":"COLUMN",
+            "vertexId":"default.kudu_ctas.smallint_col"
+        },
+        {
+            "id":7,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.smallint_col"
+        },
+        {
+            "id":8,
+            "vertexType":"COLUMN",
+            "vertexId":"default.kudu_ctas.int_col"
+        },
+        {
+            "id":9,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.int_col"
+        },
+        {
+            "id":10,
+            "vertexType":"COLUMN",
+            "vertexId":"default.kudu_ctas.bigint_col"
+        },
+        {
+            "id":11,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.bigint_col"
+        },
+        {
+            "id":12,
+            "vertexType":"COLUMN",
+            "vertexId":"default.kudu_ctas.float_col"
+        },
+        {
+            "id":13,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.float_col"
+        },
+        {
+            "id":14,
+            "vertexType":"COLUMN",
+            "vertexId":"default.kudu_ctas.double_col"
+        },
+        {
+            "id":15,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.double_col"
+        },
+        {
+            "id":16,
+            "vertexType":"COLUMN",
+            "vertexId":"default.kudu_ctas.date_string_col"
+        },
+        {
+            "id":17,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.date_string_col"
+        },
+        {
+            "id":18,
+            "vertexType":"COLUMN",
+            "vertexId":"default.kudu_ctas.string_col"
+        },
+        {
+            "id":19,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.string_col"
+        }
+    ]
+}
+====
+# No lineage should be generated for UPDATE
+update functional_kudu.alltypes set int_col = 1 where id = 1
+====
+# No lineage should be generated from DELETE
+delete from functional_kudu.alltypes where id = 1
 ====
