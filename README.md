@@ -31,7 +31,7 @@ Impala only supports Linux at the moment.
 
 ## Build Instructions
 
-./buildall.sh -notests
+See bin/bootstrap_build.sh.
 
 ## Export Control Notice
 
