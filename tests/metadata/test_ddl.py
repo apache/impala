@@ -24,7 +24,7 @@ from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIf, SkipIfLocal, SkipIfOldAggsJoins
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.util.filesystem_utils import WAREHOUSE, IS_LOCAL, IS_S3
+from tests.util.filesystem_utils import WAREHOUSE, IS_HDFS, IS_LOCAL, IS_S3
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):
@@ -393,8 +393,11 @@ class TestDdlStatements(TestDdlBase):
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_partition_ddl_predicates(self, vector, unique_database):
-    self.run_test_case('QueryTest/partition-ddl-predicates', vector,
+    self.run_test_case('QueryTest/partition-ddl-predicates-all-fs', vector,
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
+    if IS_HDFS:
+      self.run_test_case('QueryTest/partition-ddl-predicates-hdfs-only', vector,
+          use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
 # IMPALA-2002: Tests repeated adding/dropping of .jar and .so in the lib cache.
 class TestLibCache(TestDdlBase):

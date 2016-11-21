@@ -39,27 +39,6 @@ regex:.+,regex:.+,'j=1/k=a'
 STRING, STRING, STRING
 ====
 ---- QUERY
-alter table p1 partition (j<2, k in ("b", "c")) set cached in 'testPool'
----- RESULTS
-'Cached 2 partition(s).'
----- TYPES
-STRING
-====
----- QUERY
-alter table p1 partition (j<2, j>0, k<>"d") set uncached
----- RESULTS
-'Uncached 2 partition(s).'
----- TYPES
-STRING
-====
----- QUERY
-alter table p1 partition (j=3 or j=2, k like "%") set uncached
----- RESULTS
-'Uncached 0 partition(s).'
----- TYPES
-STRING
-====
----- QUERY
 alter table p1 partition (j=2) set fileformat parquet
 ---- RESULTS
 'Updated 4 partition(s).'
