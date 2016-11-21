@@ -1654,24 +1654,32 @@ void ImpalaServer::ConnectionStart(
 
 void ImpalaServer::ConnectionEnd(
     const ThriftServer::ConnectionContext& connection_context) {
-  unique_lock<mutex> l(connection_to_sessions_map_lock_);
-  ConnectionToSessionMap::iterator it =
-      connection_to_sessions_map_.find(connection_context.connection_id);
 
-  // Not every connection must have an associated session
-  if (it == connection_to_sessions_map_.end()) return;
+  vector<TUniqueId> sessions_to_close;
+  {
+    unique_lock<mutex> l(connection_to_sessions_map_lock_);
+    ConnectionToSessionMap::iterator it =
+        connection_to_sessions_map_.find(connection_context.connection_id);
+
+    // Not every connection must have an associated session
+    if (it == connection_to_sessions_map_.end()) return;
+
+    // We don't expect a large number of sessions per connection, so we copy it, so that
+    // we can drop the map lock early.
+    sessions_to_close = it->second;
+    connection_to_sessions_map_.erase(it);
+  }
 
   LOG(INFO) << "Connection from client " << connection_context.network_address
-            << " closed, closing " << it->second.size() << " associated session(s)";
+            << " closed, closing " << sessions_to_close.size() << " associated session(s)";
 
-  for (const TUniqueId& session_id: it->second) {
+  for (const TUniqueId& session_id: sessions_to_close) {
     Status status = CloseSessionInternal(session_id, true);
     if (!status.ok()) {
       LOG(WARNING) << "Error closing session " << session_id << ": "
                    << status.GetDetail();
     }
   }
-  connection_to_sessions_map_.erase(it);
 }
 
 void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
