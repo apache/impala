@@ -1337,7 +1337,8 @@ OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
-  a string primary key, b string, c string, d int, e double, f string, g string
+  a string primary key, b string null, c string null, d int null, e double null,
+  f string null, g string null
 )
 distribute by hash(a) into 3 buckets stored as kudu;
 ====
