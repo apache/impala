@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/buffer-pool.h"
 
 #include <boost/bind.hpp>
 #include <limits>
 #include <sstream>
 
-#include "bufferpool/reservation-tracker.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "common/names.h"
 #include "gutil/strings/substitute.h"
 #include "util/bit-util.h"

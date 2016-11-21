@@ -15,27 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RESERVATION_TRACKER_COUNTERS_H
-#define IMPALA_RESERVATION_TRACKER_COUNTERS_H
+#include "runtime/bufferpool/buffer-allocator.h"
 
-#include "util/runtime-profile.h"
+#include "util/bit-util.h"
 
 namespace impala {
 
-/// A set of counters for each ReservationTracker for reporting purposes.
-///
-/// If the ReservationTracker is linked to a profile these have the same lifetime as that
-/// profile, otherwise they have the same lifetime as the ReservationTracker itself.
-struct ReservationTrackerCounters {
-  /// The tracker's peak reservation in bytes.
-  RuntimeProfile::HighWaterMarkCounter* peak_reservation;
+BufferAllocator::BufferAllocator(int64_t min_buffer_len)
+  : min_buffer_len_(min_buffer_len) {}
 
-  /// The tracker's peak usage in bytes.
-  RuntimeProfile::HighWaterMarkCounter* peak_used_reservation;
+Status BufferAllocator::Allocate(int64_t len, uint8_t** buffer) {
+  DCHECK_GE(len, min_buffer_len_);
+  DCHECK_EQ(len, BitUtil::RoundUpToPowerOfTwo(len));
 
-  /// The hard limit on the tracker's reservations
-  RuntimeProfile::Counter* reservation_limit;
-};
+  *buffer = reinterpret_cast<uint8_t*>(malloc(len));
+  if (*buffer == NULL) return Status(TErrorCode::BUFFER_ALLOCATION_FAILED, len);
+  return Status::OK();
 }
 
-#endif
+void BufferAllocator::Free(uint8_t* buffer, int64_t len) {
+  free(buffer);
+}
+}

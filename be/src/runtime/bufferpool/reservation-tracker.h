@@ -15,15 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RESERVATION_TRACKER_H
-#define IMPALA_RESERVATION_TRACKER_H
+#ifndef IMPALA_RUNTIME_RESERVATION_TRACKER_H
+#define IMPALA_RUNTIME_RESERVATION_TRACKER_H
 
 #include <stdint.h>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/locks.hpp>
 #include <string>
 
-#include "bufferpool/reservation-tracker-counters.h"
+#include "runtime/bufferpool/reservation-tracker-counters.h"
 #include "common/status.h"
 #include "util/spinlock.h"
 

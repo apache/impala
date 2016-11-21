@@ -181,7 +181,6 @@ if (DOXYGEN_FOUND)
   # Possible to not input the subdirs one by one?
   set(CMAKE_DOXYGEN_INPUT
     ${CMAKE_SOURCE_DIR}/be/src
-    ${CMAKE_SOURCE_DIR}/be/src/bufferpool/
     ${CMAKE_SOURCE_DIR}/be/src/catalog/
     ${CMAKE_SOURCE_DIR}/be/src/common/
     ${CMAKE_SOURCE_DIR}/be/src/exec/
@@ -390,7 +389,7 @@ add_custom_target(be-test)
 # Utility CMake function to make specifying tests and benchmarks less verbose
 FUNCTION(ADD_BE_TEST TEST_NAME)
   # This gets the directory where the test is from (e.g. 'exprs' or 'runtime')
-  get_filename_component(DIR_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+  file(RELATIVE_PATH DIR_NAME "${CMAKE_SOURCE_DIR}/be/src/" ${CMAKE_CURRENT_SOURCE_DIR})
   ADD_EXECUTABLE(${TEST_NAME} ${TEST_NAME}.cc)
   TARGET_LINK_LIBRARIES(${TEST_NAME} ${IMPALA_TEST_LINK_LIBS})
   set(CMAKE_EXE_LINKER_FLAGS "--start-group")
@@ -434,7 +433,6 @@ endfunction(COMPILE_TO_IR)
 add_subdirectory(src/gutil)
 
 # compile these subdirs using their own CMakeLists.txt
-add_subdirectory(src/bufferpool)
 add_subdirectory(src/catalog)
 add_subdirectory(src/codegen)
 add_subdirectory(src/common)

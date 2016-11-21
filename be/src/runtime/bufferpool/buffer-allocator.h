@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_BUFFER_ALLOCATOR_H
-#define IMPALA_BUFFER_ALLOCATOR_H
+#ifndef IMPALA_RUNTIME_BUFFER_ALLOCATOR_H
+#define IMPALA_RUNTIME_BUFFER_ALLOCATOR_H
 
 #include "common/status.h"
 

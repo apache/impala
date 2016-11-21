@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_BUFFER_POOL_COUNTERS_H
-#define IMPALA_BUFFER_POOL_COUNTERS_H
+#ifndef IMPALA_RUNTIME_BUFFER_POOL_COUNTERS_H
+#define IMPALA_RUNTIME_BUFFER_POOL_COUNTERS_H
 
 #include "util/runtime-profile.h"
 

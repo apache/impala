@@ -23,8 +23,8 @@
 #include <string>
 #include <vector>
 
-#include "bufferpool/buffer-pool.h"
-#include "bufferpool/reservation-tracker.h"
+#include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "common/init.h"
 #include "common/object-pool.h"
 #include "testutil/death-test-util.h"

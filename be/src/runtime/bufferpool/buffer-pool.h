@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_BUFFER_POOL_H
-#define IMPALA_BUFFER_POOL_H
+#ifndef IMPALA_RUNTIME_BUFFER_POOL_H
+#define IMPALA_RUNTIME_BUFFER_POOL_H
 
 #include <stdint.h>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/locks.hpp>
 #include <string>
 
-#include "bufferpool/buffer-allocator.h"
-#include "bufferpool/buffer-pool-counters.h"
+#include "runtime/bufferpool/buffer-allocator.h"
+#include "runtime/bufferpool/buffer-pool-counters.h"
 #include "common/atomic.h"
 #include "common/status.h"
 #include "gutil/macros.h"

@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-#include "bufferpool/reservation-tracker.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "common/init.h"
 #include "common/object-pool.h"
 #include "runtime/mem-tracker.h"
