@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.web_sales (
   ws_net_paid_inc_ship DOUBLE,
   ws_net_paid_inc_ship_tax DOUBLE,
   ws_net_profit DOUBLE,
-  PRIMARY KEY (wd_order_number, ws_item_sk)
+  PRIMARY KEY (ws_order_number, ws_item_sk)
 )
 DISTRIBUTE BY HASH (ws_order_number,ws_item_sk) INTO {buckets} BUCKETS
 STORED AS KUDU
