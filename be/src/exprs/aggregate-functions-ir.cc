@@ -147,14 +147,18 @@ static void AllocBuffer(FunctionContext* ctx, StringVal* dst, size_t buf_len) {
 // 'buf_len' bytes and copies the content of StringVal 'src' into it.
 // If allocation fails, 'dst' will be set to a null string.
 static void CopyStringVal(FunctionContext* ctx, const StringVal& src, StringVal* dst) {
-  uint8_t* copy = ctx->Allocate(src.len);
-  if (UNLIKELY(copy == NULL && src.len != 0)) {
-    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+  if (src.is_null) {
     *dst = StringVal::null();
   } else {
-    *dst = StringVal(copy, src.len);
-    // Avoid memcpy() to NULL ptr as it's undefined.
-    if (LIKELY(dst->ptr != NULL)) memcpy(dst->ptr, src.ptr, src.len);
+    uint8_t* copy = ctx->Allocate(src.len);
+    if (UNLIKELY(copy == NULL)) {
+      // Zero-length allocation always returns a hard-coded pointer.
+      DCHECK(src.len != 0 && !ctx->impl()->state()->GetQueryStatus().ok());
+      *dst = StringVal::null();
+    } else {
+      *dst = StringVal(copy, src.len);
+      memcpy(dst->ptr, src.ptr, src.len);
+    }
   }
 }
 
