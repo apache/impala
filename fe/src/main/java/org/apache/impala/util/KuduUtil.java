@@ -22,36 +22,41 @@ import static java.lang.String.format;
 import java.util.HashSet;
 import java.util.List;
 
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.thrift.TExpr;
-import org.apache.impala.thrift.TExprNode;
-import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.analysis.Expr;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnEncoding;
+import org.apache.impala.thrift.TExpr;
+import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.THdfsCompression;
-
-import com.google.common.base.Splitter;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
-
 import org.apache.kudu.ColumnSchema;
-import org.apache.kudu.ColumnSchema.Encoding;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
+import org.apache.kudu.ColumnSchema.Encoding;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduClient.KuduClientBuilder;
 import org.apache.kudu.client.PartialRow;
 import org.apache.kudu.client.RangePartitionBound;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+
 public class KuduUtil {
 
   private static final String KUDU_TABLE_NAME_PREFIX = "impala::";
+
+  // Number of worker threads created by each KuduClient, regardless of whether or not
+  // they're needed. Impala does not share KuduClients between operations, so the number
+  // of threads created can get very large under concurrent workloads. This number should
+  // be sufficient for the Frontend/Catalog use, and has been tested in stress tests.
+  private static int KUDU_CLIENT_WORKER_THREAD_COUNT = 5;
 
   /**
    * Creates a KuduClient with the specified Kudu master addresses (as a comma-separated
@@ -64,6 +69,7 @@ public class KuduUtil {
     KuduClientBuilder b = new KuduClient.KuduClientBuilder(kuduMasters);
     b.defaultAdminOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
     b.defaultOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
+    b.workerCount(KUDU_CLIENT_WORKER_THREAD_COUNT);
     return b.build();
   }
 
