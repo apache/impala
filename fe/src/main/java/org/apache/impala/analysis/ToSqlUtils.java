@@ -91,12 +91,7 @@ public class ToSqlUtils {
     // are needed if this identifier will be preceded by a ".".
     boolean startsWithNumber = false;
     if (!hiveNeedsQuotes && !isImpalaKeyword) {
-      try {
-        Integer.parseInt(ident.substring(0, 1));
-        startsWithNumber = true;
-      } catch (NumberFormatException e) {
-        // Ignore exception, identifier does not start with number.
-      }
+      startsWithNumber = Character.isDigit(ident.charAt(0));
     }
     if (hiveNeedsQuotes || isImpalaKeyword || startsWithNumber) return "`" + ident + "`";
     return ident;
