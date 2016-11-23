@@ -404,8 +404,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     AnalysisError("select cast('foo' as varchar(0))",
         "Varchar size must be > 0: 0");
-    AnalysisError("select cast('foo' as varchar(65356))",
-        "Varchar size must be <= 65355: 65356");
+    AnalysisError("select cast('foo' as varchar(65536))",
+        "Varchar size must be <= 65535: 65536");
     AnalysisError("select cast('foo' as char(0))",
         "Char size must be > 0: 0");
     AnalysisError("select cast('foo' as char(256))",

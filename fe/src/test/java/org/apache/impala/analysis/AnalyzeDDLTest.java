@@ -1553,11 +1553,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table new_table (i int) PARTITIONED BY (d decimal(40,1))",
         "Decimal precision must be <= 38: 40");
 
-    AnalyzesOk("create table new_table(s1 varchar(1), s2 varchar(32672))");
+    AnalyzesOk("create table new_table(s1 varchar(1), s2 varchar(32672), " +
+        "s3 varchar(65535))");
     AnalysisError("create table new_table(s1 varchar(0))",
         "Varchar size must be > 0: 0");
-    AnalysisError("create table new_table(s1 varchar(65356))",
-        "Varchar size must be <= 65355: 65356");
+    AnalysisError("create table new_table(s1 varchar(65536))",
+        "Varchar size must be <= 65535: 65536");
     AnalysisError("create table new_table(s1 char(0))",
         "Char size must be > 0: 0");
     AnalysisError("create table new_table(s1 Char(256))",

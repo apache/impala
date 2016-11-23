@@ -2241,7 +2241,7 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("lower(cast('HELLO' as CHAR(3)))", "hel");
   TestStringValue("lower(cast(123456 as CHAR(3)))", "123");
   TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(3))", "123");
-  TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(65355))", "123");
+  TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(65535))", "123");
   TestIsNull("cast(NULL as CHAR(3))", ColumnType::CreateCharType(3));
 
   TestCharValue("cast('HELLO' as CHAR(255))",

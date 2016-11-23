@@ -18,12 +18,12 @@
 package org.apache.impala.catalog;
 
 import org.apache.commons.lang3.StringUtils;
-
 import org.apache.impala.analysis.TypesUtil;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TScalarType;
 import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -56,12 +56,12 @@ public class ScalarType extends Type {
   public static final int DEFAULT_SCALE = 0; // SQL standard
 
   // Longest supported VARCHAR and CHAR, chosen to match Hive.
-  public static final int MAX_VARCHAR_LENGTH = 65355;
-  public static final int MAX_CHAR_LENGTH = 255;
+  public static final int MAX_VARCHAR_LENGTH = (1 << 16) - 1; // 65535
+  public static final int MAX_CHAR_LENGTH = (1 << 8) - 1; // 255
 
   // Longest CHAR that we in line in the tuple.
   // Keep consistent with backend ColumnType::CHAR_INLINE_LENGTH
-  public static final int CHAR_INLINE_LENGTH = 128;
+  public static final int CHAR_INLINE_LENGTH = (1 << 7); // 128
 
   // Hive, mysql, sql server standard.
   public static final int MAX_PRECISION = 38;

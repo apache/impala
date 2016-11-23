@@ -74,9 +74,9 @@ struct ColumnType {
   PrimitiveType type;
   /// Only set if type == TYPE_CHAR or type == TYPE_VARCHAR
   int len;
-  static const int MAX_VARCHAR_LENGTH = 65355;
-  static const int MAX_CHAR_LENGTH = 255;
-  static const int MAX_CHAR_INLINE_LENGTH = 128;
+  static const int MAX_VARCHAR_LENGTH = (1 << 16) - 1; // 65535
+  static const int MAX_CHAR_LENGTH = (1 << 8) - 1; // 255
+  static const int MAX_CHAR_INLINE_LENGTH = (1 << 7); // 128
 
   /// Only set if type == TYPE_DECIMAL
   int precision, scale;
