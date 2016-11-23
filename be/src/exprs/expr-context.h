@@ -49,6 +49,8 @@ class ExprContext {
 
   /// Prepare expr tree for evaluation.
   /// Allocations from this context will be counted against 'tracker'.
+  /// If Prepare() is called, Close() must be called before destruction to release
+  /// resources, regardless of whether Prepare() succeeded.
   Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
                  MemTracker* tracker);
 
@@ -68,6 +70,7 @@ class ExprContext {
   Status Clone(RuntimeState* state, ExprContext** new_context);
 
   /// Closes all FunctionContexts. Must be called on every ExprContext, including clones.
+  /// Has no effect if already closed.
   void Close(RuntimeState* state);
 
   /// Calls the appropriate Get*Val() function on this context's expr tree and stores the

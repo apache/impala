@@ -79,11 +79,13 @@ JNIEXPORT jbyteArray JNICALL
 Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_expr_batch,
     jbyteArray thrift_query_ctx_bytes) {
+  Status status;
   jbyteArray result_bytes = NULL;
   TQueryCtx query_ctx;
   TExprBatch expr_batch;
   JniLocalFrame jni_frame;
   TResultRow expr_results;
+  vector<TColumnValue> results;
   ObjectPool obj_pool;
 
   DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch);
@@ -113,71 +115,60 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
   vector<ExprContext*> expr_ctxs;
   for (const TExpr& texpr : texprs) {
     ExprContext* ctx;
-    THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, texpr, &ctx), env,
-        JniUtil::internal_exc_class(), result_bytes);
-    Status prepare_status =
-        ctx->Prepare(&state, RowDescriptor(), state.query_mem_tracker());
+    status = Expr::CreateExprTree(&obj_pool, texpr, &ctx);
+    if (!status.ok()) goto error;
+
+    // Add 'ctx' to vector so it will be closed if Prepare() fails.
     expr_ctxs.push_back(ctx);
-    if (!prepare_status.ok()) {
-      for (ExprContext* ctx: expr_ctxs) ctx->Close(&state);
-      (env)->ThrowNew(JniUtil::internal_exc_class(), prepare_status.GetDetail().c_str());
-      return result_bytes;
-    }
+    status = ctx->Prepare(&state, RowDescriptor(), state.query_mem_tracker());
+    if (!status.ok()) goto error;
   }
 
   // UDFs which cannot be interpreted need to be handled by codegen.
   if (state.ScalarFnNeedsCodegen()) {
-    THROW_IF_ERROR_RET(
-        state.CreateCodegen(), env, JniUtil::internal_exc_class(), result_bytes);
+    status = state.CreateCodegen();
+    if (!status.ok()) goto error;
     LlvmCodeGen* codegen = state.codegen();
     DCHECK(codegen != NULL);
     state.CodegenScalarFns();
     codegen->EnableOptimizations(false);
     Status status = codegen->FinalizeModule();
-    if (!status.ok()) {
-      for (int i = 0; i < expr_ctxs.size(); ++i) {
-        expr_ctxs[i]->Close(&state);
-      }
-      (env)->ThrowNew(JniUtil::internal_exc_class(), status.GetDetail().c_str());
-      return result_bytes;
-    }
+    if (!status.ok()) goto error;
   }
 
   // Open() and evaluate the exprs. Always Close() the exprs even in case of errors.
-  vector<TColumnValue> results;
-  Status status;
-  int i;
-  for (i = 0; i < expr_ctxs.size(); ++i) {
-    status = expr_ctxs[i]->Open(&state);
-    if (!status.ok()) break;
+  for (ExprContext* expr_ctx : expr_ctxs) {
+    status = expr_ctx->Open(&state);
+    if (!status.ok()) goto error;
 
     TColumnValue val;
-    expr_ctxs[i]->GetConstantValue(&val);
-    status = expr_ctxs[i]->root()->GetFnContextError(expr_ctxs[i]);
-    if (!status.ok()) break;
+    expr_ctx->GetConstantValue(&val);
+    status = expr_ctx->root()->GetFnContextError(expr_ctx);
+    if (!status.ok()) goto error;
 
     // Check for mem limit exceeded.
     status = state.CheckQueryState();
-    if (!status.ok()) break;
+    if (!status.ok()) goto error;
     // Check for warnings registered in the runtime state.
     if (state.HasErrors()) {
       status = Status(state.ErrorLog());
-      break;
+      goto error;
     }
 
-    expr_ctxs[i]->Close(&state);
+    expr_ctx->Close(&state);
     results.push_back(val);
-  }
-  // Convert status to exception. Close all remaining expr contexts.
-  if (!status.ok()) {
-    for (int j = i; j < expr_ctxs.size(); ++j) expr_ctxs[j]->Close(&state);
-    (env)->ThrowNew(JniUtil::internal_exc_class(), status.GetDetail().c_str());
-    return result_bytes;
   }
 
   expr_results.__set_colVals(results);
-  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &expr_results, &result_bytes), env,
-                     JniUtil::internal_exc_class(), result_bytes);
+  status = SerializeThriftMsg(env, &expr_results, &result_bytes);
+  if (!status.ok()) goto error;
+  return result_bytes;
+
+error:
+  DCHECK(!status.ok());
+  // Convert status to exception. Close all remaining expr contexts.
+  for (ExprContext* expr_ctx : expr_ctxs) expr_ctx->Close(&state);
+  (env)->ThrowNew(JniUtil::internal_exc_class(), status.GetDetail().c_str());
   return result_bytes;
 }
 

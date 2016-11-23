@@ -71,9 +71,9 @@ Status ExprContext::Open(RuntimeState* state) {
 }
 
 void ExprContext::Close(RuntimeState* state) {
-  DCHECK(!closed_);
+  if (closed_) return;
   FunctionContext::FunctionStateScope scope =
-      is_clone_? FunctionContext::THREAD_LOCAL : FunctionContext::FRAGMENT_LOCAL;
+      is_clone_ ? FunctionContext::THREAD_LOCAL : FunctionContext::FRAGMENT_LOCAL;
   root_->Close(state, this, scope);
 
   for (int i = 0; i < fn_contexts_.size(); ++i) {
