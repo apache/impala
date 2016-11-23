@@ -133,7 +133,14 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
     DCHECK(codegen != NULL);
     state.CodegenScalarFns();
     codegen->EnableOptimizations(false);
-    codegen->FinalizeModule();
+    Status status = codegen->FinalizeModule();
+    if (!status.ok()) {
+      for (int i = 0; i < expr_ctxs.size(); ++i) {
+        expr_ctxs[i]->Close(&state);
+      }
+      (env)->ThrowNew(JniUtil::internal_exc_class(), status.GetDetail().c_str());
+      return result_bytes;
+    }
   }
 
   // Open() and evaluate the exprs. Always Close() the exprs even in case of errors.

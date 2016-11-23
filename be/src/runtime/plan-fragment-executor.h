@@ -279,7 +279,8 @@ class PlanFragmentExecutor {
 
   /// Optimizes the code-generated functions in runtime_state_->llvm_codegen().
   /// Must be called after exec_tree_->Prepare() and before exec_tree_->Open().
-  void OptimizeLlvmModule();
+  /// Returns error if LLVM optimization or compilation fails.
+  Status OptimizeLlvmModule();
 
   /// Executes Open() logic and returns resulting status. Does not set status_.
   Status OpenInternal();

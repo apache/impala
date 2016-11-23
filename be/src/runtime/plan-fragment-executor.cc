@@ -261,16 +261,11 @@ Status PlanFragmentExecutor::PrepareInternal(const TExecPlanFragmentParams& requ
   return Status::OK();
 }
 
-void PlanFragmentExecutor::OptimizeLlvmModule() {
-  if (!runtime_state_->ShouldCodegen()) return;
+Status PlanFragmentExecutor::OptimizeLlvmModule() {
+  if (!runtime_state_->ShouldCodegen()) return Status::OK();
   LlvmCodeGen* codegen = runtime_state_->codegen();
   DCHECK(codegen != NULL);
-  Status status = codegen->FinalizeModule();
-  if (!status.ok()) {
-    stringstream ss;
-    ss << "Error with codegen for this query: " << status.GetDetail();
-    runtime_state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
-  }
+  return codegen->FinalizeModule();
 }
 
 void PlanFragmentExecutor::PrintVolumeIds(
@@ -319,7 +314,7 @@ Status PlanFragmentExecutor::OpenInternal() {
     report_thread_started_cv_.wait(l);
   }
 
-  OptimizeLlvmModule();
+  RETURN_IF_ERROR(OptimizeLlvmModule());
 
   {
     SCOPED_TIMER(ADD_CHILD_TIMER(timings_profile_, "ExecTreeOpenTime", OPEN_TIMER_NAME));

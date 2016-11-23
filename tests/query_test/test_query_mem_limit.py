@@ -104,3 +104,20 @@ class TestQueryMemLimit(ImpalaTestSuite):
       assert should_succeed, "Query was expected to fail"
     except ImpalaBeeswaxException, e:
       assert not should_succeed, "Query should not have failed: %s" % e
+
+
+class TestCodegenMemLimit(ImpalaTestSuite):
+  """Tests that memory limit applies to codegen """
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestCodegenMemLimit, cls).add_test_dimensions()
+    # Only run the query for parquet
+    cls.TestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_codegen_mem_limit(self, vector):
+    self.run_test_case('QueryTest/codegen-mem-limit', vector)

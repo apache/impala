@@ -1,0 +1,10 @@
+=====
+---- QUERY
+set mem_limit=100k;
+select *
+from alltypes
+where substr(string_col, 1) = "";
+---- CATCH
+Codegen failed to reserve
+=====
+
