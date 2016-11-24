@@ -919,7 +919,8 @@ void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
   }
 
   IpAddr backend_ip;
-  DCHECK(backend_config_.LookUpBackendIp(backend.address.hostname, &backend_ip));
+  bool ret = backend_config_.LookUpBackendIp(backend.address.hostname, &backend_ip);
+  DCHECK(ret);
   DCHECK(!backend_ip.empty());
   assignment_heap_.InsertOrUpdate(backend_ip, scan_range_length,
       GetBackendRank(backend_ip));
