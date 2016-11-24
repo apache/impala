@@ -28,7 +28,7 @@ namespace impala {
 /// act as proxy for work-performing d'tors, which we try to avoid.
 class ScopeExitTrigger {
  public:
-  ScopeExitTrigger(const auto& trigger) : trigger_(trigger) {}
+  ScopeExitTrigger(const std::function<void()>& trigger) : trigger_(trigger) {}
 
   ~ScopeExitTrigger() { trigger_(); }
 
