@@ -284,6 +284,27 @@ class TestHS2(HS2TestSuite):
     assert "Sql Statement: GET_SCHEMAS" in profile_page
     assert "Query Type: DDL" in profile_page
 
+  @needs_session(conf_overlay={"idle_session_timeout": "5"})
+  def test_get_operation_status_session_timeout(self):
+    """Regression test for IMPALA-4488: GetOperationStatus() would not keep a session
+    alive"""
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    # Choose a long-running query so that it can't finish before the session timeout.
+    execute_statement_req.statement = """select * from functional.alltypes a
+    join functional.alltypes b join functional.alltypes c"""
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+    now = time.time()
+    # Loop until the session would be timed-out if IMPALA-4488 had not been fixed.
+    while time.time() - now < 10:
+      get_operation_status_resp = \
+        self.get_operation_status(execute_statement_resp.operationHandle)
+      # Will fail if session has timed out.
+      TestHS2.check_response(get_operation_status_resp)
+      time.sleep(0.1)
+
   def get_log(self, query_stmt):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
