@@ -98,7 +98,8 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
   query_ctx.request.query_options.max_errors = 1;
   RuntimeState state(query_ctx);
   // Make sure to close the runtime state no matter how this scope is exited.
-  ScopeExitTrigger close_runtime_state([&state]() { state.ReleaseResources(); });
+  const auto close_runtime_state =
+      MakeScopeExitTrigger([&state]() { state.ReleaseResources(); });
 
   THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
       result_bytes);

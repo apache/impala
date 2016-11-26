@@ -18,23 +18,38 @@
 #ifndef IMPALA_UTIL_SCOPE_EXIT_TRIGGER_H
 #define IMPALA_UTIL_SCOPE_EXIT_TRIGGER_H
 
-#include <functional>
-
 namespace impala {
 
 /// Utility class that calls a client-supplied function when it is destroyed.
 ///
 /// Use judiciously - scope exits can be hard to reason about, and this class should not
 /// act as proxy for work-performing d'tors, which we try to avoid.
+template <typename T>
+class ScopeExitTrigger;
+
+// The only way to construct ScopeExitTriggers is with MakeScopeExitTrigger, to enable
+// lambdas, which have indescribable types, to be the contained trigger, like
+//
+//   const auto foo = MakeScopeExitTrigger([](){});
+template <typename T>
+ScopeExitTrigger<T> MakeScopeExitTrigger(const T& trigger);
+
+template <typename T>
 class ScopeExitTrigger {
  public:
-  ScopeExitTrigger(const std::function<void()>& trigger) : trigger_(trigger) {}
-
   ~ScopeExitTrigger() { trigger_(); }
 
+  friend ScopeExitTrigger<T> MakeScopeExitTrigger<>(const T& trigger);
+
  private:
-  std::function<void()> trigger_;
+  explicit ScopeExitTrigger(const T& trigger) : trigger_(trigger) {}
+  T trigger_;
 };
+
+template <typename T>
+ScopeExitTrigger<T> MakeScopeExitTrigger(const T& trigger) {
+  return ScopeExitTrigger<T>(trigger);
+}
 }
 
 #endif
