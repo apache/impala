@@ -131,7 +131,7 @@ under the License.
 
       <p>
         The arithmetic operators generally do not have equivalent calling conventions using functional notation. For example, prior to
-        Impala 2.2.0 / CDH 5.4.0, there is no <codeph>MOD()</codeph> function equivalent to the <codeph>%</codeph> modulo operator.
+        <keyword keyref="impala22_full"/>, there is no <codeph>MOD()</codeph> function equivalent to the <codeph>%</codeph> modulo operator.
         Conversely, there are some arithmetic functions that do not have a corresponding operator. For example, for exponentiation you use
         the <codeph>POW()</codeph> function, but there is no <codeph>**</codeph> exponentiation operator. See
         <xref href="impala_math_functions.xml#math_functions"/> for the arithmetic functions you can use.

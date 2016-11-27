@@ -97,18 +97,14 @@ under the License.
     <conbody>
 
       <p>
-        In Impala 2.0 and later, you have the choice between the Cloudera JDBC Connector and the Hive 0.13 JDBC driver.
-        <ph rev="upstream">Cloudera</ph> recommends using the Cloudera JDBC Connector where practical.
+        In Impala 2.0 and later, you can use the Hive 0.13 JDBC driver.  If you are
+        already using JDBC applications with an earlier Impala release, you should update
+        your JDBC driver, because the Hive 0.12 driver that was formerly the only choice
+        is not compatible with Impala 2.0 and later.
       </p>
 
       <p>
-        If you are already using JDBC applications with an earlier Impala release, you must update your JDBC driver
-        to one of these choices, because the Hive 0.12 driver that was formerly the only choice is not compatible
-        with Impala 2.0 and later.
-      </p>
-
-      <p>
-        Both the Cloudera JDBC 2.5 Connector and the Hive JDBC driver provide a substantial speed increase for JDBC
+        The Hive JDBC driver provides a substantial speed increase for JDBC
         applications with Impala 2.0 and higher, for queries that return large result sets.
       </p>
 
@@ -131,31 +127,16 @@ under the License.
 
     <conbody>
 
-      <section id="install_jdbc_connector">
-        <title>Using the Cloudera JDBC Connector (recommended)</title>
-
-        <p>
-          You download and install the Cloudera JDBC 2.5 connector on any Linux, Windows, or Mac system where you
-          intend to run JDBC-enabled applications. From the
-          <xref href="http://go.cloudera.com/odbc-driver-hive-impala.html" scope="external" format="html">Cloudera
-          Connectors download page</xref>, you choose the appropriate protocol (JDBC or ODBC) and target product
-          (Impala or Hive). The ease of downloading and installing on non-CDH systems makes this connector a
-          convenient choice for organizations with heterogeneous environments.
-        </p>
-
-      </section>
-
       <section id="install_hive_driver">
         <title>Using the Hive JDBC Driver</title>
         <p>
           You install the Hive JDBC driver (<codeph>hive-jdbc</codeph> package) through the Linux package manager, on
-          hosts within the CDH cluster. The driver consists of several Java JAR files. The same driver can be used by Impala and Hive.
+          hosts within the cluster. The driver consists of several Java JAR files. The same driver can be used by Impala and Hive.
         </p>
 
         <p>
-          To get the JAR files, install the Hive JDBC driver on each CDH-enabled host in the cluster that will run
-          JDBC applications. Follow the instructions for
-          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hive_jdbc_install.html" scope="external" format="html">CDH 5</xref>.
+          To get the JAR files, install the Hive JDBC driver on each host in the cluster that will run
+          JDBC applications. <!-- TODO: Find a URL to point to for instructions and downloads -->
         </p>
 
         <note>
@@ -166,17 +147,17 @@ under the License.
         </note>
 
         <p>
-          If you are using JDBC-enabled applications on hosts outside the CDH cluster, you cannot use the CDH install
-          procedure on the non-CDH hosts. Install the JDBC driver on at least one CDH host using the preceding
+          If you are using JDBC-enabled applications on hosts outside the cluster, you cannot use the the same install
+          procedure on the hosts. Install the JDBC driver on at least one cluster host using the preceding
           procedure. Then download the JAR files to each client machine that will use JDBC with Impala:
         </p>
 
   <codeblock>commons-logging-X.X.X.jar
   hadoop-common.jar
-  hive-common-X.XX.X-cdhX.X.X.jar
-  hive-jdbc-X.XX.X-cdhX.X.X.jar
-  hive-metastore-X.XX.X-cdhX.X.X.jar
-  hive-service-X.XX.X-cdhX.X.X.jar
+  hive-common-X.XX.X.jar
+  hive-jdbc-X.XX.X.jar
+  hive-metastore-X.XX.X.jar
+  hive-service-X.XX.X.jar
   httpclient-X.X.X.jar
   httpcore-X.X.X.jar
   libfb303-X.X.X.jar
@@ -193,11 +174,6 @@ under the License.
         <ol>
           <li>
             Download the JAR files listed above to each client machine.
-  <!--
-            Download the
-            <xref href="https://downloads.cloudera.com/impala-jdbc/impala-jdbc-0.5-2.zip" scope="external" format="zip">Impala
-            JDBC zip file</xref> to the client machine that you will use to connect to Impala servers.
-  -->
             <note>
               For Maven users, see
               <xref href="https://github.com/onefoursix/Cloudera-Impala-JDBC-Example" scope="external" format="html">this
@@ -262,48 +238,6 @@ under the License.
       </p>
 
       <note conref="../shared/impala_common.xml#common/proxy_jdbc_caveat"/>
-
-      <section id="class_jdbc_connector">
-
-        <title>Using the Cloudera JDBC Connector (recommended)</title>
-
-        <p>
-          Depending on the level of the JDBC API your application is targeting, you can use
-          the following fully-qualified class names (FQCNs):
-        </p>
-
-        <ul>
-          <li><codeph>com.cloudera.impala.jdbc41.Driver</codeph></li>
-          <li><codeph>com.cloudera.impala.jdbc41.DataSource</codeph></li>
-        </ul>
-
-        <ul>
-          <li><codeph>com.cloudera.impala.jdbc4.Driver</codeph></li>
-          <li><codeph>com.cloudera.impala.jdbc4.DataSource</codeph></li>
-        </ul>
-
-        <ul>
-          <li><codeph>com.cloudera.impala.jdbc3.Driver</codeph></li>
-          <li><codeph>com.cloudera.impala.jdbc3.DataSource</codeph></li>
-        </ul>
-
-        <p>
-          The connection string has the following format:
-        </p>
-
-<codeblock>jdbc:impala://<varname>Host</varname>:<varname>Port</varname>[/<varname>Schema</varname>];<varname>Property1</varname>=<varname>Value</varname>;<varname>Property2</varname>=<varname>Value</varname>;...</codeblock>
-
-        <p>
-          The <codeph>port</codeph> value is typically 21050 for Impala.
-        </p>
-
-        <p>
-          For full details about the classes and the connection string (especially the property values available
-          for the connection string), download the appropriate driver documentation for your platform from
-          <xref href="http://www.cloudera.com/content/cloudera/en/downloads/connectors/impala/jdbc/impala-jdbc-v2-5-5.html" scope="external" format="html">the Impala JDBC Connector download page</xref>.
-        </p>
-
-      </section>
 
       <section id="class_hive_driver">
       <title>Using the Hive JDBC Driver</title>

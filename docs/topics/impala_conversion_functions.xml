@@ -45,7 +45,7 @@ under the License.
     </p>
 
     <note>
-      Although in CDH 5.5.0, the <codeph>SHOW FUNCTIONS</codeph> output for
+      Although in <keyword keyref="impala23_full"/>, the <codeph>SHOW FUNCTIONS</codeph> output for
       database <codeph>_IMPALA_BUILTINS</codeph> contains some function signatures
       matching the pattern <codeph>castto*</codeph>, these functions are not intended
       for public use and are expected to be hidden in future.
