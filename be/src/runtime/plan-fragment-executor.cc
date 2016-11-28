@@ -76,8 +76,12 @@ PlanFragmentExecutor::PlanFragmentExecutor(
     report_thread_active_(false),
     closed_(false),
     has_thread_token_(false),
+    timings_profile_(NULL),
+    root_sink_(NULL),
     is_prepared_(false),
     is_cancelled_(false),
+    per_host_mem_usage_(NULL),
+    rows_produced_counter_(NULL),
     average_thread_tokens_(NULL),
     mem_usage_sampled_counter_(NULL),
     thread_usage_sampled_counter_(NULL) {}
@@ -91,6 +95,7 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
 Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   Status status = PrepareInternal(request);
   prepared_promise_.Set(status);
+  if (!status.ok()) FragmentComplete(status);
   return status;
 }
 
@@ -287,11 +292,12 @@ void PlanFragmentExecutor::PrintVolumeIds(
 }
 
 Status PlanFragmentExecutor::Open() {
+  DCHECK(prepared_promise_.IsSet() && prepared_promise_.Get().ok());
   SCOPED_TIMER(profile()->total_time_counter());
   SCOPED_TIMER(ADD_TIMER(timings_profile_, OPEN_TIMER_NAME));
   VLOG_QUERY << "Open(): instance_id=" << runtime_state_->fragment_instance_id();
   Status status = OpenInternal();
-  UpdateStatus(status);
+  if (!status.ok()) FragmentComplete(status);
   opened_promise_.Set(status);
   return status;
 }
@@ -301,17 +307,16 @@ Status PlanFragmentExecutor::OpenInternal() {
   RETURN_IF_ERROR(
       runtime_state_->desc_tbl().PrepareAndOpenPartitionExprs(runtime_state_.get()));
 
-  // we need to start the profile-reporting thread before calling exec_tree_->Open(),
-  // since it
-  // may block
+  // We need to start the profile-reporting thread before calling exec_tree_->Open(),
+  // since it may block.
   if (!report_status_cb_.empty() && FLAGS_status_report_interval > 0) {
     unique_lock<mutex> l(report_thread_lock_);
     report_thread_.reset(
         new Thread("plan-fragment-executor", "report-profile",
-            &PlanFragmentExecutor::ReportProfile, this));
-    // make sure the thread started up, otherwise ReportProfile() might get into a race
-    // with StopReportThread()
-    report_thread_started_cv_.wait(l);
+            &PlanFragmentExecutor::ReportProfileThread, this));
+    // Make sure the thread started up, otherwise ReportProfileThread() might get into
+    // a race with StopReportThread().
+    while (!report_thread_active_) report_thread_started_cv_.wait(l);
   }
 
   RETURN_IF_ERROR(OptimizeLlvmModule());
@@ -324,29 +329,22 @@ Status PlanFragmentExecutor::OpenInternal() {
 }
 
 Status PlanFragmentExecutor::Exec() {
+  DCHECK(opened_promise_.IsSet() && opened_promise_.Get().ok());
   SCOPED_TIMER(profile()->total_time_counter());
   Status status;
   {
     // Must go out of scope before FragmentComplete(), otherwise counter will not be
     // updated by time final profile is sent, and will always be 0.
     SCOPED_TIMER(ADD_TIMER(timings_profile_, EXEC_TIMER_NAME));
-    {
-      lock_guard<mutex> l(status_lock_);
-      RETURN_IF_ERROR(status_);
-    }
     status = ExecInternal();
   }
-
-  // If there's no error, ExecInternal() completed the fragment instance's execution.
-  if (status.ok()) {
-    FragmentComplete();
-  } else if (!status.IsCancelled() && !status.IsMemLimitExceeded()) {
-    // Log error message in addition to returning in Status. Queries that do not
-    // fetch results (e.g. insert) may not receive the message directly and can
-    // only retrieve the log.
+  if (!status.ok() && !status.IsCancelled() && !status.IsMemLimitExceeded()) {
+    // Log error message in addition to returning in Status. Queries that do not fetch
+    // results (e.g. insert) may not receive the message directly and can only retrieve
+    // the log.
     runtime_state_->LogError(status.msg());
   }
-  UpdateStatus(status);
+  FragmentComplete(status);
   return status;
 }
 
@@ -376,8 +374,9 @@ Status PlanFragmentExecutor::ExecInternal() {
   return Status::OK();
 }
 
-void PlanFragmentExecutor::ReportProfile() {
-  VLOG_FILE << "ReportProfile(): instance_id=" << runtime_state_->fragment_instance_id();
+void PlanFragmentExecutor::ReportProfileThread() {
+  VLOG_FILE << "ReportProfileThread(): instance_id="
+            << runtime_state_->fragment_instance_id();
   DCHECK(!report_status_cb_.empty());
   unique_lock<mutex> l(report_thread_lock_);
   // tell Open() that we started
@@ -414,40 +413,27 @@ void PlanFragmentExecutor::ReportProfile() {
     }
 
     if (!report_thread_active_) break;
-
-    if (completed_report_sent_.Load() == 0) {
-      // No complete fragment report has been sent.
-      SendReport(false);
-    }
+    SendReport(false, Status::OK());
   }
 
   VLOG_FILE << "exiting reporting thread: instance_id="
       << runtime_state_->fragment_instance_id();
 }
 
-void PlanFragmentExecutor::SendReport(bool done) {
+void PlanFragmentExecutor::SendReport(bool done, const Status& status) {
+  DCHECK(status.ok() || done);
   if (report_status_cb_.empty()) return;
 
-  Status status;
-  {
-    lock_guard<mutex> l(status_lock_);
-    status = status_;
-  }
-
-  // If status is not OK, we need to make sure that only one sender sends a 'done'
-  // response.
-  // TODO: Clean all this up - move 'done' reporting to Close()?
-  if (!done && !status.ok()) {
-    done = completed_report_sent_.CompareAndSwap(0, 1);
-  }
-
   // Update the counter for the peak per host mem usage.
-  per_host_mem_usage_->Set(runtime_state()->query_mem_tracker()->peak_consumption());
+  if (per_host_mem_usage_ != nullptr) {
+    per_host_mem_usage_->Set(runtime_state()->query_mem_tracker()->peak_consumption());
+  }
 
   // This will send a report even if we are cancelled.  If the query completed correctly
   // but fragments still need to be cancelled (e.g. limit reached), the coordinator will
   // be waiting for a final report and profile.
-  report_status_cb_(status, profile(), done);
+  RuntimeProfile* prof = is_prepared_ ? profile() : nullptr;
+  report_status_cb_(status, prof, done);
 }
 
 void PlanFragmentExecutor::StopReportThread() {
@@ -460,29 +446,11 @@ void PlanFragmentExecutor::StopReportThread() {
   report_thread_->Join();
 }
 
-void PlanFragmentExecutor::FragmentComplete() {
-  // Check the atomic flag. If it is set, then a fragment complete report has already
-  // been sent.
-  bool send_report = completed_report_sent_.CompareAndSwap(0, 1);
+void PlanFragmentExecutor::FragmentComplete(const Status& status) {
   ReleaseThreadToken();
   StopReportThread();
-  if (send_report) SendReport(true);
-}
-
-void PlanFragmentExecutor::UpdateStatus(const Status& status) {
-  if (status.ok()) return;
-
-  bool send_report = completed_report_sent_.CompareAndSwap(0, 1);
-
-  {
-    lock_guard<mutex> l(status_lock_);
-    if (status_.ok()) {
-      status_ = status;
-    }
-  }
-
-  StopReportThread();
-  if (send_report) SendReport(true);
+  // It's safe to send final report now that the reporting thread is stopped.
+  SendReport(true, status);
 }
 
 void PlanFragmentExecutor::Cancel() {
@@ -520,6 +488,9 @@ void PlanFragmentExecutor::ReleaseThreadToken() {
 }
 
 void PlanFragmentExecutor::Close() {
+  DCHECK(!has_thread_token_);
+  DCHECK(!report_thread_active_);
+
   if (closed_) return;
   if (!is_prepared_) return;
   if (sink_.get() != nullptr) sink_->Close(runtime_state());

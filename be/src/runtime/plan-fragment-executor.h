@@ -62,14 +62,12 @@ class TPlanExecParams;
 /// includes profile information for the plan itself as well as the output sink.
 ///
 /// The ReportStatusCallback passed into the c'tor is invoked periodically to report the
-/// execution status. The frequency of those reports is controlled by the flag
+/// execution profile. The frequency of those reports is controlled by the flag
 /// status_report_interval; setting that flag to 0 disables periodic reporting altogether
 /// Regardless of the value of that flag, if a report callback is specified, it is invoked
 /// at least once at the end of execution with an overall status and profile (and 'done'
-/// indicator). The only exception is when execution is cancelled, in which case the
-/// callback is *not* invoked (the coordinator already knows that execution stopped,
-/// because it initiated the cancellation).
-//
+/// indicator).
+///
 /// Aside from Cancel(), which may be called asynchronously, this class is not
 /// thread-safe.
 class PlanFragmentExecutor {
@@ -103,14 +101,19 @@ class PlanFragmentExecutor {
   ///
   /// If Cancel() is called before Prepare(), Prepare() is a no-op and returns
   /// Status::CANCELLED;
+  ///
+  /// If Prepare() fails, it will invoke final status callback with the error status.
   Status Prepare(const TExecPlanFragmentParams& request);
 
-  /// Opens the fragment plan and sink. Starts the profile reporting thread, if required.
+  /// Opens the fragment plan and sink. Starts the profile reporting thread, if
+  /// required.  Can be called only if Prepare() succeeded. If Open() fails it will
+  /// invoke the final status callback with the error status.
   Status Open();
 
   /// Executes the fragment by repeatedly driving the sink with batches produced by the
   /// exec node tree. report_status_cb will have been called for the final time when
-  /// Exec() returns, and the status-reporting thread will have been stopped.
+  /// Exec() returns, and the status-reporting thread will have been stopped. Can be
+  /// called only if Open() succeeded.
   Status Exec();
 
   /// Closes the underlying plan fragment and frees up all resources allocated in
@@ -169,7 +172,8 @@ class PlanFragmentExecutor {
 
   /// When the report thread starts, it sets 'report_thread_active_' to true and signals
   /// 'report_thread_started_cv_'. The report thread is shut down by setting
-  /// 'report_thread_active_' to false and signalling 'stop_report_thread_cv_'.
+  /// 'report_thread_active_' to false and signalling 'stop_report_thread_cv_'. Protected
+  /// by 'report_thread_lock_'.
   bool report_thread_active_;
 
   /// true if Close() has been called
@@ -177,16 +181,6 @@ class PlanFragmentExecutor {
 
   /// true if this fragment has not returned the thread token to the thread resource mgr
   bool has_thread_token_;
-
-  /// Overall execution status. Either ok() or set to the first error status that
-  /// was encountered.
-  Status status_;
-
-  /// Protects status_
-  /// lock ordering:
-  /// 1. report_thread_lock_
-  /// 2. status_lock_
-  boost::mutex status_lock_;
 
   /// 'runtime_state_' has to be before 'sink_' as 'sink_' relies on the object pool of
   /// 'runtime_state_'. This means 'sink_' is destroyed first so any implicit connections
@@ -242,12 +236,6 @@ class PlanFragmentExecutor {
   /// of the execution.
   RuntimeProfile::Counter* average_thread_tokens_;
 
-  /// (Atomic) Flag that indicates whether a completed fragment report has been or will
-  /// be fired. It is initialized to 0 and atomically swapped to 1 when a completed
-  /// fragment report is about to be fired. Used for reducing the probability that a
-  /// report is sent twice at the end of the fragment.
-  AtomicInt32 completed_report_sent_;
-
   /// Sampled memory usage at even time intervals.
   RuntimeProfile::TimeSeriesCounter* mem_usage_sampled_counter_;
 
@@ -260,22 +248,19 @@ class PlanFragmentExecutor {
   typedef std::map<TPlanNodeId, std::vector<TScanRangeParams>> PerNodeScanRanges;
 
   /// Main loop of profile reporting thread.
-  /// Exits when notified on done_cv_.
-  /// On exit, *no report is sent*, ie, this will not send the final report.
-  void ReportProfile();
+  /// Exits when notified on stop_report_thread_cv_ and report_thread_active_ is set to
+  /// false. This will not send the final report.
+  void ReportProfileThread();
 
-  /// Invoked the report callback if there is a report callback and the current
-  /// status isn't CANCELLED. Sets 'done' to true in the callback invocation if
-  /// done == true or we have an error status.
-  void SendReport(bool done);
+  /// Invoked the report callback. If 'done' is true, sends the final report with
+  /// 'status' and the profile. This type of report is sent once and only by the
+  /// instance execution thread.  Otherwise, a profile-only report is sent, which the
+  /// ReportProfileThread() thread will do periodically.
+  void SendReport(bool done, const Status& status);
 
-  /// If status_.ok(), sets status_ to status.
-  /// If we're transitioning to an error status, stops report thread and
-  /// sends a final report.
-  void UpdateStatus(const Status& status);
-
-  /// Called when the fragment execution is complete to finalize counters.
-  void FragmentComplete();
+  /// Called when the fragment execution is complete to finalize counters and send
+  /// the final status report.  Must be called only once.
+  void FragmentComplete(const Status& status);
 
   /// Optimizes the code-generated functions in runtime_state_->llvm_codegen().
   /// Must be called after exec_tree_->Prepare() and before exec_tree_->Open().

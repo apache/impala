@@ -46,25 +46,17 @@ Status FragmentMgr::FragmentExecState::Cancel() {
   return Status::OK();
 }
 
-Status FragmentMgr::FragmentExecState::Prepare() {
-  Status status = executor_.Prepare(exec_params_);
-  if (!status.ok()) ReportStatusCb(status, NULL, true);
-  prepare_promise_.Set(status);
-  return status;
-}
-
 void FragmentMgr::FragmentExecState::Exec() {
-  if (Prepare().ok()) {
-    executor_.Open();
-    executor_.Exec();
+  Status status = executor_.Prepare(exec_params_);
+  prepare_promise_.Set(status);
+  if (status.ok()) {
+    if (executor_.Open().ok()) {
+      executor_.Exec();
+    }
   }
   executor_.Close();
 }
 
-// There can only be one of these callbacks in-flight at any moment, because
-// it is only invoked from the executor's reporting thread.
-// Also, the reported status will always reflect the most recent execution status,
-// including the final status when execution finishes.
 void FragmentMgr::FragmentExecState::ReportStatusCb(
     const Status& status, RuntimeProfile* profile, bool done) {
   DCHECK(status.ok() || done);  // if !status.ok() => done

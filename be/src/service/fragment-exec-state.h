@@ -83,7 +83,7 @@ class FragmentMgr::FragmentExecState {
   /// if set to anything other than OK, execution has terminated w/ an error
   Status exec_status_;
 
-  /// Set once Prepare() has returned with exec_status_.
+  /// Barrier for the completion of executor_.Prepare().
   Promise<Status> prepare_promise_;
 
   /// Update 'exec_status_' w/ 'status', if the former is not already an error.
@@ -92,14 +92,12 @@ class FragmentMgr::FragmentExecState {
 
   /// Callback for executor; updates exec_status_ if 'status' indicates an error
   /// or if there was a thrift error.
-  ///
   /// If not NULL, `profile` is encoded as a Thrift structure and transmitted as part of
   /// the reporting RPC. `profile` may be NULL if a runtime profile has not been created
   /// for this fragment (e.g. when the fragment has failed during preparation).
+  /// The executor must ensure that there is only one invocation at a time.
   void ReportStatusCb(const Status& status, RuntimeProfile* profile, bool done);
 
-  /// Call Prepare() and create and initialize data sink.
-  Status Prepare();
 };
 
 }
