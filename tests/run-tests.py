@@ -62,7 +62,11 @@ class TestExecutor:
     self.tests_failed = False
 
   def run_tests(self, args):
-    exit_code = pytest.main(args)
+    try:
+      exit_code = pytest.main(args)
+    except:
+      sys.stderr.write("Unexpected exception with pytest {}".format(args))
+      raise
     if exit_code != 0 and self._exit_on_error:
       sys.exit(exit_code)
     self.tests_failed = exit_code != 0 or self.tests_failed
@@ -137,7 +141,12 @@ def build_test_args(log_base_name, valid_dirs):
 def build_ignore_dir_arg_list(valid_dirs):
   """ Builds a list of directories to ignore """
   subdirs = [subdir for subdir in os.listdir(TEST_DIR) if os.path.isdir(subdir)]
-  return ' '.join(['--ignore="%s"' % d for d in set(subdirs) - set(valid_dirs)])
+  # In bash, in single-quoted strings, single quotes cannot appear - not even escaped!
+  # Instead, one must close the string with a single-quote, insert a literal single-quote
+  # (escaped, so bash doesn't think you're starting a new string), then start your
+  # single-quoted string again. That works out to the four-character sequence '\''.
+  return ' '.join(["--ignore='%s'" % d.replace("'", "'\''")
+                   for d in set(subdirs) - set(valid_dirs)])
 
 
 if __name__ == "__main__":
