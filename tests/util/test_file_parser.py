@@ -225,6 +225,8 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
           parsed_sections['CATCH'].extend(lines_content)
         else:
           raise RuntimeError, 'Unknown subsection comment: %s' % subsection_comment
+        for exception_str in parsed_sections['CATCH']:
+          assert exception_str.strip(), "Empty exception string."
         continue
 
       # The DML_RESULTS section is used to specify what the state of the table should be

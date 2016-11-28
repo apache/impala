@@ -329,7 +329,11 @@ class ImpalaTestSuite(BaseTestSuite):
           self.__restore_query_options(query_options_changed, target_impalad_client)
 
       if 'CATCH' in test_section:
-        assert test_section['CATCH'].strip() == ''
+        expected_str = " or ".join(test_section['CATCH']).strip() \
+          .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
+          .replace('$NAMENODE', NAMENODE) \
+          .replace('$IMPALA_HOME', IMPALA_HOME)
+        assert False, "Expected exception: %s" % expected_str
 
       assert result is not None
       assert result.success
