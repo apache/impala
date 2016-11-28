@@ -311,7 +311,7 @@ void RuntimeState::ReleaseResources() {
   if (desc_tbl_ != nullptr) desc_tbl_->ClosePartitionExprs(this);
   if (filter_bank_ != nullptr) filter_bank_->Close();
   if (resource_pool_ != nullptr) {
-    ExecEnv::GetInstance()->thread_mgr()->UnregisterPool(resource_pool_);
+    exec_env_->thread_mgr()->UnregisterPool(resource_pool_);
   }
 }
 }
