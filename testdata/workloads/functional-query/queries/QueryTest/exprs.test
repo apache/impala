@@ -2574,3 +2574,51 @@ where  (cast(a.string_col as string) > 'a');
 ---- TYPES
 INT
 ====
+---- QUERY
+# Test from_utc_timestamp() returning out-of-range result.
+select from_utc_timestamp(CAST("1400-01-01 05:00:00" as TIMESTAMP), "PST")
+from alltypes
+limit 1
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+---- ERRORS
+UDF WARNING: Timestamp '1400-01-01 05:00:00' did not convert to a valid local time in timezone 'PST'
+====
+---- QUERY
+# Test from_utc_timestamp() returning out-of-range result.
+select to_utc_timestamp(CAST("1400-01-01 05:00:00" as TIMESTAMP), "JST")
+from alltypes
+limit 1
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+---- ERRORS
+UDF WARNING: Timestamp '1400-01-01 05:00:00' in timezone 'JST' could not be converted to UTC
+====
+---- QUERY
+# Test out-of-range value handling when adding dates.
+select CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 367 DAYS
+from alltypes
+limit 1
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+---- ERRORS
+UDF WARNING: Cannot add interval 367: Year is out of valid range: 1400..10000
+====
+---- QUERY
+# Test out-of-range value handling when subtracting dates.
+select CAST('1400-01-01 21:00:00' AS TIMESTAMP) - INTERVAL 1 DAYS
+from alltypes
+limit 1
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+---- ERRORS
+UDF WARNING: Cannot subtract interval 1: Year is out of valid range: 1400..10000
+====
