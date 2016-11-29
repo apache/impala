@@ -293,6 +293,13 @@ function start_cluster {
 
   if [ ${#SUPPORTED_SERVICES[@]} -gt 0 ]; then
     for SERVICE in ${SUPPORTED_SERVICES[@]-}; do
+      # We only run ntp-wait when it is available. That availability is checked by the
+      # call to ntp-wait --help.
+      if [[ "${SERVICE}" == "kudu" ]] && ntp-wait --help >/dev/null 2>/dev/null \
+           && ! ntp-wait -v; then
+        echo "ntp-wait failed; cannot start kudu"
+        return 1
+      fi
       start $SERVICE
     done
 
