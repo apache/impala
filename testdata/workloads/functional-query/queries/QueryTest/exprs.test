@@ -2563,3 +2563,14 @@ where timestamp_col < cast('2013-02-18 20:46:00.01' as timestamp)
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-4550: Regression test for proper cast analysis after slot substitution within a
+# no-op explicit cast.
+select /* +straight_join */ a.id
+from   functional.alltypestiny a
+join   functional.alltypestiny b on a.string_col = b.timestamp_col
+where  (cast(a.string_col as string) > 'a');
+---- RESULTS
+---- TYPES
+INT
+====

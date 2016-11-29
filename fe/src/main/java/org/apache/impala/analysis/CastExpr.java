@@ -250,10 +250,11 @@ public class CastExpr extends Expr {
 
     Type childType = children_.get(0).type_;
     Preconditions.checkState(!childType.isNull());
-    if (childType.equals(type_)) {
-      noOp_ = true;
-      return;
-    }
+    // IMPALA-4550: We always need to set noOp_ to the correct value, since we could
+    // be performing a subsequent analysis run and its correct value might have changed.
+    // This can happen if the child node gets substituted and its type changes.
+    noOp_ = childType.equals(type_);
+    if (noOp_) return;
 
     FunctionName fnName = new FunctionName(Catalog.BUILTINS_DB, getFnName(type_));
     Type[] args = { childType };
