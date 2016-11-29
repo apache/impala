@@ -94,8 +94,4 @@ TEST(StatestoreSslTest, SmokeTest) {
 
 }
 
-int main(int argc, char **argv) {
-  InitCommonRuntime(argc, argv, false);
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();

@@ -67,6 +67,8 @@ class ThriftClientImpl {
   /// Set send timeout on the underlying TSocket.
   void setSendTimeout(int32_t ms) { socket_->setSendTimeout(ms); }
 
+  Status socket_create_status() { return socket_create_status_; }
+
  protected:
   ThriftClientImpl(const std::string& ipaddress, int port, bool ssl)
       : address_(MakeNetworkAddress(ipaddress, port)), ssl_(ssl) {
