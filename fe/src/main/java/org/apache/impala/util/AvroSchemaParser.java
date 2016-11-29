@@ -125,9 +125,20 @@ public class AvroSchemaParser {
         }
         return structType;
       case BYTES:
+        String logicalType = schema.getProp("logicalType");
+        if (logicalType == null) {
+          throw new AnalysisException(String.format(
+            "logicalType for column '%s' specified at wrong level or was not specified",
+             colName));
+        }
         // Decimal is stored in Avro as a BYTE.
-        Type decimalType = getDecimalType(schema);
-        if (decimalType != null) return decimalType;
+        if (logicalType.equalsIgnoreCase("decimal")) {
+          return getDecimalType(schema);
+        } else {
+          throw new AnalysisException(String.format(
+            "Unsupported logicalType: '%s' for column '%s' with type BYTES",
+             logicalType, colName));
+        }
       // TODO: Add support for stored Avro UNIONs by exposing them as STRUCTs in Impala.
       case UNION:
       case ENUM:
@@ -161,8 +172,7 @@ public class AvroSchemaParser {
 
   /**
    * Attempts to parse decimal type information from the Avro schema, returning
-   * a decimal ColumnType if successful or null if this schema does not map
-   * to a decimal type.
+   * a decimal ColumnType if successful.
    * Decimal is defined in Avro as a BYTE type with the logicalType property
    * set to "decimal" and a specified scale/precision.
    * Throws a SchemaParseException if the logicType=decimal, but scale/precision
@@ -170,22 +180,18 @@ public class AvroSchemaParser {
    */
   private static Type getDecimalType(Schema schema) {
     Preconditions.checkState(schema.getType() == Schema.Type.BYTES);
-    String logicalType = schema.getProp("logicalType");
-    if (logicalType != null && logicalType.equalsIgnoreCase("decimal")) {
-      // Parse the scale/precision of the decimal type.
-      Integer scale = getDecimalProp(schema, "scale");
-      // The Avro spec states that scale should default to zero if not set.
-      if (scale == null) scale = 0;
+    // Parse the scale/precision of the decimal type.
+    Integer scale = getDecimalProp(schema, "scale");
+    // The Avro spec states that scale should default to zero if not set.
+    if (scale == null) scale = 0;
 
-      // Precision is a required property according to the Avro spec.
-      Integer precision = getDecimalProp(schema, "precision");
-      if (precision == null) {
-        throw new SchemaParseException(
-            "No 'precision' property specified for 'decimal' logicalType");
-      }
-      return ScalarType.createDecimalType(precision, scale);
+    // Precision is a required property according to the Avro spec.
+    Integer precision = getDecimalProp(schema, "precision");
+    if (precision == null) {
+      throw new SchemaParseException(
+          "No 'precision' property specified for 'decimal' logicalType");
     }
-    return null;
+    return ScalarType.createDecimalType(precision, scale);
   }
 
   /**
