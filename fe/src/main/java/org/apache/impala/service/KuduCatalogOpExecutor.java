@@ -97,6 +97,7 @@ public class KuduCatalogOpExecutor {
   private static Schema createTableSchema(TCreateTableParams params)
       throws ImpalaRuntimeException {
     Set<String> keyColNames = new HashSet<>(params.getPrimary_key_column_names());
+    Preconditions.checkState(!keyColNames.isEmpty());
     List<ColumnSchema> colSchemas = new ArrayList<>(params.getColumnsSize());
     for (TColumn column: params.getColumns()) {
       Type type = Type.fromThrift(column.getColumnType());
@@ -105,9 +106,15 @@ public class KuduCatalogOpExecutor {
       // Create the actual column and check if the column is a key column
       ColumnSchemaBuilder csb =
           new ColumnSchemaBuilder(column.getColumnName(), kuduType);
-      Preconditions.checkState(column.isSetIs_key());
-      csb.key(keyColNames.contains(column.getColumnName()));
-      if (column.isSetIs_nullable()) csb.nullable(column.isIs_nullable());
+      boolean isKey = keyColNames.contains(column.getColumnName());
+      csb.key(isKey);
+      if (column.isSetIs_nullable()) {
+        csb.nullable(column.isIs_nullable());
+      } else if (!isKey) {
+        // Non-key columns are by default nullable unless the user explicitly sets their
+        // nullability.
+        csb.nullable(true);
+      }
       if (column.isSetDefault_value()) {
         csb.defaultValue(KuduUtil.getKuduDefaultValue(column.getDefault_value(), kuduType,
             column.getColumnName()));
@@ -363,7 +370,7 @@ public class KuduCatalogOpExecutor {
       Type type = Type.fromThrift(column.getColumnType());
       Preconditions.checkState(type != null);
       org.apache.kudu.Type kuduType = KuduUtil.fromImpalaType(type);
-      boolean isNullable = column.isSetIs_nullable() && column.isIs_nullable();
+      boolean isNullable = !column.isSetIs_nullable() ? true : column.isIs_nullable();
       if (isNullable) {
         if (column.isSetDefault_value()) {
           // See KUDU-1747
