@@ -116,15 +116,19 @@ public class AuthorizationPolicy implements PrivilegeCache {
    */
   public synchronized void addPrivilege(RolePrivilege privilege)
       throws CatalogException {
-    LOG.trace("Adding privilege: " + privilege.getName() +
-        " role ID: " + privilege.getRoleId());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Adding privilege: " + privilege.getName() +
+          " role ID: " + privilege.getRoleId());
+    }
     Role role = getRole(privilege.getRoleId());
     if (role == null) {
       throw new CatalogException(String.format("Error adding privilege: %s. Role ID " +
           "'%d' does not exist.", privilege.getName(), privilege.getRoleId()));
     }
-    LOG.trace("Adding privilege: " + privilege.getName() + " to role: " +
-        role.getName() + "ID: " + role.getId());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Adding privilege: " + privilege.getName() + " to role: " +
+          role.getName() + "ID: " + role.getId());
+    }
     role.addPrivilege(privilege);
   }
 
@@ -141,8 +145,10 @@ public class AuthorizationPolicy implements PrivilegeCache {
       throw new CatalogException(String.format("Error removing privilege: %s. Role ID " +
           "'%d' does not exist.", privilege.getName(), privilege.getRoleId()));
     }
-    LOG.trace("Removing privilege: '" + privilege.getName() + "' from Role ID: " +
-        privilege.getRoleId() + " Role Name: " + role.getName());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Removing privilege: '" + privilege.getName() + "' from Role ID: " +
+          privilege.getRoleId() + " Role Name: " + role.getName());
+    }
     return role.removePrivilege(privilege.getName());
   }
 
@@ -275,7 +281,9 @@ public class AuthorizationPolicy implements PrivilegeCache {
         for (RolePrivilege privilege: role.getPrivileges()) {
           String authorizeable = privilege.getName();
           if (authorizeable == null) {
-            LOG.trace("Ignoring invalid privilege: " + privilege.getName());
+            if (LOG.isTraceEnabled()) {
+              LOG.trace("Ignoring invalid privilege: " + privilege.getName());
+            }
             continue;
           }
           privileges.add(authorizeable);

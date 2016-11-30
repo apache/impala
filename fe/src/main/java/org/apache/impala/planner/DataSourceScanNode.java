@@ -272,7 +272,9 @@ public class DataSourceScanNode extends ScanNode {
     LOG.debug("computeStats DataSourceScan: cardinality=" + Long.toString(cardinality_));
 
     numNodes_ = table_.getNumNodes();
-    LOG.debug("computeStats DataSourceScan: #nodes=" + Integer.toString(numNodes_));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("computeStats DataSourceScan: #nodes=" + Integer.toString(numNodes_));
+    }
   }
 
   @Override

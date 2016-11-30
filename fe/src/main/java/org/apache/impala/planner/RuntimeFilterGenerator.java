@@ -245,7 +245,9 @@ public final class RuntimeFilterGenerator {
       // Ensure that the targer expr does not contain TupleIsNull predicates as these
       // can't be evaluated at a scan node.
       targetExpr = TupleIsNullPredicate.unwrapExpr(targetExpr.clone());
-      LOG.trace("Generating runtime filter from predicate " + joinPredicate);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Generating runtime filter from predicate " + joinPredicate);
+      }
       return new RuntimeFilter(idGen.getNextId(), filterSrcNode,
           srcExpr, targetExpr, targetSlots);
     }
@@ -424,7 +426,7 @@ public final class RuntimeFilterGenerator {
     }
     for (RuntimeFilter filter:
          filters.subList(0, Math.min(filters.size(), maxNumFilters))) {
-      LOG.trace("Runtime filter: " + filter.debugString());
+      if (LOG.isTraceEnabled()) LOG.trace("Runtime filter: " + filter.debugString());
       filter.assignToPlanNodes();
     }
   }

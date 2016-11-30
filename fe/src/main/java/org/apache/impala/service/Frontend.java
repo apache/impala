@@ -839,8 +839,10 @@ public class Frontend {
         return false;
       }
 
-      LOG.trace(String.format("Waiting for table(s) to complete loading: %s",
-          Joiner.on(", ").join(missingTbls)));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format("Waiting for table(s) to complete loading: %s",
+            Joiner.on(", ").join(missingTbls)));
+      }
       getCatalog().waitForCatalogUpdate(MAX_CATALOG_UPDATE_WAIT_TIME_MS);
       missingTbls = getMissingTbls(missingTbls);
       // TODO: Check for query cancellation here.
@@ -879,7 +881,7 @@ public class Frontend {
 
     AnalysisContext analysisCtx = new AnalysisContext(impaladCatalog_, queryCtx,
         authzConfig_);
-    LOG.debug("analyze query " + queryCtx.request.stmt);
+    if (LOG.isDebugEnabled()) LOG.debug("analyze query " + queryCtx.request.stmt);
 
     // Run analysis in a loop until it any of the following events occur:
     // 1) Analysis completes successfully.
@@ -898,8 +900,10 @@ public class Frontend {
 
           // Some tables/views were missing, request and wait for them to load.
           if (!requestTblLoadAndWait(missingTbls, MISSING_TBL_LOAD_WAIT_TIMEOUT_MS)) {
-            LOG.info(String.format("Missing tables were not received in %dms. Load " +
-                "request will be retried.", MISSING_TBL_LOAD_WAIT_TIMEOUT_MS));
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(String.format("Missing tables were not received in %dms. Load " +
+                  "request will be retried.", MISSING_TBL_LOAD_WAIT_TIMEOUT_MS));
+            }
           }
         }
       }

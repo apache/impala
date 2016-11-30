@@ -119,8 +119,10 @@ public class HdfsPartitionFilter {
     }
 
     Expr literalPredicate = predicate_.substitute(sMap, analyzer, false);
-    LOG.trace("buildPartitionPredicate: " + literalPredicate.toSql() + " " +
-        literalPredicate.debugString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("buildPartitionPredicate: " + literalPredicate.toSql() + " " +
+          literalPredicate.debugString());
+    }
     Preconditions.checkState(literalPredicate.isConstant());
     return literalPredicate;
   }

@@ -164,9 +164,11 @@ public class Planner {
     }
     rootFragment.setOutputExprs(resultExprs);
 
-    LOG.debug("desctbl: " + ctx_.getRootAnalyzer().getDescTbl().debugString());
-    LOG.debug("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
-    LOG.debug("finalize plan fragments");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("desctbl: " + ctx_.getRootAnalyzer().getDescTbl().debugString());
+      LOG.debug("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
+      LOG.debug("finalize plan fragments");
+    }
     for (PlanFragment fragment: fragments) {
       fragment.finalize(ctx_.getRootAnalyzer());
     }
@@ -214,7 +216,7 @@ public class Planner {
         graph.addTargetColumnLabels(ctx_.getQueryStmt().getColLabels());
         graph.computeLineageGraph(resultExprs, ctx_.getRootAnalyzer());
       }
-      LOG.trace("lineage: " + graph.debugString());
+      if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
       ctx_.getRootAnalyzer().getTimeline().markEvent("Lineage info computed");
     }
 
@@ -407,8 +409,10 @@ public class Planner {
     request.setPer_host_mem_req(maxPerHostMem);
     request.setPer_host_vcores((short) maxPerHostVcores);
 
-    LOG.debug("Estimated per-host peak memory requirement: " + maxPerHostMem);
-    LOG.debug("Estimated per-host virtual cores requirement: " + maxPerHostVcores);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Estimated per-host peak memory requirement: " + maxPerHostMem);
+      LOG.debug("Estimated per-host virtual cores requirement: " + maxPerHostVcores);
+    }
   }
 
   /**

@@ -57,7 +57,7 @@ public class FileSystemUtil {
     for (FileStatus fStatus: fs.listStatus(directory)) {
       // Only delete files that are not hidden.
       if (fStatus.isFile() && !isHiddenFile(fStatus.getPath().getName())) {
-        LOG.debug("Removing: " + fStatus.getPath());
+        if (LOG.isDebugEnabled()) LOG.debug("Removing: " + fStatus.getPath());
         fs.delete(fStatus.getPath(), false);
         ++numFilesDeleted;
       }
@@ -123,7 +123,9 @@ public class FileSystemUtil {
     int numFilesMoved = 0;
     for (FileStatus fStatus: sourceFs.listStatus(sourceDir)) {
       if (fStatus.isDirectory()) {
-        LOG.debug("Skipping copy of directory: " + fStatus.getPath());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Skipping copy of directory: " + fStatus.getPath());
+        }
         continue;
       } else if (isHiddenFile(fStatus.getPath().getName())) {
         continue;
@@ -180,8 +182,10 @@ public class FileSystemUtil {
     // non-distributed filesystem.
     if (!doRename) doRename = !destIsDfs && sameFileSystem;
     if (doRename) {
-      LOG.debug(String.format(
-          "Moving '%s' to '%s'", sourceFile.toString(), destFile.toString()));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format(
+            "Moving '%s' to '%s'", sourceFile.toString(), destFile.toString()));
+      }
       // Move (rename) the file.
       destFs.rename(sourceFile, destFile);
       return;
@@ -192,13 +196,17 @@ public class FileSystemUtil {
       // encryption zones. A move would return an error from the NN because a move is a
       // metadata-only operation and the files would not be encrypted/decrypted properly
       // on the DNs.
-      LOG.info(String.format(
-          "Copying source '%s' to '%s' because HDFS encryption zones are different.",
-          sourceFile, destFile));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format(
+            "Copying source '%s' to '%s' because HDFS encryption zones are different.",
+            sourceFile, destFile));
+      }
     } else {
       Preconditions.checkState(!sameFileSystem);
-      LOG.info(String.format("Copying '%s' to '%s' between filesystems.",
-          sourceFile, destFile));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("Copying '%s' to '%s' between filesystems.",
+            sourceFile, destFile));
+      }
     }
     FileUtil.copy(sourceFs, sourceFile, destFs, destFile, true, true, CONF);
   }

@@ -636,7 +636,9 @@ public class CatalogOpExecutor {
 
       // Set the altered view attributes and update the metastore.
       setViewAttributes(params, msTbl);
-      LOG.debug(String.format("Altering view %s", tableName));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("Altering view %s", tableName));
+      }
       applyAlterTable(msTbl);
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         tbl.load(true, msClient.getHiveClient(), msTbl);
@@ -665,7 +667,9 @@ public class CatalogOpExecutor {
 
     TableName tableName = table.getTableName();
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    LOG.info(String.format("Updating table stats for: %s", tableName));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("Updating table stats for: %s", tableName));
+    }
 
     // Deep copy the msTbl to avoid updating our cache before successfully persisting
     // the results to the metastore.
@@ -761,8 +765,10 @@ public class CatalogOpExecutor {
       // but it is predictable and easy to reason about because it does not depend on the
       // existing state of the metadata. See IMPALA-2201.
       long numRows = partitionStats.stats.num_rows;
-      LOG.debug(String.format("Updating stats for partition %s: numRows=%s",
-          partition.getValuesAsString(), numRows));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("Updating stats for partition %s: numRows=%s",
+            partition.getValuesAsString(), numRows));
+      }
       PartitionStatsUtil.partStatsToParameters(partitionStats, partition);
       partition.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
       partition.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
@@ -809,10 +815,12 @@ public class CatalogOpExecutor {
       ColumnStatisticsData colStatsData =
           createHiveColStatsData(entry.getValue(), tableCol.getType());
       if (colStatsData == null) continue;
-      LOG.debug(String.format("Updating column stats for %s: numDVs=%s numNulls=%s " +
-          "maxSize=%s avgSize=%s", colName, entry.getValue().getNum_distinct_values(),
-          entry.getValue().getNum_nulls(), entry.getValue().getMax_size(),
-          entry.getValue().getAvg_size()));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("Updating column stats for %s: numDVs=%s numNulls=%s " +
+            "maxSize=%s avgSize=%s", colName, entry.getValue().getNum_distinct_values(),
+            entry.getValue().getNum_nulls(), entry.getValue().getMax_size(),
+            entry.getValue().getAvg_size()));
+      }
       ColumnStatisticsObj colStatsObj = new ColumnStatisticsObj(colName,
           tableCol.getType().toString().toLowerCase(), colStatsData);
       colStats.addToStatsObj(colStatsObj);
@@ -879,8 +887,10 @@ public class CatalogOpExecutor {
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name passed as argument to Catalog.createDatabase");
     if (params.if_not_exists && catalog_.getDb(dbName) != null) {
-      LOG.debug("Skipping database creation because " + dbName + " already exists and " +
-          "IF NOT EXISTS was specified.");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Skipping database creation because " + dbName + " already exists "
+            + "and IF NOT EXISTS was specified.");
+      }
       resp.getResult().setVersion(catalog_.getCatalogVersion());
       return;
     }
@@ -893,7 +903,7 @@ public class CatalogOpExecutor {
     if (params.getLocation() != null) {
       db.setLocationUri(params.getLocation());
     }
-    LOG.debug("Creating database " + dbName);
+    if (LOG.isDebugEnabled()) LOG.debug("Creating database " + dbName);
     Db newDb = null;
     synchronized (metastoreDdlLock_) {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
@@ -905,8 +915,10 @@ public class CatalogOpExecutor {
             throw new ImpalaRuntimeException(
                 String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e);
           }
-          LOG.debug(String.format("Ignoring '%s' when creating database %s because " +
-              "IF NOT EXISTS was specified.", e, dbName));
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(String.format("Ignoring '%s' when creating database %s because " +
+                "IF NOT EXISTS was specified.", e, dbName));
+          }
           newDb = catalog_.getDb(dbName);
           if (newDb == null) {
             try {
@@ -946,8 +958,10 @@ public class CatalogOpExecutor {
  private void createFunction(TCreateFunctionParams params, TDdlExecResponse resp)
       throws ImpalaException {
     Function fn = Function.fromThrift(params.getFn());
-    LOG.debug(String.format("Adding %s: %s",
-        fn.getClass().getSimpleName(), fn.signatureString()));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("Adding %s: %s",
+          fn.getClass().getSimpleName(), fn.signatureString()));
+    }
     boolean isPersistentJavaFn =
         (fn.getBinaryType() == TFunctionBinaryType.JAVA) && fn.isPersistent();
     synchronized (metastoreDdlLock_) {
@@ -982,10 +996,11 @@ public class CatalogOpExecutor {
             "No compatible function signatures found in class: " + hiveFn.getClassName());
         }
         if (addJavaFunctionToHms(fn.dbName(), hiveFn, params.if_not_exists)) {
-          LOG.info("Funcs size:" + funcs.size());
           for (Function addedFn: funcs) {
-            LOG.info(String.format("Adding function: %s.%s", addedFn.dbName(),
-                addedFn.signatureString()));
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(String.format("Adding function: %s.%s", addedFn.dbName(),
+                  addedFn.signatureString()));
+            }
             Preconditions.checkState(catalog_.addFunction(addedFn));
             addedFunctions.add(buildTCatalogFnObject(addedFn));
           }

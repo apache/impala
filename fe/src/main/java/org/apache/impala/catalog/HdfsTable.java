@@ -370,7 +370,9 @@ public class HdfsTable extends Table {
     Preconditions.checkNotNull(fd);
     Preconditions.checkNotNull(perFsFileBlocks);
     Preconditions.checkArgument(!file.isDirectory());
-    LOG.debug("load block md for " + name_ + " file " + fd.getFileName());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("load block md for " + name_ + " file " + fd.getFileName());
+    }
 
     if (!FileSystemUtil.hasGetFileBlockLocations(fs)) {
       synthesizeBlockMetadata(fs, fd, fileFormat);
@@ -463,8 +465,10 @@ public class HdfsTable extends Table {
       // part of the FileSystem interface, so we'll need to downcast.
       if (!(fs instanceof DistributedFileSystem)) continue;
 
-      LOG.trace("Loading disk ids for: " + getFullName() + ". nodes: " +
-          hostIndex_.size() + ". filesystem: " + fsKey);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Loading disk ids for: " + getFullName() + ". nodes: " +
+            hostIndex_.size() + ". filesystem: " + fsKey);
+      }
       DistributedFileSystem dfs = (DistributedFileSystem)fs;
       FileBlocksInfo blockLists = perFsFileBlocks.get(fsKey);
       Preconditions.checkNotNull(blockLists);
@@ -1083,7 +1087,9 @@ public class HdfsTable extends Table {
       // Load partition and file metadata
       if (reuseMetadata) {
         // Incrementally update this table's partitions and file metadata
-        LOG.debug("incremental update for table: " + db_.getName() + "." + name_);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("incremental update for table: " + db_.getName() + "." + name_);
+        }
         Preconditions.checkState(partitionsToUpdate == null || loadFileMetadata);
         updateMdFromHmsTable(msTbl);
         if (msTbl.getPartitionKeysSize() == 0) {
@@ -1093,7 +1099,9 @@ public class HdfsTable extends Table {
         }
       } else {
         // Load all partitions from Hive Metastore, including file metadata.
-        LOG.debug("load table from Hive Metastore: " + db_.getName() + "." + name_);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("load table from Hive Metastore: " + db_.getName() + "." + name_);
+        }
         List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
             Lists.newArrayList();
         msPartitions.addAll(MetaStoreUtil.fetchAllPartitions(
@@ -1133,7 +1141,9 @@ public class HdfsTable extends Table {
    * Updates the file metadata of an unpartitioned HdfsTable.
    */
   private void updateUnpartitionedTableFileMd() throws CatalogException {
-    LOG.debug("update unpartitioned table: " + name_);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("update unpartitioned table: " + name_);
+    }
     resetPartitions();
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
@@ -1156,7 +1166,9 @@ public class HdfsTable extends Table {
    */
   private void updatePartitionsFromHms(IMetaStoreClient client,
       Set<String> partitionsToUpdate, boolean loadFileMetadata) throws Exception {
-    LOG.debug("sync table partitions: " + name_);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("sync table partitions: " + name_);
+    }
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
     Preconditions.checkState(msTbl.getPartitionKeysSize() != 0);
@@ -1415,8 +1427,10 @@ public class HdfsTable extends Table {
       IMetaStoreClient client) throws Exception {
     Preconditions.checkNotNull(partitions);
     if (partitions.isEmpty()) return;
-    LOG.info(String.format("Incrementally updating %d/%d partitions.",
-        partitions.size(), partitionMap_.size()));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("Incrementally updating %d/%d partitions.",
+          partitions.size(), partitionMap_.size()));
+    }
     Set<String> partitionNames = Sets.newHashSet();
     for (HdfsPartition part: partitions) {
       partitionNames.add(part.getPartitionName());
@@ -1469,8 +1483,10 @@ public class HdfsTable extends Table {
   private void loadPartitionFileMetadata(List<HdfsPartition> partitions)
       throws Exception {
     Preconditions.checkNotNull(partitions);
-    LOG.info(String.format("loading file metadata for %d partitions",
-        partitions.size()));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("loading file metadata for %d partitions",
+          partitions.size()));
+    }
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
     HdfsStorageDescriptor fileFormatDescriptor =
@@ -1782,8 +1798,10 @@ public class HdfsTable extends Table {
       List<List<String>> partitionsNotInHms) throws IOException {
     if (depth == partitionKeys.size()) {
       if (existingPartitions.contains(partitionExprs)) {
-        LOG.trace(String.format("Skip recovery of path '%s' because it already exists " +
-            "in metastore", path.toString()));
+        if (LOG.isTraceEnabled()) {
+          LOG.trace(String.format("Skip recovery of path '%s' because it already "
+              + "exists in metastore", path.toString()));
+        }
       } else {
         partitionsNotInHms.add(partitionValues);
         existingPartitions.add(partitionExprs);
@@ -1837,8 +1855,10 @@ public class HdfsTable extends Table {
           }
         }
       } catch (Exception ex) {
-        LOG.debug(String.format("Invalid partition value (%s) for Type (%s).",
-            partName[1], type.toSql()));
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(String.format("Invalid partition value (%s) for Type (%s).",
+              partName[1], type.toSql()));
+        }
         return null;
       }
     } else {

@@ -237,8 +237,10 @@ public class ImpaladCatalog extends Catalog {
       throws TableLoadingException, DatabaseNotFoundException {
     // This item is out of date and should not be applied to the catalog.
     if (catalogDeltaLog_.wasObjectRemovedAfter(catalogObject)) {
-      LOG.debug(String.format("Skipping update because a matching object was removed " +
-          "in a later catalog version: %s", catalogObject));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("Skipping update because a matching object was removed " +
+            "in a later catalog version: %s", catalogObject));
+      }
       return;
     }
 
@@ -354,8 +356,10 @@ public class ImpaladCatalog extends Catalog {
       throws TableLoadingException {
     Db db = getDb(thriftTable.db_name);
     if (db == null) {
-      LOG.debug("Parent database of table does not exist: " +
-          thriftTable.db_name + "." + thriftTable.tbl_name);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Parent database of table does not exist: " +
+            thriftTable.db_name + "." + thriftTable.tbl_name);
+      }
       return;
     }
 
@@ -369,7 +373,9 @@ public class ImpaladCatalog extends Catalog {
     function.setCatalogVersion(catalogVersion);
     Db db = getDb(function.getFunctionName().getDb());
     if (db == null) {
-      LOG.debug("Parent database of function does not exist: " + function.getName());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Parent database of function does not exist: " + function.getName());
+      }
       return;
     }
     Function existingFn = db.getFunction(fn.getSignature());

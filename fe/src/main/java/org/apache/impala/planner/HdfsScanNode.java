@@ -373,7 +373,9 @@ public class HdfsScanNode extends ScanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    LOG.debug("collecting partitions for table " + tbl_.getName());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("collecting partitions for table " + tbl_.getName());
+    }
     numPartitionsMissingStats_ = 0;
     totalFiles_ = 0;
     totalBytes_ = 0;
@@ -430,17 +432,23 @@ public class HdfsScanNode extends ScanNode {
     }
 
     if (cardinality_ > 0) {
-      LOG.debug("cardinality_=" + Long.toString(cardinality_) +
-                " sel=" + Double.toString(computeSelectivity()));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("cardinality_=" + Long.toString(cardinality_) +
+                  " sel=" + Double.toString(computeSelectivity()));
+      }
       cardinality_ = Math.round(cardinality_ * computeSelectivity());
       // IMPALA-2165: Avoid setting the cardinality to 0 after rounding.
       cardinality_ = Math.max(cardinality_, 1);
     }
     cardinality_ = capAtLimit(cardinality_);
-    LOG.debug("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
+    }
 
     computeNumNodes(analyzer, cardinality_);
-    LOG.debug("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
+    }
   }
 
   /**
@@ -493,10 +501,12 @@ public class HdfsScanNode extends ScanNode {
     // Tables can reside on 0 nodes (empty table), but a plan node must always be
     // executed on at least one node.
     numNodes_ = (cardinality == 0 || totalNodes == 0) ? 1 : totalNodes;
-    LOG.debug("computeNumNodes totalRanges=" + scanRanges_.size() +
-        " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges +
-        " localHostSet.size=" + localHostSet.size() +
-        " clusterNodes=" + cluster.numNodes());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("computeNumNodes totalRanges=" + scanRanges_.size() +
+          " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges +
+          " localHostSet.size=" + localHostSet.size() +
+          " clusterNodes=" + cluster.numNodes());
+    }
   }
 
   @Override

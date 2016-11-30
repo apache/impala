@@ -126,8 +126,10 @@ public class MetaStoreUtil {
   public static List<Partition> fetchPartitionsByName(
       IMetaStoreClient client, List<String> partNames, String dbName, String tblName)
       throws MetaException, TException {
-    LOG.trace(String.format("Fetching %d partitions for: %s.%s using partition " +
-        "batch size: %d", partNames.size(), dbName, tblName, maxPartitionsPerRpc_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Fetching %d partitions for: %s.%s using partition " +
+          "batch size: %d", partNames.size(), dbName, tblName, maxPartitionsPerRpc_));
+    }
 
     List<org.apache.hadoop.hive.metastore.api.Partition> fetchedPartitions =
         Lists.newArrayList();

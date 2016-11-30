@@ -78,9 +78,11 @@ public class DistributedPlanner {
       Preconditions.checkState(!queryStmt.hasOffset());
       isPartitioned = true;
     }
-    LOG.debug("create plan fragments");
     long perNodeMemLimit = ctx_.getQueryOptions().mem_limit;
-    LOG.debug("memlimit=" + Long.toString(perNodeMemLimit));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("create plan fragments");
+      LOG.debug("memlimit=" + Long.toString(perNodeMemLimit));
+    }
     createPlanFragments(singleNodePlan, isPartitioned, perNodeMemLimit, fragments);
     return fragments;
   }
@@ -435,10 +437,12 @@ public class DistributedPlanner {
         broadcastCost = 2 * rhsDataSize * leftChildFragment.getNumNodes();
       }
     }
-    LOG.debug("broadcast: cost=" + Long.toString(broadcastCost));
-    LOG.debug("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
-        + Float.toString(rhsTree.getAvgRowSize()) + " #nodes="
-        + Integer.toString(leftChildFragment.getNumNodes()));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("broadcast: cost=" + Long.toString(broadcastCost));
+      LOG.debug("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
+          + Float.toString(rhsTree.getAvgRowSize()) + " #nodes="
+          + Integer.toString(leftChildFragment.getNumNodes()));
+    }
 
     // repartition: both left- and rightChildFragment are partitioned on the
     // join exprs, and a hash table is built with the rightChildFragment's output.
@@ -465,12 +469,14 @@ public class DistributedPlanner {
       double rhsNetworkCost = (rhsHasCompatPartition) ? 0.0 : rhsDataSize;
       partitionCost = Math.round(lhsNetworkCost + rhsNetworkCost + rhsDataSize);
     }
-    LOG.debug("partition: cost=" + Long.toString(partitionCost));
-    LOG.debug("lhs card=" + Long.toString(lhsTree.getCardinality()) + " row_size="
-        + Float.toString(lhsTree.getAvgRowSize()));
-    LOG.debug("rhs card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
-        + Float.toString(rhsTree.getAvgRowSize()));
-    LOG.debug(rhsTree.getExplainString());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("partition: cost=" + Long.toString(partitionCost));
+      LOG.debug("lhs card=" + Long.toString(lhsTree.getCardinality()) + " row_size="
+          + Float.toString(lhsTree.getAvgRowSize()));
+      LOG.debug("rhs card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
+          + Float.toString(rhsTree.getAvgRowSize()));
+      LOG.debug(rhsTree.getExplainString());
+    }
 
     boolean doBroadcast = false;
     // we do a broadcast join if

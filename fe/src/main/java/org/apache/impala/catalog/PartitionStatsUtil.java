@@ -112,7 +112,7 @@ public class PartitionStatsUtil {
         partition.putToParameters(INCREMENTAL_STATS_CHUNK_PREFIX + i, chunks.get(i));
       }
     } catch (TException e) {
-      LOG.info("Error saving partition stats: ", e);
+      LOG.error("Error saving partition stats: ", e);
       // TODO: What to throw here?
     }
   }

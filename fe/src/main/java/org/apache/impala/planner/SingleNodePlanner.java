@@ -141,7 +141,9 @@ public class SingleNodePlanner {
       analyzer.materializeSlots(queryStmt.getBaseTblResultExprs());
     }
 
-    LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
+    }
     PlanNode singleNodePlan = createQueryPlan(queryStmt, analyzer,
         ctx_.getQueryOptions().isDisable_outermost_topn());
     Preconditions.checkNotNull(singleNodePlan);
@@ -363,15 +365,19 @@ public class SingleNodePlanner {
         // use 0 for the size to avoid it becoming the leftmost input
         // TODO: Consider raw size of scanned partitions in the absence of stats.
         candidates.add(new Pair(ref, new Long(0)));
-        LOG.trace("candidate " + ref.getUniqueAlias() + ": 0");
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("candidate " + ref.getUniqueAlias() + ": 0");
+        }
         continue;
       }
       Preconditions.checkState(ref.isAnalyzed());
       long materializedSize =
           (long) Math.ceil(plan.getAvgRowSize() * (double) plan.getCardinality());
       candidates.add(new Pair(ref, new Long(materializedSize)));
-      LOG.trace(
-          "candidate " + ref.getUniqueAlias() + ": " + Long.toString(materializedSize));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(
+            "candidate " + ref.getUniqueAlias() + ": " + Long.toString(materializedSize));
+      }
     }
     if (candidates.isEmpty()) return null;
 
@@ -402,7 +408,9 @@ public class SingleNodePlanner {
       List<Pair<TableRef, PlanNode>> refPlans, List<SubplanRef> subplanRefs)
       throws ImpalaException {
 
-    LOG.trace("createJoinPlan: " + leftmostRef.getUniqueAlias());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("createJoinPlan: " + leftmostRef.getUniqueAlias());
+    }
     // the refs that have yet to be joined
     List<Pair<TableRef, PlanNode>> remainingRefs = Lists.newArrayList();
     PlanNode root = null;  // root of accumulated join plan
@@ -458,7 +466,9 @@ public class SingleNodePlanner {
         analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
         PlanNode candidate = createJoinNode(root, entry.second, ref, analyzer);
         if (candidate == null) continue;
-        LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
+        }
 
         // Use 'candidate' as the new root; don't consider any other table refs at this
         // position in the plan.
@@ -489,10 +499,12 @@ public class SingleNodePlanner {
       long lhsCardinality = root.getCardinality();
       long rhsCardinality = minEntry.second.getCardinality();
       numOps += lhsCardinality + rhsCardinality;
-      LOG.debug(Integer.toString(i) + " chose " + minEntry.first.getUniqueAlias()
-          + " #lhs=" + Long.toString(lhsCardinality)
-          + " #rhs=" + Long.toString(rhsCardinality)
-          + " #ops=" + Long.toString(numOps));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(Integer.toString(i) + " chose " + minEntry.first.getUniqueAlias()
+            + " #lhs=" + Long.toString(lhsCardinality)
+            + " #rhs=" + Long.toString(rhsCardinality)
+            + " #ops=" + Long.toString(numOps));
+      }
       remainingRefs.remove(minEntry);
       joinedRefs.add(minEntry.first);
       root = newRoot;

@@ -70,8 +70,10 @@ public class KuduCatalogOpExecutor {
     Preconditions.checkState(!Table.isExternalTable(msTbl));
     String kuduTableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-    LOG.debug(String.format("Creating table '%s' in master '%s'", kuduTableName,
-        masterHosts));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("Creating table '%s' in master '%s'", kuduTableName,
+          masterHosts));
+    }
     try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
       // TODO: The IF NOT EXISTS case should be handled by Kudu to ensure atomicity.
       // (see KUDU-1710).
@@ -191,8 +193,10 @@ public class KuduCatalogOpExecutor {
     Preconditions.checkState(!Table.isExternalTable(msTbl));
     String tableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-    LOG.debug(String.format("Dropping table '%s' from master '%s'", tableName,
-        masterHosts));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("Dropping table '%s' from master '%s'", tableName,
+          masterHosts));
+    }
     try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
       Preconditions.checkState(!Strings.isNullOrEmpty(tableName));
       // TODO: The IF EXISTS case should be handled by Kudu to ensure atomicity.
@@ -220,8 +224,10 @@ public class KuduCatalogOpExecutor {
     String kuduTableName = msTblCopy.getParameters().get(KuduTable.KEY_TABLE_NAME);
     Preconditions.checkState(!Strings.isNullOrEmpty(kuduTableName));
     String masterHosts = msTblCopy.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-    LOG.debug(String.format("Loading schema of table '%s' from master '%s'",
-        kuduTableName, masterHosts));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("Loading schema of table '%s' from master '%s'",
+          kuduTableName, masterHosts));
+    }
     try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
       if (!kudu.tableExists(kuduTableName)) {
         throw new ImpalaRuntimeException(String.format("Table does not exist in Kudu: " +

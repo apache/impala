@@ -181,10 +181,14 @@ public class AggregationNode extends PlanNode {
     cardinality_ = aggInfo_.getGroupingExprs().isEmpty() ? 1 :
       Expr.getNumDistinctValues(aggInfo_.getGroupingExprs());
     // take HAVING predicate into account
-    LOG.trace("Agg: cardinality=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Agg: cardinality=" + Long.toString(cardinality_));
+    }
     if (cardinality_ > 0) {
       cardinality_ = Math.round((double) cardinality_ * computeSelectivity());
-      LOG.trace("sel=" + Double.toString(computeSelectivity()));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("sel=" + Double.toString(computeSelectivity()));
+      }
     }
     // if we ended up with an overflow, the estimate is certain to be wrong
     if (cardinality_ < 0) cardinality_ = -1;
@@ -199,7 +203,9 @@ public class AggregationNode extends PlanNode {
       }
     }
     cardinality_ = capAtLimit(cardinality_);
-    LOG.trace("stats Agg: cardinality=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("stats Agg: cardinality=" + Long.toString(cardinality_));
+    }
   }
 
   @Override
