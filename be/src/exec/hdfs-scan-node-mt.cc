@@ -97,6 +97,7 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
     num_owned_io_buffers_.Add(-row_batch->num_io_buffers());
     return status;
   }
+  InitNullCollectionValues(row_batch);
 
   num_rows_returned_ += row_batch->num_rows();
   if (ReachedLimit()) {
