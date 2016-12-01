@@ -67,6 +67,7 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
+  *eos = false;
 
   DCHECK(scan_range_ == NULL || scanner_ != NULL);
   if (scan_range_ == NULL || scanner_->eos()) {

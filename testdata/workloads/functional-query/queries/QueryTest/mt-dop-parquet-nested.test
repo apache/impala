@@ -1,0 +1,34 @@
+====
+---- QUERY
+# IMPALA-4554: Memory corruption of nested collection with MT_DOP > 0.
+select id, cnt
+from functional_parquet.complextypestbl t,
+  (select count(item) cnt from t.int_array) v
+order by id
+limit 10
+---- RESULTS
+1,3
+2,3
+3,0
+4,0
+5,0
+6,0
+7,0
+8,1
+---- TYPES
+bigint,bigint
+====
+---- QUERY
+# IMPALA-4458: Test proper resource cleanup for cancelled fragments.
+# This test is duplicated from nested-types-subplan.test
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from tpch_nested_parquet.customer c, c.c_orders o
+where c_custkey = 1
+limit 3
+---- RESULTS
+1,regex:.*,regex:.*,regex:.*
+1,regex:.*,regex:.*,regex:.*
+1,regex:.*,regex:.*,regex:.*
+---- TYPES
+bigint,string,bigint,string
+====

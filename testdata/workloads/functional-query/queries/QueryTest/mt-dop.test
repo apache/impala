@@ -7,3 +7,22 @@ select count(*) from alltypes
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-4565: incorrect results because mt scan node does not set eos
+# correctly and sort node only gets the first row batch.
+set batch_size=1;
+select id
+from alltypestiny
+order by id
+---- TYPES
+int
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+====

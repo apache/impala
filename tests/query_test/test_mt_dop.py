@@ -21,6 +21,7 @@ import pytest
 
 from copy import deepcopy
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfOldAggsJoins
 from tests.common.test_vector import TestDimension
 from tests.common.test_vector import TestVector
 
@@ -88,3 +89,8 @@ class TestMtDopParquet(ImpalaTestSuite):
   def test_parquet(self, vector):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-parquet', vector)
+
+  @SkipIfOldAggsJoins.nested_types
+  def test_parquet_nested(self, vector):
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    self.run_test_case('QueryTest/mt-dop-parquet-nested', vector)
