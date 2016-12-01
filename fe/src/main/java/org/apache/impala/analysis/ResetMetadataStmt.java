@@ -23,8 +23,8 @@ import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TTableName;
+
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 
 /**
  * Representation of a REFRESH/INVALIDATE METADATA statement.

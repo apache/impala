@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;

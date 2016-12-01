@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCreateDropRoleParams;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -28,9 +29,6 @@ import com.google.common.base.Preconditions;
 public class CreateDropRoleStmt extends AuthorizationStmt {
   private final String roleName_;
   private final boolean isDropRole_;
-
-  // Set in analysis
-  private String user_;
 
   public CreateDropRoleStmt(String roleName, boolean isDropRole) {
     Preconditions.checkNotNull(roleName);

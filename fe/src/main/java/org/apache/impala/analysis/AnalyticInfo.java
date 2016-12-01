@@ -20,10 +20,10 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.catalog.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.impala.catalog.Type;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -97,9 +97,11 @@ public class AnalyticInfo extends AggregateInfoBase {
       result.outputTupleDesc_.getSlots().get(i).setSourceExpr(
           result.analyticExprs_.get(i));
     }
-    LOG.trace("analytictuple=" + result.outputTupleDesc_.debugString());
-    LOG.trace("analytictuplesmap=" + result.analyticTupleSmap_.debugString());
-    LOG.trace("analytic info:\n" + result.debugString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("analytictuple=" + result.outputTupleDesc_.debugString());
+      LOG.trace("analytictuplesmap=" + result.analyticTupleSmap_.debugString());
+      LOG.trace("analytic info:\n" + result.debugString());
+    }
     return result;
   }
 

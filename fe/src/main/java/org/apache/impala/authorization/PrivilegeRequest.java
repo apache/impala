@@ -19,7 +19,7 @@ package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
 
-/*
+/**
  * Represents a privilege request in the context of an Authorizeable object. If no
  * Authorizeable object is provided, it represents a privilege request on the server.
  * For example, SELECT on table Foo in database Bar.

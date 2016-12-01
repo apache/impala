@@ -22,6 +22,9 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang.reflect.ConstructorUtils;
+import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.catalog.AuthorizationPolicy;
+import org.apache.impala.common.InternalException;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.core.common.Subject;
 import org.apache.sentry.core.model.db.DBModelAction;
@@ -33,13 +36,10 @@ import org.apache.sentry.provider.common.ProviderBackendContext;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 import org.apache.sentry.provider.file.SimpleFileProviderBackend;
 
-import org.apache.impala.catalog.AuthorizationException;
-import org.apache.impala.catalog.AuthorizationPolicy;
-import org.apache.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
-/*
+/**
  * Class used to check whether a user has access to a given resource.
  */
 public class AuthorizationChecker {

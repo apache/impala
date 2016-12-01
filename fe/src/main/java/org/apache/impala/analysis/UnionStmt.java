@@ -466,7 +466,9 @@ public class UnionStmt extends QueryStmt {
     TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor("union");
     tupleDesc.setIsMaterialized(true);
     tupleId_ = tupleDesc.getId();
-    LOG.trace("UnionStmt.createMetadata: tupleId=" + tupleId_.toString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("UnionStmt.createMetadata: tupleId=" + tupleId_.toString());
+    }
 
     // One slot per expr in the select blocks. Use first select block as representative.
     List<Expr> firstSelectExprs = operands_.get(0).getQueryStmt().getResultExprs();

@@ -336,7 +336,9 @@ public class ComputeStatsStmt extends StatementBase {
           if (p.isDefaultPartition()) continue;
           TPartitionStats partStats = p.getPartitionStats();
           if (!p.hasIncrementalStats() || tableIsMissingColStats) {
-            if (partStats == null) LOG.trace(p.toString() + " does not have stats");
+            if (partStats == null) {
+              if (LOG.isTraceEnabled()) LOG.trace(p.toString() + " does not have stats");
+            }
             if (!tableIsMissingColStats) filterPreds.add(p.getConjunctSql());
             List<String> partValues = Lists.newArrayList();
             for (LiteralExpr partValue: p.getPartitionValues()) {
@@ -345,7 +347,7 @@ public class ComputeStatsStmt extends StatementBase {
             }
             expectedPartitions_.add(partValues);
           } else {
-            LOG.trace(p.toString() + " does have statistics");
+            if (LOG.isTraceEnabled()) LOG.trace(p.toString() + " does have statistics");
             validPartStats_.add(partStats);
           }
         }
@@ -377,7 +379,9 @@ public class ComputeStatsStmt extends StatementBase {
       }
 
       if (filterPreds.size() == 0 && validPartStats_.size() != 0) {
-        LOG.info("No partitions selected for incremental stats update");
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("No partitions selected for incremental stats update");
+        }
         analyzer.addWarning("No partitions selected for incremental stats update");
         return;
       }
@@ -438,18 +442,20 @@ public class ComputeStatsStmt extends StatementBase {
     }
 
     tableStatsQueryStr_ = tableStatsQueryBuilder.toString();
-    LOG.debug("Table stats query: " + tableStatsQueryStr_);
+    if (LOG.isDebugEnabled()) LOG.debug("Table stats query: " + tableStatsQueryStr_);
 
     if (columnStatsSelectList.isEmpty()) {
       // Table doesn't have any columns that we can compute stats for.
-      LOG.info("No supported column types in table " + table_.getTableName() +
-          ", no column statistics will be gathered.");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("No supported column types in table " + table_.getTableName() +
+            ", no column statistics will be gathered.");
+      }
       columnStatsQueryStr_ = null;
       return;
     }
 
     columnStatsQueryStr_ = columnStatsQueryBuilder.toString();
-    LOG.debug("Column stats query: " + columnStatsQueryStr_);
+    if (LOG.isDebugEnabled()) LOG.debug("Column stats query: " + columnStatsQueryStr_);
   }
 
   /**

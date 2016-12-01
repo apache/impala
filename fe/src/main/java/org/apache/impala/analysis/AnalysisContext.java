@@ -51,7 +51,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 /**
- * Wrapper class for parser and analyzer.
+ * Wrapper class for parsing, analyzing and rewriting a SQL stmt.
  */
 public class AnalysisContext {
   private final static Logger LOG = LoggerFactory.getLogger(AnalysisContext.class);
@@ -411,7 +411,9 @@ public class AnalysisContext {
         // Restore the original result types and column labels.
         analysisResult_.stmt_.castResultExprs(origResultTypes);
         analysisResult_.stmt_.setColLabels(origColLabels);
-        LOG.trace("rewrittenStmt: " + analysisResult_.stmt_.toSql());
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("rewrittenStmt: " + analysisResult_.stmt_.toSql());
+        }
         if (isExplain) analysisResult_.stmt_.setIsExplain();
         Preconditions.checkState(!analysisResult_.requiresSubqueryRewrite());
       }

@@ -18,7 +18,6 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -167,7 +166,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     }
     graph.addTargetColumnLabels(colDefs);
     graph.computeLineageGraph(viewDefStmt_.getResultExprs(), analyzer);
-    LOG.trace("lineage: " + graph.debugString());
+    if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
   }
 
   public TCreateOrAlterViewParams toThrift() {

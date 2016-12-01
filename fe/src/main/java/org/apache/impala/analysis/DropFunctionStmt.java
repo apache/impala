@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
+
 import org.apache.impala.authorization.AuthorizeableFn;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
@@ -25,9 +27,6 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDropFunctionParams;
-import org.apache.impala.thrift.TFunctionCategory;
-
-import java.util.ArrayList;
 
 /**
  * Represents a DROP [IF EXISTS] FUNCTION statement

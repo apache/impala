@@ -21,7 +21,7 @@ import java.util.EnumSet;
 
 import org.apache.sentry.core.model.db.DBModelAction;
 
-/*
+/**
  * Maps an Impala Privilege to one or more Hive Access "Actions".
  */
 public enum Privilege {

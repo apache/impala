@@ -22,11 +22,10 @@ import java.io.IOException;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
@@ -37,11 +36,12 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TTableName;
-import org.apache.impala.util.TAccessLevelUtil;
 import org.apache.impala.util.FsPermissionChecker;
+import org.apache.impala.util.TAccessLevelUtil;
+
 import com.google.common.base.Preconditions;
 
-/*
+/**
  * Represents a LOAD DATA statement for moving data into an existing table:
  * LOAD DATA INPATH 'filepath' [OVERWRITE] INTO TABLE <table name>
  * [PARTITION (partcol1=val1, partcol2=val2 ...)]

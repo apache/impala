@@ -156,7 +156,9 @@ public final class ExprSubstitutionMap {
     for (int i = 0; i < lhs_.size(); ++i) {
       for (int j = i + 1; j < lhs_.size(); ++j) {
         if (lhs_.get(i).equals(lhs_.get(j))) {
-          LOG.info("verify: smap=" + this.debugString());
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("verify: smap=" + this.debugString());
+          }
           Preconditions.checkState(false);
         }
       }
