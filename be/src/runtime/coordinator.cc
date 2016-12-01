@@ -1104,6 +1104,13 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
   DCHECK(has_called_wait_);
   SCOPED_TIMER(query_profile_->total_time_counter());
 
+  if (returned_all_results_) {
+    // May be called after the first time we set *eos. Re-set *eos and return here;
+    // already torn-down root_sink_ so no more work to do.
+    *eos = true;
+    return Status::OK();
+  }
+
   DCHECK(root_sink_ != nullptr)
       << "GetNext() called without result sink. Perhaps Prepare() failed and was not "
       << "checked?";
