@@ -19,9 +19,30 @@ from abc import ABCMeta, abstractproperty
 from copy import deepcopy
 from logging import getLogger
 
-from common import Column, TableExpr, TableExprList, ValExpr, ValExprList
+from tests.comparison.common import Column, TableExpr, TableExprList, ValExpr, ValExprList
+
 
 LOG = getLogger(__name__)
+
+
+class StatementExecutionMode(object):
+  """
+  Provide a name space for statement execution modes.
+  """
+  (
+      # A SELECT statement is executed and results are compared.
+      SELECT_STATEMENT,
+      # If this is chosen, statement execution will run the CTAS statement and then
+      # SELECT * on the table for comparision. The table is torn down after.
+      CREATE_TABLE_AS,
+      # Same as above, except with a few.
+      CREATE_VIEW_AS,
+      # a DML operation that isn't actually a test, but some setup operation that needs
+      # to be run concurrently
+      DML_SETUP,
+      # a DML statement that's actually a test
+      DML_TEST,
+  ) = xrange(5)
 
 
 class AbstractStatement(object):
@@ -38,10 +59,7 @@ class AbstractStatement(object):
     self.parent = None
     # optional WITH clause some statements may have
     self.with_clause = None
-    # Used by QueryExecutor to track whether this query is "raw", a CREATE TABLE AS
-    # SELECT, or CREATE VIEW AS SELECT
-    # TODO: Instead of plain strings, these values should be from some enumerated type.
-    self.execution = 'RAW'
+    self._execution = None
 
   @abstractproperty
   def table_exprs(self):
@@ -66,6 +84,19 @@ class AbstractStatement(object):
     """
     pass
 
+  @property
+  def execution(self):
+    """
+    one of the possible StatementExecutionMode values (see class definition for meaning)
+    """
+    if self._execution is None:
+      raise Exception('execution is not set on this object')
+    return self._execution
+
+  @execution.setter
+  def execution(self, val):
+    self._execution = val
+
 
 class Query(AbstractStatement):
   # TODO: This has to be called Query for as long as we want to unpickle old reports, or
@@ -89,6 +120,10 @@ class Query(AbstractStatement):
     self.union_clause = None
     self.order_by_clause = None
     self.limit_clause = None
+    # This is a fine default value, because any well-formed object will be a SELECT
+    # statement. Only the discrepancy searcher makes the decision at run time to change
+    # this.
+    self.execution = StatementExecutionMode.SELECT_STATEMENT
 
   def __deepcopy__(self, memo):
     other = Query()
@@ -705,7 +740,8 @@ class InsertStatement(AbstractStatement):
    CONFLICT_ACTION_IGNORE) = range(2)
 
   def __init__(self, with_clause=None, insert_clause=None, select_query=None,
-               values_clause=None, conflict_action=CONFLICT_ACTION_DEFAULT):
+               values_clause=None, conflict_action=CONFLICT_ACTION_DEFAULT,
+               execution=None):
     """
     Represent an INSERT statement. The INSERT may have an optional WithClause, and then
     either a SELECT query (Query) object from whose rows we INSERT, or a VALUES clause,
@@ -718,11 +754,14 @@ class InsertStatement(AbstractStatement):
     CONFLICT DO NOTHING". The syntax doesn't change for Impala, but the implied
     semantics are needed: if we are INSERTing a Kudu table, conflict_action must be
     CONFLICT_ACTION_IGNORE.
+
+    The execution attribute is used by the discrepancy_searcher to track whether this
+    InsertStatement is some sort of setup operation or a true random statement test.
     """
     super(InsertStatement, self).__init__()
     self._select_query = None
     self._values_clause = None
-
+    self.execution = execution
     self.select_query = select_query
     self.values_clause = values_clause
     self.with_clause = with_clause
@@ -772,3 +811,7 @@ class InsertStatement(AbstractStatement):
       queries.append(self.select_query)
       queries.extend(self.select_query.nested_queries)
     return queries
+
+  @property
+  def dml_table(self):
+    return self.insert_clause.table

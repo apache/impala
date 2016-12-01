@@ -18,14 +18,14 @@
 from copy import deepcopy
 from logging import getLogger
 
-from common import (
+from tests.comparison.common import (
     CollectionColumn,
     Column,
     StructColumn,
     Table)
-from db_types import BigInt, Boolean
-from funcs import Equals, And
-from query import (
+from tests.comparison.db_types import BigInt, Boolean
+from tests.comparison.funcs import Equals, And
+from tests.comparison.query import (
     FromClause,
     InlineView,
     JoinClause,

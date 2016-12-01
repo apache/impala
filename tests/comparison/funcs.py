@@ -18,8 +18,8 @@
 from copy import deepcopy
 from itertools import ifilter
 
-from common import ValExpr
-from db_types import (
+from tests.comparison.common import ValExpr
+from tests.comparison.db_types import (
     Boolean,
     Char,
     DataType,

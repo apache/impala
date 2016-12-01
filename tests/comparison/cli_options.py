@@ -23,8 +23,8 @@ import sys
 from getpass import getuser
 from tempfile import gettempdir
 
-import db_connection
-from cluster import (
+from tests.comparison import db_connection
+from tests.comparison.cluster import (
     CmCluster,
     DEFAULT_HIVE_HOST,
     DEFAULT_HIVE_PASSWORD,
@@ -33,7 +33,7 @@ from cluster import (
     MiniCluster,
     MiniHiveCluster,
 )
-from db_types import TYPES
+from tests.comparison.db_types import TYPES
 
 
 def add_logging_options(parser, default_debug_log_file=None):

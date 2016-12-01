@@ -20,8 +20,8 @@ from logging import getLogger
 from re import sub
 from sqlparse import format
 
-from common import StructColumn, CollectionColumn
-from db_types import (
+from tests.comparison.common import StructColumn, CollectionColumn
+from tests.comparison.db_types import (
     Char,
     Decimal,
     Float,
@@ -29,8 +29,8 @@ from db_types import (
     String,
     Timestamp,
     VarChar)
-from query import InsertStatement, Query
-from query_flattener import QueryFlattener
+from tests.comparison.query import InsertStatement, Query
+from tests.comparison.query_flattener import QueryFlattener
 
 LOG = getLogger(__name__)
 

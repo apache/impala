@@ -32,13 +32,13 @@ from logging import getLogger
 from random import choice, randint, seed
 from time import time
 
-from data_generator_mapred_common import (
+from tests.comparison.data_generator_mapred_common import (
     estimate_rows_per_reducer,
     MB_PER_REDUCER,
     serialize,
     TextTableDataGenerator)
-from common import Column, Table
-from db_types import (
+from tests.comparison.common import Column, Table
+from tests.comparison.db_types import (
     Char,
     Decimal,
     EXACT_TYPES,
@@ -247,7 +247,7 @@ class DbPopulator(object):
 if __name__ == '__main__':
   from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 
-  import cli_options
+  from tests.comparison import cli_options
 
   parser = ArgumentParser(
       usage='usage: \n'

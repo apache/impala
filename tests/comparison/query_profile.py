@@ -18,7 +18,7 @@
 from logging import getLogger
 from random import choice, randint, random
 
-from db_types import (
+from tests.comparison.db_types import (
     Boolean,
     Char,
     Decimal,
@@ -26,7 +26,8 @@ from db_types import (
     Int,
     TYPES,
     Timestamp)
-from funcs import (
+from tests.comparison.query import InsertStatement, Query, StatementExecutionMode
+from tests.comparison.funcs import (
     AnalyticAvg,
     AnalyticCount,
     AnalyticFirstValue,
@@ -52,7 +53,7 @@ from funcs import (
     NotIn,
     Or,
     WindowBoundary)
-from random_val_generator import RandomValGenerator
+from tests.comparison.random_val_generator import RandomValGenerator
 
 UNBOUNDED_PRECEDING = WindowBoundary.UNBOUNDED_PRECEDING
 PRECEDING = WindowBoundary.PRECEDING
@@ -61,6 +62,7 @@ FOLLOWING = WindowBoundary.FOLLOWING
 UNBOUNDED_FOLLOWING = WindowBoundary.UNBOUNDED_FOLLOWING
 
 LOG = getLogger()
+
 
 class DefaultProfile(object):
 
@@ -190,9 +192,12 @@ class DefaultProfile(object):
             ('Scalar', 'NON_AGG', 'CORRELATED'): 0,   # Not supported
             ('Scalar', 'NON_AGG', 'UNCORRELATED'): 1},
         'QUERY_EXECUTION': {   # Used by the discrepancy searcher
-            'CREATE_TABLE_AS': 1,
-            'RAW': 10,
-            'VIEW': 1}}
+            StatementExecutionMode.CREATE_TABLE_AS: 1,
+            StatementExecutionMode.CREATE_VIEW_AS: 1,
+            StatementExecutionMode.SELECT_STATEMENT: 10},
+        'STATEMENT': {
+            # TODO: Eventually make this a mix of DML and SELECT (IMPALA-4601)
+            Query: 1}}
 
     # On/off switches
     self._flags = {
@@ -478,7 +483,8 @@ class DefaultProfile(object):
     missing_funcs = set(s.func for s in filtered_signatures) - set(func_weights)
     if missing_funcs:
       raise Exception("Weights are missing for functions: {0}".format(missing_funcs))
-    return self.choose_func_signature(filtered_signatures, self.weights('RELATIONAL_FUNCS'))
+    return self.choose_func_signature(filtered_signatures,
+                                      self.weights('RELATIONAL_FUNCS'))
 
   def choose_func_signature(self, signatures, _func_weights=None):
     '''Return a signature chosen from "signatures".'''
@@ -606,6 +612,9 @@ class DefaultProfile(object):
     """
     return None
 
+  def choose_statement(self):
+    return self._choose_from_weights('STATEMENT')
+
 
 class ImpalaNestedTypesProfile(DefaultProfile):
 
@@ -697,6 +706,21 @@ class HiveProfile(DefaultProfile):
     """
     return (AnalyticAvg, AnalyticCount, AnalyticFirstValue, AnalyticLag,
             AnalyticLastValue, AnalyticLead, AnalyticMax, AnalyticMin, AnalyticSum)
+
+
+class DMLOnlyProfile(DefaultProfile):
+  """
+  Profile that only executes DML statements
+
+  TODO: This will be useful for testing DML; eventually this should be folded into the
+  default profile. (IMPALA-4601)
+  """
+  def __init__(self):
+    super(DMLOnlyProfile, self).__init__()
+    self._weights.update({
+        'STATEMENT': {
+            InsertStatement: 1}})
+
 
 PROFILES = [var for var in locals().values()
             if isinstance(var, type) and var.__name__.endswith('Profile')]

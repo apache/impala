@@ -27,8 +27,8 @@ import base64
 import pickle
 import StringIO
 
-from db_types import Decimal
-from random_val_generator import RandomValGenerator
+from tests.comparison.db_types import Decimal
+from tests.comparison.random_val_generator import RandomValGenerator
 
 def serialize(value):
   '''Returns a serialized representation of 'value' suitable for use as a key in an MR

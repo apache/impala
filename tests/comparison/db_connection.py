@@ -45,14 +45,14 @@ from textwrap import dedent
 from threading import Lock
 from time import time
 
-from common import (
+from tests.comparison.common import (
     ArrayColumn,
     Column,
     MapColumn,
     StructColumn,
     Table,
     TableExprList)
-from db_types import (
+from tests.comparison.db_types import (
     Char,
     Decimal,
     Double,

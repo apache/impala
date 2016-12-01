@@ -21,9 +21,9 @@ from itertools import ifilter
 from logging import getLogger
 from random import shuffle, choice, randint, randrange
 
-from common import TableExprList, ValExpr, ValExprList, Table, Column
-from query_profile import DefaultProfile
-from funcs import (
+from tests.comparison.common import TableExprList, ValExpr, ValExprList, Table, Column
+from tests.comparison.query_profile import DefaultProfile
+from tests.comparison.funcs import (
     AGG_FUNCS,
     AggFunc,
     ANALYTIC_FUNCS,
@@ -36,12 +36,12 @@ from funcs import (
     PartitionByClause,
     WindowBoundary,
     WindowClause)
-from db_types import (
+from tests.comparison.db_types import (
     Boolean,
     Int,
     Float,
     TYPES)
-from query import (
+from tests.comparison.query import (
     FromClause,
     GroupByClause,
     HavingClause,
@@ -65,6 +65,7 @@ FOLLOWING = WindowBoundary.FOLLOWING
 UNBOUNDED_FOLLOWING = WindowBoundary.UNBOUNDED_FOLLOWING
 
 LOG = getLogger(__name__)
+
 
 class QueryGenerator(object):
 
@@ -94,7 +95,7 @@ class QueryGenerator(object):
     self.profile.query = None
     self.max_nested_query_count = None
 
-  def create_query(self,
+  def generate_statement(self,
       table_exprs,
       allow_with_clause=True,
       allow_union_clause=True,
@@ -102,6 +103,7 @@ class QueryGenerator(object):
       required_select_item_type=None,
       required_table_expr_col_type=None,
       require_aggregate=None,
+      dml_table=None,
       table_alias_prefix='t'):
     '''Create a random query using various language features.
 
@@ -134,6 +136,9 @@ class QueryGenerator(object):
        require_aggregate can be set to True or False to force or disable the creation
        of an aggregate query. This is used during Subquery creation where the context
        may require an aggregate or non-aggregate.
+
+       dml_table exists for kwargs compatibility with other statement generators but is
+       ignored
     '''
     if not table_exprs:
       raise Exception("At least one TableExpr is needed")
@@ -220,7 +225,7 @@ class QueryGenerator(object):
       for select_item in select_clause.items:
         select_item_data_types.append(
             choice(data_type_candidates_by_base_type[select_item.val_expr.base_type]))
-      query.union_clause = UnionClause(self.create_query(
+      query.union_clause = UnionClause(self.generate_statement(
           table_exprs,
           allow_with_clause=False,
           select_item_data_types=select_item_data_types))
@@ -249,8 +254,8 @@ class QueryGenerator(object):
     with_clause_inline_views = TableExprList()
     for with_clause_inline_view_idx \
         in xrange(self.profile.get_with_clause_table_ref_count()):
-      query = self.create_query(table_exprs,
-                                allow_with_clause=self.profile.use_nested_with())
+      query = self.generate_statement(table_exprs,
+                                      allow_with_clause=self.profile.use_nested_with())
       with_clause_alias_count = getattr(self.root_query, 'with_clause_alias_count', 0) + 1
       self.root_query.with_clause_alias_count = with_clause_alias_count
       with_clause_inline_view = \
@@ -504,7 +509,7 @@ class QueryGenerator(object):
             join_expr_type = None
           select_item_data_types = \
               [signature_arg.type] if use_scalar_subquery else signature_arg.type
-          query = self.create_query(
+          query = self.generate_statement(
               table_exprs,
               select_item_data_types=select_item_data_types,
               required_table_expr_col_type=join_expr_type,
@@ -568,7 +573,7 @@ class QueryGenerator(object):
         if not signature_arg.can_be_null and not arg.is_constant:
           val = self.profile.choose_constant(return_type=arg.type, allow_null=False)
           func.args[idx] = Coalesce.create_from_args(arg, val)
-        if not arg.is_constant or not arg.val is None:
+        if not arg.is_constant or arg.val is not None:
           has_non_null_literal_arg = True
     return func
 
@@ -669,7 +674,7 @@ class QueryGenerator(object):
     while max_children:
       null_arg_pool = None
       parent_func, parent_arg_idx = None, None
-      chosen_signature= None
+      chosen_signature=None
 
       # Since aggregate (and let's assume analytic functions) return a limited set of
       # types, some prep work may be needed if the return type isn't in the set of
@@ -1144,9 +1149,9 @@ class QueryGenerator(object):
     return deepcopy(self.profile.choose_table(table_exprs))
 
   def _create_inline_view(self, table_exprs, required_type=None):
-    return InlineView(self.create_query(
-      table_exprs, required_select_item_type=required_type,
-      allow_with_clause=self.profile.use_nested_with()))
+    return InlineView(self.generate_statement(
+        table_exprs, required_select_item_type=required_type,
+        allow_with_clause=self.profile.use_nested_with()))
 
   def _create_join_clause(self, from_clause, table_exprs):
     join_type = self.profile.choose_join_type(JoinClause.JOINS_TYPES)
@@ -1352,7 +1357,7 @@ class QueryGenerator(object):
     #
     # then choosing a random val (which is a list of aggs) in the above dict, and
     # finally randomly adding DISTINCT to items in the list.
-    exprs_to_funcs =  defaultdict(list)
+    exprs_to_funcs = defaultdict(list)
     for item in agg_items:
       for expr, funcs in self._group_agg_funcs_by_expr(item.val_expr).iteritems():
         exprs_to_funcs[expr].extend(funcs)
@@ -1548,7 +1553,7 @@ def generate_queries_for_manual_inspection():
   ref_writer = SqlWriter.create(dialect='POSTGRESQL',
       nulls_order_asc=query_profile.nulls_order_asc())
   for _ in xrange(NUM_QUERIES):
-    query = query_generator.create_query(tables)
+    query = query_generator.generate_statement(tables)
     print("Test db")
     print(sql_writer.write_query(query) + '\n')
     print("Ref db")

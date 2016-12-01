@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal as PyDecimal
 from random import randint, random, uniform
 
-from db_types import Boolean, Char, Decimal, Float, Int, Timestamp
+from tests.comparison.db_types import Boolean, Char, Decimal, Float, Int, Timestamp
 
 class RandomValGenerator(object):
 

@@ -163,8 +163,9 @@ class Job(object):
       while num_unexpected_errors < NUM_UNEXPECTED_ERRORS_THRESHOLD:
         query = None
         try:
+          # TODO: Support DML statements. Possibly this be part of IMPALA-4600.
           self.query_generator = QueryGenerator(self.query_profile)
-          query = self.query_generator.create_query(self.common_tables)
+          query = self.query_generator.generate_statement(self.common_tables)
         except IndexError as e:
           # This is a query generator bug that happens extremely rarely
           LOG.info('Query Generator Choice Problem, {0}'.format(e))

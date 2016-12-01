@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import pytest
-
 from tests.comparison.common import TableExprList, Column, Table
 from tests.comparison.db_types import Int
 from tests.comparison.query_generator import QueryGenerator
@@ -64,5 +62,5 @@ def test_use_nested_width_subquery():
   table_expr_list.append(left_table)
 
   # Check that each nested_query doesn't have a with clause
-  for nested_query in mock_query_gen.create_query(table_expr_list).nested_queries:
+  for nested_query in mock_query_gen.generate_statement(table_expr_list).nested_queries:
     assert nested_query.with_clause is None
