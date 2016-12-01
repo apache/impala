@@ -173,7 +173,8 @@ public class HdfsScanNode extends ScanNode {
 
     // Determine backend scan node implementation to use. The optimized MT implementation
     // is currently only supported for Parquet.
-    if (analyzer.getQueryOptions().mt_dop > 0 &&
+    if (analyzer.getQueryOptions().isSetMt_dop() &&
+        analyzer.getQueryOptions().mt_dop > 0 &&
         fileFormats.size() == 1 && fileFormats.contains(HdfsFileFormat.PARQUET)) {
       useMtScanNode_ = true;
     } else {

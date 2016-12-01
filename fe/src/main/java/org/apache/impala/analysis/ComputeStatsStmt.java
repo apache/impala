@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
@@ -24,6 +25,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
@@ -527,6 +529,24 @@ public class ComputeStatsStmt extends StatementBase {
 
   public String getTblStatsQuery() { return tableStatsQueryStr_; }
   public String getColStatsQuery() { return columnStatsQueryStr_; }
+
+  /**
+   * Returns true if this statement computes stats on Parquet partitions only,
+   * false otherwise.
+   */
+  public boolean isParquetOnly() {
+    if (!(table_ instanceof HdfsTable)) return false;
+    Collection<HdfsPartition> affectedPartitions = null;
+    if (partitionSet_ != null) {
+      affectedPartitions = partitionSet_.getPartitions();
+    } else {
+      affectedPartitions = ((HdfsTable) table_).getPartitions();
+    }
+    for (HdfsPartition partition: affectedPartitions) {
+      if (partition.getFileFormat() != HdfsFileFormat.PARQUET) return false;
+    }
+    return true;
+  }
 
   @Override
   public String toSql() {

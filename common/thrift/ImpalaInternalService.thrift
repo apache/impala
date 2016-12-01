@@ -191,7 +191,8 @@ struct TQueryOptions {
   // query per backend.
   // > 0: multi-threaded execution mode, with given dop
   // 0: single-threaded execution mode
-  44: optional i32 mt_dop = 0
+  // unset: may be set automatically to > 0 in createExecRequest(), otherwise same as 0
+  44: optional i32 mt_dop
 
   // If true, INSERT writes to S3 go directly to their final location rather than being
   // copied there by the coordinator. We cannot do this for INSERT OVERWRITES because for

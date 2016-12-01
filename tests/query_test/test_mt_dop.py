@@ -25,7 +25,9 @@ from tests.common.skip import SkipIfOldAggsJoins
 from tests.common.test_vector import TestDimension
 from tests.common.test_vector import TestVector
 
-MT_DOP_VALUES = [1, 2, 8]
+# COMPUTE STATS on Parquet tables automatically sets MT_DOP=4, so include
+# the value 0 to cover the non-MT path as well.
+MT_DOP_VALUES = [0, 1, 2, 8]
 
 class TestMtDop(ImpalaTestSuite):
   @classmethod

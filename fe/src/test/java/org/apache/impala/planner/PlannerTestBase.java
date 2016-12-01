@@ -364,7 +364,7 @@ public class PlannerTestBase extends FrontendTestBase {
   /**
    * Merge the options of b into a and return a
    */
-  private TQueryOptions mergeQueryOptions(TQueryOptions a, TQueryOptions b) {
+  protected TQueryOptions mergeQueryOptions(TQueryOptions a, TQueryOptions b) {
     for(TQueryOptions._Fields f : TQueryOptions._Fields.values()) {
       if (b.isSet(f)) {
         a.setFieldValue(f, b.getFieldValue(f));
@@ -484,7 +484,7 @@ public class PlannerTestBase extends FrontendTestBase {
           ImpalaInternalServiceConstants.NUM_NODES_ALL);
     }
     if (section == Section.PARALLELPLANS) {
-      queryCtx.request.query_options.mt_dop = 2;
+      queryCtx.request.query_options.setMt_dop(2);
     }
     ArrayList<String> expectedPlan = testCase.getSectionContents(section);
     boolean sectionExists = expectedPlan != null && !expectedPlan.isEmpty();

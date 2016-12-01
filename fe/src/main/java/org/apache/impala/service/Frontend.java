@@ -114,6 +114,7 @@ import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
@@ -978,8 +979,9 @@ public class Frontend {
       Planner planner, StringBuilder explainString) throws ImpalaException {
     TQueryCtx queryCtx = planner.getQueryCtx();
     AnalysisContext.AnalysisResult analysisResult = planner.getAnalysisResult();
-    boolean isMtExec =
-        analysisResult.isQueryStmt() && queryCtx.request.query_options.mt_dop > 0;
+    boolean isMtExec = analysisResult.isQueryStmt() &&
+        queryCtx.request.query_options.isSetMt_dop() &&
+        queryCtx.request.query_options.mt_dop > 0;
 
     List<PlanFragment> planRoots = Lists.newArrayList();
     TQueryExecRequest result = new TQueryExecRequest();
@@ -1038,6 +1040,7 @@ public class Frontend {
     result.setAccess_events(analysisResult.getAccessEvents());
     result.analysis_warnings = analysisResult.getAnalyzer().getWarnings();
 
+    TQueryOptions queryOptions = queryCtx.request.query_options;
     if (analysisResult.isCatalogOp()) {
       result.stmt_type = TStmtType.DDL;
       createCatalogOpRequest(analysisResult, result);
@@ -1045,6 +1048,15 @@ public class Frontend {
       if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
         result.catalog_op_request.setLineage_graph(thriftLineageGraph);
       }
+      // Set MT_DOP=4 for COMPUTE STATS on Parquet tables, unless the user has already
+      // provided another value for MT_DOP.
+      if (!queryOptions.isSetMt_dop() &&
+          analysisResult.isComputeStatsStmt() &&
+          analysisResult.getComputeStatsStmt().isParquetOnly()) {
+        queryOptions.setMt_dop(4);
+      }
+      // If unset, set MT_DOP to 0 to simplify the rest of the code.
+      if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
       // All DDL operations except for CTAS are done with analysis at this point.
       if (!analysisResult.isCreateTableAsSelectStmt()) return result;
     } else if (analysisResult.isLoadDataStmt()) {
@@ -1061,6 +1073,8 @@ public class Frontend {
       result.setSet_query_option_request(analysisResult.getSetStmt().toThrift());
       return result;
     }
+    // If unset, set MT_DOP to 0 to simplify the rest of the code.
+    if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
 
     // create TQueryExecRequest
     Preconditions.checkState(analysisResult.isQueryStmt() || analysisResult.isDmlStmt()

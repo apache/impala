@@ -17,13 +17,21 @@
 
 package org.apache.impala.planner;
 
+import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
+import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
+
+import jline.internal.Preconditions;
 
 // All planner tests, except for S3 specific tests should go here.
 public class PlannerTest extends PlannerTestBase {
@@ -307,5 +315,49 @@ public class PlannerTest extends PlannerTestBase {
     } finally {
       RuntimeEnv.INSTANCE.setTestEnv(true);
     }
+  }
+
+  @Test
+  public void testComputeStatsMtDop() {
+    for (int mtDop: new int[] {-1, 0, 1, 16}) {
+      int effectiveMtDop = (mtDop != -1) ? mtDop : 0;
+      // MT_DOP is not set automatically for stmt other than COMPUTE STATS.
+      testEffectiveMtDop(
+          "select * from functional_parquet.alltypes", mtDop, effectiveMtDop);
+      // MT_DOP is not set automatically for COMPUTE STATS on non-Parquet tables.
+      testEffectiveMtDop(
+          "compute stats functional.alltypes", mtDop, effectiveMtDop);
+    }
+    // MT_DOP is set automatically for COMPUTE STATS on Parquet tables,
+    // but can be overridden by a user-provided MT_DOP.
+    testEffectiveMtDop("compute stats functional_parquet.alltypes", -1, 4);
+    testEffectiveMtDop("compute stats functional_parquet.alltypes", 0, 0);
+    testEffectiveMtDop("compute stats functional_parquet.alltypes", 1, 1);
+    testEffectiveMtDop("compute stats functional_parquet.alltypes", 16, 16);
+  }
+
+  /**
+   * Creates an exec request for 'stmt' setting the MT_DOP query option to 'userMtDop',
+   * or leaving it unset if 'userMtDop' is -1. Asserts that the MT_DOP of the generated
+   * exec request is equal to 'expectedMtDop'.
+   */
+  private void testEffectiveMtDop(String stmt, int userMtDop, int expectedMtDop) {
+    TQueryCtx queryCtx = TestUtils.createQueryContext(
+        Catalog.DEFAULT_DB, System.getProperty("user.name"));
+    queryCtx.request.setStmt(stmt);
+    queryCtx.request.query_options = defaultQueryOptions();
+    if (userMtDop != -1) queryCtx.request.query_options.setMt_dop(userMtDop);
+    StringBuilder explainBuilder = new StringBuilder();
+    TExecRequest request = null;
+    try {
+      request = frontend_.createExecRequest(queryCtx, explainBuilder);
+    } catch (ImpalaException e) {
+      Assert.fail("Failed to create exec request for '" + stmt + "': " + e.getMessage());
+    }
+    Preconditions.checkNotNull(request);
+    int actualMtDop = -1;
+    if (request.query_options.isSetMt_dop()) actualMtDop = request.query_options.mt_dop;
+    // Check that the effective MT_DOP is as expected.
+    Assert.assertEquals(actualMtDop, expectedMtDop);
   }
 }

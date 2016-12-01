@@ -158,14 +158,18 @@ public class SingleNodePlanner {
    * Throws a NotImplementedException if plan validation fails.
    */
   public void validatePlan(PlanNode planNode) throws NotImplementedException {
-    if (ctx_.getQueryOptions().mt_dop > 0 && !RuntimeEnv.INSTANCE.isTestEnv()
+    if (ctx_.getQueryOptions().isSetMt_dop() && ctx_.getQueryOptions().mt_dop > 0
+        && !RuntimeEnv.INSTANCE.isTestEnv()
         && (planNode instanceof JoinNode || ctx_.hasTableSink())) {
       throw new NotImplementedException(
           "MT_DOP not supported for plans with base table joins or table sinks.");
     }
 
-    // As long as MT_DOP == 0 any join can run in a single-node plan.
-    if (ctx_.isSingleNodeExec() && ctx_.getQueryOptions().mt_dop == 0) return;
+    // As long as MT_DOP is unset or 0 any join can run in a single-node plan.
+    if (ctx_.isSingleNodeExec() &&
+        (!ctx_.getQueryOptions().isSetMt_dop() || ctx_.getQueryOptions().mt_dop == 0)) {
+      return;
+    }
 
     if (planNode instanceof NestedLoopJoinNode) {
       JoinNode joinNode = (JoinNode) planNode;
