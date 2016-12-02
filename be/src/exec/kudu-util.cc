@@ -78,14 +78,16 @@ void LogKuduMessage(void* unused, kudu::client::KuduLogSeverity severity,
     const char* filename, int line_number, const struct ::tm* time, const char* message,
     size_t message_len) {
 
-  // Note: we use raw ints instead of the nice LogSeverity typedef
+  // Note: use raw ints instead of the nice LogSeverity typedef
   // that can be found in glog/log_severity.h as it has an import
   // conflict with gutil/logging-inl.h (indirectly imported).
   int glog_severity;
 
   switch (severity) {
     case kudu::client::SEVERITY_INFO: glog_severity = 0; break;
-    case kudu::client::SEVERITY_WARNING: glog_severity = 1; break;
+    // Log Kudu WARNING messages at the INFO level to avoid contention created by glog
+    // locking while flushing WARNING messages.
+    case kudu::client::SEVERITY_WARNING: glog_severity = 0; break;
     case kudu::client::SEVERITY_ERROR: glog_severity = 2; break;
     case kudu::client::SEVERITY_FATAL: glog_severity = 3; break;
     default : DCHECK(false) << "Unexpected severity type: " << severity;
