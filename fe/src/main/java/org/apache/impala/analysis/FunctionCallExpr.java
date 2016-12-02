@@ -232,6 +232,10 @@ public class FunctionCallExpr extends Expr {
     }
   }
 
+  /**
+   * Needs to be kept in sync with the BE understanding of constness in
+   * scalar-fn-call.h/cc.
+   */
   @Override
   public boolean isConstant() {
     // Aggregate functions are never constant.
@@ -243,7 +247,8 @@ public class FunctionCallExpr extends Expr {
       fnName = path.get(path.size() - 1);
     }
     // Non-deterministic functions are never constant.
-    if (fnName.equalsIgnoreCase("rand") || fnName.equalsIgnoreCase("random")) {
+    if (fnName.equalsIgnoreCase("rand") || fnName.equalsIgnoreCase("random")
+        || fnName.equalsIgnoreCase("uuid")) {
       return false;
     }
     // Sleep is a special function for testing.

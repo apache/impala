@@ -1090,7 +1090,9 @@ public class Analyzer {
     registerFullOuterJoinedConjunct(e);
 
     // register single tid conjuncts
-    if (tupleIds.size() == 1) globalState_.singleTidConjuncts.add(e.getId());
+    if (tupleIds.size() == 1 && !e.isAuxExpr()) {
+      globalState_.singleTidConjuncts.add(e.getId());
+    }
 
     if (LOG.isTraceEnabled()) {
       LOG.trace("register tuple/slotConjunct: " + Integer.toString(e.getId().asInt())

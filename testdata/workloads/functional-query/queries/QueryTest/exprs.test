@@ -2622,3 +2622,18 @@ TIMESTAMP
 ---- ERRORS
 UDF WARNING: Cannot subtract interval 1: Year is out of valid range: 1400..10000
 ====
+---- QUERY
+# IMPALA-4574: UUID() is not a constant expression.
+select count(*) from functional.alltypestiny group by concat(uuid(), "_test")
+---- RESULTS
+1
+1
+1
+1
+1
+1
+1
+1
+---- TYPES
+BIGINT
+====

@@ -258,7 +258,10 @@ void ScalarFnCall::Close(RuntimeState* state, ExprContext* context,
 }
 
 bool ScalarFnCall::IsConstant() const {
-  if (fn_.name.function_name == "rand") return false;
+  if (fn_.name.function_name == "rand" || fn_.name.function_name == "random"
+      || fn_.name.function_name == "uuid" || fn_.name.function_name == "sleep") {
+    return false;
+  }
   return Expr::IsConstant();
 }
 

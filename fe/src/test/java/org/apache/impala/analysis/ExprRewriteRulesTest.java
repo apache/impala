@@ -39,7 +39,6 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
 
   public Expr RewritesOk(String expr, ExprRewriteRule rule, String expectedExpr)
       throws AnalysisException {
-    System.out.println(expr);
     String stmtStr = "select " + expr + " from functional.alltypessmall";
     SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
     Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
@@ -226,6 +225,8 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("hex(unhex(hex(unhex('D3'))))", rule, null);
     // Tests that non-deterministic functions are not folded.
     RewritesOk("rand()", rule, null);
+    RewritesOk("random()", rule, null);
+    RewritesOk("uuid()", rule, null);
     // Tests that exprs that warn during their evaluation are not folded.
     RewritesOk("coalesce(1.8, cast(int_col as decimal(38,38)))", rule, null);
   }
