@@ -97,3 +97,36 @@ F00:PLAN FRAGMENT [RANDOM]
      hosts=3 per-host-mem=0B
      tuple-ids=0 row-size=124B cardinality=2
 ====
+select * from functional_kudu.alltypes where
+-- predicates that can be pushed
+tinyint_col in (1, 2) and
+smallint_col in (false, 2) and
+int_col in (true, 2) and
+bigint_col in (1, 2) and
+bool_col in (true) and
+float_col in (0.0) and
+double_col in (0.0) and
+string_col in ("foo", cast("foo" as char(10))) and
+
+-- predicates that cannot be pushed because the SlotRef is wrapped in a cast
+tinyint_col in (1, 999) and
+smallint_col in (99999, 2) and
+int_col in (9999999999) and
+bigint_col in (9999999999999999999) and
+bool_col in (1) and
+float_col in (cast('NaN' as float)) and
+double_col in (cast('inf' as double)) and
+
+-- 'NOT IN' and lists containing slotrefs cannot be pushed
+string_col not in ("bar") and
+id in (int_col)
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED]
+  PLAN-ROOT SINK
+  |
+  00:SCAN KUDU [functional_kudu.alltypes]
+     predicates: id IN (int_col), string_col NOT IN ('bar'), bigint_col IN (9999999999999999999), double_col IN (CAST('inf' AS DOUBLE)), float_col IN (CAST('NaN' AS FLOAT)), int_col IN (9999999999), smallint_col IN (99999, 2), tinyint_col IN (1, 999), bool_col IN (1)
+     kudu predicates: double_col IN (0.0), float_col IN (0.0), bigint_col IN (1, 2), int_col IN (1, 2), smallint_col IN (0, 2), string_col IN ('foo', 'foo       '), tinyint_col IN (1, 2), bool_col IN (TRUE)
+     hosts=3 per-host-mem=unavailable
+     tuple-ids=0 row-size=126B cardinality=4
+====
