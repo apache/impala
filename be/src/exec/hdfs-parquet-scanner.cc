@@ -158,6 +158,7 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
       process_footer_timer_stats_(NULL),
       num_cols_counter_(NULL),
       num_row_groups_counter_(NULL),
+      num_scanners_with_no_reads_counter_(NULL),
       codegend_process_scratch_batch_fn_(NULL) {
   assemble_rows_timer_.Stop();
 }
@@ -170,6 +171,8 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TUnit::UNIT);
   num_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroups", TUnit::UNIT);
+  num_scanners_with_no_reads_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumScannersWithNoReads", TUnit::UNIT);
   process_footer_timer_stats_ =
       ADD_SUMMARY_STATS_TIMER(
           scan_node_->runtime_profile(), "FooterProcessingTime");
@@ -311,6 +314,24 @@ static int64_t GetRowGroupMidOffset(const parquet::RowGroup& row_group) {
   return start_offset + (end_offset - start_offset) / 2;
 }
 
+// Returns true if 'row_group' overlaps with 'split_range'.
+static bool CheckRowGroupOverlapsSplit(const parquet::RowGroup& row_group,
+    const DiskIoMgr::ScanRange* split_range) {
+  int64_t row_group_start = GetColumnStartOffset(row_group.columns[0].meta_data);
+
+  const parquet::ColumnMetaData& last_column =
+      row_group.columns[row_group.columns.size() - 1].meta_data;
+  int64_t row_group_end =
+      GetColumnStartOffset(last_column) + last_column.total_compressed_size;
+
+  int64_t split_start = split_range->offset();
+  int64_t split_end = split_start + split_range->len();
+
+  return (split_start >= row_group_start && split_start < row_group_end) ||
+      (split_end > row_group_start && split_end <= row_group_end) ||
+      (split_start <= row_group_start && split_end >= row_group_end);
+}
+
 int HdfsParquetScanner::CountScalarColumns(const vector<ParquetColumnReader*>& column_readers) {
   DCHECK(!column_readers.empty());
   int num_columns = 0;
@@ -431,6 +452,16 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
 }
 
 Status HdfsParquetScanner::NextRowGroup() {
+  const DiskIoMgr::ScanRange* split_range = static_cast<ScanRangeMetadata*>(
+      metadata_range_->meta_data())->original_split;
+  int64_t split_offset = split_range->offset();
+  int64_t split_length = split_range->len();
+
+  HdfsFileDesc* file_desc = scan_node_->GetFileDesc(filename());
+
+  bool start_with_first_row_group = row_group_idx_ == -1;
+  bool misaligned_row_group_skipped = false;
+
   advance_row_group_ = false;
   row_group_rows_read_ = 0;
 
@@ -442,26 +473,33 @@ Status HdfsParquetScanner::NextRowGroup() {
     parse_status_ = Status::OK();
 
     ++row_group_idx_;
-    if (row_group_idx_ >= file_metadata_.row_groups.size()) break;
+    if (row_group_idx_ >= file_metadata_.row_groups.size()) {
+      if (start_with_first_row_group && misaligned_row_group_skipped) {
+        // We started with the first row group and skipped all the row groups because
+        // they were misaligned. The execution flow won't reach this point if there is at
+        // least one non-empty row group which this scanner can process.
+        COUNTER_ADD(num_scanners_with_no_reads_counter_, 1);
+      }
+      break;
+    }
     const parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
     // Also check 'file_metadata_.num_rows' to make sure 'select count(*)' and 'select *'
     // behave consistently for corrupt files that have 'file_metadata_.num_rows == 0'
     // but some data in row groups.
-    if (row_group.num_rows == 0|| file_metadata_.num_rows == 0) continue;
+    if (row_group.num_rows == 0 || file_metadata_.num_rows == 0) continue;
 
-    const DiskIoMgr::ScanRange* split_range = static_cast<ScanRangeMetadata*>(
-        metadata_range_->meta_data())->original_split;
-    HdfsFileDesc* file_desc = scan_node_->GetFileDesc(filename());
     RETURN_IF_ERROR(ParquetMetadataUtils::ValidateColumnOffsets(
         file_desc->filename, file_desc->file_length, row_group));
 
+    // A row group is processed by the scanner whose split overlaps with the row
+    // group's mid point.
     int64_t row_group_mid_pos = GetRowGroupMidOffset(row_group);
-    int64_t split_offset = split_range->offset();
-    int64_t split_length = split_range->len();
     if (!(row_group_mid_pos >= split_offset &&
         row_group_mid_pos < split_offset + split_length)) {
-      // A row group is processed by the scanner whose split overlaps with the row
-      // group's mid point. This row group will be handled by a different scanner.
+      // The mid-point does not fall within the split, this row group will be handled by a
+      // different scanner.
+      // If the row group overlaps with the split, we found a misaligned row group.
+      misaligned_row_group_skipped |= CheckRowGroupOverlapsSplit(row_group, split_range);
       continue;
     }
     COUNTER_ADD(num_row_groups_counter_, 1);

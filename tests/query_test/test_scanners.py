@@ -41,6 +41,7 @@ from tests.common.test_result_verifier import (
     parse_result_rows)
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
+from tests.util.hdfs_util import NAMENODE
 from tests.util.get_parquet_metadata import get_parquet_metadata
 from tests.util.test_file_parser import QueryTestSectionReader
 
@@ -310,6 +311,61 @@ class TestParquet(ImpalaTestSuite):
     vector.get_value('exec_option')['abort_on_error'] = 1
     self.run_test_case('QueryTest/parquet-corrupt-rle-counts-abort',
                        vector, unique_database)
+
+  @SkipIfS3.hdfs_block_size
+  @SkipIfIsilon.hdfs_block_size
+  @SkipIfLocal.multiple_impalad
+  def test_misaligned_parquet_row_groups(self, vector):
+    """IMPALA-3989: Test that no warnings are issued when misaligned row groups are
+    encountered. Make sure that 'NumScannersWithNoReads' counters are set to the number of
+    scanners that end up doing no reads because of misaligned row groups.
+    """
+    # functional.parquet.alltypes is well-formatted. 'NumScannersWithNoReads' counters are
+    # set to 0.
+    table_name = 'functional_parquet.alltypes'
+    self._misaligned_parquet_row_groups_helper(table_name, 7300)
+    # lineitem_multiblock_parquet/000000_0 is ill-formatted but every scanner reads some
+    # row groups. 'NumScannersWithNoReads' counters are set to 0.
+    table_name = 'functional_parquet.lineitem_multiblock'
+    self._misaligned_parquet_row_groups_helper(table_name, 20000)
+    # lineitem_sixblocks.parquet is ill-formatted but every scanner reads some row groups.
+    # 'NumScannersWithNoReads' counters are set to 0.
+    table_name = 'functional_parquet.lineitem_sixblocks'
+    self._misaligned_parquet_row_groups_helper(table_name, 40000)
+    # Scanning lineitem_one_row_group.parquet finds two scan ranges that end up doing no
+    # reads because the file is poorly formatted.
+    table_name = 'functional_parquet.lineitem_multiblock_one_row_group'
+    self._misaligned_parquet_row_groups_helper(
+        table_name, 40000, num_scanners_with_no_reads=2)
+
+  def _misaligned_parquet_row_groups_helper(
+      self, table_name, rows_in_table, num_scanners_with_no_reads=0, log_prefix=None):
+    """Checks if executing a query logs any warnings and if there are any scanners that
+    end up doing no reads. 'log_prefix' specifies the prefix of the expected warning.
+    'num_scanners_with_no_reads' indicates the expected number of scanners that don't read
+    anything because the underlying file is poorly formatted
+    """
+    query = 'select * from %s' % table_name
+    result = self.client.execute(query)
+    assert len(result.data) == rows_in_table
+    assert (not result.log and not log_prefix) or \
+        (log_prefix and result.log.startswith(log_prefix))
+
+    runtime_profile = str(result.runtime_profile)
+    num_scanners_with_no_reads_list = re.findall(
+        'NumScannersWithNoReads: ([0-9]*)', runtime_profile)
+
+    # This will fail if the number of impalads != 3
+    # The fourth fragment is the "Averaged Fragment"
+    assert len(num_scanners_with_no_reads_list) == 4
+
+    # Calculate the total number of scan ranges that ended up not reading anything because
+    # an underlying file was poorly formatted.
+    # Skip the Averaged Fragment; it comes first in the runtime profile.
+    total = 0
+    for n in num_scanners_with_no_reads_list[1:]:
+      total += int(n)
+    assert total == num_scanners_with_no_reads
 
   @SkipIfS3.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size

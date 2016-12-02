@@ -443,6 +443,10 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Number of row groups that need to be read.
   RuntimeProfile::Counter* num_row_groups_counter_;
 
+  /// Number of scanners that end up doing no reads because their splits don't overlap
+  /// with the midpoint of any row-group in the file.
+  RuntimeProfile::Counter* num_scanners_with_no_reads_counter_;
+
   typedef int (*ProcessScratchBatchFn)(HdfsParquetScanner*, RowBatch*);
   /// The codegen'd version of ProcessScratchBatch() if available, NULL otherwise.
   ProcessScratchBatchFn codegend_process_scratch_batch_fn_;
