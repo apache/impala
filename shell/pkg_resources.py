@@ -2292,7 +2292,7 @@ class Distribution(object):
                 version = self.version
             except ValueError:
                 version = ''
-            if '0.7' in version:
+            if version.startswith('0.7'):
                 raise ValueError(
                     "A 0.7-series setuptools cannot be installed "
                     "with distribute. Found one at %s" % str(self.location))
@@ -2593,7 +2593,7 @@ def _override_setuptools(req):
             return True
         for comparator, version in req.specs:
             if comparator in ['==', '>=', '>']:
-                if '0.7' in version:
+                if version.startswith('0.7'):
                     # We want some setuptools not from the 0.6 series.
                     return False
         return True
