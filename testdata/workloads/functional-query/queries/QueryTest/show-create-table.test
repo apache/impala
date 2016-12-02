@@ -337,3 +337,12 @@ STORED AS PARQUET
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ()
 ====
+---- CREATE_VIEW
+# Create view that contains a subquery (IMPALA-4579)
+CREATE VIEW view_with_subquery AS SELECT * FROM functional.alltypestiny
+  WHERE id IN (SELECT id FROM functional.alltypesagg);
+---- RESULTS
+CREATE VIEW show_create_table_test_db.view_with_subquery
+AS SELECT * FROM functional.alltypestiny
+WHERE id IN (SELECT id FROM functional.alltypesagg)
+====
