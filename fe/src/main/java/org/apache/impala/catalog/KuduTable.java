@@ -29,15 +29,15 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.impala.analysis.ColumnDef;
-import org.apache.impala.analysis.DistributeParam;
+import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
-import org.apache.impala.thrift.TDistributeByHashParam;
-import org.apache.impala.thrift.TDistributeByRangeParam;
-import org.apache.impala.thrift.TDistributeParam;
+import org.apache.impala.thrift.TKuduPartitionByHashParam;
+import org.apache.impala.thrift.TKuduPartitionByRangeParam;
+import org.apache.impala.thrift.TKuduPartitionParam;
 import org.apache.impala.thrift.TKuduTable;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
@@ -110,9 +110,9 @@ public class KuduTable extends Table {
   // Primary key column names.
   private final List<String> primaryKeyColumnNames_ = Lists.newArrayList();
 
-  // Distribution schemes of this Kudu table. Both range and hash-based distributions are
+  // Partitioning schemes of this Kudu table. Both range and hash-based partitioning are
   // supported.
-  private final List<DistributeParam> distributeBy_ = Lists.newArrayList();
+  private final List<KuduPartitionParam> partitionBy_ = Lists.newArrayList();
 
   // Schema of the underlying Kudu table.
   private org.apache.kudu.Schema kuduSchema_;
@@ -148,36 +148,36 @@ public class KuduTable extends Table {
     return ImmutableList.copyOf(primaryKeyColumnNames_);
   }
 
-  public List<DistributeParam> getDistributeBy() {
-    return ImmutableList.copyOf(distributeBy_);
+  public List<KuduPartitionParam> getPartitionBy() {
+    return ImmutableList.copyOf(partitionBy_);
   }
 
   /**
-   * Returns the range-based distribution of this table if it exists, null otherwise.
+   * Returns the range-based partitioning of this table if it exists, null otherwise.
    */
-  private DistributeParam getRangeDistribution() {
-    for (DistributeParam distributeParam: distributeBy_) {
-      if (distributeParam.getType() == DistributeParam.Type.RANGE) {
-        return distributeParam;
+  private KuduPartitionParam getRangePartitioning() {
+    for (KuduPartitionParam partitionParam: partitionBy_) {
+      if (partitionParam.getType() == KuduPartitionParam.Type.RANGE) {
+        return partitionParam;
       }
     }
     return null;
   }
 
   /**
-   * Returns the column names of the table's range-based distribution or an empty
-   * list if the table doesn't have a range-based distribution.
+   * Returns the column names of the table's range-based partitioning or an empty
+   * list if the table doesn't have a range-based partitioning.
    */
-  public List<String> getRangeDistributionColNames() {
-    DistributeParam rangeDistribution = getRangeDistribution();
-    if (rangeDistribution == null) return Collections.<String>emptyList();
-    return rangeDistribution.getColumnNames();
+  public List<String> getRangePartitioningColNames() {
+    KuduPartitionParam rangePartitioning = getRangePartitioning();
+    if (rangePartitioning == null) return Collections.<String>emptyList();
+    return rangePartitioning.getColumnNames();
   }
 
   /**
    * Loads the metadata of a Kudu table.
    *
-   * Schema and distribution schemes are loaded directly from Kudu whereas column stats
+   * Schema and partitioning schemes are loaded directly from Kudu whereas column stats
    * are loaded from HMS. The function also updates the table schema in HMS in order to
    * propagate alterations made to the Kudu table to HMS.
    */
@@ -209,7 +209,7 @@ public class KuduTable extends Table {
     // Load metadata from Kudu and HMS
     try {
       loadSchema(kuduTable);
-      loadDistributeByParams(kuduTable);
+      loadPartitionByParams(kuduTable);
       loadAllColumnStats(msClient);
     } catch (ImpalaRuntimeException e) {
       throw new TableLoadingException("Error loading metadata for Kudu table " +
@@ -255,19 +255,19 @@ public class KuduTable extends Table {
     }
   }
 
-  private void loadDistributeByParams(org.apache.kudu.client.KuduTable kuduTable) {
+  private void loadPartitionByParams(org.apache.kudu.client.KuduTable kuduTable) {
     Preconditions.checkNotNull(kuduTable);
     Schema tableSchema = kuduTable.getSchema();
     PartitionSchema partitionSchema = kuduTable.getPartitionSchema();
     Preconditions.checkState(!colsByPos_.isEmpty());
-    distributeBy_.clear();
+    partitionBy_.clear();
     for (HashBucketSchema hashBucketSchema: partitionSchema.getHashBucketSchemas()) {
       List<String> columnNames = Lists.newArrayList();
       for (int colId: hashBucketSchema.getColumnIds()) {
         columnNames.add(getColumnNameById(tableSchema, colId));
       }
-      distributeBy_.add(
-          DistributeParam.createHashParam(columnNames, hashBucketSchema.getNumBuckets()));
+      partitionBy_.add(KuduPartitionParam.createHashParam(columnNames,
+          hashBucketSchema.getNumBuckets()));
     }
     RangeSchema rangeSchema = partitionSchema.getRangeSchema();
     List<Integer> columnIds = rangeSchema.getColumns();
@@ -277,7 +277,7 @@ public class KuduTable extends Table {
     // We don't populate the split values because Kudu's API doesn't currently support
     // retrieving the split values for range partitions.
     // TODO: File a Kudu JIRA.
-    distributeBy_.add(DistributeParam.createRangeParam(columnNames, null));
+    partitionBy_.add(KuduPartitionParam.createRangeParam(columnNames, null));
   }
 
   /**
@@ -297,14 +297,14 @@ public class KuduTable extends Table {
    */
   public static KuduTable createCtasTarget(Db db,
       org.apache.hadoop.hive.metastore.api.Table msTbl, List<ColumnDef> columnDefs,
-      List<String> primaryKeyColumnNames, List<DistributeParam> distributeParams) {
+      List<String> primaryKeyColumnNames, List<KuduPartitionParam> partitionParams) {
     KuduTable tmpTable = new KuduTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     int pos = 0;
     for (ColumnDef colDef: columnDefs) {
       tmpTable.addColumn(new Column(colDef.getColName(), colDef.getType(), pos++));
     }
     tmpTable.primaryKeyColumnNames_.addAll(primaryKeyColumnNames);
-    tmpTable.distributeBy_.addAll(distributeParams);
+    tmpTable.partitionBy_.addAll(partitionParams);
     return tmpTable;
   }
 
@@ -324,27 +324,28 @@ public class KuduTable extends Table {
     kuduMasters_ = Joiner.on(',').join(tkudu.getMaster_addresses());
     primaryKeyColumnNames_.clear();
     primaryKeyColumnNames_.addAll(tkudu.getKey_columns());
-    loadDistributeByParamsFromThrift(tkudu.getDistribute_by());
+    loadPartitionByParamsFromThrift(tkudu.getPartition_by());
   }
 
-  private void loadDistributeByParamsFromThrift(List<TDistributeParam> params) {
-    distributeBy_.clear();
-    for (TDistributeParam param: params) {
+  private void loadPartitionByParamsFromThrift(List<TKuduPartitionParam> params) {
+    partitionBy_.clear();
+    for (TKuduPartitionParam param: params) {
       if (param.isSetBy_hash_param()) {
-        TDistributeByHashParam hashParam = param.getBy_hash_param();
-        distributeBy_.add(DistributeParam.createHashParam(
+        TKuduPartitionByHashParam hashParam = param.getBy_hash_param();
+        partitionBy_.add(KuduPartitionParam.createHashParam(
             hashParam.getColumns(), hashParam.getNum_buckets()));
       } else {
         Preconditions.checkState(param.isSetBy_range_param());
-        TDistributeByRangeParam rangeParam = param.getBy_range_param();
-        distributeBy_.add(DistributeParam.createRangeParam(rangeParam.getColumns(),
+        TKuduPartitionByRangeParam rangeParam = param.getBy_range_param();
+        partitionBy_.add(KuduPartitionParam.createRangeParam(rangeParam.getColumns(),
             null));
       }
     }
   }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
+  public TTableDescriptor toThriftDescriptor(int tableId,
+      Set<Long> referencedPartitions) {
     TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.KUDU_TABLE,
         getTColumnDescriptors(), numClusteringCols_, kuduTableName_, db_.getName());
     desc.setKuduTable(getTKuduTable());
@@ -356,9 +357,9 @@ public class KuduTable extends Table {
     tbl.setKey_columns(Preconditions.checkNotNull(primaryKeyColumnNames_));
     tbl.setMaster_addresses(Lists.newArrayList(kuduMasters_.split(",")));
     tbl.setTable_name(kuduTableName_);
-    Preconditions.checkNotNull(distributeBy_);
-    for (DistributeParam distributeParam: distributeBy_) {
-      tbl.addToDistribute_by(distributeParam.toThrift());
+    Preconditions.checkNotNull(partitionBy_);
+    for (KuduPartitionParam partitionParam: partitionBy_) {
+      tbl.addToPartition_by(partitionParam.toThrift());
     }
     return tbl;
   }

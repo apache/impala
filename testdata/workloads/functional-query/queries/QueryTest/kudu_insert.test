@@ -3,7 +3,7 @@
 create table tdata
   (id int primary key, valf float null, vali bigint null, valv string null,
    valb boolean null, valt tinyint null, vals smallint null, vald double null)
-  DISTRIBUTE BY RANGE (PARTITION VALUES < 10, PARTITION 10 <= VALUES < 30,
+  PARTITION BY RANGE (PARTITION VALUES < 10, PARTITION 10 <= VALUES < 30,
   PARTITION 30 <= VALUES) STORED AS KUDU
 ---- RESULTS
 ====
@@ -238,7 +238,7 @@ NumRowErrors: 1
 ====
 ---- QUERY
 create table kudu_test_tbl primary key(id)
-distribute by range(id) (partition values < 100, partition 100 <= values <= 10000)
+partition by range(id) (partition values < 100, partition 100 <= values <= 10000)
 stored as kudu as
 select * from functional_kudu.alltypes where id < 100;
 ---- RESULTS
@@ -281,7 +281,7 @@ NumRowErrors: 7299
 # IMPALA-2521: clustered insert into table.
 create table impala_2521
 (id bigint primary key, name string, zip int)
-distribute by hash into 3 buckets stored as kudu
+partition by hash into 3 buckets stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -316,7 +316,7 @@ BIGINT,STRING,INT
 ---- QUERY
 # Table with all supported types as primary key and distribution columns
 create table allkeytypes (i1 tinyint, i2 smallint, i3 int, i4 bigint, name string,
-  valf float, vald double, primary key (i1, i2, i3, i4, name)) distribute by
+  valf float, vald double, primary key (i1, i2, i3, i4, name)) partition by
   hash into 3 buckets, range (partition value = (1,1,1,1,'1'),
   partition value = (2,2,2,2,'2'), partition value = (3,3,3,3,'3')) stored as kudu
 ---- RESULTS
@@ -335,7 +335,7 @@ NumRowErrors: 6
 # Table with default values
 create table tbl_with_defaults (a int primary key, b int null default 10,
   c int not null default 100, d int default 1000, e int null, f int not null,
-  g string default 'test', h boolean default true) distribute by hash (a) into 3
+  g string default 'test', h boolean default true) partition by hash (a) into 3
   buckets stored as kudu
 ---- RESULTS
 ====

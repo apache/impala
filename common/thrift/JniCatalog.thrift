@@ -415,9 +415,9 @@ struct TCreateTableParams {
   // If set, the table will be cached after creation with details specified in cache_op.
   13: optional THdfsCachingOp cache_op
 
-  // If set, the table is automatically distributed according to this parameter.
+  // If set, the table is automatically partitioned according to this parameter.
   // Kudu-only.
-  14: optional list<CatalogObjects.TDistributeParam> distribute_by
+  14: optional list<CatalogObjects.TKuduPartitionParam> partition_by
 
   // Primary key column names (Kudu-only)
   15: optional list<string> primary_key_column_names;

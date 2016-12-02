@@ -2445,52 +2445,52 @@ public class ParserTest extends FrontendTestBase {
 
 
     // Flexible partitioning
-    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS");
-    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS, " +
+    ParsesOk("CREATE TABLE Foo (i int) PARTITION BY HASH(i) INTO 4 BUCKETS");
+    ParsesOk("CREATE TABLE Foo (i int) PARTITION BY HASH(i) INTO 4 BUCKETS, " +
         "HASH(a) INTO 2 BUCKETS");
-    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH INTO 4 BUCKETS");
-    ParsesOk("CREATE TABLE Foo (i int, k int) DISTRIBUTE BY HASH INTO 4 BUCKETS," +
+    ParsesOk("CREATE TABLE Foo (i int) PARTITION BY HASH INTO 4 BUCKETS");
+    ParsesOk("CREATE TABLE Foo (i int, k int) PARTITION BY HASH INTO 4 BUCKETS," +
         " HASH(k) INTO 4 BUCKETS");
-    ParserError("CREATE TABLE Foo (i int) DISTRIBUTE BY HASH(i)");
-    ParserError("CREATE EXTERNAL TABLE Foo DISTRIBUTE BY HASH INTO 4 BUCKETS");
+    ParserError("CREATE TABLE Foo (i int) PARTITION BY HASH(i)");
+    ParserError("CREATE EXTERNAL TABLE Foo PARTITION BY HASH INTO 4 BUCKETS");
 
     // Range partitioning
-    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE (PARTITION VALUE = 10)");
-    ParsesOk("CREATE TABLE Foo (i int) DISTRIBUTE BY RANGE(i) " +
+    ParsesOk("CREATE TABLE Foo (i int) PARTITION BY RANGE (PARTITION VALUE = 10)");
+    ParsesOk("CREATE TABLE Foo (i int) PARTITION BY RANGE(i) " +
         "(PARTITION 1 <= VALUES < 10, PARTITION 10 <= VALUES < 20, " +
         "PARTITION 21 < VALUES <= 30, PARTITION VALUE = 50)");
-    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE(a) " +
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE(a) " +
         "(PARTITION 10 <= VALUES)");
-    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE(a) " +
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE(a) " +
         "(PARTITION VALUES < 10)");
-    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION VALUE = 10, PARTITION VALUE = 20)");
-    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE(a) " +
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE(a) " +
         "(PARTITION VALUES <= 10, PARTITION VALUE = 20)");
-    ParsesOk("CREATE TABLE Foo (a int, b int) DISTRIBUTE BY RANGE(a, b) " +
+    ParsesOk("CREATE TABLE Foo (a int, b int) PARTITION BY RANGE(a, b) " +
         "(PARTITION VALUE = (2001, 1), PARTITION VALUE = (2001, 2), " +
         "PARTITION VALUE = (2002, 1))");
-    ParsesOk("CREATE TABLE Foo (a int, b string) DISTRIBUTE BY " +
+    ParsesOk("CREATE TABLE Foo (a int, b string) PARTITION BY " +
         "HASH (a) INTO 3 BUCKETS, RANGE (a, b) (PARTITION VALUE = (1, 'abc'), " +
         "PARTITION VALUE = (2, 'def'))");
-    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION VALUE = 1 + 1) STORED AS KUDU");
-    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION 1 + 1 < VALUES) STORED AS KUDU");
-    ParsesOk("CREATE TABLE Foo (a int, b int) DISTRIBUTE BY RANGE (a) " +
+    ParsesOk("CREATE TABLE Foo (a int, b int) PARTITION BY RANGE (a) " +
         "(PARTITION b < VALUES <= a) STORED AS KUDU");
-    ParsesOk("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION now() <= VALUES, PARTITION VALUE = add_months(now(), 2)) " +
         "STORED AS KUDU");
 
-    ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) ()");
-    ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY HASH (a) INTO 4 BUCKETS, " +
+    ParserError("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) ()");
+    ParserError("CREATE TABLE Foo (a int) PARTITION BY HASH (a) INTO 4 BUCKETS, " +
         "RANGE (a) (PARTITION VALUE = 10), RANGE (a) (PARTITION VALUES < 10)");
-    ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+    ParserError("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION VALUE = 10), HASH (a) INTO 3 BUCKETS");
-    ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+    ParserError("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION VALUES = 10) STORED AS KUDU");
-    ParserError("CREATE TABLE Foo (a int) DISTRIBUTE BY RANGE (a) " +
+    ParserError("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION 10 < VALUE < 20) STORED AS KUDU");
 
     // Column options for Kudu tables
@@ -2676,9 +2676,9 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("CREATE TABLE Foo ROW FORMAT DELIMITED STORED AS PARQUETFILE AS SELECT 1");
     ParsesOk("CREATE TABLE Foo TBLPROPERTIES ('a'='b', 'c'='d') AS SELECT * from bar");
     ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) AS SELECT * from bar");
-    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) DISTRIBUTE BY HASH INTO 2 BUCKETS " +
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) PARTITION BY HASH INTO 2 BUCKETS " +
         "AS SELECT * from bar");
-    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) DISTRIBUTE BY HASH (b) INTO 2 " +
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a, b) PARTITION BY HASH (b) INTO 2 " +
         "BUCKETS AS SELECT * from bar");
 
     // With clause works
@@ -2708,12 +2708,12 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE TABLE Foo PARTITIONED BY (a, b=2) AS SELECT * from Bar");
 
     // Flexible partitioning
-    ParsesOk("CREATE TABLE Foo PRIMARY KEY (i) DISTRIBUTE BY HASH(i) INTO 4 BUCKETS AS " +
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (i) PARTITION BY HASH(i) INTO 4 BUCKETS AS " +
         "SELECT 1");
-    ParserError("CREATE TABLE Foo DISTRIBUTE BY HASH(i) INTO 4 BUCKETS AS SELECT 1");
-    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a) DISTRIBUTE BY HASH(a) INTO 4 BUCKETS " +
+    ParserError("CREATE TABLE Foo PARTITION BY HASH(i) INTO 4 BUCKETS AS SELECT 1");
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a) PARTITION BY HASH(a) INTO 4 BUCKETS " +
         "TBLPROPERTIES ('a'='b', 'c'='d') AS SELECT * from bar");
-    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a) DISTRIBUTE BY RANGE(a) " +
+    ParsesOk("CREATE TABLE Foo PRIMARY KEY (a) PARTITION BY RANGE(a) " +
         "(PARTITION 1 < VALUES < 10, PARTITION 10 <= VALUES < 20, PARTITION VALUE = 30) " +
         "STORED AS KUDU AS SELECT * FROM Bar");
   }

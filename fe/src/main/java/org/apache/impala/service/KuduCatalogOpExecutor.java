@@ -34,7 +34,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
-import org.apache.impala.thrift.TDistributeParam;
+import org.apache.impala.thrift.TKuduPartitionParam;
 import org.apache.impala.thrift.TRangePartition;
 import org.apache.impala.thrift.TRangePartitionOperationType;
 import org.apache.impala.util.KuduUtil;
@@ -138,22 +138,22 @@ public class KuduCatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTbl,
       TCreateTableParams params, Schema schema) throws ImpalaRuntimeException {
     CreateTableOptions tableOpts = new CreateTableOptions();
-    // Set the distribution schemes
-    List<TDistributeParam> distributeParams = params.getDistribute_by();
-    if (distributeParams != null) {
+    // Set the partitioning schemes
+    List<TKuduPartitionParam> partitionParams = params.getPartition_by();
+    if (partitionParams != null) {
       boolean hasRangePartitioning = false;
-      for (TDistributeParam distParam: distributeParams) {
-        if (distParam.isSetBy_hash_param()) {
-          Preconditions.checkState(!distParam.isSetBy_range_param());
-          tableOpts.addHashPartitions(distParam.getBy_hash_param().getColumns(),
-              distParam.getBy_hash_param().getNum_buckets());
+      for (TKuduPartitionParam partParam: partitionParams) {
+        if (partParam.isSetBy_hash_param()) {
+          Preconditions.checkState(!partParam.isSetBy_range_param());
+          tableOpts.addHashPartitions(partParam.getBy_hash_param().getColumns(),
+              partParam.getBy_hash_param().getNum_buckets());
         } else {
-          Preconditions.checkState(distParam.isSetBy_range_param());
+          Preconditions.checkState(partParam.isSetBy_range_param());
           hasRangePartitioning = true;
-          List<String> rangePartitionColumns = distParam.getBy_range_param().getColumns();
+          List<String> rangePartitionColumns = partParam.getBy_range_param().getColumns();
           tableOpts.setRangePartitionColumns(rangePartitionColumns);
           for (TRangePartition rangePartition:
-               distParam.getBy_range_param().getRange_partitions()) {
+               partParam.getBy_range_param().getRange_partitions()) {
             List<Pair<PartialRow, RangePartitionBound>> rangeBounds =
                 getRangePartitionBounds(rangePartition, schema, rangePartitionColumns);
             Preconditions.checkState(rangeBounds.size() == 2);
@@ -164,7 +164,7 @@ public class KuduCatalogOpExecutor {
           }
         }
       }
-      // If no range-based distribution is specified in a CREATE TABLE statement, Kudu
+      // If no range-based partitioning is specified in a CREATE TABLE statement, Kudu
       // generates one by default that includes all the primary key columns. To prevent
       // this from happening, explicitly set the range partition columns to be
       // an empty list.
@@ -333,7 +333,7 @@ public class KuduCatalogOpExecutor {
   private static List<Pair<PartialRow, RangePartitionBound>> getRangePartitionBounds(
       TRangePartition rangePartition, KuduTable tbl) throws ImpalaRuntimeException {
     return getRangePartitionBounds(rangePartition, tbl.getKuduSchema(),
-        tbl.getRangeDistributionColNames());
+        tbl.getRangePartitioningColNames());
   }
 
   /**
@@ -342,20 +342,20 @@ public class KuduCatalogOpExecutor {
    */
   private static List<Pair<PartialRow, RangePartitionBound>> getRangePartitionBounds(
       TRangePartition rangePartition, Schema schema,
-      List<String> rangeDistributionColNames) throws ImpalaRuntimeException {
+      List<String> rangePartitioningColNames) throws ImpalaRuntimeException {
     Preconditions.checkNotNull(schema);
-    Preconditions.checkState(!rangeDistributionColNames.isEmpty());
+    Preconditions.checkState(!rangePartitioningColNames.isEmpty());
     Preconditions.checkState(rangePartition.isSetLower_bound_values()
         || rangePartition.isSetUpper_bound_values());
     List<Pair<PartialRow, RangePartitionBound>> rangeBounds =
         Lists.newArrayListWithCapacity(2);
     Pair<PartialRow, RangePartitionBound> lowerBound =
-        KuduUtil.buildRangePartitionBound(schema, rangeDistributionColNames,
+        KuduUtil.buildRangePartitionBound(schema, rangePartitioningColNames,
         rangePartition.getLower_bound_values(),
         rangePartition.isIs_lower_bound_inclusive());
     rangeBounds.add(lowerBound);
     Pair<PartialRow, RangePartitionBound> upperBound =
-        KuduUtil.buildRangePartitionBound(schema, rangeDistributionColNames,
+        KuduUtil.buildRangePartitionBound(schema, rangePartitioningColNames,
         rangePartition.getUpper_bound_values(),
         rangePartition.isIs_upper_bound_inclusive());
     rangeBounds.add(upperBound);

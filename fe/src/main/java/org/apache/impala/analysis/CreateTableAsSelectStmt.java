@@ -193,7 +193,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
       Table tmpTable = null;
       if (KuduTable.isKuduTable(msTbl)) {
         tmpTable = KuduTable.createCtasTarget(db, msTbl, createStmt_.getColumnDefs(),
-            createStmt_.getTblPrimaryKeyColumnNames(), createStmt_.getDistributeParams());
+            createStmt_.getTblPrimaryKeyColumnNames(),
+            createStmt_.getKuduPartitionParams());
       } else {
         // TODO: Creating a tmp table using load() is confusing.
         // Refactor it to use a 'createCtasTarget()' function similar to Kudu table.

@@ -401,21 +401,21 @@ nonterminal CreateTableAsSelectStmt create_tbl_as_select_stmt;
 nonterminal CreateTableLikeStmt create_tbl_like_stmt;
 nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal TableDef tbl_def_without_col_defs, tbl_def_with_col_defs;
-nonterminal TableDataLayout opt_tbl_data_layout, distributed_data_layout;
+nonterminal TableDataLayout opt_tbl_data_layout, partitioned_data_layout;
 nonterminal TableDef.Options tbl_options;
 nonterminal CreateViewStmt create_view_stmt;
 nonterminal CreateDataSrcStmt create_data_src_stmt;
 nonterminal DropDataSrcStmt drop_data_src_stmt;
 nonterminal ShowDataSrcsStmt show_data_srcs_stmt;
 nonterminal StructField struct_field_def;
-nonterminal DistributeParam distribute_hash_param;
+nonterminal KuduPartitionParam hash_partition_param;
 nonterminal List<RangePartition> range_params_list;
 nonterminal RangePartition range_param;
 nonterminal Pair<Expr, Boolean> opt_lower_range_val,
    opt_upper_range_val;
-nonterminal ArrayList<DistributeParam> distribute_hash_param_list;
-nonterminal ArrayList<DistributeParam> distribute_param_list;
-nonterminal DistributeParam distribute_range_param;
+nonterminal ArrayList<KuduPartitionParam> hash_partition_param_list;
+nonterminal ArrayList<KuduPartitionParam> partition_param_list;
+nonterminal KuduPartitionParam range_partition_param;
 nonterminal ColumnDef column_def, view_column_def;
 nonterminal ArrayList<ColumnDef> column_def_list, partition_column_defs,
   view_column_def_list, view_column_defs;
@@ -1013,12 +1013,12 @@ create_tbl_as_select_stmt ::=
     // An optional clause cannot be used directly below because it would conflict with
     // the first rule in "create_tbl_stmt".
     primary_keys:primary_keys
-    distributed_data_layout:distribute_params
+    partitioned_data_layout:partition_params
     tbl_options:options
     KW_AS query_stmt:select_stmt
   {:
     tbl_def.getPrimaryKeyColumnNames().addAll(primary_keys);
-    tbl_def.getDistributeParams().addAll(distribute_params.getDistributeParams());
+    tbl_def.getKuduPartitionParams().addAll(partition_params.getKuduPartitionParams());
     tbl_def.setOptions(options);
     RESULT = new CreateTableAsSelectStmt(new CreateTableStmt(tbl_def), select_stmt, null);
   :}
@@ -1057,7 +1057,7 @@ create_tbl_stmt ::=
     tbl_options:options
   {:
     tbl_def.getPartitionColumnDefs().addAll(data_layout.getPartitionColumnDefs());
-    tbl_def.getDistributeParams().addAll(data_layout.getDistributeParams());
+    tbl_def.getKuduPartitionParams().addAll(data_layout.getKuduPartitionParams());
     tbl_def.setOptions(options);
     RESULT = new CreateTableStmt(tbl_def);
   :}
@@ -1082,7 +1082,7 @@ create_tbl_stmt ::=
     tbl_options:options
   {:
     tbl_def.getPartitionColumnDefs().addAll(data_layout.getPartitionColumnDefs());
-    tbl_def.getDistributeParams().addAll(data_layout.getDistributeParams());
+    tbl_def.getKuduPartitionParams().addAll(data_layout.getKuduPartitionParams());
     tbl_def.setOptions(options);
     RESULT = new CreateTableLikeFileStmt(new CreateTableStmt(tbl_def),
         schema_file_format, new HdfsUri(schema_location));
@@ -1148,13 +1148,13 @@ tbl_options ::=
 opt_tbl_data_layout ::=
   partition_column_defs:partition_column_defs
   {: RESULT = TableDataLayout.createPartitionedLayout(partition_column_defs); :}
-  | distributed_data_layout:data_layout
+  | partitioned_data_layout:data_layout
   {: RESULT = data_layout; :}
   ;
 
-distributed_data_layout ::=
-  distribute_param_list:distribute_params
-  {: RESULT = TableDataLayout.createDistributedLayout(distribute_params); :}
+partitioned_data_layout ::=
+  partition_param_list:partition_params
+  {: RESULT = TableDataLayout.createKuduPartitionedLayout(partition_params); :}
   | /* empty */
   {: RESULT = TableDataLayout.createEmptyLayout(); :}
   ;
@@ -1164,25 +1164,25 @@ partition_column_defs ::=
   {: RESULT = col_defs; :}
   ;
 
-// The DISTRIBUTE clause contains any number of HASH() clauses followed by exactly zero
+// The PARTITION BY clause contains any number of HASH() clauses followed by exactly zero
 // or one RANGE clauses
-distribute_param_list ::=
-  KW_DISTRIBUTE KW_BY distribute_hash_param_list:list
+partition_param_list ::=
+  KW_PARTITION KW_BY hash_partition_param_list:list
   {: RESULT = list; :}
-  | KW_DISTRIBUTE KW_BY distribute_range_param:rng
+  | KW_PARTITION KW_BY range_partition_param:rng
   {: RESULT = Lists.newArrayList(rng); :}
-  | KW_DISTRIBUTE KW_BY distribute_hash_param_list:list COMMA distribute_range_param:rng
+  | KW_PARTITION KW_BY hash_partition_param_list:list COMMA range_partition_param:rng
   {:
     list.add(rng);
     RESULT = list;
   :}
   ;
 
-// A list of HASH distribution clauses used for flexible partitioning
-distribute_hash_param_list ::=
-  distribute_hash_param:dc
+// A list of HASH partitioning clauses used for flexible partitioning
+hash_partition_param_list ::=
+  hash_partition_param:dc
   {: RESULT = Lists.newArrayList(dc); :}
-  | distribute_hash_param_list:list COMMA distribute_hash_param:d
+  | hash_partition_param_list:list COMMA hash_partition_param:d
   {:
     list.add(d);
     RESULT = list;
@@ -1190,26 +1190,26 @@ distribute_hash_param_list ::=
   ;
 
 // The column list for a HASH clause is optional.
-distribute_hash_param ::=
+hash_partition_param ::=
   KW_HASH LPAREN ident_list:cols RPAREN KW_INTO
     INTEGER_LITERAL:buckets KW_BUCKETS
-  {: RESULT = DistributeParam.createHashParam(cols, buckets.intValue()); :}
+  {: RESULT = KuduPartitionParam.createHashParam(cols, buckets.intValue()); :}
   | KW_HASH KW_INTO INTEGER_LITERAL:buckets KW_BUCKETS
   {:
-    RESULT = DistributeParam.createHashParam(Lists.<String>newArrayList(),
+    RESULT = KuduPartitionParam.createHashParam(Lists.<String>newArrayList(),
         buckets.intValue());
   :}
   ;
 
 // The column list for a RANGE clause is optional.
-distribute_range_param ::=
+range_partition_param ::=
   KW_RANGE LPAREN ident_list:cols RPAREN LPAREN range_params_list:ranges RPAREN
   {:
-    RESULT = DistributeParam.createRangeParam(cols, ranges);
+    RESULT = KuduPartitionParam.createRangeParam(cols, ranges);
   :}
   | KW_RANGE LPAREN range_params_list:ranges RPAREN
   {:
-    RESULT = DistributeParam.createRangeParam(Collections.<String>emptyList(), ranges);
+    RESULT = KuduPartitionParam.createRangeParam(Collections.<String>emptyList(), ranges);
   :}
   ;
 

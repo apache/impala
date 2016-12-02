@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-create table t primary key (id) distribute by hash (id) into 3 buckets
+create table t primary key (id) partition by hash (id) into 3 buckets
 stored as kudu
 as select id, int_col from functional.alltypestiny;
 select * from t;
@@ -19,14 +19,14 @@ INT,INT
 ---- QUERY
 # Boolean primary key column
 create table tab (x int, y boolean, primary key(x, y))
-  distribute by hash (x) into 3 buckets stored as kudu
+  partition by hash (x) into 3 buckets stored as kudu
 ---- CATCH
 NonRecoverableException: Key column may not have type of BOOL, FLOAT, or DOUBLE
 ====
 ---- QUERY
 # Float primary key column
 create table tab (x int, y float, primary key(x, y))
-  distribute by hash (x) into 3 buckets stored as kudu
+  partition by hash (x) into 3 buckets stored as kudu
 ---- CATCH
 NonRecoverableException: Key column may not have type of BOOL, FLOAT, or DOUBLE
 ====
@@ -34,27 +34,27 @@ NonRecoverableException: Key column may not have type of BOOL, FLOAT, or DOUBLE
 # Primary keys should be declared first
 # TODO: See KUDU-1709 for improving Kudu error messages.
 create table tab (x int, y int, primary key(y))
-  distribute by hash (y) into 3 buckets stored as kudu
+  partition by hash (y) into 3 buckets stored as kudu
 ---- CATCH
 NonRecoverableException: Got out-of-order key column: name: "y" type: INT32 is_key: true is_nullable: false cfile_block_size: 0
 ====
 ---- QUERY
 # Small number of hash buckets
 create table tab (a int, b int, c int, d int, primary key(a, b, c))
-  distribute by hash(a,b) into 8 buckets, hash(c) into 1 buckets stored as kudu
+  partition by hash(a,b) into 8 buckets, hash(c) into 1 buckets stored as kudu
 ---- CATCH
 NonRecoverableException: must have at least two hash buckets
 ====
 ---- QUERY
 # Same column in multiple hash based distributions
 create table tab (a int, b int, primary key (a))
-  distribute by hash (a) into 3 buckets, hash (a) into 2 buckets stored as kudu
+  partition by hash (a) into 3 buckets, hash (a) into 2 buckets stored as kudu
 ---- CATCH
 NonRecoverableException: hash bucket schema components must not contain columns in common
 ====
 ---- QUERY
 # Same column referenced multiple times in the same hash-based distribution
-create table tab (a int primary key) distribute by hash (a, a, a) into 3 buckets
+create table tab (a int primary key) partition by hash (a, a, a) into 3 buckets
 stored as kudu
 ---- CATCH
 NonRecoverableException: hash bucket schema components must not contain columns in common
@@ -62,7 +62,7 @@ NonRecoverableException: hash bucket schema components must not contain columns 
 ---- QUERY
 # Kudu table that uses Impala keywords as table name and column names
 create table `add`(`analytic` int, `function` int, primary key(`analytic`, `function`))
-distribute by hash (`analytic`) into 4 buckets, range (`function`)
+partition by hash (`analytic`) into 4 buckets, range (`function`)
 (partition values <= 1, partition 1 < values <= 10, partition 10 < values) stored as kudu;
 insert into `add` select id, int_col from functional.alltypestiny;
 select * from `add`
@@ -80,14 +80,14 @@ INT,INT
 ====
 ---- QUERY
 # Test implicit casting/folding of partition values.
-create table tab (a int primary key) distribute by range (a) (partition value = false)
+create table tab (a int primary key) partition by range (a) (partition value = false)
 stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
 # Invalid hostname
 create table tdata_bogus_host (id int primary key, name string, valf float, vali bigint)
-  DISTRIBUTE BY RANGE (PARTITION 10 <= VALUES <= 30) STORED AS KUDU
+  PARTITION BY RANGE (PARTITION 10 <= VALUES <= 30) STORED AS KUDU
   TBLPROPERTIES('kudu.master_addresses' = 'bogus host name')
 ---- CATCH
 Couldn't resolve this master's address bogus host name:7051
@@ -96,7 +96,7 @@ Couldn't resolve this master's address bogus host name:7051
 # Non-existing host
 create table tdata_non_existing_host
 (id int primary key, name string, valf float, vali bigint)
-  DISTRIBUTE BY RANGE (PARTITION 10 <= VALUES <= 30) STORED AS KUDU
+  PARTITION BY RANGE (PARTITION 10 <= VALUES <= 30) STORED AS KUDU
   TBLPROPERTIES('kudu.master_addresses' = 'bogus.host.name')
 ---- CATCH
 Couldn't resolve this master's address bogus.host.name:7051
@@ -104,7 +104,7 @@ Couldn't resolve this master's address bogus.host.name:7051
 ---- QUERY
 # Test that string case is ignored
 create table ignore_column_case (Id int, NAME string, vAlf float, vali bigint,
-  primary key (Id, NAME)) DISTRIBUTE BY RANGE (PARTITION VALUE = (1, 'Martin'))
+  primary key (Id, NAME)) PARTITION BY RANGE (PARTITION VALUE = (1, 'Martin'))
   STORED AS KUDU
 ---- RESULTS
 ====

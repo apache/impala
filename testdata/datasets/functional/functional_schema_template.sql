@@ -93,7 +93,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   year INT,
   month INT
 )
-DISTRIBUTE BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
@@ -171,7 +171,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   year INT,
   month INT
 )
-DISTRIBUTE BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
@@ -230,7 +230,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   year INT,
   month INT
 )
-DISTRIBUTE BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT INTO TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
@@ -566,7 +566,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name}_idx (
   month INT NULL,
   day INT NULL
 )
-DISTRIBUTE BY HASH (kudu_idx) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (kudu_idx) INTO 3 BUCKETS STORED AS KUDU;
 CREATE VIEW {db_name}{db_suffix}.{table_name} AS
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
        double_col, date_string_col, string_col, timestamp_col, year, month, day
@@ -645,7 +645,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   month INT,
   day INT
 )
-DISTRIBUTE BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
@@ -766,7 +766,7 @@ create table {db_name}{db_suffix}.{table_name} (
   name string null,
   zip int null
 )
-distribute by range(id) (partition values <= 1003, partition 1003 < values <= 1007,
+partition by range(id) (partition values <= 1003, partition 1003 < values <= 1007,
 partition 1007 < values) stored as kudu;
 ====
 ---- DATASET
@@ -790,7 +790,7 @@ create table {db_name}{db_suffix}.{table_name} (
   name string,
   zip int
 )
-distribute by range(id) (partition values <= 1003, partition 1003 < values <= 1007,
+partition by range(id) (partition values <= 1003, partition 1003 < values <= 1007,
 partition 1007 < values) stored as kudu;
 ====
 ---- DATASET
@@ -817,7 +817,7 @@ create table {db_name}{db_suffix}.{table_name} (
   alltypes_id int,
   primary key (test_id, test_name, test_zip, alltypes_id)
 )
-distribute by range(test_id) (partition values <= 1003, partition 1003 < values <= 1007,
+partition by range(test_id) (partition values <= 1003, partition 1003 < values <= 1007,
 partition 1007 < values) stored as kudu;
 ====
 ---- DATASET
@@ -1157,7 +1157,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   field STRING PRIMARY KEY,
   f2 INT
 )
-DISTRIBUTE BY HASH (field) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (field) INTO 3 BUCKETS STORED AS KUDU;
 ====
 ---- DATASET
 functional
@@ -1264,7 +1264,7 @@ create table {db_name}{db_suffix}.{table_name} (
   a string primary key,
   b string
 )
-distribute by range(a) (partition values <= 'b', partition 'b' < values <= 'd',
+partition by range(a) (partition values <= 'b', partition 'b' < values <= 'd',
 partition 'd' < values) stored as kudu;
 ====
 ---- DATASET
@@ -1284,7 +1284,7 @@ DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
   int_col int primary key
 )
-distribute by range(int_col) (partition values <= 2, partition 2 < values <= 4,
+partition by range(int_col) (partition values <= 2, partition 2 < values <= 4,
 partition 4 < values <= 6, partition 6 < values <= 8, partition 8 < values)
 stored as kudu;
 ====
@@ -1313,7 +1313,7 @@ create table {db_name}{db_suffix}.{table_name} (
   a string primary key, b string null, c string null, d int null, e double null,
   f string null, g string null
 )
-distribute by hash(a) into 3 buckets stored as kudu;
+partition by hash(a) into 3 buckets stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1340,7 +1340,7 @@ create table {db_name}{db_suffix}.{table_name} (
   a string primary key, b string null, c string null, d int null, e double null,
   f string null, g string null
 )
-distribute by hash(a) into 3 buckets stored as kudu;
+partition by hash(a) into 3 buckets stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1418,7 +1418,7 @@ create table {db_name}{db_suffix}.{table_name} (
   description1 string null,
   description2 string null,
   income int null)
-distribute by range(id)
+partition by range(id)
 (partition values <= '8600000US01475',
  partition '8600000US01475' < values <= '8600000US63121',
  partition '8600000US63121' < values <= '8600000US84712',

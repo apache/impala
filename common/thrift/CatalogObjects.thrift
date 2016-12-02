@@ -357,8 +357,8 @@ struct TDataSourceTable {
   2: required string init_string
 }
 
-// Parameters needed for hash distribution
-struct TDistributeByHashParam {
+// Parameters needed for hash partitioning
+struct TKuduPartitionByHashParam {
   1: required list<string> columns
   2: required i32 num_buckets
 }
@@ -370,16 +370,16 @@ struct TRangePartition {
   4: optional bool is_upper_bound_inclusive
 }
 
-// A range distribution is identified by a list of columns and a list of range partitions.
-struct TDistributeByRangeParam {
+// A range partitioning is identified by a list of columns and a list of range partitions.
+struct TKuduPartitionByRangeParam {
   1: required list<string> columns
   2: optional list<TRangePartition> range_partitions
 }
 
-// Parameters for the DISTRIBUTE BY clause.
-struct TDistributeParam {
-  1: optional TDistributeByHashParam by_hash_param;
-  2: optional TDistributeByRangeParam by_range_param;
+// Parameters for the PARTITION BY clause.
+struct TKuduPartitionParam {
+  1: optional TKuduPartitionByHashParam by_hash_param;
+  2: optional TKuduPartitionByRangeParam by_range_param;
 }
 
 // Represents a Kudu table
@@ -392,8 +392,8 @@ struct TKuduTable {
   // Name of the key columns
   3: required list<string> key_columns
 
-  // Distribution schemes
-  4: required list<TDistributeParam> distribute_by
+  // Partitioning
+  4: required list<TKuduPartitionParam> partition_by
 }
 
 // Represents a table or view.

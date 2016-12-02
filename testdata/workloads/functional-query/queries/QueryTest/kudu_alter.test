@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 create table simple (id int primary key, name string, valf float, vali bigint)
-  distribute by hash (id) into 3 buckets stored as kudu
+  partition by hash (id) into 3 buckets stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -49,7 +49,7 @@ BIGINT
 ---- QUERY
 # Create a table with range distribution
 create table tbl_to_alter (id int primary key, name string null, vali bigint not null)
-  distribute by range (id) (partition 1 < values <= 10) stored as kudu
+  partition by range (id) (partition 1 < values <= 10) stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -294,7 +294,7 @@ alter table tbl_to_alter set tblproperties('kudu.table_name'='kudu_tbl_to_alter'
 ====
 ---- QUERY
 # Create a new table and try to rename to an existing kudu table
-create table copy_of_tbl (a int primary key) distribute by hash (a) into 3 buckets
+create table copy_of_tbl (a int primary key) partition by hash (a) into 3 buckets
   stored as kudu tblproperties('kudu.table_name'='copy_of_tbl');
 alter table copy_of_tbl set tblproperties('kudu.table_name'='kudu_tbl_to_alter')
 ---- CATCH

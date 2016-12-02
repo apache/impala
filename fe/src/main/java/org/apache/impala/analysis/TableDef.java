@@ -74,7 +74,7 @@ class TableDef {
   // If true, no errors are thrown if the table already exists.
   private final boolean ifNotExists_;
 
-  // Partitioned/distribute by parameters.
+  // Partitioning parameters.
   private final TableDataLayout dataLayout_;
 
   // True if analyze() has been called.
@@ -152,8 +152,8 @@ class TableDef {
   List<ColumnDef> getPrimaryKeyColumnDefs() { return primaryKeyColDefs_; }
   boolean isExternal() { return isExternal_; }
   boolean getIfNotExists() { return ifNotExists_; }
-  List<DistributeParam> getDistributeParams() {
-    return dataLayout_.getDistributeParams();
+  List<KuduPartitionParam> getKuduPartitionParams() {
+    return dataLayout_.getKuduPartitionParams();
   }
   void setOptions(Options options) {
     Preconditions.checkNotNull(options);

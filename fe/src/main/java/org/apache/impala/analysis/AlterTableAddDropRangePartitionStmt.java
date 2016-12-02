@@ -93,10 +93,10 @@ public class AlterTableAddDropRangePartitionStmt extends AlterTableStmt {
           "partitions: RANGE %s", table.getFullName(), rangePartitionSpec_.toSql()));
     }
     KuduTable kuduTable = (KuduTable) table;
-    List<String> colNames = kuduTable.getRangeDistributionColNames();
+    List<String> colNames = kuduTable.getRangePartitioningColNames();
     if (colNames.isEmpty()) {
       throw new AnalysisException(String.format("Cannot add/drop partition %s: " +
-          "Kudu table %s doesn't have a range-based distribution.",
+          "Kudu table %s doesn't have a range-based partitioning.",
           rangePartitionSpec_.toSql(), kuduTable.getName()));
     }
     List<ColumnDef> rangeColDefs = Lists.newArrayListWithCapacity(colNames.size());

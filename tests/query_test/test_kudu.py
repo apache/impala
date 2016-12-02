@@ -83,7 +83,7 @@ class TestKuduOperations(KuduTestSuite):
             for nullable in nullability:
               impala_tbl_name = "test_column_options_%s" % str(indx)
               cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY
-                  %s %s %s %s, b INT %s %s %s %s %s) DISTRIBUTE BY HASH (a) INTO 3
+                  %s %s %s %s, b INT %s %s %s %s %s) PARTITION BY HASH (a) INTO 3
                   BUCKETS STORED AS KUDU""" % (unique_database, impala_tbl_name,
                   encoding, compression, default, blocksize, nullable, encoding,
                   compression, default, blocksize))
@@ -93,7 +93,7 @@ class TestKuduOperations(KuduTestSuite):
 
   def test_kudu_rename_table(self, cursor, kudu_client, unique_database):
     """Test Kudu table rename"""
-    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY) DISTRIBUTE BY HASH(a)
+    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY) PARTITION BY HASH(a)
         INTO 3 BUCKETS STORED AS KUDU""" % unique_database)
     kudu_tbl_name = "impala::%s.foo" % unique_database
     assert kudu_client.table_exists(kudu_tbl_name)
@@ -272,20 +272,20 @@ class TestShowCreateTable(KuduTestSuite):
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT PRIMARY KEY)
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS STORED AS KUDU""",
+        PARTITION BY HASH (c) INTO 3 BUCKETS STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
           c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) INTO 3 BUCKETS
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT PRIMARY KEY, d STRING NULL)
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c)
+        PARTITION BY HASH (c) INTO 3 BUCKETS, RANGE (c)
         (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
          PARTITION 2 < VALUES) STORED AS KUDU""",
         """
@@ -294,27 +294,27 @@ class TestShowCreateTable(KuduTestSuite):
           d STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c) (...)
+        PARTITION BY HASH (c) INTO 3 BUCKETS, RANGE (c) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT ENCODING PLAIN_ENCODING, PRIMARY KEY (c))
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS STORED AS KUDU""",
+        PARTITION BY HASH (c) INTO 3 BUCKETS STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
           c INT NOT NULL ENCODING PLAIN_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) INTO 3 BUCKETS
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT COMPRESSION LZ4, d STRING, PRIMARY KEY(c, d))
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS,
+        PARTITION BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS,
         RANGE (c, d) (PARTITION VALUE = (1, 'aaa'), PARTITION VALUE = (2, 'bbb'))
         STORED AS KUDU""",
         """
@@ -323,14 +323,14 @@ class TestShowCreateTable(KuduTestSuite):
           d STRING NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c, d)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS, RANGE (c, d) (...)
+        PARTITION BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS, RANGE (c, d) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT, d STRING, e INT NULL DEFAULT 10, PRIMARY KEY(c, d))
-        DISTRIBUTE BY RANGE (c) (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
+        PARTITION BY RANGE (c) (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
         PARTITION 2 < VALUES <= 3, PARTITION 3 < VALUES) STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
@@ -339,7 +339,7 @@ class TestShowCreateTable(KuduTestSuite):
           e INT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION DEFAULT 10,
           PRIMARY KEY (c, d)
         )
-        DISTRIBUTE BY RANGE (c) (...)
+        PARTITION BY RANGE (c) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
@@ -352,7 +352,7 @@ class TestShowCreateTable(KuduTestSuite):
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {{table}} (c INT PRIMARY KEY)
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) INTO 3 BUCKETS
         STORED AS KUDU
         TBLPROPERTIES ({props})""".format(props=props),
         """
@@ -360,7 +360,7 @@ class TestShowCreateTable(KuduTestSuite):
           c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) INTO 3 BUCKETS
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}', {props})""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS, props=props))
@@ -371,7 +371,7 @@ class TestShowCreateTable(KuduTestSuite):
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {{table}} (c INT PRIMARY KEY)
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) INTO 3 BUCKETS
         STORED AS KUDU
         TBLPROPERTIES ({props})""".format(props=props),
         """
@@ -379,7 +379,7 @@ class TestShowCreateTable(KuduTestSuite):
           c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) INTO 3 BUCKETS
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
@@ -421,7 +421,7 @@ class TestDropDb(KuduTestSuite):
       # Create a managed Kudu table
       managed_table_name = self.random_table_name()
       unique_cursor.execute("""
-          CREATE TABLE %s (a INT PRIMARY KEY) DISTRIBUTE BY HASH (a) INTO 3 BUCKETS
+          CREATE TABLE %s (a INT PRIMARY KEY) PARTITION BY HASH (a) INTO 3 BUCKETS
           STORED AS KUDU TBLPROPERTIES ('kudu.table_name' = '%s')"""
           % (managed_table_name, managed_table_name))
       assert kudu_client.table_exists(managed_table_name)
@@ -506,7 +506,7 @@ class TestImpalaKuduIntegration(KuduTestSuite):
     """Check that dropping a managed Kudu table works even if the underlying Kudu table
         has been dropped externally."""
     impala_tbl_name = "foo"
-    cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY) DISTRIBUTE BY HASH (a)
+    cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY) PARTITION BY HASH (a)
         INTO 3 BUCKETS STORED AS KUDU""" % (unique_database, impala_tbl_name))
     kudu_tbl_name = "impala::%s.%s" % (unique_database, impala_tbl_name)
     assert kudu_client.table_exists(kudu_tbl_name)
@@ -545,7 +545,7 @@ class TestKuduMemLimits(KuduTestSuite):
     l_shipmode STRING,
     l_comment STRING,
     PRIMARY KEY (l_orderkey, l_linenumber))
-  DISTRIBUTE BY HASH (l_orderkey, l_linenumber) INTO 3 BUCKETS
+  PARTITION BY HASH (l_orderkey, l_linenumber) INTO 3 BUCKETS
   STORED AS KUDU"""
 
   LOAD = """

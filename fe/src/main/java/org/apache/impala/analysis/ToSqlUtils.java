@@ -197,7 +197,7 @@ public class ToSqlUtils {
 
     String storageHandlerClassName = table.getStorageHandlerClassName();
     List<String> primaryKeySql = Lists.newArrayList();
-    String kuduDistributeByParams = null;
+    String kuduPartitionByParams = null;
     if (table instanceof KuduTable) {
       KuduTable kuduTable = (KuduTable) table;
       // Kudu tables don't use LOCATION syntax
@@ -219,10 +219,10 @@ public class ToSqlUtils {
         primaryKeySql.addAll(kuduTable.getPrimaryKeyColumnNames());
 
         List<String> paramsSql = Lists.newArrayList();
-        for (DistributeParam param: kuduTable.getDistributeBy()) {
+        for (KuduPartitionParam param: kuduTable.getPartitionBy()) {
           paramsSql.add(param.toSql());
         }
-        kuduDistributeByParams = Joiner.on(", ").join(paramsSql);
+        kuduPartitionByParams = Joiner.on(", ").join(paramsSql);
       } else {
         // We shouldn't output the columns for external tables
         colsSql = null;
@@ -230,7 +230,7 @@ public class ToSqlUtils {
     }
     HdfsUri tableLocation = location == null ? null : new HdfsUri(location);
     return getCreateTableSql(table.getDb().getName(), table.getName(), comment, colsSql,
-        partitionColsSql, primaryKeySql, kuduDistributeByParams, properties,
+        partitionColsSql, primaryKeySql, kuduPartitionByParams, properties,
         serdeParameters, isExternal, false, rowFormat, format, compression,
         storageHandlerClassName, tableLocation);
   }
@@ -242,7 +242,7 @@ public class ToSqlUtils {
    */
   public static String getCreateTableSql(String dbName, String tableName,
       String tableComment, List<String> columnsSql, List<String> partitionColumnsSql,
-      List<String> primaryKeysSql, String kuduDistributeByParams,
+      List<String> primaryKeysSql, String kuduPartitionByParams,
       Map<String, String> tblProperties, Map<String, String> serdeParameters,
       boolean isExternal, boolean ifNotExists, RowFormat rowFormat,
       HdfsFileFormat fileFormat, HdfsCompression compression, String storageHandlerClass,
@@ -271,8 +271,8 @@ public class ToSqlUtils {
           Joiner.on(", \n  ").join(partitionColumnsSql)));
     }
 
-    if (kuduDistributeByParams != null) {
-      sb.append("DISTRIBUTE BY " + kuduDistributeByParams + "\n");
+    if (kuduPartitionByParams != null) {
+      sb.append("PARTITION BY " + kuduPartitionByParams + "\n");
     }
 
     if (rowFormat != null && !rowFormat.isDefault()) {

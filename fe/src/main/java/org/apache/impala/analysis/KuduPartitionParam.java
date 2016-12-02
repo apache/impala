@@ -22,24 +22,24 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.thrift.TDistributeByHashParam;
-import org.apache.impala.thrift.TDistributeByRangeParam;
-import org.apache.impala.thrift.TDistributeParam;
+import org.apache.impala.thrift.TKuduPartitionByHashParam;
+import org.apache.impala.thrift.TKuduPartitionByRangeParam;
+import org.apache.impala.thrift.TKuduPartitionParam;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
- * Represents the distribution of a Kudu table as defined in the DISTRIBUTE BY
- * clause of a CREATE TABLE statement. The distribution can be hash-based or
+ * Represents the partitioning of a Kudu table as defined in the PARTITION BY
+ * clause of a CREATE TABLE statement. The partitioning can be hash-based or
  * range-based or both. See RangePartition for details on the supported range partitions.
  *
  * Examples:
  * - Hash-based:
- *   DISTRIBUTE BY HASH(id) INTO 10 BUCKETS
+ *   PARTITION BY HASH(id) INTO 10 BUCKETS
  * - Single column range-based:
- *   DISTRIBUTE BY RANGE(age)
+ *   PARTITION BY RANGE(age)
  *   (
  *     PARTITION VALUES < 10,
  *     PARTITION 10 <= VALUES < 20,
@@ -47,14 +47,14 @@ import com.google.common.collect.Lists;
  *     PARTITION VALUE = 100
  *   )
  * - Combination of hash and range based:
- *   DISTRIBUTE BY HASH (id) INTO 3 BUCKETS,
+ *   PARTITION BY HASH (id) INTO 3 BUCKETS,
  *   RANGE (age)
  *   (
  *     PARTITION 10 <= VALUES < 20,
  *     PARTITION VALUE = 100
  *   )
  * - Multi-column range based:
- *   DISTRIBUTE BY RANGE (year, quarter)
+ *   PARTITION BY RANGE (year, quarter)
  *   (
  *     PARTITION VALUE = (2001, 1),
  *     PARTITION VALUE = (2001, 2),
@@ -62,33 +62,33 @@ import com.google.common.collect.Lists;
  *   )
  *
  */
-public class DistributeParam implements ParseNode {
+public class KuduPartitionParam implements ParseNode {
 
   /**
-   * Creates a hash-based DistributeParam.
+   * Creates a hash-based KuduPartitionParam.
    */
-  public static DistributeParam createHashParam(List<String> cols, int buckets) {
-    return new DistributeParam(Type.HASH, cols, buckets, null);
+  public static KuduPartitionParam createHashParam(List<String> cols, int buckets) {
+    return new KuduPartitionParam(Type.HASH, cols, buckets, null);
   }
 
   /**
-   * Creates a range-based DistributeParam.
+   * Creates a range-based KuduPartitionParam.
    */
-  public static DistributeParam createRangeParam(List<String> cols,
+  public static KuduPartitionParam createRangeParam(List<String> cols,
       List<RangePartition> rangePartitions) {
-    return new DistributeParam(Type.RANGE, cols, NO_BUCKETS, rangePartitions);
+    return new KuduPartitionParam(Type.RANGE, cols, NO_BUCKETS, rangePartitions);
   }
 
   private static final int NO_BUCKETS = -1;
 
   /**
-   * The distribution type.
+   * The partitioning type.
    */
   public enum Type {
     HASH, RANGE
   }
 
-  // Columns of this distribution. If no columns are specified, all
+  // Columns of this partitioning. If no columns are specified, all
   // the primary key columns of the associated table are used.
   private final List<String> colNames_ = Lists.newArrayList();
 
@@ -96,16 +96,16 @@ public class DistributeParam implements ParseNode {
   // before the call to analyze().
   private Map<String, ColumnDef> pkColumnDefByName_;
 
-  // Distribution scheme type
+  // partitioning scheme type
   private final Type type_;
 
-  // Only relevant for hash-based distribution, -1 otherwise
+  // Only relevant for hash-based partitioning, -1 otherwise
   private final int numBuckets_;
 
-  // List of range partitions specified in a range-based distribution.
+  // List of range partitions specified in a range-based partitioning.
   private List<RangePartition> rangePartitions_;
 
-  private DistributeParam(Type t, List<String> colNames, int buckets,
+  private KuduPartitionParam(Type t, List<String> colNames, int buckets,
       List<RangePartition> partitions) {
     type_ = t;
     for (String name: colNames) colNames_.add(name.toLowerCase());
@@ -118,18 +118,18 @@ public class DistributeParam implements ParseNode {
     Preconditions.checkState(!colNames_.isEmpty());
     Preconditions.checkNotNull(pkColumnDefByName_);
     Preconditions.checkState(!pkColumnDefByName_.isEmpty());
-    // Validate that the columns specified in this distribution are primary key columns.
+    // Validate that the columns specified in this partitioning are primary key columns.
     for (String colName: colNames_) {
       if (!pkColumnDefByName_.containsKey(colName)) {
         throw new AnalysisException(String.format("Column '%s' in '%s' is not a key " +
-            "column. Only key columns can be used in DISTRIBUTE BY.", colName, toSql()));
+            "column. Only key columns can be used in PARTITION BY.", colName, toSql()));
       }
     }
     if (type_ == Type.RANGE) analyzeRangeParam(analyzer);
   }
 
   /**
-   * Analyzes a range-based distribution. This function does not check for overlapping
+   * Analyzes a range-based partitioning. This function does not check for overlapping
    * range partitions; these checks are performed by Kudu and an error is reported back
    * to the user.
    */
@@ -171,18 +171,18 @@ public class DistributeParam implements ParseNode {
   @Override
   public String toString() { return toSql(); }
 
-  public TDistributeParam toThrift() {
-    TDistributeParam result = new TDistributeParam();
+  public TKuduPartitionParam toThrift() {
+    TKuduPartitionParam result = new TKuduPartitionParam();
     // TODO: Add a validate() function to ensure the validity of distribute params.
     if (type_ == Type.HASH) {
-      TDistributeByHashParam hash = new TDistributeByHashParam();
+      TKuduPartitionByHashParam hash = new TKuduPartitionByHashParam();
       Preconditions.checkState(numBuckets_ != NO_BUCKETS);
       hash.setNum_buckets(numBuckets_);
       hash.setColumns(colNames_);
       result.setBy_hash_param(hash);
     } else {
       Preconditions.checkState(type_ == Type.RANGE);
-      TDistributeByRangeParam rangeParam = new TDistributeByRangeParam();
+      TKuduPartitionByRangeParam rangeParam = new TKuduPartitionByRangeParam();
       rangeParam.setColumns(colNames_);
       if (rangePartitions_ == null) {
         result.setBy_range_param(rangeParam);
