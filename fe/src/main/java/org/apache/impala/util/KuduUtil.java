@@ -178,6 +178,9 @@ public class KuduUtil {
       case STRING:
         checkCorrectType(literal.isSetString_literal(), type, colName, literal);
         return literal.getString_literal().getValue();
+      case BOOL:
+        checkCorrectType(literal.isSetBool_literal(), type, colName, literal);
+        return literal.getBool_literal().isValue();
       default:
         throw new ImpalaRuntimeException("Unsupported value for column type: " +
             type.toString());

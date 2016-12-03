@@ -331,3 +331,74 @@ insert into allkeytypes select cast(id as tinyint), smallint_col, int_col,
 NumModifiedRows: 3
 NumRowErrors: 6
 ====
+---- QUERY
+# Table with default values
+create table tbl_with_defaults (a int primary key, b int null default 10,
+  c int not null default 100, d int default 1000, e int null, f int not null,
+  g string default 'test', h boolean default true) distribute by hash (a) into 3
+  buckets stored as kudu
+---- RESULTS
+====
+---- QUERY
+insert into tbl_with_defaults (a, f) values (1, 1), (2, 2), (3, 3), (4, 4)
+---- RUNTIME_PROFILE
+NumModifiedRows: 4
+NumRowErrors: 0
+---- LABELS
+A, B, C, D, E, F, G, H
+---- DML_RESULTS: tbl_with_defaults
+1,10,100,1000,NULL,1,'test',true
+2,10,100,1000,NULL,2,'test',true
+3,10,100,1000,NULL,3,'test',true
+4,10,100,1000,NULL,4,'test',true
+---- TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN
+====
+---- QUERY
+insert into tbl_with_defaults values (5, 5, 5, 5, 5, 5, 'row', false)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+A, B, C, D, E, F, G, H
+---- DML_RESULTS: tbl_with_defaults
+1,10,100,1000,NULL,1,'test',true
+2,10,100,1000,NULL,2,'test',true
+3,10,100,1000,NULL,3,'test',true
+4,10,100,1000,NULL,4,'test',true
+5,5,5,5,5,5,'row',false
+---- TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN
+====
+---- QUERY
+alter table tbl_with_defaults add columns (i int null, j int not null default 10000)
+---- RESULTS
+====
+---- QUERY
+select * from tbl_with_defaults
+---- RESULTS
+1,10,100,1000,NULL,1,'test',true,NULL,10000
+2,10,100,1000,NULL,2,'test',true,NULL,10000
+3,10,100,1000,NULL,3,'test',true,NULL,10000
+4,10,100,1000,NULL,4,'test',true,NULL,10000
+5,5,5,5,5,5,'row',false,NULL,10000
+---- TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,INT,INT
+====
+---- QUERY
+insert into tbl_with_defaults values (6,6,6,6,6,6,'another row',false,6,6)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+A, B, C, D, E, F, G, H, I, J
+---- DML_RESULTS: tbl_with_defaults
+1,10,100,1000,NULL,1,'test',true,NULL,10000
+2,10,100,1000,NULL,2,'test',true,NULL,10000
+3,10,100,1000,NULL,3,'test',true,NULL,10000
+4,10,100,1000,NULL,4,'test',true,NULL,10000
+5,5,5,5,5,5,'row',false,NULL,10000
+6,6,6,6,6,6,'another row',false,6,6
+---- TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,INT,INT
+====
