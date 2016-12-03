@@ -2,15 +2,15 @@
 ---- QUERY
 create table simple (id int primary key, name string, valf float, vali bigint)
   partition by range (partition values < 10, partition 10 <= values < 30,
-  partition 30 <= values) stored as kudu tblproperties('kudu.num_tablet_replicas' = '2')
+  partition 30 <= values) stored as kudu tblproperties('kudu.num_tablet_replicas' = '1')
 ---- RESULTS
 ====
 ---- QUERY
 show table stats simple
 ---- RESULTS
--1,'','8000000A',regex:.*?:\d+,2
--1,'8000000A','8000001E',regex:.*?:\d+,2
--1,'8000001E','',regex:.*?:\d+,2
+-1,'','8000000A',regex:.*?:\d+,1
+-1,'8000000A','8000001E',regex:.*?:\d+,1
+-1,'8000001E','',regex:.*?:\d+,1
 ---- TYPES
 INT,STRING,STRING,STRING,INT
 ---- LABELS

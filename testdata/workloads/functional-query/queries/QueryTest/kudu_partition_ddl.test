@@ -231,7 +231,7 @@ create table simple_range_with_overlapping (id int, name string, valf float, val
   primary key (id, name)) partition by range (id)
   (partition values <= 10, partition values < 20, partition value = 5) stored as kudu
 ---- CATCH
-NonRecoverableException: overlapping range partitions: first range partition: [<start>, (int32 id=11)), second range partition: [<start>, (int32 id=20))
+NonRecoverableException: overlapping range partitions: first range partition: VALUES < 11, second range partition: VALUES < 20
 ====
 ---- QUERY
 -- Test range partitioning with the same partition specified multiple times
@@ -239,7 +239,7 @@ create table simple_range_duplicate_parts (id int, name string, valf float, vali
   primary key(id, name)) partition by range (id)
   (partition 10 < values <= 20, partition 10 < values <= 20) stored as kudu
 ---- CATCH
-NonRecoverableException: overlapping range partitions: first range partition: [(int32 id=11), (int32 id=21)), second range partition: [(int32 id=11), (int32 id=21))
+NonRecoverableException: overlapping range partitions: first range partition: 11 <= VALUES < 21, second range partition: 11 <= VALUES < 21
 ====
 ---- QUERY
 -- Test multi-column range partitioning with the same partition specified multiple times
@@ -247,5 +247,5 @@ create table range_multi_col_duplicate_parts (id int, name string, valf float,
   vali bigint, primary key (id, name)) partition by range (id, name)
   (partition value = (10, 'dimitris'), partition value = (10, 'dimitris')) stored as kudu
 ---- CATCH
-NonRecoverableException: overlapping range partitions: first range partition: [(int32 id=10, string name=dimitris), (int32 id=10, string name=dimitris\000)), second range partition: [(int32 id=10, string name=dimitris), (int32 id=10, string name=dimitris\000))
+NonRecoverableException: overlapping range partitions: first range partition: (10, "dimitris") <= VALUES < (10, "dimitris\000"), second range partition: (10, "dimitris") <= VALUES < (10, "dimitris\000")
 ====
