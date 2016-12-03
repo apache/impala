@@ -163,8 +163,8 @@ public class DataSourceTable extends Table {
     Preconditions.checkNotNull(msTbl);
     msTable_ = msTbl;
     clearColumns();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("load table: " + db_.getName() + "." + name_);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("load table: " + db_.getName() + "." + name_);
     }
     String dataSourceName = getRequiredTableProperty(msTbl, TBL_PROP_DATA_SRC_NAME, null);
     String location = getRequiredTableProperty(msTbl, TBL_PROP_LOCATION, dataSourceName);

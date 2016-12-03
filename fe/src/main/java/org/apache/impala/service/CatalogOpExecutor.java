@@ -636,8 +636,8 @@ public class CatalogOpExecutor {
 
       // Set the altered view attributes and update the metastore.
       setViewAttributes(params, msTbl);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Altering view %s", tableName));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format("Altering view %s", tableName));
       }
       applyAlterTable(msTbl);
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
@@ -667,8 +667,8 @@ public class CatalogOpExecutor {
 
     TableName tableName = table.getTableName();
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("Updating table stats for: %s", tableName));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Updating table stats for: %s", tableName));
     }
 
     // Deep copy the msTbl to avoid updating our cache before successfully persisting
@@ -765,8 +765,8 @@ public class CatalogOpExecutor {
       // but it is predictable and easy to reason about because it does not depend on the
       // existing state of the metadata. See IMPALA-2201.
       long numRows = partitionStats.stats.num_rows;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Updating stats for partition %s: numRows=%s",
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format("Updating stats for partition %s: numRows=%s",
             partition.getValuesAsString(), numRows));
       }
       PartitionStatsUtil.partStatsToParameters(partitionStats, partition);
@@ -815,8 +815,8 @@ public class CatalogOpExecutor {
       ColumnStatisticsData colStatsData =
           createHiveColStatsData(entry.getValue(), tableCol.getType());
       if (colStatsData == null) continue;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Updating column stats for %s: numDVs=%s numNulls=%s " +
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format("Updating column stats for %s: numDVs=%s numNulls=%s " +
             "maxSize=%s avgSize=%s", colName, entry.getValue().getNum_distinct_values(),
             entry.getValue().getNum_nulls(), entry.getValue().getMax_size(),
             entry.getValue().getAvg_size()));
@@ -887,8 +887,8 @@ public class CatalogOpExecutor {
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name passed as argument to Catalog.createDatabase");
     if (params.if_not_exists && catalog_.getDb(dbName) != null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Skipping database creation because " + dbName + " already exists "
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Skipping database creation because " + dbName + " already exists "
             + "and IF NOT EXISTS was specified.");
       }
       resp.getResult().setVersion(catalog_.getCatalogVersion());
@@ -903,7 +903,7 @@ public class CatalogOpExecutor {
     if (params.getLocation() != null) {
       db.setLocationUri(params.getLocation());
     }
-    if (LOG.isDebugEnabled()) LOG.debug("Creating database " + dbName);
+    if (LOG.isTraceEnabled()) LOG.trace("Creating database " + dbName);
     Db newDb = null;
     synchronized (metastoreDdlLock_) {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
@@ -915,8 +915,8 @@ public class CatalogOpExecutor {
             throw new ImpalaRuntimeException(
                 String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e);
           }
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(String.format("Ignoring '%s' when creating database %s because " +
+          if (LOG.isTraceEnabled()) {
+            LOG.trace(String.format("Ignoring '%s' when creating database %s because " +
                 "IF NOT EXISTS was specified.", e, dbName));
           }
           newDb = catalog_.getDb(dbName);
@@ -958,8 +958,8 @@ public class CatalogOpExecutor {
  private void createFunction(TCreateFunctionParams params, TDdlExecResponse resp)
       throws ImpalaException {
     Function fn = Function.fromThrift(params.getFn());
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("Adding %s: %s",
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Adding %s: %s",
           fn.getClass().getSimpleName(), fn.signatureString()));
     }
     boolean isPersistentJavaFn =
@@ -997,8 +997,8 @@ public class CatalogOpExecutor {
         }
         if (addJavaFunctionToHms(fn.dbName(), hiveFn, params.if_not_exists)) {
           for (Function addedFn: funcs) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug(String.format("Adding function: %s.%s", addedFn.dbName(),
+            if (LOG.isTraceEnabled()) {
+              LOG.trace(String.format("Adding function: %s.%s", addedFn.dbName(),
                   addedFn.signatureString()));
             }
             Preconditions.checkState(catalog_.addFunction(addedFn));
@@ -1031,7 +1031,7 @@ public class CatalogOpExecutor {
 
   private void createDataSource(TCreateDataSourceParams params, TDdlExecResponse resp)
       throws ImpalaException {
-    if (LOG.isDebugEnabled()) { LOG.debug("Adding DATA SOURCE: " + params.toString()); }
+    if (LOG.isTraceEnabled()) { LOG.trace("Adding DATA SOURCE: " + params.toString()); }
     DataSource dataSource = DataSource.fromThrift(params.getData_source());
     if (catalog_.getDataSource(dataSource.getName()) != null) {
       if (!params.if_not_exists) {
@@ -1054,7 +1054,7 @@ public class CatalogOpExecutor {
 
   private void dropDataSource(TDropDataSourceParams params, TDdlExecResponse resp)
       throws ImpalaException {
-    if (LOG.isDebugEnabled()) { LOG.debug("Drop DATA SOURCE: " + params.toString()); }
+    if (LOG.isTraceEnabled()) LOG.trace("Drop DATA SOURCE: " + params.toString());
     DataSource dataSource = catalog_.getDataSource(params.getData_source());
     if (dataSource == null) {
       if (!params.if_exists) {
@@ -1208,7 +1208,7 @@ public class CatalogOpExecutor {
     Preconditions.checkState(params.getDb() != null && !params.getDb().isEmpty(),
         "Null or empty database name passed as argument to Catalog.dropDatabase");
 
-    LOG.debug("Dropping database " + params.getDb());
+    LOG.trace("Dropping database " + params.getDb());
     Db db = catalog_.getDb(params.db);
     if (db != null && db.numFunctions() > 0 && !params.cascade) {
       throw new CatalogException("Database " + db.getName() + " is not empty");
@@ -1290,7 +1290,7 @@ public class CatalogOpExecutor {
       throws ImpalaException {
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    LOG.debug(String.format("Dropping table/view %s", tableName));
+    LOG.trace(String.format("Dropping table/view %s", tableName));
 
     TCatalogObject removedObject = new TCatalogObject();
     synchronized (metastoreDdlLock_) {
@@ -1504,13 +1504,13 @@ public class CatalogOpExecutor {
 
     if (params.if_not_exists &&
         catalog_.containsTable(tableName.getDb(), tableName.getTbl())) {
-      LOG.debug(String.format("Skipping table creation because %s already exists and " +
+      LOG.trace(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tableName));
       response.getResult().setVersion(catalog_.getCatalogVersion());
       return false;
     }
     org.apache.hadoop.hive.metastore.api.Table tbl = createMetaStoreTable(params);
-    LOG.debug(String.format("Creating table %s", tableName));
+    LOG.trace(String.format("Creating table %s", tableName));
     if (KuduTable.isKuduTable(tbl)) return createKuduTable(tbl, params, response);
     Preconditions.checkState(params.getColumns().size() > 0,
         "Empty column list given as argument to Catalog.createTable");
@@ -1680,7 +1680,7 @@ public class CatalogOpExecutor {
           "Null or empty column list given as argument to DdlExecutor.createView");
     if (params.if_not_exists &&
         catalog_.containsTable(tableName.getDb(), tableName.getTbl())) {
-      LOG.debug(String.format("Skipping view creation because %s already exists and " +
+      LOG.trace(String.format("Skipping view creation because %s already exists and " +
           "ifNotExists is true.", tableName));
     }
 
@@ -1688,7 +1688,7 @@ public class CatalogOpExecutor {
     org.apache.hadoop.hive.metastore.api.Table view =
         new org.apache.hadoop.hive.metastore.api.Table();
     setViewAttributes(params, view);
-    LOG.debug(String.format("Creating view %s", tableName));
+    LOG.trace(String.format("Creating view %s", tableName));
     createTable(view, params.if_not_exists, null, response);
   }
 
@@ -1712,7 +1712,7 @@ public class CatalogOpExecutor {
 
     if (params.if_not_exists &&
         catalog_.containsTable(tblName.getDb(), tblName.getTbl())) {
-      LOG.debug(String.format("Skipping table creation because %s already exists and " +
+      LOG.trace(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tblName));
       response.getResult().setVersion(catalog_.getCatalogVersion());
       return;
@@ -1767,7 +1767,7 @@ public class CatalogOpExecutor {
     }
     // Set the row count of this table to unknown.
     tbl.putToParameters(StatsSetupConst.ROW_COUNT, "-1");
-    LOG.debug(String.format("Creating table %s LIKE %s", tblName, srcTblName));
+    LOG.trace(String.format("Creating table %s LIKE %s", tblName, srcTblName));
     createTable(tbl, params.if_not_exists, null, response);
   }
 
@@ -1861,7 +1861,7 @@ public class CatalogOpExecutor {
     TableName tableName = tbl.getTableName();
     if (ifNotExists && catalog_.containsHdfsPartition(tableName.getDb(),
         tableName.getTbl(), partitionSpec)) {
-      LOG.debug(String.format("Skipping partition creation because (%s) already exists" +
+      LOG.trace(String.format("Skipping partition creation because (%s) already exists" +
           " and ifNotExists is true.", Joiner.on(", ").join(partitionSpec)));
       return null;
     }
@@ -1916,7 +1916,7 @@ public class CatalogOpExecutor {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partition"), e);
       }
-      LOG.debug(String.format("Ignoring '%s' when adding partition to %s because" +
+      LOG.trace(String.format("Ignoring '%s' when adding partition to %s because" +
           " ifNotExists is true.", e, tableName));
     } catch (TException e) {
       throw new ImpalaRuntimeException(
@@ -1950,7 +1950,7 @@ public class CatalogOpExecutor {
       Preconditions.checkState(!partitionSet.isEmpty());
     } else {
       if (partitionSet.isEmpty()) {
-        LOG.debug(String.format("Ignoring empty partition list when dropping " +
+        LOG.trace(String.format("Ignoring empty partition list when dropping " +
             "partitions from %s because ifExists is true.", tableName));
         return tbl;
       }
@@ -1985,7 +1985,7 @@ public class CatalogOpExecutor {
             throw new ImpalaRuntimeException(
                 String.format(HMS_RPC_ERROR_FORMAT_STR, "dropPartition"), e);
           }
-          LOG.debug(
+          LOG.trace(
               String.format("Ignoring '%s' when dropping partitions from %s because" +
               " ifExists is true.", e, tableName));
         }
@@ -2492,7 +2492,7 @@ public class CatalogOpExecutor {
       updateLastDdlTime(msTbl, msClient);
     } catch (AlreadyExistsException e) {
       // This may happen when another client of HMS has added the partitions.
-      LOG.debug(String.format("Ignoring '%s' when adding partition to %s.", e,
+      LOG.trace(String.format("Ignoring '%s' when adding partition to %s.", e,
           tableName));
     } catch (TException e) {
       throw new ImpalaRuntimeException(
@@ -2853,7 +2853,9 @@ public class CatalogOpExecutor {
   private long updateLastDdlTime(org.apache.hadoop.hive.metastore.api.Table msTbl,
       MetaStoreClient msClient) throws MetaException, NoSuchObjectException, TException {
     Preconditions.checkNotNull(msTbl);
-    LOG.debug("Updating lastDdlTime for table: " + msTbl.getTableName());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Updating lastDdlTime for table: " + msTbl.getTableName());
+    }
     Map<String, String> params = msTbl.getParameters();
     long lastDdlTime = calculateDdlTime(msTbl);
     params.put("transient_lastDdlTime", Long.toString(lastDdlTime));

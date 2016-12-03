@@ -70,8 +70,8 @@ public class KuduCatalogOpExecutor {
     Preconditions.checkState(!Table.isExternalTable(msTbl));
     String kuduTableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("Creating table '%s' in master '%s'", kuduTableName,
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Creating table '%s' in master '%s'", kuduTableName,
           masterHosts));
     }
     try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
@@ -200,8 +200,8 @@ public class KuduCatalogOpExecutor {
     Preconditions.checkState(!Table.isExternalTable(msTbl));
     String tableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("Dropping table '%s' from master '%s'", tableName,
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Dropping table '%s' from master '%s'", tableName,
           masterHosts));
     }
     try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
@@ -231,8 +231,8 @@ public class KuduCatalogOpExecutor {
     String kuduTableName = msTblCopy.getParameters().get(KuduTable.KEY_TABLE_NAME);
     Preconditions.checkState(!Strings.isNullOrEmpty(kuduTableName));
     String masterHosts = msTblCopy.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("Loading schema of table '%s' from master '%s'",
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Loading schema of table '%s' from master '%s'",
           kuduTableName, masterHosts));
     }
     try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {

@@ -373,8 +373,8 @@ public class HdfsScanNode extends ScanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("collecting partitions for table " + tbl_.getName());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("collecting partitions for table " + tbl_.getName());
     }
     numPartitionsMissingStats_ = 0;
     totalFiles_ = 0;
@@ -432,8 +432,8 @@ public class HdfsScanNode extends ScanNode {
     }
 
     if (cardinality_ > 0) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("cardinality_=" + Long.toString(cardinality_) +
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("cardinality_=" + Long.toString(cardinality_) +
                   " sel=" + Double.toString(computeSelectivity()));
       }
       cardinality_ = Math.round(cardinality_ * computeSelectivity());
@@ -441,13 +441,13 @@ public class HdfsScanNode extends ScanNode {
       cardinality_ = Math.max(cardinality_, 1);
     }
     cardinality_ = capAtLimit(cardinality_);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
     }
 
     computeNumNodes(analyzer, cardinality_);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
     }
   }
 
@@ -501,8 +501,8 @@ public class HdfsScanNode extends ScanNode {
     // Tables can reside on 0 nodes (empty table), but a plan node must always be
     // executed on at least one node.
     numNodes_ = (cardinality == 0 || totalNodes == 0) ? 1 : totalNodes;
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("computeNumNodes totalRanges=" + scanRanges_.size() +
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computeNumNodes totalRanges=" + scanRanges_.size() +
           " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges +
           " localHostSet.size=" + localHostSet.size() +
           " clusterNodes=" + cluster.numNodes());

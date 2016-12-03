@@ -237,8 +237,8 @@ public class ImpaladCatalog extends Catalog {
       throws TableLoadingException, DatabaseNotFoundException {
     // This item is out of date and should not be applied to the catalog.
     if (catalogDeltaLog_.wasObjectRemovedAfter(catalogObject)) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Skipping update because a matching object was removed " +
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format("Skipping update because a matching object was removed " +
             "in a later catalog version: %s", catalogObject));
       }
       return;
@@ -356,8 +356,8 @@ public class ImpaladCatalog extends Catalog {
       throws TableLoadingException {
     Db db = getDb(thriftTable.db_name);
     if (db == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Parent database of table does not exist: " +
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Parent database of table does not exist: " +
             thriftTable.db_name + "." + thriftTable.tbl_name);
       }
       return;
@@ -373,8 +373,8 @@ public class ImpaladCatalog extends Catalog {
     function.setCatalogVersion(catalogVersion);
     Db db = getDb(function.getFunctionName().getDb());
     if (db == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Parent database of function does not exist: " + function.getName());
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Parent database of function does not exist: " + function.getName());
       }
       return;
     }

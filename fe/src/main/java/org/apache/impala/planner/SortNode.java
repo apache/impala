@@ -134,8 +134,8 @@ public class SortNode extends PlanNode {
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     cardinality_ = capAtLimit(getChild(0).cardinality_);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("stats Sort: cardinality=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("stats Sort: cardinality=" + Long.toString(cardinality_));
     }
   }
 

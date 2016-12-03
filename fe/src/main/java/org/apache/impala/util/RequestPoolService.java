@@ -274,8 +274,8 @@ public class RequestPoolService {
     JniUtil.deserializeThrift(protocolFactory_, resolvePoolParams,
         thriftResolvePoolParams);
     TResolveRequestPoolResult result = resolveRequestPool(resolvePoolParams);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("resolveRequestPool(pool={}, user={}): resolved_pool={}, has_access={}",
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("resolveRequestPool(pool={}, user={}): resolved_pool={}, has_access={}",
           new Object[] {
             resolvePoolParams.getRequested_pool(), resolvePoolParams.getUser(),
             result.resolved_pool, result.has_access });
@@ -375,7 +375,7 @@ public class RequestPoolService {
       result.setDefault_query_options(getLlamaPoolConfigValue(currentLlamaConf, pool,
           QUERY_OPTIONS_KEY, ""));
     }
-    if (LOG.isDebugEnabled()) {
+    if (LOG.isTraceEnabled()) {
       LOG.debug("getPoolConfig(pool={}): max_mem_resources={}, max_requests={}, " +
           "max_queued={},  queue_timeout_ms={}, default_query_options={}",
           new Object[] { pool, result.max_mem_resources, result.max_requests,

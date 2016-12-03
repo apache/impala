@@ -79,8 +79,8 @@ public class MetaStoreClientPool {
      * connection to the HMS before giving up and failing out with an exception.
      */
     private MetaStoreClient(HiveConf hiveConf, int cnxnTimeoutSec) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Creating MetaStoreClient. Pool Size = " + clientPool_.size());
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Creating MetaStoreClient. Pool Size = " + clientPool_.size());
       }
 
       long retryDelaySeconds = hiveConf.getTimeVar(

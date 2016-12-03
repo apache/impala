@@ -269,11 +269,13 @@ public class DataSourceScanNode extends ScanNode {
     cardinality_ = Math.max(1, cardinality_);
     cardinality_ = capAtLimit(cardinality_);
 
-    LOG.debug("computeStats DataSourceScan: cardinality=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computeStats DataSourceScan: cardinality=" + Long.toString(cardinality_));
+    }
 
     numNodes_ = table_.getNumNodes();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("computeStats DataSourceScan: #nodes=" + Integer.toString(numNodes_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computeStats DataSourceScan: #nodes=" + Integer.toString(numNodes_));
     }
   }
 

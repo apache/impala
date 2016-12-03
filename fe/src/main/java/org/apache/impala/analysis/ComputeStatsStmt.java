@@ -379,8 +379,8 @@ public class ComputeStatsStmt extends StatementBase {
       }
 
       if (filterPreds.size() == 0 && validPartStats_.size() != 0) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("No partitions selected for incremental stats update");
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("No partitions selected for incremental stats update");
         }
         analyzer.addWarning("No partitions selected for incremental stats update");
         return;
@@ -442,12 +442,12 @@ public class ComputeStatsStmt extends StatementBase {
     }
 
     tableStatsQueryStr_ = tableStatsQueryBuilder.toString();
-    if (LOG.isDebugEnabled()) LOG.debug("Table stats query: " + tableStatsQueryStr_);
+    if (LOG.isTraceEnabled()) LOG.trace("Table stats query: " + tableStatsQueryStr_);
 
     if (columnStatsSelectList.isEmpty()) {
       // Table doesn't have any columns that we can compute stats for.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("No supported column types in table " + table_.getTableName() +
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("No supported column types in table " + table_.getTableName() +
             ", no column statistics will be gathered.");
       }
       columnStatsQueryStr_ = null;
@@ -455,7 +455,7 @@ public class ComputeStatsStmt extends StatementBase {
     }
 
     columnStatsQueryStr_ = columnStatsQueryBuilder.toString();
-    if (LOG.isDebugEnabled()) LOG.debug("Column stats query: " + columnStatsQueryStr_);
+    if (LOG.isTraceEnabled()) LOG.trace("Column stats query: " + columnStatsQueryStr_);
   }
 
   /**

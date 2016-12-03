@@ -216,14 +216,14 @@ public class HBaseScanNode extends ScanNode {
     cardinality_ *= computeSelectivity();
     cardinality_ = Math.max(1, cardinality_);
     cardinality_ = capAtLimit(cardinality_);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("computeStats HbaseScan: cardinality=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computeStats HbaseScan: cardinality=" + Long.toString(cardinality_));
     }
 
     // TODO: take actual regions into account
     numNodes_ = tbl.getNumNodes();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes_));
     }
   }
 

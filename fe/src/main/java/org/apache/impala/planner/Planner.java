@@ -164,10 +164,10 @@ public class Planner {
     }
     rootFragment.setOutputExprs(resultExprs);
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("desctbl: " + ctx_.getRootAnalyzer().getDescTbl().debugString());
-      LOG.debug("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
-      LOG.debug("finalize plan fragments");
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("desctbl: " + ctx_.getRootAnalyzer().getDescTbl().debugString());
+      LOG.trace("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
+      LOG.trace("finalize plan fragments");
     }
     for (PlanFragment fragment: fragments) {
       fragment.finalize(ctx_.getRootAnalyzer());
@@ -409,9 +409,9 @@ public class Planner {
     request.setPer_host_mem_req(maxPerHostMem);
     request.setPer_host_vcores((short) maxPerHostVcores);
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Estimated per-host peak memory requirement: " + maxPerHostMem);
-      LOG.debug("Estimated per-host virtual cores requirement: " + maxPerHostVcores);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Estimated per-host peak memory requirement: " + maxPerHostMem);
+      LOG.trace("Estimated per-host virtual cores requirement: " + maxPerHostVcores);
     }
   }
 

@@ -57,7 +57,7 @@ public class FileSystemUtil {
     for (FileStatus fStatus: fs.listStatus(directory)) {
       // Only delete files that are not hidden.
       if (fStatus.isFile() && !isHiddenFile(fStatus.getPath().getName())) {
-        if (LOG.isDebugEnabled()) LOG.debug("Removing: " + fStatus.getPath());
+        if (LOG.isTraceEnabled()) LOG.trace("Removing: " + fStatus.getPath());
         fs.delete(fStatus.getPath(), false);
         ++numFilesDeleted;
       }
@@ -123,8 +123,8 @@ public class FileSystemUtil {
     int numFilesMoved = 0;
     for (FileStatus fStatus: sourceFs.listStatus(sourceDir)) {
       if (fStatus.isDirectory()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Skipping copy of directory: " + fStatus.getPath());
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Skipping copy of directory: " + fStatus.getPath());
         }
         continue;
       } else if (isHiddenFile(fStatus.getPath().getName())) {
@@ -182,8 +182,8 @@ public class FileSystemUtil {
     // non-distributed filesystem.
     if (!doRename) doRename = !destIsDfs && sameFileSystem;
     if (doRename) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format(
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format(
             "Moving '%s' to '%s'", sourceFile.toString(), destFile.toString()));
       }
       // Move (rename) the file.
@@ -196,15 +196,15 @@ public class FileSystemUtil {
       // encryption zones. A move would return an error from the NN because a move is a
       // metadata-only operation and the files would not be encrypted/decrypted properly
       // on the DNs.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format(
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format(
             "Copying source '%s' to '%s' because HDFS encryption zones are different.",
             sourceFile, destFile));
       }
     } else {
       Preconditions.checkState(!sameFileSystem);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Copying '%s' to '%s' between filesystems.",
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format("Copying '%s' to '%s' between filesystems.",
             sourceFile, destFile));
       }
     }

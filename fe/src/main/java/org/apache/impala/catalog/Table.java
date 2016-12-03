@@ -154,7 +154,7 @@ public abstract class Table implements CatalogObject {
    * the correctness of the system.
    */
   protected void loadAllColumnStats(IMetaStoreClient client) {
-    if (LOG.isDebugEnabled()) LOG.debug("Loading column stats for table: " + name_);
+    if (LOG.isTraceEnabled()) LOG.trace("Loading column stats for table: " + name_);
     List<ColumnStatisticsObj> colStats;
 
     // We need to only query those columns which may have stats; asking HMS for other

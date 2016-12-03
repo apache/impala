@@ -157,8 +157,8 @@ public class ExternalDataSourceExecutor {
         if (initString_ != null && initString_.startsWith(CACHE_CLASS_PREFIX)) {
           cachedClasses_.put(cacheMapKey, c);
         }
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Loaded jar for class {} at path {}", className_, jarPath_);
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Loaded jar for class {} at path {}", className_, jarPath_);
         }
         numClassCacheMisses_++;
       } else {

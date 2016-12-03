@@ -223,8 +223,8 @@ public class KuduScanNode extends ScanNode {
     cardinality_ *= computeSelectivity();
     cardinality_ = Math.min(Math.max(1, cardinality_), kuduTable_.getNumRows());
     cardinality_ = capAtLimit(cardinality_);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("computeStats KuduScan: cardinality=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computeStats KuduScan: cardinality=" + Long.toString(cardinality_));
     }
   }
 

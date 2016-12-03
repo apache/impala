@@ -180,7 +180,7 @@ public class AggregateInfo extends AggregateInfoBase {
       Preconditions.checkState(tupleDesc == null);
       result.createDistinctAggInfo(groupingExprs, distinctAggExprs, analyzer);
     }
-    if (LOG.isDebugEnabled()) LOG.debug("agg info:\n" + result.debugString());
+    if (LOG.isTraceEnabled()) LOG.trace("agg info:\n" + result.debugString());
     return result;
   }
 

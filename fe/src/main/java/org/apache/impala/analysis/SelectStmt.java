@@ -273,7 +273,7 @@ public class SelectStmt extends QueryStmt {
     }
 
     if (aggInfo_ != null) {
-      if (LOG.isDebugEnabled()) LOG.debug("post-analysis " + aggInfo_.debugString());
+      if (LOG.isTraceEnabled()) LOG.trace("post-analysis " + aggInfo_.debugString());
     }
   }
 

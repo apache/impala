@@ -375,8 +375,8 @@ public class MetadataOp {
         }
       }
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Returning " + result.rows.size() + " table columns");
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Returning " + result.rows.size() + " table columns");
     }
     return result;
   }
@@ -428,8 +428,8 @@ public class MetadataOp {
       result.rows.add(row);
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Returning " + result.rows.size() + " schemas");
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Returning " + result.rows.size() + " schemas");
     }
     return result;
   }
@@ -483,7 +483,7 @@ public class MetadataOp {
         result.rows.add(row);
       }
     }
-    if (LOG.isDebugEnabled()) LOG.debug("Returning " + result.rows.size() + " tables");
+    if (LOG.isTraceEnabled()) LOG.trace("Returning " + result.rows.size() + " tables");
     return result;
   }
 

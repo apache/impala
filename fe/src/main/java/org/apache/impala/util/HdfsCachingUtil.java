@@ -130,8 +130,8 @@ public class HdfsCachingUtil {
   public static void uncacheTbl(org.apache.hadoop.hive.metastore.api.Table table)
       throws ImpalaRuntimeException {
     Preconditions.checkNotNull(table);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Uncaching table: " + table.getDbName() + "." + table.getTableName());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Uncaching table: " + table.getDbName() + "." + table.getTableName());
     }
     Long id = getCacheDirectiveId(table.getParameters());
     if (id == null) return;
@@ -238,8 +238,8 @@ public class HdfsCachingUtil {
 
     bytesNeeded = cacheDir.getStats().getBytesNeeded();
     currentBytesCached = cacheDir.getStats().getBytesCached();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("Waiting on cache directive id: %d. Bytes " +
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Waiting on cache directive id: %d. Bytes " +
           "cached (%d) / needed (%d)", directiveId, currentBytesCached, bytesNeeded));
     }
     // All the bytes are cached, just return.
@@ -262,8 +262,8 @@ public class HdfsCachingUtil {
       currentBytesCached = cacheDir.getStats().getBytesCached();
       bytesNeeded = cacheDir.getStats().getBytesNeeded();
       if (currentBytesCached == bytesNeeded) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(String.format("Cache directive id: %d has completed." +
+        if (LOG.isTraceEnabled()) {
+          LOG.trace(String.format("Cache directive id: %d has completed." +
               "Bytes cached (%d) / needed (%d)", directiveId, currentBytesCached,
               bytesNeeded));
         }
@@ -301,8 +301,8 @@ public class HdfsCachingUtil {
         .setPool(poolName)
         .setReplication(replication)
         .setPath(path).build();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Submitting cache directive: " + info.toString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Submitting cache directive: " + info.toString());
     }
     try {
       return getDfs().addCacheDirective(info);
@@ -355,8 +355,8 @@ public class HdfsCachingUtil {
         .setPool(poolName)
         .setReplication(replication)
         .setPath(path).build();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Modifying cache directive: " + info.toString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Modifying cache directive: " + info.toString());
     }
     try {
       getDfs().modifyCacheDirective(info);
@@ -372,7 +372,7 @@ public class HdfsCachingUtil {
    * directive.
    */
   private static void removeDirective(long directiveId) throws ImpalaRuntimeException {
-    if (LOG.isDebugEnabled()) LOG.debug("Removing cache directive id: " + directiveId);
+    if (LOG.isTraceEnabled()) LOG.trace("Removing cache directive id: " + directiveId);
     try {
       getDfs().removeCacheDirective(directiveId);
     } catch (IOException e) {

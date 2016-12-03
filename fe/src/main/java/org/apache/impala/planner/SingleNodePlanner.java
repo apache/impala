@@ -499,8 +499,8 @@ public class SingleNodePlanner {
       long lhsCardinality = root.getCardinality();
       long rhsCardinality = minEntry.second.getCardinality();
       numOps += lhsCardinality + rhsCardinality;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(Integer.toString(i) + " chose " + minEntry.first.getUniqueAlias()
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(Integer.toString(i) + " chose " + minEntry.first.getUniqueAlias()
             + " #lhs=" + Long.toString(lhsCardinality)
             + " #rhs=" + Long.toString(rhsCardinality)
             + " #ops=" + Long.toString(numOps));

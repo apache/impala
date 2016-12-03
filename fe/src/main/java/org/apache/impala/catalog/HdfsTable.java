@@ -370,8 +370,8 @@ public class HdfsTable extends Table {
     Preconditions.checkNotNull(fd);
     Preconditions.checkNotNull(perFsFileBlocks);
     Preconditions.checkArgument(!file.isDirectory());
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("load block md for " + name_ + " file " + fd.getFileName());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("load block md for " + name_ + " file " + fd.getFileName());
     }
 
     if (!FileSystemUtil.hasGetFileBlockLocations(fs)) {
@@ -1087,8 +1087,8 @@ public class HdfsTable extends Table {
       // Load partition and file metadata
       if (reuseMetadata) {
         // Incrementally update this table's partitions and file metadata
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("incremental update for table: " + db_.getName() + "." + name_);
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("incremental update for table: " + db_.getName() + "." + name_);
         }
         Preconditions.checkState(partitionsToUpdate == null || loadFileMetadata);
         updateMdFromHmsTable(msTbl);
@@ -1099,8 +1099,8 @@ public class HdfsTable extends Table {
         }
       } else {
         // Load all partitions from Hive Metastore, including file metadata.
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("load table from Hive Metastore: " + db_.getName() + "." + name_);
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("load table from Hive Metastore: " + db_.getName() + "." + name_);
         }
         List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
             Lists.newArrayList();
@@ -1141,8 +1141,8 @@ public class HdfsTable extends Table {
    * Updates the file metadata of an unpartitioned HdfsTable.
    */
   private void updateUnpartitionedTableFileMd() throws CatalogException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("update unpartitioned table: " + name_);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("update unpartitioned table: " + name_);
     }
     resetPartitions();
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
@@ -1166,8 +1166,8 @@ public class HdfsTable extends Table {
    */
   private void updatePartitionsFromHms(IMetaStoreClient client,
       Set<String> partitionsToUpdate, boolean loadFileMetadata) throws Exception {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("sync table partitions: " + name_);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("sync table partitions: " + name_);
     }
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
@@ -1427,8 +1427,8 @@ public class HdfsTable extends Table {
       IMetaStoreClient client) throws Exception {
     Preconditions.checkNotNull(partitions);
     if (partitions.isEmpty()) return;
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("Incrementally updating %d/%d partitions.",
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Incrementally updating %d/%d partitions.",
           partitions.size(), partitionMap_.size()));
     }
     Set<String> partitionNames = Sets.newHashSet();
@@ -1483,8 +1483,8 @@ public class HdfsTable extends Table {
   private void loadPartitionFileMetadata(List<HdfsPartition> partitions)
       throws Exception {
     Preconditions.checkNotNull(partitions);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("loading file metadata for %d partitions",
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("loading file metadata for %d partitions",
           partitions.size()));
     }
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
@@ -1855,8 +1855,8 @@ public class HdfsTable extends Table {
           }
         }
       } catch (Exception ex) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(String.format("Invalid partition value (%s) for Type (%s).",
+        if (LOG.isTraceEnabled()) {
+          LOG.trace(String.format("Invalid partition value (%s) for Type (%s).",
               partName[1], type.toSql()));
         }
         return null;

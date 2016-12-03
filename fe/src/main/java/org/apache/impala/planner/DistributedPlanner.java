@@ -79,9 +79,9 @@ public class DistributedPlanner {
       isPartitioned = true;
     }
     long perNodeMemLimit = ctx_.getQueryOptions().mem_limit;
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("create plan fragments");
-      LOG.debug("memlimit=" + Long.toString(perNodeMemLimit));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("create plan fragments");
+      LOG.trace("memlimit=" + Long.toString(perNodeMemLimit));
     }
     createPlanFragments(singleNodePlan, isPartitioned, perNodeMemLimit, fragments);
     return fragments;
@@ -437,9 +437,9 @@ public class DistributedPlanner {
         broadcastCost = 2 * rhsDataSize * leftChildFragment.getNumNodes();
       }
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("broadcast: cost=" + Long.toString(broadcastCost));
-      LOG.debug("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("broadcast: cost=" + Long.toString(broadcastCost));
+      LOG.trace("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
           + Float.toString(rhsTree.getAvgRowSize()) + " #nodes="
           + Integer.toString(leftChildFragment.getNumNodes()));
     }
@@ -469,13 +469,13 @@ public class DistributedPlanner {
       double rhsNetworkCost = (rhsHasCompatPartition) ? 0.0 : rhsDataSize;
       partitionCost = Math.round(lhsNetworkCost + rhsNetworkCost + rhsDataSize);
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("partition: cost=" + Long.toString(partitionCost));
-      LOG.debug("lhs card=" + Long.toString(lhsTree.getCardinality()) + " row_size="
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("partition: cost=" + Long.toString(partitionCost));
+      LOG.trace("lhs card=" + Long.toString(lhsTree.getCardinality()) + " row_size="
           + Float.toString(lhsTree.getAvgRowSize()));
-      LOG.debug("rhs card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
+      LOG.trace("rhs card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
           + Float.toString(rhsTree.getAvgRowSize()));
-      LOG.debug(rhsTree.getExplainString());
+      LOG.trace(rhsTree.getExplainString());
     }
 
     boolean doBroadcast = false;

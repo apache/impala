@@ -74,8 +74,8 @@ public class SelectNode extends PlanNode {
       Preconditions.checkState(cardinality_ >= 0);
     }
     cardinality_ = capAtLimit(cardinality_);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("stats Select: cardinality=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("stats Select: cardinality=" + Long.toString(cardinality_));
     }
   }
 

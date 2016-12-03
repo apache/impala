@@ -157,8 +157,8 @@ public class JniFrontend {
 
     StringBuilder explainString = new StringBuilder();
     TExecRequest result = frontend_.createExecRequest(queryCtx, explainString);
-    if (explainString.length() > 0 && LOG.isDebugEnabled()) {
-      LOG.debug(explainString.toString());
+    if (explainString.length() > 0 && LOG.isTraceEnabled()) {
+      LOG.trace(explainString.toString());
     }
 
     // TODO: avoid creating serializer for each query?
@@ -234,7 +234,7 @@ public class JniFrontend {
     TQueryCtx queryCtx = new TQueryCtx();
     JniUtil.deserializeThrift(protocolFactory_, queryCtx, thriftQueryContext);
     String plan = frontend_.getExplainString(queryCtx);
-    if (LOG.isDebugEnabled()) LOG.debug("Explain plan: " + plan);
+    if (LOG.isTraceEnabled()) LOG.trace("Explain plan: " + plan);
     return plan;
   }
 

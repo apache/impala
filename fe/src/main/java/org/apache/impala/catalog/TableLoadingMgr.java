@@ -278,8 +278,10 @@ public class TableLoadingMgr {
     // Always get the next table from the head of the deque.
     final TTableName tblName = tableLoadingDeque_.takeFirst();
     tableLoadingSet_.remove(tblName);
-    LOG.debug("Loading next table. Remaining items in queue: "
-        + tableLoadingDeque_.size());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Loading next table. Remaining items in queue: "
+          + tableLoadingDeque_.size());
+    }
     try {
       // TODO: Instead of calling "getOrLoad" here we could call "loadAsync". We would
       // just need to add a mechanism for moving loaded tables into the Catalog.
