@@ -1440,7 +1440,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Partition column name mismatch: tinyint_col != int_col");
 
     // CTAS into managed Kudu tables
-    AnalyzesOk("create table t primary key (id) partition by hash (id) into 3 buckets" +
+    AnalyzesOk("create table t primary key (id) partition by hash (id) partitions 3" +
         " stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col, " +
         "bigint_col, float_col, double_col, date_string_col, string_col " +
         "from functional.alltypestiny");
@@ -1449,7 +1449,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col, " +
         "bigint_col, float_col, double_col, date_string_col, string_col " +
         "from functional.alltypestiny");
-    AnalyzesOk("create table t primary key (id) partition by hash (id) into 3 buckets, "+
+    AnalyzesOk("create table t primary key (id) partition by hash (id) partitions 3, "+
         "range (id) (partition values < 10, partition 10 <= values < 20, " +
         "partition value = 30) stored as kudu as select id, bool_col, tinyint_col, " +
         "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
@@ -1461,27 +1461,27 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "external Kudu tables.");
 
     // CTAS into Kudu tables with unsupported types
-    AnalysisError("create table t primary key (id) partition by hash into 3 buckets" +
+    AnalysisError("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select id, timestamp_col from functional.alltypestiny",
         "Cannot create table 't': Type TIMESTAMP is not supported in Kudu");
-    AnalysisError("create table t primary key (cs) partition by hash into 3 buckets" +
+    AnalysisError("create table t primary key (cs) partition by hash partitions 3" +
         " stored as kudu as select cs from functional.chars_tiny",
         "Cannot create table 't': Type CHAR(5) is not supported in Kudu");
-    AnalysisError("create table t primary key (vc) partition by hash into 3 buckets" +
+    AnalysisError("create table t primary key (vc) partition by hash partitions 3" +
         " stored as kudu as select vc from functional.chars_tiny",
         "Cannot create table 't': Type VARCHAR(32) is not supported in Kudu");
-    AnalysisError("create table t primary key (id) partition by hash into 3 buckets" +
+    AnalysisError("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select c1 as id from functional.decimal_tiny",
         "Cannot create table 't': Type DECIMAL(10,4) is not supported in Kudu");
-    AnalysisError("create table t primary key (id) partition by hash into 3 buckets" +
+    AnalysisError("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select id, s from functional.complextypes_fileformat",
         "Expr 's' in select list returns a complex type 'STRUCT<f1:STRING,f2:INT>'.\n" +
         "Only scalar types are allowed in the select list.");
-    AnalysisError("create table t primary key (id) partition by hash into 3 buckets" +
+    AnalysisError("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select id, m from functional.complextypes_fileformat",
         "Expr 'm' in select list returns a complex type 'MAP<STRING,BIGINT>'.\n" +
         "Only scalar types are allowed in the select list.");
-    AnalysisError("create table t primary key (id) partition by hash into 3 buckets" +
+    AnalysisError("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select id, a from functional.complextypes_fileformat",
         "Expr 'a' in select list returns a complex type 'ARRAY<INT>'.\n" +
         "Only scalar types are allowed in the select list.");
@@ -1914,17 +1914,17 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     TestUtils.assumeKuduIsSupported();
     // Test primary keys and partition by clauses
     AnalyzesOk("create table tab (x int primary key) partition by hash(x) " +
-        "into 8 buckets stored as kudu");
+        "partitions 8 stored as kudu");
     AnalyzesOk("create table tab (x int, primary key(x)) partition by hash(x) " +
-        "into 8 buckets stored as kudu");
+        "partitions 8 stored as kudu");
     AnalyzesOk("create table tab (x int, y int, primary key (x, y)) " +
-        "partition by hash(x, y) into 8 buckets stored as kudu");
+        "partition by hash(x, y) partitions 8 stored as kudu");
     AnalyzesOk("create table tab (x int, y int, primary key (x)) " +
-        "partition by hash(x) into 8 buckets stored as kudu");
+        "partition by hash(x) partitions 8 stored as kudu");
     AnalyzesOk("create table tab (x int, y int, primary key(x, y)) " +
-        "partition by hash(y) into 8 buckets stored as kudu");
+        "partition by hash(y) partitions 8 stored as kudu");
     AnalyzesOk("create table tab (x int, y string, primary key (x)) partition by " +
-        "hash (x) into 3 buckets, range (x) (partition values < 1, partition " +
+        "hash (x) partitions 3, range (x) (partition values < 1, partition " +
         "1 <= values < 10, partition 10 <= values < 20, partition value = 30) " +
         "stored as kudu");
     AnalyzesOk("create table tab (x int, y int, primary key (x, y)) partition by " +
@@ -1952,24 +1952,24 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Multilevel partitioning. Data is split into 3 buckets based on 'x' and each
     // bucket is partitioned into 4 tablets based on the range partitions of 'y'.
     AnalyzesOk("create table tab (x int, y string, primary key(x, y)) " +
-        "partition by hash(x) into 3 buckets, range(y) " +
+        "partition by hash(x) partitions 3, range(y) " +
         "(partition values < 'aa', partition 'aa' <= values < 'bb', " +
         "partition 'bb' <= values < 'cc', partition 'cc' <= values) " +
         "stored as kudu");
     // Key column in upper case
     AnalyzesOk("create table tab (x int, y int, primary key (X)) " +
-        "partition by hash (x) into 8 buckets stored as kudu");
+        "partition by hash (x) partitions 8 stored as kudu");
     // Flexible Partitioning
     AnalyzesOk("create table tab (a int, b int, c int, d int, primary key (a, b, c))" +
-        "partition by hash (a, b) into 8 buckets, hash(c) into 2 buckets stored as " +
+        "partition by hash (a, b) partitions 8, hash(c) partitions 2 stored as " +
         "kudu");
     // No columns specified in the PARTITION BY HASH clause
     AnalyzesOk("create table tab (a int primary key, b int, c int, d int) " +
-        "partition by hash into 8 buckets stored as kudu");
+        "partition by hash partitions 8 stored as kudu");
     // Distribute range data types are picked up during analysis and forwarded to Kudu.
     // Column names in distribute params should also be case-insensitive.
     AnalyzesOk("create table tab (a int, b int, c int, d int, primary key(a, b, c, d))" +
-        "partition by hash (a, B, c) into 8 buckets, " +
+        "partition by hash (a, B, c) partitions 8, " +
         "range (A) (partition values < 1, partition 1 <= values < 2, " +
         "partition 2 <= values < 3, partition 3 <= values < 4, partition 4 <= values) " +
         "stored as kudu");
@@ -1979,18 +1979,18 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "(partition 'aa' < values <= 'bb') stored as kudu");
     // Null values in range partition values
     AnalysisError("create table tab (id int, name string, primary key(id, name)) " +
-        "partition by hash (id) into 3 buckets, range (name) " +
+        "partition by hash (id) partitions 3, range (name) " +
         "(partition value = null, partition value = 1) stored as kudu",
         "Range partition values cannot be NULL. Range partition: 'PARTITION " +
         "VALUE = NULL'");
     // Primary key specified in tblproperties
     AnalysisError(String.format("create table tab (x int) partition by hash (x) " +
-        "into 8 buckets stored as kudu tblproperties ('%s' = 'x')",
+        "partitions 8 stored as kudu tblproperties ('%s' = 'x')",
         KuduTable.KEY_KEY_COLUMNS), "PRIMARY KEY must be used instead of the table " +
         "property");
     // Primary key column that doesn't exist
     AnalysisError("create table tab (x int, y int, primary key (z)) " +
-        "partition by hash (x) into 8 buckets stored as kudu",
+        "partition by hash (x) partitions 8 stored as kudu",
         "PRIMARY KEY column 'z' does not exist in the table");
     // Invalid composite primary key
     AnalysisError("create table tab (x int primary key, primary key(x)) stored " +
@@ -2003,7 +2003,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "of the column definition.");
     // Specifying the same primary key column multiple times
     AnalysisError("create table tab (x int, primary key (x, x)) partition by hash (x) " +
-        "into 8 buckets stored as kudu",
+        "partitions 8 stored as kudu",
         "Column 'x' is listed multiple times as a PRIMARY KEY.");
     // Number of range partition boundary values should be equal to the number of range
     // columns.
@@ -2014,7 +2014,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "partitioning columns: (2 vs 1). Range partition: 'PARTITION VALUE = (1,2)'");
     // Key ranges must match the column types.
     AnalysisError("create table tab (a int, b int, c int, d int, primary key(a, b, c)) " +
-        "partition by hash (a, b, c) into 8 buckets, range (a) " +
+        "partition by hash (a, b, c) partitions 8, range (a) " +
         "(partition value = 1, partition value = 'abc', partition 3 <= values) " +
         "stored as kudu", "Range partition value 'abc' (type: STRING) is not type " +
         "compatible with partitioning column 'a' (type: INT).");
@@ -2044,7 +2044,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Only key columns can be used in PARTITION BY.");
     // No float range partition values
     AnalysisError("create table tab (a int, b int, c int, d int, primary key (a, b, c))" +
-        "partition by hash (a, b, c) into 8 buckets, " +
+        "partition by hash (a, b, c) partitions 8, " +
         "range (a) (partition value = 1.2, partition value = 2) stored as kudu",
         "Range partition value 1.2 (type: DECIMAL(2,1)) is not type compatible with " +
         "partitioning column 'a' (type: INT).");
@@ -2055,7 +2055,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "is not a key column. Only key columns can be used in PARTITION BY");
     // Kudu table name is specified in tblproperties
     AnalyzesOk("create table tab (x int primary key) partition by hash (x) " +
-        "into 8 buckets stored as kudu tblproperties ('kudu.table_name'='tab_1'," +
+        "partitions 8 stored as kudu tblproperties ('kudu.table_name'='tab_1'," +
         "'kudu.num_tablet_replicas'='1'," +
         "'kudu.master_addresses' = '127.0.0.1:8080, 127.0.0.1:8081')");
     // No port is specified in kudu master address
@@ -2079,7 +2079,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "'testPool'", "A Kudu table cannot be cached in HDFS.");
     // LOCATION cannot be used with Kudu tables
     AnalysisError("create table tab (a int primary key) partition by hash (a) " +
-        "into 3 buckets stored as kudu location '/test-warehouse/'",
+        "partitions 3 stored as kudu location '/test-warehouse/'",
         "LOCATION cannot be specified for a Kudu table.");
     // PARTITION BY is required for managed tables.
     AnalysisError("create table tab (a int, primary key (a)) stored as kudu",
@@ -2105,12 +2105,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
       // Unsupported type is PK and partition col
       String stmt = String.format("create table tab (x %s primary key) " +
-          "partition by hash(x) into 3 buckets stored as kudu", t);
+          "partition by hash(x) partitions 3 stored as kudu", t);
       AnalysisError(stmt, expectedError);
 
       // Unsupported type is not PK/partition col
       stmt = String.format("create table tab (x int primary key, y %s) " +
-          "partition by hash(x) into 3 buckets stored as kudu", t);
+          "partition by hash(x) partitions 3 stored as kudu", t);
       AnalysisError(stmt, expectedError);
     }
 
@@ -2126,7 +2126,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
               AnalyzesOk(String.format("create table tab (x int primary key " +
                   "not null encoding %s compression %s %s %s, y int encoding %s " +
                   "compression %s %s %s %s) partition by hash (x) " +
-                  "into 3 buckets stored as kudu", enc, comp, def, block, enc,
+                  "partitions 3 stored as kudu", enc, comp, def, block, enc,
                   comp, def, nul, block));
             }
           }
@@ -2136,23 +2136,23 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Primary key specified using the PRIMARY KEY clause
     AnalyzesOk("create table tab (x int not null encoding plain_encoding " +
         "compression snappy block_size 1, y int null encoding rle compression lz4 " +
-        "default 1, primary key(x)) partition by hash (x) into 3 buckets " +
+        "default 1, primary key(x)) partition by hash (x) partitions 3 " +
         "stored as kudu");
     // Primary keys can't be null
     AnalysisError("create table tab (x int primary key null, y int not null) " +
-        "partition by hash (x) into 3 buckets stored as kudu", "Primary key columns " +
+        "partition by hash (x) partitions 3 stored as kudu", "Primary key columns " +
         "cannot be nullable: x INT PRIMARY KEY NULL");
     AnalysisError("create table tab (x int not null, y int null, primary key (x, y)) " +
-        "partition by hash (x) into 3 buckets stored as kudu", "Primary key columns " +
+        "partition by hash (x) partitions 3 stored as kudu", "Primary key columns " +
         "cannot be nullable: y INT NULL");
     // Unsupported encoding value
     AnalysisError("create table tab (x int primary key, y int encoding invalid_enc) " +
-        "partition by hash (x) into 3 buckets stored as kudu", "Unsupported encoding " +
+        "partition by hash (x) partitions 3 stored as kudu", "Unsupported encoding " +
         "value 'INVALID_ENC'. Supported encoding values are: " +
         Joiner.on(", ").join(Encoding.values()));
     // Unsupported compression algorithm
     AnalysisError("create table tab (x int primary key, y int compression " +
-        "invalid_comp) partition by hash (x) into 3 buckets stored as kudu",
+        "invalid_comp) partition by hash (x) partitions 3 stored as kudu",
         "Unsupported compression algorithm 'INVALID_COMP'. Supported compression " +
         "algorithms are: " + Joiner.on(", ").join(CompressionAlgorithm.values()));
     // Default values
@@ -2160,38 +2160,38 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "i3 int default 100, i4 bigint default 1000, vals string default 'test', " +
         "valf float default cast(1.2 as float), vald double default " +
         "cast(3.1452 as double), valb boolean default true, " +
-        "primary key (i1, i2, i3, i4, vals)) partition by hash (i1) into 3 " +
-        "buckets stored as kudu");
+        "primary key (i1, i2, i3, i4, vals)) partition by hash (i1) partitions 3 " +
+        "stored as kudu");
     AnalyzesOk("create table tab (i int primary key default 1+1+1) " +
-        "partition by hash (i) into 3 buckets stored as kudu");
+        "partition by hash (i) partitions 3 stored as kudu");
     AnalyzesOk("create table tab (i int primary key default factorial(5)) " +
-        "partition by hash (i) into 3 buckets stored as kudu");
+        "partition by hash (i) partitions 3 stored as kudu");
     AnalyzesOk("create table tab (i int primary key, x int null default " +
-        "isnull(null, null)) partition by hash (i) into 3 buckets stored as kudu");
+        "isnull(null, null)) partition by hash (i) partitions 3 stored as kudu");
     // Invalid default values
     AnalysisError("create table tab (i int primary key default 'string_val') " +
-        "partition by hash (i) into 3 buckets stored as kudu", "Default value " +
+        "partition by hash (i) partitions 3 stored as kudu", "Default value " +
         "'string_val' (type: STRING) is not compatible with column 'i' (type: INT).");
     AnalysisError("create table tab (i int primary key, x int default 1.1) " +
-        "partition by hash (i) into 3 buckets stored as kudu",
+        "partition by hash (i) partitions 3 stored as kudu",
         "Default value 1.1 (type: DECIMAL(2,1)) is not compatible with column " +
         "'x' (type: INT).");
     AnalysisError("create table tab (i tinyint primary key default 128) " +
-        "partition by hash (i) into 3 buckets stored as kudu", "Default value " +
+        "partition by hash (i) partitions 3 stored as kudu", "Default value " +
         "128 (type: SMALLINT) is not compatible with column 'i' (type: TINYINT).");
     AnalysisError("create table tab (i int primary key default isnull(null, null)) " +
-        "partition by hash (i) into 3 buckets stored as kudu", "Default value of " +
+        "partition by hash (i) partitions 3 stored as kudu", "Default value of " +
         "NULL not allowed on non-nullable column: 'i'");
     AnalysisError("create table tab (i int primary key, x int not null " +
-        "default isnull(null, null)) partition by hash (i) into 3 buckets " +
+        "default isnull(null, null)) partition by hash (i) partitions 3 " +
         "stored as kudu", "Default value of NULL not allowed on non-nullable column: " +
         "'x'");
     // Invalid block_size values
     AnalysisError("create table tab (i int primary key block_size 1.1) " +
-        "partition by hash (i) into 3 buckets stored as kudu", "Invalid value " +
+        "partition by hash (i) partitions 3 stored as kudu", "Invalid value " +
         "for BLOCK_SIZE: 1.1. A positive INTEGER value is expected.");
     AnalysisError("create table tab (i int primary key block_size 'val') " +
-        "partition by hash (i) into 3 buckets stored as kudu", "Invalid value " +
+        "partition by hash (i) partitions 3 stored as kudu", "Invalid value " +
         "for BLOCK_SIZE: 'val'. A positive INTEGER value is expected.");
   }
 
@@ -2438,7 +2438,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Kudu specific clauses used in an Avro table.
     AnalysisError("create table functional.new_table (i int) " +
-        "partition by hash(i) into 3 buckets stored as avro",
+        "partition by hash(i) partitions 3 stored as avro",
         "Only Kudu tables can use the PARTITION BY clause.");
     AnalysisError("create table functional.new_table (i int primary key) " +
         "stored as avro", "Unsupported column options for file format 'AVRO': " +

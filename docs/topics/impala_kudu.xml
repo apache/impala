@@ -147,14 +147,13 @@ under the License.
         Kudu tables use special mechanisms to evenly distribute data among the underlying tablet servers. Although
         we refer to such tables as partitioned tables, they are distinguished from traditional Impala partitioned
         tables by use of different clauses on the <codeph>CREATE TABLE</codeph> statement. Partitioned Kudu tables
-        use <codeph>DISTRIBUTE BY</codeph>, <codeph>HASH</codeph>, <codeph>RANGE</codeph>, and <codeph>SPLIT
-        ROWS</codeph> clauses rather than the traditional <codeph>PARTITIONED BY</codeph> clause. All of the
-        columns involved in these clauses must be primary key columns. These clauses let you specify different ways
-        to divide the data for each column, or even for different value ranges within a column. This flexibility
-        lets you avoid problems with uneven distribution of data, where the partitioning scheme for HDFS tables
-        might result in some partitions being much larger than others. By setting up an effective partitioning
-        scheme for a Kudu table, you can ensure that the work for a query can be parallelized evenly across the
-        hosts in a cluster.
+        use <codeph>PARTITION BY</codeph>, <codeph>HASH</codeph>, and <codeph>RANGE</codeph> clauses rather than
+        the traditional <codeph>PARTITIONED BY</codeph> clause. All of the columns involved in these clauses must
+        be primary key columns. These clauses let you specify different ways to divide the data for each column,
+        or even for different value ranges within a column. This flexibility lets you avoid problems with uneven
+        distribution of data, where the partitioning scheme for HDFS tables might result in some partitions being
+        much larger than others. By setting up an effective partitioning scheme for a Kudu table, you can ensure
+        that the work for a query can be parallelized evenly across the hosts in a cluster.
       </p>
 
     </conbody>

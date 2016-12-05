@@ -102,7 +102,7 @@ class TestCancellation(ImpalaTestSuite):
         assert QUERIES.has_key(query) and QUERIES[query] is not None,\
             "PRIMARY KEY for query %s not specified" % query
         query = "create table ctas_cancel primary key (%s) "\
-            "partition by hash into 3 buckets stored as kudu as %s" %\
+            "partition by hash partitions 3 stored as kudu as %s" %\
             (QUERIES[query], query)
       else:
         query = "create table ctas_cancel stored as %sfile as %s" %\

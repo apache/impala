@@ -478,7 +478,7 @@ class TestImpalaShell(ImpalaTestSuite):
   def test_kudu_dml_reporting(self, unique_database):
     db = unique_database
     run_impala_shell_cmd('--query="create table %s.dml_test (id int primary key, '\
-        'age int null) partition by hash(id) into 2 buckets stored as kudu"' % db)
+        'age int null) partition by hash(id) partitions 2 stored as kudu"' % db)
 
     self._validate_dml_stmt("insert into %s.dml_test (id) values (7), (7)" % db, 1, 1)
     self._validate_dml_stmt("insert into %s.dml_test (id) values (7)" % db, 0, 1)

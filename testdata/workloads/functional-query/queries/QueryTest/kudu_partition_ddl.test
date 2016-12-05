@@ -2,8 +2,8 @@
 ---- QUERY
 -- Test hash partitioning
 create table simple_hash (id int, name string, valf float, vali bigint,
-  primary key (id, name)) partition by hash(id) INTO 4 buckets,
-  hash(name) INTO 2 buckets stored as kudu
+  primary key (id, name)) partition by hash(id) partitions 4,
+  hash(name) partitions 2 stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -124,7 +124,7 @@ INT,STRING,STRING,STRING,INT
 ---- QUERY
 -- Test hash and range partitioning
 create table simple_hash_range (id int, name string, valf float, vali bigint,
-  primary key (id, name)) partition by hash(id) into 4 buckets, range(id, name)
+  primary key (id, name)) partition by hash(id) partitions 4, range(id, name)
   (partition value = (10, 'martin'), partition value = (20, 'alex')) stored as kudu
 ---- RESULTS
 ====
@@ -146,7 +146,7 @@ INT,STRING,STRING,STRING,INT
 ====
 ---- QUERY
 create table simple_hash_range_ctas
-  primary key (id, name) partition by hash(id) into 4 buckets,
+  primary key (id, name) partition by hash(id) partitions 4,
   range(id, name) (partition value = (10, 'casey'), partition value = (20, 'marcel'))
   stored as kudu
 as select * from simple_hash
@@ -172,7 +172,7 @@ INT,STRING,STRING,STRING,INT
 ---- QUERY
 -- Test hash defaults to all columns
 create table simple_hash_all_columns (id int, name string, valf float, vali bigint,
-  primary key (id, name)) partition by hash into 4 buckets stored as kudu
+  primary key (id, name)) partition by hash partitions 4 stored as kudu
 ---- RESULTS
 ====
 ---- QUERY

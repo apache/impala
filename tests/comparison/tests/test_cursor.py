@@ -76,11 +76,11 @@ def postgresql_cursor():
          'sql': {'two_cols': 'CREATE TABLE two_cols (col1 INT, col2 INT)',
                  'one_pk': 'CREATE TABLE one_pk (col1 INT, col2 INT, '
                            'PRIMARY KEY (col1))\n'
-                           'DISTRIBUTE BY HASH (col1) INTO 3 BUCKETS\n'
+                           'PARTITION BY HASH (col1) PARTITIONS 3\n'
                            'STORED AS KUDU',
                  'three_pks': 'CREATE TABLE three_pks (col1 INT, col2 CHAR(255), '
                               'col3 INT, col4 INT, PRIMARY KEY (col1, col2, col3))\n'
-                              'DISTRIBUTE BY HASH (col1) INTO 3 BUCKETS\n'
+                              'PARTITION BY HASH (col1) PARTITIONS 3\n'
                               'STORED AS KUDU'}},
         {'class': PostgresqlCursor,
          'sql': {'two_cols': 'CREATE TABLE two_cols (col1 INTEGER NULL, '

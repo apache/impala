@@ -93,7 +93,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   year INT,
   month INT
 )
-PARTITION BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
@@ -171,7 +171,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   year INT,
   month INT
 )
-PARTITION BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
@@ -230,7 +230,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   year INT,
   month INT
 )
-PARTITION BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT INTO TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
@@ -566,7 +566,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name}_idx (
   month INT NULL,
   day INT NULL
 )
-PARTITION BY HASH (kudu_idx) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (kudu_idx) PARTITIONS 3 STORED AS KUDU;
 CREATE VIEW {db_name}{db_suffix}.{table_name} AS
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
        double_col, date_string_col, string_col, timestamp_col, year, month, day
@@ -645,7 +645,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   month INT,
   day INT
 )
-PARTITION BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
@@ -1157,7 +1157,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   field STRING PRIMARY KEY,
   f2 INT
 )
-PARTITION BY HASH (field) INTO 3 BUCKETS STORED AS KUDU;
+PARTITION BY HASH (field) PARTITIONS 3 STORED AS KUDU;
 ====
 ---- DATASET
 functional
@@ -1313,7 +1313,7 @@ create table {db_name}{db_suffix}.{table_name} (
   a string primary key, b string null, c string null, d int null, e double null,
   f string null, g string null
 )
-partition by hash(a) into 3 buckets stored as kudu;
+partition by hash(a) partitions 3 stored as kudu;
 ====
 ---- DATASET
 functional
@@ -1340,7 +1340,7 @@ create table {db_name}{db_suffix}.{table_name} (
   a string primary key, b string null, c string null, d int null, e double null,
   f string null, g string null
 )
-partition by hash(a) into 3 buckets stored as kudu;
+partition by hash(a) partitions 3 stored as kudu;
 ====
 ---- DATASET
 functional

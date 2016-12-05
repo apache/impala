@@ -588,7 +588,7 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
     <conbody>
 
       <p>
-        Kudu tables use a more fine-grained partitioning scheme than tables containing HDFS data files. You specify a <codeph>DISTRIBUTE
+        Kudu tables use a more fine-grained partitioning scheme than tables containing HDFS data files. You specify a <codeph>PARTITION
         BY</codeph> clause with the <codeph>CREATE TABLE</codeph> statement to identify how to divide the values from the partition key
         columns.
       </p>

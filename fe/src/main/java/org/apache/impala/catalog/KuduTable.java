@@ -333,7 +333,7 @@ public class KuduTable extends Table {
       if (param.isSetBy_hash_param()) {
         TKuduPartitionByHashParam hashParam = param.getBy_hash_param();
         partitionBy_.add(KuduPartitionParam.createHashParam(
-            hashParam.getColumns(), hashParam.getNum_buckets()));
+            hashParam.getColumns(), hashParam.getNum_partitions()));
       } else {
         Preconditions.checkState(param.isSetBy_range_param());
         TKuduPartitionByRangeParam rangeParam = param.getBy_range_param();

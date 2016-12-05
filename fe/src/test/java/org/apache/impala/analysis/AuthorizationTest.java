@@ -911,7 +911,7 @@ public class AuthorizationTest {
 
     // IMPALA-4000: ALL privileges on SERVER are not required to create managed tables.
     AuthzOk("create table tpch.kudu_tbl (i int, j int, primary key (i))" +
-        " PARTITION BY HASH (i) INTO 9 BUCKETS stored as kudu TBLPROPERTIES " +
+        " PARTITION BY HASH (i) PARTITIONS 9 stored as kudu TBLPROPERTIES " +
         "('kudu.master_addresses'='127.0.0.1')");
 
     // User does not have permission to create table at the specified location..

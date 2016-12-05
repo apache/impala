@@ -30,7 +30,7 @@ create table describe_test
  c2 int not null default 100 encoding plain_encoding compression snappy,
  c3 int null block_size 8388608,
  primary key (pk1, pk2, pk3))
-partition by hash (pk1) into 3 buckets
+partition by hash (pk1) partitions 3
 stored as kudu;
 describe describe_test;
 ---- LABELS

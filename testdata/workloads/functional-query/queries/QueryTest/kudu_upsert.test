@@ -392,7 +392,7 @@ create table multiple_key_cols
   (string_col string, bigint_col bigint, tinyint_col tinyint, smallint_col smallint,
    bool_col boolean null, int_col int null, double_col double null,
    float_col float null, primary key (string_col, bigint_col, tinyint_col, smallint_col))
-  PARTITION BY HASH (string_col) INTO 16 BUCKETS STORED AS KUDU
+  PARTITION BY HASH (string_col) PARTITIONS 16 STORED AS KUDU
 ====
 ---- QUERY
 insert into multiple_key_cols values

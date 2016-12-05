@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 create table simple (id int primary key, name string, valf float, vali bigint)
-  partition by hash (id) into 3 buckets stored as kudu
+  partition by hash (id) partitions 3 stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -294,7 +294,7 @@ alter table tbl_to_alter set tblproperties('kudu.table_name'='kudu_tbl_to_alter'
 ====
 ---- QUERY
 # Create a new table and try to rename to an existing kudu table
-create table copy_of_tbl (a int primary key) partition by hash (a) into 3 buckets
+create table copy_of_tbl (a int primary key) partition by hash (a) partitions 3
   stored as kudu tblproperties('kudu.table_name'='copy_of_tbl');
 alter table copy_of_tbl set tblproperties('kudu.table_name'='kudu_tbl_to_alter')
 ---- CATCH

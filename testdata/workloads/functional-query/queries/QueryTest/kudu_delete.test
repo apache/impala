@@ -301,7 +301,7 @@ create table multiple_key_cols
    smallint_col smallint, bool_col boolean null, int_col int null,
    double_col double null, float_col float null,
    primary key (string_col, bigint_col, tinyint_col, smallint_col))
-  PARTITION BY HASH (string_col) INTO 16 BUCKETS STORED AS KUDU
+  PARTITION BY HASH (string_col) PARTITIONS 16 STORED AS KUDU
 ====
 ---- QUERY
 insert into multiple_key_cols values
@@ -343,7 +343,7 @@ STRING,BIGINT,TINYINT,SMALLINT,BOOLEAN,INT,DOUBLE,FLOAT
 # IMPALA-3454: A delete that requires a rewrite may not get the Kudu column order correct
 # if the Kudu columns are of different types.
 create table impala_3454 (key_1 tinyint, key_2 bigint, PRIMARY KEY (key_1, key_2))
-  PARTITION BY HASH INTO 3 BUCKETS STORED AS KUDU
+  PARTITION BY HASH PARTITIONS 3 STORED AS KUDU
 ---- RESULTS
 ====
 ---- QUERY

@@ -21,7 +21,7 @@ INT, BIGINT
 # Regression test for IMPALA-2740, a NULL value from a previously filtered row would
 # carry over into the next unfiltered row (the result below would incorrectly be 2,NULL).
 CREATE TABLE impala_2740 (key INT PRIMARY KEY, value INT)
-  PARTITION BY HASH (key) INTO 3 BUCKETS STORED AS KUDU;
+  PARTITION BY HASH (key) PARTITIONS 3 STORED AS KUDU;
 INSERT INTO impala_2740 VALUES (1, NULL), (2, -2);
 SELECT * FROM impala_2740 WHERE key != 1;
 ---- RESULTS
@@ -35,9 +35,9 @@ INT, INT
 # is run on all impalads. However, for the t1 table there is only as single scan range,
 # so two of the scan instances get empty scan ranges.
 CREATE TABLE impala_2635_t1 (id BIGINT PRIMARY KEY, name STRING)
-  PARTITION BY HASH (id) INTO 3 BUCKETS STORED AS KUDU;
+  PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
 CREATE TABLE impala_2635_t2 (id BIGINT PRIMARY KEY, name STRING)
-  PARTITION BY HASH(id) INTO 16 BUCKETS STORED AS KUDU;
+  PARTITION BY HASH(id) PARTITIONS 16 STORED AS KUDU;
 INSERT INTO impala_2635_t1 VALUES (0, 'Foo');
 INSERT INTO impala_2635_t2 VALUES (1, 'Blah');
 SELECT * FROM impala_2635_t1 UNION ALL SELECT * FROM impala_2635_t2;

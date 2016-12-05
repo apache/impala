@@ -37,7 +37,7 @@ import com.google.common.collect.Lists;
  *
  * Examples:
  * - Hash-based:
- *   PARTITION BY HASH(id) INTO 10 BUCKETS
+ *   PARTITION BY HASH(id) PARTITIONS 10
  * - Single column range-based:
  *   PARTITION BY RANGE(age)
  *   (
@@ -47,7 +47,7 @@ import com.google.common.collect.Lists;
  *     PARTITION VALUE = 100
  *   )
  * - Combination of hash and range based:
- *   PARTITION BY HASH (id) INTO 3 BUCKETS,
+ *   PARTITION BY HASH (id) PARTITIONS 3,
  *   RANGE (age)
  *   (
  *     PARTITION 10 <= VALUES < 20,
@@ -67,8 +67,8 @@ public class KuduPartitionParam implements ParseNode {
   /**
    * Creates a hash-based KuduPartitionParam.
    */
-  public static KuduPartitionParam createHashParam(List<String> cols, int buckets) {
-    return new KuduPartitionParam(Type.HASH, cols, buckets, null);
+  public static KuduPartitionParam createHashParam(List<String> cols, int numPartitions) {
+    return new KuduPartitionParam(Type.HASH, cols, numPartitions, null);
   }
 
   /**
@@ -76,10 +76,10 @@ public class KuduPartitionParam implements ParseNode {
    */
   public static KuduPartitionParam createRangeParam(List<String> cols,
       List<RangePartition> rangePartitions) {
-    return new KuduPartitionParam(Type.RANGE, cols, NO_BUCKETS, rangePartitions);
+    return new KuduPartitionParam(Type.RANGE, cols, NO_HASH_PARTITIONS, rangePartitions);
   }
 
-  private static final int NO_BUCKETS = -1;
+  private static final int NO_HASH_PARTITIONS = -1;
 
   /**
    * The partitioning type.
@@ -100,17 +100,17 @@ public class KuduPartitionParam implements ParseNode {
   private final Type type_;
 
   // Only relevant for hash-based partitioning, -1 otherwise
-  private final int numBuckets_;
+  private final int numHashPartitions_;
 
   // List of range partitions specified in a range-based partitioning.
   private List<RangePartition> rangePartitions_;
 
-  private KuduPartitionParam(Type t, List<String> colNames, int buckets,
+  private KuduPartitionParam(Type t, List<String> colNames, int numHashPartitions,
       List<RangePartition> partitions) {
     type_ = t;
     for (String name: colNames) colNames_.add(name.toLowerCase());
     rangePartitions_ = partitions;
-    numBuckets_ = buckets;
+    numHashPartitions_ = numHashPartitions;
   }
 
   @Override
@@ -149,9 +149,8 @@ public class KuduPartitionParam implements ParseNode {
       Joiner.on(", ").appendTo(builder, colNames_).append(")");
     }
     if (type_ == Type.HASH) {
-      builder.append(" INTO ");
-      Preconditions.checkState(numBuckets_ != NO_BUCKETS);
-      builder.append(numBuckets_).append(" BUCKETS");
+      Preconditions.checkState(numHashPartitions_ != NO_HASH_PARTITIONS);
+      builder.append(" PARTITIONS ").append(numHashPartitions_);
     } else {
       builder.append(" (");
       if (rangePartitions_ != null) {
@@ -176,8 +175,8 @@ public class KuduPartitionParam implements ParseNode {
     // TODO: Add a validate() function to ensure the validity of distribute params.
     if (type_ == Type.HASH) {
       TKuduPartitionByHashParam hash = new TKuduPartitionByHashParam();
-      Preconditions.checkState(numBuckets_ != NO_BUCKETS);
-      hash.setNum_buckets(numBuckets_);
+      Preconditions.checkState(numHashPartitions_ != NO_HASH_PARTITIONS);
+      hash.setNum_partitions(numHashPartitions_);
       hash.setColumns(colNames_);
       result.setBy_hash_param(hash);
     } else {

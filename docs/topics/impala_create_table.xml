@@ -279,18 +279,18 @@ file_format:
 
 <!--
     <p rev="kudu">
-      <b>Partitioning for Kudu tables (DISTRIBUTE BY clause)</b>
+      <b>Partitioning for Kudu tables (PARTITION BY clause)</b>
     </p>
 
     <p rev="kudu">
       For Kudu tables, you specify logical partitioning across one or more columns using the
-      <codeph>DISTRIBUTE BY</codeph> clause. In contrast to partitioning for HDFS-based tables,
+      <codeph>PARTITION BY</codeph> clause. In contrast to partitioning for HDFS-based tables,
       multiple values for a partition key column can be located in the same partition.
       The optional <codeph>HASH</codeph> clause lets you divide one or a set of partition key columns
-      into a specified number of buckets; you can use more than one <codeph>HASH</codeph>
+      into a specified number of partitions; you can use more than one <codeph>HASH</codeph>
       clause, specifying a distinct set of partition key columns for each.
       The optional <codeph>RANGE</codeph> clause further subdivides the partitions, based on
-      a set of literal values for the partition key columns.
+      a range of values for the partition key columns.
     </p>
 -->
 

@@ -360,7 +360,7 @@ struct TDataSourceTable {
 // Parameters needed for hash partitioning
 struct TKuduPartitionByHashParam {
   1: required list<string> columns
-  2: required i32 num_buckets
+  2: required i32 num_partitions
 }
 
 struct TRangePartition {

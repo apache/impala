@@ -12,7 +12,7 @@ Error opening Kudu table 'impala::functional_kudu.alltypes'
 ====
 ---- QUERY
 create table test_kudu (x int primary key)
-partition by hash(x) into 3 buckets stored as kudu
+partition by hash(x) partitions 3 stored as kudu
 ---- CATCH
 Error creating Kudu table
 ====

@@ -223,7 +223,7 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   elif file_format == 'kudu':
     # Use partitioned_by to set a trivial hash distribution
     assert not partitioned_by, "Kudu table shouldn't have partition cols defined"
-    partitioned_by = "partition by hash into 3 buckets"
+    partitioned_by = "partition by hash partitions 3"
 
     # Fetch KUDU host and port from environment
     kudu_master = os.getenv("KUDU_MASTER_ADDRESS", "127.0.0.1")

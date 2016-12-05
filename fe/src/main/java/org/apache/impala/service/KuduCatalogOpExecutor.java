@@ -146,7 +146,7 @@ public class KuduCatalogOpExecutor {
         if (partParam.isSetBy_hash_param()) {
           Preconditions.checkState(!partParam.isSetBy_range_param());
           tableOpts.addHashPartitions(partParam.getBy_hash_param().getColumns(),
-              partParam.getBy_hash_param().getNum_buckets());
+              partParam.getBy_hash_param().getNum_partitions());
         } else {
           Preconditions.checkState(partParam.isSetBy_range_param());
           hasRangePartitioning = true;

@@ -44,7 +44,7 @@ import org.apache.hadoop.fs.permission.FsAction;
  * - EXTERNAL
  * - IF NOT EXISTS
  * - PARTITIONED BY
- * - DISTRIBUTE BY
+ * - PARTITION BY
  * - ROWFORMAT
  * - FILEFORMAT
  * - COMMENT

@@ -60,7 +60,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   L_COMMENT STRING,
   PRIMARY KEY(L_ORDERKEY, L_PARTKEY, L_SUPPKEY, L_LINENUMBER)
 )
-partition by hash (l_orderkey) into 9 buckets stored as kudu;
+partition by hash (l_orderkey) partitions 9 stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -95,7 +95,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   P_RETAILPRICE DOUBLE,
   P_COMMENT STRING
 )
-partition by hash (p_partkey) into 9 buckets stored as kudu;
+partition by hash (p_partkey) partitions 9 stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -123,7 +123,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   PS_COMMENT STRING,
   PRIMARY KEY(PS_PARTKEY, PS_SUPPKEY)
 )
-partition by hash (ps_partkey, ps_suppkey) into 9 buckets stored as kudu;
+partition by hash (ps_partkey, ps_suppkey) partitions 9 stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -154,7 +154,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   S_ACCTBAL DOUBLE,
   S_COMMENT STRING
 )
-partition by hash (s_suppkey) into 9 buckets stored as kudu;
+partition by hash (s_suppkey) partitions 9 stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -179,7 +179,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   N_REGIONKEY SMALLINT,
   N_COMMENT STRING
 )
-partition by hash (n_nationkey) into 9 buckets stored as kudu;
+partition by hash (n_nationkey) partitions 9 stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -202,7 +202,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   R_NAME STRING,
   R_COMMENT STRING
 )
-partition by hash (r_regionkey) into 9 buckets stored as kudu;
+partition by hash (r_regionkey) partitions 9 stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -237,7 +237,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   O_SHIPPRIORITY INT,
   O_COMMENT STRING
 )
-partition by hash (o_orderkey) into 9 buckets stored as kudu;
+partition by hash (o_orderkey) partitions 9 stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -270,7 +270,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   C_MKTSEGMENT STRING,
   C_COMMENT STRING
 )
-partition by hash (c_custkey) into 9 buckets stored as kudu;
+partition by hash (c_custkey) partitions 9 stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD

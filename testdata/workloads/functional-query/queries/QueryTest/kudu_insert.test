@@ -281,7 +281,7 @@ NumRowErrors: 7299
 # IMPALA-2521: clustered insert into table.
 create table impala_2521
 (id bigint primary key, name string, zip int)
-partition by hash into 3 buckets stored as kudu
+partition by hash partitions 3 stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -317,7 +317,7 @@ BIGINT,STRING,INT
 # Table with all supported types as primary key and distribution columns
 create table allkeytypes (i1 tinyint, i2 smallint, i3 int, i4 bigint, name string,
   valf float, vald double, primary key (i1, i2, i3, i4, name)) partition by
-  hash into 3 buckets, range (partition value = (1,1,1,1,'1'),
+  hash partitions 3, range (partition value = (1,1,1,1,'1'),
   partition value = (2,2,2,2,'2'), partition value = (3,3,3,3,'3')) stored as kudu
 ---- RESULTS
 ====
@@ -335,8 +335,8 @@ NumRowErrors: 6
 # Table with default values
 create table tbl_with_defaults (a int primary key, b int null default 10,
   c int not null default 100, d int default 1000, e int null, f int not null,
-  g string default 'test', h boolean default true) partition by hash (a) into 3
-  buckets stored as kudu
+  g string default 'test', h boolean default true) partition by hash (a)
+  partitions 3 stored as kudu
 ---- RESULTS
 ====
 ---- QUERY

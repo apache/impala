@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.lineitem (
   L_COMMENT STRING,
   PRIMARY KEY (L_ORDERKEY, L_LINENUMBER)
 )
-partition by hash (l_orderkey) into {buckets} buckets
+partition by hash (l_orderkey) partitions {buckets}
 STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.part (
   P_RETAILPRICE DOUBLE,
   P_COMMENT STRING
 )
-partition by hash (p_partkey) into {buckets} buckets
+partition by hash (p_partkey) partitions {buckets}
 STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.partsupp (
   PS_COMMENT STRING,
   PRIMARY KEY (PS_PARTKEY, PS_SUPPKEY)
 )
-partition by hash (ps_partkey, ps_suppkey) into {buckets} buckets
+partition by hash (ps_partkey, ps_suppkey) partitions {buckets}
 STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.supplier (
   S_ACCTBAL DOUBLE,
   S_COMMENT STRING
 )
-partition by hash (s_suppkey) into {buckets} buckets
+partition by hash (s_suppkey) partitions {buckets}
 STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.nation (
   N_REGIONKEY BIGINT,
   N_COMMENT STRING
 )
-partition by hash (n_nationkey) into {buckets} buckets
+partition by hash (n_nationkey) partitions {buckets}
 STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.region (
   R_NAME STRING,
   R_COMMENT STRING
 )
-partition by hash (r_regionkey) into {buckets} buckets
+partition by hash (r_regionkey) partitions {buckets}
 STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.orders (
   O_SHIPPRIORITY BIGINT,
   O_COMMENT STRING
 )
-partition by hash (o_orderkey) into {buckets} buckets
+partition by hash (o_orderkey) partitions {buckets}
 STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.customer (
   C_MKTSEGMENT STRING,
   C_COMMENT STRING
 )
-partition by hash (c_custkey) into {buckets} buckets
+partition by hash (c_custkey) partitions {buckets}
 STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
