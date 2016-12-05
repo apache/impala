@@ -282,12 +282,29 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   int ProcessProbeBatch(const TJoinOp::type join_op, TPrefetchMode::type,
       RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status);
 
-  /// Sweep the hash_tbl_ of the partition that is at the front of
-  /// output_build_partitions_, using hash_tbl_iterator_ and output any unmatched build
-  /// rows. If reaches the end of the hash table it closes that partition, removes it from
-  /// output_build_partitions_ and moves hash_tbl_iterator_ to the beginning of the
-  /// new partition at the front of output_build_partitions_.
-  void OutputUnmatchedBuild(RowBatch* out_batch);
+  /// Used when NeedToProcessUnmatchedBuildRows() is true. Writes all unmatched rows from
+  /// 'output_build_partitions_' to 'out_batch', up to 'out_batch' capacity.
+  Status OutputUnmatchedBuild(RowBatch* out_batch);
+
+  /// Called by OutputUnmatchedBuild() when there isn't a hash table built, which happens
+  /// when a spilled partition had 0 probe rows. In this case, all of the build rows are
+  /// unmatched and we can iterate over the entire build side of the partition, which will
+  /// be the only partition in 'output_build_partitions_'. If it reaches the end of the
+  /// partition, it closes that partition and removes it from 'output_build_partitions_'.
+  Status OutputAllBuild(RowBatch* out_batch);
+
+  /// Called by OutputUnmatchedBuild when there is a hash table built. Sweeps the
+  /// 'hash_tbl_' of the partition that is at the front of 'output_build_partitions_',
+  /// using 'hash_tbl_iterator_' and outputs any unmatched build rows. If it reaches the
+  /// end of the hash table it closes that partition, removes it from
+  /// 'output_build_partitions_' and moves 'hash_tbl_iterator_' to the beginning of the
+  /// new partition at the front of 'output_build_partitions_'.
+  Status OutputUnmatchedBuildFromHashTable(RowBatch* out_batch);
+
+  /// Writes 'build_row' to 'out_batch' at the position of 'out_batch_iterator' in a
+  /// 'join_op_' specific way.
+  void OutputBuildRow(
+      RowBatch* out_batch, TupleRow* build_row, RowBatch::Iterator* out_batch_iterator);
 
   /// Initializes 'null_aware_probe_partition_' and prepares its probe stream for writing.
   Status InitNullAwareProbePartition();
@@ -338,10 +355,12 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Moves onto the next spilled partition and initializes 'input_partition_'. This
   /// function processes the entire build side of 'input_partition_' and when this
   /// function returns, we are ready to consume the probe side of 'input_partition_'.
-  /// If the build side's hash table fits in memory, we will construct input_partition_'s
-  /// hash table. If it does not, meaning we need to repartition, this function will
-  /// repartition the build rows into 'builder->hash_partitions_' and prepare for
-  /// repartitioning the partition's probe rows.
+  /// If the build side's hash table fits in memory and there are probe rows, we will
+  /// construct input_partition_'s hash table. If it does not fit, meaning we need to
+  /// repartition, this function will repartition the build rows into
+  /// 'builder->hash_partitions_' and prepare for repartitioning the partition's probe
+  /// rows. If there are no probe rows, we just prepare the build side to be read by
+  /// OutputUnmatchedBuild().
   Status PrepareSpilledPartitionForProbe(RuntimeState* state, bool* got_partition);
 
   /// Calls Close() on every probe partition, destroys the partitions and cleans up any
@@ -388,6 +407,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Time spent evaluating other_join_conjuncts for NAAJ.
   RuntimeProfile::Counter* null_aware_eval_timer_;
+
+  /// Number of partitions which had zero probe rows and we therefore didn't build the
+  /// hash table.
+  RuntimeProfile::Counter* num_hash_table_builds_skipped_;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
@@ -450,6 +473,15 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// The current index into null_probe_rows_/matched_null_probe_ that we are
   /// outputting.
   int64_t null_probe_output_idx_;
+
+  /// Used by OutputAllBuild() to iterate over the entire build side tuple stream of the
+  /// current partition.
+  std::unique_ptr<RowBatch> output_unmatched_batch_;
+
+  /// Stores an iterator into 'output_unmatched_batch_' to start from on the next call to
+  /// OutputAllBuild(), or NULL if there are no partitions without hash tables needing to
+  /// be processed by OutputUnmatchedBuild().
+  std::unique_ptr<RowBatch::Iterator> output_unmatched_batch_iter_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
