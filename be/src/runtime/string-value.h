@@ -31,7 +31,7 @@ namespace impala {
 
 /// The format of a string-typed slot.
 /// The returned StringValue of all functions that return StringValue
-/// shares its buffer the parent.
+/// shares its buffer with the parent.
 /// TODO: rename this to be less confusing with impala_udf::StringVal.
 struct StringValue {
   /// The current limitation for a string instance is 1GB character data.

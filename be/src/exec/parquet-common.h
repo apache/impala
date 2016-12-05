@@ -90,7 +90,7 @@ class ParquetPlainEncoder {
 
   /// Returns the encoded size of values of type t. Returns -1 if it is variable
   /// length. This can be different than the slot size of the types.
-  static int ByteSize(const ColumnType& t) {
+  static int EncodedByteSize(const ColumnType& t) {
     switch (t.type) {
       case TYPE_STRING:
       case TYPE_VARCHAR:
@@ -185,19 +185,12 @@ class ParquetPlainEncoder {
     memcpy(v, buffer, byte_size);
     return byte_size;
   }
-
-  /// Encode 't', which must be in the machine endian, to FIXED_LEN_BYTE_ARRAY
-  /// of 'fixed_len_size'. The result is encoded as big endian.
-  template <typename T>
-  static int EncodeToFixedLenByteArray(uint8_t* buffer, int fixed_len_size, const T& t);
-
-  /// Decodes into v assuming buffer is encoded using FIXED_LEN_BYTE_ARRAY of
-  /// 'fixed_len_size'. The bytes in buffer must be big endian and the result stored in
-  /// v is the machine endian format. The caller is responsible for ensuring that
-  /// 'buffer' is at least 'fixed_len_size' bytes long.
-  template<typename T>
-  static int DecodeFromFixedLenByteArray(uint8_t* buffer, int fixed_len_size, T* v);
 };
+
+/// Calling this with arguments of type ColumnType is certainly a programmer error, so we
+/// disallow it.
+template <>
+int ParquetPlainEncoder::ByteSize(const ColumnType& t);
 
 /// Disable for bools. Plain encoding is not used for booleans.
 template<> int ParquetPlainEncoder::ByteSize(const bool& b);

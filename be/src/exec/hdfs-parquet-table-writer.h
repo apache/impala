@@ -100,6 +100,11 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   /// Minimum file size.  If the configured size is less, fail.
   static const int HDFS_MIN_FILE_SIZE = 8 * 1024 * 1024;
 
+  /// Maximum statistics size. If the size of a single thrift parquet::Statistics struct
+  /// for a page or row group exceed this value, we'll not write it. We use the same value
+  /// as 'parquet-mr'.
+  static const int MAX_COLUMN_STATS_SIZE = 4 * 1024;
+
   /// Per-column information state.  This contains some metadata as well as the
   /// data buffers.
   class BaseColumnWriter;
