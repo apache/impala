@@ -204,7 +204,7 @@ STRING
 # on any URIs. The FE tests have additional error message verification.
 create table grant_rev_db.test_tbl2(i int) location '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_test_tbl2';
 ---- CATCH
-does not have privileges to access: __HDFS_FILENAME__
+does not have privileges to access: $NAMENODE/test-warehouse/grant_rev_test_tbl2
 ====
 ---- QUERY
 grant role grant_revoke_test_ALL_URI to group $GROUP_NAME

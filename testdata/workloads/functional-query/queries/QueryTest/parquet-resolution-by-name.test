@@ -220,7 +220,8 @@ string,int
 set parquet_fallback_schema_resolution="position";
 select key, value from switched_map_fields_resolution_test.int_map
 ---- CATCH
-File '__HDFS_FILENAME__' has an incompatible Parquet schema for column
+File '$NAMENODE/test-warehouse/$DATABASE.db/switched_map_fields_resolution_test/
+switched_map.parq' has an incompatible Parquet schema for column
  '$DATABASE.switched_map_fields_resolution_test.int_map.key'.
  Column type: STRING, Parquet schema:
 required int32 value [i:0 d:1 r:1]
