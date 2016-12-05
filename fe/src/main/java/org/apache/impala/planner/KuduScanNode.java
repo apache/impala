@@ -102,8 +102,16 @@ public class KuduScanNode extends ScanNode {
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaRuntimeException {
-    assignConjuncts(analyzer);
+    conjuncts_.clear();
+    // Add bound predicates.
+    conjuncts_.addAll(analyzer.getBoundPredicates(desc_.getId()));
+    // Add unassigned predicates.
+    List<Expr> unassigned = analyzer.getUnassignedConjuncts(this);
+    conjuncts_.addAll(unassigned);
+    analyzer.markConjunctsAssigned(unassigned);
+    // Add equivalence predicates.
     analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
+    Expr.removeDuplicates(conjuncts_);
     conjuncts_ = orderConjunctsByCost(conjuncts_);
 
     try (KuduClient client = KuduUtil.createKuduClient(kuduTable_.getKuduMasterHosts())) {

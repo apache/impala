@@ -281,3 +281,36 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.alltypes]
    kudu predicates: bool_col = FALSE
 ====
+# IMPALA-4578: Test predicate propagation for Kudu scans.
+select /* +straight_join */ count(*)
+from functional_kudu.alltypes a
+inner join functional_kudu.alltypessmall b
+  on a.id = b.id
+left outer join functional_kudu.alltypestiny c
+  on b.int_col = c.int_col
+where a.id > 10 and c.int_col > 20
+  and cast(b.id as string) > '123'
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: b.int_col = c.int_col
+|  other predicates: c.int_col > 20
+|
+|--02:SCAN KUDU [functional_kudu.alltypestiny c]
+|     kudu predicates: c.int_col > 20
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN KUDU [functional_kudu.alltypessmall b]
+|     predicates: CAST(b.id AS STRING) > '123'
+|     kudu predicates: b.id > 10
+|
+00:SCAN KUDU [functional_kudu.alltypes a]
+   predicates: CAST(a.id AS STRING) > '123'
+   kudu predicates: a.id > 10
+====
