@@ -5,6 +5,12 @@ create table simple (id int primary key, name string, valf float, vali bigint)
 ---- RESULTS
 ====
 ---- QUERY
+# Hash partitions cannot be enumerated as range partitions
+show range partitions simple
+---- CATCH
+AnalysisException: SHOW RANGE PARTITIONS requested but table does not have range partitions: $DATABASE.simple
+====
+---- QUERY
 # Alter master address to a different location
 alter table simple set tblproperties (
   'kudu.master_addresses' = 'localhost'
@@ -53,9 +59,22 @@ create table tbl_to_alter (id int primary key, name string null, vali bigint not
 ---- RESULTS
 ====
 ---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+====
+---- QUERY
 # Add a range partition
 alter table tbl_to_alter add range partition 10 < values <= 20
 ---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+'11 <= VALUES < 21'
 ====
 ---- QUERY
 # Insert a row to the new partition
@@ -74,6 +93,14 @@ INT,STRING,BIGINT
 # Add a singleton range partition
 alter table tbl_to_alter add range partition value = 100
 ---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+'11 <= VALUES < 21'
+'VALUE = 100'
 ====
 ---- QUERY
 # Insert a row to the new partition
@@ -95,6 +122,15 @@ alter table tbl_to_alter add range partition 1000 < values
 ---- RESULTS
 ====
 ---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+'11 <= VALUES < 21'
+'VALUE = 100'
+'VALUES >= 1001'
+====
+---- QUERY
 # Try to insert a partition that overlaps with an existing partition
 alter table tbl_to_alter add range partition 10 < values <= 30
 ---- CATCH
@@ -112,6 +148,14 @@ alter table tbl_to_alter drop range partition value = 100
 ---- RESULTS
 ====
 ---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+'11 <= VALUES < 21'
+'VALUES >= 1001'
+====
+---- QUERY
 # Select table rows after one partition was dropped
 select * from tbl_to_alter
 ---- RESULTS
@@ -121,14 +165,27 @@ INT,STRING,BIGINT
 ====
 ---- QUERY
 # Drop an existing range partition
-alter table tbl_to_alter drop range partition 10 < values <= 20
+alter table tbl_to_alter drop range partition 11 <= values < 21
 ---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+'VALUES >= 1001'
 ====
 ---- QUERY
 # Drop all the range partitions
 alter table tbl_to_alter drop range partition 1 < values <= 10;
 alter table tbl_to_alter drop range partition 1000 < values
 ---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+''
 ====
 ---- QUERY
 # Retrieve the rows of a table after all the partitions got dropped
@@ -152,6 +209,12 @@ alter table tbl_to_alter add range partition 1 < values <= 20;
 alter table tbl_to_alter add columns (new_col1 int not null default 10,
   new_col2 bigint not null default 1000)
 ---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 21'
 ====
 ---- QUERY
 # Insert a row that has values for the new columns

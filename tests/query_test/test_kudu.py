@@ -23,9 +23,11 @@ from kudu.schema import (
     INT32,
     INT64,
     INT8,
+    SchemaBuilder,
     STRING,
     BINARY,
     UNIXTIME_MICROS)
+from kudu.client import Partitioning
 import logging
 import pytest
 import textwrap
@@ -102,6 +104,37 @@ class TestKuduOperations(KuduTestSuite):
         unique_database, new_kudu_tbl_name))
     assert kudu_client.table_exists(new_kudu_tbl_name)
     assert not kudu_client.table_exists(kudu_tbl_name)
+
+  def test_kudu_show_unbounded_range_partition(self, cursor, kudu_client,
+                                               unique_database):
+    """Check that a single unbounded range partition gets printed correctly."""
+    schema_builder = SchemaBuilder()
+    column_spec = schema_builder.add_column("id", INT64)
+    column_spec.nullable(False)
+    schema_builder.set_primary_keys(["id"])
+    schema = schema_builder.build()
+
+    name = unique_database + ".unbounded_range_table"
+
+    try:
+      kudu_client.create_table(name, schema,
+                        partitioning=Partitioning().set_range_partition_columns(["id"]))
+      kudu_table = kudu_client.table(name)
+
+      impala_table_name = self.get_kudu_table_base_name(kudu_table.name)
+      props = "TBLPROPERTIES('kudu.table_name'='%s')" % kudu_table.name
+      cursor.execute("CREATE EXTERNAL TABLE %s STORED AS KUDU %s" % (impala_table_name,
+          props))
+      with self.drop_impala_table_after_context(cursor, impala_table_name):
+        cursor.execute("SHOW RANGE PARTITIONS %s" % impala_table_name)
+        assert cursor.description == [
+          ('RANGE (id)', 'STRING', None, None, None, None, None)]
+        assert cursor.fetchall() == [('UNBOUNDED',)]
+
+    finally:
+      if kudu_client.table_exists(name):
+        kudu_client.delete_table(name)
+
 
 class TestCreateExternalTable(KuduTestSuite):
 

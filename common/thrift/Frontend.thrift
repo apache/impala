@@ -177,9 +177,17 @@ struct TShowDbsParams {
   1: optional string show_pattern
 }
 
-// Parameters for SHOW TABLE/COLUMN STATS commands
+// Used by SHOW STATS and SHOW PARTITIONS to control what information is returned.
+enum TShowStatsOp {
+  TABLE_STATS,
+  COLUMN_STATS,
+  PARTITIONS,
+  RANGE_PARTITIONS
+}
+
+// Parameters for SHOW TABLE/COLUMN STATS and SHOW PARTITIONS commands
 struct TShowStatsParams {
-  1: required bool is_show_col_stats
+  1: TShowStatsOp op
   2: CatalogObjects.TTableName table_name
 }
 

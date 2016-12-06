@@ -120,6 +120,7 @@ import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TShowFilesParams;
+import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TTableName;
@@ -715,7 +716,7 @@ public class Frontend {
   /**
    * Generate result set and schema for a SHOW TABLE STATS command.
    */
-  public TResultSet getTableStats(String dbName, String tableName)
+  public TResultSet getTableStats(String dbName, String tableName, TShowStatsOp op)
       throws ImpalaException {
     Table table = impaladCatalog_.getTable(dbName, tableName);
     if (table instanceof HdfsTable) {
@@ -725,7 +726,11 @@ public class Frontend {
     } else if (table instanceof DataSourceTable) {
       return ((DataSourceTable) table).getTableStats();
     } else if (table instanceof KuduTable) {
-      return ((KuduTable) table).getTableStats();
+      if (op == TShowStatsOp.RANGE_PARTITIONS) {
+        return ((KuduTable) table).getRangePartitions();
+      } else {
+        return ((KuduTable) table).getTableStats();
+      }
     } else {
       throw new InternalException("Invalid table class: " + table.getClass());
     }

@@ -1744,6 +1744,11 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("SHOW PARTITIONS db.tbl");
     ParsesOk("SHOW PARTITIONS `db`.`tbl`");
 
+    // Show range partitions
+    ParsesOk("SHOW RANGE PARTITIONS tbl");
+    ParsesOk("SHOW RANGE PARTITIONS db.tbl");
+    ParsesOk("SHOW RANGE PARTITIONS `db`.`tbl`");
+
     // Show files of table
     ParsesOk("SHOW FILES IN tbl");
     ParsesOk("SHOW FILES IN db.tbl");

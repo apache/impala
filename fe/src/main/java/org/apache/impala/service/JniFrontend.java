@@ -80,6 +80,7 @@ import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowGrantRoleParams;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowRolesResult;
+import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
@@ -358,12 +359,13 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, thriftShowStatsParams);
     Preconditions.checkState(params.isSetTable_name());
     TResultSet result;
-    if (params.isIs_show_col_stats()) {
+
+    if (params.op == TShowStatsOp.COLUMN_STATS) {
       result = frontend_.getColumnStats(params.getTable_name().getDb_name(),
           params.getTable_name().getTable_name());
     } else {
       result = frontend_.getTableStats(params.getTable_name().getDb_name(),
-          params.getTable_name().getTable_name());
+          params.getTable_name().getTable_name(), params.op);
     }
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {

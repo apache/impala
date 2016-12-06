@@ -49,6 +49,7 @@ import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TPrivilegeLevel;
+import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TTablePropertyType;
 
 parser code {:
@@ -308,8 +309,8 @@ nonterminal UseStmt use_stmt;
 nonterminal SetStmt set_stmt;
 nonterminal ShowTablesStmt show_tables_stmt;
 nonterminal ShowDbsStmt show_dbs_stmt;
-nonterminal ShowPartitionsStmt show_partitions_stmt;
-nonterminal ShowStatsStmt show_stats_stmt;
+nonterminal ShowStatsStmt show_stats_stmt, show_partitions_stmt,
+  show_range_partitions_stmt;
 nonterminal String show_pattern;
 nonterminal ShowFilesStmt show_files_stmt;
 nonterminal DescribeDbStmt describe_db_stmt;
@@ -552,6 +553,8 @@ stmt ::=
   {: RESULT = show_dbs; :}
   | show_partitions_stmt:show_partitions
   {: RESULT = show_partitions; :}
+  | show_range_partitions_stmt:show_range_partitions
+  {: RESULT = show_range_partitions; :}
   | show_stats_stmt:show_stats
   {: RESULT = show_stats; :}
   | show_functions_stmt:show_functions
@@ -2084,14 +2087,19 @@ show_dbs_stmt ::=
 
 show_stats_stmt ::=
   KW_SHOW KW_TABLE KW_STATS table_name:table
-  {: RESULT = new ShowStatsStmt(table, false); :}
+  {: RESULT = new ShowStatsStmt(table, TShowStatsOp.TABLE_STATS); :}
   | KW_SHOW KW_COLUMN KW_STATS table_name:table
-  {: RESULT = new ShowStatsStmt(table, true); :}
+  {: RESULT = new ShowStatsStmt(table, TShowStatsOp.COLUMN_STATS); :}
   ;
 
 show_partitions_stmt ::=
   KW_SHOW KW_PARTITIONS table_name:table
-  {: RESULT = new ShowPartitionsStmt(table); :}
+  {: RESULT = new ShowStatsStmt(table, TShowStatsOp.PARTITIONS); :}
+  ;
+
+show_range_partitions_stmt ::=
+  KW_SHOW KW_RANGE KW_PARTITIONS table_name:table
+  {: RESULT = new ShowStatsStmt(table, TShowStatsOp.RANGE_PARTITIONS); :}
   ;
 
 show_functions_stmt ::=

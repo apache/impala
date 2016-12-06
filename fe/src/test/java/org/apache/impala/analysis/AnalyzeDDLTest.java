@@ -3288,6 +3288,26 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestShowRangePartitions() throws AnalysisException {
+    AnalyzesOk("show range partitions functional_kudu.dimtbl");
+    AnalysisError("show range partitions baddb.alltypes",
+        "Database does not exist: baddb");
+    AnalysisError("show range partitions functional.badtbl",
+        "Table does not exist: functional.badtbl");
+    AnalysisError("show range partitions functional.alltypes",
+        "SHOW RANGE PARTITIONS must target a Kudu table: functional.alltypes");
+    AnalysisError("show range partitions functional.alltypesnopart",
+        "SHOW RANGE PARTITIONS must target a Kudu table: functional.alltypes");
+    AnalysisError("show range partitions functional_kudu.alltypes",
+        "SHOW RANGE PARTITIONS requested but table does not have range partitions: " +
+        "functional_kudu.alltypes");
+    AnalysisError("show range partitions functional.view_view",
+        "SHOW RANGE PARTITIONS not applicable to a view: functional.view_view");
+    AnalysisError("show range partitions functional_hbase.alltypes",
+        "SHOW RANGE PARTITIONS must target a Kudu table: functional_hbase.alltypes");
+  }
+
+  @Test
   public void TestShowCreateFunction() throws AnalysisException {
     addTestFunction("TestFn", Lists.newArrayList(Type.INT, Type.INT), false);
     AnalyzesOk("show create function TestFn");
