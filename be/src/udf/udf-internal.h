@@ -144,6 +144,11 @@ class FunctionContextImpl {
   /// Return false if 'buf' is null; returns true otherwise.
   bool CheckAllocResult(const char* fn_name, uint8_t* buf, int64_t byte_size);
 
+  /// A utility function which checks for memory limits that may have been exceeded by
+  /// Allocate(), Reallocate(), AllocateLocal() or TrackAllocation(). Sets the
+  /// appropriate error status if necessary.
+  void CheckMemLimit(const char* fn_name, int64_t byte_size);
+
   /// Preallocated buffer for storing varargs (if the function has any). Allocated and
   /// owned by this object, but populated by an Expr function. The buffer is interpreted
   /// as an array of the appropriate AnyVal subclass.

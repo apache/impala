@@ -77,9 +77,10 @@ class ExprContext {
   /// result in result_.
   void* GetValue(const TupleRow* row);
 
-  /// Convenience function for evaluating constant Exprs from the FE. Extracts value into
-  /// col_val and sets the appropriate __isset flag. No fields are set for NULL values.
-  /// The specific field in col_val that receives the value is based on the expr type:
+  /// Convenience function for evaluating Exprs that don't reference slots from the FE.
+  /// Extracts value into 'col_val' and sets the appropriate __isset flag. No fields are
+  /// set for NULL values. The specific field in 'col_val' that receives the value is
+  /// based on the expr type:
   /// TYPE_BOOLEAN: boolVal
   /// TYPE_TINYINT/SMALLINT/INT: intVal
   /// TYPE_BIGINT: longVal
@@ -89,7 +90,7 @@ class ExprContext {
   ///              above 127. Pass the raw bytes so the caller can decide what to
   ///              do with the result (e.g., bail constant folding).
   /// TYPE_TIMESTAMP: binaryVal has the raw data, stringVal its string representation.
-  void GetConstantValue(TColumnValue* col_val);
+  void EvaluateWithoutRow(TColumnValue* col_val);
 
   /// Convenience functions: print value into 'str' or 'stream'.  NULL turns into "NULL".
   void PrintValue(const TupleRow* row, std::string* str);

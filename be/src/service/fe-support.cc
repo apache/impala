@@ -76,7 +76,7 @@ Java_org_apache_impala_service_FeSupport_NativeFeTestInit(
 // the expr evaluation.
 extern "C"
 JNIEXPORT jbyteArray JNICALL
-Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
+Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_expr_batch,
     jbyteArray thrift_query_ctx_bytes) {
   Status status;
@@ -144,7 +144,7 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
     if (!status.ok()) goto error;
 
     TColumnValue val;
-    expr_ctx->GetConstantValue(&val);
+    expr_ctx->EvaluateWithoutRow(&val);
     status = expr_ctx->root()->GetFnContextError(expr_ctx);
     if (!status.ok()) goto error;
 
@@ -356,8 +356,8 @@ static JNINativeMethod native_methods[] = {
     (void*)::Java_org_apache_impala_service_FeSupport_NativeFeTestInit
   },
   {
-    (char*)"NativeEvalConstExprs", (char*)"([B[B)[B",
-    (void*)::Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs
+    (char*)"NativeEvalExprsWithoutRow", (char*)"([B[B)[B",
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow
   },
   {
     (char*)"NativeCacheJar", (char*)"([B)[B",

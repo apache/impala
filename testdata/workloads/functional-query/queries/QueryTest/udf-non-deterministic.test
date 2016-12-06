@@ -1,0 +1,17 @@
+====
+---- QUERY
+# Only run without expr rewrites (constant folding) because count_rows() is
+# non-deterministic.
+select count_rows() from functional.alltypestiny;
+---- TYPES
+BIGINT
+---- RESULTS
+1
+2
+3
+4
+5
+6
+7
+8
+====

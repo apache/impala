@@ -214,6 +214,10 @@ Literal::Literal(ColumnType type, const TimestampValue& v)
   value_.timestamp_val = v;
 }
 
+bool Literal::IsLiteral() const {
+  return true;
+}
+
 template<class T>
 bool ParseString(const string& str, T* val) {
   istringstream stream(str);

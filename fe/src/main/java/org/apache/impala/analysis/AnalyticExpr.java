@@ -402,7 +402,7 @@ public class AnalyticExpr extends Expr {
       isPosConstant = false;
     } else {
       try {
-        TColumnValue val = FeSupport.EvalConstExpr(offset, analyzer.getQueryCtx());
+        TColumnValue val = FeSupport.EvalExprWithoutRow(offset, analyzer.getQueryCtx());
         if (TColumnValueUtil.getNumericVal(val) <= 0) isPosConstant = false;
       } catch (InternalException exc) {
         throw new AnalysisException(
@@ -502,8 +502,8 @@ public class AnalyticExpr extends Expr {
         }
         // Check if argument value is zero or negative and throw an exception if found.
         try {
-          TColumnValue bucketValue =
-              FeSupport.EvalConstExpr(getFnCall().getChild(0), analyzer.getQueryCtx());
+          TColumnValue bucketValue = FeSupport.EvalExprWithoutRow(
+              getFnCall().getChild(0), analyzer.getQueryCtx());
           Long arg = bucketValue.getLong_val();
           if (arg <= 0) {
             throw new AnalysisException("NTILE() requires a positive argument: " + arg);

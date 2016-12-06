@@ -453,6 +453,10 @@ bool Expr::IsConstant() const {
   return true;
 }
 
+bool Expr::IsLiteral() const {
+  return false;
+}
+
 int Expr::GetSlotIds(vector<SlotId>* slot_ids) const {
   int n = 0;
   for (int i = 0; i < children_.size(); ++i) {

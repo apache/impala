@@ -211,11 +211,23 @@ Status ScalarFnCall::Open(RuntimeState* state, ExprContext* ctx,
         input_arg = reinterpret_cast<AnyVal*>(varargs_buffer);
         varargs_buffer += arg_bytes;
       }
-      const AnyVal* constant_arg = fn_ctx->impl()->constant_args()[i];
-      if (constant_arg == NULL) {
-        non_constant_args.emplace_back(children_[i], input_arg);
-      } else {
+      // IMPALA-4586: Cache constant arguments only if the frontend has rewritten them
+      // into literal expressions. This gives the frontend control over how expressions
+      // are evaluated. This means that setting enable_expr_rewrites=false will also
+      // disable caching of non-literal constant expressions, which gives the old
+      // behaviour (before this caching optimisation was added) of repeatedly evaluating
+      // exprs that are constant according to IsConstant(). For exprs that are not truly
+      // constant (yet IsConstant() returns true for) e.g. non-deterministic UDFs, this
+      // means that setting enable_expr_rewrites=false works as a safety valve to get
+      // back the old behaviour, before constant expr folding or caching was added.
+      // TODO: once we can annotate UDFs as non-deterministic (IMPALA-4606), we should
+      // be able to trust IsConstant() and switch back to that.
+      if (children_[i]->IsLiteral()) {
+        const AnyVal* constant_arg = fn_ctx->impl()->constant_args()[i];
+        DCHECK(constant_arg != NULL);
         memcpy(input_arg, constant_arg, arg_bytes);
+      } else {
+        non_constant_args.emplace_back(children_[i], input_arg);
       }
     }
     fn_ctx->impl()->SetNonConstantArgs(move(non_constant_args));

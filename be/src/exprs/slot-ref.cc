@@ -101,7 +101,7 @@ Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
 }
 
 int SlotRef::GetSlotIds(vector<SlotId>* slot_ids) const {
-  slot_ids->push_back(slot_id_);
+  if (slot_ids != nullptr) slot_ids->push_back(slot_id_);
   return 1;
 }
 

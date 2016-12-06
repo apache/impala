@@ -170,7 +170,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
 
     TColumnValue val = null;
     try {
-      val = FeSupport.EvalConstExpr(constExpr, queryCtx);
+      val = FeSupport.EvalExprWithoutRow(constExpr, queryCtx);
     } catch (InternalException e) {
       LOG.error(String.format("Failed to evaluate expr '%s'",
           constExpr.toSql(), e.getMessage()));

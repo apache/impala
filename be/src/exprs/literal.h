@@ -46,6 +46,8 @@ class Literal: public Expr {
   /// Literal.
   static Literal* CreateLiteral(const ColumnType& type, const std::string& str);
 
+  virtual bool IsLiteral() const;
+
   virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
 
   virtual impala_udf::BooleanVal GetBooleanVal(ExprContext*, const TupleRow*);

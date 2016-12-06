@@ -1,0 +1,32 @@
+====
+---- QUERY
+# Test UDF used as constant partition key.
+drop table if exists udfinserttest;
+create table udfinserttest (a int) partitioned by (udf_was_opened string);
+
+insert overwrite table udfinserttest
+partition (udf_was_opened=cast(validate_open(1) as string)) values (1);
+
+# IMPALA-1030: exercise the case where a partition already exists
+insert overwrite table udfinserttest
+partition (udf_was_opened=cast(validate_open(1) as string)) values (1);
+
+# Don't overwrite
+insert into table udfinserttest
+partition (udf_was_opened=cast(validate_open(1) as string)) values (2);
+====
+---- QUERY
+select * from udfinserttest;
+---- TYPES
+int, string
+---- RESULTS
+1,'1'
+2,'1'
+====
+---- QUERY
+# Limit expression must be evaluated in FE.
+select bool_col from functional.alltypestiny limit if(validate_open(1), 0, 1)
+---- TYPES
+boolean
+---- RESULTS
+====

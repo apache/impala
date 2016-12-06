@@ -150,8 +150,8 @@ void ExprContext::FreeLocalAllocations(const vector<FunctionContext*>& fn_ctxs) 
   }
 }
 
-void ExprContext::GetConstantValue(TColumnValue* col_val) {
-  DCHECK(root_->IsConstant());
+void ExprContext::EvaluateWithoutRow(TColumnValue* col_val) {
+  DCHECK_EQ(0, root_->GetSlotIds());
   void* value = GetValue(NULL);
   if (value == NULL) return;
 

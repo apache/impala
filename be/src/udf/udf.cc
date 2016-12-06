@@ -280,14 +280,19 @@ inline bool FunctionContextImpl::CheckAllocResult(const char* fn_name,
     context_->SetError(ss.str().c_str());
     return false;
   }
+  CheckMemLimit(fn_name, byte_size);
+  return true;
+}
+
+inline void FunctionContextImpl::CheckMemLimit(const char* fn_name,
+    int64_t byte_size) {
 #ifndef IMPALA_UDF_SDK_BUILD
   MemTracker* mem_tracker = pool_->mem_tracker();
-  if (mem_tracker->LimitExceeded()) {
+  if (mem_tracker->AnyLimitExceeded()) {
     ErrorMsg msg = ErrorMsg(TErrorCode::UDF_MEM_LIMIT_EXCEEDED, string(fn_name));
     state_->SetMemLimitExceeded(mem_tracker, byte_size, &msg);
   }
 #endif
-  return true;
 }
 
 uint8_t* FunctionContext::Allocate(int byte_size) noexcept {
@@ -351,6 +356,7 @@ void FunctionContext::TrackAllocation(int64_t bytes) {
   assert(!impl_->closed_);
   impl_->external_bytes_tracked_ += bytes;
   impl_->pool_->mem_tracker()->Consume(bytes);
+  impl_->CheckMemLimit("FunctionContext::TrackAllocation", bytes);
 }
 
 void FunctionContext::Free(int64_t bytes) {
