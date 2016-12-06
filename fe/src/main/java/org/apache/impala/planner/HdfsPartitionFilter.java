@@ -21,9 +21,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
@@ -33,10 +30,14 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.common.InternalException;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TResultRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -83,7 +84,7 @@ public class HdfsPartitionFilter {
    * that pass the filter.
    */
   public HashSet<Long> getMatchingPartitionIds(ArrayList<HdfsPartition> partitions,
-      Analyzer analyzer) throws InternalException {
+      Analyzer analyzer) throws ImpalaException {
     HashSet<Long> result = new HashSet<Long>();
     // List of predicates to evaluate
     ArrayList<Expr> predicates = new ArrayList<Expr>(partitions.size());
@@ -110,7 +111,7 @@ public class HdfsPartitionFilter {
    * for the partition cols with the respective partition-key values.
    */
   private Expr buildPartitionPredicate(HdfsPartition partition, Analyzer analyzer)
-      throws InternalException {
+      throws ImpalaException {
     // construct smap
     ExprSubstitutionMap sMap = new ExprSubstitutionMap();
     for (int i = 0; i < refdKeys_.size(); ++i) {
@@ -123,7 +124,10 @@ public class HdfsPartitionFilter {
       LOG.trace("buildPartitionPredicate: " + literalPredicate.toSql() + " " +
           literalPredicate.debugString());
     }
-    Preconditions.checkState(literalPredicate.isConstant());
+    if (!literalPredicate.isConstant()) {
+      throw new NotImplementedException(
+          "Unsupported non-deterministic predicate: " + predicate_.toSql());
+    }
     return literalPredicate;
   }
 }

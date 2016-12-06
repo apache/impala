@@ -25,7 +25,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.InternalException;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.thrift.TPartitionKeyValue;
@@ -87,7 +87,8 @@ public class PartitionSet extends PartitionSpecBase {
     try {
       HdfsPartitionPruner pruner = new HdfsPartitionPruner(desc);
       partitions_ = pruner.prunePartitions(analyzer, transformedConjuncts, true);
-    } catch (InternalException e) {
+    } catch (ImpalaException e) {
+      if (e instanceof AnalysisException) throw (AnalysisException) e;
       throw new AnalysisException("Partition expr evaluation failed in the backend.", e);
     }
 
