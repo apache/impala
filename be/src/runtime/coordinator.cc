@@ -1668,17 +1668,14 @@ void Coordinator::ReportQuerySummary() {
   if (!fragment_instance_states_.empty()) {
     // Average all fragment instances for each fragment.
     for (FragmentInstanceState* state: fragment_instance_states_) {
-      // TODO: make profiles uniform across all fragments so we don't have
-      // to keep special-casing the coord fragment
-      if (state->fragment_idx() == 0) {
-        state->profile()->ComputeTimeInProfile();
-        UpdateExecSummary(*state);
-      } else {
-        state->profile()->ComputeTimeInProfile();
-        UpdateAverageProfile(state);
+      state->profile()->ComputeTimeInProfile();
+      UpdateAverageProfile(state);
+      // Skip coordinator fragment, if one exists.
+      // TODO: Can we remove the special casing here?
+      if (executor_ == nullptr || state->fragment_idx() != 0) {
         ComputeFragmentSummaryStats(state);
-        UpdateExecSummary(*state);
       }
+      UpdateExecSummary(*state);
     }
 
     InstanceComparator comparator;
