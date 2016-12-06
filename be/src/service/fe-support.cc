@@ -131,9 +131,10 @@ Java_org_apache_impala_service_FeSupport_NativeEvalConstExprs(
     if (!status.ok()) goto error;
     LlvmCodeGen* codegen = state.codegen();
     DCHECK(codegen != NULL);
-    state.CodegenScalarFns();
+    status = state.CodegenScalarFns();
+    if (!status.ok()) goto error;
     codegen->EnableOptimizations(false);
-    Status status = codegen->FinalizeModule();
+    status = codegen->FinalizeModule();
     if (!status.ok()) goto error;
   }
 

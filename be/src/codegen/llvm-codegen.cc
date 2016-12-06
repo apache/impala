@@ -354,19 +354,20 @@ Status LlvmCodeGen::LinkModule(const string& file) {
 
   for (const string& fn_name: ref_fns) {
     Function* fn = module_->getFunction(fn_name);
-    DCHECK(fn != NULL);
-    if (fn->isMaterializable()) {
-      MaterializeFunction(fn);
+    // The global variable from source module which references 'fn' can have private
+    // linkage and it may not be linked into 'module_'.
+    if (fn != NULL && fn->isMaterializable()) {
+      RETURN_IF_ERROR(MaterializeFunction(fn));
       materializable_fns.erase(fn->getName().str());
     }
   }
-  // Parse materialized functions in the source module and materialize functions it
-  // references. Do it after linking so LLVM has "merged" functions defined in both
-  // modules.
+  // Parse functions in the source module materialized during linking and materialize
+  // their callees. Do it after linking so LLVM has "merged" functions defined in both
+  // modules. LLVM may not link in functions (and their callees) from source module if
+  // they're defined in destination module already.
   for (const string& fn_name: materializable_fns) {
     Function* fn = module_->getFunction(fn_name);
-    DCHECK(fn != NULL);
-    if (!fn->isMaterializable()) MaterializeCallees(fn);
+    if (fn != NULL && !fn->isMaterializable()) RETURN_IF_ERROR(MaterializeCallees(fn));
   }
   return Status::OK();
 }

@@ -538,3 +538,10 @@ BIGINT
 7
 8
 ====
+---- QUERY
+select pow(3,2), xpow(3,2);
+---- TYPES
+DOUBLE, DOUBLE
+---- RESULTS
+9,9
+====

@@ -369,6 +369,7 @@ drop function if exists {database}.var_sum(string...);
 drop function if exists {database}.var_sum(decimal(4,2)...);
 drop function if exists {database}.var_sum_multiply(double, int...);
 drop function if exists {database}.var_sum_multiply2(double, int...);
+drop function if exists {database}.xpow(double, double);
 drop function if exists {database}.to_lower(string);
 drop function if exists {database}.constant_timestamp();
 drop function if exists {database}.validate_arg_type(string);
@@ -463,6 +464,10 @@ symbol='_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_
 create function {database}.var_sum_multiply2(double, int...) returns double
 location '{location}'
 symbol='_Z15VarSumMultiply2PN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE';
+
+create function {database}.xpow(double, double) returns double
+location '{location}'
+symbol='_ZN6impala13MathFunctions3PowEPN10impala_udf15FunctionContextERKNS1_9DoubleValES6_';
 
 create function {database}.to_lower(string) returns string
 location '{location}'
