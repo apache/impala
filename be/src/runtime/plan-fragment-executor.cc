@@ -293,10 +293,13 @@ void PlanFragmentExecutor::PrintVolumeIds(
 
 Status PlanFragmentExecutor::Open() {
   DCHECK(prepared_promise_.IsSet() && prepared_promise_.Get().ok());
-  SCOPED_TIMER(profile()->total_time_counter());
-  SCOPED_TIMER(ADD_TIMER(timings_profile_, OPEN_TIMER_NAME));
-  VLOG_QUERY << "Open(): instance_id=" << runtime_state_->fragment_instance_id();
-  Status status = OpenInternal();
+  Status status;
+  {
+    SCOPED_TIMER(profile()->total_time_counter());
+    SCOPED_TIMER(ADD_TIMER(timings_profile_, OPEN_TIMER_NAME));
+    VLOG_QUERY << "Open(): instance_id=" << runtime_state_->fragment_instance_id();
+    status = OpenInternal();
+  }
   if (!status.ok()) FragmentComplete(status);
   opened_promise_.Set(status);
   return status;
@@ -330,19 +333,20 @@ Status PlanFragmentExecutor::OpenInternal() {
 
 Status PlanFragmentExecutor::Exec() {
   DCHECK(opened_promise_.IsSet() && opened_promise_.Get().ok());
-  SCOPED_TIMER(profile()->total_time_counter());
   Status status;
   {
     // Must go out of scope before FragmentComplete(), otherwise counter will not be
-    // updated by time final profile is sent, and will always be 0.
+    // updated by time final profile is sent.
+    SCOPED_TIMER(profile()->total_time_counter());
     SCOPED_TIMER(ADD_TIMER(timings_profile_, EXEC_TIMER_NAME));
     status = ExecInternal();
-  }
-  if (!status.ok() && !status.IsCancelled() && !status.IsMemLimitExceeded()) {
-    // Log error message in addition to returning in Status. Queries that do not fetch
-    // results (e.g. insert) may not receive the message directly and can only retrieve
-    // the log.
-    runtime_state_->LogError(status.msg());
+
+    if (!status.ok() && !status.IsCancelled() && !status.IsMemLimitExceeded()) {
+      // Log error message in addition to returning in Status. Queries that do not fetch
+      // results (e.g. insert) may not receive the message directly and can only retrieve
+      // the log.
+      runtime_state_->LogError(status.msg());
+    }
   }
   FragmentComplete(status);
   return status;
