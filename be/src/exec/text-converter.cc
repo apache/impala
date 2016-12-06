@@ -167,10 +167,8 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
 
   if (!slot_desc->type().IsVarLenStringType()) {
     builder.SetInsertPoint(check_zero_block);
-    // If len <= 0 and it is not a string col, set slot to NULL
-    // The len can be less than 0 if the field contained an escape character which
-    // is only valid for string cols.
-    Value* null_len = builder.CreateICmpSLE(
+    // If len == 0 and it is not a string col, set slot to NULL
+    Value* null_len = builder.CreateICmpEQ(
         args[2], codegen->GetIntConstant(TYPE_INT, 0));
     builder.CreateCondBr(null_len, set_null_block, parse_slot_block);
   }

@@ -457,6 +457,21 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
       Value* data = builder.CreateLoad(data_ptr, "data");
       Value* len = builder.CreateLoad(len_ptr, "len");
 
+      // Convert length to positive if it is negative. Negative lengths are assigned to
+      // slots that contain escape characters.
+      // TODO: CodegenWriteSlot() currently does not handle text that requres unescaping.
+      // However, if it is modified to handle that case, we need to detect it here and
+      // send a 'need_escape' bool to CodegenWriteSlot(), since we are making the length
+      // positive here.
+      Value* len_lt_zero = builder.CreateICmpSLT(len,
+          codegen->GetIntConstant(TYPE_INT, 0), "len_lt_zero");
+      Value* ones_compliment_len = builder.CreateNot(len, "ones_compliment_len");
+      Value* positive_len = builder.CreateAdd(
+          ones_compliment_len, codegen->GetIntConstant(TYPE_INT, 1),
+          "positive_len");
+      len = builder.CreateSelect(len_lt_zero, positive_len, len,
+          "select_positive_len");
+
       // Call slot parse function
       Function* slot_fn = slot_fns[slot_idx];
       Value* slot_parsed = builder.CreateCall(slot_fn,
