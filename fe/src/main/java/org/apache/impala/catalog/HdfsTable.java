@@ -894,6 +894,7 @@ public class HdfsTable extends Table {
       throw new CatalogException(String.format("Partition %s already exists in table %s",
           partition.getPartitionName(), getFullName()));
     }
+    if (partition.getFileFormat() == HdfsFileFormat.AVRO) hasAvroData_ = true;
     partitionMap_.put(partition.getId(), partition);
     totalHdfsBytes_ += partition.getSize();
     numHdfsFiles_ += partition.getNumFileDescriptors();
@@ -1430,7 +1431,6 @@ public class HdfsTable extends Table {
       // If the partition is null, its HDFS path does not exist, and it was not added to
       // this table's partition list. Skip the partition.
       if (partition == null) continue;
-      if (partition.getFileFormat() == HdfsFileFormat.AVRO) hasAvroData_ = true;
       if (msPartition.getParameters() != null) {
         partition.setNumRows(getRowCount(msPartition.getParameters()));
       }
