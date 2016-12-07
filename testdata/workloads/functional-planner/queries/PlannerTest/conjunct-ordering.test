@@ -175,3 +175,23 @@ PLAN-ROOT SINK
    partitions=24/24 files=24 size=478.45KB
    predicates: a.id = 0, a.int_col = 0
 ====
+# IMPALA-4614: Tests that the eval cost of timestamp literals is set.
+# The HAVING predicate is assigned to the scan and tests that it has
+# an eval cost set after being substituted and re-analyzed.
+select count(*) from functional.alltypes
+where int_col < 10 and
+  timestamp_col < cast('2010-01-02 01:05:20' as timestamp)
+  and timestamp_col != cast(date_string_col as timestamp)
+group by timestamp_col
+having timestamp_col < cast('2010-01-01 01:05:20' as timestamp)
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: timestamp_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.timestamp_col < TIMESTAMP '2010-01-01 01:05:20', int_col < 10, timestamp_col < TIMESTAMP '2010-01-02 01:05:20', timestamp_col != CAST(date_string_col AS TIMESTAMP)
+====

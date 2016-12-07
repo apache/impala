@@ -45,6 +45,7 @@ public class TimestampLiteral extends LiteralExpr {
     value_ = value;
     strValue_ = strValue;
     type_ = Type.TIMESTAMP;
+    evalCost_ = Expr.LITERAL_COST;
   }
 
   /**
