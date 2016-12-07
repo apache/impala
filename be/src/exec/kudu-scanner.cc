@@ -139,13 +139,14 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
                          "Could not set replica selection.");
   }
   kudu::client::KuduScanner::ReadMode mode =
-      MODE_READ_AT_SNAPSHOT.compare(FLAGS_kudu_read_mode) ?
+      MODE_READ_AT_SNAPSHOT == FLAGS_kudu_read_mode ?
           kudu::client::KuduScanner::READ_AT_SNAPSHOT :
           kudu::client::KuduScanner::READ_LATEST;
   KUDU_RETURN_IF_ERROR(scanner_->SetReadMode(mode), "Could not set scanner ReadMode");
-
   KUDU_RETURN_IF_ERROR(scanner_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms),
       "Could not set scanner timeout");
+  VLOG_ROW << "Starting KuduScanner with ReadMode=" << mode << " timeout=" <<
+      FLAGS_kudu_operation_timeout_ms;
 
   {
     SCOPED_TIMER(state_->total_storage_wait_timer());
