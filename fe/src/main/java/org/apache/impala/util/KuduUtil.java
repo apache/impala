@@ -33,6 +33,7 @@ import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnEncoding;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.THdfsCompression;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
@@ -156,6 +157,7 @@ public class KuduUtil {
       org.apache.kudu.Type type, String colName) throws ImpalaRuntimeException {
     Preconditions.checkState(defaultValue.getNodes().size() == 1);
     TExprNode literal = defaultValue.getNodes().get(0);
+    if (literal.getNode_type() == TExprNodeType.NULL_LITERAL) return null;
     switch (type) {
       case INT8:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);

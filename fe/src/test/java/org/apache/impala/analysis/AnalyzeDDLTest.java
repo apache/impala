@@ -2133,6 +2133,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         }
       }
     }
+    // Use NULL as default values
+    AnalyzesOk("create table tab (x int primary key, i1 tinyint default null, " +
+        "i2 smallint default null, i3 int default null, i4 bigint default null, " +
+        "vals string default null, valf float default null, vald double default null, " +
+        "valb boolean default null) partition by hash (x) partitions 3 stored as kudu");
+    // Use NULL as a default value on a non-nullable column
+    AnalysisError("create table tab (x int primary key, y int not null default null) " +
+        "partition by hash (x) partitions 3 stored as kudu", "Default value of NULL " +
+        "not allowed on non-nullable column: 'y'");
     // Primary key specified using the PRIMARY KEY clause
     AnalyzesOk("create table tab (x int not null encoding plain_encoding " +
         "compression snappy block_size 1, y int null encoding rle compression lz4 " +

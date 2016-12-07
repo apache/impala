@@ -123,3 +123,23 @@ select ID, nAmE, VALF, VALI from ignore_column_case where NaMe = 'Martin';
 ---- TYPES
 INT,STRING,FLOAT,BIGINT
 ====
+---- QUERY
+# Using NULL as default values
+create table tbl_with_null_defaults (x int primary key, i1 tinyint default null,
+  i2 smallint default null, i3 int default null, i4 bigint default null,
+  vals string default null, valf float default null, vald double default null,
+  valb boolean default null) partition by hash (x) partitions 3 stored as kudu
+---- RESULTS
+====
+---- QUERY
+insert into tbl_with_null_defaults (x) values (1);
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+X, I1, I2, I3, I4, VALS, VALF, VALD, VALB
+---- DML_RESULTS: tbl_with_null_defaults
+1,NULL,NULL,NULL,NULL,'NULL',NULL,NULL,NULL
+---- TYPES
+INT,TINYINT,SMALLINT,INT,BIGINT,STRING,FLOAT,DOUBLE,BOOLEAN
+====
