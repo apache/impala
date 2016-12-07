@@ -46,11 +46,15 @@ class TestMiniStress(ImpalaTestSuite):
       cls.TestMatrix.add_constraint(lambda v:\
           v.get_value('exec_option')['batch_size'] != 1)
 
+  @pytest.mark.xfail(run=False, reason="IMPALA-2605: the stress tests have a history of "
+                     "causing the end-to-end tests to hang")
   @pytest.mark.stress
   def test_mini_stress(self, vector):
     for i in xrange(NUM_ITERATIONS):
       self.run_test_case('stress', vector)
 
+  @pytest.mark.xfail(run=False, reason="IMPALA-2605: the stress tests have a history of "
+                     "causing the end-to-end tests to hang")
   @pytest.mark.stress
   def test_sort_stress(self, vector):
     if self.exploration_strategy() == 'core':

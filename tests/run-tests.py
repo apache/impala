@@ -20,7 +20,10 @@
 # Runs the Impala query tests, first executing the tests that cannot be run in parallel
 # and then executing the remaining tests in parallel. All additional command line options
 # are passed to py.test.
+from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_service import ImpaladService
 import itertools
+import json
 import multiprocessing
 import os
 import pytest
@@ -149,6 +152,21 @@ def build_ignore_dir_arg_list(valid_dirs):
                    for d in set(subdirs) - set(valid_dirs)])
 
 
+def print_metrics(substring):
+  """Prints metrics with the given substring in the name"""
+  for impalad in ImpalaCluster().impalads:
+    print ">" * 80
+    port = impalad._get_webserver_port()
+    print "connections metrics for impalad at port {}:".format(port)
+    debug_info = json.loads(ImpaladService(
+            impalad.hostname,
+            webserver_port=port)
+            .open_debug_webpage('metrics?json').read())
+    for metric in debug_info['metric_group']['metrics']:
+      if substring in metric['name']:
+        print json.dumps(metric, indent=1)
+    print "<" * 80
+
 if __name__ == "__main__":
   exit_on_error = '-x' in sys.argv or '--exitfirst' in sys.argv
   test_executor = TestExecutor(exit_on_error=exit_on_error)
@@ -169,9 +187,11 @@ if __name__ == "__main__":
   test_executor.run_tests(args)
 
   # Run the stress tests tests
+  print_metrics('connections')
   args = '-m "stress" -n %d %s' %\
       (NUM_STRESS_CLIENTS, build_test_args('stress', VALID_TEST_DIRS))
   test_executor.run_tests(args)
+  print_metrics('connections')
 
   # Run the remaining query tests in parallel
   args = '-m "not execute_serially and not stress"  -n %d %s' %\
