@@ -24,10 +24,12 @@ from tests.comparison.common import StructColumn, CollectionColumn
 from tests.comparison.db_types import (
     Char,
     Decimal,
+    Double,
     Float,
     Int,
     String,
     Timestamp,
+    TinyInt,
     VarChar)
 from tests.comparison.query import InsertStatement, Query
 from tests.comparison.query_flattener import QueryFlattener
@@ -314,6 +316,12 @@ class SqlWriter(object):
   def _write_cast(self, arg, type):
     return 'CAST(%s AS %s)' % (self._write(arg), type)
 
+  def _write_cast_func(self, func):
+    val_expr = func.args[0]
+    type_ = func.args[1]
+    return 'CAST({val_expr} AS {type_})'.format(
+        val_expr=self._write(val_expr), type_=self._write(type_))
+
   def _write_date_add_year(self, func):
     return "%s + INTERVAL %s YEAR" \
         % (self._write(func.args[0]), self._write(func.args[1]))
@@ -399,11 +407,17 @@ class SqlWriter(object):
     return sql
 
   def _write_data_type_metaclass(self, data_type_class):
-    '''Write a data type class such as Int or Boolean.'''
-    aliases = getattr(data_type_class, self.DIALECT, None)
-    if aliases:
-      return aliases[0]
-    return data_type_class.__name__.upper()
+    '''Write a data type class such as Int, Boolean, or Decimal(4, 2).'''
+    if data_type_class == Char:
+      return 'CHAR({0})'.format(data_type_class.MAX)
+    elif data_type_class == VarChar:
+      return 'VARCHAR({0})'.format(data_type_class.MAX)
+    elif data_type_class == Decimal:
+      return 'DECIMAL({scale},{precision})'.format(
+          scale=data_type_class.MAX_DIGITS,
+          precision=data_type_class.MAX_FRACTIONAL_DIGITS)
+    else:
+      return data_type_class.__name__.upper()
 
   def _write_subquery(self, subquery):
     return '({0})'.format(self._write(subquery.query))
@@ -449,9 +463,9 @@ class SqlWriter(object):
     """
     Return a string representing the VALUES clause of an INSERT query.
     """
-    return 'VALUES {values_rows}'.format(
-        values_rows=', '.join([self._write(values_row)
-                               for values_row in values_clause.values_rows]))
+    return 'VALUES\n{values_rows}'.format(
+        values_rows=',\n'.join([self._write(values_row)
+                                for values_row in values_clause.values_rows]))
 
   def _write(self, object_):
     '''Return a sql string representation of the given object.'''
@@ -694,9 +708,18 @@ class PostgresqlSqlWriter(SqlWriter):
 
   def _write_data_type_metaclass(self, data_type_class):
     '''Write a data type class such as Int or Boolean.'''
-    if data_type_class in (Char, String, VarChar):
+    if data_type_class == Double:
+      return 'DOUBLE PRECISION'
+    elif data_type_class == Float:
+      return 'REAL'
+    elif data_type_class == String:
       return 'VARCHAR(%s)' % data_type_class.MAX
-    return data_type_class.__name__.upper()
+    elif data_type_class == Timestamp:
+      return 'TIMESTAMP WITHOUT TIME ZONE'
+    elif data_type_class == TinyInt:
+      return 'SMALLINT'
+    else:
+      return super(PostgresqlSqlWriter, self)._write_data_type_metaclass(data_type_class)
 
   def _write_order_by_clause(self, order_by_clause):
     sql = 'ORDER BY '

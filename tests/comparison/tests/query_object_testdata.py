@@ -286,11 +286,15 @@ INSERT_QUERY_TEST_CASES = [
         ),
         impala_query_string=(
             'INSERT INTO kudu_table\n'
-            "VALUES (1, 'a'), (2, 'b')"
+            'VALUES\n'
+            "(1, 'a'),\n"
+            "(2, 'b')"
         ),
         postgres_query_string=(
             'INSERT INTO kudu_table\n'
-            "VALUES (1, 'a' || ''), (2, 'b' || '')"
+            'VALUES\n'
+            "(1, 'a' || ''),\n"
+            "(2, 'b' || '')"
         ),
     ),
     InsertStatementTest(
@@ -303,11 +307,13 @@ INSERT_QUERY_TEST_CASES = [
         ),
         impala_query_string=(
             'INSERT INTO kudu_table\n'
-            'VALUES (1)'
+            'VALUES\n'
+            '(1)'
         ),
         postgres_query_string=(
             'INSERT INTO kudu_table\n'
-            'VALUES (1)'
+            'VALUES\n'
+            '(1)'
         ),
     ),
     InsertStatementTest(
@@ -320,11 +326,13 @@ INSERT_QUERY_TEST_CASES = [
         ),
         impala_query_string=(
             'INSERT INTO kudu_table (int_col, char_col)\n'
-            "VALUES (1, 'a')"
+            'VALUES\n'
+            "(1, 'a')"
         ),
         postgres_query_string=(
             'INSERT INTO kudu_table (int_col, char_col)\n'
-            "VALUES (1, 'a' || '')"
+            'VALUES\n'
+            "(1, 'a' || '')"
         ),
     ),
     InsertStatementTest(
@@ -338,11 +346,13 @@ INSERT_QUERY_TEST_CASES = [
         ),
         impala_query_string=(
             'INSERT INTO kudu_table (int_col)\n'
-            "VALUES (1)"
+            'VALUES\n'
+            '(1)'
         ),
         postgres_query_string=(
             'INSERT INTO kudu_table (int_col)\n'
-            "VALUES (1)"
+            'VALUES\n'
+            '(1)'
         ),
     ),
     InsertStatementTest(
@@ -413,11 +423,15 @@ INSERT_QUERY_TEST_CASES = [
         ),
         impala_query_string=(
             'INSERT INTO kudu_table\n'
-            "VALUES (1, 'a'), (2, 'b')"
+            'VALUES\n'
+            "(1, 'a'),\n"
+            "(2, 'b')"
         ),
         postgres_query_string=(
             'INSERT INTO kudu_table\n'
-            "VALUES (1, 'a' || ''), (2, 'b' || '')\n"
+            'VALUES\n'
+            "(1, 'a' || ''),\n"
+            "(2, 'b' || '')\n"
             'ON CONFLICT DO NOTHING'
         ),
     ),

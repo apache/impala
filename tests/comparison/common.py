@@ -289,7 +289,7 @@ class Column(ValExpr):
 
   def __repr__(self):
     return '%s<name: %s, type: %s>' % (
-        type(self).__name__, self.name, self.type.__name__)
+        type(self).__name__, self.name, self.exact_type.__name__)
 
   def __deepcopy__(self, memo):
     # Don't return a deep copy of owner, since that is a circular reference

@@ -16,7 +16,7 @@
 # under the License.
 
 from logging import getLogger
-from random import choice, randint, random
+from random import choice, randint, random, shuffle
 
 from tests.comparison.db_types import (
     Boolean,
@@ -26,7 +26,11 @@ from tests.comparison.db_types import (
     Int,
     TYPES,
     Timestamp)
-from tests.comparison.query import InsertStatement, Query, StatementExecutionMode
+from tests.comparison.query import (
+    InsertStatement,
+    Query,
+    StatementExecutionMode,
+    ValuesClause)
 from tests.comparison.funcs import (
     AnalyticAvg,
     AnalyticCount,
@@ -76,7 +80,8 @@ class DefaultProfile(object):
         'WITH_TABLE_COUNT': (1, 3),
         'TABLE_COUNT': (1, 2),
         'ANALYTIC_LEAD_LAG_OFFSET': (1, 100),
-        'ANALYTIC_WINDOW_OFFSET': (1, 100)}
+        'ANALYTIC_WINDOW_OFFSET': (1, 100),
+        'INSERT_VALUES_ROWS': (1, 10)}
 
     # Below are interdependent weights used to determine probabilities. The probability
     # of any item being selected should be (item weight) / sum(weights). A weight of
@@ -94,13 +99,14 @@ class DefaultProfile(object):
             Int: 10,
             Timestamp: 1},
         'RELATIONAL_FUNCS': {
-        # The weights below are "best effort" suggestions. Because QueryGenerator
-        # prefers to set column types first, and some functions are "supported" only by
-        # some types, it means functions can be pruned off from this dictionary, and
-        # that will shift the probabilities. A quick example if that if a Char column is
-        # chosen: LessThan may not have a pre-defined signature for Char comparison, so
-        # LessThan shouldn't be chosen with Char columns. The tendency to prune will
-        # shift as the "funcs" module is adjusted to add/remove signatures.
+            # The weights below are "best effort" suggestions. Because QueryGenerator
+            # prefers to set column types first, and some functions are "supported" only
+            # by some types, it means functions can be pruned off from this dictionary,
+            # and that will shift the probabilities. A quick example if that if a Char
+            # column is chosen: LessThan may not have a pre-defined signature for Char
+            # comparison, so LessThan shouldn't be chosen with Char columns. The
+            # tendency to prune will shift as the "funcs" module is adjusted to
+            # add/remove signatures.
             And: 2,
             Coalesce: 2,
             Equals: 40,
@@ -115,19 +121,18 @@ class DefaultProfile(object):
             LessThanOrEquals: 2,
             NotEquals: 2,
             NotIn: 2,
-            Or: 2,
-         },
+            Or: 2},
         'CONJUNCT_DISJUNCTS': {
-        # And and Or appear both under RELATIONAL_FUNCS and CONJUNCT_DISJUNCTS for the
-        # following reasons:
-        # 1. And and Or are considered "relational" by virtue of taking two arguments
-        # and returning a Boolean. The crude signature selection means they could be
-        # selected, so we describe weights there.
-        # 2. They are set here explicitly as well so that
-        # QueryGenerator._create_bool_func_tree() can create a "more realistic"
-        # expression that has a Boolean operator at the top of the tree by explicitly
-        # asking for an And or Or.
-        # IMPALA-3896 tracks a better way to do this.
+            # And and Or appear both under RELATIONAL_FUNCS and CONJUNCT_DISJUNCTS for the
+            # following reasons:
+            # 1. And and Or are considered "relational" by virtue of taking two arguments
+            # and returning a Boolean. The crude signature selection means they could be
+            # selected, so we describe weights there.
+            # 2. They are set here explicitly as well so that
+            # QueryGenerator._create_bool_func_tree() can create a "more realistic"
+            # expression that has a Boolean operator at the top of the tree by explicitly
+            # asking for an And or Or.
+            # IMPALA-3896 tracks a better way to do this.
             And: 5,
             Or: 1},
         'ANALYTIC_WINDOW': {
@@ -197,7 +202,16 @@ class DefaultProfile(object):
             StatementExecutionMode.SELECT_STATEMENT: 10},
         'STATEMENT': {
             # TODO: Eventually make this a mix of DML and SELECT (IMPALA-4601)
-            Query: 1}}
+            Query: 1},
+        'INSERT_SOURCE_CLAUSE': {
+            Query: 3,
+            ValuesClause: 1},
+        'INSERT_COLUMN_LIST': {
+            'partial': 3,
+            'none': 1},
+        'VALUES_ITEM_EXPR': {
+            'constant': 1,
+            'function': 2}}
 
     # On/off switches
     self._flags = {
@@ -290,8 +304,8 @@ class DefaultProfile(object):
       weights = self.weights(*weights)
     else:
       weights = weights[0]
-    return self._choose_from_weights(dict(
-      (choice_, weight) for choice_, weight in weights.iteritems() if filter(choice_)))
+    return self._choose_from_weights(dict((choice_, weight) for choice_, weight
+                                     in weights.iteritems() if filter(choice_)))
 
   def _decide_from_probability(self, *keys):
     return random() < self.probability(*keys)
@@ -373,9 +387,9 @@ class DefaultProfile(object):
       allow_correlated = False
     weights = dict(((name, use_agg, use_correlated), weight)
                    for (name, use_agg, use_correlated), weight in weights.iteritems()
-                   if name == func_name \
-                       and (allow_agg or use_agg == 'NON_AGG') \
-                       and weight)
+                   if name == func_name and
+                   (allow_agg or use_agg == 'NON_AGG') and
+                   weight)
     if weights:
       return self._choose_from_weights(weights)
 
@@ -534,8 +548,8 @@ class DefaultProfile(object):
             signature_length += 1
         if not signature_weight:
           continue
-        if signature.func not in func_weights \
-            or signature_weight > func_weights[signature.func]:
+        if (signature.func not in func_weights or
+           signature_weight > func_weights[signature.func]):
           func_weights[signature.func] = signature_weight
           signature_length_by_func[signature.func] = signature_length
       if not func_weights:
@@ -614,6 +628,46 @@ class DefaultProfile(object):
 
   def choose_statement(self):
     return self._choose_from_weights('STATEMENT')
+
+  def choose_insert_source_clause(self):
+    """
+    Returns whether we generate an INSERT SELECT or an INSERT VALUES
+    """
+    return self._choose_from_weights('INSERT_SOURCE_CLAUSE')
+
+  def choose_insert_column_list(self, table):
+    """
+    Decide whether or not an INSERT will be in the form of:
+    INSERT INTO table SELECT|VALUES ...
+    or
+    INSERT INTO table (col1, col2, ...) SELECT|VALUES ...
+    If the second form, the column list is shuffled. The column list will always contain
+    the primary key columns and between 0 and all additional columns.
+    """
+    if 'partial' == self._choose_from_weights('INSERT_COLUMN_LIST'):
+      columns_to_insert = list(table.primary_keys)
+      min_additional_insert_cols = 0 if columns_to_insert else 1
+      remaining_columns = [col for col in table.cols if not col.is_primary_key]
+      shuffle(remaining_columns)
+      additional_column_count = randint(min_additional_insert_cols, len(remaining_columns))
+      columns_to_insert.extend(remaining_columns[:additional_column_count])
+      shuffle(columns_to_insert)
+      return columns_to_insert
+    else:
+      return None
+
+  def choose_insert_values_row_count(self):
+    """
+    Choose the number of rows to insert in an INSERT VALUES
+    """
+    return self._choose_from_bounds('INSERT_VALUES_ROWS')
+
+  def choose_values_item_expr(self):
+    """
+    For a VALUES clause, Choose whether a particular item in a particular row will be a
+    constant or a function.
+    """
+    return self._choose_from_weights('VALUES_ITEM_EXPR')
 
 
 class ImpalaNestedTypesProfile(DefaultProfile):

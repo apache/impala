@@ -123,7 +123,7 @@ class DbCursor(object):
           mismatch = True
           break
         for left, right in izip(common_table.cols, table.cols):
-          if not left.name == right.name and left.type == right.type:
+          if not (left.name == right.name and left.type == right.type):
             LOG.debug('Ignoring table %s. It has different columns %s vs %s.' %
                 (table_name, left, right))
             mismatch = True

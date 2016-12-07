@@ -189,7 +189,7 @@ class QueryGenerator(object):
             and not select_clause.analytic_items \
             and not select_clause.contains_approximate_types \
             and self.profile.use_group_by_clause()):
-      group_by_items = [item for item in select_clause.basic_items
+      group_by_items = [deepcopy(item) for item in select_clause.basic_items
                         if not item.val_expr.is_constant]
       # TODO: What if there are select_clause.analytic_items?
       if group_by_items:
@@ -376,15 +376,15 @@ class QueryGenerator(object):
   def _create_basic_select_item(self, table_exprs, return_type):
     max_children = self.profile.choose_nested_expr_count()
     if max_children:
-      value = self._create_func_tree(return_type)
-      value = self._populate_func_with_vals(value, table_exprs)
+      value = self.create_func_tree(return_type)
+      value = self.populate_func_with_vals(value, table_exprs)
     elif return_type in table_exprs.col_types:
       value = self.profile.choose_val_expr(table_exprs.cols_by_type[return_type])
     else:
       value = self.profile.choose_constant(return_type)
     return SelectItem(value)
 
-  def _create_func_tree(self, return_type, allow_subquery=False):
+  def create_func_tree(self, return_type, allow_subquery=False):
     '''Returns an instance of a basic function that has all of it's arguments either set
        to None or another instance of a function that has it's arguments set likewise. The
        caller should replace the None values with column references or constants as
@@ -468,7 +468,7 @@ class QueryGenerator(object):
       matching_signatures.append(signature)
     return matching_signatures
 
-  def _populate_func_with_vals(self,
+  def populate_func_with_vals(self,
       func,
       table_exprs=TableExprList(),
       val_exprs=ValExprList(),
@@ -538,8 +538,8 @@ class QueryGenerator(object):
               query.where_clause = WhereClause(correlation_condition)
           func.args[idx] = Subquery(query)
         else:
-          replacement_func = self._create_func_tree(func.type)
-          return self._populate_func_with_vals(
+          replacement_func = self.create_func_tree(func.type)
+          return self.populate_func_with_vals(
               replacement_func,
               table_exprs=table_exprs,
               val_exprs=val_exprs,
@@ -565,7 +565,7 @@ class QueryGenerator(object):
           func.args[idx] = val
           arg = val
         elif arg.is_func:
-          func.args[idx] = self._populate_func_with_vals(
+          func.args[idx] = self.populate_func_with_vals(
               arg,
               table_exprs=table_exprs,
               val_exprs=val_exprs,
@@ -579,7 +579,7 @@ class QueryGenerator(object):
 
   def _create_agg_select_item(self, table_exprs, basic_select_item_exprs, return_type):
     value = self._create_agg_func_tree(return_type)
-    value = self._populate_func_with_vals(value, table_exprs, basic_select_item_exprs)
+    value = self.populate_func_with_vals(value, table_exprs, basic_select_item_exprs)
     return SelectItem(value)
 
   def _create_agg_func_tree(self, return_type):
@@ -589,7 +589,7 @@ class QueryGenerator(object):
                                    basic_funcs=FUNCS):
     '''Returns an instance of a function that is guaranteed to either be or contain an
        aggregate or analytic function. The arguments of the returned function will either
-       be None or an instance of a function as in _create_func_tree.
+       be None or an instance of a function as in create_func_tree.
 
        The chosen aggregate or analytic functions will be restricted to the list of
        functions in agg_funcs and analytic_funcs.
@@ -934,7 +934,7 @@ class QueryGenerator(object):
 
     allow_agg = any(ifilter(lambda expr: expr.contains_agg, select_item_exprs))
     value = self._create_analytic_func_tree(return_type, excluded_designs, allow_agg)
-    value = self._populate_func_with_vals(
+    value = self.populate_func_with_vals(
         value,
         table_exprs=TableExprList(),
         val_exprs=ValExprList())
@@ -1274,7 +1274,7 @@ class QueryGenerator(object):
 
     table_exprs = TableExprList(possible_left_table_exprs)
     table_exprs.append(right_table_expr)
-    self._populate_func_with_vals(root_predicate, table_exprs=table_exprs)
+    self.populate_func_with_vals(root_predicate, table_exprs=table_exprs)
     return root_predicate
 
   def _populate_null_args_list(self,
@@ -1306,7 +1306,7 @@ class QueryGenerator(object):
       table_exprs,
       table_alias_prefix):
     predicate, _ = self._create_boolean_func_tree(allow_subquery=True)
-    predicate = self._populate_func_with_vals(
+    predicate = self.populate_func_with_vals(
         predicate,
         table_exprs=table_exprs,
         table_alias_prefix=table_alias_prefix)
@@ -1320,7 +1320,7 @@ class QueryGenerator(object):
       predicate = self._create_agg_func_tree(Boolean)
     else:
       predicate, _ = self._create_boolean_func_tree()
-    predicate = self._populate_func_with_vals(
+    predicate = self.populate_func_with_vals(
         predicate, val_exprs=basic_select_item_exprs)
     # https://issues.cloudera.org/browse/IMPALA-1423
     # Make sure any cols used have a table identifier. As of this writing the only

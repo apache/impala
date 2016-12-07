@@ -15,9 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from copy import deepcopy
+
 from tests.comparison.common import Table
-from tests.comparison.db_types import Char, Float, Int
-from tests.comparison.model_translator import SqlWriter
+from tests.comparison.funcs import CastFunc
 from tests.comparison.query import (
     InsertClause,
     InsertStatement,
@@ -26,15 +27,16 @@ from tests.comparison.query import (
     ValuesClause,
     ValuesRow)
 from tests.comparison.query_generator import QueryGenerator
-from tests.comparison.query_profile import DefaultProfile
 
 
 class InsertStatementGenerator(object):
   def __init__(self, profile):
     # QueryProfile-like object
     self.profile = profile
-    # used to generate SELECT queries for INSERT ... SELECT statements
-    self.query_generator = QueryGenerator(profile)
+    # used to generate SELECT queries for INSERT ... SELECT statements;
+    # to ensure state is completely reset, this is created anew with each call to
+    # generate_statement()
+    self.select_stmt_generator = None
 
   def generate_statement(self, tables, dml_table):
     """
@@ -45,34 +47,103 @@ class InsertStatementGenerator(object):
     "sources" of the INSERT's WITH and FROM/WHERE clauses.
 
     dml_table is a required Table object. The INSERT will be into this table.
-
-    This is just a stub, good enough to generatea valid INSERT INTO ... VALUES
-    statement. Actual implementation is tracked IMPALA-4353.
     """
     if not (isinstance(tables, list) and len(tables) > 0 and
             all((isinstance(t, Table) for t in tables))):
-      raise Exception("tables must be a not-empty list of Table objects")
+      raise Exception('tables must be a not-empty list of Table objects')
 
     if not isinstance(dml_table, Table):
       raise Exception('dml_table must be a Table')
 
+    self.select_stmt_generator = QueryGenerator(self.profile)
+
     if dml_table.primary_keys:
-      conflict_action = InsertStatement.CONFLICT_ACTION_IGNORE
+      insert_statement = InsertStatement(
+          conflict_action=InsertStatement.CONFLICT_ACTION_IGNORE)
     else:
-      conflict_action = InsertStatement.CONFLICT_ACTION_DEFAULT
+      insert_statement = InsertStatement(
+          conflict_action=InsertStatement.CONFLICT_ACTION_DEFAULT)
 
-    return InsertStatement(
-        insert_clause=InsertClause(dml_table),
-        values_clause=self.generate_values_clause(dml_table.cols),
-        conflict_action=conflict_action, execution=StatementExecutionMode.DML_TEST)
+    insert_statement.execution = StatementExecutionMode.DML_TEST
 
-  def generate_values_clause(self, table_columns):
-    constants = []
-    for col in table_columns:
-      val = self.profile.choose_constant(return_type=col.exact_type,
-                                         allow_null=(not col.is_primary_key))
-      constants.append(val)
-    return ValuesClause([ValuesRow(constants)])
+    # Choose whether this is a
+    #   INSERT INTO table SELECT/VALUES
+    # or
+    #   INSERT INTO table (col1, col2, ...) SELECT/VALUES
+    # If the method returns None, it's the former.
+    insert_column_list = self.profile.choose_insert_column_list(dml_table)
+    insert_statement.insert_clause = InsertClause(
+        dml_table, column_list=insert_column_list)
+    # We still need to internally track the columns we're inserting. Keep in mind None
+    # means "all" without an explicit column list. Since we've already created the
+    # InsertClause object though, we can fill this in for ourselves.
+    if insert_column_list is None:
+      insert_column_list = dml_table.cols
+    insert_item_data_types = [col.type for col in insert_column_list]
+
+    # Decide whether this is INSERT VALUES or INSERT SELECT
+    insert_source_clause = self.profile.choose_insert_source_clause()
+
+    if issubclass(insert_source_clause, Query):
+      # Use QueryGenerator()'s public interface to generate the SELECT.
+      select_query = self.select_stmt_generator.generate_statement(
+          tables, select_item_data_types=insert_item_data_types)
+      # To avoid many loss-of-precision errors, explicitly cast the SelectItems. The
+      # generator's type system is not near sophisticated enough to know how random
+      # expressions will be implicitly casted in the databases. This requires less work
+      # to implement. IMPALA-4693 considers alternative approaches.
+      self._cast_select_items(select_query, insert_column_list)
+      insert_statement.with_clause = deepcopy(select_query.with_clause)
+      select_query.with_clause = None
+      insert_statement.select_query = select_query
+    elif issubclass(insert_source_clause, ValuesClause):
+      insert_statement.values_clause = self._generate_values_clause(insert_column_list)
+    else:
+      raise Exception('unsupported INSERT source clause: {0}'.format(
+          insert_source_clause))
+    return insert_statement
+
+  def _generate_values_clause(self, columns):
+    """
+    Return a VALUES clause containing a variable number of rows.
+
+    The values corresponding to primary keys will be non-null constants. Any other
+    columns could be null, constants, or function trees that may or may not evaluate to
+    null.
+    """
+    values_rows = []
+    for _ in xrange(self.profile.choose_insert_values_row_count()):
+      values_row = []
+      for col in columns:
+        if col.is_primary_key:
+          val = self.profile.choose_constant(return_type=col.exact_type, allow_null=False)
+        elif 'constant' == self.profile.choose_values_item_expr():
+          val = self.profile.choose_constant(return_type=col.exact_type, allow_null=True)
+        else:
+          func_tree = self.select_stmt_generator.create_func_tree(
+              col.type, allow_subquery=False)
+          val = self.select_stmt_generator.populate_func_with_vals(func_tree)
+          # Only the generic type, not the exact type, of the value will be known. To
+          # avoid a lot of failed queries due to precision errors, we cast the val to
+          # the exact type of the column. This will still not prevent "out of range"
+          # conditions, as we don't try to evaluate the random expressions.
+          val = CastFunc(val, col.exact_type)
+        values_row.append(val)
+      values_rows.append(ValuesRow(values_row))
+    return ValuesClause(values_rows)
+
+  def _cast_select_items(self, select_query, column_list):
+    """
+    For a given Query select_query and a column_list (list of Columns), cast each select
+    item in select_query to the exact type of the column.
+
+    A Query may have a UNION, recursively do this down the line.
+    """
+    for col_idx, select_item in enumerate(select_query.select_clause.items):
+      cast_val_expr = CastFunc(select_item.val_expr, column_list[col_idx].exact_type)
+      select_item.val_expr = cast_val_expr
+    if select_query.union_clause:
+      self._cast_select_items(select_query.union_clause.query, column_list)
 
 
 def get_generator(statement_type):
