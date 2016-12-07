@@ -134,7 +134,7 @@ Status RuntimeState::Init(ExecEnv* exec_env) {
     DCHECK(resource_pool_ != NULL);
   }
 
-  total_thread_statistics_ = ADD_THREAD_COUNTERS(runtime_profile(), "");
+  total_thread_statistics_ = ADD_THREAD_COUNTERS(runtime_profile(), "TotalThreads");
   total_storage_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalStorageWaitTime");
   total_network_send_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkSendTime");
   total_network_receive_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkReceiveTime");
