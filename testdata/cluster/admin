@@ -293,12 +293,19 @@ function start_cluster {
 
   if [ ${#SUPPORTED_SERVICES[@]} -gt 0 ]; then
     for SERVICE in ${SUPPORTED_SERVICES[@]-}; do
-      # We only run ntp-wait when it is available. That availability is checked by the
-      # call to ntp-wait --help.
-      if [[ "${SERVICE}" == "kudu" ]] && ntp-wait --help >/dev/null 2>/dev/null \
-           && ! ntp-wait -v; then
-        echo "ntp-wait failed; cannot start kudu"
-        return 1
+      # If all of the following are true, we wait for ntp to sync before proceeding:
+      #
+      # 1. Kudu is being started
+      # 2. An internet connection is available (checked by pinging $NTP_CANARY)
+      # 3. ntp-wait is installed (checked by calling ntp-wait with the "--help" flag)
+      if [[ "${SERVICE}" == "kudu" ]]; then
+        NTP_CANARY=pool.ntp.org
+        if ! ping -c 1 -w 5 "${NTP_CANARY}" >/dev/null 2>/dev/null; then
+          echo "WARNING: cannot reach ${NTP_CANARY}; ntp sync recommended for Kudu"
+        elif ntp-wait --help >/dev/null 2>/dev/null && ! ntp-wait -v; then
+          echo "ntp-wait failed; cannot start kudu"
+          return 1
+        fi
       fi
       start $SERVICE
     done
