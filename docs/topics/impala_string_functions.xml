@@ -302,7 +302,7 @@ SELECT chr(97);
       <dlentry id="instr">
 
         <dt>
-          <codeph>instr(string str, string substr)</codeph>
+          <codeph>instr(string str, string substr <ph rev="IMPALA-3973">[, bigint position [, bigint occurrence ] ]</ph>)</codeph>
         </dt>
 
         <dd>
@@ -312,6 +312,178 @@ SELECT chr(97);
           <p>
             <b>Return type:</b> <codeph>int</codeph>
           </p>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+          <p>
+            If the substring is not present in the string, the function returns 0:
+          </p>
+
+<codeblock rev="IMPALA-3973 2.8.0">
+select instr('foo bar bletch', 'z');
++------------------------------+
+| instr('foo bar bletch', 'z') |
++------------------------------+
+| 0                            |
++------------------------------+
+</codeblock>
+
+          <p rev="IMPALA-3973 2.8.0">
+            The optional third and fourth arguments let you find instances of the substring
+            other than the first instance starting from the left:
+          </p>
+          <ul>
+            <li>
+              <p>
+                The third argument lets you specify a starting point within the string
+                other than 1:
+              </p>
+
+<codeblock>
+-- Restricting the search to positions 7..end,
+-- the first occurrence of 'b' is at position 9.
+select instr('foo bar bletch', 'b', 7);
++---------------------------------+
+| instr('foo bar bletch', 'b', 7) |
++---------------------------------+
+| 9                               |
++---------------------------------+
+
+-- If there are no more occurrences after the
+-- specified position, the result is 0.
+select instr('foo bar bletch', 'b', 10);
++----------------------------------+
+| instr('foo bar bletch', 'b', 10) |
++----------------------------------+
+| 0                                |
++----------------------------------+
+</codeblock>
+
+              <p>
+                If the third argument is negative, the search works right-to-left
+                starting that many characters from the right. The return value still
+                represents the position starting from the left side of the string.
+              </p>
+
+<codeblock rev="IMPALA-3973 2.8.0">
+-- Scanning right to left, the first occurrence of 'o'
+-- is at position 8. (8th character from the left.)
+select instr('hello world','o',-1);
++-------------------------------+
+| instr('hello world', 'o', -1) |
++-------------------------------+
+| 8                             |
++-------------------------------+
+
+-- Scanning right to left, starting from the 6th character
+-- from the right, the first occurrence of 'o' is at
+-- position 5 (5th character from the left).
+select instr('hello world','o',-6);
++-------------------------------+
+| instr('hello world', 'o', -6) |
++-------------------------------+
+| 5                             |
++-------------------------------+
+
+-- If there are no more occurrences after the
+-- specified position, the result is 0.
+select instr('hello world','o',-10);
++--------------------------------+
+| instr('hello world', 'o', -10) |
++--------------------------------+
+| 0                              |
++--------------------------------+
+</codeblock>
+
+            </li>
+
+            <li>
+              <p>
+                The fourth argument lets you specify an occurrence other than the first:
+              </p>
+
+<codeblock rev="IMPALA-3973 2.8.0">
+-- 2nd occurrence of 'b' is at position 9.
+select instr('foo bar bletch', 'b', 1, 2);
++------------------------------------+
+| instr('foo bar bletch', 'b', 1, 2) |
++------------------------------------+
+| 9                                  |
++------------------------------------+
+
+-- Negative position argument means scan right-to-left.
+-- This example finds second instance of 'b' from the right.
+select instr('foo bar bletch', 'b', -1, 2);
++-------------------------------------+
+| instr('foo bar bletch', 'b', -1, 2) |
++-------------------------------------+
+| 5                                   |
++-------------------------------------+
+</codeblock>
+
+              <p>
+                If the fourth argument is greater than the number of matching occurrences,
+                the function returns 0:
+              </p>
+
+<codeblock>
+-- There is no 3rd occurrence within the string.
+select instr('foo bar bletch', 'b', 1, 3);
++------------------------------------+
+| instr('foo bar bletch', 'b', 1, 3) |
++------------------------------------+
+| 0                                  |
++------------------------------------+
+
+-- There is not even 1 occurrence when scanning
+-- the string starting at position 10.
+select instr('foo bar bletch', 'b', 10, 1);
++-------------------------------------+
+| instr('foo bar bletch', 'b', 10, 1) |
++-------------------------------------+
+| 0                                   |
++-------------------------------------+
+</codeblock>
+
+              <p>
+                The fourth argument cannot be negative or zero. A non-positive value for
+                this argument causes an error:
+              </p>
+
+<codeblock>
+select instr('foo bar bletch', 'b', 1, 0);
+ERROR: UDF ERROR: Invalid occurrence parameter to instr function: 0
+
+select instr('aaaaaaaaa','aa', 1, -1);
+ERROR: UDF ERROR: Invalid occurrence parameter to instr function: -1
+</codeblock>
+
+            </li>
+
+            <li>
+              <p>
+                If either of the optional arguments is <codeph>NULL</codeph>,
+                the function also returns <codeph>NULL</codeph>:
+              </p>
+
+<codeblock>
+select instr('foo bar bletch', 'b', null);
++------------------------------------+
+| instr('foo bar bletch', 'b', null) |
++------------------------------------+
+| NULL                               |
++------------------------------------+
+
+select instr('foo bar bletch', 'b', 1, null);
++---------------------------------------+
+| instr('foo bar bletch', 'b', 1, null) |
++---------------------------------------+
+| NULL                                  |
++---------------------------------------+
+</codeblock>
+            </li>
+
+          </ul>
+
         </dd>
 
       </dlentry>
