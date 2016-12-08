@@ -30,6 +30,12 @@ using std::string;
 #include "common/logging.h"
 #include "gutil/integral_types.h"
 
+#define NANOS_PER_SEC  1000000000ll
+#define NANOS_PER_MICRO      1000ll
+#define MICROS_PER_SEC    1000000ll
+#define MICROS_PER_MILLI     1000ll
+#define MILLIS_PER_SEC       1000ll
+
 typedef double WallTime;
 
 // Append result to a supplied string.
@@ -52,9 +58,6 @@ bool WallTime_Parse_Timezone(const char* time_spec,
                                     bool local,
                                     WallTime* result);
 
-// Return current time in seconds as a WallTime.
-WallTime WallTime_Now();
-
 typedef int64 MicrosecondsInt64;
 typedef int64 NanosecondsInt64;
 
@@ -76,7 +79,7 @@ inline void GetCurrentTime(mach_timespec_t* ts) {
 inline MicrosecondsInt64 GetCurrentTimeMicros() {
   mach_timespec_t ts;
   GetCurrentTime(&ts);
-  return ts.tv_sec * 1e6 + ts.tv_nsec / 1e3;
+  return ts.tv_sec * MICROS_PER_SEC + ts.tv_nsec / NANOS_PER_MICRO;
 }
 
 inline int64_t GetMonoTimeNanos() {
@@ -91,7 +94,7 @@ inline int64_t GetMonoTimeNanos() {
 }
 
 inline MicrosecondsInt64 GetMonoTimeMicros() {
-  return GetMonoTimeNanos() / 1e3;
+  return GetMonoTimeNanos() / NANOS_PER_MICRO;
 }
 
 inline MicrosecondsInt64 GetThreadCpuTimeMicros() {
@@ -117,7 +120,8 @@ inline MicrosecondsInt64 GetThreadCpuTimeMicros() {
     return 0;
   }
 
-  return thread_info_data.user_time.seconds * 1e6 + thread_info_data.user_time.microseconds;
+  return thread_info_data.user_time.seconds * MICROS_PER_SEC +
+      thread_info_data.user_time.microseconds;
 }
 
 #else
@@ -125,13 +129,13 @@ inline MicrosecondsInt64 GetThreadCpuTimeMicros() {
 inline MicrosecondsInt64 GetClockTimeMicros(clockid_t clock) {
   timespec ts;
   clock_gettime(clock, &ts);
-  return ts.tv_sec * 1e6 + ts.tv_nsec / 1e3;
+  return ts.tv_sec * MICROS_PER_SEC + ts.tv_nsec / NANOS_PER_MICRO;
 }
 
 inline NanosecondsInt64 GetClockTimeNanos(clockid_t clock) {
   timespec ts;
   clock_gettime(clock, &ts);
-  return ts.tv_sec * 1e9 + ts.tv_nsec;
+  return ts.tv_sec * NANOS_PER_SEC + ts.tv_nsec;
 }
 
 #endif // defined(__APPLE__)

@@ -166,18 +166,6 @@ bool WallTime_Parse_Timezone(const char* time_spec,
   return true;
 }
 
-WallTime WallTime_Now() {
-#if defined(__APPLE__)
-  mach_timespec_t ts;
-  walltime_internal::GetCurrentTime(&ts);
-  return ts.tv_sec + ts.tv_nsec / static_cast<double>(1e9);
-#else
-  timespec ts;
-  clock_gettime(CLOCK_REALTIME, &ts);
-  return ts.tv_sec + ts.tv_nsec / static_cast<double>(1e9);
-#endif  // defined(__APPLE__)
-}
-
 void StringAppendStrftime(string* dst,
                           const char* format,
                           time_t when,
