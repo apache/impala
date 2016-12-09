@@ -795,9 +795,19 @@ public class HdfsTable extends Table {
    * permissions Impala has on the given path. If the path does not exist, recurses up
    * the path until a existing parent directory is found, and inherit access permissions
    * from that.
+   * Always returns READ_WRITE for S3 files.
    */
   private TAccessLevel getAvailableAccessLevel(FileSystem fs, Path location)
       throws IOException {
+
+    // Avoid calling getPermissions() on file path for S3 files, as that makes a round
+    // trip to S3. Also, the S3A connector is currently unable to manage S3 permissions,
+    // so for now it is safe to assume that all files(objects) have READ_WRITE
+    // permissions, as that's what the S3A connector will always return too.
+    // TODO: Revisit if the S3A connector is updated to be able to manage S3 object
+    // permissions. (see HADOOP-13892)
+    if (FileSystemUtil.isS3AFileSystem(fs)) return TAccessLevel.READ_WRITE;
+
     FsPermissionChecker permissionChecker = FsPermissionChecker.getInstance();
     while (location != null) {
       if (fs.exists(location)) {
