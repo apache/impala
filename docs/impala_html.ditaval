@@ -17,9 +17,11 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
-<!-- Exclude Cloudera-only content. This is typically material that's permanently hidden,
-     e.g. obsolete or abandoned. Use pre-release for material being actively worked on
-     that's not ready for prime time. -->
+<!-- Exclude blocks of content. This is typically material that's permanently hidden,
+     (obsolete or abandoned), or aspirational (maybe write new topic somewhere down the road).
+     Use pre-release condition instead for material being actively worked on
+     that's not quite ready for prime time. -->
+<prop att="audience" val="hidden" action="exclude"/>
 <prop att="audience" val="Cloudera" action="exclude"/>
 <!-- These two are backward: things marked HTML are excluded from the HTML and
      things marked PDF are excluded from the PDF. -->
