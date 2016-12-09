@@ -31,7 +31,7 @@
 
 #include "common/names.h"
 
-#define DEFAULT_KUDU_MUTATION_BUFFER_SIZE 100 * 1024 * 1024
+#define DEFAULT_KUDU_MUTATION_BUFFER_SIZE 10 * 1024 * 1024
 
 DEFINE_int32(kudu_mutation_buffer_size, DEFAULT_KUDU_MUTATION_BUFFER_SIZE,
     "The size (bytes) of the Kudu client buffer for mutations.");
@@ -173,10 +173,11 @@ Status KuduTableSink::Open(RuntimeState* state) {
   // Internally, the Kudu client keeps one or more buffers for writing operations. When a
   // single buffer is flushed, it is locked (that space cannot be reused) until all
   // operations within it complete, so it is important to have a number of buffers. In
-  // our testing, we found that allowing a total of 100MB of buffer space to provide good
+  // our testing, we found that allowing a total of 10MB of buffer space to provide good
   // results; this is the default.  Then, because of some existing 8MB limits in Kudu, we
   // want to have that total space broken up into 7MB buffers (INDIVIDUAL_BUFFER_SIZE).
   // The mutation flush watermark is set to flush every INDIVIDUAL_BUFFER_SIZE.
+  // TODO: simplify/remove this logic when Kudu simplifies the API (KUDU-1808).
   int num_buffers = FLAGS_kudu_mutation_buffer_size / INDIVIDUAL_BUFFER_SIZE;
   if (num_buffers == 0) num_buffers = 1;
   KUDU_RETURN_IF_ERROR(session_->SetMutationBufferFlushWatermark(1.0 / num_buffers),
