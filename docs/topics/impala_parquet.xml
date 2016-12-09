@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">Parquet support in Impala</indexterm>
+      <indexterm audience="hidden">Parquet support in Impala</indexterm>
       Impala helps you to create, manage, and query Parquet tables. Parquet is a column-oriented binary file format
       intended to be highly efficient for the types of large-scale queries that Impala is best at. Parquet is
       especially good for queries scanning particular columns within a table, for example to query <q>wide</q>
@@ -443,7 +443,7 @@ Add an example here.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">COMPRESSION_CODEC query option</indexterm>
+        <indexterm audience="hidden">COMPRESSION_CODEC query option</indexterm>
         When Impala writes Parquet data files using the <codeph>INSERT</codeph> statement, the underlying
         compression is controlled by the <codeph>COMPRESSION_CODEC</codeph> query option. (Prior to Impala 2.0, the
         query option name was <codeph>PARQUET_COMPRESSION_CODEC</codeph>.) The allowed values for this query option
@@ -461,7 +461,7 @@ Add an example here.
       <conbody>
 
         <p>
-          <indexterm audience="Cloudera">compression</indexterm>
+          <indexterm audience="hidden">compression</indexterm>
           By default, the underlying data files for a Parquet table are compressed with Snappy. The combination of
           fast compression and decompression makes it a good choice for many data sets. To ensure Snappy
           compression is used, for example after experimenting with other compression codecs, set the

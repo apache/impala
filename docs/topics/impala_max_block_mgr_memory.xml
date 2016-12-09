@@ -34,7 +34,7 @@ under the License.
   <conbody>
 
     <p rev="2.1.0">
-      <indexterm audience="Cloudera">MAX_BLOCK_MGR_MEMORY query option</indexterm>
+      <indexterm audience="hidden">MAX_BLOCK_MGR_MEMORY query option</indexterm>
     </p>
 
     <p></p>

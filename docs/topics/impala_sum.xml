@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">sum() function</indexterm>
+      <indexterm audience="hidden">sum() function</indexterm>
       An aggregate function that returns the sum of a set of numbers. Its single argument can be numeric column, or
       the numeric result of a function or expression applied to the column value. Rows with a <codeph>NULL</codeph>
       value for the specified column are ignored. If the table is empty, or all the values supplied to

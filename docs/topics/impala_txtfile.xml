@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">Text support in Impala</indexterm>
+      <indexterm audience="hidden">Text support in Impala</indexterm>
       Impala supports using text files as the storage format for input and output. Text files are a
       convenient format to use for interchange with other applications or scripts that produce or read delimited
       text files, such as CSV or TSV with commas or tabs for delimiters.
@@ -439,9 +439,9 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</codeblock>
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">LZO support in Impala</indexterm>
+        <indexterm audience="hidden">LZO support in Impala</indexterm>
 
-        <indexterm audience="Cloudera">compression</indexterm>
+        <indexterm audience="hidden">compression</indexterm>
         Impala supports using text data files that employ LZO compression. <ph rev="upstream">Cloudera</ph> recommends compressing
         text data files when practical. Impala queries are usually I/O-bound; reducing the amount of data read from
         disk typically speeds up a query, despite the extra CPU work to uncompress the data in memory.
@@ -483,11 +483,11 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</codeblock>
         <ol>
           <li>
             <b>Prepare your systems to work with LZO by downloading and installing the appropriate libraries:</b>
-            <p audience="Cloudera">
+            <p audience="hidden">
               <b>On systems managed by Cloudera Manager using parcels:</b>
             </p>
 
-            <p audience="Cloudera">
+            <p audience="hidden">
               See the setup instructions for the LZO parcel in the Cloudera Manager documentation for
               <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_ig_install_gpl_extras.html" scope="external" format="html">Cloudera
               Manager 5</xref>.
@@ -725,13 +725,13 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">gzip support in Impala</indexterm>
+        <indexterm audience="hidden">gzip support in Impala</indexterm>
 
-        <indexterm audience="Cloudera">bzip2 support in Impala</indexterm>
+        <indexterm audience="hidden">bzip2 support in Impala</indexterm>
 
-        <indexterm audience="Cloudera">Snappy support in Impala</indexterm>
+        <indexterm audience="hidden">Snappy support in Impala</indexterm>
 
-        <indexterm audience="Cloudera">compression</indexterm>
+        <indexterm audience="hidden">compression</indexterm>
         In Impala 2.0 and later, Impala supports using text data files that employ gzip, bzip2, or Snappy
         compression. These compression types are primarily for convenience within an existing ETL pipeline rather
         than maximum performance. Although it requires less I/O to read compressed text than the equivalent
@@ -815,7 +815,7 @@ $ hdfs dfs -ls 'hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_co
 
   </concept>
 
-  <concept audience="Cloudera" id="txtfile_data_types">
+  <concept audience="hidden" id="txtfile_data_types">
 
     <title>Data Type Considerations for Text Tables</title>
 

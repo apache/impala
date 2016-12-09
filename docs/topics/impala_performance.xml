@@ -101,7 +101,7 @@ under the License.
         Impala can use.
       </li>
 
-      <li rev="1.2" audience="Cloudera">
+      <li rev="1.2" audience="hidden">
         <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/>. Impala can use the HDFS caching feature to pin
         frequently accessed data in memory, reducing disk I/O.
       </li>
@@ -120,28 +120,28 @@ under the License.
 
 <!-- Empty/hidden stub sections that might be worth expanding later. -->
 
-  <concept id="perf_network" audience="Cloudera">
+  <concept id="perf_network" audience="hidden">
 
     <title>Network Traffic</title>
 
     <conbody/>
   </concept>
 
-  <concept id="perf_partition_schema" audience="Cloudera">
+  <concept id="perf_partition_schema" audience="hidden">
 
     <title>Designing Partitioned Tables</title>
 
     <conbody/>
   </concept>
 
-  <concept id="perf_partition_query" audience="Cloudera">
+  <concept id="perf_partition_query" audience="hidden">
 
     <title>Queries on Partitioned Tables</title>
 
     <conbody/>
   </concept>
 
-  <concept id="perf_monitoring" audience="Cloudera">
+  <concept id="perf_monitoring" audience="hidden">
 
     <title>Monitoring Performance through the Impala Web Interface</title>
   <prolog>
@@ -153,42 +153,42 @@ under the License.
     <conbody/>
   </concept>
 
-  <concept id="perf_query_coord" audience="Cloudera">
+  <concept id="perf_query_coord" audience="hidden">
 
     <title>Query Coordination</title>
 
     <conbody/>
   </concept>
 
-  <concept id="perf_bottlenecks" audience="Cloudera">
+  <concept id="perf_bottlenecks" audience="hidden">
 
     <title>Performance Bottlenecks</title>
 
     <conbody/>
   </concept>
 
-  <concept id="perf_long_queries" audience="Cloudera">
+  <concept id="perf_long_queries" audience="hidden">
 
     <title>Managing Long-Running Queries</title>
 
     <conbody/>
   </concept>
 
-  <concept id="perf_load" audience="Cloudera">
+  <concept id="perf_load" audience="hidden">
 
     <title>Performance Considerations for Loading Data</title>
 
     <conbody/>
   </concept>
 
-  <concept id="perf_file_formats" audience="Cloudera">
+  <concept id="perf_file_formats" audience="hidden">
 
     <title>Performance Considerations for File Formats</title>
 
     <conbody/>
   </concept>
 
-  <concept id="perf_compression" audience="Cloudera">
+  <concept id="perf_compression" audience="hidden">
 
     <title>Performance Considerations for Compression</title>
   <prolog>
@@ -200,7 +200,7 @@ under the License.
     <conbody/>
   </concept>
 
-  <concept id="perf_codegen" audience="Cloudera">
+  <concept id="perf_codegen" audience="hidden">
 
     <title>Native Code Generation</title>
 

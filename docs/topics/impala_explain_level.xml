@@ -39,7 +39,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">EXPLAIN_LEVEL query option</indexterm>
+      <indexterm audience="hidden">EXPLAIN_LEVEL query option</indexterm>
       Controls the amount of detail provided in the output of the <codeph>EXPLAIN</codeph> statement. The basic
       output can help you identify high-level performance issues such as scanning a higher volume of data or more
       partitions than you expect. The higher levels of detail show how intermediate results flow between nodes and

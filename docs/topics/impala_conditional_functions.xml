@@ -46,7 +46,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">CASE expression</indexterm>
+          <indexterm audience="hidden">CASE expression</indexterm>
           <b>Purpose:</b> Compares an expression to one or more possible values, and returns a corresponding result
           when a match is found.
           <p conref="../shared/impala_common.xml#common/return_same_type"/>
@@ -83,7 +83,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">CASE expression</indexterm>
+          <indexterm audience="hidden">CASE expression</indexterm>
           <b>Purpose:</b> Tests whether any of a sequence of expressions is true, and returns a corresponding
           result for the first true expression.
           <p conref="../shared/impala_common.xml#common/return_same_type"/>
@@ -146,7 +146,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">coalesce() function</indexterm>
+          <indexterm audience="hidden">coalesce() function</indexterm>
           <b>Purpose:</b> Returns the first specified argument that is not <codeph>NULL</codeph>, or
           <codeph>NULL</codeph> if all arguments are <codeph>NULL</codeph>.
           <p conref="../shared/impala_common.xml#common/return_same_type"/>
@@ -162,7 +162,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">decode() function</indexterm>
+          <indexterm audience="hidden">decode() function</indexterm>
           <b>Purpose:</b> Compares an expression to one or more possible values, and returns a corresponding result
           when a match is found.
           <p conref="../shared/impala_common.xml#common/return_same_type"/>
@@ -201,7 +201,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">if() function</indexterm>
+          <indexterm audience="hidden">if() function</indexterm>
           <b>Purpose:</b> Tests an expression and returns a corresponding result depending on whether the result is
           true, false, or <codeph>NULL</codeph>.
           <p>
@@ -218,7 +218,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">isnull() function</indexterm>
+          <indexterm audience="hidden">isnull() function</indexterm>
           <b>Purpose:</b> Alias for the <codeph>isnull()</codeph> function, with the same behavior. To simplify
           porting SQL with vendor extensions to Impala.
           <p conref="../shared/impala_common.xml#common/added_in_130"/>
@@ -233,7 +233,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">isfalse() function</indexterm>
+          <indexterm audience="hidden">isfalse() function</indexterm>
           <b>Purpose:</b> Tests if a Boolean expression is <codeph>false</codeph> or not.
           Returns <codeph>true</codeph> if so.
           If the argument is <codeph>NULL</codeph>, returns <codeph>false</codeph>.
@@ -251,7 +251,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">isnotfalse() function</indexterm>
+          <indexterm audience="hidden">isnotfalse() function</indexterm>
           <b>Purpose:</b> Tests if a Boolean expression is not <codeph>false</codeph> (that is, either <codeph>true</codeph> or <codeph>NULL</codeph>).
           Returns <codeph>true</codeph> if so.
           If the argument is <codeph>NULL</codeph>, returns <codeph>true</codeph>.
@@ -270,7 +270,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">isnottrue() function</indexterm>
+          <indexterm audience="hidden">isnottrue() function</indexterm>
           <b>Purpose:</b> Tests if a Boolean expression is not <codeph>true</codeph> (that is, either <codeph>false</codeph> or <codeph>NULL</codeph>).
           Returns <codeph>true</codeph> if so.
           If the argument is <codeph>NULL</codeph>, returns <codeph>true</codeph>.
@@ -288,7 +288,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">isnull() function</indexterm>
+          <indexterm audience="hidden">isnull() function</indexterm>
           <b>Purpose:</b> Tests if an expression is <codeph>NULL</codeph>, and returns the expression result value
           if not. If the first argument is <codeph>NULL</codeph>, returns the second argument.
           <p>
@@ -310,7 +310,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">istrue() function</indexterm>
+          <indexterm audience="hidden">istrue() function</indexterm>
           <b>Purpose:</b> Tests if a Boolean expression is <codeph>true</codeph> or not.
           Returns <codeph>true</codeph> if so.
           If the argument is <codeph>NULL</codeph>, returns <codeph>false</codeph>.
@@ -329,7 +329,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">function</indexterm>
+          <indexterm audience="hidden">function</indexterm>
           <b>Purpose:</b> Tests if an expression (of any type) is <codeph>NULL</codeph> or not.
           Returns <codeph>false</codeph> if so.
           The converse of <codeph>nullvalue()</codeph>.
@@ -347,7 +347,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">nullif() function</indexterm>
+          <indexterm audience="hidden">nullif() function</indexterm>
           <b>Purpose:</b> Returns <codeph>NULL</codeph> if the two specified arguments are equal. If the specified
           arguments are not equal, returns the value of <varname>expr1</varname>. The data types of the expressions
           must be compatible, according to the conversion rules from <xref href="impala_datatypes.xml#datatypes"/>.
@@ -384,7 +384,7 @@ END</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">nullifzero() function</indexterm>
+          <indexterm audience="hidden">nullifzero() function</indexterm>
           <b>Purpose:</b> Returns <codeph>NULL</codeph> if the numeric expression evaluates to 0, otherwise returns
           the result of the expression.
           <p>
@@ -405,7 +405,7 @@ END</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">function</indexterm>
+          <indexterm audience="hidden">function</indexterm>
           <b>Purpose:</b> Tests if an expression (of any type) is <codeph>NULL</codeph> or not.
           Returns <codeph>true</codeph> if so.
           The converse of <codeph>nonnullvalue()</codeph>.
@@ -423,7 +423,7 @@ END</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">nvl() function</indexterm>
+          <indexterm audience="hidden">nvl() function</indexterm>
           <b>Purpose:</b> Alias for the <codeph>isnull()</codeph> function. Tests if an expression is
           <codeph>NULL</codeph>, and returns the expression result value if not. If the first argument is
           <codeph>NULL</codeph>, returns the second argument. Equivalent to the <codeph>nvl()</codeph> function
@@ -443,7 +443,7 @@ END</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">zeroifnull() function</indexterm>
+          <indexterm audience="hidden">zeroifnull() function</indexterm>
           <b>Purpose:</b> Returns 0 if the numeric expression evaluates to <codeph>NULL</codeph>, otherwise returns
           the result of the expression.
           <p>

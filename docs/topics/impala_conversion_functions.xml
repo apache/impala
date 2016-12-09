@@ -67,7 +67,7 @@ under the License.
 </dt>
 
 <dd>
-<indexterm audience="Cloudera">cast() function</indexterm>
+<indexterm audience="hidden">cast() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to any other type.
 If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Usage notes:</b>
@@ -136,12 +136,12 @@ describe t2;
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttobigint" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttobigint" audience="hidden">
 <dt>
 <codeph>casttobigint(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttobigint() function</indexterm>
+<indexterm audience="hidden">casttobigint() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>BIGINT</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>bigint</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -166,12 +166,12 @@ describe big_types;
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttoboolean" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttoboolean" audience="hidden">
 <dt>
 <codeph>casttoboolean(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttoboolean() function</indexterm>
+<indexterm audience="hidden">casttoboolean() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>BOOLEAN</codeph>.
 Numeric values of 0 evaluate to <codeph>false</codeph>, and non-zero values evaluate to <codeph>true</codeph>.
 If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
@@ -255,12 +255,12 @@ select casttoboolean('false');
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttochar" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttochar" audience="hidden">
 <dt>
 <codeph>casttochar(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttochar() function</indexterm>
+<indexterm audience="hidden">casttochar() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>CHAR</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>char</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -286,12 +286,12 @@ describe char_types;
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttodecimal" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttodecimal" audience="hidden">
 <dt>
 <codeph>casttodecimal(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttodecimal() function</indexterm>
+<indexterm audience="hidden">casttodecimal() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>DECIMAL</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>decimal</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -308,12 +308,12 @@ describe char_types;
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttodouble" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttodouble" audience="hidden">
 <dt>
 <codeph>casttodouble(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttodouble() function</indexterm>
+<indexterm audience="hidden">casttodouble() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>DOUBLE</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>double</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -358,12 +358,12 @@ select casttodouble(now());
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttofloat" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttofloat" audience="hidden">
 <dt>
 <codeph>casttofloat(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttofloat() function</indexterm>
+<indexterm audience="hidden">casttofloat() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>FLOAT</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>float</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -408,12 +408,12 @@ select casttofloat(now());
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttoint" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttoint" audience="hidden">
 <dt>
 <codeph>casttoint(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttoint() function</indexterm>
+<indexterm audience="hidden">casttoint() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>INT</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>int</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -458,12 +458,12 @@ select casttoint('3');
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttosmallint" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttosmallint" audience="hidden">
 <dt>
 <codeph>casttosmallint(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttosmallint() function</indexterm>
+<indexterm audience="hidden">casttosmallint() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>SMALLINT</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>smallint</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -488,12 +488,12 @@ describe small_types;
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttostring" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttostring" audience="hidden">
 <dt>
 <codeph>casttostring(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttostring() function</indexterm>
+<indexterm audience="hidden">casttostring() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>STRING</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>string</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -518,12 +518,12 @@ describe string_types;
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttotimestamp" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttotimestamp" audience="hidden">
 <dt>
 <codeph>casttotimestamp(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttotimestamp() function</indexterm>
+<indexterm audience="hidden">casttotimestamp() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>TIMESTAMP</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>timestamp</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -554,12 +554,12 @@ select casttotimestamp('1000');
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttotinyint" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttotinyint" audience="hidden">
 <dt>
 <codeph>casttotinyint(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttotinyint() function</indexterm>
+<indexterm audience="hidden">casttotinyint() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>TINYINT</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>tinyint</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -584,12 +584,12 @@ describe tiny_types;
 </dd>
 </dlentry>
 
-<dlentry rev="2.3.0" id="casttovarchar" audience="Cloudera">
+<dlentry rev="2.3.0" id="casttovarchar" audience="hidden">
 <dt>
 <codeph>casttovarchar(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">casttovarchar() function</indexterm>
+<indexterm audience="hidden">casttovarchar() function</indexterm>
 <b>Purpose:</b> Converts the value of an expression to <codeph>VARCHAR</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
 <p><b>Return type:</b> <codeph>varchar</codeph></p>
 <p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
@@ -639,7 +639,7 @@ select casttovarchar(true);
 <codeph>typeof(type value)</codeph>
 </dt>
 <dd>
-<indexterm audience="Cloudera">typeof() function</indexterm>
+<indexterm audience="hidden">typeof() function</indexterm>
 <b>Purpose:</b> Returns the name of the data type corresponding to an expression. For types with
 extra attributes, such as length for <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph>,
 or precision and scale for <codeph>DECIMAL</codeph>, includes the full specification of the type.

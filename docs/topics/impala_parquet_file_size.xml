@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">PARQUET_FILE_SIZE query option</indexterm>
+      <indexterm audience="hidden">PARQUET_FILE_SIZE query option</indexterm>
       Specifies the maximum size of each Parquet data file produced by Impala <codeph>INSERT</codeph> statements.
     </p>
 

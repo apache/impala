@@ -44,7 +44,7 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
-  <concept audience="Cloudera" id="llama">
+  <concept audience="hidden" id="llama">
   <!-- Hiding the whole concept now that Llama is desupported. -->
 
     <title>The Llama Daemon</title>
@@ -315,14 +315,14 @@ under the License.
 
     <conbody>
 
-<!-- Conditionalizing some content here with audience="Cloudera" because there are already some XML comments
+<!-- Conditionalizing some content here with audience="hidden" because there are already some XML comments
      inside the list, so not practical to enclose the whole thing in XML comments. -->
 
-      <p audience="Cloudera">
+      <p audience="hidden">
         Currently, Impala in CDH 5 has the following limitations for resource management of Impala queries:
       </p>
 
-      <ul audience="Cloudera">
+      <ul audience="hidden">
         <li>
           Table statistics are required, and column statistics are highly valuable, for Impala to produce accurate
           estimates of how much memory to request from YARN. See

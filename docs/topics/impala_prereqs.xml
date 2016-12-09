@@ -43,8 +43,8 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">prerequisites</indexterm>
-      <indexterm audience="Cloudera">requirements</indexterm>
+      <indexterm audience="hidden">prerequisites</indexterm>
+      <indexterm audience="hidden">requirements</indexterm>
       To perform as expected, Impala depends on the availability of the software, hardware, and configurations
       described in the following sections.
     </p>
@@ -83,14 +83,14 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">software requirements</indexterm>
-        <indexterm audience="Cloudera">Red Hat Enterprise Linux</indexterm>
-        <indexterm audience="Cloudera">RHEL</indexterm>
-        <indexterm audience="Cloudera">CentOS</indexterm>
-        <indexterm audience="Cloudera">SLES</indexterm>
-        <indexterm audience="Cloudera">Ubuntu</indexterm>
-        <indexterm audience="Cloudera">SUSE</indexterm>
-        <indexterm audience="Cloudera">Debian</indexterm> The relevant supported operating systems
+        <indexterm audience="hidden">software requirements</indexterm>
+        <indexterm audience="hidden">Red Hat Enterprise Linux</indexterm>
+        <indexterm audience="hidden">RHEL</indexterm>
+        <indexterm audience="hidden">CentOS</indexterm>
+        <indexterm audience="hidden">SLES</indexterm>
+        <indexterm audience="hidden">Ubuntu</indexterm>
+        <indexterm audience="hidden">SUSE</indexterm>
+        <indexterm audience="hidden">Debian</indexterm> The relevant supported operating systems
         and versions for Impala are the same as for the corresponding CDH 5 platforms. For
         details, see the <cite>Supported Operating Systems</cite> page for
         <ph audience="integrated"><xref href="rn_consolidated_pcm.xml#cdh_cm_supported_os">CDH
@@ -113,9 +113,9 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">Hive</indexterm>
-        <indexterm audience="Cloudera">MySQL</indexterm>
-        <indexterm audience="Cloudera">PostgreSQL</indexterm>
+        <indexterm audience="hidden">Hive</indexterm>
+        <indexterm audience="hidden">MySQL</indexterm>
+        <indexterm audience="hidden">PostgreSQL</indexterm>
         Impala can interoperate with data stored in Hive, and uses the same infrastructure as Hive for tracking
         metadata about schema objects such as tables and columns. The following components are prerequisites for
         Impala:
@@ -193,8 +193,8 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">Java</indexterm>
-        <indexterm audience="Cloudera">impala-dependencies.jar</indexterm>
+        <indexterm audience="hidden">Java</indexterm>
+        <indexterm audience="hidden">impala-dependencies.jar</indexterm>
         Although Impala is primarily written in C++, it does use Java to communicate with various Hadoop
         components:
       </p>
@@ -237,7 +237,7 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">network configuration</indexterm>
+        <indexterm audience="hidden">network configuration</indexterm>
         As part of ensuring best performance, Impala attempts to complete tasks on local data, as opposed to using
         network connections to work with remote data. To support this goal, Impala matches
         the <b>hostname</b> provided to each Impala daemon with the <b>IP address</b> of each DataNode by
@@ -265,14 +265,14 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">hardware requirements</indexterm>
-        <indexterm audience="Cloudera">capacity</indexterm>
-        <indexterm audience="Cloudera">RAM</indexterm>
-        <indexterm audience="Cloudera">memory</indexterm>
-        <indexterm audience="Cloudera">CPU</indexterm>
-        <indexterm audience="Cloudera">processor</indexterm>
-        <indexterm audience="Cloudera">Intel</indexterm>
-        <indexterm audience="Cloudera">AMD</indexterm>
+        <indexterm audience="hidden">hardware requirements</indexterm>
+        <indexterm audience="hidden">capacity</indexterm>
+        <indexterm audience="hidden">RAM</indexterm>
+        <indexterm audience="hidden">memory</indexterm>
+        <indexterm audience="hidden">CPU</indexterm>
+        <indexterm audience="hidden">processor</indexterm>
+        <indexterm audience="hidden">Intel</indexterm>
+        <indexterm audience="hidden">AMD</indexterm>
         During join operations, portions of data from each joined table are loaded into memory. Data sets can be
         very large, so ensure your hardware has sufficient memory to accommodate the joins you anticipate
         completing.
@@ -333,9 +333,9 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">impala user</indexterm>
-        <indexterm audience="Cloudera">impala group</indexterm>
-        <indexterm audience="Cloudera">root user</indexterm>
+        <indexterm audience="hidden">impala user</indexterm>
+        <indexterm audience="hidden">impala group</indexterm>
+        <indexterm audience="hidden">root user</indexterm>
         Impala creates and uses a user and group named <codeph>impala</codeph>. Do not delete this account or group
         and do not modify the account's or group's permissions and rights. Ensure no existing systems obstruct the
         functioning of these accounts and groups. For example, if you have scripts that delete user accounts not in
@@ -343,7 +343,7 @@ under the License.
       </p>
 
 <!-- Taking out because no longer applicable in CDH 5.5 and up. -->
-      <p id="impala_hdfs_group" rev="1.2" audience="Cloudera">
+      <p id="impala_hdfs_group" rev="1.2" audience="hidden">
         For the resource management feature to work (in combination with CDH 5 and the YARN and Llama components),
         the <codeph>impala</codeph> user must be a member of the <codeph>hdfs</codeph> group. This setup is
         performed automatically during a new install, but not when upgrading from earlier Impala releases to Impala

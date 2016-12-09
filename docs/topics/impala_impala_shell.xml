@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">impala-shell</indexterm>
+      <indexterm audience="hidden">impala-shell</indexterm>
       You can use the Impala shell tool (<codeph>impala-shell</codeph>) to set up databases and tables, insert
       data, and issue queries. For ad hoc queries and exploration, you can submit SQL statements in an interactive
       session. To automate your work, you can specify command-line options to process a single statement or a

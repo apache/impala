@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">ALTER VIEW statement</indexterm>
+      <indexterm audience="hidden">ALTER VIEW statement</indexterm>
       Changes the characteristics of a view. The syntax has two forms:
     </p>
 

@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">CHAR data type</indexterm>
+      <indexterm audience="hidden">CHAR data type</indexterm>
       A fixed-length character type, padded with trailing spaces if necessary to achieve the specified length. If
       values are longer than the specified length, Impala truncates any trailing characters.
     </p>

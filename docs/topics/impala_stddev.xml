@@ -37,9 +37,9 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">stddev() function</indexterm>
-      <indexterm audience="Cloudera">stddev_samp() function</indexterm>
-      <indexterm audience="Cloudera">stddev_pop() function</indexterm>
+      <indexterm audience="hidden">stddev() function</indexterm>
+      <indexterm audience="hidden">stddev_samp() function</indexterm>
+      <indexterm audience="hidden">stddev_pop() function</indexterm>
       An aggregate function that
       <xref href="http://en.wikipedia.org/wiki/Standard_deviation" scope="external" format="html">standard
       deviation</xref> of a set of numbers.

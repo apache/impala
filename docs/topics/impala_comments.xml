@@ -33,7 +33,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">comments (SQL)</indexterm>
+      <indexterm audience="hidden">comments (SQL)</indexterm>
       Impala supports the familiar styles of SQL comments:
     </p>
 

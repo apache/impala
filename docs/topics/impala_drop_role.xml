@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DROP ROLE statement</indexterm>
+      <indexterm audience="hidden">DROP ROLE statement</indexterm>
 <!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
       The <codeph>DROP ROLE</codeph> statement removes a role from the metastore database. Once dropped, the role
       is revoked for all users to whom it was previously assigned, and all privileges granted to that role are

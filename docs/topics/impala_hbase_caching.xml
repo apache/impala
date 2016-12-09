@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">HBASE_CACHING query option</indexterm>
+      <indexterm audience="hidden">HBASE_CACHING query option</indexterm>
       Setting this option is equivalent to calling the
         <codeph>setCaching</codeph> method of the class <xref
         href="http://hbase.apache.org/apidocs/org/apache/hadoop/hbase/client/Scan.html"

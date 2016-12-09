@@ -33,7 +33,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0">
-      <indexterm audience="Cloudera">DISABLE_OUTERMOST_TOPN query option</indexterm>
+      <indexterm audience="hidden">DISABLE_OUTERMOST_TOPN query option</indexterm>
     </p>
 
     <p>

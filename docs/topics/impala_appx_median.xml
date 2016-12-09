@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">appx_median() function</indexterm>
+      <indexterm audience="hidden">appx_median() function</indexterm>
       An aggregate function that returns a value that is approximately the median (midpoint) of values in the set
       of input values.
     </p>

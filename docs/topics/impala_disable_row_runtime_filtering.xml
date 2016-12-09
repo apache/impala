@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0">
-      <indexterm audience="Cloudera">DISABLE_ROW_RUNTIME_FILTERING query option</indexterm>
+      <indexterm audience="hidden">DISABLE_ROW_RUNTIME_FILTERING query option</indexterm>
       The <codeph>DISABLE_ROW_RUNTIME_FILTERING</codeph> query option
       reduces the scope of the runtime filtering feature. Queries still dynamically prune
       partitions, but do not apply the filtering logic to individual rows within partitions.

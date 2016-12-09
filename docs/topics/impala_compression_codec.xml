@@ -43,7 +43,7 @@ under the License.
 <!-- Could turn into a conref. -->
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">COMPRESSION_CODEC query option</indexterm>
+      <indexterm audience="hidden">COMPRESSION_CODEC query option</indexterm>
       When Impala writes Parquet data files using the <codeph>INSERT</codeph> statement, the underlying compression
       is controlled by the <codeph>COMPRESSION_CODEC</codeph> query option.
     </p>

@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">planning</indexterm>
+      <indexterm audience="hidden">planning</indexterm>
       Before you set up Impala in production, do some planning to make sure that your hardware setup has sufficient
       capacity, that your cluster topology is optimal for Impala queries, and that your schema design and ETL
       processes follow the best practices for Impala.

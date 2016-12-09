@@ -124,7 +124,7 @@ under the License.
           if all the digits of the input values were 9s and the absolute values were added together.
         </p>
 <!-- Seems like buggy output from this first query, so hiding the example for the time being. -->
-<codeblock audience="Cloudera"><![CDATA[[localhost:21000] > select 50000.5 + 12.444, precision(50000.5 + 12.444), scale(50000.5 + 12.444);
+<codeblock audience="hidden"><![CDATA[[localhost:21000] > select 50000.5 + 12.444, precision(50000.5 + 12.444), scale(50000.5 + 12.444);
 +------------------+-----------------------------+-------------------------+
 | 50000.5 + 12.444 | precision(50000.5 + 12.444) | scale(50000.5 + 12.444) |
 +------------------+-----------------------------+-------------------------+

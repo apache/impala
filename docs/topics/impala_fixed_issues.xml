@@ -2003,7 +2003,7 @@ ce601ec : Enable using isilon as the underlying filesystem.
         fixes to performance and flexibility for dealing with I/O using remote reads.
         See <xref href="impala_isilon.xml#impala_isilon"/> for details on using Impala and Isilon together.
       </p>
-      <p audience="Cloudera"><b>Bug:</b> <xref href="https://jira.cloudera.com/browse/CDH-24040" scope="external" format="html">CDH-24040</xref></p>
+      <p audience="hidden"><b>Bug:</b> <xref href="https://jira.cloudera.com/browse/CDH-24040" scope="external" format="html">CDH-24040</xref></p>
       <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1968" scope="external" format="html">IMPALA-1968</xref>,
       <xref href="https://issues.cloudera.org/browse/IMPALA-1730" scope="external" format="html">IMPALA-1730</xref></p>
       </conbody>
@@ -2098,7 +2098,7 @@ ce601ec : Enable using isilon as the underlying filesystem.
       <title>Isilon: fix custom_cluster/test_insert_inherit_permission.py</title>
       <conbody>
       <p></p>
-      <p audience="Cloudera"><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
+      <p audience="hidden"><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -2109,7 +2109,7 @@ ce601ec : Enable using isilon as the underlying filesystem.
       <title>Isilon: add remote HDFS disk queue</title>
       <conbody>
       <p></p>
-      <p audience="Cloudera"><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
+      <p audience="hidden"><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -2131,7 +2131,7 @@ ce601ec : Enable using isilon as the underlying filesystem.
       <title>Isilon: don't warn for multiple remote parquet blocks</title>
       <conbody>
       <p></p>
-      <p audience="Cloudera"><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
+      <p audience="hidden"><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -5130,7 +5130,7 @@ Bad stats:
           key.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-1188" scope="external" format="html">IMP-1188</xref>
         </p>
@@ -5974,7 +5974,7 @@ hive&gt; NULL</codeblock>
           Insert INTO TABLE SELECT &lt;constant&gt; will not insert any data and may return an error.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-231" scope="external" format="html"/> ; KI added 0.1
           <i>Cloudera internal only</i>
@@ -6436,7 +6436,7 @@ hive&gt; NULL</codeblock>
 
       <conbody>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-474" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -6551,7 +6551,7 @@ hive&gt; NULL</codeblock>
           does not propagate to Impala.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-56" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -6795,7 +6795,7 @@ hive&gt; NULL</codeblock>
           impala-shell will incorrectly report that the failed metadata refresh completed successfully.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-611" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -6871,7 +6871,7 @@ hive&gt; NULL</codeblock>
 
       <conbody>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-601" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -6901,7 +6901,7 @@ hive&gt; NULL</codeblock>
           table will return an <codeph>unknown table</codeph> error message, even if the table is known.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-298" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -6925,7 +6925,7 @@ hive&gt; NULL</codeblock>
           even if the metadata for that table is fixed.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-298" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -6947,7 +6947,7 @@ hive&gt; NULL</codeblock>
           Attempting to select from these tables fails.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-581" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -6970,7 +6970,7 @@ hive&gt; NULL</codeblock>
           any of the joined tables in the WHERE clause.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-137" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -7002,7 +7002,7 @@ hive&gt; NULL</codeblock>
 
 <codeblock>SELECT * FROM (SELECT sum(col1) FROM some_table GROUP BY col1) t1 JOIN other_table ON (...);</codeblock>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-491" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -7026,7 +7026,7 @@ hive&gt; NULL</codeblock>
 
 <codeblock>INSERT OVERWRITE TABLE test SELECT * FROM test2 LIMIT 1;</codeblock>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-497" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -7050,7 +7050,7 @@ hive&gt; NULL</codeblock>
 
 <codeblock>SELECT * FROM test2 LIMIT 1;</codeblock>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-535" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -7072,7 +7072,7 @@ hive&gt; NULL</codeblock>
           Attempting to read such files does not generate a diagnostic.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-270" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
@@ -7095,7 +7095,7 @@ hive&gt; NULL</codeblock>
           exception.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b>
           <xref href="https://jira.cloudera.com/browse/IMP-522" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>

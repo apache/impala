@@ -175,21 +175,21 @@ under the License.
 
 <!-- Bunch of potential concept topics for future consideration. Major areas of Impala modelled on areas of discussion for Oracle Database, and distributed databases in general. -->
 
-  <concept id="intro_datatypes" audience="Cloudera">
+  <concept id="intro_datatypes" audience="hidden">
 
     <title>Overview of Impala SQL Data Types</title>
 
     <conbody/>
   </concept>
 
-  <concept id="intro_network" audience="Cloudera">
+  <concept id="intro_network" audience="hidden">
 
     <title>Overview of Impala Network Topology</title>
 
     <conbody/>
   </concept>
 
-  <concept id="intro_cluster" audience="Cloudera">
+  <concept id="intro_cluster" audience="hidden">
 
     <title>Overview of Impala Cluster Topology</title>
 

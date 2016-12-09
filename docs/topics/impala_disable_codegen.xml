@@ -34,7 +34,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DISABLE_CODEGEN query option</indexterm>
+      <indexterm audience="hidden">DISABLE_CODEGEN query option</indexterm>
       This is a debug option, intended for diagnosing and working around issues that cause crashes. If a query
       fails with an <q>illegal instruction</q> or other hardware-specific message, try setting
       <codeph>DISABLE_CODEGEN=true</codeph> and running the query again. If the query succeeds only when the

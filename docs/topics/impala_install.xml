@@ -32,15 +32,15 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">installation</indexterm>
-      <indexterm audience="Cloudera">pseudo-distributed cluster</indexterm>
-      <indexterm audience="Cloudera">cluster</indexterm>
-      <indexterm audience="Cloudera">DataNodes</indexterm>
-      <indexterm audience="Cloudera">NameNode</indexterm>
-      <indexterm audience="Cloudera">Cloudera Manager</indexterm>
-      <indexterm audience="Cloudera">impalad</indexterm>
-      <indexterm audience="Cloudera">impala-shell</indexterm>
-      <indexterm audience="Cloudera">statestored</indexterm>
+      <indexterm audience="hidden">installation</indexterm>
+      <indexterm audience="hidden">pseudo-distributed cluster</indexterm>
+      <indexterm audience="hidden">cluster</indexterm>
+      <indexterm audience="hidden">DataNodes</indexterm>
+      <indexterm audience="hidden">NameNode</indexterm>
+      <indexterm audience="hidden">Cloudera Manager</indexterm>
+      <indexterm audience="hidden">impalad</indexterm>
+      <indexterm audience="hidden">impala-shell</indexterm>
+      <indexterm audience="hidden">statestored</indexterm>
       Impala is an open-source add-on to the Cloudera Enterprise Core that returns rapid responses to
       queries.
     </p>

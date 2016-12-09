@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">APPX_COUNT_DISTINCT query option</indexterm>
+      <indexterm audience="hidden">APPX_COUNT_DISTINCT query option</indexterm>
       Allows multiple <codeph>COUNT(DISTINCT)</codeph> operations within a single query, by internally rewriting
       each <codeph>COUNT(DISTINCT)</codeph> to use the <codeph>NDV()</codeph> function. The resulting count is
       approximate rather than precise.

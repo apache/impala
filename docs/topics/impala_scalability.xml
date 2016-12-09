@@ -50,7 +50,7 @@ under the License.
 
   </conbody>
 
-  <concept audience="Cloudera" id="scalability_memory">
+  <concept audience="hidden" id="scalability_memory">
 
     <title>Overview and Guidelines for Impala Memory Usage</title>
   <prolog>
@@ -167,7 +167,7 @@ Memory Usage: Additional Notes
 
     <conbody>
 
-      <p audience="Cloudera">
+      <p audience="hidden">
         Details to fill in in future: Impact of <q>load catalog in background</q> option.
         Changing timeouts. Related Cloudera Manager settings.
       </p>
@@ -310,7 +310,7 @@ Memory Usage: Additional Notes
     </conbody>
   </concept>
 
-  <concept audience="Cloudera" id="scalability_cluster_size">
+  <concept audience="hidden" id="scalability_cluster_size">
 
     <title>Scalability Considerations for Impala Cluster Size and Topology</title>
 
@@ -321,7 +321,7 @@ Memory Usage: Additional Notes
     </conbody>
   </concept>
 
-  <concept audience="Cloudera" id="concurrent_connections">
+  <concept audience="hidden" id="concurrent_connections">
 
     <title>Scaling the Number of Concurrent Connections</title>
 
@@ -469,7 +469,7 @@ Memory Usage: Additional Notes
               query.
             </li>
 
-            <li audience="Cloudera">
+            <li audience="hidden">
               The <uicontrol>Impala Queries</uicontrol> dialog in Cloudera Manager. You can see the peak memory
               usage for a query, combined across all nodes in the cluster.
             </li>

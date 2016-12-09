@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DESCRIBE statement</indexterm>
+      <indexterm audience="hidden">DESCRIBE statement</indexterm>
       The <codeph>DESCRIBE</codeph> statement displays metadata about a table, such as the column names and their
       data types.
       <ph rev="2.3.0">In <keyword keyref="impala23_full"/> and higher, you can specify the name of a complex type column, which takes

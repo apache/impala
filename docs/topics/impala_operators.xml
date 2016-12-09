@@ -34,7 +34,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">operators</indexterm>
+      <indexterm audience="hidden">operators</indexterm>
       SQL operators are a class of comparison functions that are widely used within the <codeph>WHERE</codeph> clauses of
       <codeph>SELECT</codeph> statements.
     </p>
@@ -50,7 +50,7 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">arithmetic operators</indexterm>
+        <indexterm audience="hidden">arithmetic operators</indexterm>
         The arithmetic operators use expressions with a left-hand argument, the operator, and then (in most cases) a right-hand argument.
       </p>
 
@@ -195,7 +195,7 @@ where nation.item.n_nationkey &lt; 5;
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">BETWEEN operator</indexterm>
+        <indexterm audience="hidden">BETWEEN operator</indexterm>
         In a <codeph>WHERE</codeph> clause, compares an expression to both a lower and upper bound. The comparison is successful is the
         expression is greater than or equal to the lower bound, and less than or equal to the upper bound. If the bound values are switched,
         so the lower bound is greater than the upper bound, does not match any values.
@@ -287,7 +287,7 @@ where nation.item.n_nationkey between 3 and 5
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">comparison operators</indexterm>
+        <indexterm audience="hidden">comparison operators</indexterm>
         Impala supports the familiar comparison operators for checking equality and sort order for the column data types:
       </p>
 
@@ -368,14 +368,14 @@ where nation.item.n_nationkey &lt; 5
 
   </concept>
 
-  <concept audience="Cloudera" rev="2.1.0" id="except">
+  <concept audience="hidden" rev="2.1.0" id="except">
 
     <title>EXCEPT Operator</title>
 
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">EXCEPT operator</indexterm>
+        <indexterm audience="hidden">EXCEPT operator</indexterm>
       </p>
 
     </conbody>
@@ -389,9 +389,9 @@ where nation.item.n_nationkey &lt; 5
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">EXISTS operator</indexterm>
+        <indexterm audience="hidden">EXISTS operator</indexterm>
 
-        <indexterm audience="Cloudera">NOT EXISTS operator</indexterm>
+        <indexterm audience="hidden">NOT EXISTS operator</indexterm>
         The <codeph>EXISTS</codeph> operator tests whether a subquery returns any results. You typically use it to find values from one
         table that have corresponding values in another table.
       </p>
@@ -651,7 +651,7 @@ ERROR: AnalysisException: couldn't resolve column reference: 'x'
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">ILIKE operator</indexterm>
+        <indexterm audience="hidden">ILIKE operator</indexterm>
         A case-insensitive comparison operator for <codeph>STRING</codeph> data, with basic wildcard capability using <codeph>_</codeph> to match a single
         character and <codeph>%</codeph> to match multiple characters. The argument expression must match the entire string value.
         Typically, it is more efficient to put any <codeph>%</codeph> wildcard match at the end of the string.
@@ -743,9 +743,9 @@ select 'ABCXYZ' not like 'ab_xyz';
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">IN operator</indexterm>
+        <indexterm audience="hidden">IN operator</indexterm>
 
-        <indexterm audience="Cloudera">NOT IN operator</indexterm>
+        <indexterm audience="hidden">NOT IN operator</indexterm>
         The <codeph>IN</codeph> operator compares an argument value to a set of values, and returns <codeph>TRUE</codeph> if the argument
         matches any value in the set. The <codeph>NOT IN</codeph> operator reverses the comparison, and checks if the argument value is not
         part of a set of values.
@@ -940,14 +940,14 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
 
   </concept>
 
-  <concept audience="Cloudera" rev="2.1.0" id="intersect">
+  <concept audience="hidden" rev="2.1.0" id="intersect">
 
     <title>INTERSECT Operator</title>
 
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">INTERSECT operator</indexterm>
+        <indexterm audience="hidden">INTERSECT operator</indexterm>
       </p>
 
     </conbody>
@@ -961,7 +961,7 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">IREGEXP operator</indexterm>
+        <indexterm audience="hidden">IREGEXP operator</indexterm>
         Tests whether a value matches a regular expression, using case-insensitive string comparisons.
         Uses the POSIX regular expression syntax where <codeph>^</codeph> and
         <codeph>$</codeph> match the beginning and end of the string, <codeph>.</codeph> represents any single character, <codeph>*</codeph>
@@ -1042,9 +1042,9 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">IS DISTINCT FROM operator</indexterm>
+        <indexterm audience="hidden">IS DISTINCT FROM operator</indexterm>
 
-        <indexterm audience="Cloudera">IS NOT DISTINCT FROM operator</indexterm>
+        <indexterm audience="hidden">IS NOT DISTINCT FROM operator</indexterm>
         The <codeph>IS DISTINCT FROM</codeph> operator, and its converse the <codeph>IS NOT DISTINCT FROM</codeph> operator, test whether or
         not values are identical. <codeph>IS NOT DISTINCT FROM</codeph> is similar to the <codeph>=</codeph> operator, and <codeph>IS
         DISTINCT FROM</codeph> is similar to the <codeph>!=</codeph> operator, except that <codeph>NULL</codeph> values are treated as
@@ -1185,9 +1185,9 @@ select
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">IS NULL operator</indexterm>
+        <indexterm audience="hidden">IS NULL operator</indexterm>
 
-        <indexterm audience="Cloudera">IS NOT NULL operator</indexterm>
+        <indexterm audience="hidden">IS NOT NULL operator</indexterm>
         The <codeph>IS NULL</codeph> operator, and its converse the <codeph>IS NOT NULL</codeph> operator, test whether a specified value is
         <codeph><xref href="impala_literals.xml#null">NULL</xref></codeph>. Because using <codeph>NULL</codeph> with any of the other
         comparison operators such as <codeph>=</codeph> or <codeph>!=</codeph> also returns <codeph>NULL</codeph> rather than
@@ -1252,7 +1252,7 @@ select count(*) from web_traffic where weird_http_code is not null;</codeblock>
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">LIKE operator</indexterm>
+        <indexterm audience="hidden">LIKE operator</indexterm>
         A comparison operator for <codeph>STRING</codeph> data, with basic wildcard capability using the underscore
         (<codeph>_</codeph>) to match a single character and the percent sign (<codeph>%</codeph>) to match multiple
         characters. The argument expression must match the entire string value.
@@ -1299,7 +1299,7 @@ select distinct c_last_name from customer where c_last_name like 'M___';</codebl
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">logical operators</indexterm>
+        <indexterm audience="hidden">logical operators</indexterm>
         Logical operators return a <codeph>BOOLEAN</codeph> value, based on a binary or unary logical operation between arguments that are
         also Booleans. Typically, the argument expressions use <xref href="impala_operators.xml#comparison_operators">comparison
         operators</xref>.
@@ -1521,7 +1521,7 @@ where
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">REGEXP operator</indexterm>
+        <indexterm audience="hidden">REGEXP operator</indexterm>
         Tests whether a value matches a regular expression. Uses the POSIX regular expression syntax where <codeph>^</codeph> and
         <codeph>$</codeph> match the beginning and end of the string, <codeph>.</codeph> represents any single character, <codeph>*</codeph>
         represents a sequence of zero or more items, <codeph>+</codeph> represents a sequence of one or more items, <codeph>?</codeph>
@@ -1589,7 +1589,7 @@ where
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">RLIKE operator</indexterm>
+        <indexterm audience="hidden">RLIKE operator</indexterm>
         Synonym for the <codeph>REGEXP</codeph> operator. See <xref href="impala_operators.xml#regexp"/> for details.
       </p>
 

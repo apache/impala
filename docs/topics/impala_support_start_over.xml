@@ -32,7 +32,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">SUPPORT_START_OVER query option</indexterm>
+      <indexterm audience="hidden">SUPPORT_START_OVER query option</indexterm>
       Leave this setting at its default value.
       It is a read-only setting, tested by some client applications such as Hue.
     </p>

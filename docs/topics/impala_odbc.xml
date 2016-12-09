@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">ODBC</indexterm>
+      <indexterm audience="hidden">ODBC</indexterm>
       Third-party products can be designed to integrate with Impala using ODBC. For the best experience, ensure any
       third-party product you intend to use is supported. Verifying support includes checking that the versions of
       Impala, ODBC, the operating system, and the third-party product have all been approved for use together.

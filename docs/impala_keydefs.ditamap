@@ -667,7 +667,7 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="topics/impala_cluster_sizing.xml" keys="cluster_sizing"/>
   <keydef href="topics/impala_schema_design.xml" keys="schema_design"/>
   <keydef href="topics/impala_install.xml" keys="install"/>
-  <keydef audience="Cloudera" href="topics/impala_cm_installation.xml" keys="cm_installation"/>
+  <keydef audience="hidden" href="topics/impala_cm_installation.xml" keys="cm_installation"/>
   <keydef href="topics/impala_noncm_installation.xml" keys="noncm_installation"/>
   <keydef href="topics/impala_config.xml" keys="config"/>
   <keydef href="topics/impala_config_performance.xml" keys="config_performance"/>

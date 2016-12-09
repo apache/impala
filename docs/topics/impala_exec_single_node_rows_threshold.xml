@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">EXEC_SINGLE_NODE_ROWS_THRESHOLD query option</indexterm>
+      <indexterm audience="hidden">EXEC_SINGLE_NODE_ROWS_THRESHOLD query option</indexterm>
       This setting controls the cutoff point (in terms of number of rows scanned) below which Impala treats a query
       as a <q>small</q> query, turning off optimizations such as parallel execution and native code generation. The
       overhead for these optimizations is applicable for queries involving substantial amounts of data, but it

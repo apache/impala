@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">MEM_LIMIT query option</indexterm>
+      <indexterm audience="hidden">MEM_LIMIT query option</indexterm>
       When resource management is not enabled, defines the maximum amount of memory a query can allocate on each node.
       Therefore, the total memory that can be used by a query is the <codeph>MEM_LIMIT</codeph> times the number of nodes.
     </p>

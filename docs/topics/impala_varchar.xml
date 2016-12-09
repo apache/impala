@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">VARCHAR data type</indexterm>
+      <indexterm audience="hidden">VARCHAR data type</indexterm>
       A variable-length character type, truncated during processing if necessary to fit within the specified
       length.
     </p>

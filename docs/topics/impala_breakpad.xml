@@ -85,7 +85,7 @@ under the License.
         <!-- Location stated in IMPALA-3581; overridden by different location from IMPALA-2686?
              <filepath><varname>log_directory</varname>/minidumps/<varname>daemon_name</varname></filepath> -->
          <ul>
-          <li audience="Cloudera">
+          <li audience="hidden">
             <p>
               Clusters managed by Cloudera Manager: <filepath>/var/log/impala-minidumps/<varname>daemon_name</varname></filepath>
             </p>

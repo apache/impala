@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0">
-      <indexterm audience="Cloudera">RUNTIME_BLOOM_FILTER_SIZE query option</indexterm>
+      <indexterm audience="hidden">RUNTIME_BLOOM_FILTER_SIZE query option</indexterm>
       Size (in bytes) of Bloom filter data structure used by the runtime filtering
       feature.
     </p>

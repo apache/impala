@@ -39,8 +39,8 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">file formats</indexterm>
-      <indexterm audience="Cloudera">compression</indexterm>
+      <indexterm audience="hidden">file formats</indexterm>
+      <indexterm audience="hidden">compression</indexterm>
       Impala supports several familiar file formats used in Apache Hadoop. Impala can load and query data files
       produced by other Hadoop components such as Pig or MapReduce, and data files produced by Impala can be used
       by other components also. The following sections discuss the procedures, limitations, and performance

@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept audience="Cloudera" id="date" rev="2.0.0">
+<concept audience="hidden" id="date" rev="2.0.0">
 
   <title>DATE Data Type (<keyword keyref="impala21"/> or higher only)</title>
   <prolog>
@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DATE data type</indexterm>
+      <indexterm audience="hidden">DATE data type</indexterm>
       A type representing the date (year, month, and day) as a single numeric value. Used to represent a broader
       date range than possible with the <codeph>TIMESTAMP</codeph> type, with fewer distinct values than
       <codeph>TIMESTAMP</codeph>, and in a more compact and efficient form than using a <codeph>STRING</codeph>

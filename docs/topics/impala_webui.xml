@@ -35,8 +35,8 @@ under the License.
   <conbody>
 
     <p id="webui_intro">
-      <indexterm audience="Cloudera">web UI</indexterm>
-      <indexterm audience="Cloudera">debug UI</indexterm>
+      <indexterm audience="hidden">web UI</indexterm>
+      <indexterm audience="hidden">debug UI</indexterm>
       Each of the Impala daemons (<cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>,
       and <cmdname>catalogd</cmdname>) includes a built-in web server that displays
       diagnostic and status information:
@@ -104,14 +104,14 @@ under the License.
         suspect is having problems.
       </p>
 
-      <note audience="Cloudera">
+      <note audience="hidden">
         To get a convenient picture of the health of all Impala nodes in a cluster, use the Cloudera Manager
         interface, which collects the low-level operational information from all Impala nodes, and presents a
         unified view of the entire cluster.
       </note>
     </conbody>
 
-    <concept audience="Cloudera" id="webui_impalad_disabling">
+    <concept audience="hidden" id="webui_impalad_disabling">
 
       <title>Turning off the Web UI for impalad</title>
 
@@ -351,7 +351,7 @@ under the License.
     </concept>
   </concept>
 
-  <concept audience="Cloudera" id="webui_statestored">
+  <concept audience="hidden" id="webui_statestored">
 
     <title>Debug Web UI for statestored</title>
 
@@ -360,7 +360,7 @@ under the License.
       <p></p>
     </conbody>
 
-    <concept audience="Cloudera" id="webui_statestored_disabling">
+    <concept audience="hidden" id="webui_statestored_disabling">
 
       <title>Turning off the Web UI for statestored</title>
 
@@ -536,7 +536,7 @@ under the License.
     </concept>
   </concept>
 
-  <concept audience="Cloudera" id="webui_catalogd">
+  <concept audience="hidden" id="webui_catalogd">
 
     <title>Debug Web UI for catalogd</title>
 
@@ -545,7 +545,7 @@ under the License.
       <p></p>
     </conbody>
 
-    <concept audience="Cloudera" id="webui_catalogd_disabling">
+    <concept audience="hidden" id="webui_catalogd_disabling">
 
       <title>Turning off the Web UI for impalad</title>
 

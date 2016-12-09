@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.6.0 IMPALA-3286">
-      <indexterm audience="Cloudera">PREFETCH_MODE query option</indexterm>
+      <indexterm audience="hidden">PREFETCH_MODE query option</indexterm>
       Determines whether the prefetching optimization is applied during
       join query processing.
     </p>

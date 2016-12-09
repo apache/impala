@@ -47,7 +47,7 @@ under the License.
           upgrade from CDH 4 to the latest CDH 5, which also has the latest Impala.
         </li>
 
-        <li rev="ver" audience="Cloudera">
+        <li rev="ver" audience="hidden">
           When you upgrade Impala, also upgrade Cloudera Manager if necessary:
           <ul>
             <li>
@@ -92,7 +92,7 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
-  <concept id="upgrade_cm_parcels" audience="Cloudera">
+  <concept id="upgrade_cm_parcels" audience="hidden">
 
     <title>Upgrading Impala through Cloudera Manager - Parcels</title>
   <prolog>
@@ -170,7 +170,7 @@ sudo apt-get purge <varname>pkg_names</varname> # Ubuntu, Debian</codeblock>
     </conbody>
   </concept>
 
-  <concept id="upgrade_cm_pkgs" audience="Cloudera">
+  <concept id="upgrade_cm_pkgs" audience="hidden">
 
     <title>Upgrading Impala through Cloudera Manager - Packages</title>
   <prolog>

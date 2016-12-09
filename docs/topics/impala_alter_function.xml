@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept audience="Cloudera" rev="1.x" id="alter_function">
+<concept audience="hidden" rev="1.x" id="alter_function">
 
   <title>ALTER FUNCTION Statement</title>
   <titlealts audience="PDF"><navtitle>ALTER FUNCTION</navtitle></titlealts>

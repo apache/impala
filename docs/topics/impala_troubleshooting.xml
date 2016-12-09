@@ -34,7 +34,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">troubleshooting</indexterm>
+      <indexterm audience="hidden">troubleshooting</indexterm>
       Troubleshooting for Impala requires being able to diagnose and debug problems
       with performance, network connectivity, out-of-memory conditions, disk space usage,
       and crash or hang conditions in any of the Impala-related daemons.
@@ -342,7 +342,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
         </tgroup>
       </table>
 
-      <p audience="Cloudera">
+      <p audience="hidden">
         Some or all of these settings might also be useful.
 <codeblock>NUM_SCANNER_THREADS: 0
 ABORT_ON_DEFAULT_LIMIT_EXCEEDED: 0
@@ -363,7 +363,7 @@ MEM_LIMIT: 0
     </conbody>
   </concept>
 
-  <concept audience="Cloudera" id="core_dumps">
+  <concept audience="hidden" id="core_dumps">
 
     <title>Enabling Core Dumps for Impala</title>
 
@@ -394,7 +394,7 @@ MEM_LIMIT: 0
     </conbody>
   </concept>
 
-  <concept audience="Cloudera" id="io_throughput">
+  <concept audience="hidden" id="io_throughput">
     <title>Verifying I/O Throughput</title>
     <conbody>
       <p>

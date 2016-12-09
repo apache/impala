@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">JDBC</indexterm>
+      <indexterm audience="hidden">JDBC</indexterm>
       Impala supports the standard JDBC interface, allowing access from commercial Business Intelligence tools and
       custom software written in Java or other programming languages. The JDBC driver allows you to access Impala
       from a Java program that you write, or a Business Intelligence or similar tool that uses JDBC to communicate

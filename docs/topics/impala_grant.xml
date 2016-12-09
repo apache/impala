@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">GRANT statement</indexterm>
+      <indexterm audience="hidden">GRANT statement</indexterm>
 <!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
       The <codeph>GRANT</codeph> statement grants roles or privileges on specified objects to groups. Only Sentry
       administrative users can grant roles to a group.

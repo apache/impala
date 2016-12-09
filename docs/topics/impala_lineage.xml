@@ -40,8 +40,8 @@ under the License.
   <conbody>
 
     <p rev="2.2.0">
-      <indexterm audience="Cloudera">lineage</indexterm>
-      <indexterm audience="Cloudera">column lineage</indexterm>
+      <indexterm audience="hidden">lineage</indexterm>
+      <indexterm audience="hidden">column lineage</indexterm>
       <term>Lineage</term> is a feature in the Cloudera Navigator data
       management component that helps you track where data originated, and how
       data propagates through the system through SQL statements such as

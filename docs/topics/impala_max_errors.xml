@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">MAX_ERRORS query option</indexterm>
+      <indexterm audience="hidden">MAX_ERRORS query option</indexterm>
       Maximum number of non-fatal errors for any particular query that are recorded in the Impala log file. For
       example, if a billion-row table had a non-fatal data error in every row, you could diagnose the problem
       without all billion errors being logged. Unspecified or 0 indicates the built-in default value of 1000.

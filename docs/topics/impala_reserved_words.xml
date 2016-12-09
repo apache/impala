@@ -34,7 +34,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">reserved words</indexterm>
+      <indexterm audience="hidden">reserved words</indexterm>
       The following are the reserved words for the current release of Impala. A reserved word is one that
       cannot be used directly as an identifier; you must quote it with backticks. For example, a statement
       <codeph>CREATE TABLE select (x INT)</codeph> fails, while <codeph>CREATE TABLE `select` (x INT)</codeph>

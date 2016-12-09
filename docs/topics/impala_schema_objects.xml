@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">schema objects</indexterm>
+      <indexterm audience="hidden">schema objects</indexterm>
       With Impala, you work with schema objects that are familiar to database users: primarily databases, tables, views,
       and functions. The SQL syntax to work with these objects is explained in
       <xref href="impala_langref_sql.xml#langref_sql"/>. This section explains the conceptual knowledge you need to

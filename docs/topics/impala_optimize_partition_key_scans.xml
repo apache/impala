@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0 IMPALA-2499">
-      <indexterm audience="Cloudera">OPTIMIZE_PARTITION_KEY_SCANS query option</indexterm>
+      <indexterm audience="hidden">OPTIMIZE_PARTITION_KEY_SCANS query option</indexterm>
       Enables a fast code path for queries that apply simple aggregate functions to partition key
       columns: <codeph>MIN(<varname>key_column</varname>)</codeph>, <codeph>MAX(<varname>key_column</varname>)</codeph>,
       or <codeph>COUNT(DISTINCT <varname>key_column</varname>)</codeph>.

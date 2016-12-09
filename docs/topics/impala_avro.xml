@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="1.4.0">
-      <indexterm audience="Cloudera">Avro support in Impala</indexterm>
+      <indexterm audience="hidden">Avro support in Impala</indexterm>
       Impala supports using tables whose data files use the Avro file format. Impala can query Avro
       tables, and in Impala 1.4.0 and higher can create them, but currently cannot insert data into them. For
       insert operations, use Hive, then switch back to Impala to run queries.
@@ -382,7 +382,7 @@ for this information.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">compression</indexterm>
+        <indexterm audience="hidden">compression</indexterm>
         To enable compression for Avro tables, specify settings in the Hive shell to enable compression and to
         specify a codec, then issue a <codeph>CREATE TABLE</codeph> statement as in the preceding examples. Impala
         supports the <codeph>snappy</codeph> and <codeph>deflate</codeph> codecs for Avro tables.

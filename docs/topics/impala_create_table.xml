@@ -41,7 +41,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">CREATE TABLE statement</indexterm>
+      <indexterm audience="hidden">CREATE TABLE statement</indexterm>
       Creates a new table and specifies its characteristics. While creating a table, you optionally specify aspects
       such as:
     </p>

@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">ABORT_ON_ERROR query option</indexterm>
+      <indexterm audience="hidden">ABORT_ON_ERROR query option</indexterm>
       When this option is enabled, Impala cancels a query immediately when any of the nodes encounters an error,
       rather than continuing and possibly returning incomplete results. This option is disabled by default, to help
       gather maximum diagnostic information when an error occurs, for example, whether the same problem occurred on

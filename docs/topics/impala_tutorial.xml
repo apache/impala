@@ -462,7 +462,7 @@ Copyright (c) 2012 Cloudera, Inc. All rights reserved.
       </conbody>
     </concept>
 
-    <concept audience="Cloudera" id="tutorial_quickstart_vm">
+    <concept audience="hidden" id="tutorial_quickstart_vm">
 
       <title>Setting Up Impala with the QuickStart VM</title>
 
@@ -475,7 +475,7 @@ Copyright (c) 2012 Cloudera, Inc. All rights reserved.
       </conbody>
     </concept>
 
-    <concept audience="Cloudera" id="tutorial_hdfs">
+    <concept audience="hidden" id="tutorial_hdfs">
 
       <title>Exploring the HDFS Directory Structure</title>
 
@@ -489,7 +489,7 @@ Copyright (c) 2012 Cloudera, Inc. All rights reserved.
       </conbody>
     </concept>
 
-    <concept audience="Cloudera" id="tutorial_external_table">
+    <concept audience="hidden" id="tutorial_external_table">
 
       <title/>
 
@@ -1517,7 +1517,7 @@ Returned 10 row(s) in 0.39s</codeblock>
       </conbody>
     </concept>
 
-    <concept audience="Cloudera" id="tut_connect">
+    <concept audience="hidden" id="tut_connect">
 
       <title>Connecting to Impala through impala-shell</title>
 
@@ -1578,7 +1578,7 @@ Returned 10 row(s) in 0.39s</codeblock>
     </concept>
   </concept>
 
-  <concept audience="Cloudera" id="tut_mem_limit">
+  <concept audience="hidden" id="tut_mem_limit">
 
     <title>Effects of Memory Limits on Impala Queries</title>
   <prolog>
@@ -2492,7 +2492,7 @@ need to be restricted to a date range of 1995 and higher.
     </conbody>
   </concept>
 
-  <concept audience="Cloudera" id="tut_synthesizing">
+  <concept audience="hidden" id="tut_synthesizing">
 
     <title>Synthesizing Data</title>
 

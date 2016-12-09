@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DROP DATABASE statement</indexterm>
+      <indexterm audience="hidden">DROP DATABASE statement</indexterm>
       Removes a database from the system. The physical operations involve removing the metadata for the database
       from the metastore, and deleting the corresponding <codeph>*.db</codeph> directory from HDFS.
     </p>

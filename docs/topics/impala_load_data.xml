@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">LOAD DATA statement</indexterm>
+      <indexterm audience="hidden">LOAD DATA statement</indexterm>
       The <codeph>LOAD DATA</codeph> statement streamlines the ETL process for an internal Impala table by moving a
       data file or all the data files in a directory from an HDFS location into the Impala data directory for that
       table.

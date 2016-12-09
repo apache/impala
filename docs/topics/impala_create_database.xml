@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">CREATE DATABASE statement</indexterm>
+      <indexterm audience="hidden">CREATE DATABASE statement</indexterm>
       Creates a new database.
     </p>
 

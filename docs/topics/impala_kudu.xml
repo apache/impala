@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">Kudu</indexterm>
+      <indexterm audience="hidden">Kudu</indexterm>
       You can use Impala to query Kudu tables. This capability allows convenient access to a storage system that is
       tuned for different kinds of workloads than the default with Impala. The default Impala tables use data files
       stored on HDFS, which are ideal for bulk loads and queries using full-table scans. In contrast, Kudu can do

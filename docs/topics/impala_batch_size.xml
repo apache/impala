@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">BATCH_SIZE query option</indexterm>
+      <indexterm audience="hidden">BATCH_SIZE query option</indexterm>
       Number of rows evaluated at a time by SQL operators. Unspecified or a size of 0 uses a predefined default
       size. Using a large number improves responsiveness, especially for scan operations, at the cost of a higher memory footprint.
     </p>

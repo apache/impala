@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">group_concat() function</indexterm>
+      <indexterm audience="hidden">group_concat() function</indexterm>
       An aggregate function that returns a single string representing the argument value concatenated together for
       each row of the result set. If the optional separator string is specified, the separator is added between
       each pair of concatenated values. The default separator is a comma followed by a space.

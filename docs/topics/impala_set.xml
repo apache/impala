@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">SET statement</indexterm>
+      <indexterm audience="hidden">SET statement</indexterm>
       Specifies values for query options that control the runtime behavior of other statements within the same
       session.
     </p>

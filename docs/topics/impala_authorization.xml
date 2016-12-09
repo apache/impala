@@ -222,7 +222,7 @@ under the License.
       </p>
 
       <ul>
-        <li audience="Cloudera">
+        <li audience="hidden">
           <p>
             In an environment managed by Cloudera Manager, the server name is specified through
             <menucascade><uicontrol>Impala (Service-Wide)</uicontrol><uicontrol>Category</uicontrol><uicontrol>Advanced</uicontrol><uicontrol>Sentry Service</uicontrol></menucascade> and
@@ -698,7 +698,7 @@ ERROR: AuthorizationException: User 'cloudera' does not have privileges to acces
 
         </example>
 
-        <example audience="Cloudera" id="sec_ex_views" rev="2.3.0 collevelauth">
+        <example audience="hidden" id="sec_ex_views" rev="2.3.0 collevelauth">
 
           <title>Controlling Access at the Column Level through Views</title>
 
@@ -1586,7 +1586,7 @@ column-level security was by creating views that referenced particular sets of c
     </conbody>
   </concept>
 
-  <concept id="sentry_cm" audience="Cloudera">
+  <concept id="sentry_cm" audience="hidden">
 
     <title>Managing Sentry for Impala through Cloudera Manager</title>
 

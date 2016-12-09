@@ -429,7 +429,7 @@ under the License.
               <codeph>queue_wait_timeout_ms</codeph>
             </dt>
             <dd>
-              <indexterm audience="Cloudera">--queue_wait_timeout_ms</indexterm>
+              <indexterm audience="hidden">--queue_wait_timeout_ms</indexterm>
               <b>Purpose:</b> Maximum amount of time (in milliseconds) that a
               request waits to be admitted before timing out.
               <p>
@@ -445,7 +445,7 @@ under the License.
               <codeph>default_pool_max_requests</codeph>
             </dt>
             <dd>
-              <indexterm audience="Cloudera">--default_pool_max_requests</indexterm>
+              <indexterm audience="hidden">--default_pool_max_requests</indexterm>
               <b>Purpose:</b> Maximum number of concurrent outstanding requests
               allowed to run before incoming requests are queued. Because this
               limit applies cluster-wide, but each Impala node makes independent
@@ -468,7 +468,7 @@ under the License.
               <codeph>default_pool_max_queued</codeph>
             </dt>
             <dd>
-              <indexterm audience="Cloudera">--default_pool_max_queued</indexterm>
+              <indexterm audience="hidden">--default_pool_max_queued</indexterm>
               <b>Purpose:</b> Maximum number of requests allowed to be queued
               before rejecting requests. Because this limit applies
               cluster-wide, but each Impala node makes independent decisions to
@@ -492,7 +492,7 @@ under the License.
               <codeph>default_pool_mem_limit</codeph>
             </dt>
             <dd>
-              <indexterm audience="Cloudera">--default_pool_mem_limit</indexterm>
+              <indexterm audience="hidden">--default_pool_mem_limit</indexterm>
               <b>Purpose:</b> Maximum amount of memory (across the entire
               cluster) that all outstanding requests in this pool can use before
               new requests to this pool are queued. Specified in bytes,
@@ -523,7 +523,7 @@ under the License.
               <codeph>disable_admission_control</codeph>
             </dt>
             <dd>
-              <indexterm audience="Cloudera">--disable_admission_control</indexterm>
+              <indexterm audience="hidden">--disable_admission_control</indexterm>
               <b>Purpose:</b> Turns off the admission control feature entirely,
               regardless of other configuration option settings.
               <p>
@@ -539,7 +539,7 @@ under the License.
               <codeph>disable_pool_max_requests</codeph>
             </dt>
             <dd>
-              <indexterm audience="Cloudera">--disable_pool_max_requests</indexterm>
+              <indexterm audience="hidden">--disable_pool_max_requests</indexterm>
               <b>Purpose:</b> Disables all per-pool limits on the maximum number
               of running requests. <p>
                 <b>Type:</b> Boolean </p>
@@ -554,7 +554,7 @@ under the License.
               <codeph>disable_pool_mem_limits</codeph>
             </dt>
             <dd>
-              <indexterm audience="Cloudera">--disable_pool_mem_limits</indexterm>
+              <indexterm audience="hidden">--disable_pool_mem_limits</indexterm>
               <b>Purpose:</b> Disables all per-pool mem limits. <p>
                 <b>Type:</b> Boolean </p>
               <p>
@@ -568,7 +568,7 @@ under the License.
               <codeph>fair_scheduler_allocation_path</codeph>
             </dt>
             <dd>
-              <indexterm audience="Cloudera">--fair_scheduler_allocation_path</indexterm>
+              <indexterm audience="hidden">--fair_scheduler_allocation_path</indexterm>
               <b>Purpose:</b> Path to the fair scheduler allocation file
                 (<codeph>fair-scheduler.xml</codeph>). <p
                 conref="../shared/impala_common.xml#common/type_string" />
@@ -589,7 +589,7 @@ under the License.
               <codeph>llama_site_path</codeph>
             </dt>
             <dd>
-              <indexterm audience="Cloudera">--llama_site_path</indexterm>
+              <indexterm audience="hidden">--llama_site_path</indexterm>
               <b>Purpose:</b> Path to the configuration file used by admission control
                 (<codeph>llama-site.xml</codeph>). If set,
                 <codeph>fair_scheduler_allocation_path</codeph> must also be set.
@@ -606,7 +606,7 @@ under the License.
       </section>
     </conbody>
 
-    <concept id="admission_config_cm" audience="Cloudera">
+    <concept id="admission_config_cm" audience="hidden">
 
 <!-- TK: Maybe all this stuff overlaps with admin_impala_admission_control and can be delegated there. -->
 
@@ -625,7 +625,7 @@ under the License.
           <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_managing_resources.html" scope="external" format="html">Managing Resources with Cloudera Manager</xref>.
         </p>
 
-        <p audience="Cloudera"><!-- Hiding link because that subtopic is now hidden. -->
+        <p audience="hidden"><!-- Hiding link because that subtopic is now hidden. -->
           See <xref href="#admission_examples"/> for a sample setup for admission control under
           Cloudera Manager.
         </p>
@@ -694,7 +694,7 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
           <keyword keyref="impala25_full"/> and higher.
         </p>
 
-        <p audience="Cloudera"><!-- Hiding link because that subtopic is now hidden. -->
+        <p audience="hidden"><!-- Hiding link because that subtopic is now hidden. -->
           See <xref href="#admission_examples/section_etq_qgb_rq"/> for sample configuration files
           for admission control using multiple resource pools, without Cloudera Manager.
         </p>
@@ -708,7 +708,7 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
 
       <conbody>
 
-        <section id="section_fqn_qgb_rq" audience="Cloudera">
+        <section id="section_fqn_qgb_rq" audience="hidden">
 
           <title>Example Admission Control Configurations Using Cloudera Manager</title>
 

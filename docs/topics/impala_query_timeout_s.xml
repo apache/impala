@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">QUERY_TIMEOUT_S query option</indexterm>
+      <indexterm audience="hidden">QUERY_TIMEOUT_S query option</indexterm>
       Sets the idle query timeout value for the session, in seconds. Queries that sit idle for longer than the
       timeout value are automatically cancelled. If the system administrator specified the
       <codeph>--idle_query_timeout</codeph> startup option, <codeph>QUERY_TIMEOUT_S</codeph> must be smaller than

@@ -34,8 +34,8 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">memory errors</indexterm>
-      <indexterm audience="Cloudera">out-of-memory errors</indexterm>
+      <indexterm audience="hidden">memory errors</indexterm>
+      <indexterm audience="hidden">out-of-memory errors</indexterm>
     </p>
 
     <p outputclass="toc inpage"/>

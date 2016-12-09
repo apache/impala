@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">max() function</indexterm>
+      <indexterm audience="hidden">max() function</indexterm>
       An aggregate function that returns the maximum value from a set of numbers. Opposite of the
       <codeph>MIN</codeph> function. Its single argument can be numeric column, or the numeric result of a function
       or expression applied to the column value. Rows with a <codeph>NULL</codeph> value for the specified column

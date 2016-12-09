@@ -37,11 +37,11 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">variance() function</indexterm>
-      <indexterm audience="Cloudera">variance_samp() function</indexterm>
-      <indexterm audience="Cloudera">variance_pop() function</indexterm>
-      <indexterm audience="Cloudera">var_samp() function</indexterm>
-      <indexterm audience="Cloudera">var_pop() function</indexterm>
+      <indexterm audience="hidden">variance() function</indexterm>
+      <indexterm audience="hidden">variance_samp() function</indexterm>
+      <indexterm audience="hidden">variance_pop() function</indexterm>
+      <indexterm audience="hidden">var_samp() function</indexterm>
+      <indexterm audience="hidden">var_pop() function</indexterm>
       An aggregate function that returns the
       <xref href="http://en.wikipedia.org/wiki/Variance" scope="external" format="html">variance</xref> of a set of
       numbers. This is a mathematical property that signifies how far the values spread apart from the mean. The

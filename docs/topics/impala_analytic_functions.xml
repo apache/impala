@@ -44,9 +44,9 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">analytic functions</indexterm>
+      <indexterm audience="hidden">analytic functions</indexterm>
 
-      <indexterm audience="Cloudera">window functions</indexterm>
+      <indexterm audience="hidden">window functions</indexterm>
       Analytic functions (also known as window functions) are a special category of built-in functions. Like
       aggregate functions, they examine the contents of multiple input rows to compute each output value. However,
       rather than being limited to one result value per <codeph>GROUP BY</codeph> group, they operate on
@@ -1210,7 +1210,7 @@ from stock_ticker
 
   </concept>
 
-  <concept audience="Cloudera" rev="2.x.x" id="nth_value">
+  <concept audience="hidden" rev="2.x.x" id="nth_value">
 
     <title>NTH_VALUE Function</title>
 

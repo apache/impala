@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DELETE statement</indexterm>
+      <indexterm audience="hidden">DELETE statement</indexterm>
       Deletes one or more rows from a Kudu table.
       Although deleting a single row or a range of rows would be inefficient for tables using HDFS
       data files, Kudu is able to perform this operation efficiently. Therefore, this statement

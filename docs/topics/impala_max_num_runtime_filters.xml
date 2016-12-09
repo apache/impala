@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0">
-      <indexterm audience="Cloudera">MAX_NUM_RUNTIME_FILTERS query option</indexterm>
+      <indexterm audience="hidden">MAX_NUM_RUNTIME_FILTERS query option</indexterm>
       The <codeph>MAX_NUM_RUNTIME_FILTERS</codeph> query option
       sets an upper limit on the number of runtime filters that can be produced for each query.
     </p>

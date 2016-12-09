@@ -34,29 +34,29 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">defaults file</indexterm>
+      <indexterm audience="hidden">defaults file</indexterm>
 
-      <indexterm audience="Cloudera">configuration file</indexterm>
+      <indexterm audience="hidden">configuration file</indexterm>
 
-      <indexterm audience="Cloudera">options</indexterm>
+      <indexterm audience="hidden">options</indexterm>
 
-      <indexterm audience="Cloudera">IMPALA_STATE_STORE_PORT</indexterm>
+      <indexterm audience="hidden">IMPALA_STATE_STORE_PORT</indexterm>
 
-      <indexterm audience="Cloudera">IMPALA_BACKEND_PORT</indexterm>
+      <indexterm audience="hidden">IMPALA_BACKEND_PORT</indexterm>
 
-      <indexterm audience="Cloudera">IMPALA_LOG_DIR</indexterm>
+      <indexterm audience="hidden">IMPALA_LOG_DIR</indexterm>
 
-      <indexterm audience="Cloudera">IMPALA_STATE_STORE_ARGS</indexterm>
+      <indexterm audience="hidden">IMPALA_STATE_STORE_ARGS</indexterm>
 
-      <indexterm audience="Cloudera">IMPALA_SERVER_ARGS</indexterm>
+      <indexterm audience="hidden">IMPALA_SERVER_ARGS</indexterm>
 
-      <indexterm audience="Cloudera">ENABLE_CORE_DUMPS</indexterm>
+      <indexterm audience="hidden">ENABLE_CORE_DUMPS</indexterm>
 
-      <indexterm audience="Cloudera">core dumps</indexterm>
+      <indexterm audience="hidden">core dumps</indexterm>
 
-      <indexterm audience="Cloudera">restarting services</indexterm>
+      <indexterm audience="hidden">restarting services</indexterm>
 
-      <indexterm audience="Cloudera">services</indexterm>
+      <indexterm audience="hidden">services</indexterm>
       The configuration options for the Impala-related daemons let you choose which hosts and
       ports to use for the services that run on a single host, specify directories for logging,
       control resource usage and security, and specify other aspects of the Impala software.
@@ -66,7 +66,7 @@ under the License.
 
   </conbody>
 
-  <concept id="config_options_cm" audience="Cloudera">
+  <concept id="config_options_cm" audience="hidden">
 
     <title>Configuring Impala Startup Options through Cloudera Manager</title>
 
@@ -243,7 +243,7 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
             to:
           </p>
 <codeblock>export ENABLE_CORE_DUMPS=${ENABLE_COREDUMPS:-true}</codeblock>
-          <p audience="Cloudera">
+          <p audience="hidden">
             On systems managed by Cloudera Manager, enable the <uicontrol>Enable Core
             Dump</uicontrol> setting for the Impala service.
           </p>
@@ -339,11 +339,11 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
         </p>
       </note>
 
-      <p audience="Cloudera" outputclass="toc inpage"/>
+      <p audience="hidden" outputclass="toc inpage"/>
 
     </conbody>
 
-    <concept audience="Cloudera" id="config_options_impalad_details">
+    <concept audience="hidden" id="config_options_impalad_details">
 
       <title>Configuration Options for impalad Daemon</title>
 
@@ -510,7 +510,7 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
     </concept>
 
-    <concept audience="Cloudera" id="config_options_statestored_details">
+    <concept audience="hidden" id="config_options_statestored_details">
 
       <title>Configuration Options for statestored Daemon</title>
 
@@ -522,7 +522,7 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
     </concept>
 
-    <concept audience="Cloudera" id="config_options_catalogd_details">
+    <concept audience="hidden" id="config_options_catalogd_details">
 
       <title>Configuration Options for catalogd Daemon</title>
 

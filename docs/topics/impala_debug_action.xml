@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DEBUG_ACTION query option</indexterm>
+      <indexterm audience="hidden">DEBUG_ACTION query option</indexterm>
       Introduces artificial problem conditions within queries. For internal Cloudera debugging and troubleshooting.
     </p>
 

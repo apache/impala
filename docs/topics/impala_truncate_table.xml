@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p rev="2.3.0">
-      <indexterm audience="Cloudera">TRUNCATE TABLE statement</indexterm>
+      <indexterm audience="hidden">TRUNCATE TABLE statement</indexterm>
       Removes the data from an Impala table while leaving the table itself.
     </p>
 

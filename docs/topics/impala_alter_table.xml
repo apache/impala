@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">ALTER TABLE statement</indexterm>
+      <indexterm audience="hidden">ALTER TABLE statement</indexterm>
       The <codeph>ALTER TABLE</codeph> statement changes the structure or properties of an existing Impala table.
     </p>
     <p>

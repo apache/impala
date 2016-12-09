@@ -39,7 +39,7 @@ under the License.
     <note conref="../shared/impala_common.xml#common/llama_query_options_obsolete"/>
 
     <p>
-      <indexterm audience="Cloudera">RESERVATION_REQUEST_TIMEOUT query option</indexterm>
+      <indexterm audience="hidden">RESERVATION_REQUEST_TIMEOUT query option</indexterm>
       Maximum number of milliseconds Impala will wait for a reservation to be completely granted or denied. Used in
       conjunction with the Impala resource management feature in Impala 1.2 and higher with CDH 5.
     </p>

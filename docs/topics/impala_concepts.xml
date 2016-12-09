@@ -48,14 +48,14 @@ under the License.
 
 <!-- These other topics are waiting to be filled in. Could become subtopics or top-level topics depending on the depth of coverage in each case. -->
 
-  <concept id="intro_data_lifecycle" audience="Cloudera">
+  <concept id="intro_data_lifecycle" audience="hidden">
 
     <title>Overview of the Data Lifecycle for Impala</title>
 
     <conbody/>
   </concept>
 
-  <concept id="intro_etl" audience="Cloudera">
+  <concept id="intro_etl" audience="hidden">
 
     <title>Overview of the Extract, Transform, Load (ETL) Process for Impala</title>
   <prolog>
@@ -69,28 +69,28 @@ under the License.
     <conbody/>
   </concept>
 
-  <concept id="intro_hadoop_data" audience="Cloudera">
+  <concept id="intro_hadoop_data" audience="hidden">
 
     <title>How Impala Works with Hadoop Data Files</title>
 
     <conbody/>
   </concept>
 
-  <concept id="intro_web_ui" audience="Cloudera">
+  <concept id="intro_web_ui" audience="hidden">
 
     <title>Overview of the Impala Web Interface</title>
 
     <conbody/>
   </concept>
 
-  <concept id="intro_bi" audience="Cloudera">
+  <concept id="intro_bi" audience="hidden">
 
     <title>Using Impala with Business Intelligence Tools</title>
 
     <conbody/>
   </concept>
 
-  <concept id="intro_ha" audience="Cloudera">
+  <concept id="intro_ha" audience="hidden">
 
     <title>Overview of Impala Availability and Fault Tolerance</title>
 
@@ -102,7 +102,7 @@ under the License.
      to make it visible.
 -->
 
-  <concept id="intro_llvm" audience="Cloudera">
+  <concept id="intro_llvm" audience="hidden">
 
     <title>Overview of Impala Runtime Code Generation</title>
 
@@ -187,7 +187,7 @@ under the License.
 
 <!-- Same as the previous section: adapted from CIDR paper, ready to externalize after deciding where to go. -->
 
-  <concept audience="Cloudera" id="intro_io">
+  <concept audience="hidden" id="intro_io">
 
     <title>Overview of Impala I/O</title>
 
@@ -215,7 +215,7 @@ under the License.
 
 <!-- Although good idea to get some answers from Henry first. -->
 
-  <concept audience="Cloudera" id="intro_state_distribution">
+  <concept audience="hidden" id="intro_state_distribution">
 
     <title>State distribution</title>
 

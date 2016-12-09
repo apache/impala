@@ -33,9 +33,9 @@ under the License.
   <conbody>
 
     <p rev="1.2">
-      <indexterm audience="Cloudera">state store</indexterm>
-      <indexterm audience="Cloudera">starting services</indexterm>
-      <indexterm audience="Cloudera">services</indexterm>
+      <indexterm audience="hidden">state store</indexterm>
+      <indexterm audience="hidden">starting services</indexterm>
+      <indexterm audience="hidden">services</indexterm>
       To activate Impala if it is installed but not yet started:
     </p>
 
@@ -69,7 +69,7 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
-  <concept id="starting_via_cm" audience="Cloudera">
+  <concept id="starting_via_cm" audience="hidden">
 
     <title>Starting Impala through Cloudera Manager</title>
 

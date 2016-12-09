@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">SELECT statement</indexterm>
+      <indexterm audience="hidden">SELECT statement</indexterm>
       The <codeph>SELECT</codeph> statement performs queries, retrieving data from one or more tables and producing
       result sets consisting of rows and columns.
     </p>
@@ -208,7 +208,7 @@ LIMIT <i>expression</i> [OFFSET <i>expression</i>]
     </p>
   </conbody>
 
-  <concept id="where" audience="Cloudera">
+  <concept id="where" audience="hidden">
 
 <!-- WHERE hidden for the moment until there's the chance to add some reasonably comprehensive content
 

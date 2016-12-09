@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">subqueries</indexterm>
+      <indexterm audience="hidden">subqueries</indexterm>
       A <term>subquery</term> is a query that is nested within another query. Subqueries let queries on one table
       dynamically adapt based on the contents of another table. This technique provides great flexibility and
       expressive power for SQL queries.

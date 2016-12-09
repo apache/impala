@@ -95,7 +95,7 @@ under the License.
             </li>
           </ul>
         </li>
-        <li audience="Cloudera">
+        <li audience="hidden">
           <p rev="IMPALA-3210 CDH-43736"><!-- Patch didn't make it into in <keyword keyref="impala27_full"/> -->
             [<xref href="https://issues.cloudera.org/browse/IMPALA-3210" scope="external" format="html">IMPALA-3210</xref>]
             The analytic functions <codeph>FIRST_VALUE()</codeph> and <codeph>LAST_VALUE()</codeph>
@@ -171,7 +171,7 @@ under the License.
             column definitions in Avro tables.
           </p>
         </li>
-        <li audience="Cloudera"><!-- Patch didn't make it into in <keyword keyref="impala27_full"/> -->
+        <li audience="hidden"><!-- Patch didn't make it into in <keyword keyref="impala27_full"/> -->
           <p rev="IMPALA-1654 CDH-43747">
             [<xref href="https://issues.cloudera.org/browse/IMPALA-1654" scope="external" format="html">IMPALA-1654</xref>]
             Several kinds of DDL operations
@@ -934,21 +934,21 @@ under the License.
             <ph audience="PDF">See <xref href="impala_optimize_partition_key_scans.xml"/> for details.</ph>
           </p>
         </li>
-        <li audience="Cloudera"><!-- All the other undocumented query options are not really new features for this release, so hiding this whole bullet. -->
+        <li audience="hidden"><!-- All the other undocumented query options are not really new features for this release, so hiding this whole bullet. -->
           <p>
             Other new query options:
           </p>
           <ul>
-            <li audience="Cloudera"><!-- Actually from a long way back, just never documented. Not sure if appropriate to keep internal-only or expose. -->
+            <li audience="hidden"><!-- Actually from a long way back, just never documented. Not sure if appropriate to keep internal-only or expose. -->
               <codeph>DISABLE_OUTERMOST_TOPN</codeph>
             </li>
-            <li audience="Cloudera"><!-- Actually from a long way back, just never documented. Not sure if appropriate to keep internal-only or expose. -->
+            <li audience="hidden"><!-- Actually from a long way back, just never documented. Not sure if appropriate to keep internal-only or expose. -->
               <codeph>RM_INITIAL_MEM</codeph>
             </li>
-            <li audience="Cloudera"><!-- Seems to be related to writing sequence files, a capability not externalized at this time. -->
+            <li audience="hidden"><!-- Seems to be related to writing sequence files, a capability not externalized at this time. -->
               <codeph>SEQ_COMPRESSION_MODE</codeph>
             </li>
-            <li audience="Cloudera"><!-- Actually, was only used for working around one JIRA. Being deprecated now in Impala 2.3 via IMPALA-2963. -->
+            <li audience="hidden"><!-- Actually, was only used for working around one JIRA. Being deprecated now in Impala 2.3 via IMPALA-2963. -->
               <codeph>DISABLE_CACHED_READS</codeph>
             </li>
           </ul>
@@ -1444,7 +1444,7 @@ under the License.
 
   </concept>
 
-  <concept audience="Cloudera" rev="5.4.6" id="new_features_226">
+  <concept audience="hidden" rev="5.4.6" id="new_features_226">
 
     <title>New Features in Impala 2.2.6 / CDH 5.4.6</title>
 
@@ -1500,7 +1500,7 @@ under the License.
 
 <!-- I let the 5.4.3/5.4.3 subtopic above remain in existence, but now back to hiding specific 5.4.x subtopics
      after the .0 one that has the actual new features.
-  <concept audience="Cloudera" rev="5.4.2" id="new_features_222">
+  <concept audience="hidden" rev="5.4.2" id="new_features_222">
 
     <title>New Features in Impala 2.2.x for CDH 5.4.2</title>
 
@@ -2130,7 +2130,7 @@ under the License.
               values are padded with spaces on the right. See <xref href="impala_char.xml#char"/> for details.
             </li>
 
-            <li audience="Cloudera">
+            <li audience="hidden">
 <!-- This feature will be undocumented in Impala 2.0, probably ready for prime time in 2.1. -->
               <codeph>DATE</codeph>. See <xref href="impala_date.xml#date"/> for details.
             </li>
@@ -2311,7 +2311,7 @@ under the License.
           </p>
         </li>
 
-        <li audience="Cloudera">
+        <li audience="hidden">
 <!-- This feature will be undocumented in Impala 2.0, probably ready for prime time in 2.1. -->
           <p>
             Improved file format support. Impala can now write to Avro, compressed text, SequenceFile, and RCFile
@@ -2338,7 +2338,7 @@ under the License.
           </p>
         </li>
 
-        <li audience="Cloudera">
+        <li audience="hidden">
 <!-- This feature will be undocumented in Impala 2.0, probably ready for prime time in 2.1. -->
           <p>
             The <codeph>COMPUTE STATS</codeph> statement can now gather statistics for newly added partitions
@@ -2579,7 +2579,7 @@ under the License.
           </p>
         </li>
 
-        <li audience="Cloudera">
+        <li audience="hidden">
 <!-- Not documenting for 1.4. Revisit in a future release. -->
           <p>
             Data sources. <ph audience="PDF">See <xref href="impala_data_sources.xml#data_sources"/> for
@@ -2630,7 +2630,7 @@ under the License.
           <ul>
 <!-- This particular change has been pushed out to a later release. -->
 
-            <li audience="Cloudera">
+            <li audience="hidden">
               Certain simple aggregation operations (with no <codeph>GROUP BY</codeph> step) are multi-threaded if
               spare cores are available.
             </li>
@@ -3266,7 +3266,7 @@ under the License.
           </p>
         </li>
 
-        <li audience="Cloudera">
+        <li audience="hidden">
           <p>
             Integration with the YARN resource management framework. Only available in combination with CDH 5. This
             feature makes use of the underlying YARN service, plus an additional service (Llama) that coordinates

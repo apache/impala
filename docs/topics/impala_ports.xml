@@ -35,7 +35,7 @@ under the License.
   <conbody id="conbody_ports">
 
     <p>
-      <indexterm audience="Cloudera">ports</indexterm>
+      <indexterm audience="hidden">ports</indexterm>
       Impala uses the TCP ports listed in the following table. Before deploying Impala, ensure these ports are open
       on each system.
     </p>

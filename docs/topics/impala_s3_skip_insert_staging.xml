@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p rev="2.6.0 IMPALA-3452 CDH-39913">
-      <indexterm audience="Cloudera">IMPALA_S3_SKIP_INSERT_STAGING query option</indexterm>
+      <indexterm audience="hidden">IMPALA_S3_SKIP_INSERT_STAGING query option</indexterm>
     </p>
 
     <p>

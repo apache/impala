@@ -51,7 +51,7 @@ under the License.
     <topicref href="topics/impala_schema_design.xml"/>
   </topicref>
   <topicref audience="standalone" href="topics/impala_install.xml#install">
-    <topicref href="topics/impala_cm_installation.xml#cm_installation" audience="Cloudera"/>
+    <topicref href="topics/impala_cm_installation.xml#cm_installation" audience="hidden"/>
     <topicref href="topics/impala_noncm_installation.xml#noncm_installation"/>
 <!-- Removed when Hue docs were removed from main library. Might be worth resurrecting someday as general Impala+Hue topic. -->
 <!--		<topicref href="impala_hue_xi20559.xml"/> -->
@@ -101,7 +101,7 @@ under the License.
       <topicref href="topics/impala_boolean.xml"/>
       <topicref href="topics/impala_char.xml"/>
       <topicref href="topics/impala_decimal.xml"/>
-      <topicref audience="Cloudera" href="topics/impala_date.xml"/>
+      <topicref audience="hidden" href="topics/impala_date.xml"/>
       <topicref href="topics/impala_double.xml"/>
       <topicref href="topics/impala_float.xml"/>
       <topicref href="topics/impala_int.xml"/>
@@ -120,7 +120,7 @@ under the License.
     <topicref href="topics/impala_schema_objects.xml">
       <topicref href="topics/impala_aliases.xml"/>
       <topicref href="topics/impala_databases.xml"/>
-      <topicref audience="Cloudera" href="topics/impala_data_sources.xml"/>
+      <topicref audience="hidden" href="topics/impala_data_sources.xml"/>
       <topicref href="topics/impala_functions_overview.xml"/>
       <topicref href="topics/impala_identifiers.xml"/>
       <topicref href="topics/impala_tables.xml"/>
@@ -132,7 +132,7 @@ under the License.
       <topicref href="topics/impala_alter_table.xml"/>
       <topicref href="topics/impala_alter_view.xml"/>
       <topicref href="topics/impala_compute_stats.xml"/>
-      <topicref audience="Cloudera" href="topics/impala_create_data_source.xml"/>
+      <topicref audience="hidden" href="topics/impala_create_data_source.xml"/>
       <topicref href="topics/impala_create_database.xml"/>
       <topicref href="topics/impala_create_function.xml"/>
       <topicref href="topics/impala_create_role.xml"/>
@@ -140,7 +140,7 @@ under the License.
       <topicref href="topics/impala_create_view.xml"/>
       <topicref href="topics/impala_delete.xml"/>
       <topicref href="topics/impala_describe.xml"/>
-      <topicref audience="Cloudera" href="topics/impala_drop_data_source.xml"/>
+      <topicref audience="hidden" href="topics/impala_drop_data_source.xml"/>
       <topicref href="topics/impala_drop_database.xml"/>
       <topicref href="topics/impala_drop_function.xml"/>
       <topicref href="topics/impala_drop_role.xml"/>
@@ -177,9 +177,9 @@ under the License.
           <topicref href="topics/impala_compression_codec.xml"/>
           <topicref href="topics/impala_debug_action.xml"/>
           <topicref href="topics/impala_default_order_by_limit.xml"/>
-          <topicref audience="Cloudera" href="topics/impala_disable_cached_reads.xml"/>
+          <topicref audience="hidden" href="topics/impala_disable_cached_reads.xml"/>
           <topicref href="topics/impala_disable_codegen.xml"/>
-          <topicref audience="Cloudera" href="topics/impala_disable_outermost_topn.xml"/>
+          <topicref audience="hidden" href="topics/impala_disable_outermost_topn.xml"/>
           <topicref rev="2.5.0" href="topics/impala_disable_row_runtime_filtering.xml"/>
           <topicref rev="2.5.0" href="topics/impala_disable_streaming_preaggregations.xml"/>
           <topicref href="topics/impala_disable_unsafe_spills.xml"/>
@@ -206,7 +206,7 @@ under the License.
           <topicref href="topics/impala_request_pool.xml"/>
           <topicref rev="2.5.0" href="topics/impala_schedule_random_replica.xml"/>
           <topicref rev="2.7.0" href="topics/impala_replica_preference.xml"/>
-          <topicref audience="Cloudera" href="topics/impala_rm_initial_mem.xml"/>
+          <topicref audience="hidden" href="topics/impala_rm_initial_mem.xml"/>
           <topicref href="topics/impala_reservation_request_timeout.xml"/>
           <topicref rev="2.5.0" href="topics/impala_runtime_bloom_filter_size.xml"/>
           <topicref rev="2.6.0" href="topics/impala_runtime_filter_max_size.xml"/>
@@ -272,7 +272,7 @@ under the License.
     <topicref href="topics/impala_perf_testing.xml"/>
     <topicref href="topics/impala_explain_plan.xml"/>
     <topicref href="topics/impala_perf_skew.xml"/>
-    <topicref audience="Cloudera" href="topics/impala_perf_ddl.xml"/>
+    <topicref audience="hidden" href="topics/impala_perf_ddl.xml"/>
   </topicref>
   <topicref href="topics/impala_scalability.xml"/>
   <topicref href="topics/impala_partitioning.xml"/>
@@ -305,7 +305,7 @@ under the License.
   </topicref>
   <!-- Release coordinator: don't remove this pre-release tag, it will
        probably remain in pre-release state for some time. -->
-  <topicref audience="Cloudera" href="topics/impala_errata.xml"/>
+  <topicref audience="hidden" href="topics/impala_errata.xml"/>
 
 <!-- Substitution variables and link destinations abstracted
      into a .h-like side file. -->

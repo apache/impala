@@ -189,7 +189,7 @@ under the License.
         specify the option on the <cmdname>impalad</cmdname> command line.
       </p>
 
-      <p audience="Cloudera">
+      <p audience="hidden">
         For clusters managed by Cloudera Manager 5.4.0 and higher,
         search for the configuration field names <codeph>ldap_domain</codeph>,
         <codeph>ldap_basedn</codeph>, or <codeph>ldap_bind_pattern</codeph>,
@@ -303,7 +303,7 @@ username, for example <codeph>username@example.com</codeph>.
       </metadata>
     </prolog>
     <conbody>
-      <section id="ldap_impala_hue_cm" audience="Cloudera">
+      <section id="ldap_impala_hue_cm" audience="hidden">
         <title>Enabling LDAP for Impala in Hue Using Cloudera Manager</title>
         <p>
           <ol>

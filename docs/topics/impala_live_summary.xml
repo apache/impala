@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p rev="2.3.0">
-      <indexterm audience="Cloudera">LIVE_SUMMARY query option</indexterm>
+      <indexterm audience="hidden">LIVE_SUMMARY query option</indexterm>
       For queries submitted through the <cmdname>impala-shell</cmdname> command,
       displays the same output as the <codeph>SUMMARY</codeph> command,
       with the measurements updated in real time as the query progresses.
@@ -142,7 +142,7 @@ LIVE_SUMMARY set to true
 </codeblock>
 
 <!-- Keeping this sample output that illustrates a couple of glitches in the LIVE_SUMMARY display, hidden, to help filing JIRAs. -->
-<codeblock audience="Cloudera"><![CDATA[[
+<codeblock audience="hidden"><![CDATA[[
 +---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
 | Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
 +---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+

@@ -76,7 +76,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">ascii() function</indexterm>
+          <indexterm audience="hidden">ascii() function</indexterm>
           <b>Purpose:</b> Returns the numeric ASCII code of the first character of the argument.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -93,7 +93,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">btrim() function</indexterm>
+          <indexterm audience="hidden">btrim() function</indexterm>
           <b>Purpose:</b> Removes all instances of one or more characters
           from the start and end of a <codeph>STRING</codeph> value.
           By default, removes only spaces.
@@ -151,8 +151,8 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">char_length() function</indexterm>
-          <indexterm audience="Cloudera">character_length() function</indexterm>
+          <indexterm audience="hidden">char_length() function</indexterm>
+          <indexterm audience="hidden">character_length() function</indexterm>
           <b>Purpose:</b> Returns the length in characters of the argument string. Aliases for the
           <codeph>length()</codeph> function.
           <p>
@@ -169,7 +169,7 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">chr() function</indexterm>
+          <indexterm audience="hidden">chr() function</indexterm>
           <b>Purpose:</b> Returns a character specified by a decimal code point value.
           The interpretation and display of the resulting character depends on your system locale.
           Because consistent processing of Impala string values is only guaranteed
@@ -208,7 +208,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">concat() function</indexterm>
+          <indexterm audience="hidden">concat() function</indexterm>
           <b>Purpose:</b> Returns a single string representing all the argument values joined together.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
@@ -225,7 +225,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">concat_ws() function</indexterm>
+          <indexterm audience="hidden">concat_ws() function</indexterm>
           <b>Purpose:</b> Returns a single string representing the second and following argument values joined
           together, delimited by a specified separator.
           <p>
@@ -243,7 +243,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">find_in_set() function</indexterm>
+          <indexterm audience="hidden">find_in_set() function</indexterm>
           <b>Purpose:</b> Returns the position (starting from 1) of the first occurrence of a specified string
           within a comma-separated string. Returns <codeph>NULL</codeph> if either argument is
           <codeph>NULL</codeph>, 0 if the search string is not found, or 0 if the search string contains a comma.
@@ -261,7 +261,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">group_concat() function</indexterm>
+          <indexterm audience="hidden">group_concat() function</indexterm>
           <b>Purpose:</b> Returns a single string representing the argument value concatenated together for each
           row of the result set. If the optional separator string is specified, the separator is added between each
           pair of concatenated values.
@@ -290,7 +290,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">initcap() function</indexterm>
+          <indexterm audience="hidden">initcap() function</indexterm>
           <b>Purpose:</b> Returns the input string with the first letter capitalized.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
@@ -306,7 +306,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">instr() function</indexterm>
+          <indexterm audience="hidden">instr() function</indexterm>
           <b>Purpose:</b> Returns the position (starting from 1) of the first occurrence of a substring within a
           longer string.
           <p>
@@ -323,7 +323,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">length() function</indexterm>
+          <indexterm audience="hidden">length() function</indexterm>
           <b>Purpose:</b> Returns the length in characters of the argument string.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -339,7 +339,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">locate() function</indexterm>
+          <indexterm audience="hidden">locate() function</indexterm>
           <b>Purpose:</b> Returns the position (starting from 1) of the first occurrence of a substring within a
           longer string, optionally after a particular position.
           <p>
@@ -356,7 +356,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">lower() function</indexterm>
+          <indexterm audience="hidden">lower() function</indexterm>
           <b>Purpose:</b> Returns the argument string converted to all-lowercase.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
@@ -374,7 +374,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">lpad() function</indexterm>
+          <indexterm audience="hidden">lpad() function</indexterm>
           <b>Purpose:</b> Returns a string of a specified length, based on the first argument string. If the
           specified string is too short, it is padded on the left with a repeating sequence of the characters from
           the pad string. If the specified string is too long, it is truncated on the right.
@@ -392,7 +392,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">ltrim() function</indexterm>
+          <indexterm audience="hidden">ltrim() function</indexterm>
           <b>Purpose:</b> Returns the argument string with any leading spaces removed from the left side.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
@@ -408,7 +408,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">parse_url() function</indexterm>
+          <indexterm audience="hidden">parse_url() function</indexterm>
           <b>Purpose:</b> Returns the portion of a URL corresponding to a specified part. The part argument can be
           <codeph>'PROTOCOL'</codeph>, <codeph>'HOST'</codeph>, <codeph>'PATH'</codeph>, <codeph>'REF'</codeph>,
           <codeph>'AUTHORITY'</codeph>, <codeph>'FILE'</codeph>, <codeph>'USERINFO'</codeph>, or
@@ -436,7 +436,7 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">regexp_extract() function</indexterm>
+          <indexterm audience="hidden">regexp_extract() function</indexterm>
           <b>Purpose:</b> Returns the specified () group from a string based on a regular expression pattern. Group
           0 refers to the entire extracted string, while group 1, 2, and so on refers to the first, second, and so
           on <codeph>(...)</codeph> portion.
@@ -501,7 +501,7 @@ Returned 1 row(s) in 0.11s</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">regexp_like() function</indexterm>
+          <indexterm audience="hidden">regexp_like() function</indexterm>
           <b>Purpose:</b> Returns <codeph>true</codeph> or <codeph>false</codeph> to indicate
           whether the source string contains anywhere inside it the regular expression given by the pattern.
           The optional third argument consists of letter flags that change how the match is performed,
@@ -607,7 +607,7 @@ select regexp_like('foooooobar','fx*y*o*b');
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">regexp_replace() function</indexterm>
+          <indexterm audience="hidden">regexp_replace() function</indexterm>
           <b>Purpose:</b> Returns the initial argument with the regular expression pattern replaced by the final
           argument string.
           <p>
@@ -664,7 +664,7 @@ Returned 1 row(s) in 0.12s</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">repeat() function</indexterm>
+          <indexterm audience="hidden">repeat() function</indexterm>
           <b>Purpose:</b> Returns the argument string repeated a specified number of times.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
@@ -680,7 +680,7 @@ Returned 1 row(s) in 0.12s</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">reverse() function</indexterm>
+          <indexterm audience="hidden">reverse() function</indexterm>
           <b>Purpose:</b> Returns the argument string with characters in reversed order.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
@@ -696,7 +696,7 @@ Returned 1 row(s) in 0.12s</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">rpad() function</indexterm>
+          <indexterm audience="hidden">rpad() function</indexterm>
           <b>Purpose:</b> Returns a string of a specified length, based on the first argument string. If the
           specified string is too short, it is padded on the right with a repeating sequence of the characters from
           the pad string. If the specified string is too long, it is truncated on the right.
@@ -714,7 +714,7 @@ Returned 1 row(s) in 0.12s</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">rtrim() function</indexterm>
+          <indexterm audience="hidden">rtrim() function</indexterm>
           <b>Purpose:</b> Returns the argument string with any trailing spaces removed from the right side.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
@@ -730,7 +730,7 @@ Returned 1 row(s) in 0.12s</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">space() function</indexterm>
+          <indexterm audience="hidden">space() function</indexterm>
           <b>Purpose:</b> Returns a concatenated string of the specified number of spaces. Shorthand for
           <codeph>repeat(' ',<varname>n</varname>)</codeph>.
           <p>
@@ -747,7 +747,7 @@ Returned 1 row(s) in 0.12s</codeblock>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">split_part() function</indexterm>
+          <indexterm audience="hidden">split_part() function</indexterm>
           <b>Purpose:</b> Returns the nth field within a delimited string.
           The fields are numbered starting from 1.
           The delimiter can consist of multiple characters, not just a
@@ -839,7 +839,7 @@ select split_part('one\|/two\|/three','\|/',3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">strleft() function</indexterm>
+          <indexterm audience="hidden">strleft() function</indexterm>
           <b>Purpose:</b> Returns the leftmost characters of the string. Shorthand for a call to
           <codeph>substr()</codeph> with 2 arguments.
           <p>
@@ -856,7 +856,7 @@ select split_part('one\|/two\|/three','\|/',3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">strright() function</indexterm>
+          <indexterm audience="hidden">strright() function</indexterm>
           <b>Purpose:</b> Returns the rightmost characters of the string. Shorthand for a call to
           <codeph>substr()</codeph> with 2 arguments.
           <p>
@@ -874,7 +874,7 @@ select split_part('one\|/two\|/three','\|/',3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">substr() function</indexterm>
+          <indexterm audience="hidden">substr() function</indexterm>
           <b>Purpose:</b> Returns the portion of the string starting at a specified point, optionally with a
           specified maximum length. The characters in the string are indexed starting at 1.
           <p>
@@ -891,7 +891,7 @@ select split_part('one\|/two\|/three','\|/',3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">translate() function</indexterm>
+          <indexterm audience="hidden">translate() function</indexterm>
           <b>Purpose:</b> Returns the input string with a set of characters replaced by another set of characters.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
@@ -907,7 +907,7 @@ select split_part('one\|/two\|/three','\|/',3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">trim() function</indexterm>
+          <indexterm audience="hidden">trim() function</indexterm>
           <b>Purpose:</b> Returns the input string with both leading and trailing spaces removed. The same as
           passing the string through both <codeph>ltrim()</codeph> and <codeph>rtrim()</codeph>.
           <p>
@@ -928,8 +928,8 @@ select split_part('one\|/two\|/three','\|/',3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">upper() function</indexterm>
-          <indexterm audience="Cloudera">ucase() function</indexterm>
+          <indexterm audience="hidden">upper() function</indexterm>
+          <indexterm audience="hidden">ucase() function</indexterm>
           <b>Purpose:</b> Returns the argument string converted to all-uppercase.
           <p>
             <b>Return type:</b> <codeph>string</codeph>

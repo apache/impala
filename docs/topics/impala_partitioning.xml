@@ -41,7 +41,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">partitioning</indexterm>
+      <indexterm audience="hidden">partitioning</indexterm>
       By default, all the data files for a table are located in a single directory. Partitioning is a technique for physically dividing the
       data during loading, based on values from one or more columns, to speed up queries that test those columns. For example, with a
       <codeph>school_records</codeph> table partitioned on a <codeph>year</codeph> column, there is a separate data directory for each
@@ -332,7 +332,7 @@ insert into weather <b>partition (year=2014, month=04, day)</b> select 'sunny',2
       <conbody>
 
         <p rev="1.2.2">
-          <indexterm audience="Cloudera">predicate propagation</indexterm>
+          <indexterm audience="hidden">predicate propagation</indexterm>
           Impala can even do partition pruning in cases where the partition key column is not directly compared to a constant, by applying
           the transitive property to other parts of the <codeph>WHERE</codeph> clause. This technique is known as predicate propagation, and
           is available in Impala 1.2.2 and later. In this example, the census table includes another column indicating when the data was
@@ -575,7 +575,7 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
 
   </concept>
 
-  <concept rev="kudu" id="partition_kudu" audience="Cloudera">
+  <concept rev="kudu" id="partition_kudu" audience="hidden">
 
     <title>Using Partitioning with Kudu Tables</title>
 

@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">REVOKE statement</indexterm>
+      <indexterm audience="hidden">REVOKE statement</indexterm>
 <!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
       The <codeph>REVOKE</codeph> statement revokes roles or privileges on a specified object from groups. Only
       Sentry administrative users can revoke the role from a group. The revocation has a cascading effect. For

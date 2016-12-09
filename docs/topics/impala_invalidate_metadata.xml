@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">INVALIDATE METADATA statement</indexterm>
+      <indexterm audience="hidden">INVALIDATE METADATA statement</indexterm>
       Marks the metadata for one or all tables as stale. Required after a table is created through the Hive shell,
       before the table is available for Impala queries. The next time the current Impala node performs a query
       against a table whose metadata is invalidated, Impala reloads the associated metadata before the query

@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">CREATE ROLE statement</indexterm>
+      <indexterm audience="hidden">CREATE ROLE statement</indexterm>
 <!-- Copied from Sentry docs. Turn into conref. -->
       The <codeph>CREATE ROLE</codeph> statement creates a role to which privileges can be granted. Privileges can
       be granted to roles, which can then be assigned to users. A user that has been assigned a role will only be

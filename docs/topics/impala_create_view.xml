@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">CREATE VIEW statement</indexterm>
+      <indexterm audience="hidden">CREATE VIEW statement</indexterm>
       The <codeph>CREATE VIEW</codeph> statement lets you create a shorthand abbreviation for a more complicated
       query. The base query can involve joins, expressions, reordered columns, column aliases, and other SQL
       features that can make a query hard to understand or maintain.

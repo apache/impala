@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DROP FUNCTION statement</indexterm>
+      <indexterm audience="hidden">DROP FUNCTION statement</indexterm>
       Removes a user-defined function (UDF), so that it is not available for execution during Impala
       <codeph>SELECT</codeph> or <codeph>INSERT</codeph> operations.
     </p>

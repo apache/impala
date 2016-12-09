@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">avg() function</indexterm>
+      <indexterm audience="hidden">avg() function</indexterm>
       An aggregate function that returns the average value from a set of numbers or <codeph>TIMESTAMP</codeph> values.
       Its single argument can be numeric column, or the numeric result of a function or expression applied to the
       column value. Rows with a <codeph>NULL</codeph> value for the specified column are ignored. If the table is empty,

@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p rev="2.6.0 IMPALA-2835 CDH-33330">
-      <indexterm audience="Cloudera">PARQUET_FALLBACK_SCHEMA_RESOLUTION query option</indexterm>
+      <indexterm audience="hidden">PARQUET_FALLBACK_SCHEMA_RESOLUTION query option</indexterm>
       Allows Impala to look up columns within Parquet files by column name, rather than column order,
       when necessary.
     </p>

@@ -96,7 +96,7 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">internal tables</indexterm>
+        <indexterm audience="hidden">internal tables</indexterm>
         The default kind of table produced by the <codeph>CREATE TABLE</codeph> statement is known as an internal
         table. (Its counterpart is the external table, produced by the <codeph>CREATE EXTERNAL TABLE</codeph>
         syntax.)
@@ -166,7 +166,7 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">external tables</indexterm>
+        <indexterm audience="hidden">external tables</indexterm>
         The syntax <codeph>CREATE EXTERNAL TABLE</codeph> sets up an Impala table that points at existing data
         files, potentially in HDFS locations outside the normal Impala data directories.. This operation saves the
         expense of importing the data into a new table when you already have the data files in a known location in

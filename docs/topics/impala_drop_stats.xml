@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p rev="2.1.0">
-      <indexterm audience="Cloudera">DROP STATS statement</indexterm>
+      <indexterm audience="hidden">DROP STATS statement</indexterm>
       Removes the specified statistics from a table or partition. The statistics were originally created by the
       <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL STATS</codeph> statement.
     </p>

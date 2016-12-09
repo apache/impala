@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DISTINCT operator</indexterm>
+      <indexterm audience="hidden">DISTINCT operator</indexterm>
       The <codeph>DISTINCT</codeph> operator in a <codeph>SELECT</codeph> statement filters the result set to
       remove duplicates:
     </p>

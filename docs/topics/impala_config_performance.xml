@@ -90,10 +90,10 @@ under the License.
           Impala configuration directory. The default Impala configuration
           location is <codeph>/etc/impala/conf</codeph>. </li>
         <li>
-          <indexterm audience="Cloudera"
+          <indexterm audience="hidden"
             >dfs.client.read.shortcircuit</indexterm>
-          <indexterm audience="Cloudera">dfs.domain.socket.path</indexterm>
-          <indexterm audience="Cloudera"
+          <indexterm audience="hidden">dfs.domain.socket.path</indexterm>
+          <indexterm audience="hidden"
             >dfs.client.file-block-storage-locations.timeout.millis</indexterm>
           On all Impala nodes, configure the following properties in <!-- Exact timing is unclear, since we say farther down to copy /etc/hadoop/conf/hdfs-site.xml to /etc/impala/conf.
      Which wouldn't work if we already modified the Impala version of the file here. Not to mention that this

@@ -35,8 +35,8 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">Hive</indexterm>
-      <indexterm audience="Cloudera">HiveQL</indexterm>
+      <indexterm audience="hidden">Hive</indexterm>
+      <indexterm audience="hidden">HiveQL</indexterm>
       Impala's SQL syntax follows the SQL-92 standard, and includes many industry extensions in areas such as
       built-in functions. See <xref href="impala_porting.xml#porting"/> for a general discussion of adapting SQL
       code from a variety of database systems to Impala.

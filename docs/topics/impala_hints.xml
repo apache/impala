@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">hints</indexterm>
+      <indexterm audience="hidden">hints</indexterm>
       The Impala SQL dialect supports query hints, for fine-tuning the inner workings of queries. Specify hints as
       a temporary workaround for expensive queries, where missing statistics or other factors cause inefficient
       performance.

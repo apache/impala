@@ -34,7 +34,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">query errors</indexterm>
+      <indexterm audience="hidden">query errors</indexterm>
     </p>
 
     <p outputclass="toc inpage"/>

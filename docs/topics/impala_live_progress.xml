@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p rev="2.3.0">
-      <indexterm audience="Cloudera">LIVE_PROGRESS query option</indexterm>
+      <indexterm audience="hidden">LIVE_PROGRESS query option</indexterm>
       For queries submitted through the <cmdname>impala-shell</cmdname> command,
       displays an interactive progress bar showing roughly what percentage of
       processing has been completed. When the query finishes, the progress bar is erased

@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">SYNC_DDL query option</indexterm>
+      <indexterm audience="hidden">SYNC_DDL query option</indexterm>
       When enabled, causes any DDL operation such as <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph>
       to return only when the changes have been propagated to all other Impala nodes in the cluster by the Impala
       catalog service. That way, if you issue a subsequent <codeph>CONNECT</codeph> statement in

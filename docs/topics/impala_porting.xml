@@ -41,7 +41,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">porting</indexterm>
+      <indexterm audience="hidden">porting</indexterm>
       Although Impala uses standard SQL for queries, you might need to modify SQL source when bringing applications
       to Impala, due to variations in data types, built-in functions, vendor language extensions, and
       Hadoop-specific syntax. Even when SQL is working correctly, you might make further minor modifications for

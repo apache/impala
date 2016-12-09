@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.6.0 IMPALA-2069">
-      <indexterm audience="Cloudera">PARQUET_ANNOTATE_STRINGS_UTF8 query option</indexterm>
+      <indexterm audience="hidden">PARQUET_ANNOTATE_STRINGS_UTF8 query option</indexterm>
       Causes Impala <codeph>INSERT</codeph> and <codeph>CREATE TABLE AS SELECT</codeph> statements
       to write Parquet files that use the UTF-8 annotation for <codeph>STRING</codeph> columns.
     </p>

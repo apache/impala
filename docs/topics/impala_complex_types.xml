@@ -35,9 +35,9 @@ under the License.
   <conbody>
 
     <p rev="2.3.0">
-      <indexterm audience="Cloudera">complex types</indexterm>
+      <indexterm audience="hidden">complex types</indexterm>
 
-      <indexterm audience="Cloudera">nested types</indexterm>
+      <indexterm audience="hidden">nested types</indexterm>
       <term>Complex types</term> (also referred to as <term>nested types</term>) let you represent multiple data values within a single
       row/column position. They differ from the familiar column types such as <codeph>BIGINT</codeph> and <codeph>STRING</codeph>, known as
       <term>scalar types</term> or <term>primitive types</term>, which represent a single data value within a given row/column position.
@@ -2236,7 +2236,7 @@ SELECT count(*) FROM supplier;
 
       </conbody>
 
-      <concept audience="Cloudera" id="complex_python">
+      <concept audience="hidden" id="complex_python">
 
 <!-- Hiding this subtopic for the moment because there isn't enough material related to Ibis yet, which would be useful for background or to construct examples. -->
 
@@ -2282,7 +2282,7 @@ SELECT count(*) FROM supplier;
 
     </concept>
 
-    <concept id="complex_types_ex_aggregation" audience="Cloudera">
+    <concept id="complex_types_ex_aggregation" audience="hidden">
 
       <title>Aggregating the Elements in an ARRAY</title>
 
@@ -2297,7 +2297,7 @@ SELECT count(*) FROM supplier;
 
     </concept>
 
-    <concept id="complex_types_ex_map_keys" audience="Cloudera">
+    <concept id="complex_types_ex_map_keys" audience="hidden">
 
       <title>Finding the Distinct Keys in a MAP</title>
 
@@ -2312,7 +2312,7 @@ SELECT count(*) FROM supplier;
 
     </concept>
 
-    <concept id="complex_types_ex_map_struct" audience="Cloudera">
+    <concept id="complex_types_ex_map_struct" audience="hidden">
 
       <title>Using a STRUCT as the Value Part of a MAP</title>
 
@@ -2487,7 +2487,7 @@ SELECT t1.continent, t1.country.name, t2.item
 
     </concept>
 
-    <concept audience="Cloudera" id="complex_types_no_joins">
+    <concept audience="hidden" id="complex_types_no_joins">
 
       <title>Using Complex Types without Join Queries</title>
 

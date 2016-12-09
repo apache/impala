@@ -47,7 +47,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">current_database() function</indexterm>
+          <indexterm audience="hidden">current_database() function</indexterm>
           <b>Purpose:</b> Returns the database that the session is currently using, either <codeph>default</codeph>
           if no database has been selected, or whatever database the session switched to through a
           <codeph>USE</codeph> statement or the <cmdname>impalad</cmdname><codeph>-d</codeph> option.
@@ -65,7 +65,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">effective_user() function</indexterm>
+          <indexterm audience="hidden">effective_user() function</indexterm>
           <b>Purpose:</b> Typically returns the same value as <codeph>user()</codeph>,
           except if delegation is enabled, in which case it returns the ID of the delegated user.
           <p>
@@ -85,7 +85,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">pid() function</indexterm>
+          <indexterm audience="hidden">pid() function</indexterm>
           <b>Purpose:</b> Returns the process ID of the <cmdname>impalad</cmdname> daemon that the session is
           connected to. You can use it during low-level debugging, to issue Linux commands that trace, show the
           arguments, and so on the <cmdname>impalad</cmdname> process.
@@ -96,14 +96,14 @@ under the License.
 
       </dlentry>
 
-      <dlentry audience="Cloudera" id="sleep">
+      <dlentry audience="hidden" id="sleep">
 
         <dt>
           <codeph>sleep(int ms)</codeph>
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">sleep() function</indexterm>
+          <indexterm audience="hidden">sleep() function</indexterm>
           <b>Purpose:</b> Pauses the query for a specified number of milliseconds. For slowing down queries with
           small result sets enough to monitor runtime execution, memory usage, or other factors that otherwise
           would be difficult to capture during the brief interval of query execution. When used in the
@@ -126,7 +126,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">user() function</indexterm>
+          <indexterm audience="hidden">user() function</indexterm>
           <b>Purpose:</b> Returns the username of the Linux user who is connected to the <cmdname>impalad</cmdname>
           daemon. Typically called a single time, in a query without any <codeph>FROM</codeph> clause, to
           understand how authorization settings apply in a security context; once you know the logged-in username,
@@ -150,7 +150,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">uuid() function</indexterm>
+          <indexterm audience="hidden">uuid() function</indexterm>
           <b>Purpose:</b> Returns a <xref href="https://en.wikipedia.org/wiki/Universally_unique_identifier" scope="external" format="html">universal unique identifier</xref>, a 128-bit value encoded as a string with groups of hexadecimal digits separated by dashes.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
@@ -198,7 +198,7 @@ select uuid() from four_row_table;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">version() function</indexterm>
+          <indexterm audience="hidden">version() function</indexterm>
           <b>Purpose:</b> Returns information such as the precise version number and build date for the
           <codeph>impalad</codeph> daemon that you are currently connected to. Typically used to confirm that you
           are connected to the expected level of Impala to use a particular feature, or to connect to several nodes

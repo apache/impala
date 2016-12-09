@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DROP TABLE statement</indexterm>
+      <indexterm audience="hidden">DROP TABLE statement</indexterm>
       Removes an Impala table. Also removes the underlying HDFS data files for internal tables, although not for
       external tables.
     </p>

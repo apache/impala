@@ -33,9 +33,9 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">incorrect results</indexterm>
-      <indexterm audience="Cloudera">bad results</indexterm>
-      <indexterm audience="Cloudera">wrong results</indexterm>
+      <indexterm audience="hidden">incorrect results</indexterm>
+      <indexterm audience="hidden">bad results</indexterm>
+      <indexterm audience="hidden">wrong results</indexterm>
     </p>
 
     <p outputclass="toc inpage"/>

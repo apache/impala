@@ -33,7 +33,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0">
-      <indexterm audience="Cloudera">RM_INITIAL_MEM query option</indexterm>
+      <indexterm audience="hidden">RM_INITIAL_MEM query option</indexterm>
     </p>
 
     <p>

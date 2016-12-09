@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">UPSERT statement</indexterm>
+      <indexterm audience="hidden">UPSERT statement</indexterm>
       Acts as a combination of the <codeph>INSERT</codeph>
       and <codeph>UPDATE</codeph> statements.
       For each row processed by the <codeph>UPSERT</codeph>

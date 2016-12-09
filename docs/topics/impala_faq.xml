@@ -52,7 +52,7 @@ under the License.
         FAQs in this category:
       </p>
 
-      <section id="faq_tryout" audience="Cloudera">
+      <section id="faq_tryout" audience="hidden">
 
         <title>How do I try Impala out?</title>
 
@@ -73,7 +73,7 @@ under the License.
         </sectiondiv>
       </section>
 
-      <section id="faq_demo_vm" audience="Cloudera">
+      <section id="faq_demo_vm" audience="hidden">
 
         <title>Does Cloudera offer a VM for demonstrating Impala?</title>
 
@@ -473,7 +473,7 @@ through the <codeph>DEFAULT_ORDER_BY_LIMIT</codeph> query option.</ph>
               information about Impala performance optimizations and tuning techniques for queries.
             </li>
 
-            <li audience="Cloudera">
+            <li audience="hidden">
               Using Cloudera Manager, you can deploy and manage your Impala services. Cloudera Manager is the best
               way to get started with Impala on your cluster.
             </li>
@@ -647,7 +647,7 @@ through the <codeph>DEFAULT_ORDER_BY_LIMIT</codeph> query option.</ph>
         </sectiondiv>
       </section>
 
-      <section audience="Cloudera" id="faq_roadmap">
+      <section audience="hidden" id="faq_roadmap">
 
 <!-- Hidden to avoid RevRec implications. -->
 

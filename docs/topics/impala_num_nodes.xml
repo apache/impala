@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">NUM_NODES query option</indexterm>
+      <indexterm audience="hidden">NUM_NODES query option</indexterm>
       Limit the number of nodes that process a query, typically during debugging.
     </p>
 

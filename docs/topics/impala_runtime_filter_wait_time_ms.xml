@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0">
-      <indexterm audience="Cloudera">RUNTIME_FILTER_WAIT_TIME_MS query option</indexterm>
+      <indexterm audience="hidden">RUNTIME_FILTER_WAIT_TIME_MS query option</indexterm>
       The <codeph>RUNTIME_FILTER_WAIT_TIME_MS</codeph> query option
       adjusts the settings for the runtime filtering feature.
       It specifies a time in milliseconds that each scan node waits for

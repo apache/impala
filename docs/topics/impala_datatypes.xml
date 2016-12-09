@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">data types</indexterm>
+      <indexterm audience="hidden">data types</indexterm>
       Impala supports a set of data types that you can use for table columns, expression values, and function
       arguments and return values.
     </p>

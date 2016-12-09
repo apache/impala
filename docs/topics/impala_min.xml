@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">min() function</indexterm>
+      <indexterm audience="hidden">min() function</indexterm>
       An aggregate function that returns the minimum value from a set of numbers. Opposite of the
       <codeph>MAX</codeph> function. Its single argument can be numeric column, or the numeric result of a function
       or expression applied to the column value. Rows with a <codeph>NULL</codeph> value for the specified column

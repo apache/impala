@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0">
-      <indexterm audience="Cloudera">runtime filtering</indexterm>
+      <indexterm audience="hidden">runtime filtering</indexterm>
       <term>Runtime filtering</term> is a wide-ranging optimization feature available in
       <keyword keyref="impala25_full"/> and higher. When only a fraction of the data in a table is
       needed for a query against a partitioned table or to evaluate a join condition,

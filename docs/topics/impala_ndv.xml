@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">ndv() function</indexterm>
+      <indexterm audience="hidden">ndv() function</indexterm>
       An aggregate function that returns an approximate value similar to the result of <codeph>COUNT(DISTINCT
       <varname>col</varname>)</codeph>, the <q>number of distinct values</q>. It is much faster than the
       combination of <codeph>COUNT</codeph> and <codeph>DISTINCT</codeph>, and uses a constant amount of memory and

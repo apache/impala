@@ -95,7 +95,7 @@ shiftright
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">bitand() function</indexterm>
+          <indexterm audience="hidden">bitand() function</indexterm>
           <b>Purpose:</b> Returns an integer value representing the bits that are set to 1 in both of the arguments.
           If the arguments are of different sizes, the smaller is promoted to the type of the larger.
           <p>
@@ -164,7 +164,7 @@ select bitand(-1,15); /* 11111111 &amp; 00001111 */
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">bitnot() function</indexterm>
+          <indexterm audience="hidden">bitnot() function</indexterm>
           <b>Purpose:</b> Inverts all the bits of the input argument.
           <p>
             <b>Usage notes:</b> The <codeph>bitnot()</codeph> function is equivalent to the <codeph>~</codeph> unary operator.
@@ -221,7 +221,7 @@ select bitnot(-128); /* 10000000 -> 01111111 */
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">bitor() function</indexterm>
+          <indexterm audience="hidden">bitor() function</indexterm>
           <b>Purpose:</b> Returns an integer value representing the bits that are set to 1 in either of the arguments.
           If the arguments are of different sizes, the smaller is promoted to the type of the larger.
           <p>
@@ -265,7 +265,7 @@ select bitor(0,7); /* 00000000 | 00000111 */
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">bitxor() function</indexterm>
+          <indexterm audience="hidden">bitxor() function</indexterm>
           <b>Purpose:</b> Returns an integer value representing the bits that are set to 1 in one but not both of the arguments.
           If the arguments are of different sizes, the smaller is promoted to the type of the larger.
           <p>
@@ -319,7 +319,7 @@ select bitxor(3,7); /* 00000011 ^ 00000111 */
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">countset() function</indexterm>
+          <indexterm audience="hidden">countset() function</indexterm>
           <b>Purpose:</b> By default, returns the number of 1 bits in the specified integer value.
           If the optional second argument is set to zero, it returns the number of 0 bits instead.
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
@@ -387,7 +387,7 @@ select countset(7,0); /* 00000111 = 5 0 bits; third argument can only be 0 or 1 
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">getbit() function</indexterm>
+          <indexterm audience="hidden">getbit() function</indexterm>
           <b>Purpose:</b> Returns a 0 or 1 representing the bit at a
           specified position. The positions are numbered right to left, starting at zero.
           The position argument cannot be negative.
@@ -461,7 +461,7 @@ select getbit(cast(-1 as int),25); /* 11111111111111111111111111111111 */
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">rotateleft() function</indexterm>
+          <indexterm audience="hidden">rotateleft() function</indexterm>
           <b>Purpose:</b> Rotates an integer value left by a specified number of bits.
           As the most significant bit is taken out of the original value,
           if it is a 1 bit, it is <q>rotated</q> back to the least significant bit.
@@ -525,7 +525,7 @@ select rotateleft(-127,3); /* 10000001 -> 00001100 */
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">rotateright() function</indexterm>
+          <indexterm audience="hidden">rotateright() function</indexterm>
           <b>Purpose:</b> Rotates an integer value right by a specified number of bits.
           As the least significant bit is taken out of the original value,
           if it is a 1 bit, it is <q>rotated</q> back to the most significant bit.
@@ -588,7 +588,7 @@ select rotateright(-127,3); /* 10000001 -> 00110000 */
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">setbit() function</indexterm>
+          <indexterm audience="hidden">setbit() function</indexterm>
           <b>Purpose:</b> By default, changes a bit at a specified position to a 1, if it is not already.
           If the optional third argument is set to zero, the specified bit is set to 0 instead.
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
@@ -672,7 +672,7 @@ select setbit(7,2,0); /* 00000111 -> 00000011; third argument of 0 clears instea
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">shiftleft() function</indexterm>
+          <indexterm audience="hidden">shiftleft() function</indexterm>
           <b>Purpose:</b> Shifts an integer value left by a specified number of bits.
           As the most significant bit is taken out of the original value,
           it is discarded and the least significant bit becomes 0.
@@ -748,7 +748,7 @@ select shiftleft(-1,4); /* 11111111 -> 11110000 */
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">shiftright() function</indexterm>
+          <indexterm audience="hidden">shiftright() function</indexterm>
           <b>Purpose:</b> Shifts an integer value right by a specified number of bits.
           As the least significant bit is taken out of the original value,
           it is discarded and the most significant bit becomes 0.

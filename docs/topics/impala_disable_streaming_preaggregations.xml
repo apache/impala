@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0 IMPALA-1305">
-      <indexterm audience="Cloudera">DISABLE_STREAMING_PREAGGREGATIONS query option</indexterm>
+      <indexterm audience="hidden">DISABLE_STREAMING_PREAGGREGATIONS query option</indexterm>
       Turns off the <q>streaming preaggregation</q> optimization that is available in <keyword keyref="impala25_full"/>
       and higher. This optimization reduces unnecessary work performed by queries that perform aggregation
       operations on columns with few or no duplicate values, for example <codeph>DISTINCT <varname>id_column</varname></codeph>

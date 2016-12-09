@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">NUM_SCANNER_THREADS query option</indexterm>
+      <indexterm audience="hidden">NUM_SCANNER_THREADS query option</indexterm>
       Maximum number of scanner threads (on each node) used for each query. By default, Impala uses as many cores
       as are available (one thread per core). You might lower this value if queries are using excessive resources
       on a busy cluster. Impala imposes a maximum value automatically, so a high value has no practical effect.

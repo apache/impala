@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">SSL</indexterm>
+      <indexterm audience="hidden">SSL</indexterm>
       Impala supports TLS/SSL network encryption, between Impala and client programs, and between the Impala-related daemons running on
       different nodes in the cluster. This feature is important when you also use other features such as Kerberos authentication or Sentry
       authorization, where credentials are being transmitted back and forth.
@@ -56,7 +56,7 @@ under the License.
 
   </conbody>
 
-  <concept id="concept_gnk_2tt_qp" audience="Cloudera">
+  <concept id="concept_gnk_2tt_qp" audience="hidden">
 
     <title>Using Cloudera Manager</title>
 

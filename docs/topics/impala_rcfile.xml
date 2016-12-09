@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">RCFile support in Impala</indexterm>
+      <indexterm audience="hidden">RCFile support in Impala</indexterm>
       Impala supports using RCFile data files.
     </p>
 
@@ -167,7 +167,7 @@ Returned 3 row(s) in 0.23s</codeblock>
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">compression</indexterm>
+        <indexterm audience="hidden">compression</indexterm>
         You may want to enable compression on existing tables. Enabling compression provides performance gains in
         most cases and is supported for RCFile tables. For example, to enable Snappy compression, you would specify
         the following additional settings when loading data through the Hive shell:
@@ -250,7 +250,7 @@ hive&gt; INSERT OVERWRITE TABLE tbl_rc PARTITION(year) SELECT * FROM tbl;</codeb
     </conbody>
   </concept>
 
-  <concept audience="Cloudera" id="rcfile_data_types">
+  <concept audience="hidden" id="rcfile_data_types">
 
     <title>Data Type Considerations for RCFile Tables</title>
 

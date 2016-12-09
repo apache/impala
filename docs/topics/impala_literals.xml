@@ -34,7 +34,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">literals</indexterm>
+      <indexterm audience="hidden">literals</indexterm>
       Each of the Impala data types has corresponding notation for literal values of that type. You specify literal
       values in SQL statements, such as in the <codeph>SELECT</codeph> list or <codeph>WHERE</codeph> clause of a
       query, or as an argument to a function call. See <xref href="impala_datatypes.xml#datatypes"/> for a complete
@@ -51,7 +51,7 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">numeric literals</indexterm>
+        <indexterm audience="hidden">numeric literals</indexterm>
         To write literals for the integer types (<codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>,
         <codeph>INT</codeph>, and <codeph>BIGINT</codeph>), use a sequence of digits with optional leading zeros.
       </p>
@@ -146,7 +146,7 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">string literals</indexterm>
+        <indexterm audience="hidden">string literals</indexterm>
         String literals are quoted using either single or double quotation marks. You can use either kind of quotes
         for string literals, even both kinds for different literals within the same statement.
       </p>
@@ -320,7 +320,7 @@ select case bool_col when true then 'yes' when false 'no' else 'null' end from t
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">NULL</indexterm>
+        <indexterm audience="hidden">NULL</indexterm>
         The notion of <codeph>NULL</codeph> values is familiar from all kinds of database systems, but each SQL
         dialect can have its own behavior and restrictions on <codeph>NULL</codeph> values. For Big Data
         processing, the precise semantics of <codeph>NULL</codeph> values are significant: any misunderstanding

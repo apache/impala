@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">MAX_SCAN_RANGE_LENGTH query option</indexterm>
+      <indexterm audience="hidden">MAX_SCAN_RANGE_LENGTH query option</indexterm>
       Maximum length of the scan range. Interacts with the number of HDFS blocks in the table to determine how many
       CPU cores across the cluster are involved with the processing for a query. (Each core processes one scan
       range.)

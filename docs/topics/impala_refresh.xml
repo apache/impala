@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">REFRESH statement</indexterm>
+      <indexterm audience="hidden">REFRESH statement</indexterm>
       To accurately respond to queries, the Impala node that acts as the coordinator (the node to which you are
       connected through <cmdname>impala-shell</cmdname>, JDBC, or ODBC) must have current metadata about those
       databases and tables that are referenced in Impala queries. If you are not familiar with the way Impala uses

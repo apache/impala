@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">USE statement</indexterm>
+      <indexterm audience="hidden">USE statement</indexterm>
       Switches the current session to a specified database. The <term>current database</term> is where any
       <codeph>CREATE TABLE</codeph>, <codeph>INSERT</codeph>, <codeph>SELECT</codeph>, or other statements act when
       you specify a table or other object name, without prefixing it with a database name. The new current database

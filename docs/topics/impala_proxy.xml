@@ -143,7 +143,7 @@ under the License.
           Run the load-balancing proxy server, pointing it at the configuration file that you set up.
         </li>
 
-        <li audience="Cloudera">
+        <li audience="hidden">
           On systems managed by Cloudera Manager, on the page
           <menucascade><uicontrol>Impala</uicontrol><uicontrol>Configuration</uicontrol><uicontrol>Impala Daemon
           Default Group</uicontrol></menucascade>, specify a value for the <uicontrol>Impala Daemons Load
@@ -170,7 +170,7 @@ under the License.
 
   </concept>
 
-  <concept id="proxy_balancing" rev="CDH-33836 DOCS-349 CDH-39925 CDH-36812" audience="Cloudera">
+  <concept id="proxy_balancing" rev="CDH-33836 DOCS-349 CDH-39925 CDH-36812" audience="hidden">
     <title>Choosing the Load-Balancing Algorithm</title>
     <conbody>
       <p>
@@ -269,7 +269,7 @@ under the License.
           running the <cmdname>impalad</cmdname> daemon.
         </li>
 
-        <li rev="CDH-40363" audience="Cloudera">
+        <li rev="CDH-40363" audience="hidden">
           For a cluster managed by Cloudera Manager (5.4.2 or higher), fill in the Impala configuration setting
           <uicontrol>Impala Daemons Load Balancer</uicontrol> with the appropriate host:port combination.
           Then restart the Impala service.
@@ -320,7 +320,7 @@ under the License.
                 configuration snippet, add: <codeblock>--principal=impala/<varname>proxy_host</varname>@<varname>realm</varname>
   --be_principal=impala/<varname>actual_host</varname>@<varname>realm</varname>
   --keytab_file=<varname>path_to_merged_keytab</varname></codeblock>
-                <note audience="Cloudera">
+                <note audience="hidden">
                   <p>On a cluster managed by Cloudera Manager 5.1 (or higher),
                     when you set up Kerberos authentication using the wizard, you
                     can choose to allow Cloudera Manager to deploy the
@@ -335,7 +335,7 @@ under the License.
                 </note>
               </li>
 
-              <li audience="Cloudera">
+              <li audience="hidden">
                 On a cluster managed by Cloudera Manager, create a role group to set the configuration values from
                 the preceding step on a per-host basis.
               </li>
@@ -352,7 +352,7 @@ under the License.
             Restart Impala to make the changes take effect. Follow the appropriate steps depending on whether you use
             Cloudera Manager or not:
             <ul>
-              <li audience="Cloudera">
+              <li audience="hidden">
                 On a cluster managed by Cloudera Manager, restart the Impala service.
               </li>
 
@@ -522,11 +522,11 @@ listen impalajdbc :21051
 
       <note conref="../shared/impala_common.xml#common/proxy_jdbc_caveat"/>
 
-      <p audience="Cloudera">
+      <p audience="hidden">
         The following example shows extra steps needed for a cluster using Kerberos authentication:
       </p>
 
-<codeblock audience="Cloudera">$ klist
+<codeblock audience="hidden">$ klist
 $ impala-shell -k
 $ kinit -r 1d -kt /systest/keytabs/hdfs.keytab hdfs
 $ impala-shell -i c2104.hal.cloudera.com:21000

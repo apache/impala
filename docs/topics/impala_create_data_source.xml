@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept audience="Cloudera" rev="1.4.0" id="create_data_source">
+<concept audience="hidden" rev="1.4.0" id="create_data_source">
 
   <title>CREATE DATA SOURCE Statement</title>
   <titlealts audience="PDF"><navtitle>CREATE DATA SOURCE</navtitle></titlealts>
@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">CREATE DATA SOURCE statement</indexterm>
+      <indexterm audience="hidden">CREATE DATA SOURCE statement</indexterm>
     </p>
 
     <p conref="../shared/impala_common.xml#common/ddl_blurb"/>

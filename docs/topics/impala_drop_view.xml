@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DROP VIEW statement</indexterm>
+      <indexterm audience="hidden">DROP VIEW statement</indexterm>
       Removes the specified view, which was originally created by the <codeph>CREATE VIEW</codeph> statement.
       Because a view is purely a logical construct (an alias for a query) with no physical data behind it,
       <codeph>DROP VIEW</codeph> only involves changes to metadata in the metastore database, not any data files in

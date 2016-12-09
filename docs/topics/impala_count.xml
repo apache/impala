@@ -38,7 +38,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">count() function</indexterm>
+      <indexterm audience="hidden">count() function</indexterm>
       An aggregate function that returns the number of rows, or the number of non-<codeph>NULL</codeph> rows.
     </p>
 

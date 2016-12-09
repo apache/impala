@@ -982,7 +982,7 @@ within UDAs, you can return without specifying a value.
             href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.h"
             scope="external" format="html" /></p>
 
-<codeblock audience="Cloudera">#ifndef SAMPLES_UDA_H
+<codeblock audience="hidden">#ifndef SAMPLES_UDA_H
 #define SAMPLES_UDA_H
 
 #include &lt;impala_udf/udf.h&gt;
@@ -1084,7 +1084,7 @@ StringVal ToStringVal(FunctionContext* context, const T&amp; val);
             scope="external" format="html" />
         </p>
 
-<codeblock audience="Cloudera">#include "uda-sample.h"
+<codeblock audience="hidden">#include "uda-sample.h"
 #include &lt;assert.h&gt;
 #include &lt;sstream&gt;
 

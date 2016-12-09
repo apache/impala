@@ -82,7 +82,7 @@ under the License.
 
     <conbody>
 
-      <p audience="Cloudera" conref="../shared/impala_common.xml#common/impala_overview_diagram"/>
+      <p audience="hidden" conref="../shared/impala_common.xml#common/impala_overview_diagram"/>
 
       <p conref="../shared/impala_common.xml#common/component_list"/>
 

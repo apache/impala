@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">HBASE_CACHE_BLOCKS query option</indexterm>
+      <indexterm audience="hidden">HBASE_CACHE_BLOCKS query option</indexterm>
       Setting this option is equivalent to calling the
         <codeph>setCacheBlocks</codeph> method of the class <xref
         href="http://hbase.apache.org/apidocs/org/apache/hadoop/hbase/client/Scan.html"

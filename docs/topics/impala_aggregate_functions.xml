@@ -43,7 +43,7 @@ under the License.
     <p conref="../shared/impala_common.xml#common/aggr3"/>
 
     <p>
-      <indexterm audience="Cloudera">aggregate functions</indexterm>
+      <indexterm audience="hidden">aggregate functions</indexterm>
     </p>
 
     <p outputclass="toc"/>

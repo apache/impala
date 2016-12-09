@@ -30,7 +30,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">window functions</indexterm>
+      <indexterm audience="hidden">window functions</indexterm>
       Window functions are a special category of built-in functions. They produce one output value for each input
       row, like scalar functions such as <codeph>length()</codeph> or <codeph>substr()</codeph>. Yet like aggregate
       functions, they also examine the contents of multiple input rows to compute each output value.

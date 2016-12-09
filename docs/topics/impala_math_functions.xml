@@ -77,7 +77,7 @@ under the License.
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">abs() function</indexterm>
+          <indexterm audience="hidden">abs() function</indexterm>
           <b>Purpose:</b> Returns the absolute value of the argument.
           <p rev="2.0.1" conref="../shared/impala_common.xml#common/return_type_same"/>
           <p>
@@ -96,7 +96,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">acos() function</indexterm>
+          <indexterm audience="hidden">acos() function</indexterm>
           <b>Purpose:</b> Returns the arccosine of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -112,7 +112,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">asin() function</indexterm>
+          <indexterm audience="hidden">asin() function</indexterm>
           <b>Purpose:</b> Returns the arcsine of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -128,7 +128,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">atan() function</indexterm>
+          <indexterm audience="hidden">atan() function</indexterm>
           <b>Purpose:</b> Returns the arctangent of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -144,7 +144,7 @@ under the License.
         </dt>
 
         <dd rev="2.3.0 IMPALA-1771">
-          <indexterm audience="Cloudera">atan2() function</indexterm>
+          <indexterm audience="hidden">atan2() function</indexterm>
           <b>Purpose:</b> Returns the arctangent of the two arguments, with the signs of the arguments used to determine the
           quadrant of the result.
           <p>
@@ -161,7 +161,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">bin() function</indexterm>
+          <indexterm audience="hidden">bin() function</indexterm>
           <b>Purpose:</b> Returns the binary representation of an integer value, that is, a string of 0 and 1
           digits.
           <p>
@@ -183,7 +183,7 @@ under the License.
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">ceil() function</indexterm>
+          <indexterm audience="hidden">ceil() function</indexterm>
           <b>Purpose:</b> Returns the smallest integer that is greater than or equal to the argument.
           <p>
             <b>Return type:</b> <codeph>int</codeph> or <codeph>decimal(p,s)</codeph> depending on the type of the
@@ -201,7 +201,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">conv() function</indexterm>
+          <indexterm audience="hidden">conv() function</indexterm>
           <b>Purpose:</b> Returns a string representation of an integer value in a particular base. The input value
           can be a string, for example to convert a hexadecimal number such as <codeph>fce2</codeph> to decimal. To
           use the return value as a number (for example, when converting to base 10), use <codeph>CAST()</codeph>
@@ -220,7 +220,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">cos() function</indexterm>
+          <indexterm audience="hidden">cos() function</indexterm>
           <b>Purpose:</b> Returns the cosine of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -236,7 +236,7 @@ under the License.
         </dt>
 
         <dd rev="2.3.0 IMPALA-1771">
-          <indexterm audience="Cloudera">cosh() function</indexterm>
+          <indexterm audience="hidden">cosh() function</indexterm>
           <b>Purpose:</b> Returns the hyperbolic cosine of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -252,7 +252,7 @@ under the License.
         </dt>
 
         <dd rev="2.3.0 IMPALA-1771">
-          <indexterm audience="Cloudera">cot() function</indexterm>
+          <indexterm audience="hidden">cot() function</indexterm>
           <b>Purpose:</b> Returns the cotangent of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -269,7 +269,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">degrees() function</indexterm>
+          <indexterm audience="hidden">degrees() function</indexterm>
           <b>Purpose:</b> Converts argument value from radians to degrees.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -285,7 +285,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">e() function</indexterm>
+          <indexterm audience="hidden">e() function</indexterm>
           <b>Purpose:</b> Returns the
           <xref href="https://en.wikipedia.org/wiki/E_(mathematical_constant" scope="external" format="html">mathematical
           constant e</xref>.
@@ -304,7 +304,7 @@ under the License.
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">exp() function</indexterm>
+          <indexterm audience="hidden">exp() function</indexterm>
           <b>Purpose:</b> Returns the
           <xref href="https://en.wikipedia.org/wiki/E_(mathematical_constant" scope="external" format="html">mathematical
           constant e</xref> raised to the power of the argument.
@@ -321,7 +321,7 @@ under the License.
           <codeph>factorial(integer_type a)</codeph>
         </dt>
         <dd rev="2.3.0">
-          <indexterm audience="Cloudera">factorial() function</indexterm>
+          <indexterm audience="hidden">factorial() function</indexterm>
           <b>Purpose:</b> Computes the <xref href="https://en.wikipedia.org/wiki/Factorial" scope="external" format="html">factorial</xref> of an integer value.
           It works with any integer type.
           <p conref="../shared/impala_common.xml#common/added_in_230"/>
@@ -377,7 +377,7 @@ select factorial(-100);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">floor() function</indexterm>
+          <indexterm audience="hidden">floor() function</indexterm>
           <b>Purpose:</b> Returns the largest integer that is less than or equal to the argument.
           <p>
             <b>Return type:</b> <codeph>bigint</codeph> or <codeph>decimal(p,s)</codeph> depending on the type of
@@ -394,7 +394,7 @@ select factorial(-100);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">fmod() function</indexterm>
+          <indexterm audience="hidden">fmod() function</indexterm>
           <b>Purpose:</b> Returns the modulus of a floating-point number. Equivalent to the <codeph>%</codeph> arithmetic operator.
           <p>
             <b>Return type:</b> <codeph>float</codeph> or <codeph>double</codeph>, depending on type of arguments
@@ -477,7 +477,7 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd rev="1.2.2">
-          <indexterm audience="Cloudera">fnv_hash() function</indexterm>
+          <indexterm audience="hidden">fnv_hash() function</indexterm>
           <b>Purpose:</b> Returns a consistent 64-bit value derived from the input argument, for convenience of
           implementing hashing logic in an application.
           <p>
@@ -567,7 +567,7 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">greatest() function</indexterm>
+          <indexterm audience="hidden">greatest() function</indexterm>
           <b>Purpose:</b> Returns the largest value from a list of expressions.
           <p conref="../shared/impala_common.xml#common/return_same_type"/>
         </dd>
@@ -581,7 +581,7 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">hex() function</indexterm>
+          <indexterm audience="hidden">hex() function</indexterm>
           <b>Purpose:</b> Returns the hexadecimal representation of an integer value, or of the characters in a
           string.
           <p>
@@ -598,7 +598,7 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">is_inf() function</indexterm>
+          <indexterm audience="hidden">is_inf() function</indexterm>
           <b>Purpose:</b> Tests whether a value is equal to the special value <q>inf</q>, signifying infinity.
           <p>
             <b>Return type:</b> <codeph>boolean</codeph>
@@ -616,7 +616,7 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">is_nan() function</indexterm>
+          <indexterm audience="hidden">is_nan() function</indexterm>
           <b>Purpose:</b> Tests whether a value is equal to the special value <q>NaN</q>, signifying <q>not a
           number</q>.
           <p>
@@ -637,7 +637,7 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">least() function</indexterm>
+          <indexterm audience="hidden">least() function</indexterm>
           <b>Purpose:</b> Returns the smallest value from a list of expressions.
           <p conref="../shared/impala_common.xml#common/return_same_type"/>
         </dd>
@@ -652,8 +652,8 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">ln() function</indexterm>
-          <indexterm audience="Cloudera">dlog1() function</indexterm>
+          <indexterm audience="hidden">ln() function</indexterm>
+          <indexterm audience="hidden">dlog1() function</indexterm>
           <b>Purpose:</b> Returns the
           <xref href="https://en.wikipedia.org/wiki/Natural_logarithm" scope="external" format="html">natural
           logarithm</xref> of the argument.
@@ -671,7 +671,7 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">log() function</indexterm>
+          <indexterm audience="hidden">log() function</indexterm>
           <b>Purpose:</b> Returns the logarithm of the second argument to the specified base.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -688,8 +688,8 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">log10() function</indexterm>
-          <indexterm audience="Cloudera">dlog10() function</indexterm>
+          <indexterm audience="hidden">log10() function</indexterm>
+          <indexterm audience="hidden">dlog10() function</indexterm>
           <b>Purpose:</b> Returns the logarithm of the argument to the base 10.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -705,7 +705,7 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">log2() function</indexterm>
+          <indexterm audience="hidden">log2() function</indexterm>
           <b>Purpose:</b> Returns the logarithm of the argument to the base 2.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -722,10 +722,10 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">max_int() function</indexterm>
-          <indexterm audience="Cloudera">max_tinyint() function</indexterm>
-          <indexterm audience="Cloudera">max_smallint() function</indexterm>
-          <indexterm audience="Cloudera">max_bigint() function</indexterm>
+          <indexterm audience="hidden">max_int() function</indexterm>
+          <indexterm audience="hidden">max_tinyint() function</indexterm>
+          <indexterm audience="hidden">max_smallint() function</indexterm>
+          <indexterm audience="hidden">max_bigint() function</indexterm>
           <b>Purpose:</b> Returns the largest value of the associated integral type.
           <p>
             <b>Return type:</b> The same as the integral type being checked.
@@ -749,10 +749,10 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">min_int() function</indexterm>
-          <indexterm audience="Cloudera">min_tinyint() function</indexterm>
-          <indexterm audience="Cloudera">min_smallint() function</indexterm>
-          <indexterm audience="Cloudera">min_bigint() function</indexterm>
+          <indexterm audience="hidden">min_int() function</indexterm>
+          <indexterm audience="hidden">min_tinyint() function</indexterm>
+          <indexterm audience="hidden">min_smallint() function</indexterm>
+          <indexterm audience="hidden">min_bigint() function</indexterm>
           <b>Purpose:</b> Returns the smallest value of the associated integral type (a negative number).
           <p>
             <b>Return type:</b> The same as the integral type being checked.
@@ -774,7 +774,7 @@ select fmod(9.9,3.3);
         </dt>
 
         <dd rev="2.2.0">
-          <indexterm audience="Cloudera">mod() function</indexterm>
+          <indexterm audience="hidden">mod() function</indexterm>
           <b>Purpose:</b> Returns the modulus of a number. Equivalent to the <codeph>%</codeph> arithmetic operator.
           Works with any size integer type, any size floating-point type, and <codeph>DECIMAL</codeph>
           with any precision and scale.
@@ -867,7 +867,7 @@ select mod(9.9,3.0);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">negative() function</indexterm>
+          <indexterm audience="hidden">negative() function</indexterm>
           <b>Purpose:</b> Returns the argument with the sign reversed; returns a positive value if the argument was
           already negative.
           <p rev="2.0.1" conref="../shared/impala_common.xml#common/return_type_same"/>
@@ -892,7 +892,7 @@ select mod(9.9,3.0);
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">pi() function</indexterm>
+          <indexterm audience="hidden">pi() function</indexterm>
           <b>Purpose:</b> Returns the constant pi.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -908,7 +908,7 @@ select mod(9.9,3.0);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">pmod() function</indexterm>
+          <indexterm audience="hidden">pmod() function</indexterm>
           <b>Purpose:</b> Returns the positive modulus of a number.
           Primarily for <xref href="https://issues.apache.org/jira/browse/HIVE-656" scope="external" format="html">HiveQL compatibility</xref>.
           <p>
@@ -974,7 +974,7 @@ select pmod(5,-2);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">positive() function</indexterm>
+          <indexterm audience="hidden">positive() function</indexterm>
           <b>Purpose:</b> Returns the original argument unchanged (even if the argument is negative).
           <p rev="2.0.1" conref="../shared/impala_common.xml#common/return_type_same"/>
 <!--
@@ -1001,10 +1001,10 @@ select pmod(5,-2);
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">pow() function</indexterm>
-          <indexterm audience="Cloudera">power() function</indexterm>
-          <indexterm audience="Cloudera">dpow() function</indexterm>
-          <indexterm audience="Cloudera">fpow() function</indexterm>
+          <indexterm audience="hidden">pow() function</indexterm>
+          <indexterm audience="hidden">power() function</indexterm>
+          <indexterm audience="hidden">dpow() function</indexterm>
+          <indexterm audience="hidden">fpow() function</indexterm>
           <b>Purpose:</b> Returns the first argument raised to the power of the second argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -1020,7 +1020,7 @@ select pmod(5,-2);
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">precision() function</indexterm>
+          <indexterm audience="hidden">precision() function</indexterm>
           <b>Purpose:</b> Computes the precision (number of decimal digits) needed to represent the type of the
           argument expression as a <codeph>DECIMAL</codeph> value.
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
@@ -1045,7 +1045,7 @@ select pmod(5,-2);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">quotient() function</indexterm>
+          <indexterm audience="hidden">quotient() function</indexterm>
           <b>Purpose:</b> Returns the first argument divided by the second argument, discarding any fractional
           part. Avoids promoting arguments to <codeph>DOUBLE</codeph> as happens with the <codeph>/</codeph> SQL
           operator.
@@ -1063,7 +1063,7 @@ select pmod(5,-2);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">radians() function</indexterm>
+          <indexterm audience="hidden">radians() function</indexterm>
           <b>Purpose:</b> Converts argument value from degrees to radians.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -1081,7 +1081,7 @@ select pmod(5,-2);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">rand() function</indexterm>
+          <indexterm audience="hidden">rand() function</indexterm>
           <b>Purpose:</b> Returns a random value between 0 and 1. After <codeph>rand()</codeph> is called with a
           seed argument, it produces a consistent random sequence based on the seed value.
           <p>
@@ -1179,8 +1179,8 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">round() function</indexterm>
-          <indexterm audience="Cloudera">dround() function</indexterm>
+          <indexterm audience="hidden">round() function</indexterm>
+          <indexterm audience="hidden">dround() function</indexterm>
           <b>Purpose:</b> Rounds a floating-point value. By default (with a single argument), rounds to the nearest
           integer. Values ending in .5 are rounded up for positive numbers, down for negative numbers (that is,
           away from zero). The optional second argument specifies how many digits to leave after the decimal point;
@@ -1204,7 +1204,7 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
         </dt>
 
         <dd rev="1.4.0">
-          <indexterm audience="Cloudera">scale() function</indexterm>
+          <indexterm audience="hidden">scale() function</indexterm>
           <b>Purpose:</b> Computes the scale (number of decimal digits to the right of the decimal point) needed to
           represent the type of the argument expression as a <codeph>DECIMAL</codeph> value.
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
@@ -1229,7 +1229,7 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">sign() function</indexterm>
+          <indexterm audience="hidden">sign() function</indexterm>
           <b>Purpose:</b> Returns -1, 0, or 1 to indicate the signedness of the argument value.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -1245,7 +1245,7 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">sin() function</indexterm>
+          <indexterm audience="hidden">sin() function</indexterm>
           <b>Purpose:</b> Returns the sine of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -1261,7 +1261,7 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
         </dt>
 
         <dd rev="2.3.0 IMPALA-1771">
-          <indexterm audience="Cloudera">sinh() function</indexterm>
+          <indexterm audience="hidden">sinh() function</indexterm>
           <b>Purpose:</b> Returns the hyperbolic sine of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -1278,8 +1278,8 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">sqrt() function</indexterm>
-          <indexterm audience="Cloudera">dsqrt() function</indexterm>
+          <indexterm audience="hidden">sqrt() function</indexterm>
+          <indexterm audience="hidden">dsqrt() function</indexterm>
           <b>Purpose:</b> Returns the square root of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -1295,7 +1295,7 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">tan() function</indexterm>
+          <indexterm audience="hidden">tan() function</indexterm>
           <b>Purpose:</b> Returns the tangent of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -1311,7 +1311,7 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
         </dt>
 
         <dd rev="2.3.0 IMPALA-1771">
-          <indexterm audience="Cloudera">tanh() function</indexterm>
+          <indexterm audience="hidden">tanh() function</indexterm>
           <b>Purpose:</b> Returns the hyperbolic tangent of the argument.
           <p>
             <b>Return type:</b> <codeph>double</codeph>
@@ -1328,8 +1328,8 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
         </dt>
 
         <dd rev="2.3.0">
-          <indexterm audience="Cloudera">truncate() function</indexterm>
-          <indexterm audience="Cloudera">dtrunc() function</indexterm>
+          <indexterm audience="hidden">truncate() function</indexterm>
+          <indexterm audience="hidden">dtrunc() function</indexterm>
           <b>Purpose:</b> Removes some or all fractional digits from a numeric value.
           With no argument, removes all fractional digits, leaving an integer value.
           The optional argument specifies the number of fractional digits to include
@@ -1393,7 +1393,7 @@ select truncate(3.456,7)
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">unhex() function</indexterm>
+          <indexterm audience="hidden">unhex() function</indexterm>
           <b>Purpose:</b> Returns a string of characters with ASCII values corresponding to pairs of hexadecimal
           digits in the argument.
           <p>

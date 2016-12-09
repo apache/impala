@@ -39,7 +39,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">COMPUTE STATS statement</indexterm>
+      <indexterm audience="hidden">COMPUTE STATS statement</indexterm>
       Gathers information about volume and distribution of data in a table and all associated columns and
       partitions. The information is stored in the metastore database, and used by Impala to help optimize queries.
       For example, if Impala can determine that a table is large or small, or has many or few distinct values it

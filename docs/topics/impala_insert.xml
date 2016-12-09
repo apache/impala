@@ -41,7 +41,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">INSERT statement</indexterm>
+      <indexterm audience="hidden">INSERT statement</indexterm>
       Impala supports inserting into tables and partitions that you create with the Impala <codeph>CREATE
       TABLE</codeph> statement, or pre-defined tables and partitions created through Hive.
     </p>

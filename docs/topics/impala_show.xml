@@ -34,7 +34,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">SHOW statement</indexterm>
+      <indexterm audience="hidden">SHOW statement</indexterm>
       The <codeph>SHOW</codeph> statement is a flexible way to get information about different types of Impala
       objects.
     </p>
@@ -60,7 +60,7 @@ SHOW GRANT ROLE <varname>role_name</varname></ph>
 <!-- SHOW ROLE GRANT { USER <varname>user_name</varname> | GROUP <varname>group_name</varname> | ROLE <varname>role_name</varname> } -->
 
 <!-- Extracted from the previous codeblock because even hidden content produces blank lines.
-<ph audience="Cloudera" rev="1.4.0">SHOW DATA SOURCES [LIKE '<varname>source_name</varname>]</ph>
+<ph audience="hidden" rev="1.4.0">SHOW DATA SOURCES [LIKE '<varname>source_name</varname>]</ph>
 -->
 
 <!-- Some suggestion there would be this syntax for 1.4, but it's not in the builds:
@@ -1255,7 +1255,7 @@ show functions in _impala_builtins like '*week*';
     </conbody>
   </concept>
 
-  <concept rev="someday" audience="Cloudera" id="show_data_sources">
+  <concept rev="someday" audience="hidden" id="show_data_sources">
 
     <title>SHOW DATA SOURCES Statement (CDH x.y and later only)</title>
 

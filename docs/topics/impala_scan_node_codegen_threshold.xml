@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0 IMPALA-1755">
-      <indexterm audience="Cloudera">SCAN_NODE_CODEGEN_THRESHOLD query option</indexterm>
+      <indexterm audience="hidden">SCAN_NODE_CODEGEN_THRESHOLD query option</indexterm>
       The <codeph>SCAN_NODE_CODEGEN_THRESHOLD</codeph> query option
       adjusts the aggressiveness of the code generation optimization process
       when performing I/O read operations. It can help to work around performance problems

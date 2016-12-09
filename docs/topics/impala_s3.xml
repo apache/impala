@@ -39,9 +39,9 @@ under the License.
     <note conref="../shared/impala_common.xml#common/s3_production"/>
 
     <p rev="2.2.0">
-      <indexterm audience="Cloudera">S3 with Impala</indexterm>
+      <indexterm audience="hidden">S3 with Impala</indexterm>
 
-      <indexterm audience="Cloudera">Amazon S3 with Impala</indexterm>
+      <indexterm audience="hidden">Amazon S3 with Impala</indexterm>
       You can use Impala to query data residing on the Amazon S3 filesystem. This capability allows convenient
       access to a storage system that is remotely managed, accessible from anywhere, and integrated with various
       cloud-based services. Impala can query files in any supported file format from S3. The S3 storage location
@@ -126,10 +126,10 @@ under the License.
     <conbody>
 
       <p>
-        <indexterm audience="Cloudera">fs.s3a.access.key configuration setting</indexterm>
-        <indexterm audience="Cloudera">fs.s3a.secret.key configuration setting</indexterm>
-        <indexterm audience="Cloudera">access.key configuration setting</indexterm>
-        <indexterm audience="Cloudera">secret.key configuration setting</indexterm>
+        <indexterm audience="hidden">fs.s3a.access.key configuration setting</indexterm>
+        <indexterm audience="hidden">fs.s3a.secret.key configuration setting</indexterm>
+        <indexterm audience="hidden">access.key configuration setting</indexterm>
+        <indexterm audience="hidden">secret.key configuration setting</indexterm>
         To allow Impala to access data in S3, specify values for the following configuration settings in your
         <filepath>core-site.xml</filepath> file:
       </p>

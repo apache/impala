@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">REQUEST_POOL query option</indexterm>
+      <indexterm audience="hidden">REQUEST_POOL query option</indexterm>
       The pool or queue name that queries should be submitted to. Only applies when you enable the Impala admission control feature.
       Specifies the name of the pool used by requests from Impala to the resource manager.
     </p>

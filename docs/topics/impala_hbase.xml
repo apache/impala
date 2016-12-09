@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">HBase</indexterm>
+      <indexterm audience="hidden">HBase</indexterm>
       You can use Impala to query HBase tables. This capability allows convenient access to a storage system that
       is tuned for different kinds of workloads than the default with Impala. The default Impala tables use data
       files stored on HDFS, which are ideal for bulk loads and queries using full-table scans. In contrast, HBase
@@ -162,7 +162,7 @@ under the License.
 &lt;/property&gt;
 </codeblock>
 
-      <p audience="Cloudera">
+      <p audience="hidden">
         Currently, Cloudera Manager does not have an Impala-only override for HBase settings, so any HBase
         configuration change you make through Cloudera Manager would take affect for all HBase applications.
         Therefore, this change is not recommended on systems managed by Cloudera Manager.
@@ -630,7 +630,7 @@ set hbase_caching=1000;
     </conbody>
   </concept>
 
-  <concept audience="Cloudera" id="hbase_create_new">
+  <concept audience="hidden" id="hbase_create_new">
 
     <title>Creating a New HBase Table for Impala to Use</title>
 
@@ -647,7 +647,7 @@ set hbase_caching=1000;
     </conbody>
   </concept>
 
-  <concept audience="Cloudera" id="hbase_reuse_existing">
+  <concept audience="hidden" id="hbase_reuse_existing">
 
     <title>Associate Impala with an Existing HBase Table</title>
 
@@ -664,7 +664,7 @@ set hbase_caching=1000;
     </conbody>
   </concept>
 
-  <concept audience="Cloudera" id="hbase_column_families">
+  <concept audience="hidden" id="hbase_column_families">
 
     <title>Map HBase Columns and Column Families to Impala Columns</title>
 

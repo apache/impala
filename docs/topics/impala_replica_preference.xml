@@ -34,7 +34,7 @@ under the License.
   <conbody>
 
     <p rev="2.7.0">
-      <indexterm audience="Cloudera">REPLICA_PREFERENCE query option</indexterm>
+      <indexterm audience="hidden">REPLICA_PREFERENCE query option</indexterm>
     </p>
 
     <p>

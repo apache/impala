@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.5.0">
-      <indexterm audience="Cloudera">SCHEDULE_RANDOM_REPLICA query option</indexterm>
+      <indexterm audience="hidden">SCHEDULE_RANDOM_REPLICA query option</indexterm>
     </p>
 
     <p>

@@ -36,7 +36,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">PARQUET_COMPRESSION_CODEC query option</indexterm>
+      <indexterm audience="hidden">PARQUET_COMPRESSION_CODEC query option</indexterm>
       Deprecated. Use <codeph>COMPRESSION_CODEC</codeph> in Impala 2.0 and later. See
       <xref href="impala_compression_codec.xml#compression_codec"/> for details.
     </p>

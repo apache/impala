@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">impala-shell</indexterm>
+      <indexterm audience="hidden">impala-shell</indexterm>
       Use the following commands within <codeph>impala-shell</codeph> to pass requests to the
       <codeph>impalad</codeph> daemon that the shell is connected to. You can enter a command interactively at the
       prompt, or pass it as the argument to the <codeph>-q</codeph> option of <codeph>impala-shell</codeph>. Most

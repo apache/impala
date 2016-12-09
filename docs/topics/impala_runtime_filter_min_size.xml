@@ -35,7 +35,7 @@ under the License.
   <conbody>
 
     <p rev="2.6.0 IMPALA-3480">
-      <indexterm audience="Cloudera">RUNTIME_FILTER_MIN_SIZE query option</indexterm>
+      <indexterm audience="hidden">RUNTIME_FILTER_MIN_SIZE query option</indexterm>
       The <codeph>RUNTIME_FILTER_MIN_SIZE</codeph> query option
       adjusts the settings for the runtime filtering feature.
       This option defines the minimum size for a filter,

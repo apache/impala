@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">DISABLE_CACHED_READS query option</indexterm>
+      <indexterm audience="hidden">DISABLE_CACHED_READS query option</indexterm>
       Prevents Impala from reading data files that are <q>pinned</q> in memory
       through the HDFS caching feature. Primarily a debugging option for
       cases where processing of HDFS cached data is concentrated on a single

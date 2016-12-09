@@ -37,7 +37,7 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="Cloudera">DISABLE_UNSAFE_SPILLS query option</indexterm>
+      <indexterm audience="hidden">DISABLE_UNSAFE_SPILLS query option</indexterm>
       Enable this option if you prefer to have queries fail when they exceed the Impala memory limit, rather than
       write temporary data to disk.
     </p>

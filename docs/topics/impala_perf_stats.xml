@@ -744,7 +744,7 @@ EXPLAIN SELECT ... FROM t1 WHERE year BETWEEN 2006 AND 2009;
 
 <!-- Might deserve its own conceptual topic at some point. -->
 
-  <concept audience="Cloudera" rev="1.2.2" id="perf_stats_joins">
+  <concept audience="hidden" rev="1.2.2" id="perf_stats_joins">
 
     <title>How Statistics Are Used in Join Queries</title>
 
@@ -756,7 +756,7 @@ EXPLAIN SELECT ... FROM t1 WHERE year BETWEEN 2006 AND 2009;
 
 <!-- Might deserve its own conceptual topic at some point. -->
 
-  <concept audience="Cloudera" rev="1.2.2" id="perf_stats_inserts">
+  <concept audience="hidden" rev="1.2.2" id="perf_stats_inserts">
 
     <title>How Statistics Are Used in INSERT Operations</title>
 

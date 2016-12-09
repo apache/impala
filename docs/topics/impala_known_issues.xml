@@ -412,7 +412,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
 
 <!-- To do: Hiding for the moment. https://jira.cloudera.com/browse/CDH-38736 reports the issue is fixed. -->
 
-    <concept id="impala-shell_ssl_dependency" audience="Cloudera" rev="impala-shell_ssl_dependency">
+    <concept id="impala-shell_ssl_dependency" audience="hidden" rev="impala-shell_ssl_dependency">
 
       <title>impala-shell requires Python with ssl module</title>
 
@@ -572,7 +572,7 @@ impala-shell -s impala --ssl --ca_cert /path_to_truststore/truststore.pem
           in out-of-memory errors in catalogd and leading to query failures.
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Bug:</b> <xref href="https://jira.cloudera.com/browse/TSB-168" scope="external" format="html">TSB-168</xref>
         </p>
 
@@ -1377,7 +1377,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
           table. See <xref href="impala_tables.xml#tables"/> for the differences between internal and external tables.
         </note>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/CDH-41605" scope="external" format="html">CDH-41605</xref>
         </p>
 
@@ -1397,7 +1397,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
       <conbody>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b> <xref href="https://jira.cloudera.com/browse/IMP-469" scope="external" format="html"/>; KI added 0.1
           <i>Cloudera internal only</i>
         </p>
@@ -1427,7 +1427,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
           allowed value of type (Hive returns NULL).
         </p>
 
-        <p audience="Cloudera">
+        <p audience="hidden">
           <b>Cloudera Bug:</b> <xref href="https://jira.cloudera.com/browse/IMP-175" scope="external" format="html">IMPALA-175</xref> ; KI
           added 0.1 <i>Cloudera internal only</i>
         </p>

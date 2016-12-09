@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">EXPLAIN statement</indexterm>
+      <indexterm audience="hidden">EXPLAIN statement</indexterm>
       Returns the execution plan for a statement, showing the low-level mechanisms that Impala will use to read the
       data, divide the work among nodes in the cluster, and transmit intermediate and final results across the
       network. Use <codeph>explain</codeph> followed by a complete <codeph>SELECT</codeph> query. For example:

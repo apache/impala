@@ -44,7 +44,7 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="Cloudera">cluster sizing</indexterm>
+      <indexterm audience="hidden">cluster sizing</indexterm>
       This document provides a very rough guideline to estimate the size of a cluster needed for a specific
       customer application. You can use this information when planning how much and what type of hardware to
       acquire for a new cluster, or when adding Impala workloads to an existing cluster.

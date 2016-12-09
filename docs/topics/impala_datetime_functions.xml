@@ -89,7 +89,7 @@ months_between
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">add_months() function</indexterm>
+          <indexterm audience="hidden">add_months() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time plus some number of months.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -141,7 +141,7 @@ select now(), add_months(now(), -1);
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">adddate() function</indexterm>
+          <indexterm audience="hidden">adddate() function</indexterm>
           <b>Purpose:</b> Adds a specified number of days to a <codeph>TIMESTAMP</codeph> value. Similar to
           <codeph>date_add()</codeph>, but starts with an actual <codeph>TIMESTAMP</codeph> value instead of a
           string that is converted to a <codeph>TIMESTAMP</codeph>.
@@ -179,7 +179,7 @@ select now() as right_now, adddate(now(), -15) as now_minus_15;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">current_timestamp() function</indexterm>
+          <indexterm audience="hidden">current_timestamp() function</indexterm>
           <b>Purpose:</b> Alias for the <codeph>now()</codeph> function.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -213,7 +213,7 @@ select current_timestamp() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">date_add() function</indexterm>
+          <indexterm audience="hidden">date_add() function</indexterm>
           <b>Purpose:</b> Adds a specified number of days to a <codeph>TIMESTAMP</codeph> value.
           <!-- Found this not to be true in latest release. I think the signature changed way back.
           The first argument
@@ -287,7 +287,7 @@ select date_add(cast('2016-01-31' as timestamp), interval 3 months) as 'april_31
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">date_part() function</indexterm>
+          <indexterm audience="hidden">date_part() function</indexterm>
           <b>Purpose:</b> Similar to
           <xref href="impala_datetime_functions.xml#datetime_functions/extract"><codeph>EXTRACT()</codeph></xref>,
           with the argument order reversed. Supports the same date and time units as <codeph>EXTRACT()</codeph>.
@@ -323,7 +323,7 @@ select date_part('hour',now()) as hour_of_day;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">date_sub() function</indexterm>
+          <indexterm audience="hidden">date_sub() function</indexterm>
           <b>Purpose:</b> Subtracts a specified number of days from a <codeph>TIMESTAMP</codeph> value.
           <!-- Found this not to be true in latest release. I think the signature changed way back.
           The first argument can be a string, which is automatically cast to <codeph>TIMESTAMP</codeph> if it uses the
@@ -396,7 +396,7 @@ select date_sub(cast('2016-05-31' as timestamp), interval 1 months) as 'april_31
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">datediff() function</indexterm>
+          <indexterm audience="hidden">datediff() function</indexterm>
           <b>Purpose:</b> Returns the number of days between two <codeph>TIMESTAMP</codeph> values.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -474,7 +474,7 @@ select now() as right_now, datediff(now(), now() - interval 18 hours) as 18_hour
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">day() function</indexterm>
+          <indexterm audience="hidden">day() function</indexterm>
           <b>Purpose:</b> Returns the day field from the date portion of a <codeph>TIMESTAMP</codeph>.
           The value represents the day of the month, therefore is in the range 1-31, or less for
           months without 31 days.
@@ -549,7 +549,7 @@ select day('2016-02-028');
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">dayname() function</indexterm>
+          <indexterm audience="hidden">dayname() function</indexterm>
           <b>Purpose:</b> Returns the day field from a <codeph>TIMESTAMP</codeph> value, converted to the string
           corresponding to that day name. The range of return values is <codeph>'Sunday'</codeph> to
           <codeph>'Saturday'</codeph>. Used in report-generating queries, as an alternative to calling
@@ -593,7 +593,7 @@ select now() + interval 1 day as tomorrow,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">dayofweek() function</indexterm>
+          <indexterm audience="hidden">dayofweek() function</indexterm>
           <b>Purpose:</b> Returns the day field from the date portion of a <codeph>TIMESTAMP</codeph>, corresponding to the day of
           the week. The range of return values is 1 (Sunday) to 7 (Saturday).
           <p>
@@ -621,7 +621,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">dayofyear() function</indexterm>
+          <indexterm audience="hidden">dayofyear() function</indexterm>
           <b>Purpose:</b> Returns the day field from a <codeph>TIMESTAMP</codeph> value, corresponding to the day
           of the year. The range of return values is 1 (January 1) to 366 (December 31 of a leap year).
           <p>
@@ -664,7 +664,7 @@ select now() - interval 1 year as last_year,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">days_add() function</indexterm>
+          <indexterm audience="hidden">days_add() function</indexterm>
           <b>Purpose:</b> Adds a specified number of days to a <codeph>TIMESTAMP</codeph> value. Similar to
           <codeph>date_add()</codeph>, but starts with an actual <codeph>TIMESTAMP</codeph> value instead of a
           string that is converted to a <codeph>TIMESTAMP</codeph>.
@@ -692,7 +692,7 @@ select now() as right_now, days_add(now(), 31) as 31_days_later;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">days_sub() function</indexterm>
+          <indexterm audience="hidden">days_sub() function</indexterm>
           <b>Purpose:</b> Subtracts a specified number of days from a <codeph>TIMESTAMP</codeph> value. Similar to
           <codeph>date_sub()</codeph>, but starts with an actual <codeph>TIMESTAMP</codeph> value instead of a
           string that is converted to a <codeph>TIMESTAMP</codeph>.
@@ -719,7 +719,7 @@ select now() as right_now, days_sub(now(), 31) as 31_days_ago;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">extract() function</indexterm>
+          <indexterm audience="hidden">extract() function</indexterm>
           <b>Purpose:</b> Returns one of the numeric date or time fields from a <codeph>TIMESTAMP</codeph> value.
           <p>
             <b>Unit argument:</b> The <codeph>unit</codeph> string can be one of <codeph>year</codeph>,
@@ -778,7 +778,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">from_unixtime() function</indexterm>
+          <indexterm audience="hidden">from_unixtime() function</indexterm>
           <b>Purpose:</b> Converts the number of seconds from the Unix epoch to the specified time into a string in
           the local time zone.
           <p>
@@ -854,7 +854,7 @@ select from_unixtime(1392394861,"HH:mm:ss");
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">from_utc_timestamp() function</indexterm>
+          <indexterm audience="hidden">from_utc_timestamp() function</indexterm>
           <b>Purpose:</b> Converts a specified UTC timestamp value into the appropriate value for a specified time
           zone.
           <p>
@@ -921,7 +921,7 @@ select '2016-01-05' as local_datetime,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">hour() function</indexterm>
+          <indexterm audience="hidden">hour() function</indexterm>
           <b>Purpose:</b> Returns the hour field from a <codeph>TIMESTAMP</codeph> field.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -955,7 +955,7 @@ select now() + interval 12 hours as 12_hours_from_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">hours_add() function</indexterm>
+          <indexterm audience="hidden">hours_add() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time plus some number of hours.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -982,7 +982,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">hours_sub() function</indexterm>
+          <indexterm audience="hidden">hours_sub() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time minus some number of hours.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1008,7 +1008,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">int_months_between() function</indexterm>
+          <indexterm audience="hidden">int_months_between() function</indexterm>
           <b>Purpose:</b> Returns the number of months between the date portions of two <codeph>TIMESTAMP</codeph> values,
           as an <codeph>INT</codeph> representing only the full months that passed.
           <p>
@@ -1089,7 +1089,7 @@ select int_months_between('2015-03-31', '2015-01-30');
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">microseconds_add() function</indexterm>
+          <indexterm audience="hidden">microseconds_add() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time plus some number of microseconds.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1116,7 +1116,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">microseconds_sub() function</indexterm>
+          <indexterm audience="hidden">microseconds_sub() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time minus some number of microseconds.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1142,7 +1142,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">millisecond() function</indexterm>
+          <indexterm audience="hidden">millisecond() function</indexterm>
           <b>Purpose:</b> Returns the millisecond portion of a <codeph>TIMESTAMP</codeph> value.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -1185,7 +1185,7 @@ select now(), millisecond(now());
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">milliseconds_add() function</indexterm>
+          <indexterm audience="hidden">milliseconds_add() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time plus some number of milliseconds.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1212,7 +1212,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">milliseconds_sub() function</indexterm>
+          <indexterm audience="hidden">milliseconds_sub() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time minus some number of milliseconds.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1238,7 +1238,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">minute() function</indexterm>
+          <indexterm audience="hidden">minute() function</indexterm>
           <b>Purpose:</b> Returns the minute field from a <codeph>TIMESTAMP</codeph> value.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -1264,7 +1264,7 @@ select now() as right_now, minute(now()) as current_minute;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">minutes_add() function</indexterm>
+          <indexterm audience="hidden">minutes_add() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time plus some number of minutes.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1290,7 +1290,7 @@ select now() as right_now, minutes_add(now(), 90) as 90_minutes_from_now;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">minutes_sub() function</indexterm>
+          <indexterm audience="hidden">minutes_sub() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time minus some number of minutes.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1316,7 +1316,7 @@ select now() as right_now, minutes_sub(now(), 90) as 90_minutes_ago;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">month() function</indexterm>
+          <indexterm audience="hidden">month() function</indexterm>
           <b>Purpose:</b> Returns the month field, represented as an integer, from the date portion of a <codeph>TIMESTAMP</codeph>.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -1342,7 +1342,7 @@ select now() as right_now, month(now()) as current_month;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">months_add() function</indexterm>
+          <indexterm audience="hidden">months_add() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time plus some number of months.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1408,7 +1408,7 @@ with t1 as (select cast('2015-01-31' as timestamp) as jan_31)
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">months_between() function</indexterm>
+          <indexterm audience="hidden">months_between() function</indexterm>
           <b>Purpose:</b> Returns the number of months between the date portions of two <codeph>TIMESTAMP</codeph> values.
           Can include a fractional part representing extra days in addition to the full months
           between the dates. The fractional component is computed by dividing the difference in days by 31 (regardless of the month).
@@ -1586,7 +1586,7 @@ select months_between('2015-03-28 23:00:00', '2015-03-01 11:45:00');
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">months_sub() function</indexterm>
+          <indexterm audience="hidden">months_sub() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time minus some number of months.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1613,7 +1613,7 @@ with t1 as (select trunc(now(), 'dd') as today)
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">nanoseconds_add() function</indexterm>
+          <indexterm audience="hidden">nanoseconds_add() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time plus some number of nanoseconds.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1647,7 +1647,7 @@ select now() as right_now, nanoseconds_add(now(), 1e9) as 1_second_later;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">nanoseconds_sub() function</indexterm>
+          <indexterm audience="hidden">nanoseconds_sub() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time minus some number of nanoseconds.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1679,7 +1679,7 @@ select now() as right_now, nanoseconds_sub(now(), 1e9) as 1_second_earlier;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">now() function</indexterm>
+          <indexterm audience="hidden">now() function</indexterm>
           <b>Purpose:</b> Returns the current date and time (in the local time zone) as a
           <codeph>TIMESTAMP</codeph> value.
           <p>
@@ -1736,7 +1736,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">second() function</indexterm>
+          <indexterm audience="hidden">second() function</indexterm>
           <b>Purpose:</b> Returns the second field from a <codeph>TIMESTAMP</codeph> value.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -1763,7 +1763,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">seconds_add() function</indexterm>
+          <indexterm audience="hidden">seconds_add() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time plus some number of seconds.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1790,7 +1790,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">seconds_sub() function</indexterm>
+          <indexterm audience="hidden">seconds_sub() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time minus some number of seconds.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -1817,7 +1817,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">subdate() function</indexterm>
+          <indexterm audience="hidden">subdate() function</indexterm>
           <b>Purpose:</b> Subtracts a specified number of days from a <codeph>TIMESTAMP</codeph> value. Similar to
           <codeph>date_sub()</codeph>, but starts with an actual <codeph>TIMESTAMP</codeph> value instead of a
           string that is converted to a <codeph>TIMESTAMP</codeph>.
@@ -1855,7 +1855,7 @@ select now() as right_now, subdate(now(), -15) as now_plus_15;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">timeofday() function</indexterm>
+          <indexterm audience="hidden">timeofday() function</indexterm>
           <b>Purpose:</b> Returns a string representation of the current date and time, according to the time of the local system,
           including any time zone designation.
           <p>
@@ -1921,7 +1921,7 @@ select regexp_replace(timeofday(), '.* ([A-Z]+)$', '\\1') as current_timezone;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">timestamp_cmp() function</indexterm>
+          <indexterm audience="hidden">timestamp_cmp() function</indexterm>
           <b>Purpose:</b> Tests if one <codeph>TIMESTAMP</codeph> value is
           newer than, older than, or identical to another <codeph>TIMESTAMP</codeph>
           <p>
@@ -2015,7 +2015,7 @@ select timestamp_cmp(now(), null)
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">to_date() function</indexterm>
+          <indexterm audience="hidden">to_date() function</indexterm>
           <b>Purpose:</b> Returns a string representation of the date field from a timestamp value.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
@@ -2041,7 +2041,7 @@ select now() as right_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">to_utc_timestamp() function</indexterm>
+          <indexterm audience="hidden">to_utc_timestamp() function</indexterm>
           <b>Purpose:</b> Converts a specified timestamp value in a specified time zone into the corresponding
           value for the UTC time zone.
           <p>
@@ -2107,7 +2107,7 @@ select now() as 'Current time in California USA',
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">trunc() function</indexterm>
+          <indexterm audience="hidden">trunc() function</indexterm>
           <b>Purpose:</b> Strips off fields from a <codeph>TIMESTAMP</codeph> value.
           <p>
             <b>Unit argument:</b> The <codeph>unit</codeph> argument value is case-sensitive. This argument string
@@ -2206,7 +2206,7 @@ select now() + interval 2 weeks as 2_weeks_from_now,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">unix_timestamp() function</indexterm>
+          <indexterm audience="hidden">unix_timestamp() function</indexterm>
           <b>Purpose:</b> Returns an integer value representing the current date and time as a delta from the Unix
           epoch, or converts from a specified date and time value represented as a <codeph>TIMESTAMP</codeph> or
           <codeph>STRING</codeph>.
@@ -2313,7 +2313,7 @@ select unix_timestamp
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">weekofyear() function</indexterm>
+          <indexterm audience="hidden">weekofyear() function</indexterm>
           <b>Purpose:</b> Returns the corresponding week (1-53) from the date portion of a <codeph>TIMESTAMP</codeph>.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -2347,7 +2347,7 @@ select now() + interval 2 weeks as in_2_weeks,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">weeks_add() function</indexterm>
+          <indexterm audience="hidden">weeks_add() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time plus some number of weeks.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -2373,7 +2373,7 @@ select now() as right_now, weeks_add(now(), 2) as week_after_next;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">weeks_sub() function</indexterm>
+          <indexterm audience="hidden">weeks_sub() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time minus some number of weeks.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -2398,7 +2398,7 @@ select now() as right_now, weeks_sub(now(), 2) as week_before_last;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">year() function</indexterm>
+          <indexterm audience="hidden">year() function</indexterm>
           <b>Purpose:</b> Returns the year field from the date portion of a <codeph>TIMESTAMP</codeph>.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
@@ -2424,7 +2424,7 @@ select now() as right_now, year(now()) as this_year;
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">years_add() function</indexterm>
+          <indexterm audience="hidden">years_add() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time plus some number of years.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -2464,7 +2464,7 @@ select cast('2016-02-29' as timestamp) as feb_29_2016,
         </dt>
 
         <dd>
-          <indexterm audience="Cloudera">years_sub() function</indexterm>
+          <indexterm audience="hidden">years_sub() function</indexterm>
           <b>Purpose:</b> Returns the specified date and time minus some number of years.
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
