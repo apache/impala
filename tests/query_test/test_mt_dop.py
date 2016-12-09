@@ -92,6 +92,8 @@ class TestMtDopParquet(ImpalaTestSuite):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-parquet', vector)
 
+  @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
+                     reason='IMPALA-4641')
   @SkipIfOldAggsJoins.nested_types
   def test_parquet_nested(self, vector):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')

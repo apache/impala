@@ -105,6 +105,10 @@ def pytest_addoption(parser):
   parser.addoption("--skip_hbase", action="store_true", default=False,
                    help="Skip HBase tests")
 
+  parser.addoption("--testing_remote_cluster", action="store_true", default=False,
+                   help=("Indicates that tests are being run against a remote cluster. "
+                         "Some tests may be marked to skip or xfail on remote clusters."))
+
 
 def pytest_assertrepr_compare(op, left, right):
   """
@@ -468,3 +472,15 @@ def impala_testinfra_cursor():
       yield cursor
     finally:
       cursor.close()
+
+
+@pytest.fixture(autouse=True, scope='session')
+def validate_pytest_config():
+  """
+  Validate that pytest command line options make sense.
+  """
+  if pytest.config.option.testing_remote_cluster:
+    local_prefixes = ('localhost', '127.', '0.0.0.0')
+    if any(pytest.config.option.impalad.startswith(loc) for loc in local_prefixes):
+      logging.error("--testing_remote_cluster can not be used with a local impalad")
+      pytest.exit("Invalid pytest config option: --testing_remote_cluster")
