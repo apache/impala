@@ -787,9 +787,7 @@ Status SimpleScheduler::Schedule(QuerySchedule* schedule) {
   }
   schedule->SetUniqueHosts(unique_hosts);
 
-  // TODO-MT: call AdmitQuery()
-  bool is_mt_execution = schedule->request().query_ctx.request.query_options.mt_dop > 0;
-  if (!is_mt_execution && !FLAGS_disable_admission_control) {
+  if (!FLAGS_disable_admission_control) {
     RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
   }
   return Status::OK();
