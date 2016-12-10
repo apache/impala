@@ -141,7 +141,7 @@ if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
       # Remove spaces, trim minor versions, and convert to lowercase.
       DISTRO_VERSION="$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")"
       case "$DISTRO_VERSION" in
-        centos6 | centos7 | debian7 | debian8 | ubuntu* )
+        centos6 | centos7 | debian7 | debian8 | sles12 | ubuntu* )
             KUDU_IS_SUPPORTED=true;;
       esac
     fi
