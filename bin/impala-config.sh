@@ -57,7 +57,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-: ${IMPALA_TOOLCHAIN_BUILD_ID=304-a5cb8de41a}
+: ${IMPALA_TOOLCHAIN_BUILD_ID=308-96a4cc516e}
 
 # This flag is used in $IMPALA_HOME/cmake_modules/toolchain.cmake.
 # If it's 0, Impala will be built with the compiler in the toolchain directory.
@@ -270,7 +270,6 @@ export IMPALA_GFLAGS_VERSION=2.0
 export IMPALA_GLOG_VERSION=0.3.2-p2
 export IMPALA_GPERFTOOLS_VERSION=2.5
 export IMPALA_GTEST_VERSION=1.6.0
-export IMPALA_KUDU_VERSION=a70c905006
 export IMPALA_LLVM_VERSION=3.8.0-p1
 export IMPALA_LLVM_ASAN_VERSION=3.8.0-p1
 # Debug builds should use the release+asserts build to get additional coverage.
@@ -291,12 +290,14 @@ export IMPALA_THRIFT_VERSION=0.9.0-p8
 export IMPALA_THRIFT_JAVA_VERSION=0.9.0
 export IMPALA_ZLIB_VERSION=1.2.8
 
+# Kudu version in the toolchain; provides libkudu_client.so and minicluster binaries.
+export IMPALA_KUDU_VERSION=e018a83
+
+# Kudu version used to identify Java client jar from maven
+export KUDU_JAVA_VERSION=1.2.0-SNAPSHOT
+
 export KUDU_MASTER="${KUDU_MASTER:-127.0.0.1}"
 export KUDU_MASTER_PORT="${KUDU_MASTER_PORT:-7051}"
-# TODO: Figure out a way to use a snapshot version without causing a lot of breakage due
-#       to nightly changes from Kudu. The version below is the last released version but
-#       before release this needs to be updated to the version about to be released.
-export KUDU_JAVA_VERSION=1.2.0-SNAPSHOT
 
 if [[ $OSTYPE == "darwin"* ]]; then
   IMPALA_CYRUS_SASL_VERSION=2.1.26
