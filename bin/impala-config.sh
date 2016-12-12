@@ -379,8 +379,13 @@ export ASAN_SYMBOLIZER_PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_ASAN_VERSION
 
 export CLUSTER_DIR="${IMPALA_HOME}/testdata/cluster"
 
+# The number of parallel build processes we should run at a time.
 : ${IMPALA_BUILD_THREADS:="$(nproc)"}
 export IMPALA_BUILD_THREADS
+
+# Additional flags to pass to make or ninja.
+: ${IMPALA_MAKE_FLAGS:=""}
+export IMPALA_MAKE_FLAGS
 
 # Some environments (like the packaging build) might not have $USER set.  Fix that here.
 export USER="${USER-`id -un`}"

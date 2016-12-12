@@ -32,7 +32,7 @@ TARGET_BUILD_TYPE=${TARGET_BUILD_TYPE:-""}
 BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS:-""}
 CMAKE_ONLY=0
 MAKE_CMD=make
-MAKE_ARGS=-j${IMPALA_BUILD_THREADS:-4}
+MAKE_ARGS="-j${IMPALA_BUILD_THREADS:-4} ${IMPALA_MAKE_FLAGS}"
 
 # The minimal make targets if BUILD_EVERYTHING is 0.
 MAKE_TARGETS="impalad statestored catalogd fesupport loggingsupport ImpalaUdf"
@@ -161,7 +161,7 @@ fi
 
 if [ $CLEAN -eq 1 ]
 then
-  ${MAKE_CMD} clean
+  ${MAKE_CMD} ${IMPALA_MAKE_FLAGS} clean
 fi
 
 $IMPALA_HOME/bin/gen_build_version.py
