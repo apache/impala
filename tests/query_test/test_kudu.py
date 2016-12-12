@@ -34,6 +34,8 @@ import textwrap
 
 from tests.common import KUDU_MASTER_HOSTS
 from tests.common.kudu_test_suite import KuduTestSuite
+from tests.common.impala_cluster import ImpalaCluster
+from tests.verifiers.metric_verifier import MetricVerifier
 
 LOG = logging.getLogger(__name__)
 
@@ -614,3 +616,12 @@ class TestKuduMemLimits(KuduTestSuite):
         if (mem_limit > self.QUERY_MEM_LIMITS[i]):
           raise
         assert "Memory limit exceeded" in str(e)
+
+    # IMPALA-4645: Wait for fragments to complete; in some tests KuduScanNodes took some
+    # time to Close() after the query returned all rows. This is necessary to ensure
+    # these queries do not impact other tests.
+    # TODO: Scan nodes shouldn't take so long to shutdown; remove when this is
+    # fixed (IMPALA-4654).
+    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
+    for v in verifiers:
+      v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=120)
