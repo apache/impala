@@ -15,11 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 3.2.3)
 
 # Explicitly define project() to allow modifying the compiler before the project is
 # initialized.
 project(Impala)
+
+include(cmake_modules/kudu_cmake_fns.txt)
 
 if (NOT DEFINED BUILD_SHARED_LIBS)
   set(BUILD_SHARED_LIBS OFF)
@@ -125,6 +127,7 @@ include_directories(${BZIP2_INCLUDE_DIR})
 
 find_package(Zlib REQUIRED)
 include_directories(${ZLIB_INCLUDE_DIR})
+message(STATUS "zlib: Static -> ${ZLIB_STATIC}, Other -> ${ZLIB_LIBRARIES}")
 
 if(NOT BUILD_SHARED_LIBS)
   # Panic if we cannot find the static libraries as they are supposed to be
@@ -266,6 +269,36 @@ include_directories(${AVRO_INCLUDE_DIR})
 set(LIBS ${LIBS} ${AVRO_STATIC_LIB})
 message(STATUS "Avro include dir: " ${AVRO_INCLUDE_DIR})
 message(STATUS "Avro static library: " ${AVRO_STATIC_LIB})
+
+###################################################################
+# These dependencies use Kudu's CMake functions
+
+ADD_THIRDPARTY_LIB(glog
+  STATIC_LIB ${GLOG_STATIC_LIB})
+ADD_THIRDPARTY_LIB(gflags
+  STATIC_LIB ${GFLAGS_STATIC_LIB})
+ADD_THIRDPARTY_LIB(zlib
+  STATIC_LIB ${ZLIB_STATIC_LIBRARIES})
+ADD_THIRDPARTY_LIB(cyrus_sasl
+  SHARED_LIB ${SASL_SHARED_LIB})
+
+if (NOT APPLE)
+  find_library(RT_LIB_PATH rt)
+  if(NOT RT_LIB_PATH)
+    message(FATAL_ERROR "Could not find librt on the system path")
+  endif()
+  ADD_THIRDPARTY_LIB(rt
+    SHARED_LIB "${RT_LIB_PATH}")
+
+  find_library(DL_LIB_PATH dl)
+  if(NOT DL_LIB_PATH)
+    message(FATAL_ERROR "Could not find libdl on the system path")
+  endif()
+  ADD_THIRDPARTY_LIB(dl
+    SHARED_LIB "${DL_LIB_PATH}")
+endif()
+
+###################################################################
 
 # KuduClient can use GLOG
 add_definitions(-DKUDU_HEADERS_USE_GLOG)
