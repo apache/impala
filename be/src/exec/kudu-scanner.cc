@@ -105,12 +105,11 @@ Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
     RETURN_IF_CANCELLED(state_);
 
     if (cur_kudu_batch_num_read_ < cur_kudu_batch_.NumRows()) {
-      bool batch_done;
-      RETURN_IF_ERROR(DecodeRowsIntoRowBatch(row_batch, &tuple, &batch_done));
-      if (batch_done) break;
+      RETURN_IF_ERROR(DecodeRowsIntoRowBatch(row_batch, &tuple));
+      if (row_batch->AtCapacity()) break;
     }
 
-    if (scanner_->HasMoreRows()) {
+    if (scanner_->HasMoreRows() && !scan_node_->ReachedLimit()) {
       RETURN_IF_ERROR(GetNextScannerBatch());
       continue;
     }
@@ -161,26 +160,19 @@ void KuduScanner::CloseCurrentClientScanner() {
   scanner_.reset();
 }
 
-Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch, bool* batch_done) {
+Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch) {
   int num_rows_remaining = cur_kudu_batch_.NumRows() - cur_kudu_batch_num_read_;
   int rows_to_add = std::min(row_batch->capacity() - row_batch->num_rows(),
       num_rows_remaining);
   cur_kudu_batch_num_read_ += rows_to_add;
   row_batch->CommitRows(rows_to_add);
-  // If we've reached the capacity, or the LIMIT for the scan, return.
-  if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) {
-    *batch_done = true;
-  }
   return Status::OK();
 }
 
-Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_mem,
-    bool* batch_done) {
-  *batch_done = false;
-
+Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_mem) {
   // Short-circuit the count(*) case.
   if (scan_node_->tuple_desc_->slots().empty()) {
-    return HandleEmptyProjection(row_batch, batch_done);
+    return HandleEmptyProjection(row_batch);
   }
 
   // Iterate through the Kudu rows, evaluate conjuncts and deep-copy survivors into
@@ -205,10 +197,7 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
     row->SetTuple(0, *tuple_mem);
     row_batch->CommitLastRow();
     // If we've reached the capacity, or the LIMIT for the scan, return.
-    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) {
-      *batch_done = true;
-      break;
-    }
+    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
     // Move to the next tuple in the tuple buffer.
     *tuple_mem = next_tuple(*tuple_mem);
   }
