@@ -314,3 +314,15 @@ PLAN-ROOT SINK
    predicates: CAST(a.id AS STRING) > '123'
    kudu predicates: a.id > 10
 ====
+# IMPALA-4662: Kudu analysis failure for NULL literal in IN list
+# NULL literal in values list results in applying predicate at scan node
+select id from functional_kudu.alltypestiny where
+id in (1, null) and string_col in (null) and bool_col in (null) and double_col in (null)
+and float_col in (null) and tinyint_col in (null) and smallint_col in (null) and
+bigint_col in (null)
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.alltypestiny]
+   predicates: id IN (1, NULL), bigint_col IN (NULL), bool_col IN (NULL), double_col IN (NULL), float_col IN (NULL), smallint_col IN (NULL), string_col IN (NULL), tinyint_col IN (NULL)
+====

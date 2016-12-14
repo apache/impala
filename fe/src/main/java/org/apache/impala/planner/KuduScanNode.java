@@ -309,7 +309,7 @@ public class KuduScanNode extends ScanNode {
     SlotRef ref = (SlotRef) predicate.getChild(0);
     LiteralExpr literal = (LiteralExpr) predicate.getChild(1);
 
-    // Cannot push prediates with null literal values (KUDU-1595).
+    // Cannot push predicates with null literal values (KUDU-1595).
     if (literal instanceof NullLiteral) return false;
 
     String colName = ref.getDesc().getColumn().getName();
@@ -379,8 +379,13 @@ public class KuduScanNode extends ScanNode {
     List<Object> values = Lists.newArrayList();
     for (int i = 1; i < predicate.getChildren().size(); ++i) {
       if (!(predicate.getChild(i).isLiteral())) return false;
-      Object value = getKuduInListValue((LiteralExpr) predicate.getChild(i));
-      Preconditions.checkNotNull(value == null);
+      LiteralExpr literal = (LiteralExpr) predicate.getChild(i);
+
+      // Cannot push predicates with null literal values (KUDU-1595).
+      if (literal instanceof NullLiteral) return false;
+
+      Object value = getKuduInListValue(literal);
+      Preconditions.checkNotNull(value);
       values.add(value);
     }
 
