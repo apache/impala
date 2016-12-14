@@ -93,7 +93,10 @@ class KuduScanNode : public ScanNode {
 
   /// Set to true when the scan is complete (either because all scan tokens have been
   /// processed, the limit was reached or some error occurred).
-  /// Protected by lock_
+  /// Protected by lock_. It is safe to do optimistic reads without taking lock_ in
+  /// certain places, based on the decisions taken after that.
+  /// The tradeoff is occasionally doing some extra work versus increasing lock
+  /// contention.
   volatile bool done_;
 
   /// Thread group for all scanner worker threads

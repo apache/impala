@@ -183,12 +183,8 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     *eos = true;
   }
 
-  Status status;
-  {
-    unique_lock<mutex> l(lock_);
-    status = status_;
-  }
-  return status;
+  unique_lock<mutex> l(lock_);
+  return status_;
 }
 
 void KuduScanNode::Close(RuntimeState* state) {
@@ -219,7 +215,7 @@ void KuduScanNode::DebugString(int indentation_level, stringstream* out) const {
 
 const string* KuduScanNode::GetNextScanToken() {
   unique_lock<mutex> lock(lock_);
-  if (next_scan_token_idx_ >= scan_tokens_.size()) return NULL;
+  if (done_ || next_scan_token_idx_ >= scan_tokens_.size()) return nullptr;
   const string* token = &scan_tokens_[next_scan_token_idx_++];
   return token;
 }
@@ -254,7 +250,7 @@ void KuduScanNode::ThreadAvailableCb(ThreadResourceMgr::ResourcePool* pool) {
 Status KuduScanNode::ProcessScanToken(KuduScanner* scanner, const string& scan_token) {
   RETURN_IF_ERROR(scanner->OpenNextScanToken(scan_token));
   bool eos = false;
-  while (!eos) {
+  while (!eos && !done_) {
     gscoped_ptr<RowBatch> row_batch(new RowBatch(
         row_desc(), runtime_state_->batch_size(), mem_tracker()));
     RETURN_IF_ERROR(scanner->GetNext(row_batch.get(), &eos));
@@ -282,6 +278,8 @@ void KuduScanNode::RunScannerThread(const string& name, const string* initial_to
   const string* scan_token = initial_token;
   Status status = scanner.Open();
   if (status.ok()) {
+    // Here, even though a read of 'done_' may conflict with a write to it,
+    // ProcessScanToken() will return early, as will GetNextScanToken().
     while (!done_ && scan_token != NULL) {
       status = ProcessScanToken(&scanner, *scan_token);
       if (!status.ok()) break;
@@ -304,11 +302,9 @@ void KuduScanNode::RunScannerThread(const string& name, const string* initial_to
 
   {
     unique_lock<mutex> l(lock_);
-    if (!status.ok()) {
-      if (status_.ok()) {
-        status_ = status;
-        done_ = true;
-      }
+    if (!status.ok() && status_.ok()) {
+      status_ = status;
+      done_ = true;
     }
     // Decrement num_active_scanners_ unless handling the case of an early exit when
     // optional threads have been exceeded, in which case it already was decremented.
