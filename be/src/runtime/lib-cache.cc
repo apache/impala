@@ -33,8 +33,7 @@
 
 namespace filesystem = boost::filesystem;
 
-DEFINE_string(local_library_dir, "/tmp",
-              "Local directory to copy UDF libraries from HDFS into");
+DECLARE_string(local_library_dir);
 
 namespace impala {
 

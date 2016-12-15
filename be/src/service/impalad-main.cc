@@ -27,6 +27,7 @@
 #include "exec/hbase-table-scanner.h"
 #include "exec/hbase-table-writer.h"
 #include "exprs/hive-udf-call.h"
+#include "exprs/timezone_db.h"
 #include "runtime/hbase-table.h"
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
@@ -59,6 +60,7 @@ DECLARE_bool(enable_rm);
 int ImpaladMain(int argc, char** argv) {
   InitCommonRuntime(argc, argv, true);
 
+  ABORT_IF_ERROR(TimezoneDatabase::Initialize());
   ABORT_IF_ERROR(LlvmCodeGen::InitializeLlvm());
   JniUtil::InitLibhdfs();
   ABORT_IF_ERROR(HBaseTableScanner::Init());

@@ -19,6 +19,7 @@
 
 #include <boost/date_time/compiler_config.hpp>
 #include <boost/date_time/local_time/posix_time_zone.hpp>
+#include <boost/filesystem.hpp>
 
 #include "exprs/timestamp-functions.h"
 #include "gutil/strings/substitute.h"
@@ -28,6 +29,8 @@
 using boost::local_time::tz_database;
 using boost::local_time::time_zone_ptr;
 using boost::local_time::posix_time_zone;
+
+DECLARE_string(local_library_dir);
 
 namespace impala {
 
@@ -666,14 +669,16 @@ const char* TimezoneDatabase::TIMEZONE_DATABASE_STR = "\"ID\",\"STD ABBR\",\"STD
 
 Status TimezoneDatabase::Initialize() {
   // Create a temporary file and write the timezone information.  The boost
-  // interface only loads this format from a file.  We don't want to raise
-  // an error here since this is done when the backend is created and this
-  // information might not actually get used by any queries.
-  char filestr[] = "/tmp/impala.tzdb.XXXXXXX";
+  // interface only loads this format from a file. We abort the startup if
+  // this initialization fails for some reason.
+  char *filestr = const_cast<char*>((boost::filesystem::path(FLAGS_local_library_dir)
+      / string("impala.tzdb.XXXXXXX")).string().c_str());
   FILE* file;
   int fd;
   if ((fd = mkstemp(filestr)) == -1) {
-    return Status(Substitute("Could not create temporary timezone file: $0", filestr));
+    return Status(Substitute("Could not create temporary timezone file: $0. Check that "
+        "the directory $1 is writable by the user running Impala.", filestr,
+        FLAGS_local_library_dir));
   }
   if ((file = fopen(filestr, "w")) == NULL) {
     unlink(filestr);

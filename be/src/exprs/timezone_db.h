@@ -32,7 +32,7 @@ namespace impala {
 class TimezoneDatabase {
  public:
   /// Set up the static timezone database.
-  static Status Initialize();
+  static Status Initialize() WARN_UNUSED_RESULT;
 
   /// Converts the name of a timezone to a boost timezone object. In some cases, the
   /// timestamp is required to determine the timezone because occasionally timezone

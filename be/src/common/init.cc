@@ -24,7 +24,6 @@
 #include "common/status.h"
 #include "exec/kudu-util.h"
 #include "exprs/expr.h"
-#include "exprs/timezone_db.h"
 #include "gutil/atomicops.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
@@ -75,6 +74,10 @@ DEFINE_int64(pause_monitor_sleep_time_ms, 500, "Sleep time in milliseconds for "
 DEFINE_int64(pause_monitor_warn_threshold_ms, 10000, "If the pause monitor sleeps "
     "more than this time period, a warning is logged. If set to 0 or less, pause monitor"
     " is disabled.");
+
+DEFINE_string(local_library_dir, "/tmp",
+    "Scratch space for local fs operations. Currently used for copying "
+    "UDF binaries locally from HDFS and also for initializing the timezone db");
 
 // Defined by glog. This allows users to specify the log level using a glob. For
 // example -vmodule=*scanner*=3 would enable full logging for scanners. If redaction
@@ -198,7 +201,6 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   impala::InitThreading();
   impala::TimestampParser::Init();
   impala::SeedOpenSSLRNG();
-  ABORT_IF_ERROR(impala::TimezoneDatabase::Initialize());
   ABORT_IF_ERROR(impala::InitAuth(argv[0]));
 
   // Initialize maintenance_thread after InitGoogleLoggingSafe and InitThreading.

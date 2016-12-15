@@ -38,6 +38,7 @@
 #include "exprs/null-literal.h"
 #include "exprs/string-functions.h"
 #include "exprs/timestamp-functions.h"
+#include "exprs/timezone_db.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/hive_metastore_types.h"
 #include "rpc/thrift-client.h"
@@ -7072,6 +7073,7 @@ TEST_F(ExprTest, UuidTest) {
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
+  ABORT_IF_ERROR(TimezoneDatabase::Initialize());
   InitFeSupport(false);
   impala::LlvmCodeGen::InitializeLlvm();
 
