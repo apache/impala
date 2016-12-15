@@ -33,9 +33,11 @@ import java.util.TreeMap;
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.BlockStorageLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.VolumeId;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -105,17 +107,6 @@ import com.google.common.collect.Sets;
  *
  */
 public class HdfsTable extends Table {
-
-  /** Dummy class to get it to compile */
-  public class BlockStorageLocation {
-
-  }
-
-  /** Dummy class to get it to compile */
-  public class VolumeId {
-
-  }
-
   // hive's default value for table property 'serialization.null.format'
   private static final String DEFAULT_NULL_COLUMN_VALUE = "\\N";
 
@@ -444,14 +435,14 @@ public class HdfsTable extends Table {
       FileBlocksInfo blockLists = perFsFileBlocks.get(fsKey);
       Preconditions.checkNotNull(blockLists);
       BlockStorageLocation[] storageLocs = null;
-      //try {
+      try {
         // Get the BlockStorageLocations for all the blocks
-        // storageLocs = dfs.getFileBlockStorageLocations(blockLists.locations);
-      //} catch (IOException e) {
-      //  LOG.error("Couldn't determine block storage locations for filesystem " +
-      //      fs + ":\n" + e.getMessage());
-      //  continue;
-      //}
+        storageLocs = dfs.getFileBlockStorageLocations(blockLists.locations);
+      } catch (IOException e) {
+        LOG.error("Couldn't determine block storage locations for filesystem " +
+            fs + ":\n" + e.getMessage());
+        continue;
+      }
       if (storageLocs == null || storageLocs.length == 0) {
         LOG.warn("Attempted to get block locations for filesystem " + fs +
             " but the call returned no results");
@@ -468,8 +459,7 @@ public class HdfsTable extends Table {
       // Attach volume IDs given by the storage location to the corresponding
       // THdfsFileBlocks.
       for (int locIdx = 0; locIdx < storageLocs.length; ++locIdx) {
-        //VolumeId[] volumeIds = storageLocs[locIdx].getVolumeIds();
-        VolumeId[] volumeIds = new VolumeId[0];
+        VolumeId[] volumeIds = storageLocs[locIdx].getVolumeIds();
         THdfsFileBlock block = blockLists.blocks.get(locIdx);
         // Convert opaque VolumeId to 0 based ids.
         // TODO: the diskId should be eventually retrievable from Hdfs when the

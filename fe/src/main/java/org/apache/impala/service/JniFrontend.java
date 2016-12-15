@@ -720,14 +720,13 @@ public class JniFrontend {
     }
 
     // dfs.client.file-block-storage-locations.timeout.millis should be >= 10 seconds
-    int dfsClientFileBlockStorageLocationsTimeoutMs = 0;
-        //conf.getInt(
-        // DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS,
-        // DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS_DEFAULT);
+    int dfsClientFileBlockStorageLocationsTimeoutMs = conf.getInt(
+        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS,
+        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS_DEFAULT);
     if (dfsClientFileBlockStorageLocationsTimeoutMs <
         MIN_DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS) {
       errorCause.append(prefix);
-      //errorCause.append(DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS);
+      errorCause.append(DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS);
       errorCause.append(" is too low. It should be at least 10 seconds.\n");
     }
 
