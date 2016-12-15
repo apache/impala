@@ -245,6 +245,23 @@ class TestParquet(ImpalaTestSuite):
     vector.get_value('exec_option')['abort_on_error'] = 1
     self.run_test_case('QueryTest/parquet-abort-on-error', vector)
 
+  def test_timestamp_out_of_range(self, vector, unique_database):
+    """IMPALA-4363: Test scanning parquet files with an out of range timestamp."""
+    self.client.execute(("create table {0}.out_of_range_timestamp (ts timestamp) "
+        "stored as parquet").format(unique_database))
+    out_of_range_timestamp_loc = get_fs_path(
+        "/test-warehouse/{0}.db/{1}".format(unique_database, "out_of_range_timestamp"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal',
+        os.environ['IMPALA_HOME'] + "/testdata/data/out_of_range_timestamp.parquet",
+        out_of_range_timestamp_loc])
+
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/out-of-range-timestamp-continue-on-error',
+        vector, unique_database)
+    vector.get_value('exec_option')['abort_on_error'] = 1
+    self.run_test_case('QueryTest/out-of-range-timestamp-abort-on-error',
+        vector, unique_database)
+
   def test_zero_rows(self, vector, unique_database):
     """IMPALA-3943: Tests that scanning files with num_rows=0 in the file footer
     succeeds without errors."""

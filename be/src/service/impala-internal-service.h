@@ -20,65 +20,33 @@
 
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
-#include "service/impala-server.h"
-#include "service/fragment-mgr.h"
-#include "testutil/fault-injection-util.h"
 
 namespace impala {
+
+class ImpalaServer;
+class QueryExecMgr;
 
 /// Proxies Thrift RPC requests onto their implementing objects for the
 /// ImpalaInternalService service.
 class ImpalaInternalService : public ImpalaInternalServiceIf {
  public:
-  ImpalaInternalService() {
-    impala_server_ = ExecEnv::GetInstance()->impala_server();
-    DCHECK(impala_server_ != nullptr);
-    fragment_mgr_ = ExecEnv::GetInstance()->fragment_mgr();
-    DCHECK(fragment_mgr_ != nullptr);
-  }
-
+  ImpalaInternalService();
   virtual void ExecPlanFragment(TExecPlanFragmentResult& return_val,
-      const TExecPlanFragmentParams& params) {
-    FAULT_INJECTION_RPC_DELAY(RPC_EXECPLANFRAGMENT);
-    fragment_mgr_->ExecPlanFragment(params).SetTStatus(&return_val);
-  }
-
+      const TExecPlanFragmentParams& params);
   virtual void CancelPlanFragment(TCancelPlanFragmentResult& return_val,
-      const TCancelPlanFragmentParams& params) {
-    FAULT_INJECTION_RPC_DELAY(RPC_CANCELPLANFRAGMENT);
-    fragment_mgr_->CancelPlanFragment(return_val, params);
-  }
-
+      const TCancelPlanFragmentParams& params);
   virtual void ReportExecStatus(TReportExecStatusResult& return_val,
-      const TReportExecStatusParams& params) {
-    FAULT_INJECTION_RPC_DELAY(RPC_REPORTEXECSTATUS);
-    impala_server_->ReportExecStatus(return_val, params);
-  }
-
+      const TReportExecStatusParams& params);
   virtual void TransmitData(TTransmitDataResult& return_val,
-      const TTransmitDataParams& params) {
-    FAULT_INJECTION_RPC_DELAY(RPC_TRANSMITDATA);
-    impala_server_->TransmitData(return_val, params);
-  }
-
+      const TTransmitDataParams& params);
   virtual void UpdateFilter(TUpdateFilterResult& return_val,
-      const TUpdateFilterParams& params) {
-    FAULT_INJECTION_RPC_DELAY(RPC_UPDATEFILTER);
-    impala_server_->UpdateFilter(return_val, params);
-  }
-
+      const TUpdateFilterParams& params);
   virtual void PublishFilter(TPublishFilterResult& return_val,
-      const TPublishFilterParams& params) {
-    FAULT_INJECTION_RPC_DELAY(RPC_PUBLISHFILTER);
-    fragment_mgr_->PublishFilter(return_val, params);
-  }
+      const TPublishFilterParams& params);
 
  private:
-  /// Manages fragment reporting and data transmission
   ImpalaServer* impala_server_;
-
-  /// Manages fragment execution
-  FragmentMgr* fragment_mgr_;
+  QueryExecMgr* query_exec_mgr_;
 };
 
 }

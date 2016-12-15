@@ -147,14 +147,18 @@ static void AllocBuffer(FunctionContext* ctx, StringVal* dst, size_t buf_len) {
 // 'buf_len' bytes and copies the content of StringVal 'src' into it.
 // If allocation fails, 'dst' will be set to a null string.
 static void CopyStringVal(FunctionContext* ctx, const StringVal& src, StringVal* dst) {
-  uint8_t* copy = ctx->Allocate(src.len);
-  if (UNLIKELY(copy == NULL && src.len != 0)) {
-    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+  if (src.is_null) {
     *dst = StringVal::null();
   } else {
-    *dst = StringVal(copy, src.len);
-    // Avoid memcpy() to NULL ptr as it's undefined.
-    if (LIKELY(dst->ptr != NULL)) memcpy(dst->ptr, src.ptr, src.len);
+    uint8_t* copy = ctx->Allocate(src.len);
+    if (UNLIKELY(copy == NULL)) {
+      // Zero-length allocation always returns a hard-coded pointer.
+      DCHECK(src.len != 0 && !ctx->impl()->state()->GetQueryStatus().ok());
+      *dst = StringVal::null();
+    } else {
+      *dst = StringVal(copy, src.len);
+      memcpy(dst->ptr, src.ptr, src.len);
+    }
   }
 }
 
@@ -776,8 +780,7 @@ void AggregateFunctions::PcUpdate(FunctionContext* c, const T& input, StringVal*
   // different seed).
   for (int i = 0; i < NUM_PC_BITMAPS; ++i) {
     uint32_t hash_value = AnyValUtil::Hash(input, *c->GetArgType(0), i);
-    int bit_index = __builtin_ctz(hash_value);
-    if (UNLIKELY(hash_value == 0)) bit_index = PC_BITMAP_LENGTH - 1;
+    const int bit_index = BitUtil::CountTrailingZeros(hash_value, PC_BITMAP_LENGTH - 1);
     // Set bitmap[i, bit_index] to 1
     SetDistinctEstimateBit(dst->ptr, i, bit_index);
   }
@@ -794,10 +797,10 @@ void AggregateFunctions::PcsaUpdate(FunctionContext* c, const T& input, StringVa
   uint32_t row_index = hash_value % NUM_PC_BITMAPS;
 
   // We want the zero-based position of the least significant 1-bit in binary
-  // representation of hash_value. __builtin_ctz does exactly this because it returns
-  // the number of trailing 0-bits in x (or undefined if x is zero).
-  int bit_index = __builtin_ctz(hash_value / NUM_PC_BITMAPS);
-  if (UNLIKELY(hash_value == 0)) bit_index = PC_BITMAP_LENGTH - 1;
+  // representation of hash_value. BitUtil::CountTrailingZeros(x,y) does exactly this
+  // because it returns the number of trailing 0-bits in x (or y if x is zero).
+  const int bit_index =
+      BitUtil::CountTrailingZeros(hash_value / NUM_PC_BITMAPS, PC_BITMAP_LENGTH - 1);
 
   // Set bitmap[row_index, bit_index] to 1
   SetDistinctEstimateBit(dst->ptr, row_index, bit_index);
@@ -1181,6 +1184,24 @@ void AggregateFunctions::HllUpdate(FunctionContext* ctx, const T& src, StringVal
   DCHECK_EQ(dst->len, HLL_LEN);
   uint64_t hash_value =
       AnyValUtil::Hash64(src, *ctx->GetArgType(0), HashUtil::FNV64_SEED);
+  // Use the lower bits to index into the number of streams and then find the first 1 bit
+  // after the index bits.
+  int idx = hash_value & (HLL_LEN - 1);
+  const uint8_t first_one_bit =
+      1 + BitUtil::CountTrailingZeros(
+              hash_value >> HLL_PRECISION, sizeof(hash_value) * CHAR_BIT - HLL_PRECISION);
+  dst->ptr[idx] = ::max(dst->ptr[idx], first_one_bit);
+}
+
+// Specialize for DecimalVal to allow substituting decimal size.
+template <>
+void AggregateFunctions::HllUpdate(
+    FunctionContext* ctx, const DecimalVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, HLL_LEN);
+  uint64_t hash_value = AnyValUtil::HashDecimal64(
+      src, Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_SIZE, 0), HashUtil::FNV64_SEED);
   if (hash_value != 0) {
     // Use the lower bits to index into the number of streams and then
     // find the first 1 bit after the index bits.
@@ -1190,8 +1211,8 @@ void AggregateFunctions::HllUpdate(FunctionContext* ctx, const T& src, StringVal
   }
 }
 
-void AggregateFunctions::HllMerge(FunctionContext* ctx, const StringVal& src,
-    StringVal* dst) {
+void AggregateFunctions::HllMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
   DCHECK(!dst->is_null);
   DCHECK(!src.is_null);
   DCHECK_EQ(dst->len, HLL_LEN);

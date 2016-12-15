@@ -78,6 +78,8 @@ public enum PrimitiveType {
       case BIGINT: return BIGINT;
       case FLOAT: return FLOAT;
       case DOUBLE: return DOUBLE;
+      case DATE: return DATE;
+      case DATETIME: return DATETIME;
       case STRING: return STRING;
       case VARCHAR: return VARCHAR;
       case TIMESTAMP: return TIMESTAMP;

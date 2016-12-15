@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="runtime_filter_mode" rev="2.5.0">
+
+  <title>RUNTIME_FILTER_MODE Query Option (<keyword keyref="impala25"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>RUNTIME_FILTER_MODE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.5.0">
+      <indexterm audience="Cloudera">RUNTIME_FILTER_MODE query option</indexterm>
+    </p>
+
+    <p>
+      The <codeph>RUNTIME_FILTER_MODE</codeph> query option
+      adjusts the settings for the runtime filtering feature.
+      It turns this feature on and off, and controls how
+      extensively the filters are transmitted between hosts.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric (0, 1, 2)
+      or corresponding mnemonic strings (<codeph>OFF</codeph>, <codeph>LOCAL</codeph>, <codeph>GLOBAL</codeph>).
+    </p>
+
+    <p rev="2.6.0 CDH-41184">
+      <b>Default:</b> 2 (equivalent to <codeph>GLOBAL</codeph>); formerly was 1 / <codeph>LOCAL</codeph>, in <keyword keyref="impala25_full"/>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_250"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p rev="2.6.0 CDH-41184">
+      In <keyword keyref="impala26_full"/> and higher, the default is <codeph>GLOBAL</codeph>.
+      This setting is recommended for a wide variety of workloads, to provide best
+      performance with <q>out of the box</q> settings.
+    </p>
+
+    <p rev="2.6.0 CDH-41184">
+      The lowest setting of <codeph>LOCAL</codeph> does a similar level of optimization
+      (such as partition pruning) as in earlier Impala releases.
+      This setting was the default in <keyword keyref="impala25_full"/>,
+      to allow for a period of post-upgrade testing for existing workloads.
+      This setting is suitable for workloads with non-performance-critical queries,
+      or if the coordinator node is under heavy CPU or memory pressure.
+    </p>
+
+    <p>
+      You might change the setting to <codeph>OFF</codeph> if your workload contains
+      many queries involving partitioned tables or joins that do not experience a performance
+      increase from the runtime filters feature. If the overhead of producing the runtime filters
+      outweighs the performance benefit for queries, you can turn the feature off entirely.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_partitioning.xml#partitioning"/> for details about runtime filtering.
+      <xref href="impala_disable_row_runtime_filtering.xml#disable_row_runtime_filtering"/>,
+      <xref href="impala_runtime_bloom_filter_size.xml#runtime_bloom_filter_size"/>,
+      <xref href="impala_runtime_filter_wait_time_ms.xml#runtime_filter_wait_time_ms"/>,
+      and
+      <xref href="impala_max_num_runtime_filters.xml#max_num_runtime_filters"/>
+      for tuning options for runtime filtering.
+    </p>
+
+  </conbody>
+</concept>

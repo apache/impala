@@ -55,6 +55,7 @@
 #include "exprs/utility-functions-ir.cc"
 #include "runtime/mem-pool.h"
 #include "runtime/raw-value-ir.cc"
+#include "runtime/runtime-filter-ir.cc"
 #include "udf/udf-ir.cc"
 #include "util/hash-util-ir.cc"
 

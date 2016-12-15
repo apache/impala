@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+add_subdirectory(bufferpool)
 
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
@@ -36,6 +37,8 @@ add_library(Runtime
   disk-io-mgr-scan-range.cc
   disk-io-mgr-stress.cc
   exec-env.cc
+  free-pool.cc
+  fragment-instance-state.cc
   hbase-table.cc
   hbase-table-factory.cc
   hdfs-fs-cache.cc
@@ -45,6 +48,8 @@ add_library(Runtime
   multi-precision.cc
   parallel-executor.cc
   plan-fragment-executor.cc
+  query-exec-mgr.cc
+  query-state.cc
   test-env.cc
   types.cc
   raw-value.cc
@@ -52,6 +57,7 @@ add_library(Runtime
   row-batch.cc
   runtime-filter.cc
   runtime-filter-bank.cc
+  runtime-filter-ir.cc
   runtime-state.cc
   sorted-run-merger.cc
   sorter.cc

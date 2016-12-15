@@ -58,9 +58,9 @@ class DataSink {
   virtual std::string GetName() = 0;
 
   /// Setup. Call before Send(), Open(), or Close() during the prepare phase of the query
-  /// fragment. Any memory allocated will be tracked against the caller-provided
-  /// 'mem_tracker'. Subclasses must call DataSink::Prepare().
-  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
+  /// fragment. Creates a MemTracker for the sink that is a child of 'parent_mem_tracker'.
+  /// Subclasses must call DataSink::Prepare().
+  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
 
   /// Call before Send() to open the sink.
   virtual Status Open(RuntimeState* state) = 0;
@@ -94,7 +94,7 @@ class DataSink {
   static std::string OutputDmlStats(const PartitionStatusMap& stats,
       const std::string& prefix = "");
 
-  MemTracker* mem_tracker() const { return mem_tracker_; }
+  MemTracker* mem_tracker() const { return mem_tracker_.get(); }
   RuntimeProfile* profile() const { return profile_; }
 
  protected:
@@ -109,13 +109,11 @@ class DataSink {
   RuntimeProfile* profile_;
 
   /// The MemTracker for all allocations made by the DataSink. Initialized in Prepare().
-  /// Not owned.
-  MemTracker* mem_tracker_;
+  boost::scoped_ptr<MemTracker> mem_tracker_;
 
   /// A child of 'mem_tracker_' that tracks expr allocations. Initialized in Prepare().
   boost::scoped_ptr<MemTracker> expr_mem_tracker_;
-
 };
 
-}  // namespace impala
+} // namespace impala
 #endif

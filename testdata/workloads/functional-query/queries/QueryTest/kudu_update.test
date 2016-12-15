@@ -1,0 +1,341 @@
+====
+---- QUERY
+create table tdata
+  (id int primary key, name string null, valf float null, vali bigint null,
+   valv string null, valb boolean null, valt tinyint null, vals smallint null,
+   vald double null)
+  PARTITION BY RANGE (PARTITION VALUES < 10, PARTITION 10 <= VALUES < 30,
+  PARTITION 30 <= VALUES <= 10000) STORED AS KUDU
+---- RESULTS
+====
+---- QUERY
+insert into tdata values
+(1, "martin", 1.0, 232232323, cast('a' as string), true, 1, 2, 3),
+(2, "david", cast(1.0 as float), 99398493939, cast('b' as string), false, 4, 5, 6),
+(3, "todd", cast(1.0 as float), 993393939, "c", true, 7, 8, 9),
+(40, "he", cast(0.0 as float), 43, cast('e' as string), false, 50, 60, 70),
+(120, "she", cast(0.0 as float), 99, cast('f' as string), true, -1, 0, 1)
+---- RESULTS
+: 5
+---- RUNTIME_PROFILE
+NumModifiedRows: 5
+NumRowErrors: 0
+====
+---- QUERY
+# single row, equality on key, bigint
+# TODO: Verify row count in RESULTS after fixing IMPALA-3713, and supporting RESULTS and
+# DML_RESULTS in the same test case.
+update tdata set vali=43 where id = 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'martin',1.0,43,'a',true,1,2,3
+2,'david',1.0,99398493939,'b',false,4,5,6
+3,'todd',1.0,993393939,'c',true,7,8,9
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,99,'f',true,-1,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# single row, equality on key, string
+# Try updating a string col where casting a value that is bigger than the varchar in the
+# cast. The value gets truncated and stored to the string col.
+update tdata set valv=cast('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as varchar(20)) where id = 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',true,1,2,3
+2,'david',1.0,99398493939,'b',false,4,5,6
+3,'todd',1.0,993393939,'c',true,7,8,9
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,99,'f',true,-1,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# single row, equality on key, boolean
+update tdata set valb=false where id = 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,99398493939,'b',false,4,5,6
+3,'todd',1.0,993393939,'c',true,7,8,9
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,99,'f',true,-1,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# single row, equality on key, set to NULL
+update tdata set name=null where id = 40
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,99398493939,'b',false,4,5,6
+3,'todd',1.0,993393939,'c',true,7,8,9
+40,'NULL',0.0,43,'e',false,50,60,70
+120,'she',0.0,99,'f',true,-1,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# single row, equlity on key, set from NULL
+update tdata set name='he' where id = 40
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,99398493939,'b',false,4,5,6
+3,'todd',1.0,993393939,'c',true,7,8,9
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,99,'f',true,-1,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# single row, equality on key, boundary value
+update tdata set vali = max_bigint() where id = 120
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,99398493939,'b',false,4,5,6
+3,'todd',1.0,993393939,'c',true,7,8,9
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',true,-1,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# single row, inequality on key, float
+update tdata set valf = -1 where id > 2 and id < 4
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,99398493939,'b',false,4,5,6
+3,'todd',-1.0,993393939,'c',true,7,8,9
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',true,-1,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# single row, inequality on key, tinyint
+update tdata set valt = 10 where id > 100
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,99398493939,'b',false,4,5,6
+3,'todd',-1.0,993393939,'c',true,7,8,9
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',true,10,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# single row, equality on non-key, string
+update tdata set name='unknown' where name = 'martin'
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,99398493939,'b',false,4,5,6
+3,'todd',-1.0,993393939,'c',true,7,8,9
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',true,10,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# single row, inequality on non-key, double
+update tdata set vald = 0 where valf < 0
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,99398493939,'b',false,4,5,6
+3,'todd',-1.0,993393939,'c',true,7,8,0
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',true,10,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# multiple rows, predicate on key
+update tdata set vali=43 where id > 1 and id < 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,43,'b',false,4,5,6
+3,'todd',-1.0,43,'c',true,7,8,0
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',true,10,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# multiple rows, predicate on non-key
+update tdata set valb=false where name LIKE '%he'
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,43,'b',false,4,5,6
+3,'todd',-1.0,43,'c',true,7,8,0
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# update the same row multiple times: cross join produces 5 identical updates
+update a set a.name='they' from tdata a, tdata b where a.id = 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 5
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'they',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,43,'b',false,4,5,6
+3,'todd',-1.0,43,'c',true,7,8,0
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# value of update is a constant expression
+update tdata set valf = 1 + 2 where id = 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'they',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,43,'b',false,4,5,6
+3,'todd',-1.0,43,'c',true,7,8,0
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# value of update is a non-constant expression
+update tdata set name = concat(name, name) where id % 2 = 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'theythey',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,43,'b',false,4,5,6
+3,'toddtodd',-1.0,43,'c',true,7,8,0
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# error - update key column
+update tdata set id = 0 where name = 'he'
+---- CATCH
+Key column 'id' cannot be updated.
+====
+---- QUERY
+# no rows updated
+update tdata set name = 'none' where id = 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'theythey',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,43,'b',false,4,5,6
+3,'toddtodd',-1.0,43,'c',true,7,8,0
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# Try to update a row with a primary key value that is not covered by the existing range
+# partitions. This doesn't actually end up selecting any rows to modify.
+update tdata set vali = 10 where id = 10001
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+1,'theythey',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
+2,'david',1.0,43,'b',false,4,5,6
+3,'toddtodd',-1.0,43,'c',true,7,8,0
+40,'he',0.0,43,'e',false,50,60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+insert into tdata
+select id, string_col, float_col, bigint_col, string_col, bool_col, tinyint_col,
+smallint_col, double_col from functional_kudu.alltypes
+---- RESULTS
+: 7295
+---- RUNTIME_PROFILE
+NumModifiedRows: 7295
+NumRowErrors: 5
+====
+---- QUERY
+# Test a larger UPDATE
+update tdata set vali = -1
+---- RESULTS
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+====

@@ -72,6 +72,36 @@ class TestFetchFirst(HS2TestSuite):
 
   @pytest.mark.execute_serially
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6)
+  def test_fetch_first_with_exhausted_cache(self):
+    """Regression test for IMPALA-4580. If a result cache is large enough to include all
+    results, and the fetch is restarted after all rows have been fetched, the final fetch
+    (internally) that returns EOS is not idempotent and can crash."""
+    RESULT_SET_SIZE = 100
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.confOverlay = dict()
+    execute_statement_req.confOverlay[self.IMPALA_RESULT_CACHING_OPT] =\
+      str(RESULT_SET_SIZE)
+    execute_statement_req.statement =\
+      "SELECT * FROM functional.alltypes ORDER BY id LIMIT %s" % RESULT_SET_SIZE
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    HS2TestSuite.check_response(execute_statement_resp)
+
+    # First fetch more than the entire result set, ensuring that coordinator has hit EOS
+    # condition.
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, RESULT_SET_SIZE + 1,
+                     RESULT_SET_SIZE)
+
+    # Now restart the fetch, again trying to fetch more than the full result set size so
+    # that the cache is exhausted and the coordinator is checked for more rows.
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_FIRST, RESULT_SET_SIZE + 1,
+                     RESULT_SET_SIZE)
+    self.close(execute_statement_resp.operationHandle)
+
+  @pytest.mark.execute_serially
+  @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6)
   def test_query_stmts_v6(self):
     self.run_query_stmts_test();
 

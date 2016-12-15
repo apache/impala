@@ -288,7 +288,7 @@ public class AnalyticWindow {
     if (e.isConstant() && e.getType().isNumericType()) {
       try {
         val = TColumnValueUtil.getNumericVal(
-            FeSupport.EvalConstExpr(e, analyzer.getQueryCtx()));
+            FeSupport.EvalExprWithoutRow(e, analyzer.getQueryCtx()));
         if (val <= 0) isPos = false;
       } catch (InternalException exc) {
         throw new AnalysisException(
@@ -329,8 +329,8 @@ public class AnalyticWindow {
         e2 != null && e2.isConstant() && e2.getType().isNumericType());
 
     try {
-      TColumnValue val1 = FeSupport.EvalConstExpr(e1, analyzer.getQueryCtx());
-      TColumnValue val2 = FeSupport.EvalConstExpr(e2, analyzer.getQueryCtx());
+      TColumnValue val1 = FeSupport.EvalExprWithoutRow(e1, analyzer.getQueryCtx());
+      TColumnValue val2 = FeSupport.EvalExprWithoutRow(e2, analyzer.getQueryCtx());
       double left = TColumnValueUtil.getNumericVal(val1);
       double right = TColumnValueUtil.getNumericVal(val2);
       if (left > right) {

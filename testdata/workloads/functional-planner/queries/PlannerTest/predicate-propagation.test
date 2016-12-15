@@ -1132,7 +1132,7 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t2.id = functional.alltypestiny.id, t2.int_col = functional.alltypestiny.int_col
-|  other predicates: functional.alltypestiny.tinyint_col + functional.alltypestiny.smallint_col + functional.alltypestiny.int_col > 10, ifnull(functional.alltypestiny.tinyint_col + functional.alltypestiny.bigint_col, TRUE) = TRUE
+|  other predicates: functional.alltypestiny.tinyint_col + functional.alltypestiny.smallint_col + functional.alltypestiny.int_col > 10, ifnull(functional.alltypestiny.tinyint_col + functional.alltypestiny.bigint_col, 1) = 1
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
@@ -1140,7 +1140,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t1.id = t2.id, t1.int_col = t2.int_col
-|  other predicates: t2.tinyint_col = t2.smallint_col, ifnull(t2.tinyint_col + t2.bigint_col, TRUE) = TRUE
+|  other predicates: t2.tinyint_col = t2.smallint_col, ifnull(t2.tinyint_col + t2.bigint_col, 1) = 1
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 files=4 size=6.32KB
@@ -1352,6 +1352,6 @@ PLAN-ROOT SINK
 |     predicates: n_regionkey = 1, n_name = 'BRAZIL'
 |
 00:SCAN HDFS [tpch_parquet.customer c]
-   partitions=1/1 files=1 size=12.47MB
+   partitions=1/1 files=1 size=12.27MB
    predicates: c_custkey % 2 = 0
 ====

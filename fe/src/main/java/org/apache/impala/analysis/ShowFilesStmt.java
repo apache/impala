@@ -17,15 +17,13 @@
 
 package org.apache.impala.analysis;
 
-import java.util.List;
-
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TShowFilesParams;
-import org.apache.impala.thrift.TPartitionKeyValue;
-import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.thrift.TTableName;
+
 import com.google.common.base.Preconditions;
 
 /**

@@ -26,6 +26,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
@@ -34,7 +35,6 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TKuduScanNode;
@@ -102,8 +102,16 @@ public class KuduScanNode extends ScanNode {
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaRuntimeException {
-    assignConjuncts(analyzer);
+    conjuncts_.clear();
+    // Add bound predicates.
+    conjuncts_.addAll(analyzer.getBoundPredicates(desc_.getId()));
+    // Add unassigned predicates.
+    List<Expr> unassigned = analyzer.getUnassignedConjuncts(this);
+    conjuncts_.addAll(unassigned);
+    analyzer.markConjunctsAssigned(unassigned);
+    // Add equivalence predicates.
     analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
+    Expr.removeDuplicates(conjuncts_);
     conjuncts_ = orderConjunctsByCost(conjuncts_);
 
     try (KuduClient client = KuduUtil.createKuduClient(kuduTable_.getKuduMasterHosts())) {
@@ -224,7 +232,9 @@ public class KuduScanNode extends ScanNode {
     cardinality_ *= computeSelectivity();
     cardinality_ = Math.min(Math.max(1, cardinality_), kuduTable_.getNumRows());
     cardinality_ = capAtLimit(cardinality_);
-    LOG.debug("computeStats KuduScan: cardinality=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computeStats KuduScan: cardinality=" + Long.toString(cardinality_));
+    }
   }
 
   @Override
@@ -273,7 +283,11 @@ public class KuduScanNode extends ScanNode {
       KuduClient client, org.apache.kudu.client.KuduTable rpcTable) {
     ListIterator<Expr> it = conjuncts_.listIterator();
     while (it.hasNext()) {
-      if (tryConvertKuduPredicate(analyzer, rpcTable, it.next())) it.remove();
+      Expr predicate = it.next();
+      if (tryConvertBinaryKuduPredicate(analyzer, rpcTable, predicate) ||
+          tryConvertInListKuduPredicate(analyzer, rpcTable, predicate)) {
+        it.remove();
+      }
     }
   }
 
@@ -281,7 +295,7 @@ public class KuduScanNode extends ScanNode {
    * If 'expr' can be converted to a KuduPredicate, returns true and updates
    * kuduPredicates_ and kuduConjuncts_.
    */
-  private boolean tryConvertKuduPredicate(Analyzer analyzer,
+  private boolean tryConvertBinaryKuduPredicate(Analyzer analyzer,
       org.apache.kudu.client.KuduTable table, Expr expr) {
     if (!(expr instanceof BinaryPredicate)) return false;
     BinaryPredicate predicate = (BinaryPredicate) expr;
@@ -346,6 +360,60 @@ public class KuduScanNode extends ScanNode {
   }
 
   /**
+   * If the InList 'expr' can be converted to a KuduPredicate, returns true and updates
+   * kuduPredicates_ and kuduConjuncts_.
+   */
+  private boolean tryConvertInListKuduPredicate(Analyzer analyzer,
+      org.apache.kudu.client.KuduTable table, Expr expr) {
+    if (!(expr instanceof InPredicate)) return false;
+    InPredicate predicate = (InPredicate) expr;
+
+    // Only convert IN predicates, i.e. cannot convert NOT IN.
+    if (predicate.isNotIn()) return false;
+
+    // Do not convert if there is an implicit cast.
+    if (!(predicate.getChild(0) instanceof SlotRef)) return false;
+    SlotRef ref = (SlotRef) predicate.getChild(0);
+
+    // KuduPredicate takes a list of values as Objects.
+    List<Object> values = Lists.newArrayList();
+    for (int i = 1; i < predicate.getChildren().size(); ++i) {
+      if (!(predicate.getChild(i).isLiteral())) return false;
+      Object value = getKuduInListValue((LiteralExpr) predicate.getChild(i));
+      Preconditions.checkNotNull(value == null);
+      values.add(value);
+    }
+
+    String colName = ref.getDesc().getColumn().getName();
+    ColumnSchema column = table.getSchema().getColumn(colName);
+    kuduPredicates_.add(KuduPredicate.newInListPredicate(column, values));
+    kuduConjuncts_.add(predicate);
+    return true;
+  }
+
+  /**
+   * Return the value of the InList child expression 'e' as an Object that can be
+   * added to a KuduPredicate. If the Expr is not supported by Kudu or the type doesn't
+   * match the expected PrimitiveType 'type', null is returned.
+   */
+  private static Object getKuduInListValue(LiteralExpr e) {
+    switch (e.getType().getPrimitiveType()) {
+      case BOOLEAN: return ((BoolLiteral) e).getValue();
+      case TINYINT: return (byte) ((NumericLiteral) e).getLongValue();
+      case SMALLINT: return (short) ((NumericLiteral) e).getLongValue();
+      case INT: return (int) ((NumericLiteral) e).getLongValue();
+      case BIGINT: return ((NumericLiteral) e).getLongValue();
+      case FLOAT: return (float) ((NumericLiteral) e).getDoubleValue();
+      case DOUBLE: return ((NumericLiteral) e).getDoubleValue();
+      case STRING: return ((StringLiteral) e).getValue();
+      default:
+        Preconditions.checkState(false,
+            "Unsupported Kudu type considered for predicate: %s", e.getType().toSql());
+    }
+    return null;
+  }
+
+  /**
    * Returns a Kudu comparison operator for the BinaryPredicate operator, or null if
    * the operation is not supported by Kudu.
    */
@@ -363,19 +431,11 @@ public class KuduScanNode extends ScanNode {
 
   /**
    * Normalizes and returns a copy of 'predicate' consisting of an uncast SlotRef and a
-   * constant Expr into the following form: <SlotRef> <Op> <LiteralExpr>
-   * If 'predicate' cannot be expressed in this way, null is returned.
+   * constant Expr into the following form: <SlotRef> <Op> <LiteralExpr>.
+   * Assumes that constant expressions have already been folded.
    */
   private static BinaryPredicate normalizeSlotRefComparison(BinaryPredicate predicate,
       Analyzer analyzer) {
-    try {
-      predicate = (BinaryPredicate) predicate.clone();
-      predicate.foldConstantChildren(analyzer);
-    } catch (AnalysisException ex) {
-      // Throws if the expression cannot be evaluated by the BE.
-      return null;
-    }
-
     SlotRef ref = null;
     if (predicate.getChild(0) instanceof SlotRef) {
       ref = (SlotRef) predicate.getChild(0);

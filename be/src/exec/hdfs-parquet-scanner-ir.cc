@@ -17,13 +17,16 @@
 
 #include "exec/hdfs-parquet-scanner.h"
 
+#include "exec/filter-context.h"
 #include "exec/parquet-scratch-tuple-batch.h"
+#include "exprs/expr.h"
+#include "runtime/runtime-filter.h"
+#include "runtime/runtime-filter.inline.h"
 #include "runtime/tuple-row.h"
 
 using namespace impala;
 
 int HdfsParquetScanner::ProcessScratchBatch(RowBatch* dst_batch) {
-  const bool has_filters = !filter_ctxs_.empty();
   ExprContext* const* conjunct_ctxs = &(*scanner_conjunct_ctxs_)[0];
   const int num_conjuncts = scanner_conjunct_ctxs_->size();
 
@@ -48,7 +51,7 @@ int HdfsParquetScanner::ProcessScratchBatch(RowBatch* dst_batch) {
     scratch_tuple += tuple_size;
     // Evaluate runtime filters and conjuncts. Short-circuit the evaluation if
     // the filters/conjuncts are empty to avoid function calls.
-    if (has_filters && !EvalRuntimeFilters(reinterpret_cast<TupleRow*>(output_row))) {
+    if (!EvalRuntimeFilters(reinterpret_cast<TupleRow*>(output_row))) {
       continue;
     }
     if (!ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts,
@@ -60,6 +63,19 @@ int HdfsParquetScanner::ProcessScratchBatch(RowBatch* dst_batch) {
     if (output_row == output_row_end) break;
   }
   scratch_batch_->tuple_idx += (scratch_tuple - scratch_tuple_start) / tuple_size;
-
   return output_row - output_row_start;
+}
+
+bool HdfsParquetScanner::EvalRuntimeFilter(int i, TupleRow* row) {
+  LocalFilterStats* stats = &filter_stats_[i];
+  const FilterContext* ctx = filter_ctxs_[i];
+  ++stats->total_possible;
+  if (stats->enabled && ctx->filter->HasBloomFilter()) {
+    ++stats->considered;
+    if (!ctx->Eval(row)) {
+      ++stats->rejected;
+      return false;
+    }
+  }
+  return true;
 }

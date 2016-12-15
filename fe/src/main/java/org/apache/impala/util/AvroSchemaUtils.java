@@ -23,19 +23,19 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.apache.commons.io.IOUtils;
+
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
-
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-
 /**
  * Contains utility functions for dealing with Avro schemas.
  */
@@ -139,10 +139,13 @@ public class AvroSchemaUtils {
       if ((colDef.getType().isStringType() && avroCol.getType().isStringType())) {
         Preconditions.checkState(
             avroCol.getType().getPrimitiveType() == PrimitiveType.STRING);
+        Map<ColumnDef.Option, Object> option = Maps.newHashMap();
+        String comment = avroCol.getComment();
+        if (comment != null) option.put(ColumnDef.Option.COMMENT, comment);
         ColumnDef reconciledColDef = new ColumnDef(
-            avroCol.getColName(), colDef.getTypeDef(), avroCol.getComment());
+            avroCol.getColName(), colDef.getTypeDef(), option);
         try {
-          reconciledColDef.analyze();
+          reconciledColDef.analyze(null);
         } catch (AnalysisException e) {
           Preconditions.checkNotNull(
               null, "reconciledColDef.analyze() should never throw.");

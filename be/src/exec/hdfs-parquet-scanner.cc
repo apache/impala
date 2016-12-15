@@ -23,6 +23,7 @@
 #include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
 
+#include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "exec/hdfs-scanner.h"
@@ -48,18 +49,18 @@
 
 using llvm::Function;
 using namespace impala;
+using namespace llvm;
 
 DEFINE_double(parquet_min_filter_reject_ratio, 0.1, "(Advanced) If the percentage of "
     "rows rejected by a runtime filter drops below this value, the filter is disabled.");
 DECLARE_bool(enable_partitioned_aggregation);
 DECLARE_bool(enable_partitioned_hash_join);
 
-// The number of rows between checks to see if a filter is not effective, and should be
-// disabled. Must be a power of two.
-const int ROWS_PER_FILTER_SELECTIVITY_CHECK = 16 * 1024;
-static_assert(
-    !(ROWS_PER_FILTER_SELECTIVITY_CHECK & (ROWS_PER_FILTER_SELECTIVITY_CHECK - 1)),
-    "ROWS_PER_FILTER_SELECTIVITY_CHECK must be a power of two");
+// The number of row batches between checks to see if a filter is effective, and
+// should be disabled. Must be a power of two.
+constexpr int BATCHES_PER_FILTER_SELECTIVITY_CHECK = 16;
+static_assert(BitUtil::IsPowerOf2(BATCHES_PER_FILTER_SELECTIVITY_CHECK),
+    "BATCHES_PER_FILTER_SELECTIVITY_CHECK must be a power of two");
 
 // Max dictionary page header size in bytes. This is an estimate and only needs to be an
 // upper bound.
@@ -69,6 +70,8 @@ const int64_t HdfsParquetScanner::FOOTER_SIZE;
 const int16_t HdfsParquetScanner::ROW_GROUP_END;
 const int16_t HdfsParquetScanner::INVALID_LEVEL;
 const int16_t HdfsParquetScanner::INVALID_POS;
+
+const char* HdfsParquetScanner::LLVM_CLASS_NAME = "class.impala::HdfsParquetScanner";
 
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
@@ -146,6 +149,7 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
       row_group_idx_(-1),
       row_group_rows_read_(0),
       advance_row_group_(true),
+      row_batches_produced_(0),
       scratch_batch_(new ScratchTupleBatch(
           scan_node->row_desc(), state_->batch_size(), scan_node->mem_tracker())),
       metadata_range_(NULL),
@@ -183,7 +187,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   for (int i = 0; i < context->filter_ctxs().size(); ++i) {
     const FilterContext* ctx = &context->filter_ctxs()[i];
     DCHECK(ctx->filter != NULL);
-    if (!ctx->filter->AlwaysTrue()) filter_ctxs_.push_back(ctx);
+    filter_ctxs_.push_back(ctx);
   }
   filter_stats_.resize(filter_ctxs_.size());
 
@@ -225,25 +229,30 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 }
 
 void HdfsParquetScanner::Close(RowBatch* row_batch) {
-  if (row_batch != NULL) {
+  if (row_batch != nullptr) {
     FlushRowGroupResources(row_batch);
     row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
     if (scan_node_->HasRowBatchQueue()) {
       static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(row_batch);
     }
   } else {
-    if (template_tuple_pool_.get() != NULL) template_tuple_pool_->FreeAll();
-    if (!FLAGS_enable_partitioned_hash_join ||
-        !FLAGS_enable_partitioned_aggregation) {
-      // With the legacy aggs/joins the tuple ptrs of the scratch batch are allocated
-      // from the scratch batch's mem pool. We can get into this case if Open() fails.
-      scratch_batch_->mem_pool()->FreeAll();
-    }
+    if (template_tuple_pool_ != nullptr) template_tuple_pool_->FreeAll();
+    dictionary_pool_.get()->FreeAll();
+    context_->ReleaseCompletedResources(nullptr, true);
+    for (ParquetColumnReader* col_reader : column_readers_) col_reader->Close(nullptr);
+    // The scratch batch may still contain tuple data (or tuple ptrs if the legacy joins
+    // or aggs are enabled). We can get into this case if Open() fails or if the query is
+    // cancelled.
+    scratch_batch_->mem_pool()->FreeAll();
+  }
+  if (level_cache_pool_ != nullptr) {
+    level_cache_pool_->FreeAll();
+    level_cache_pool_.reset();
   }
 
   // Verify all resources (if any) have been transferred.
-  DCHECK_EQ(template_tuple_pool_.get()->total_allocated_bytes(), 0);
-  DCHECK_EQ(dictionary_pool_.get()->total_allocated_bytes(), 0);
+  DCHECK_EQ(template_tuple_pool_->total_allocated_bytes(), 0);
+  DCHECK_EQ(dictionary_pool_->total_allocated_bytes(), 0);
   DCHECK_EQ(scratch_batch_->mem_pool()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
 
@@ -269,12 +278,7 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
   if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
   scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
 
-  if (level_cache_pool_.get() != NULL) {
-    level_cache_pool_->FreeAll();
-    level_cache_pool_.reset();
-  }
-
-  if (schema_resolver_.get() != NULL) schema_resolver_.reset();
+  if (schema_resolver_.get() != nullptr) schema_resolver_.reset();
 
   for (int i = 0; i < filter_ctxs_.size(); ++i) {
     const FilterStats* stats = filter_ctxs_[i]->stats;
@@ -326,6 +330,18 @@ int HdfsParquetScanner::CountScalarColumns(const vector<ParquetColumnReader*>& c
   return num_columns;
 }
 
+void HdfsParquetScanner::CheckFiltersEffectiveness() {
+  for (int i = 0; i < filter_stats_.size(); ++i) {
+    LocalFilterStats* stats = &filter_stats_[i];
+    const RuntimeFilter* filter = filter_ctxs_[i]->filter;
+    double reject_ratio = stats->rejected / static_cast<double>(stats->considered);
+    if (filter->AlwaysTrue() ||
+        reject_ratio < FLAGS_parquet_min_filter_reject_ratio) {
+      stats->enabled = 0;
+    }
+  }
+}
+
 Status HdfsParquetScanner::ProcessSplit() {
   DCHECK(scan_node_->HasRowBatchQueue());
   HdfsScanNode* scan_node = static_cast<HdfsScanNode*>(scan_node_);
@@ -333,6 +349,10 @@ Status HdfsParquetScanner::ProcessSplit() {
     StartNewParquetRowBatch();
     RETURN_IF_ERROR(GetNextInternal(batch_));
     scan_node->AddMaterializedRowBatch(batch_);
+    ++row_batches_produced_;
+    if ((row_batches_produced_ & (BATCHES_PER_FILTER_SELECTIVITY_CHECK - 1)) == 0) {
+      CheckFiltersEffectiveness();
+    }
   } while (!eos_ && !scan_node_->ReachedLimit());
 
   // Transfer the remaining resources to this new batch in Close().
@@ -574,8 +594,11 @@ Status HdfsParquetScanner::CommitRows(RowBatch* dst_batch, int num_rows) {
 
   // We need to pass the row batch to the scan node if there is too much memory attached,
   // which can happen if the query is very selective. We need to release memory even
-  // if no rows passed predicates.
-  if (dst_batch->AtCapacity() || context_->num_completed_io_buffers() > 0) {
+  // if no rows passed predicates. We should only do this when all rows have been copied
+  // from the scratch batch, since those rows may reference completed I/O buffers in
+  // 'context_'.
+  if (scratch_batch_->AtEnd()
+      && (dst_batch->AtCapacity() || context_->num_completed_io_buffers() > 0)) {
     context_->ReleaseCompletedResources(dst_batch, /* done */ false);
   }
   if (context_->cancelled()) return Status::CANCELLED;
@@ -634,8 +657,9 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
 }
 
 Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
-    const vector<ExprContext*>& conjunct_ctxs, Function** process_scratch_batch_fn) {
-  DCHECK(node->runtime_state()->codegen_enabled());
+    const vector<ExprContext*>& conjunct_ctxs, const vector<FilterContext>& filter_ctxs,
+    Function** process_scratch_batch_fn) {
+  DCHECK(node->runtime_state()->ShouldCodegen());
   *process_scratch_batch_fn = NULL;
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
   DCHECK(codegen != NULL);
@@ -652,6 +676,14 @@ Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
   int replaced = codegen->ReplaceCallSites(fn, eval_conjuncts_fn, "EvalConjuncts");
   DCHECK_EQ(replaced, 1);
 
+  Function* eval_runtime_filters_fn;
+  RETURN_IF_ERROR(CodegenEvalRuntimeFilters(
+      codegen, filter_ctxs, &eval_runtime_filters_fn));
+  DCHECK(eval_runtime_filters_fn != NULL);
+
+  replaced = codegen->ReplaceCallSites(fn, eval_runtime_filters_fn, "EvalRuntimeFilters");
+  DCHECK_EQ(replaced, 1);
+
   fn->setName("ProcessScratchBatch");
   *process_scratch_batch_fn = codegen->FinalizeFunction(fn);
   if (*process_scratch_batch_fn == NULL) {
@@ -663,31 +695,96 @@ Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
 bool HdfsParquetScanner::EvalRuntimeFilters(TupleRow* row) {
   int num_filters = filter_ctxs_.size();
   for (int i = 0; i < num_filters; ++i) {
-    LocalFilterStats* stats = &filter_stats_[i];
-    if (!stats->enabled) continue;
-    const RuntimeFilter* filter = filter_ctxs_[i]->filter;
-    // Check filter effectiveness every ROWS_PER_FILTER_SELECTIVITY_CHECK rows.
-    // TODO: The stats updates and the filter effectiveness check are executed very
-    // frequently. Consider hoisting it out of of this loop, and doing an equivalent
-    // check less frequently, e.g., after producing an output batch.
-    ++stats->total_possible;
-    if (UNLIKELY(
-        !(stats->total_possible & (ROWS_PER_FILTER_SELECTIVITY_CHECK - 1)))) {
-      double reject_ratio = stats->rejected / static_cast<double>(stats->considered);
-      if (filter->AlwaysTrue() ||
-          reject_ratio < FLAGS_parquet_min_filter_reject_ratio) {
-        stats->enabled = 0;
-        continue;
-      }
-    }
-    ++stats->considered;
-    void* e = filter_ctxs_[i]->expr->GetValue(row);
-    if (!filter->Eval<void>(e, filter_ctxs_[i]->expr->root()->type())) {
-      ++stats->rejected;
-      return false;
-    }
+    if (!EvalRuntimeFilter(i, row)) return false;
   }
   return true;
+}
+
+// ; Function Attrs: noinline
+// define i1 @EvalRuntimeFilters(%"class.impala::HdfsParquetScanner"* %this,
+//                               %"class.impala::TupleRow"* %row) #34 {
+// entry:
+//   %0 = call i1 @_ZN6impala18HdfsParquetScanner17EvalRuntimeFilterEiPNS_8TupleRowE.2(
+//       %"class.impala::HdfsParquetScanner"* %this, i32 0, %"class.impala::TupleRow"* %row)
+//   br i1 %0, label %continue, label %bail_out
+//
+// bail_out:                                         ; preds = %entry
+//   ret i1 false
+//
+// continue:                                         ; preds = %entry
+//   ret i1 true
+// }
+//
+// EvalRuntimeFilter() is the same as the cross-compiled version except EvalOneFilter()
+// is replaced with the one generated by CodegenEvalOneFilter().
+Status HdfsParquetScanner::CodegenEvalRuntimeFilters(LlvmCodeGen* codegen,
+    const vector<FilterContext>& filter_ctxs, Function** fn) {
+  LLVMContext& context = codegen->context();
+  LlvmBuilder builder(context);
+
+  *fn = NULL;
+  Type* this_type = codegen->GetPtrType(HdfsParquetScanner::LLVM_CLASS_NAME);
+  PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  LlvmCodeGen::FnPrototype prototype(codegen, "EvalRuntimeFilters",
+      codegen->GetType(TYPE_BOOLEAN));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
+
+  Value* args[2];
+  Function* eval_runtime_filters_fn = prototype.GeneratePrototype(&builder, args);
+  Value* this_arg = args[0];
+  Value* row_arg = args[1];
+
+  int num_filters = filter_ctxs.size();
+  if (num_filters == 0) {
+    builder.CreateRet(codegen->true_value());
+  } else {
+    // row_rejected_block: jump target for when a filter is evaluated to false.
+    BasicBlock* row_rejected_block =
+        BasicBlock::Create(context, "row_rejected", eval_runtime_filters_fn);
+
+    DCHECK_GT(num_filters, 0);
+    for (int i = 0; i < num_filters; ++i) {
+      Function* eval_runtime_filter_fn =
+          codegen->GetFunction(IRFunction::PARQUET_SCANNER_EVAL_RUNTIME_FILTER, true);
+      DCHECK(eval_runtime_filter_fn != NULL);
+
+      // Codegen function for inlining filter's expression evaluation and constant fold
+      // the type of the expression into the hashing function to avoid branches.
+      Function* eval_one_filter_fn;
+      RETURN_IF_ERROR(filter_ctxs[i].CodegenEval(codegen, &eval_one_filter_fn));
+      DCHECK(eval_one_filter_fn != NULL);
+
+      int replaced = codegen->ReplaceCallSites(eval_runtime_filter_fn, eval_one_filter_fn,
+          "FilterContext4Eval");
+      DCHECK_EQ(replaced, 1);
+
+      Value* idx = codegen->GetIntConstant(TYPE_INT, i);
+      Value* passed_filter = builder.CreateCall(
+          eval_runtime_filter_fn, ArrayRef<Value*>({this_arg, idx, row_arg}));
+
+      BasicBlock* continue_block =
+          BasicBlock::Create(context, "continue", eval_runtime_filters_fn);
+      builder.CreateCondBr(passed_filter, continue_block, row_rejected_block);
+      builder.SetInsertPoint(continue_block);
+    }
+    builder.CreateRet(codegen->true_value());
+
+    builder.SetInsertPoint(row_rejected_block);
+    builder.CreateRet(codegen->false_value());
+
+    // Don't inline this function to avoid code bloat in ProcessScratchBatch().
+    // If there is any filter, EvalRuntimeFilters() is large enough to not benefit
+    // much from inlining.
+    eval_runtime_filters_fn->addFnAttr(llvm::Attribute::NoInline);
+  }
+
+  *fn = codegen->FinalizeFunction(eval_runtime_filters_fn);
+  if (*fn == NULL) {
+    return Status("Codegen'd HdfsParquetScanner::EvalRuntimeFilters() failed "
+        "verification, see log");
+  }
+  return Status::OK();
 }
 
 bool HdfsParquetScanner::AssembleCollection(

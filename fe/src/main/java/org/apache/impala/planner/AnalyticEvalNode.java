@@ -121,7 +121,9 @@ public class AnalyticEvalNode extends PlanNode {
     // do this at the end so it can take all conjuncts into account
     computeStats(analyzer);
 
-    LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
+    }
 
     // point fn calls, partition and ordering exprs at our input
     ExprSubstitutionMap childSmap = getCombinedChildSmap();
@@ -129,7 +131,7 @@ public class AnalyticEvalNode extends PlanNode {
     substitutedPartitionExprs_ = Expr.substituteList(partitionExprs_, childSmap,
         analyzer, false);
     orderByElements_ = OrderByElement.substitute(orderByElements_, childSmap, analyzer);
-    LOG.trace("evalnode: " + debugString());
+    if (LOG.isTraceEnabled()) LOG.trace("evalnode: " + debugString());
   }
 
   @Override

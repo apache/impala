@@ -275,22 +275,22 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     }
     DCHECK(serialize_stream_->has_write_block());
   }
-  if (!state->codegen_enabled()) {
-    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
-  }
+  AddCodegenDisabledMessage(state);
   return Status::OK();
 }
 
 void PartitionedAggregationNode::Codegen(RuntimeState* state) {
-  DCHECK(state->codegen_enabled());
+  DCHECK(state->ShouldCodegen());
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
   TPrefetchMode::type prefetch_mode = state_->query_options().prefetch_mode;
-  Status codegen_status =
-     is_streaming_preagg_ ? CodegenProcessBatchStreaming(codegen, prefetch_mode) :
-          CodegenProcessBatch(codegen, prefetch_mode);
+  Status codegen_status = is_streaming_preagg_ ?
+      CodegenProcessBatchStreaming(codegen, prefetch_mode) :
+      CodegenProcessBatch(codegen, prefetch_mode);
   runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
-  ExecNode::Codegen(state);
 }
 
 Status PartitionedAggregationNode::Open(RuntimeState* state) {
@@ -1555,7 +1555,8 @@ Status PartitionedAggregationNode::QueryMaintenance(RuntimeState* state) {
 // }
 //
 Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
-    AggFnEvaluator* evaluator, SlotDescriptor* slot_desc, Function** fn) {
+    AggFnEvaluator* evaluator, int evaluator_idx, SlotDescriptor* slot_desc,
+    Function** fn) {
   PointerType* fn_ctx_type =
       codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME);
   PointerType* expr_ctxs_type =
@@ -1699,10 +1700,18 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
   builder.SetInsertPoint(ret_block);
   builder.CreateRetVoid();
 
+  // Avoid producing huge UpdateTuple() function after inlining - LLVM's optimiser
+  // memory/CPU usage scales super-linearly with function size.
+  // E.g. compute stats on all columns of a 1000-column table previously took 4 minutes to
+  // codegen because all the UpdateSlot() functions were inlined.
+  if (evaluator_idx >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) {
+    codegen->SetNoInline(*fn);
+  }
+
   *fn = codegen->FinalizeFunction(*fn);
   if (*fn == NULL) {
     return Status("PartitionedAggregationNode::CodegenUpdateSlot(): codegen'd "
-        "UpdateSlot() function failed verification, see log");
+                  "UpdateSlot() function failed verification, see log");
   }
   return Status::OK();
 }
@@ -1876,7 +1885,8 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
       builder.CreateStore(count_inc, slot_ptr);
     } else {
       Function* update_slot_fn;
-      RETURN_IF_ERROR(CodegenUpdateSlot(codegen, evaluator, slot_desc, &update_slot_fn));
+      RETURN_IF_ERROR(
+          CodegenUpdateSlot(codegen, evaluator, i, slot_desc, &update_slot_fn));
       Value* agg_fn_ctx_ptr = builder.CreateConstGEP1_32(agg_fn_ctxs_arg, i);
       Value* agg_fn_ctx = builder.CreateLoad(agg_fn_ctx_ptr, "agg_fn_ctx");
       // Call GetExprCtx() to get the expression context.
@@ -1888,6 +1898,12 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
     }
   }
   builder.CreateRetVoid();
+
+  // Avoid inlining big UpdateTuple function into outer loop - we're unlikely to get
+  // any benefit from it since the function call overhead will be amortized.
+  if (aggregate_evaluators_.size() > LlvmCodeGen::CODEGEN_INLINE_EXPR_BATCH_THRESHOLD) {
+    codegen->SetNoInline(*fn);
+  }
 
   // CodegenProcessBatch() does the final optimizations.
   *fn = codegen->FinalizeFunction(*fn);

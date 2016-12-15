@@ -227,6 +227,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     children_ = Expr.cloneList(other.children_);
   }
 
+  public boolean isAnalyzed() { return isAnalyzed_; }
   public ExprId getId() { return id_; }
   protected void setId(ExprId id) { id_ = id; }
   public Type getType() { return type_; }
@@ -850,22 +851,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static <C extends Expr> void removeDuplicates(List<C> l) {
     if (l == null) return;
-    ListIterator<C> it1 = l.listIterator();
-    while (it1.hasNext()) {
-      C e1 = it1.next();
-      ListIterator<C> it2 = l.listIterator();
-      boolean duplicate = false;
-      while (it2.hasNext()) {
-        C e2 = it2.next();
-          // only check up to but excluding e1
-        if (e1 == e2) break;
-        if (e1.equals(e2)) {
-          duplicate = true;
-          break;
-        }
-      }
-      if (duplicate) it1.remove();
-    }
+    List<C> origList = Lists.newArrayList(l);
+    l.clear();
+    for (C expr: origList) if (!l.contains(expr)) l.add(expr);
   }
 
   /**
@@ -1196,36 +1184,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     collect(Subquery.class, subqueries);
     Preconditions.checkState(subqueries.size() == 1);
     return subqueries.get(0);
-  }
-
-  /**
-   * For children of 'this' that are constant expressions and the type of which has a
-   * LiteralExpr subclass, evaluate them in the BE and substitute the child with the
-   * resulting LiteralExpr. Modifies 'this' in place. If any children are folded, this
-   * Expr is reset and re-analyzed.
-   *
-   * Throws an AnalysisException if the evaluation fails in the BE.
-   *
-   * TODO: Convert to a generic constant expr folding function to be used during analysis.
-   */
-  public void foldConstantChildren(Analyzer analyzer) throws AnalysisException {
-    Preconditions.checkState(isAnalyzed_);
-    Preconditions.checkNotNull(analyzer);
-
-    int numFolded = 0;
-    for (int i = 0; i < children_.size(); ++i) {
-      Expr child = getChild(i);
-      if (child.isLiteral() || !child.isConstant()) continue;
-      LiteralExpr literalExpr = LiteralExpr.create(child, analyzer.getQueryCtx());
-      if (literalExpr == null) continue;
-      setChild(i, literalExpr);
-      ++numFolded;
-    }
-
-    if (numFolded > 0) {
-      reset();
-      analyze(analyzer);
-    }
   }
 
   /**

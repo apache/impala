@@ -22,35 +22,34 @@ import com.google.common.collect.Lists;
 import java.util.List;
 
 /**
- * Represents the PARTITION BY and DISTRIBUTED BY clauses of a DDL statement.
- * TODO: Reconsider this class when we add support for new range partitioning syntax (see
- * IMPALA-3724).
+ * Represents the PARTITION BY and PARTITIONED BY clauses of a DDL statement.
  */
 class TableDataLayout {
 
   private final List<ColumnDef> partitionColDefs_;
-  private final List<DistributeParam> distributeParams_;
+  private final List<KuduPartitionParam> kuduPartitionParams_;
 
   private TableDataLayout(List<ColumnDef> partitionColumnDefs,
-      List<DistributeParam> distributeParams) {
+      List<KuduPartitionParam> partitionParams) {
     partitionColDefs_ = partitionColumnDefs;
-    distributeParams_ = distributeParams;
+    kuduPartitionParams_ = partitionParams;
   }
 
   static TableDataLayout createPartitionedLayout(List<ColumnDef> partitionColumnDefs) {
     return new TableDataLayout(partitionColumnDefs,
-        Lists.<DistributeParam>newArrayList());
+        Lists.<KuduPartitionParam>newArrayList());
   }
 
-  static TableDataLayout createDistributedLayout(List<DistributeParam> distributeParams) {
-    return new TableDataLayout(Lists.<ColumnDef>newArrayList(), distributeParams);
+  static TableDataLayout createKuduPartitionedLayout(
+      List<KuduPartitionParam> partitionParams) {
+    return new TableDataLayout(Lists.<ColumnDef>newArrayList(), partitionParams);
   }
 
   static TableDataLayout createEmptyLayout() {
     return new TableDataLayout(Lists.<ColumnDef>newArrayList(),
-        Lists.<DistributeParam>newArrayList());
+        Lists.<KuduPartitionParam>newArrayList());
   }
 
   List<ColumnDef> getPartitionColumnDefs() { return partitionColDefs_; }
-  List<DistributeParam> getDistributeParams() { return distributeParams_; }
+  List<KuduPartitionParam> getKuduPartitionParams() { return kuduPartitionParams_; }
 }

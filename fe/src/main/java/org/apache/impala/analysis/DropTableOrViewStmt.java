@@ -19,8 +19,11 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TAccessEvent;
+import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
@@ -85,7 +88,7 @@ public class DropTableOrViewStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     dbName_ = analyzer.getTargetDbName(tableName_);
     try {
-      Table table = analyzer.getTable(tableName_, Privilege.DROP);
+      Table table = analyzer.getTable(tableName_, Privilege.DROP, true);
       Preconditions.checkNotNull(table);
       if (table instanceof View && dropTable_) {
         throw new AnalysisException(String.format(
@@ -95,6 +98,14 @@ public class DropTableOrViewStmt extends StatementBase {
         throw new AnalysisException(String.format(
             "DROP VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
       }
+    } catch (TableLoadingException e) {
+      // We should still try to DROP tables that failed to load, so that tables that are
+      // in a bad state, eg. deleted externally from Kudu, can be dropped.
+      // We still need an access event - we don't know if this is a TABLE or a VIEW, so
+      // we set it as TABLE as VIEW loading is unlikely to fail and even if it does
+      // TABLE -> VIEW is a small difference.
+      analyzer.addAccessEvent(new TAccessEvent(
+          tableName_.toString(), TCatalogObjectType.TABLE, Privilege.DROP.toString()));
     } catch (AnalysisException e) {
       if (ifExists_ && analyzer.getMissingTbls().isEmpty()) return;
       throw e;

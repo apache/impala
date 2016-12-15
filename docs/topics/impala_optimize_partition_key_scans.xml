@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.5.0 IMPALA-2499" id="optimize_partition_key_scans">
+
+  <title>OPTIMIZE_PARTITION_KEY_SCANS Query Option (<keyword keyref="impala25"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>OPTIMIZE_PARTITION_KEY_SCANS</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.5.0 IMPALA-2499">
+      <indexterm audience="Cloudera">OPTIMIZE_PARTITION_KEY_SCANS query option</indexterm>
+      Enables a fast code path for queries that apply simple aggregate functions to partition key
+      columns: <codeph>MIN(<varname>key_column</varname>)</codeph>, <codeph>MAX(<varname>key_column</varname>)</codeph>,
+      or <codeph>COUNT(DISTINCT <varname>key_column</varname>)</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+
+    <note conref="../shared/impala_common.xml#common/one_but_not_true"/>
+
+    <p conref="../shared/impala_common.xml#common/added_in_250"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      This optimization speeds up common <q>introspection</q> operations when using queries
+      to calculate the cardinality and range for partition key columns.
+    </p>
+
+    <p>
+      This optimization does not apply if the queries contain any <codeph>WHERE</codeph>,
+      <codeph>GROUP BY</codeph>, or <codeph>HAVING</codeph> clause. The relevant queries
+      should only compute the minimum, maximum, or number of distinct values for the
+      partition key columns across the whole table.
+    </p>
+
+    <p>
+      This optimization is enabled by a query option because it skips some consistency checks
+      and therefore can return slightly different partition values if partitions are in the
+      process of being added, dropped, or loaded outside of Impala. Queries might exhibit different
+      behavior depending on the setting of this option in the following cases:
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          If files are removed from a partition using HDFS or other non-Impala operations,
+          there is a period until the next <codeph>REFRESH</codeph> of the table where regular
+          queries fail at run time because they detect the missing files. With this optimization
+          enabled, queries that evaluate only the partition key column values (not the contents of
+          the partition itself) succeed, and treat the partition as if it still exists.
+        </p>
+      </li>
+      <li>
+        <p>
+          If a partition contains any data files, but the data files do not contain any rows,
+          a regular query considers that the partition does not exist. With this optimization
+          enabled, the partition is treated as if it exists.
+        </p>
+        <p>
+          If the partition includes no files at all, this optimization does not change the query
+          behavior: the partition is considered to not exist whether or not this optimization is enabled.
+        </p>
+      </li>
+    </ul>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following example shows initial schema setup and the default behavior of queries that
+      return just the partition key column for a table:
+    </p>
+
+<codeblock>
+-- Make a partitioned table with 3 partitions.
+create table t1 (s string) partitioned by (year int);
+insert into t1 partition (year=2015) values ('last year');
+insert into t1 partition (year=2016) values ('this year');
+insert into t1 partition (year=2017) values ('next year');
+
+-- Regardless of the option setting, this query must read the
+-- data files to know how many rows to return for each year value.
+explain select year from t1;
++-----------------------------------------------------+
+| Explain String                                      |
++-----------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=0B VCores=0 |
+|                                                     |
+| F00:PLAN FRAGMENT [UNPARTITIONED]                   |
+|   00:SCAN HDFS [key_cols.t1]                        |
+|      partitions=3/3 files=4 size=40B                |
+|      table stats: 3 rows total                      |
+|      column stats: all                              |
+|      hosts=3 per-host-mem=unavailable               |
+|      tuple-ids=0 row-size=4B cardinality=3          |
++-----------------------------------------------------+
+
+-- The aggregation operation means the query does not need to read
+-- the data within each partition: the result set contains exactly 1 row
+-- per partition, derived from the partition key column value.
+-- By default, Impala still includes a 'scan' operation in the query.
+explain select distinct year from t1;
++------------------------------------------------------------------------------------+
+| Explain String                                                                     |
++------------------------------------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=0B VCores=0                                |
+|                                                                                    |
+| 01:AGGREGATE [FINALIZE]                                                            |
+| |  group by: year                                                                  |
+| |                                                                                  |
+| 00:SCAN HDFS [key_cols.t1]                                                         |
+|    partitions=0/0 files=0 size=0B                                                  |
++------------------------------------------------------------------------------------+
+</codeblock>
+
+    <p>
+      The following examples show how the plan is made more efficient when the
+      <codeph>OPTIMIZE_PARTITION_KEY_SCANS</codeph> option is enabled:
+    </p>
+
+<codeblock>
+set optimize_partition_key_scans=1;
+OPTIMIZE_PARTITION_KEY_SCANS set to 1
+
+-- The aggregation operation is turned into a UNION internally,
+-- with constant values known in advance based on the metadata
+-- for the partitioned table.
+explain select distinct year from t1;
++-----------------------------------------------------+
+| Explain String                                      |
++-----------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=0B VCores=0 |
+|                                                     |
+| F00:PLAN FRAGMENT [UNPARTITIONED]                   |
+|   01:AGGREGATE [FINALIZE]                           |
+|   |  group by: year                                 |
+|   |  hosts=1 per-host-mem=unavailable               |
+|   |  tuple-ids=1 row-size=4B cardinality=3          |
+|   |                                                 |
+|   00:UNION                                          |
+|      constant-operands=3                            |
+|      hosts=1 per-host-mem=unavailable               |
+|      tuple-ids=0 row-size=4B cardinality=3          |
++-----------------------------------------------------+
+
+-- The same optimization applies to other aggregation queries
+-- that only return values based on partition key columns:
+-- MIN, MAX, COUNT(DISTINCT), and so on.
+explain select min(year) from t1;
++-----------------------------------------------------+
+| Explain String                                      |
++-----------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=0B VCores=0 |
+|                                                     |
+| F00:PLAN FRAGMENT [UNPARTITIONED]                   |
+|   01:AGGREGATE [FINALIZE]                           |
+|   |  output: min(year)                              |
+|   |  hosts=1 per-host-mem=unavailable               |
+|   |  tuple-ids=1 row-size=4B cardinality=1          |
+|   |                                                 |
+|   00:UNION                                          |
+|      constant-operands=3                            |
+|      hosts=1 per-host-mem=unavailable               |
+|      tuple-ids=0 row-size=4B cardinality=3          |
++-----------------------------------------------------+
+</codeblock>
+
+  </conbody>
+</concept>

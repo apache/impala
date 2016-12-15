@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.2.1" id="offset">
+
+  <title>OFFSET Clause</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Reports"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>OFFSET</codeph> clause in a <codeph>SELECT</codeph> query causes the result set to start some
+      number of rows after the logical first item. The result set is numbered starting from zero, so <codeph>OFFSET
+      0</codeph> produces the same result as leaving out the <codeph>OFFSET</codeph> clause. Always use this clause
+      in combination with <codeph>ORDER BY</codeph> (so that it is clear which item should be first, second, and so
+      on) and <codeph>LIMIT</codeph> (so that the result set covers a bounded range, such as items 0-9, 100-199,
+      and so on).
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/limit_and_offset"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following example shows how you could run a <q>paging</q> query originally written for a traditional
+      database application. Because typical Impala queries process megabytes or gigabytes of data and read large
+      data files from disk each time, it is inefficient to run a separate query to retrieve each small group of
+      items. Use this technique only for compatibility while porting older applications, then rewrite the
+      application code to use a single query with a large result set, and display pages of results from the cached
+      result set.
+    </p>
+
+<codeblock>[localhost:21000] &gt; create table numbers (x int);
+[localhost:21000] &gt; insert into numbers select x from very_long_sequence;
+Inserted 1000000 rows in 1.34s
+[localhost:21000] &gt; select x from numbers order by x limit 5 offset 0;
++----+
+| x  |
++----+
+| 1  |
+| 2  |
+| 3  |
+| 4  |
+| 5  |
++----+
+[localhost:21000] &gt; select x from numbers order by x limit 5 offset 5;
++----+
+| x  |
++----+
+| 6  |
+| 7  |
+| 8  |
+| 9  |
+| 10 |
++----+
+</codeblock>
+  </conbody>
+</concept>

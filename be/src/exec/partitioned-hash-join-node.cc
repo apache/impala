@@ -135,14 +135,16 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
 
   num_probe_rows_partitioned_ =
       ADD_COUNTER(runtime_profile(), "ProbeRowsPartitioned", TUnit::UNIT);
-  if (!state->codegen_enabled()) {
-    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
-  }
+  AddCodegenDisabledMessage(state);
   return Status::OK();
 }
 
 void PartitionedHashJoinNode::Codegen(RuntimeState* state) {
-  DCHECK(state->codegen_enabled());
+  DCHECK(state->ShouldCodegen());
+  // Codegen the children node;
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
 
@@ -152,11 +154,8 @@ void PartitionedHashJoinNode::Codegen(RuntimeState* state) {
   // Codegen the probe side.
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
   Status probe_codegen_status = CodegenProcessProbeBatch(codegen, prefetch_mode);
-  runtime_profile()->AddCodegenMsg(probe_codegen_status.ok(), probe_codegen_status,
-      "Probe Side");
-
-  // Codegen the children node;
-  ExecNode::Codegen(state);
+  runtime_profile()->AddCodegenMsg(
+      probe_codegen_status.ok(), probe_codegen_status, "Probe Side");
 }
 
 Status PartitionedHashJoinNode::Open(RuntimeState* state) {

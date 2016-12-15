@@ -1,0 +1,852 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="glossary">
+
+  <title>Impala Glossary</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <section id="glos_ddl">
+
+      <title>DDL</title>
+
+      <p>
+        A category of SQL statements involving administrative or metadata-related operations. Many of these
+        statements start with the keywords <codeph>CREATE</codeph>, <codeph>ALTER</codeph>, or
+        <codeph>DROP</codeph>. Contrast with DML.
+      </p>
+    </section>
+
+    <section id="glos_dml">
+
+      <title>DML</title>
+
+      <p>
+        A category of SQL statements that modify table data. Impala has a limited set of DML statements, primarily
+        the <codeph>INSERT</codeph> statement. Contrast with DDL.
+      </p>
+    </section>
+
+    <section id="glos_catalog">
+
+      <title>catalog</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_catalogd">
+
+      <title>catalogd</title>
+
+      <p>
+        A daemon.
+      </p>
+    </section>
+
+    <section id="glos_impalad">
+
+      <title>impalad</title>
+
+      <p>
+        A daemon.
+      </p>
+    </section>
+
+    <section id="glos_statestored">
+
+      <title>statestored</title>
+
+      <p>
+        A daemon.
+      </p>
+    </section>
+
+    <section id="glos_statestore">
+
+      <title>statestore</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_metastore">
+
+      <title>metastore</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_table">
+
+      <title>table</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_database">
+
+      <title>database</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_hive">
+
+      <title>Hive</title>
+
+      <p>
+        Its full trademarked name is Apache Hive.
+      </p>
+    </section>
+
+    <section id="glos_hbase">
+
+      <title>HBase</title>
+
+      <p>
+        Its full trademarked name is Apache HBase.
+      </p>
+    </section>
+
+    <section id="glos_coordinator_node">
+
+      <title>coordinator node</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_sql">
+
+      <title>SQL</title>
+
+      <p>
+        An acronym for Structured Query Language, the industry standard language for database operations.
+        Implemented by components such as Impala and Hive.
+      </p>
+    </section>
+
+    <section id="glos_avro">
+
+      <title>Avro</title>
+
+      <p>
+        A file format.
+      </p>
+    </section>
+
+    <section id="glos_text">
+
+      <title>text</title>
+
+      <p>
+        A file format.
+      </p>
+    </section>
+
+    <section id="glos_hdfs">
+
+      <title>HDFS</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_block">
+
+      <title>block</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_parquet">
+
+      <title>Parquet</title>
+
+      <p>
+        A file format.
+      </p>
+    </section>
+
+    <section id="glos_rcfile">
+
+      <title>RCFile</title>
+
+      <p>
+        A file format.
+      </p>
+    </section>
+
+    <section id="glos_sequencefile">
+
+      <title>SequenceFile</title>
+
+      <p>
+        A file format.
+      </p>
+    </section>
+
+    <section id="glos_snappy">
+
+      <title>Snappy</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_file_format">
+
+      <title>file format</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_compression">
+
+      <title>compression</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_codec">
+
+      <title>codec</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_lzo">
+
+      <title>LZO</title>
+
+      <p>
+        A compression codec.
+      </p>
+    </section>
+
+    <section id="glos_gzip">
+
+      <title>gzip</title>
+
+      <p>
+        A compression codec.
+      </p>
+    </section>
+
+    <section id="glos_bzip2">
+
+      <title>BZip2</title>
+
+      <p>
+        A compression codec.
+      </p>
+    </section>
+
+    <section id="glos_sentry">
+
+      <title/>
+
+      <p></p>
+    </section>
+
+    <section id="glos_authorization">
+
+      <title>authorization</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_authentication">
+
+      <title>authentication</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_delegation">
+
+      <title>delegation</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_skew">
+
+      <title>skew</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_profile">
+
+      <title>profile</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_query">
+
+      <title>query</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_external_table">
+
+      <title>external table</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_internal_table">
+
+      <title>internal table</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_view">
+
+      <title>view</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_function">
+
+      <title>function</title>
+
+      <p>
+        In Impala, a kind of database object that performs customized processing or business logic. The kinds of
+        functions include built-in functions, UDFs, and UDAs.
+      </p>
+    </section>
+
+    <section id="glos_udf">
+
+      <title>UDF</title>
+
+      <p>
+        Acronym for user-defined function. In Impala, a function that you write in C++ or Java. A UDF (as opposed
+        to a UDA) returns a single scalar value for each row evaluated in the result set. On occasion, UDF is used
+        in a broad context to include all kinds of user-written functions, including UDAs.
+      </p>
+    </section>
+
+    <section id="glos_uda">
+
+      <title>UDA</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_aggregate_function">
+
+      <title>aggregate function</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_built_in_function">
+
+      <title>built-in function</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_analytic_function">
+
+      <title>analytic function</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_admission_control">
+
+      <title>admission control</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_llama">
+
+      <title>llama</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_impala">
+
+      <title>Impala</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_table_statistics">
+
+      <title>table statistics</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_column_statistics">
+
+      <title>column statistics</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_statistics">
+
+      <title>statistics</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_incremental_statistics">
+
+      <title>incremental statistics</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_hdfs_caching">
+
+      <title>HDFS caching</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_join_query">
+
+      <title>join query</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_straight_join">
+
+      <title>straight join</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_inner_join">
+
+      <title>inner join</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_outer_join">
+
+      <title>outer join</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_left_join">
+
+      <title>left join</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_right_join">
+
+      <title>right join</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_equijoin">
+
+      <title>equijoin</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_antijoin">
+
+      <title>antijoin</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_semijoin">
+
+      <title>semijoin</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_cross_join">
+
+      <title>cross join</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_hint">
+
+      <title>hint</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_distinct">
+
+      <title>distinct</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_impala_shell">
+
+      <title>impala-shell</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_odbc">
+
+      <title>ODBC</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_jdbc">
+
+      <title>JDBC</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_data_types">
+
+      <title>data types</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_performance">
+
+      <title>performance</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_scalability">
+
+      <title>scalability</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_hue">
+
+      <title>Hue</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_partition">
+
+      <title>partition</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_partitioning">
+
+      <title>partitioning</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_partitioned_table">
+
+      <title>partitioned table</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_hdfs_trashcan">
+
+      <title>HDFS trashcan</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_explain_plan">
+
+      <title>EXPLAIN plan</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_summary">
+
+      <title>summary</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_executive_summary">
+
+      <title>executive summary</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_alias">
+
+      <title>alias</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_identifier">
+
+      <title>identifier</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_query_option">
+
+      <title>query option</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_daemon">
+
+      <title>daemon</title>
+
+      <p>
+        The daemons that make up the Impala service are <cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>,
+        and <cmdname>catalogd</cmdname>.
+      </p>
+    </section>
+
+    <section id="impala_service">
+
+      <title>Impala service</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_session">
+
+      <title>session</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_schema">
+
+      <title>schema</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_schema_evolution">
+
+      <title>schema evolution</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_literal">
+
+      <title>literal</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_string">
+
+      <title>string</title>
+
+      <p>
+        String values are represented in Impala by the data types <codeph>STRING</codeph>,
+        <codeph>VARCHAR</codeph>, and <codeph>CHAR</codeph>.
+      </p>
+    </section>
+
+    <section id="glos_number">
+
+      <title>number</title>
+
+      <p>
+        Numeric values are represented in Impala by the data types <codeph>INT</codeph>, <codeph>BIGINT</codeph>,
+        <codeph>SMALLINT</codeph>, <codeph>TINYINT</codeph>, <codeph>DECIMAL</codeph>, <codeph>DOUBLE</codeph>, and
+        <codeph>FLOAT</codeph>.
+      </p>
+    </section>
+
+    <section id="glos_date_time">
+
+      <title>date/time</title>
+
+      <p>
+        Date and time values are represented in Impala by the <codeph>TIMESTAMP</codeph> data type. Sometimes, for
+        convenience or as part of a partitioning plan, dates are represented as formatted <codeph>STRING</codeph>
+        columns or as separate integer columns for year, month, and day.
+      </p>
+    </section>
+
+    <section id="glos_cancel">
+
+      <title>cancel</title>
+
+      <p>
+        Halting an Impala query before it is completely finished.
+      </p>
+    </section>
+
+    <section id="glos_streaming">
+
+      <title>streaming</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_sorting">
+
+      <title>sorting</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_aggregation">
+
+      <title>aggregation</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_fragment">
+
+      <title>fragment</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_source">
+
+      <title>source</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_sink">
+
+      <title>sink</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_thrift">
+
+      <title>Thrift</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_delegation">
+
+      <title>delegation</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_authorization">
+
+      <title>authorization</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_authentication">
+
+      <title>authentication</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_partition_pruning">
+
+      <title>partition pruning</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_heartbeat">
+
+      <title>heartbeat</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_subscriber">
+
+      <title>subscriber</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_topic">
+
+      <title>topic</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_broadcast_join">
+
+      <title>broadcast join</title>
+
+      <p></p>
+    </section>
+
+    <section id="glos_shuffle_join">
+
+      <title>shuffle join</title>
+
+      <p></p>
+    </section>
+
+<!-- Use as a template for new definitions:
+    <section id="glos_">
+      <title></title>
+      <p>
+      </p>
+    </section>
+
+-->
+  </conbody>
+</concept>

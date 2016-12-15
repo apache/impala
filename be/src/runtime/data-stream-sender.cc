@@ -381,25 +381,24 @@ DataStreamSender::~DataStreamSender() {
   }
 }
 
-Status DataStreamSender::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
-  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
+Status DataStreamSender::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   state_ = state;
   SCOPED_TIMER(profile_->total_time_counter());
 
-  RETURN_IF_ERROR(Expr::Prepare(partition_expr_ctxs_, state, row_desc_, mem_tracker));
+  RETURN_IF_ERROR(
+      Expr::Prepare(partition_expr_ctxs_, state, row_desc_, mem_tracker_.get()));
 
-  bytes_sent_counter_ =
-      ADD_COUNTER(profile(), "BytesSent", TUnit::BYTES);
+  bytes_sent_counter_ = ADD_COUNTER(profile(), "BytesSent", TUnit::BYTES);
   uncompressed_bytes_counter_ =
       ADD_COUNTER(profile(), "UncompressedRowBatchSize", TUnit::BYTES);
-  serialize_batch_timer_ =
-      ADD_TIMER(profile(), "SerializeBatchTime");
-  thrift_transmit_timer_ = profile()->AddConcurrentTimerCounter("TransmitDataRPCTime",
-      TUnit::TIME_NS);
+  serialize_batch_timer_ = ADD_TIMER(profile(), "SerializeBatchTime");
+  thrift_transmit_timer_ =
+      profile()->AddConcurrentTimerCounter("TransmitDataRPCTime", TUnit::TIME_NS);
   network_throughput_ =
       profile()->AddDerivedCounter("NetworkThroughput(*)", TUnit::BYTES_PER_SECOND,
           bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_sent_counter_,
-                        thrift_transmit_timer_));
+                                       thrift_transmit_timer_));
   overall_throughput_ =
       profile()->AddDerivedCounter("OverallThroughput", TUnit::BYTES_PER_SECOND,
            bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_sent_counter_,

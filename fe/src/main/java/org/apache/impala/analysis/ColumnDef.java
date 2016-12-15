@@ -18,21 +18,26 @@
 package org.apache.impala.analysis;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
+import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
+import org.apache.kudu.ColumnSchema.Encoding;
 
 /**
  * Represents a column definition in a CREATE/ALTER TABLE/VIEW statement.
@@ -40,31 +45,89 @@ import org.apache.impala.util.MetaStoreUtil;
  * whereas column definitions in CREATE/ALTER VIEW statements infer the column type from
  * the corresponding view definition. All column definitions have an optional comment.
  * Since a column definition refers a column stored in the Metastore, the column name
- * must be valid according to the Metastore's rules (see @MetaStoreUtils).
+ * must be valid according to the Metastore's rules (see @MetaStoreUtils). A number of
+ * additional column options may be specified for Kudu tables.
  */
 public class ColumnDef {
   private final String colName_;
-  private String comment_;
-
   // Required in CREATE/ALTER TABLE stmts. Set to NULL in CREATE/ALTER VIEW stmts,
   // for which we setType() after analyzing the defining view definition stmt.
   private final TypeDef typeDef_;
   private Type type_;
+  private String comment_;
 
-  // Set to true if the user specified "PRIMARY KEY" in the column definition. Kudu table
-  // definitions may use this.
-  private boolean isPrimaryKey_;
-
-  public ColumnDef(String colName, TypeDef typeDef, String comment) {
-    this(colName, typeDef, false, comment);
+  // Available column options
+  public enum Option {
+    IS_PRIMARY_KEY,
+    IS_NULLABLE,
+    ENCODING,
+    COMPRESSION,
+    DEFAULT,
+    BLOCK_SIZE,
+    COMMENT
   }
 
-  public ColumnDef(String colName, TypeDef typeDef, boolean isPrimaryKey,
-      String comment) {
+  // Kudu-specific column options
+  //
+  // Set to true if the user specified "PRIMARY KEY" in the column definition.
+  private boolean isPrimaryKey_;
+  // Set to true if this column may contain null values. Can be NULL if
+  // not specified.
+  private Boolean isNullable_;
+  private String encodingVal_;
+  // Encoding for this column; set in analysis.
+  private Encoding encoding_;
+  private String compressionVal_;
+  // Compression algorithm for this column; set in analysis.
+  private CompressionAlgorithm compression_;
+  // Default value for this column.
+  private Expr defaultValue_;
+  // Desired block size for this column.
+  private LiteralExpr blockSize_;
+
+  public ColumnDef(String colName, TypeDef typeDef, Map<Option, Object> options) {
+    Preconditions.checkNotNull(options);
     colName_ = colName.toLowerCase();
     typeDef_ = typeDef;
-    isPrimaryKey_ = isPrimaryKey;
-    comment_ = comment;
+    for (Map.Entry<Option, Object> option: options.entrySet()) {
+      switch (option.getKey()) {
+        case IS_PRIMARY_KEY:
+          Preconditions.checkState(option.getValue() instanceof Boolean);
+          isPrimaryKey_ = (Boolean) option.getValue();
+          break;
+        case IS_NULLABLE:
+          Preconditions.checkState(option.getValue() instanceof Boolean);
+          isNullable_ = (Boolean) option.getValue();
+          break;
+        case ENCODING:
+          Preconditions.checkState(option.getValue() instanceof String);
+          encodingVal_ = ((String) option.getValue()).toUpperCase();
+          break;
+        case COMPRESSION:
+          Preconditions.checkState(option.getValue() instanceof String);
+          compressionVal_ = ((String) option.getValue()).toUpperCase();
+          break;
+        case DEFAULT:
+          Preconditions.checkState(option.getValue() instanceof Expr);
+          defaultValue_ = (Expr) option.getValue();
+          break;
+        case BLOCK_SIZE:
+          Preconditions.checkState(option.getValue() instanceof LiteralExpr);
+          blockSize_ = (LiteralExpr) option.getValue();
+          break;
+        case COMMENT:
+          Preconditions.checkState(option.getValue() instanceof String);
+          comment_ = (String) option.getValue();
+          break;
+        default:
+          throw new IllegalStateException(String.format("Illegal option %s",
+              option.getKey()));
+      }
+    }
+  }
+
+  public ColumnDef(String colName, TypeDef typeDef) {
+    this(colName, typeDef, Collections.<Option, Object>emptyMap());
   }
 
   /**
@@ -81,8 +144,7 @@ public class ColumnDef {
     colName_ = fs.getName();
     typeDef_ = new TypeDef(type);
     comment_ = fs.getComment();
-    isPrimaryKey_ = false;
-    analyze();
+    analyze(null);
   }
 
   public String getColName() { return colName_; }
@@ -92,8 +154,18 @@ public class ColumnDef {
   boolean isPrimaryKey() { return isPrimaryKey_; }
   public void setComment(String comment) { comment_ = comment; }
   public String getComment() { return comment_; }
+  public boolean hasKuduOptions() {
+    return isPrimaryKey() || isNullabilitySet() || hasEncoding() || hasCompression()
+        || hasDefaultValue() || hasBlockSize();
+  }
+  public boolean hasEncoding() { return encodingVal_ != null; }
+  public boolean hasCompression() { return compressionVal_ != null; }
+  public boolean hasBlockSize() { return blockSize_ != null; }
+  public boolean isNullabilitySet() { return isNullable_ != null; }
+  public boolean isNullable() { return isNullabilitySet() && isNullable_; }
+  public boolean hasDefaultValue() { return defaultValue_ != null; }
 
-  public void analyze() throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     // Check whether the column name meets the Metastore's requirements.
     if (!MetaStoreUtils.validateName(colName_, null)) {
       throw new AnalysisException("Invalid column/field name: " + colName_);
@@ -112,6 +184,10 @@ public class ColumnDef {
           "%s has %d characters.", colName_, MetaStoreUtil.MAX_TYPE_NAME_LENGTH,
           typeSql, typeSql.length()));
     }
+    if (hasKuduOptions()) {
+      Preconditions.checkNotNull(analyzer);
+      analyzeKuduOptions(analyzer);
+    }
     if (comment_ != null &&
         comment_.length() > MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH) {
       throw new AnalysisException(String.format(
@@ -121,15 +197,93 @@ public class ColumnDef {
     }
   }
 
+  private void analyzeKuduOptions(Analyzer analyzer) throws AnalysisException {
+    if (isPrimaryKey_ && isNullable_ != null && isNullable_) {
+      throw new AnalysisException("Primary key columns cannot be nullable: " +
+          toString());
+    }
+    // Encoding value
+    if (encodingVal_ != null) {
+      try {
+        encoding_ = Encoding.valueOf(encodingVal_);
+      } catch (IllegalArgumentException e) {
+        throw new AnalysisException(String.format("Unsupported encoding value '%s'. " +
+            "Supported encoding values are: %s", encodingVal_,
+            Joiner.on(", ").join(Encoding.values())));
+      }
+    }
+    // Compression algorithm
+    if (compressionVal_ != null) {
+      try {
+        compression_ = CompressionAlgorithm.valueOf(compressionVal_);
+      } catch (IllegalArgumentException e) {
+        throw new AnalysisException(String.format("Unsupported compression " +
+            "algorithm '%s'. Supported compression algorithms are: %s", compressionVal_,
+            Joiner.on(", ").join(CompressionAlgorithm.values())));
+      }
+    }
+    // Analyze the default value, if any.
+    // TODO: Similar checks are applied for range partition values in
+    // RangePartition.analyzeBoundaryValue(). Consider consolidating the logic into a
+    // single function.
+    if (defaultValue_ != null) {
+      try {
+        defaultValue_.analyze(analyzer);
+      } catch (AnalysisException e) {
+        throw new AnalysisException(String.format("Only constant values are allowed " +
+            "for default values: %s", defaultValue_.toSql()), e);
+      }
+      if (!defaultValue_.isConstant()) {
+        throw new AnalysisException(String.format("Only constant values are allowed " +
+            "for default values: %s", defaultValue_.toSql()));
+      }
+      defaultValue_ = LiteralExpr.create(defaultValue_, analyzer.getQueryCtx());
+      if (defaultValue_ == null) {
+        throw new AnalysisException(String.format("Only constant values are allowed " +
+            "for default values: %s", defaultValue_.toSql()));
+      }
+      if (defaultValue_.getType().isNull() && ((isNullable_ != null && !isNullable_)
+          || isPrimaryKey_)) {
+        throw new AnalysisException(String.format("Default value of NULL not allowed " +
+            "on non-nullable column: '%s'", getColName()));
+      }
+      if (!Type.isImplicitlyCastable(defaultValue_.getType(), type_, true)) {
+        throw new AnalysisException(String.format("Default value %s (type: %s) " +
+            "is not compatible with column '%s' (type: %s).", defaultValue_.toSql(),
+            defaultValue_.getType().toSql(), colName_, type_.toSql()));
+      }
+      if (!defaultValue_.getType().equals(type_)) {
+        Expr castLiteral = defaultValue_.uncheckedCastTo(type_);
+        Preconditions.checkNotNull(castLiteral);
+        defaultValue_ = LiteralExpr.create(castLiteral, analyzer.getQueryCtx());
+      }
+      Preconditions.checkNotNull(defaultValue_);
+    }
+
+    // Analyze the block size value, if any.
+    if (blockSize_ != null) {
+      blockSize_.analyze(null);
+      if (!blockSize_.getType().isIntegerType()) {
+        throw new AnalysisException(String.format("Invalid value for BLOCK_SIZE: %s. " +
+            "A positive INTEGER value is expected.", blockSize_.toSql()));
+      }
+    }
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder(colName_).append(" ");
     if (type_ != null) {
-      sb.append(type_);
+      sb.append(type_.toSql());
     } else {
-      sb.append(typeDef_);
+      sb.append(typeDef_.toSql());
     }
     if (isPrimaryKey_) sb.append(" PRIMARY KEY");
+    if (isNullable_ != null) sb.append(isNullable_ ? " NULL" : " NOT NULL");
+    if (encoding_ != null) sb.append(" ENCODING " + encoding_.toString());
+    if (compression_ != null) sb.append(" COMPRESSION " + compression_.toString());
+    if (defaultValue_ != null) sb.append(" DEFAULT " + defaultValue_.toSql());
+    if (blockSize_ != null) sb.append(" BLOCK_SIZE " + blockSize_.toSql());
     if (comment_ != null) sb.append(String.format(" COMMENT '%s'", comment_));
     return sb.toString();
   }
@@ -146,12 +300,21 @@ public class ColumnDef {
         .append(isPrimaryKey_, rhs.isPrimaryKey_)
         .append(typeDef_, rhs.typeDef_)
         .append(type_, rhs.type_)
+        .append(isNullable_, rhs.isNullable_)
+        .append(encoding_, rhs.encoding_)
+        .append(compression_, rhs.compression_)
+        .append(defaultValue_, rhs.defaultValue_)
+        .append(blockSize_, rhs.blockSize_)
         .isEquals();
   }
 
   public TColumn toThrift() {
-    TColumn col = new TColumn(new TColumn(getColName(), type_.toThrift()));
-    col.setComment(getComment());
+    TColumn col = new TColumn(getColName(), type_.toThrift());
+    Integer blockSize =
+        blockSize_ == null ? null : (int) ((NumericLiteral) blockSize_).getIntValue();
+    KuduUtil.setColumnOptions(col, isPrimaryKey_, isNullable_, encoding_,
+        compression_, defaultValue_, blockSize);
+    if (comment_ != null) col.setComment(comment_);
     return col;
   }
 

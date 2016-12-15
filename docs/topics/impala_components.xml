@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="intro_components">
+
+  <title>Components of the Impala Server</title>
+  <titlealts audience="PDF"><navtitle>Components</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Concepts"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The Impala server is a distributed, massively parallel processing (MPP) database engine. It consists of
+      different daemon processes that run on specific hosts within your CDH cluster.
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="intro_impalad">
+
+    <title>The Impala Daemon</title>
+
+    <conbody>
+
+      <p>
+        The core Impala component is a daemon process that runs on each DataNode of the cluster, physically represented
+        by the <codeph>impalad</codeph> process. It reads and writes to data files; accepts queries transmitted
+        from the <codeph>impala-shell</codeph> command, Hue, JDBC, or ODBC; parallelizes the queries and
+        distributes work across the cluster; and transmits intermediate query results back to the
+        central coordinator node.
+      </p>
+
+      <p>
+        You can submit a query to the Impala daemon running on any DataNode, and that instance of the daemon serves as the
+        <term>coordinator node</term> for that query. The other nodes transmit partial results back to the
+        coordinator, which constructs the final result set for a query. When running experiments with functionality
+        through the <codeph>impala-shell</codeph> command, you might always connect to the same Impala daemon for
+        convenience. For clusters running production workloads, you might load-balance by
+        submitting each query to a different Impala daemon in round-robin style, using the JDBC or ODBC interfaces.
+      </p>
+
+      <p>
+        The Impala daemons are in constant communication with the <term>statestore</term>, to confirm which nodes
+        are healthy and can accept new work.
+      </p>
+
+      <p rev="1.2">
+        They also receive broadcast messages from the <cmdname>catalogd</cmdname> daemon (introduced in Impala 1.2)
+        whenever any Impala node in the cluster creates, alters, or drops any type of object, or when an
+        <codeph>INSERT</codeph> or <codeph>LOAD DATA</codeph> statement is processed through Impala. This
+        background communication minimizes the need for <codeph>REFRESH</codeph> or <codeph>INVALIDATE
+        METADATA</codeph> statements that were needed to coordinate metadata across nodes prior to Impala 1.2.
+      </p>
+
+      <p>
+        <b>Related information:</b> <xref href="impala_config_options.xml#config_options"/>,
+        <xref href="impala_processes.xml#processes"/>, <xref href="impala_timeouts.xml#impalad_timeout"/>,
+        <xref href="impala_ports.xml#ports"/>, <xref href="impala_proxy.xml#proxy"/>
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="intro_statestore">
+
+    <title>The Impala Statestore</title>
+
+    <conbody>
+
+      <p>
+        The Impala component known as the <term>statestore</term> checks on the health of Impala daemons on all the
+        DataNodes in a cluster, and continuously relays its findings to each of those daemons. It is physically
+        represented by a daemon process named <codeph>statestored</codeph>; you only need such a process on one
+        host in the cluster. If an Impala daemon goes offline due to hardware failure, network error, software issue,
+        or other reason, the statestore informs all the other Impala daemons so that future queries can avoid making
+        requests to the unreachable node.
+      </p>
+
+      <p>
+        Because the statestore's purpose is to help when things go wrong, it is not critical to the normal
+        operation of an Impala cluster. If the statestore is not running or becomes unreachable, the Impala daemons
+        continue running and distributing work among themselves as usual; the cluster just becomes less robust if
+        other Impala daemons fail while the statestore is offline. When the statestore comes back online, it re-establishes
+        communication with the Impala daemons and resumes its monitoring function.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/statestored_catalogd_ha_blurb"/>
+
+      <p>
+        <b>Related information:</b>
+      </p>
+
+      <p>
+        <xref href="impala_scalability.xml#statestore_scalability"/>,
+        <xref href="impala_config_options.xml#config_options"/>, <xref href="impala_processes.xml#processes"/>,
+        <xref href="impala_timeouts.xml#statestore_timeout"/>, <xref href="impala_ports.xml#ports"/>
+      </p>
+    </conbody>
+  </concept>
+
+  <concept rev="1.2" id="intro_catalogd">
+
+    <title>The Impala Catalog Service</title>
+
+    <conbody>
+
+      <p>
+        The Impala component known as the <term>catalog service</term> relays the metadata changes from Impala SQL
+        statements to all the DataNodes in a cluster. It is physically represented by a daemon process named
+        <codeph>catalogd</codeph>; you only need such a process on one host in the cluster. Because the requests
+        are passed through the statestore daemon, it makes sense to run the <cmdname>statestored</cmdname> and
+        <cmdname>catalogd</cmdname> services on the same host.
+      </p>
+
+      <p>
+        The catalog service avoids the need to issue
+        <codeph>REFRESH</codeph> and <codeph>INVALIDATE METADATA</codeph> statements when the metadata changes are
+        performed by statements issued through Impala. When you create a table, load data, and so on through Hive,
+        you do need to issue <codeph>REFRESH</codeph> or <codeph>INVALIDATE METADATA</codeph> on an Impala node
+        before executing a query there.
+      </p>
+
+      <p>
+        This feature touches a number of aspects of Impala:
+      </p>
+
+<!-- This was formerly a conref, but since the list of links also included a link
+     to this same topic, materializing the list here and removing that
+     circular link. (The conref is still used in Incompatible Changes.)
+
+      <ul conref="../shared/impala_common.xml#common/catalogd_xrefs">
+        <li/>
+      </ul>
+-->
+
+      <ul id="catalogd_xrefs">
+        <li>
+          <p>
+            See <xref href="impala_install.xml#install"/>, <xref href="impala_upgrading.xml#upgrading"/> and
+            <xref href="impala_processes.xml#processes"/>, for usage information for the
+            <cmdname>catalogd</cmdname> daemon.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            The <codeph>REFRESH</codeph> and <codeph>INVALIDATE METADATA</codeph> statements are not needed
+            when the <codeph>CREATE TABLE</codeph>, <codeph>INSERT</codeph>, or other table-changing or
+            data-changing operation is performed through Impala. These statements are still needed if such
+            operations are done through Hive or by manipulating data files directly in HDFS, but in those cases the
+            statements only need to be issued on one Impala node rather than on all nodes. See
+            <xref href="impala_refresh.xml#refresh"/> and
+            <xref href="impala_invalidate_metadata.xml#invalidate_metadata"/> for the latest usage information for
+            those statements.
+          </p>
+        </li>
+      </ul>
+
+      <p conref="../shared/impala_common.xml#common/load_catalog_in_background"/>
+
+      <p conref="../shared/impala_common.xml#common/statestored_catalogd_ha_blurb"/>
+
+      <note>
+        <p conref="../shared/impala_common.xml#common/catalog_server_124"/>
+      </note>
+
+      <p>
+        <b>Related information:</b> <xref href="impala_config_options.xml#config_options"/>,
+        <xref href="impala_processes.xml#processes"/>, <xref href="impala_ports.xml#ports"/>
+      </p>
+    </conbody>
+  </concept>
+</concept>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.4.0" id="drop_role">
+
+  <title>DROP ROLE Statement (<keyword keyref="impala20"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>DROP ROLE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Sentry"/>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Roles"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+      <!-- Consider whether to go deeper into categories like Security for the Sentry-related statements. -->
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">DROP ROLE statement</indexterm>
+<!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
+      The <codeph>DROP ROLE</codeph> statement removes a role from the metastore database. Once dropped, the role
+      is revoked for all users to whom it was previously assigned, and all privileges granted to that role are
+      revoked. Queries that are already executing are not affected. Impala verifies the role information
+      approximately every 60 seconds, so the effects of <codeph>DROP ROLE</codeph> might not take effect for new
+      Impala queries for a brief period.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>DROP ROLE <varname>role_name</varname>
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
+
+    <p>
+      Only administrative users (initially, a predefined set of users specified in the Sentry service configuration
+      file) can use this statement.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
+
+    <p>
+      Impala makes use of any roles and privileges specified by the <codeph>GRANT</codeph> and
+      <codeph>REVOKE</codeph> statements in Hive, and Hive makes use of any roles and privileges specified by the
+      <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Impala. The Impala <codeph>GRANT</codeph>
+      and <codeph>REVOKE</codeph> statements for privileges do not require the <codeph>ROLE</codeph> keyword to be
+      repeated before each role name, unlike the equivalent Hive statements.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_authorization.xml#authorization"/>, <xref href="impala_grant.xml#grant"/>
+      <xref href="impala_revoke.xml#revoke"/>, <xref href="impala_create_role.xml#create_role"/>,
+      <xref href="impala_show.xml#show"/>
+    </p>
+
+<!-- To do: nail down the new SHOW syntax, e.g. SHOW ROLES, SHOW CURRENT ROLES, SHOW GROUPS. -->
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
+
+  </conbody>
+</concept>

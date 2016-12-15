@@ -227,8 +227,8 @@ class ParquetColumnReader {
   /// Returns true if this column reader has reached the end of the row group.
   inline bool RowGroupAtEnd() { return rep_level_ == HdfsParquetScanner::ROW_GROUP_END; }
 
-  /// Transfers the remaining resources backing tuples to the given row batch,
-  /// and frees up other resources.
+  /// If 'row_batch' is non-NULL, transfers the remaining resources backing tuples to it,
+  /// and frees up other resources. If 'row_batch' is NULL frees all resources instead.
   virtual void Close(RowBatch* row_batch) = 0;
 
  protected:
@@ -343,10 +343,12 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   }
 
   virtual void Close(RowBatch* row_batch) {
-    if (decompressed_data_pool_.get() != NULL) {
+    if (row_batch != nullptr) {
       row_batch->tuple_data_pool()->AcquireData(decompressed_data_pool_.get(), false);
+    } else {
+      decompressed_data_pool_->FreeAll();
     }
-    if (decompressor_.get() != NULL) decompressor_->Close();
+    if (decompressor_ != nullptr) decompressor_->Close();
   }
 
   int64_t total_len() const { return metadata_->total_compressed_size; }
@@ -438,15 +440,6 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// 'size' bytes remaining.
   virtual Status InitDataPage(uint8_t* data, int size) = 0;
 
- private:
-  /// Writes the next value into *slot using pool if necessary. Also advances rep_level_
-  /// and def_level_ via NextLevels().
-  ///
-  /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
-  /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
-  /// true.
-  template <bool IN_COLLECTION>
-  inline bool ReadSlot(void* slot, MemPool* pool);
 };
 
 /// Collections are not materialized directly in parquet files; only scalar values appear
@@ -509,12 +502,13 @@ class CollectionColumnReader : public ParquetColumnReader {
   void UpdateDerivedState();
 
   /// Recursively reads from children_ to assemble a single CollectionValue into
-  /// *slot. Also advances rep_level_ and def_level_ via NextLevels().
+  /// the appropriate destination slot in 'tuple'. Also advances rep_level_ and
+  /// def_level_ via NextLevels().
   ///
   /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
-  inline bool ReadSlot(void* slot, MemPool* pool);
+  inline bool ReadSlot(Tuple* tuple, MemPool* pool);
 };
 
 }

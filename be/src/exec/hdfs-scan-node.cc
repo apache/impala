@@ -64,15 +64,6 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       all_ranges_started_(false),
       thread_avail_cb_id_(-1),
       max_num_scanner_threads_(CpuInfo::num_cores()) {
-  max_materialized_row_batches_ = FLAGS_max_row_batches;
-  if (max_materialized_row_batches_ <= 0) {
-    // TODO: This parameter has an U-shaped effect on performance: increasing the value
-    // would first improve performance, but further increasing would degrade performance.
-    // Investigate and tune this.
-    max_materialized_row_batches_ =
-        10 * (DiskInfo::num_disks() + DiskIoMgr::REMOTE_NUM_DISKS);
-  }
-  materialized_row_batches_.reset(new RowBatchQueue(max_materialized_row_batches_));
 }
 
 HdfsScanNode::~HdfsScanNode() {
@@ -148,6 +139,27 @@ Status HdfsScanNode::GetNextInternal(
   *eos = true;
   unique_lock<mutex> l(lock_);
   return status_;
+}
+
+Status HdfsScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  int default_max_row_batches = FLAGS_max_row_batches;
+  if (default_max_row_batches <= 0) {
+    default_max_row_batches = 10 * (DiskInfo::num_disks() + DiskIoMgr::REMOTE_NUM_DISKS);
+  }
+  if (state->query_options().__isset.mt_dop && state->query_options().mt_dop > 0) {
+    // To avoid a significant memory increase, adjust the number of maximally queued
+    // row batches per scan instance based on MT_DOP. The max materialized row batches
+    // is at least 2 to allow for some parallelism between the producer/consumer.
+    max_materialized_row_batches_ =
+        max(2, default_max_row_batches / state->query_options().mt_dop);
+  } else {
+    max_materialized_row_batches_ = default_max_row_batches;
+  }
+  VLOG_QUERY << "Max row batch queue size for scan node '" << id_
+      << "' in fragment instance '" << state->fragment_instance_id()
+      << "': " << max_materialized_row_batches_;
+  materialized_row_batches_.reset(new RowBatchQueue(max_materialized_row_batches_));
+  return HdfsScanNodeBase::Init(tnode, state);
 }
 
 Status HdfsScanNode::Prepare(RuntimeState* state) {
@@ -356,7 +368,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
 
 void HdfsScanNode::ScannerThread() {
   SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
-  SCOPED_TIMER(runtime_state_->total_cpu_timer());
+  SCOPED_THREAD_COUNTER_MEASUREMENT(runtime_state_->total_thread_statistics());
 
   // Make thread-local copy of filter contexts to prune scan ranges, and to pass to the
   // scanner for finer-grained filtering.
@@ -386,8 +398,8 @@ void HdfsScanNode::ScannerThread() {
           runtime_state_->resource_pool()->ReleaseThreadToken(false);
           if (filter_status.ok()) {
             for (auto& ctx: filter_ctxs) {
-              ctx.expr->FreeLocalAllocations();
-              ctx.expr->Close(runtime_state_);
+              ctx.expr_ctx->FreeLocalAllocations();
+              ctx.expr_ctx->Close(runtime_state_);
             }
           }
           return;
@@ -458,8 +470,8 @@ void HdfsScanNode::ScannerThread() {
 
   if (filter_status.ok()) {
     for (auto& ctx: filter_ctxs) {
-      ctx.expr->FreeLocalAllocations();
-      ctx.expr->Close(runtime_state_);
+      ctx.expr_ctx->FreeLocalAllocations();
+      ctx.expr_ctx->Close(runtime_state_);
     }
   }
 
@@ -489,7 +501,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
   HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
   DCHECK(partition != NULL) << "table_id=" << hdfs_table_->id()
                             << " partition_id=" << partition_id
-                            << "\n" << PrintThrift(runtime_state_->fragment_params());
+                            << "\n" << PrintThrift(runtime_state_->instance_ctx());
 
   // IMPALA-3798: Filtering before the scanner is created can cause hangs if a header
   // split is filtered out, for sequence-based file formats. If the scanner does not

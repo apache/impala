@@ -22,7 +22,7 @@ import java.util.List;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
-/*
+/**
  * Class used to authorize access to a URI.
  */
 public class AuthorizeableUri extends Authorizeable {

@@ -61,14 +61,16 @@ class KuduScanner {
  private:
   /// Handles the case where the projection is empty (e.g. count(*)).
   /// Does this by adding sets of rows to 'row_batch' instead of adding one-by-one.
-  Status HandleEmptyProjection(RowBatch* row_batch, bool* batch_done);
+  Status HandleEmptyProjection(RowBatch* row_batch);
 
   /// Decodes rows previously fetched from kudu, now in 'cur_rows_' into a RowBatch.
   ///  - 'batch' is the batch that will point to the new tuples.
   ///  - *tuple_mem should be the location to output tuples.
-  ///  - Sets 'batch_done' to true to indicate that the batch was filled to capacity or
-  ///    the limit was reached.
-  Status DecodeRowsIntoRowBatch(RowBatch* batch, Tuple** tuple_mem, bool* batch_done);
+  /// Returns OK when one of the following conditions occur:
+  ///  - cur_kudu_batch_ is fully consumed
+  ///  - batch is full
+  ///  - scan_node_ limit has been reached
+  Status DecodeRowsIntoRowBatch(RowBatch* batch, Tuple** tuple_mem);
 
   /// Fetches the next batch of rows from the current kudu::client::KuduScanner.
   Status GetNextScannerBatch();

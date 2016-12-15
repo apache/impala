@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="secure_files">
+
+  <title>Securing Impala Data and Log Files</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Logs"/>
+      <data name="Category" value="HDFS"/>
+      <data name="Category" value="Administrators"/>
+      <!-- To do for John: mention redaction as a fallback to keep sensitive info out of the log files. -->
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      One aspect of security is to protect files from unauthorized access at the filesystem level. For example, if
+      you store sensitive data in HDFS, you specify permissions on the associated files and directories in HDFS to
+      restrict read and write permissions to the appropriate users and groups.
+    </p>
+
+    <p>
+      If you issue queries containing sensitive values in the <codeph>WHERE</codeph> clause, such as financial
+      account numbers, those values are stored in Impala log files in the Linux filesystem and you must secure
+      those files also. For the locations of Impala log files, see <xref href="impala_logging.xml#logging"/>.
+    </p>
+
+    <p>
+      All Impala read and write operations are performed under the filesystem privileges of the
+      <codeph>impala</codeph> user. The <codeph>impala</codeph> user must be able to read all directories and data
+      files that you query, and write into all the directories and data files for <codeph>INSERT</codeph> and
+      <codeph>LOAD DATA</codeph> statements. At a minimum, make sure the <codeph>impala</codeph> user is in the
+      <codeph>hive</codeph> group so that it can access files and directories shared between Impala and Hive. See
+      <xref href="impala_prereqs.xml#prereqs_account"/> for more details.
+    </p>
+
+    <p>
+      Setting file permissions is necessary for Impala to function correctly, but is not an effective security
+      practice by itself:
+    </p>
+
+    <ul>
+      <li>
+      <p>
+        The way to ensure that only authorized users can submit requests for databases and tables they are allowed
+        to access is to set up Sentry authorization, as explained in
+        <xref href="impala_authorization.xml#authorization"/>. With authorization enabled, the checking of the user
+        ID and group is done by Impala, and unauthorized access is blocked by Impala itself. The actual low-level
+        read and write requests are still done by the <codeph>impala</codeph> user, so you must have appropriate
+        file and directory permissions for that user ID.
+      </p>
+      </li>
+
+      <li>
+      <p>
+        You must also set up Kerberos authentication, as described in <xref href="impala_kerberos.xml#kerberos"/>,
+        so that users can only connect from trusted hosts. With Kerberos enabled, if someone connects a new host to
+        the network and creates user IDs that match your privileged IDs, they will be blocked from connecting to
+        Impala at all from that host.
+      </p>
+      </li>
+    </ul>
+  </conbody>
+</concept>

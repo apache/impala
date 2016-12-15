@@ -93,7 +93,7 @@ def parse_query_test_file(file_name, valid_section_names=None, encoding=None):
   section_names = valid_section_names
   if section_names is None:
     section_names = ['QUERY', 'RESULTS', 'TYPES', 'LABELS', 'SETUP', 'CATCH', 'ERRORS',
-        'USER', 'RUNTIME_PROFILE', 'SHELL']
+        'USER', 'RUNTIME_PROFILE', 'SHELL', 'DML_RESULTS']
   return parse_test_file(file_name, section_names, encoding=encoding,
       skip_unknown_sections=False)
 
@@ -225,7 +225,22 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
           parsed_sections['CATCH'].extend(lines_content)
         else:
           raise RuntimeError, 'Unknown subsection comment: %s' % subsection_comment
+        for exception_str in parsed_sections['CATCH']:
+          assert exception_str.strip(), "Empty exception string."
         continue
+
+      # The DML_RESULTS section is used to specify what the state of the table should be
+      # after executing a DML query (in the QUERY section). The target table name must
+      # be specified in a table comment, and then the expected rows in the table are the
+      # contents of the section. If the TYPES and LABELS sections are provided, they
+      # will be verified against the DML_RESULTS. Using both DML_RESULTS and RESULTS is
+      # not supported.
+      if subsection_name == 'DML_RESULTS':
+        if subsection_comment is None or subsection_comment == '':
+          raise RuntimeError, 'DML_RESULTS requires that the table is specified ' \
+              'in the comment.'
+        parsed_sections['DML_RESULTS_TABLE'] = subsection_comment
+        parsed_sections['VERIFIER'] = 'VERIFY_IS_EQUAL_SORTED'
 
       parsed_sections[subsection_name] = subsection_str
 

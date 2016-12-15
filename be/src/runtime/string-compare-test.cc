@@ -28,8 +28,15 @@ namespace impala {
 // Expect that strncmp() and StringCompare() return the same result.
 static void RunTestCase(const string& l, const string& r) {
   int cmp_len = ::min(l.size(), r.size());
-  EXPECT_EQ(strncmp(l.c_str(), r.c_str(), cmp_len),
-      StringCompare(l.c_str(), l.size(), r.c_str(), r.size(), cmp_len));
+  int strncmp_r = strncmp(l.c_str(), r.c_str(), cmp_len);
+  int stringcompare_r = StringCompare(l.c_str(), l.size(), r.c_str(), r.size(), cmp_len);
+  if (strncmp_r == 0) {
+    EXPECT_EQ(stringcompare_r, 0) << l << " " << r;
+  } else if (strncmp_r > 0) {
+    EXPECT_GT(stringcompare_r, 0) << l << " " << r;
+  } else {
+    EXPECT_LT(stringcompare_r, 0) << l << " " << r;
+  }
 }
 
 TEST(StringCompareTest, Basic) {

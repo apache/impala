@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="databases">
+
+  <title>Overview of Impala Databases</title>
+  <titlealts audience="PDF"><navtitle>Databases</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Databases"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      In Impala, a database is a logical container for a group of tables. Each database defines a separate
+      namespace. Within a database, you can refer to the tables inside it using their unqualified names. Different
+      databases can contain tables with identical names.
+    </p>
+
+    <p>
+      Creating a database is a lightweight operation. There are minimal database-specific properties to configure,
+      only <codeph>LOCATION</codeph> and <codeph>COMMENT</codeph>.  There is no <codeph>ALTER DATABASE</codeph> statement.
+    </p>
+
+    <p>
+      Typically, you create a separate database for each project or application, to avoid naming conflicts between
+      tables and to make clear which tables are related to each other. The <codeph>USE</codeph> statement lets
+      you switch between databases. Unqualified references to tables, views, and functions refer to objects
+      within the current database. You can also refer to objects in other databases by using qualified names
+      of the form <codeph><varname>dbname</varname>.<varname>object_name</varname></codeph>.
+    </p>
+
+    <p>
+      Each database is physically represented by a directory in HDFS. When you do not specify a <codeph>LOCATION</codeph>
+      attribute, the directory is located in the Impala data directory with the associated tables managed by Impala.
+      When you do specify a <codeph>LOCATION</codeph> attribute, any read and write operations for tables in that
+      database are relative to the specified HDFS directory.
+    </p>
+
+    <p>
+      There is a special database, named <codeph>default</codeph>, where you begin when you connect to Impala.
+      Tables created in <codeph>default</codeph> are physically located one level higher in HDFS than all the
+      user-created databases.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/builtins_db"/>
+
+    <p>
+      <b>Related statements:</b>
+    </p>
+
+    <p>
+      <xref href="impala_create_database.xml#create_database"/>,
+      <xref href="impala_drop_database.xml#drop_database"/>, <xref href="impala_use.xml#use"/>,
+      <xref href="impala_show.xml#show_databases"/>
+    </p>
+  </conbody>
+</concept>

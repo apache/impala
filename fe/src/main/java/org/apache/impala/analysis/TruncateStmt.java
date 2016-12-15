@@ -17,19 +17,13 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTruncateParams;
+
 import com.google.common.base.Preconditions;
-import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 
 /**
  * Representation of a TRUNCATE statement.

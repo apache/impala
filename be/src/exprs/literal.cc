@@ -18,12 +18,15 @@
 #include "literal.h"
 
 #include <sstream>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
+#include "runtime/timestamp-parse-util.h"
+#include "gen-cpp/Exprs_types.h"
 
 #include "common/names.h"
 
@@ -120,6 +123,14 @@ Literal::Literal(const TExprNode& node)
       }
       break;
     }
+    case TYPE_TIMESTAMP: {
+      DCHECK_EQ(node.node_type, TExprNodeType::TIMESTAMP_LITERAL);
+      DCHECK(node.__isset.timestamp_literal);
+      const string& ts_val = node.timestamp_literal.value;
+      DCHECK_EQ(type_.GetSlotSize(), ts_val.size());
+      memcpy(&value_.timestamp_val, ts_val.data(), type_.GetSlotSize());
+      break;
+    }
     default:
       DCHECK(false) << "Invalid type: " << TypeToString(type_.type);
   }
@@ -197,11 +208,31 @@ Literal::Literal(ColumnType type, const StringValue& v) : Expr(type) {
   DCHECK(type.type == TYPE_STRING || type.type == TYPE_CHAR) << type;
 }
 
+Literal::Literal(ColumnType type, const TimestampValue& v)
+  : Expr(type) {
+  DCHECK_EQ(type.type, TYPE_TIMESTAMP) << type;
+  value_.timestamp_val = v;
+}
+
+bool Literal::IsLiteral() const {
+  return true;
+}
+
 template<class T>
 bool ParseString(const string& str, T* val) {
   istringstream stream(str);
   stream >> *val;
   return !stream.fail();
+}
+
+template<>
+bool ParseString(const string& str, TimestampValue* val) {
+  boost::gregorian::date date;
+  boost::posix_time::time_duration time;
+  bool success = TimestampParser::Parse(str.data(), str.length(), &date, &time);
+  val->set_date(date);
+  val->set_time(time);
+  return success;
 }
 
 Literal* Literal::CreateLiteral(const ColumnType& type, const string& str) {
@@ -246,8 +277,8 @@ Literal* Literal::CreateLiteral(const ColumnType& type, const string& str) {
     case TYPE_CHAR:
       return new Literal(type, str);
     case TYPE_TIMESTAMP: {
-      double v = 0;
-      DCHECK(ParseString<double>(str, &v));
+      TimestampValue v;
+      DCHECK(ParseString<TimestampValue>(str, &v));
       return new Literal(type, v);
     }
     case TYPE_DECIMAL: {
@@ -319,6 +350,13 @@ DecimalVal Literal::GetDecimalVal(ExprContext* context, const TupleRow* row) {
   return DecimalVal();
 }
 
+TimestampVal Literal::GetTimestampVal(ExprContext* context, const TupleRow* row) {
+  DCHECK_EQ(type_.type, TYPE_TIMESTAMP) << type_;
+  TimestampVal result;
+  value_.timestamp_val.ToTimestampVal(&result);
+  return result;
+}
+
 string Literal::DebugString() const {
   stringstream out;
   out << "Literal(value=";
@@ -361,6 +399,9 @@ string Literal::DebugString() const {
         default:
           DCHECK(false) << type_.DebugString();
       }
+      break;
+    case TYPE_TIMESTAMP:
+      out << value_.timestamp_val;
       break;
     default:
       out << "[bad type! " << type_ << "]";
@@ -431,6 +472,12 @@ Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
         default:
           DCHECK(false) << type_.DebugString();
       }
+      break;
+    case TYPE_TIMESTAMP:
+      v.SetTimeOfDay(builder.getInt64(
+          *reinterpret_cast<const int64_t*>(&value_.timestamp_val.time())));
+      v.SetDate(builder.getInt32(
+          *reinterpret_cast<const int32_t*>(&value_.timestamp_val.date())));
       break;
     default:
       stringstream ss;

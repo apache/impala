@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="disable_codegen">
+
+  <title>DISABLE_CODEGEN Query Option</title>
+  <titlealts audience="PDF"><navtitle>DISABLE_CODEGEN</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Performance"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">DISABLE_CODEGEN query option</indexterm>
+      This is a debug option, intended for diagnosing and working around issues that cause crashes. If a query
+      fails with an <q>illegal instruction</q> or other hardware-specific message, try setting
+      <codeph>DISABLE_CODEGEN=true</codeph> and running the query again. If the query succeeds only when the
+      <codeph>DISABLE_CODEGEN</codeph> option is turned on, submit the problem to <keyword keyref="support_org"/> and include that
+      detail in the problem report. Do not otherwise run with this setting turned on, because it results in lower
+      overall performance.
+    </p>
+
+    <p>
+      Because the code generation phase adds a small amount of overhead for each query, you might turn on the
+      <codeph>DISABLE_CODEGEN</codeph> option to achieve maximum throughput when running many short-lived queries
+      against small tables.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+
+  </conbody>
+</concept>

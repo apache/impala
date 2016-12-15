@@ -755,13 +755,18 @@ Status HashTableCtx::CodegenEvalRow(LlvmCodeGen* codegen, bool build, Function**
     if (!status.ok()) {
       (*fn)->eraseFromParent(); // deletes function
       *fn = NULL;
-      return Status(Substitute("Problem with HashTableCtx::CodegenEvalRow(): $0",
-          status.GetDetail()));
+      return Status(Substitute(
+          "Problem with HashTableCtx::CodegenEvalRow(): $0", status.GetDetail()));
     }
 
-    Value* get_expr_ctx_args[] = { this_ptr, codegen->GetIntConstant(TYPE_INT, i) };
+    // Avoid bloating function by inlining too many exprs into it.
+    if (i >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) {
+      codegen->SetNoInline(expr_fn);
+    }
+
+    Value* get_expr_ctx_args[] = {this_ptr, codegen->GetIntConstant(TYPE_INT, i)};
     Value* ctx_arg = builder.CreateCall(get_expr_ctx_fn, get_expr_ctx_args, "expr_ctx");
-    Value* expr_fn_args[] = { ctx_arg, row };
+    Value* expr_fn_args[] = {ctx_arg, row};
     CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(
         codegen, &builder, ctxs[i]->root()->type(), expr_fn, expr_fn_args, "result");
     Value* is_null = result.GetIsNull();
@@ -800,10 +805,15 @@ Status HashTableCtx::CodegenEvalRow(LlvmCodeGen* codegen, bool build, Function**
   }
   builder.CreateRet(has_null);
 
+  // Avoid inlining a large EvalRow() function into caller.
+  if (ctxs.size() > LlvmCodeGen::CODEGEN_INLINE_EXPR_BATCH_THRESHOLD) {
+    codegen->SetNoInline(*fn);
+  }
+
   *fn = codegen->FinalizeFunction(*fn);
   if (*fn == NULL) {
     return Status("Codegen'd HashTableCtx::EvalRow() function failed verification, "
-        "see log");
+                  "see log");
   }
   return Status::OK();
 }
@@ -972,6 +982,11 @@ Status HashTableCtx::CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur, Funct
   }
 
   builder.CreateRet(hash_result);
+
+  // Avoid inlining into caller if there are many exprs.
+  if (build_expr_ctxs_.size() > LlvmCodeGen::CODEGEN_INLINE_EXPR_BATCH_THRESHOLD) {
+    codegen->SetNoInline(*fn);
+  }
   *fn = codegen->FinalizeFunction(*fn);
   if (*fn == NULL) {
     return Status(
@@ -1095,12 +1110,16 @@ Status HashTableCtx::CodegenEquals(LlvmCodeGen* codegen, bool force_null_equalit
     if (!status.ok()) {
       (*fn)->eraseFromParent(); // deletes function
       *fn = NULL;
-      return Status(Substitute("Problem with HashTableCtx::CodegenEquals: $0",
-          status.GetDetail()));
+      return Status(
+          Substitute("Problem with HashTableCtx::CodegenEquals: $0", status.GetDetail()));
+    }
+    if (build_expr_ctxs_.size() > LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) {
+      // Avoid bloating function by inlining too many exprs into it.
+      codegen->SetNoInline(expr_fn);
     }
 
     // Load ExprContext* from 'build_expr_ctxs_'.
-    Value* get_expr_ctx_args[] = { this_ptr, codegen->GetIntConstant(TYPE_INT, i) };
+    Value* get_expr_ctx_args[] = {this_ptr, codegen->GetIntConstant(TYPE_INT, i)};
     Value* ctx_arg = builder.CreateCall(get_expr_ctx_fn, get_expr_ctx_args, "expr_ctx");
 
     // Evaluate the expression.
@@ -1156,10 +1175,14 @@ Status HashTableCtx::CodegenEquals(LlvmCodeGen* codegen, bool force_null_equalit
   builder.SetInsertPoint(false_block);
   builder.CreateRet(codegen->false_value());
 
+  // Avoid inlining into caller if it is large.
+  if (build_expr_ctxs_.size() > LlvmCodeGen::CODEGEN_INLINE_EXPR_BATCH_THRESHOLD) {
+    codegen->SetNoInline(*fn);
+  }
   *fn = codegen->FinalizeFunction(*fn);
   if (*fn == NULL) {
     return Status("Codegen'd HashTableCtx::Equals() function failed verification, "
-        "see log");
+                  "see log");
   }
   return Status::OK();
 }

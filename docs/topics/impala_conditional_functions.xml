@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?><!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="conditional_functions">
+
+  <title>Impala Conditional Functions</title>
+  <titlealts audience="PDF"><navtitle>Conditional Functions</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Impala supports the following conditional functions for testing equality, comparison operators, and nullity:
+    </p>
+
+    <dl>
+      <dlentry id="case">
+
+        <dt>
+          <codeph>CASE a WHEN b THEN c [WHEN d THEN e]... [ELSE f] END</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">CASE expression</indexterm>
+          <b>Purpose:</b> Compares an expression to one or more possible values, and returns a corresponding result
+          when a match is found.
+          <p conref="../shared/impala_common.xml#common/return_same_type"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            In this form of the <codeph>CASE</codeph> expression, the initial value <codeph>A</codeph>
+            being evaluated for each row it typically a column reference, or an expression involving
+            a column. This form can only compare against a set of specified values, not ranges,
+            multi-value comparisons such as <codeph>BETWEEN</codeph> or <codeph>IN</codeph>,
+            regular expressions, or <codeph>NULL</codeph>.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            Although this example is split across multiple lines, you can put any or all parts of a <codeph>CASE</codeph> expression
+            on a single line, with no punctuation or other separators between the <codeph>WHEN</codeph>,
+            <codeph>ELSE</codeph>, and <codeph>END</codeph> clauses.
+          </p>
+<codeblock>select case x
+    when 1 then 'one'
+    when 2 then 'two'
+    when 0 then 'zero'
+    else 'out of range'
+  end
+    from t1;
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="case2">
+
+        <dt>
+          <codeph>CASE WHEN a THEN b [WHEN c THEN d]... [ELSE e] END</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">CASE expression</indexterm>
+          <b>Purpose:</b> Tests whether any of a sequence of expressions is true, and returns a corresponding
+          result for the first true expression.
+          <p conref="../shared/impala_common.xml#common/return_same_type"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            <codeph>CASE</codeph> expressions without an initial test value have more flexibility.
+            For example, they can test different columns in different <codeph>WHEN</codeph> clauses,
+            or use comparison operators such as <codeph>BETWEEN</codeph>, <codeph>IN</codeph> and <codeph>IS NULL</codeph>
+            rather than comparing against discrete values.
+          </p>
+          <p>
+            <codeph>CASE</codeph> expressions are often the foundation of long queries that
+            summarize and format results for easy-to-read reports. For example, you might
+            use a <codeph>CASE</codeph> function call to turn values from a numeric column
+            into category strings corresponding to integer values, or labels such as <q>Small</q>,
+            <q>Medium</q> and <q>Large</q> based on ranges. Then subsequent parts of the
+            query might aggregate based on the transformed values, such as how many
+            values are classified as small, medium, or large. You can also use <codeph>CASE</codeph>
+            to signal problems with out-of-bounds values, <codeph>NULL</codeph> values,
+            and so on.
+          </p>
+          <p>
+            By using operators such as <codeph>OR</codeph>, <codeph>IN</codeph>,
+            <codeph>REGEXP</codeph>, and so on in <codeph>CASE</codeph> expressions,
+            you can build extensive tests and transformations into a single query.
+            Therefore, applications that construct SQL statements often rely heavily on <codeph>CASE</codeph>
+            calls in the generated SQL code.
+          </p>
+          <p>
+            Because this flexible form of the <codeph>CASE</codeph> expressions allows you to perform
+            many comparisons and call multiple functions when evaluating each row, be careful applying
+            elaborate <codeph>CASE</codeph> expressions to queries that process large amounts of data.
+            For example, when practical, evaluate and transform values through <codeph>CASE</codeph>
+            after applying operations such as aggregations that reduce the size of the result set;
+            transform numbers to strings after performing joins with the original numeric values.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            Although this example is split across multiple lines, you can put any or all parts of a <codeph>CASE</codeph> expression
+            on a single line, with no punctuation or other separators between the <codeph>WHEN</codeph>,
+            <codeph>ELSE</codeph>, and <codeph>END</codeph> clauses.
+          </p>
+<codeblock>select case
+    when dayname(now()) in ('Saturday','Sunday') then 'result undefined on weekends'
+    when x > y then 'x greater than y'
+    when x = y then 'x and y are equal'
+    when x is null or y is null then 'one of the columns is null'
+    else null
+  end
+    from t1;
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="coalesce">
+
+        <dt>
+          <codeph>coalesce(type v1, type v2, ...)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">coalesce() function</indexterm>
+          <b>Purpose:</b> Returns the first specified argument that is not <codeph>NULL</codeph>, or
+          <codeph>NULL</codeph> if all arguments are <codeph>NULL</codeph>.
+          <p conref="../shared/impala_common.xml#common/return_same_type"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="2.0.0" id="decode">
+
+        <dt>
+          <codeph>decode(type expression, type search1, type result1 [, type search2, type result2 ...] [, type
+          default] )</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">decode() function</indexterm>
+          <b>Purpose:</b> Compares an expression to one or more possible values, and returns a corresponding result
+          when a match is found.
+          <p conref="../shared/impala_common.xml#common/return_same_type"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            Can be used as shorthand for a <codeph>CASE</codeph> expression.
+          </p>
+          <p>
+            The original expression and the search expressions must of the same type or convertible types. The
+            result expression can be a different type, but all result expressions must be of the same type.
+          </p>
+          <p>
+            Returns a successful match If the original expression is <codeph>NULL</codeph> and a search expression
+            is also <codeph>NULL</codeph>. the
+          </p>
+          <p>
+            Returns <codeph>NULL</codeph> if the final <codeph>default</codeph> value is omitted and none of the
+            search expressions match the original expression.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following example translates numeric day values into descriptive names:
+          </p>
+<codeblock>SELECT event, decode(day_of_week, 1, "Monday", 2, "Tuesday", 3, "Wednesday",
+  4, "Thursday", 5, "Friday", 6, "Saturday", 7, "Sunday", "Unknown day")
+  FROM calendar;
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="if">
+
+        <dt>
+          <codeph>if(boolean condition, type ifTrue, type ifFalseOrNull)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">if() function</indexterm>
+          <b>Purpose:</b> Tests an expression and returns a corresponding result depending on whether the result is
+          true, false, or <codeph>NULL</codeph>.
+          <p>
+            <b>Return type:</b> Same as the <codeph>ifTrue</codeph> argument value
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="1.3.0" id="ifnull">
+
+        <dt>
+          <codeph>ifnull(type a, type ifNull)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">isnull() function</indexterm>
+          <b>Purpose:</b> Alias for the <codeph>isnull()</codeph> function, with the same behavior. To simplify
+          porting SQL with vendor extensions to Impala.
+          <p conref="../shared/impala_common.xml#common/added_in_130"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="isfalse" rev="2.2.0">
+
+        <dt>
+          <codeph>isfalse(<varname>boolean</varname>)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">isfalse() function</indexterm>
+          <b>Purpose:</b> Tests if a Boolean expression is <codeph>false</codeph> or not.
+          Returns <codeph>true</codeph> if so.
+          If the argument is <codeph>NULL</codeph>, returns <codeph>false</codeph>.
+          Identical to <codeph>isnottrue()</codeph>, except it returns the opposite value for a <codeph>NULL</codeph> argument.
+          <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
+          <p conref="../shared/impala_common.xml#common/added_in_220"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="isnotfalse" rev="2.2.0">
+
+        <dt>
+          <codeph>isnotfalse(<varname>boolean</varname>)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">isnotfalse() function</indexterm>
+          <b>Purpose:</b> Tests if a Boolean expression is not <codeph>false</codeph> (that is, either <codeph>true</codeph> or <codeph>NULL</codeph>).
+          Returns <codeph>true</codeph> if so.
+          If the argument is <codeph>NULL</codeph>, returns <codeph>true</codeph>.
+          Identical to <codeph>istrue()</codeph>, except it returns the opposite value for a <codeph>NULL</codeph> argument.
+          <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
+          <p conref="../shared/impala_common.xml#common/for_compatibility_only"/>
+          <p conref="../shared/impala_common.xml#common/added_in_220"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="isnottrue" rev="2.2.0">
+
+        <dt>
+          <codeph>isnottrue(<varname>boolean</varname>)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">isnottrue() function</indexterm>
+          <b>Purpose:</b> Tests if a Boolean expression is not <codeph>true</codeph> (that is, either <codeph>false</codeph> or <codeph>NULL</codeph>).
+          Returns <codeph>true</codeph> if so.
+          If the argument is <codeph>NULL</codeph>, returns <codeph>true</codeph>.
+          Identical to <codeph>isfalse()</codeph>, except it returns the opposite value for a <codeph>NULL</codeph> argument.
+          <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
+          <p conref="../shared/impala_common.xml#common/added_in_220"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="isnull">
+
+        <dt>
+          <codeph>isnull(type a, type ifNull)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">isnull() function</indexterm>
+          <b>Purpose:</b> Tests if an expression is <codeph>NULL</codeph>, and returns the expression result value
+          if not. If the first argument is <codeph>NULL</codeph>, returns the second argument.
+          <p>
+            <b>Compatibility notes:</b> Equivalent to the <codeph>nvl()</codeph> function from Oracle Database or
+            <codeph>ifnull()</codeph> from MySQL. The <codeph>nvl()</codeph> and <codeph>ifnull()</codeph>
+            functions are also available in Impala.
+          </p>
+          <p>
+            <b>Return type:</b> Same as the first argument value
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="istrue" rev="2.2.0">
+
+        <dt>
+          <codeph>istrue(<varname>boolean</varname>)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">istrue() function</indexterm>
+          <b>Purpose:</b> Tests if a Boolean expression is <codeph>true</codeph> or not.
+          Returns <codeph>true</codeph> if so.
+          If the argument is <codeph>NULL</codeph>, returns <codeph>false</codeph>.
+          Identical to <codeph>isnotfalse()</codeph>, except it returns the opposite value for a <codeph>NULL</codeph> argument.
+          <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
+          <p conref="../shared/impala_common.xml#common/for_compatibility_only"/>
+          <p conref="../shared/impala_common.xml#common/added_in_220"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="nonnullvalue" rev="2.2.0">
+
+        <dt>
+          <codeph>nonnullvalue(<varname>expression</varname>)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">function</indexterm>
+          <b>Purpose:</b> Tests if an expression (of any type) is <codeph>NULL</codeph> or not.
+          Returns <codeph>false</codeph> if so.
+          The converse of <codeph>nullvalue()</codeph>.
+          <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
+          <p conref="../shared/impala_common.xml#common/for_compatibility_only"/>
+          <p conref="../shared/impala_common.xml#common/added_in_220"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="1.3.0" id="nullif">
+
+        <dt>
+          <codeph>nullif(<varname>expr1</varname>,<varname>expr2</varname>)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">nullif() function</indexterm>
+          <b>Purpose:</b> Returns <codeph>NULL</codeph> if the two specified arguments are equal. If the specified
+          arguments are not equal, returns the value of <varname>expr1</varname>. The data types of the expressions
+          must be compatible, according to the conversion rules from <xref href="impala_datatypes.xml#datatypes"/>.
+          You cannot use an expression that evaluates to <codeph>NULL</codeph> for <varname>expr1</varname>; that
+          way, you can distinguish a return value of <codeph>NULL</codeph> from an argument value of
+          <codeph>NULL</codeph>, which would never match <varname>expr2</varname>.
+          <p>
+            <b>Usage notes:</b> This function is effectively shorthand for a <codeph>CASE</codeph> expression of
+            the form:
+          </p>
+<codeblock>CASE
+  WHEN <varname>expr1</varname> = <varname>expr2</varname> THEN NULL
+  ELSE <varname>expr1</varname>
+END</codeblock>
+          <p>
+            It is commonly used in division expressions, to produce a <codeph>NULL</codeph> result instead of a
+            divide-by-zero error when the divisor is equal to zero:
+          </p>
+<codeblock>select 1.0 / nullif(c1,0) as reciprocal from t1;</codeblock>
+          <p>
+            You might also use it for compatibility with other database systems that support the same
+            <codeph>NULLIF()</codeph> function.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_same_type"/>
+          <p conref="../shared/impala_common.xml#common/added_in_130"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="1.3.0" id="nullifzero">
+
+        <dt>
+          <codeph>nullifzero(<varname>numeric_expr</varname>)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">nullifzero() function</indexterm>
+          <b>Purpose:</b> Returns <codeph>NULL</codeph> if the numeric expression evaluates to 0, otherwise returns
+          the result of the expression.
+          <p>
+            <b>Usage notes:</b> Used to avoid error conditions such as divide-by-zero in numeric calculations.
+            Serves as shorthand for a more elaborate <codeph>CASE</codeph> expression, to simplify porting SQL with
+            vendor extensions to Impala.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_same_type"/>
+          <p conref="../shared/impala_common.xml#common/added_in_130"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="nullvalue" rev="2.2.0">
+
+        <dt>
+          <codeph>nullvalue(<varname>expression</varname>)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">function</indexterm>
+          <b>Purpose:</b> Tests if an expression (of any type) is <codeph>NULL</codeph> or not.
+          Returns <codeph>true</codeph> if so.
+          The converse of <codeph>nonnullvalue()</codeph>.
+          <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
+          <p conref="../shared/impala_common.xml#common/for_compatibility_only"/>
+          <p conref="../shared/impala_common.xml#common/added_in_220"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="nvl" rev="1.1">
+
+        <dt>
+          <codeph>nvl(type a, type ifNull)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">nvl() function</indexterm>
+          <b>Purpose:</b> Alias for the <codeph>isnull()</codeph> function. Tests if an expression is
+          <codeph>NULL</codeph>, and returns the expression result value if not. If the first argument is
+          <codeph>NULL</codeph>, returns the second argument. Equivalent to the <codeph>nvl()</codeph> function
+          from Oracle Database or <codeph>ifnull()</codeph> from MySQL.
+          <p>
+            <b>Return type:</b> Same as the first argument value
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_11"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="1.3.0" id="zeroifnull">
+
+        <dt>
+          <codeph>zeroifnull(<varname>numeric_expr</varname>)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">zeroifnull() function</indexterm>
+          <b>Purpose:</b> Returns 0 if the numeric expression evaluates to <codeph>NULL</codeph>, otherwise returns
+          the result of the expression.
+          <p>
+            <b>Usage notes:</b> Used to avoid unexpected results due to unexpected propagation of
+            <codeph>NULL</codeph> values in numeric calculations. Serves as shorthand for a more elaborate
+            <codeph>CASE</codeph> expression, to simplify porting SQL with vendor extensions to Impala.
+          </p>
+          <p conref="../shared/impala_common.xml#common/return_same_type"/>
+          <p conref="../shared/impala_common.xml#common/added_in_130"/>
+        </dd>
+
+      </dlentry>
+    </dl>
+  </conbody>
+</concept>

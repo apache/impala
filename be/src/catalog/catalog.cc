@@ -35,6 +35,9 @@ DEFINE_bool(load_catalog_in_background, false,
 DEFINE_int32(num_metadata_loading_threads, 16,
     "(Advanced) The number of metadata loading threads (degree of parallelism) to use "
     "when loading catalog metadata.");
+DEFINE_int32(initial_hms_cnxn_timeout_s, 120,
+    "Number of seconds catalogd will wait to establish an initial connection to the HMS "
+    "before exiting.");
 DEFINE_string(sentry_config, "", "Local path to a sentry-site.xml configuration "
     "file. If set, authorization will be enabled.");
 

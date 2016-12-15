@@ -58,6 +58,7 @@ enum TDdlType {
 enum TAlterTableType {
   ADD_REPLACE_COLUMNS,
   ADD_PARTITION,
+  ADD_DROP_RANGE_PARTITION,
   CHANGE_COLUMN,
   DROP_COLUMN,
   DROP_PARTITION,
@@ -176,14 +177,32 @@ struct TAlterTableAddPartitionParams {
   1: required list<CatalogObjects.TPartitionKeyValue> partition_spec
 
   // If true, no error is raised if a partition with the same spec already exists.
-  3: required bool if_not_exists
+  2: required bool if_not_exists
 
   // Optional HDFS storage location for the Partition. If not specified the
   // default storage location is used.
-  2: optional string location
+  3: optional string location
 
   // Optional caching operation to perform on the newly added partition.
   4: optional THdfsCachingOp cache_op
+}
+
+enum TRangePartitionOperationType {
+  ADD,
+  DROP
+}
+
+// Parameters for ALTER TABLE ADD/DROP RANGE PARTITION command
+struct TAlterTableAddDropRangePartitionParams {
+  // Range partition to add/drop
+  1: required CatalogObjects.TRangePartition range_partition_spec
+
+  // If true, ignore errors raised while adding/dropping a range
+  // partition
+  2: required bool ignore_errors
+
+  // Operation
+  3: required TRangePartitionOperationType type
 }
 
 // Parameters for ALTER TABLE DROP COLUMN commands.
@@ -319,6 +338,9 @@ struct TAlterTableParams {
 
   // Parameters for ALTER TABLE SET CACHED|UNCACHED
   13: optional TAlterTableSetCachedParams set_cached_params
+
+  // Parameters for ALTER TABLE ADD/ADD RANGE PARTITION
+  14: optional TAlterTableAddDropRangePartitionParams add_drop_range_partition_params
 }
 
 // Parameters of CREATE TABLE LIKE commands
@@ -393,9 +415,9 @@ struct TCreateTableParams {
   // If set, the table will be cached after creation with details specified in cache_op.
   13: optional THdfsCachingOp cache_op
 
-  // If set, the table is automatically distributed according to this parameter.
+  // If set, the table is automatically partitioned according to this parameter.
   // Kudu-only.
-  14: optional list<CatalogObjects.TDistributeParam> distribute_by
+  14: optional list<CatalogObjects.TKuduPartitionParam> partition_by
 
   // Primary key column names (Kudu-only)
   15: optional list<string> primary_key_column_names;

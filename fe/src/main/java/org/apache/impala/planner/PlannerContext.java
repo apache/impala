@@ -89,6 +89,9 @@ public class PlannerContext {
   public boolean isInsertOrCtas() {
     return analysisResult_.isInsertStmt() || analysisResult_.isCreateTableAsSelectStmt();
   }
+  public boolean isInsert() { return analysisResult_.isInsertStmt(); }
+  public boolean isUpdateOrDelete() {
+    return analysisResult_.isUpdateStmt() || analysisResult_.isDeleteStmt(); }
   public boolean isQuery() { return analysisResult_.isQueryStmt(); }
   public boolean hasTableSink() {
     return isInsertOrCtas() || analysisResult_.isUpdateStmt()

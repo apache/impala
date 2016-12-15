@@ -131,9 +131,15 @@ class TestHbaseComputeStats(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'hbase')
 
+  @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
+                     reason=("Setting up HBase tests currently assumes a local "
+                             "mini-cluster. See IMPALA-4661."))
   def test_hbase_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/hbase-compute-stats', vector, unique_database)
 
+  @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
+                     reason=("Setting up HBase tests currently assumes a local "
+                             "mini-cluster. See IMPALA-4661."))
   def test_hbase_compute_stats_incremental(self, vector, unique_database):
     self.run_test_case('QueryTest/hbase-compute-stats-incremental', vector,
       unique_database)

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.1" id="drop_view">
+
+  <title>DROP VIEW Statement</title>
+  <titlealts audience="PDF"><navtitle>DROP VIEW</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="Views"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">DROP VIEW statement</indexterm>
+      Removes the specified view, which was originally created by the <codeph>CREATE VIEW</codeph> statement.
+      Because a view is purely a logical construct (an alias for a query) with no physical data behind it,
+      <codeph>DROP VIEW</codeph> only involves changes to metadata in the metastore database, not any data files in
+      HDFS.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>DROP VIEW [IF EXISTS] [<varname>db_name</varname>.]<varname>view_name</varname></codeblock>
+
+    <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/create_drop_view_examples"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_views.xml#views"/>, <xref href="impala_create_view.xml#create_view"/>,
+      <xref href="impala_alter_view.xml#alter_view"/>
+    </p>
+  </conbody>
+</concept>

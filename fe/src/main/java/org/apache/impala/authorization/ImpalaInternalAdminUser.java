@@ -17,7 +17,7 @@
 
 package org.apache.impala.authorization;
 
-/*
+/**
  * A singleton class that represents a special user type used for internal Impala
  * sessions (for example, populating the debug webpage Catalog view). This user has
  * all privileges on all objects in the server.

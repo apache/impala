@@ -123,16 +123,20 @@ public class SortNode extends PlanNode {
     info_.substituteOrderingExprs(outputSmap_, analyzer);
     info_.checkConsistency();
 
-    LOG.trace("sort id " + tupleIds_.get(0).toString() + " smap: "
-        + outputSmap_.debugString());
-    LOG.trace("sort input exprs: " + Expr.debugString(resolvedTupleExprs_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("sort id " + tupleIds_.get(0).toString() + " smap: "
+          + outputSmap_.debugString());
+      LOG.trace("sort input exprs: " + Expr.debugString(resolvedTupleExprs_));
+    }
   }
 
   @Override
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     cardinality_ = capAtLimit(getChild(0).cardinality_);
-    LOG.debug("stats Sort: cardinality=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("stats Sort: cardinality=" + Long.toString(cardinality_));
+    }
   }
 
   @Override

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="langref_sql">
+
+  <title>Impala SQL Statements</title>
+  <titlealts audience="PDF"><navtitle>SQL Statements</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The Impala SQL dialect supports a range of standard elements, plus some extensions for Big Data use cases
+      related to data loading and data warehousing.
+    </p>
+
+    <note>
+      <p>
+        In the <cmdname>impala-shell</cmdname> interpreter, a semicolon at the end of each statement is required.
+        Since the semicolon is not actually part of the SQL syntax, we do not include it in the syntax definition
+        of each statement, but we do show it in examples intended to be run in <cmdname>impala-shell</cmdname>.
+      </p>
+    </note>
+
+    <p audience="PDF" outputclass="toc all">
+      The following sections show the major SQL statements that you work with in Impala:
+    </p>
+  </conbody>
+</concept>

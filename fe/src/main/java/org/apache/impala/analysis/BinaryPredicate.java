@@ -335,12 +335,11 @@ public class BinaryPredicate extends Predicate {
   }
 
   /**
-   * Swaps the first with the second child in-place. Only valid to call for
-   * equivalence and not equal predicates.
+   * Swaps the first and second child in-place and sets the operation to its converse.
    */
   public void reverse() {
-    Preconditions.checkState(op_.isEquivalence() || op_ == Operator.NE);
     Collections.swap(children_, 0, 1);
+    op_ = op_.converse();
   }
 
   @Override

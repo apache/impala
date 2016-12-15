@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="intro_hadoop">
+
+  <title>How Impala Fits Into the Hadoop Ecosystem</title>
+  <titlealts audience="PDF"><navtitle>Role in the Hadoop Ecosystem</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Concepts"/>
+      <data name="Category" value="Hadoop"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Impala makes use of many familiar components within the Hadoop ecosystem. Impala can interchange data with
+      other Hadoop components, as both a consumer and a producer, so it can fit in flexible ways into your ETL and
+      ELT pipelines.
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="intro_hive">
+
+    <title>How Impala Works with Hive</title>
+
+    <conbody>
+
+      <p>
+        A major Impala goal is to make SQL-on-Hadoop operations fast and efficient enough to appeal to new
+        categories of users and open up Hadoop to new types of use cases. Where practical, it makes use of existing
+        Apache Hive infrastructure that many Hadoop users already have in place to perform long-running,
+        batch-oriented SQL queries.
+      </p>
+
+      <p>
+        In particular, Impala keeps its table definitions in a traditional MySQL or PostgreSQL database known as
+        the <b>metastore</b>, the same database where Hive keeps this type of data. Thus, Impala can access tables
+        defined or loaded by Hive, as long as all columns use Impala-supported data types, file formats, and
+        compression codecs.
+      </p>
+
+      <p>
+        The initial focus on query features and performance means that Impala can read more types of data with the
+        <codeph>SELECT</codeph> statement than it can write with the <codeph>INSERT</codeph> statement. To query
+        data using the Avro, RCFile, or SequenceFile <xref href="impala_file_formats.xml#file_formats">file
+        formats</xref>, you load the data using Hive.
+      </p>
+
+      <p rev="1.2.2">
+        The Impala query optimizer can also make use of <xref href="impala_perf_stats.xml#perf_table_stats">table
+        statistics</xref> and <xref href="impala_perf_stats.xml#perf_column_stats">column statistics</xref>.
+        Originally, you gathered this information with the <codeph>ANALYZE TABLE</codeph> statement in Hive; in
+        Impala 1.2.2 and higher, use the Impala <codeph><xref href="impala_compute_stats.xml#compute_stats">COMPUTE
+        STATS</xref></codeph> statement instead. <codeph>COMPUTE STATS</codeph> requires less setup, is more
+        reliable, and does not require switching back and forth between <cmdname>impala-shell</cmdname>
+        and the Hive shell.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="intro_metastore">
+
+    <title>Overview of Impala Metadata and the Metastore</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Concepts"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Hive"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        As discussed in <xref href="impala_hadoop.xml#intro_hive"/>, Impala maintains information about table
+        definitions in a central database known as the <b>metastore</b>. Impala also tracks other metadata for the
+        low-level characteristics of data files:
+      </p>
+
+      <ul>
+        <li>
+          The physical locations of blocks within HDFS.
+        </li>
+      </ul>
+
+      <p>
+        For tables with a large volume of data and/or many partitions, retrieving all the metadata for a table can
+        be time-consuming, taking minutes in some cases. Thus, each Impala node caches all of this metadata to
+        reuse for future queries against the same table.
+      </p>
+
+      <p rev="1.2">
+        If the table definition or the data in the table is updated, all other Impala daemons in the cluster must
+        receive the latest metadata, replacing the obsolete cached metadata, before issuing a query against that
+        table. In Impala 1.2 and higher, the metadata update is automatic, coordinated through the
+        <cmdname>catalogd</cmdname> daemon, for all DDL and DML statements issued through Impala. See
+        <xref href="impala_components.xml#intro_catalogd"/> for details.
+      </p>
+
+      <p>
+        For DDL and DML issued through Hive, or changes made manually to files in HDFS, you still use the
+        <codeph>REFRESH</codeph> statement (when new data files are added to existing tables) or the
+        <codeph>INVALIDATE METADATA</codeph> statement (for entirely new tables, or after dropping a table,
+        performing an HDFS rebalance operation, or deleting data files). Issuing <codeph>INVALIDATE
+        METADATA</codeph> by itself retrieves metadata for all the tables tracked by the metastore. If you know
+        that only specific tables have been changed outside of Impala, you can issue <codeph>REFRESH
+        <varname>table_name</varname></codeph> for each affected table to only retrieve the latest metadata for
+        those tables.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="intro_hdfs">
+
+    <title>How Impala Uses HDFS</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Concepts"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="HDFS"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        Impala uses the distributed filesystem HDFS as its primary data storage medium. Impala relies on the
+        redundancy provided by HDFS to guard against hardware or network outages on individual nodes. Impala table
+        data is physically represented as data files in HDFS, using familiar HDFS file formats and compression
+        codecs. When data files are present in the directory for a new table, Impala reads them all, regardless of
+        file name. New data is added in files with names controlled by Impala.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="intro_hbase">
+
+    <title>How Impala Uses HBase</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Concepts"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="HBase"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        HBase is an alternative to HDFS as a storage medium for Impala data. It is a database storage system built
+        on top of HDFS, without built-in SQL support. Many Hadoop users already have it configured and store large
+        (often sparse) data sets in it. By defining tables in Impala and mapping them to equivalent tables in
+        HBase, you can query the contents of the HBase tables through Impala, and even perform join queries
+        including both Impala and HBase tables. See <xref href="impala_hbase.xml#impala_hbase"/> for details.
+      </p>
+    </conbody>
+  </concept>
+</concept>

@@ -725,8 +725,8 @@ PLAN-ROOT SINK
 |  hash predicates: o_orderkey = l_orderkey
 |
 |--01:SCAN KUDU [tpch_kudu.lineitem]
-|     predicates: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate
-|     kudu predicates: l_receiptdate < '1995-01-01', l_receiptdate >= '1994-01-01'
+|     predicates: l_commitdate < l_receiptdate, l_shipdate < l_commitdate
+|     kudu predicates: l_shipmode IN ('MAIL', 'SHIP'), l_receiptdate < '1995-01-01', l_receiptdate >= '1994-01-01'
 |
 00:SCAN KUDU [tpch_kudu.orders]
 ====
@@ -917,7 +917,8 @@ PLAN-ROOT SINK
 |  hash predicates: ps_partkey = p_partkey
 |
 |--01:SCAN KUDU [tpch_kudu.part]
-|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
+|     predicates: p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
+|     kudu predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
 |
 00:SCAN KUDU [tpch_kudu.partsupp]
 ====
@@ -1080,8 +1081,7 @@ PLAN-ROOT SINK
 |     kudu predicates: p_size >= 1
 |
 00:SCAN KUDU [tpch_kudu.lineitem]
-   predicates: l_shipmode IN ('AIR', 'AIR REG')
-   kudu predicates: l_shipinstruct = 'DELIVER IN PERSON'
+   kudu predicates: l_shipmode IN ('AIR', 'AIR REG'), l_shipinstruct = 'DELIVER IN PERSON'
 ====
 # Q20 - Potential Part Promotion Query
 select

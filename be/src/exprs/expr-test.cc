@@ -41,6 +41,7 @@
 #include "gen-cpp/hive_metastore_types.h"
 #include "rpc/thrift-client.h"
 #include "rpc/thrift-server.h"
+#include "runtime/runtime-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/string-value.h"
@@ -52,6 +53,7 @@
 #include "util/debug-util.h"
 #include "util/string-parser.h"
 #include "util/test-info.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 
 #include "common/names.h"
 
@@ -73,6 +75,7 @@ using namespace llvm;
 namespace impala {
 ImpaladQueryExecutor* executor_;
 bool disable_codegen_;
+bool enable_expr_rewrites_;
 
 template <typename ORIGINAL_TYPE, typename VAL_TYPE>
 string LiteralToString(VAL_TYPE val) {
@@ -972,7 +975,7 @@ bool ExprTest::ConvertValue<bool>(const string& value) {
   if (value.compare("false") == 0) {
     return false;
   } else {
-    DCHECK(value.compare("true") == 0);
+    DCHECK(value.compare("true") == 0) << value;
     return true;
   }
 }
@@ -1024,7 +1027,7 @@ template <typename T> void TestSingleLiteralConstruction(
     const ColumnType& type, const T& value, const string& string_val) {
   ObjectPool pool;
   RowDescriptor desc;
-  RuntimeState state(TExecPlanFragmentParams(), NULL);
+  RuntimeState state{TQueryCtx()};
   MemTracker tracker;
 
   Expr* expr = pool.Add(new Literal(type, value));
@@ -1040,7 +1043,7 @@ TEST_F(ExprTest, NullLiteral) {
   for (int type = TYPE_BOOLEAN; type != TYPE_DATE; ++type) {
     NullLiteral expr(static_cast<PrimitiveType>(type));
     ExprContext ctx(&expr);
-    RuntimeState state(TExecPlanFragmentParams(), NULL);
+    RuntimeState state{TQueryCtx()};
     MemTracker tracker;
     EXPECT_OK(ctx.Prepare(&state, RowDescriptor(), &tracker));
     EXPECT_OK(ctx.Open(&state));
@@ -2240,7 +2243,7 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("lower(cast('HELLO' as CHAR(3)))", "hel");
   TestStringValue("lower(cast(123456 as CHAR(3)))", "123");
   TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(3))", "123");
-  TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(65355))", "123");
+  TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(65535))", "123");
   TestIsNull("cast(NULL as CHAR(3))", ColumnType::CreateCharType(3));
 
   TestCharValue("cast('HELLO' as CHAR(255))",
@@ -3579,6 +3582,36 @@ TEST_F(ExprTest, TimestampFunctions) {
       "CAST('9995-12-11 00:00:00' AS TIMESTAMP) + INTERVAL 61 MONTH", TYPE_TIMESTAMP);
   TestIsNull(
       "CAST('9995-12-11 00:00:00' AS TIMESTAMP) - INTERVAL -61 MONTH", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 1000 DAYS", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('1400-01-01 00:12:00' AS TIMESTAMP) - INTERVAL 1 DAYS", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 10000 HOURS", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('1400-01-01 00:12:00' AS TIMESTAMP) - INTERVAL 24 HOURS", TYPE_TIMESTAMP);
+  TestIsNull("CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 1000000 MINUTES",
+      TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('1400-01-01 00:12:00' AS TIMESTAMP) - INTERVAL 13 MINUTES", TYPE_TIMESTAMP);
+  TestIsNull("CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 100000000 SECONDS",
+      TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('1400-01-01 00:00:00' AS TIMESTAMP) - INTERVAL 1 SECONDS", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 100000000000 MILLISECONDS",
+      TYPE_TIMESTAMP);
+  TestIsNull("CAST('1400-01-01 00:00:00' AS TIMESTAMP) - INTERVAL 1 MILLISECONDS",
+      TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 100000000000000 MICROSECONDS",
+      TYPE_TIMESTAMP);
+  TestIsNull("CAST('1400-01-01 00:00:00' AS TIMESTAMP) - INTERVAL 1 MICROSECONDS",
+      TYPE_TIMESTAMP);
+  TestIsNull("CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 100000000000000000 "
+      "NANOSECONDS", TYPE_TIMESTAMP);
+  TestIsNull("CAST('1400-01-01 00:00:00' AS TIMESTAMP) - INTERVAL 1 NANOSECONDS",
+      TYPE_TIMESTAMP);
   // Add/sub months.
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval 13 months) as string)",
@@ -4066,10 +4099,22 @@ TEST_F(ExprTest, TimestampFunctions) {
   }
 
   // Hive silently ignores bad timezones.  We log a problem.
-  TestStringValue(
-      "cast(from_utc_timestamp("
-      "cast('1970-01-01 00:00:00' as timestamp), 'FOOBAR') as string)",
+  TestStringValue("cast(from_utc_timestamp("
+                  "cast('1970-01-01 00:00:00' as timestamp), 'FOOBAR') as string)",
       "1970-01-01 00:00:00");
+
+  // These return NULL because timezone conversion makes the value out
+  // of range.
+  TestIsNull("to_utc_timestamp(CAST(\"1400-01-01 05:00:00\" as TIMESTAMP), \"AEST\")",
+      TYPE_TIMESTAMP);
+  TestIsNull("from_utc_timestamp(CAST(\"1400-01-01 05:00:00\" as TIMESTAMP), \"PST\")",
+      TYPE_TIMESTAMP);
+  // TODO: IMPALA-4549: these should return NULL, but validation doesn't catch year 10000.
+  // Just check that we don't crash.
+  GetValue("from_utc_timestamp(CAST(\"10000-12-31 21:00:00\" as TIMESTAMP), \"JST\")",
+      TYPE_TIMESTAMP);
+  GetValue("to_utc_timestamp(CAST(\"10000-12-31 21:00:00\" as TIMESTAMP), \"PST\")",
+      TYPE_TIMESTAMP);
 
   // With support of date strings this generates a date and 0 time.
   TestStringValue(
@@ -5048,7 +5093,11 @@ TEST_F(ExprTest, ResultsLayoutTest) {
     expected_offsets.clear();
     // With one expr, all offsets should be 0.
     expected_offsets[t.GetByteSize()] = set<int>({0});
-    exprs.push_back(pool.Add(Literal::CreateLiteral(t, "0")));
+    if (t.type != TYPE_TIMESTAMP) {
+      exprs.push_back(pool.Add(Literal::CreateLiteral(t, "0")));
+    } else {
+      exprs.push_back(pool.Add(Literal::CreateLiteral(t, "2016-11-09")));
+    }
     if (t.IsVarLenStringType()) {
       ValidateLayout(exprs, 16, 0, expected_offsets);
     } else {
@@ -5106,8 +5155,8 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_byte_size += 5 * 8;      // No more padding
   ASSERT_EQ(expected_byte_size % 8, 0);
 
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "2016-11-09")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "2016-11-09")));
   exprs.push_back(pool.Add(
       Literal::CreateLiteral(ColumnType::CreateDecimalType(20, 0), "0")));
   expected_offsets[16].insert(expected_byte_size);
@@ -6123,21 +6172,35 @@ int main(int argc, char **argv) {
       impala_server->beeswax_port());
   ABORT_IF_ERROR(executor_->Setup());
 
-  vector<string> options;
-  // Disable FE Expr rewrites to make sure the Exprs get executed exactly as specified
+  // Disable FE expr rewrites to make sure the Exprs get executed exactly as specified
   // in the tests here.
+  vector<string> options;
   options.push_back("ENABLE_EXPR_REWRITES=0");
   options.push_back("DISABLE_CODEGEN=1");
   disable_codegen_ = true;
+  enable_expr_rewrites_ = false;
   executor_->setExecOptions(options);
-
   cout << "Running without codegen" << endl;
   int ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;
 
+  options.clear();
+  options.push_back("ENABLE_EXPR_REWRITES=0");
   options.push_back("DISABLE_CODEGEN=0");
   disable_codegen_ = false;
+  enable_expr_rewrites_ = false;
   executor_->setExecOptions(options);
   cout << endl << "Running with codegen" << endl;
+  ret = RUN_ALL_TESTS();
+  if (ret != 0) return ret;
+
+  // Enable FE expr rewrites to get test for constant folding over all exprs.
+  options.clear();
+  options.push_back("ENABLE_EXPR_REWRITES=1");
+  options.push_back("DISABLE_CODEGEN=1");
+  disable_codegen_ = true;
+  enable_expr_rewrites_ = true;
+  executor_->setExecOptions(options);
+  cout << endl << "Running without codegen and expr rewrites" << endl;
   return RUN_ALL_TESTS();
 }

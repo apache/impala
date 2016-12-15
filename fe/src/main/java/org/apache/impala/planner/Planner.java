@@ -20,7 +20,6 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.Analyzer;
@@ -30,7 +29,6 @@ import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.QueryStmt;
-import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.KuduTable;
@@ -38,7 +36,6 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.common.TreeNode;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryCtx;
@@ -51,9 +48,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Creates an executable plan from an analyzed parse tree and query options.
@@ -102,7 +97,7 @@ public class Planner {
     if (isSmallQuery) {
       // Execute on a single node and disable codegen for small results
       ctx_.getQueryOptions().setNum_nodes(1);
-      ctx_.getQueryOptions().setDisable_codegen(true);
+      ctx_.getQueryCtx().disable_codegen_hint = true;
       if (maxRowsProcessed < ctx_.getQueryOptions().batch_size ||
           maxRowsProcessed < 1024 && ctx_.getQueryOptions().batch_size == 0) {
         // Only one scanner thread for small queries
@@ -169,9 +164,11 @@ public class Planner {
     }
     rootFragment.setOutputExprs(resultExprs);
 
-    LOG.debug("desctbl: " + ctx_.getRootAnalyzer().getDescTbl().debugString());
-    LOG.debug("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
-    LOG.debug("finalize plan fragments");
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("desctbl: " + ctx_.getRootAnalyzer().getDescTbl().debugString());
+      LOG.trace("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
+      LOG.trace("finalize plan fragments");
+    }
     for (PlanFragment fragment: fragments) {
       fragment.finalize(ctx_.getRootAnalyzer());
     }
@@ -181,15 +178,35 @@ public class Planner {
 
     ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
+      // Lineage is disabled for UPDATE AND DELETE statements
+      if (ctx_.isUpdateOrDelete()) return fragments;
       // Compute the column lineage graph
       if (ctx_.isInsertOrCtas()) {
-        Table targetTable = ctx_.getAnalysisResult().getInsertStmt().getTargetTable();
-        graph.addTargetColumnLabels(targetTable);
-        Preconditions.checkNotNull(targetTable);
+        InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
         List<Expr> exprs = Lists.newArrayList();
-        if (targetTable instanceof HBaseTable) {
+        Table targetTable = insertStmt.getTargetTable();
+        Preconditions.checkNotNull(targetTable);
+        if (targetTable instanceof KuduTable) {
+          if (ctx_.isInsert()) {
+            // For insert statements on Kudu tables, we only need to consider
+            // the labels of columns mentioned in the column list.
+            List<String> mentionedColumns = insertStmt.getMentionedColumns();
+            Preconditions.checkState(!mentionedColumns.isEmpty());
+            List<String> targetColLabels = Lists.newArrayList();
+            String tblFullName = targetTable.getFullName();
+            for (String column: mentionedColumns) {
+              targetColLabels.add(tblFullName + "." + column);
+            }
+            graph.addTargetColumnLabels(targetColLabels);
+          } else {
+            graph.addTargetColumnLabels(targetTable);
+          }
+          exprs.addAll(resultExprs);
+        } else if (targetTable instanceof HBaseTable) {
+          graph.addTargetColumnLabels(targetTable);
           exprs.addAll(resultExprs);
         } else {
+          graph.addTargetColumnLabels(targetTable);
           exprs.addAll(ctx_.getAnalysisResult().getInsertStmt().getPartitionKeyExprs());
           exprs.addAll(resultExprs.subList(0,
               targetTable.getNonClusteringColumns().size()));
@@ -199,7 +216,7 @@ public class Planner {
         graph.addTargetColumnLabels(ctx_.getQueryStmt().getColLabels());
         graph.computeLineageGraph(resultExprs, ctx_.getRootAnalyzer());
       }
-      LOG.trace("lineage: " + graph.debugString());
+      if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
       ctx_.getRootAnalyzer().getTimeline().markEvent("Lineage info computed");
     }
 
@@ -392,8 +409,10 @@ public class Planner {
     request.setPer_host_mem_req(maxPerHostMem);
     request.setPer_host_vcores((short) maxPerHostVcores);
 
-    LOG.debug("Estimated per-host peak memory requirement: " + maxPerHostMem);
-    LOG.debug("Estimated per-host virtual cores requirement: " + maxPerHostVcores);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Estimated per-host peak memory requirement: " + maxPerHostMem);
+      LOG.trace("Estimated per-host virtual cores requirement: " + maxPerHostVcores);
+    }
   }
 
   /**

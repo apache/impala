@@ -25,9 +25,10 @@ import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
-
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.KuduColumn;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Table;
@@ -35,9 +36,12 @@ import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TResultRow;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 
-/*
+/**
  * Builds results for DESCRIBE DATABASE statements by constructing and
  * populating a TDescribeResult object.
  */
@@ -173,15 +177,15 @@ public class DescribeResultFactory {
     return descResult;
   }
 
-  /*
+  /**
    * Builds a TDescribeResult that contains the result of a DESCRIBE FORMATTED|EXTENDED
    * <table> command. For the formatted describe output the goal is to be exactly the
    * same as what Hive (via HiveServer2) outputs, for compatibility reasons. To do this,
    * Hive's MetadataFormatUtils class is used to build the results.
    */
   public static TDescribeResult buildDescribeFormattedResult(Table table) {
-    TDescribeResult descResult = new TDescribeResult();
-    descResult.results = Lists.newArrayList();
+    TDescribeResult result = new TDescribeResult();
+    result.results = Lists.newArrayList();
 
     org.apache.hadoop.hive.metastore.api.Table msTable =
         table.getMetaStoreTable().deepCopy();
@@ -218,28 +222,71 @@ public class DescribeResultFactory {
         }
         resultRow.addToColVals(colVal);
       }
-      descResult.results.add(resultRow);
+      result.results.add(resultRow);
     }
-    return descResult;
+    return result;
   }
 
-  /*
-   * Builds a TDescribeResult that contains the result of a DESCRIBE <path> command:
-   * the names and types of fields of the table or complex type referred to by the path.
+  /**
+   * Builds a TDescribeResult for a nested collection whose fields are represented
+   * by the given StructType.
    */
   public static TDescribeResult buildDescribeMinimalResult(StructType type) {
     TDescribeResult descResult = new TDescribeResult();
     descResult.results = Lists.newArrayList();
-
     for (StructField field: type.getFields()) {
       TColumnValue colNameCol = new TColumnValue();
       colNameCol.setString_val(field.getName());
       TColumnValue dataTypeCol = new TColumnValue();
       dataTypeCol.setString_val(field.getType().prettyPrint().toLowerCase());
       TColumnValue commentCol = new TColumnValue();
-      commentCol.setString_val(field.getComment() != null ? field.getComment() : "");
+      commentCol.setString_val(Strings.nullToEmpty(field.getComment()));
       descResult.results.add(
           new TResultRow(Lists.newArrayList(colNameCol, dataTypeCol, commentCol)));
+    }
+    return descResult;
+  }
+
+  /**
+   * Builds a TDescribeResult for a table.
+   */
+  public static TDescribeResult buildDescribeMinimalResult(Table table) {
+    if (!(table instanceof KuduTable)) {
+      return buildDescribeMinimalResult(table.getHiveColumnsAsStruct());
+    }
+
+    TDescribeResult descResult = new TDescribeResult();
+    descResult.results = Lists.newArrayList();
+    for (Column c: table.getColumnsInHiveOrder()) {
+      Preconditions.checkState(c instanceof KuduColumn);
+      KuduColumn kuduColumn = (KuduColumn) c;
+      // General describe info.
+      TColumnValue colNameCol = new TColumnValue();
+      colNameCol.setString_val(kuduColumn.getName());
+      TColumnValue dataTypeCol = new TColumnValue();
+      dataTypeCol.setString_val(kuduColumn.getType().prettyPrint().toLowerCase());
+      TColumnValue commentCol = new TColumnValue();
+      commentCol.setString_val(Strings.nullToEmpty(kuduColumn.getComment()));
+      // Kudu-specific describe info.
+      TColumnValue pkCol = new TColumnValue();
+      pkCol.setString_val(Boolean.toString(kuduColumn.isKey()));
+      TColumnValue nullableCol = new TColumnValue();
+      nullableCol.setString_val(Boolean.toString(kuduColumn.isNullable()));
+      TColumnValue defaultValCol = new TColumnValue();
+      if (kuduColumn.hasDefaultValue()) {
+        defaultValCol.setString_val(kuduColumn.getDefaultValue().getStringValue());
+      } else {
+        defaultValCol.setString_val("");
+      }
+      TColumnValue encodingCol = new TColumnValue();
+      encodingCol.setString_val(kuduColumn.getEncoding().toString());
+      TColumnValue compressionCol = new TColumnValue();
+      compressionCol.setString_val(kuduColumn.getCompression().toString());
+      TColumnValue blockSizeCol = new TColumnValue();
+      blockSizeCol.setString_val(Integer.toString(kuduColumn.getBlockSize()));
+      descResult.results.add(new TResultRow(
+          Lists.newArrayList(colNameCol, dataTypeCol, commentCol, pkCol, nullableCol,
+              defaultValCol, encodingCol, compressionCol, blockSizeCol)));
     }
     return descResult;
   }

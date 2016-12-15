@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="tables">
+
+  <title>Overview of Impala Tables</title>
+  <titlealts audience="PDF"><navtitle>Tables</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Databases"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p/>
+
+    <p>
+      Tables are the primary containers for data in Impala. They have the familiar row and column layout similar to
+      other database systems, plus some features such as partitioning often associated with higher-end data
+      warehouse systems.
+    </p>
+
+    <p>
+      Logically, each table has a structure based on the definition of its columns, partitions, and other
+      properties.
+    </p>
+
+    <p>
+      Physically, each table that uses HDFS storage is associated with a directory in HDFS. The table data consists of all the data files
+      underneath that directory:
+    </p>
+
+    <ul>
+      <li>
+        <xref href="impala_tables.xml#internal_tables">Internal tables</xref> are managed by Impala, and use directories
+        inside the designated Impala work area.
+      </li>
+
+      <li>
+        <xref href="impala_tables.xml#external_tables">External tables</xref> use arbitrary HDFS directories, where
+        the data files are typically shared between different Hadoop components.
+      </li>
+
+      <li>
+        Large-scale data is usually handled by partitioned tables, where the data files are divided among different
+        HDFS subdirectories.
+      </li>
+    </ul>
+
+    <p rev="2.2.0">
+      Impala tables can also represent data that is stored in HBase, or in the Amazon S3 filesystem (CDH 5.4.0 or higher),
+      or on Isilon storage devices (CDH 5.4.3 or higher).  See <xref href="impala_hbase.xml#impala_hbase"/>,
+      <xref href="impala_s3.xml#s3"/>, and <xref href="impala_isilon.xml#impala_isilon"/>
+      for details about those special kinds of tables.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/ignore_file_extensions"/>
+
+    <p>
+      <b>Related statements:</b> <xref href="impala_create_table.xml#create_table"/>,
+      <xref href="impala_drop_table.xml#drop_table"/>, <xref href="impala_alter_table.xml#alter_table"/>
+      <xref href="impala_insert.xml#insert"/>, <xref href="impala_load_data.xml#load_data"/>,
+      <xref href="impala_select.xml#select"/>
+    </p>
+  </conbody>
+
+  <concept id="internal_tables">
+
+    <title>Internal Tables</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">internal tables</indexterm>
+        The default kind of table produced by the <codeph>CREATE TABLE</codeph> statement is known as an internal
+        table. (Its counterpart is the external table, produced by the <codeph>CREATE EXTERNAL TABLE</codeph>
+        syntax.)
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            Impala creates a directory in HDFS to hold the data files.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            You can create data in internal tables by issuing <codeph>INSERT</codeph> or <codeph>LOAD DATA</codeph>
+            statements.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            If you add or replace data using HDFS operations, issue the <codeph>REFRESH</codeph> command in
+            <cmdname>impala-shell</cmdname> so that Impala recognizes the changes in data files, block locations,
+            and so on.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            When you issue a <codeph>DROP TABLE</codeph> statement, Impala physically removes all the data files
+            from the directory.
+          </p>
+        </li>
+
+        <li>
+          <p conref="../shared/impala_common.xml#common/check_internal_external_table"/>
+        </li>
+
+        <li>
+          <p>
+            When you issue an <codeph>ALTER TABLE</codeph> statement to rename an internal table, all data files
+            are moved into the new HDFS directory for the table. The files are moved even if they were formerly in
+            a directory outside the Impala data directory, for example in an internal table with a
+            <codeph>LOCATION</codeph> attribute pointing to an outside HDFS directory.
+          </p>
+        </li>
+      </ul>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/switch_internal_external_table"/>
+
+      <p conref="../shared/impala_common.xml#common/related_info"/>
+
+      <p>
+        <xref href="impala_tables.xml#external_tables"/>, <xref href="impala_create_table.xml#create_table"/>,
+        <xref href="impala_drop_table.xml#drop_table"/>, <xref href="impala_alter_table.xml#alter_table"/>,
+        <xref href="impala_describe.xml#describe"/>
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="external_tables">
+
+    <title>External Tables</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="Cloudera">external tables</indexterm>
+        The syntax <codeph>CREATE EXTERNAL TABLE</codeph> sets up an Impala table that points at existing data
+        files, potentially in HDFS locations outside the normal Impala data directories.. This operation saves the
+        expense of importing the data into a new table when you already have the data files in a known location in
+        HDFS, in the desired file format.
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            You can use Impala to query the data in this table.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            You can create data in external tables by issuing <codeph>INSERT</codeph> or <codeph>LOAD DATA</codeph>
+            statements.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            If you add or replace data using HDFS operations, issue the <codeph>REFRESH</codeph> command in
+            <cmdname>impala-shell</cmdname> so that Impala recognizes the changes in data files, block locations,
+            and so on.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            When you issue a <codeph>DROP TABLE</codeph> statement in Impala, that removes the connection that
+            Impala has with the associated data files, but does not physically remove the underlying data. You can
+            continue to use the data files with other Hadoop components and HDFS operations.
+          </p>
+        </li>
+
+        <li>
+          <p conref="../shared/impala_common.xml#common/check_internal_external_table"/>
+        </li>
+
+        <li>
+          <p>
+            When you issue an <codeph>ALTER TABLE</codeph> statement to rename an external table, all data files
+            are left in their original locations.
+          </p>
+        </li>
+
+        <li>
+          <p>
+            You can point multiple external tables at the same HDFS directory by using the same
+            <codeph>LOCATION</codeph> attribute for each one. The tables could have different column definitions,
+            as long as the number and types of columns are compatible with the schema evolution considerations for
+            the underlying file type. For example, for text data files, one table might define a certain column as
+            a <codeph>STRING</codeph> while another defines the same column as a <codeph>BIGINT</codeph>.
+          </p>
+        </li>
+      </ul>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/switch_internal_external_table"/>
+
+      <p conref="../shared/impala_common.xml#common/related_info"/>
+
+      <p>
+        <xref href="impala_tables.xml#internal_tables"/>, <xref href="impala_create_table.xml#create_table"/>,
+        <xref href="impala_drop_table.xml#drop_table"/>, <xref href="impala_alter_table.xml#alter_table"/>,
+        <xref href="impala_describe.xml#describe"/>
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="table_file_formats">
+    <title>File Formats</title>
+    <conbody>
+      <p>
+        Each table has an associated file format, which determines how Impala interprets the
+        associated data files. See <xref href="impala_file_formats.xml#file_formats"/> for details.
+      </p>
+      <p>
+        You set the file format during the <codeph>CREATE TABLE</codeph> statement,
+        or change it later using the <codeph>ALTER TABLE</codeph> statement.
+        Partitioned tables can have a different file format for individual partitions,
+        allowing you to change the file format used in your ETL process for new data
+        without going back and reconverting all the existing data in the same table.
+      </p>
+      <p>
+        Any <codeph>INSERT</codeph> statements produce new data files with the current file format of the table.
+        For existing data files, changing the file format of the table does not automatically do any data conversion.
+        You must use <codeph>TRUNCATE TABLE</codeph> or <codeph>INSERT OVERWRITE</codeph> to remove any previous data
+        files that use the old file format.
+        Then you use the <codeph>LOAD DATA</codeph> statement, <codeph>INSERT ... SELECT</codeph>, or other mechanism
+        to put data files of the correct format into the table.
+      </p>
+      <p>
+        The default file format, text, is the most flexible and easy to produce when you are just getting started with
+        Impala. The Parquet file format offers the highest query performance and uses compression to reduce storage
+        requirements; therefore, <ph rev="upstream">Cloudera</ph> recommends using Parquet for Impala tables with substantial amounts of data.
+        <ph rev="2.3.0">Also, the complex types (<codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>)
+        available in <keyword keyref="impala23_full"/> and higher are currently only supported with the Parquet file type.</ph>
+        Based on your existing ETL workflow, you might use other file formats such as Avro, possibly doing a final
+        conversion step to Parquet to take advantage of its performance for analytic queries.
+      </p>
+    </conbody>
+  </concept>
+
+</concept>

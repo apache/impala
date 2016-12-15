@@ -85,6 +85,10 @@ CollectionVal NullLiteral::GetCollectionVal(ExprContext* context, const TupleRow
   return CollectionVal::null();
 }
 
+bool NullLiteral::IsLiteral() const {
+  return true;
+}
+
 // Generated IR for a bigint NULL literal:
 //
 // define { i8, i64 } @NullLiteral(i8* %context, %"class.impala::TupleRow"* %row) {

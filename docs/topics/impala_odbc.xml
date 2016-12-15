@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_odbc">
+
+  <title id="odbc">Configuring Impala to Work with ODBC</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="ODBC"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">ODBC</indexterm>
+      Third-party products can be designed to integrate with Impala using ODBC. For the best experience, ensure any
+      third-party product you intend to use is supported. Verifying support includes checking that the versions of
+      Impala, ODBC, the operating system, and the third-party product have all been approved for use together.
+      Before configuring your systems to use ODBC, download a connector.
+      You may need to sign in and accept license agreements before accessing the pages required for downloading
+      ODBC connectors.
+    </p>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
+
+  <concept id="odbc_driver">
+    <title>Downloading the ODBC Driver</title>
+      <conbody>
+
+      <note type="important">
+        As of late 2015, most business intelligence applications are certified with the 2.x ODBC drivers.
+        Although the instructions on this page cover both the 2.x and 1.x drivers, expect to use the 2.x drivers
+        exclusively for most ODBC applications connecting to Impala.
+      </note>
+
+        <p>
+          See the
+          <xref href="http://www.cloudera.com/content/support/en/downloads/download-components/download-products.html?productID=3mDesWddUS" scope="external" format="html">downloads
+          page</xref> for a matrix of the certified driver version for different products. See the
+          <xref href="http://www.cloudera.com/content/support/en/documentation/cloudera-connectors-documentation/connector-documentation-latest.html" scope="external" format="html">documentation
+          page</xref> for installation instructions.
+        </p>
+
+      </conbody>
+    </concept>
+
+    <concept id="odbc_port">
+      <title>Configuring the ODBC Port</title>
+      <conbody>
+        <p>
+          Versions 2.5 and 2.0 of the Cloudera ODBC Connector, currently certified for some but not all BI applications,
+          use the HiveServer2 protocol, corresponding to Impala port 21050. Impala supports Kerberos authentication with
+          all the supported versions of the driver, and requires ODBC 2.05.13 for Impala or higher for LDAP username/password
+          authentication.
+        </p>
+
+        <p>
+          Version 1.x of the Cloudera ODBC Connector uses the original HiveServer1 protocol, corresponding to Impala
+          port 21000.
+        </p>
+
+      </conbody>
+    </concept>
+
+    <concept id="odbc_demo">
+      <title>Example of Setting Up an ODBC Application for Impala</title>
+      <conbody>
+
+        <p>
+          To illustrate the outline of the setup process, here is a transcript of a session to set up
+          all required drivers and a business intelligence application
+          that uses the ODBC driver, under Mac OS X. Each <codeph>.dmg</codeph> file runs a GUI-based
+          installer, first for the <xref href="http://www.iodbc.org/dataspace/iodbc/wiki/iODBC/Downloads" scope="external" format="html">underlying IODBC driver</xref> needed for non-Windows systems, then for
+          the Cloudera ODBC Connector, and finally for the BI tool itself.
+        </p>
+
+<codeblock>$ ls -1
+Cloudera-ODBC-Driver-for-Impala-Install-Guide.pdf
+BI_Tool_Installer.dmg
+iodbc-sdk-3.52.7-macosx-10.5.dmg
+ClouderaImpalaODBC.dmg
+$ open iodbc-sdk-3.52.7-macosx-10.dmg
+<varname>Install the IODBC driver using its installer</varname>
+$ open ClouderaImpalaODBC.dmg
+<varname>Install the Cloudera ODBC Connector using its installer</varname>
+$ installer_dir=$(pwd)
+$ cd /opt/cloudera/impalaodbc
+$ ls -1
+Cloudera ODBC Driver for Impala Install Guide.pdf
+Readme.txt
+Setup
+lib
+ErrorMessages
+Release Notes.txt
+Tools
+$ cd Setup
+$ ls
+odbc.ini    odbcinst.ini
+$ cp odbc.ini ~/.odbc.ini
+$ vi ~/.odbc.ini
+$ cat ~/.odbc.ini
+[ODBC]
+# Specify any global ODBC configuration here such as ODBC tracing.
+
+[ODBC Data Sources]
+Sample Cloudera Impala DSN=Cloudera ODBC Driver for Impala
+
+[Sample Cloudera Impala DSN]
+
+# Description: DSN Description.
+# This key is not necessary and is only to give a description of the data source.
+Description=Cloudera ODBC Driver for Impala DSN
+
+# Driver: The location where the ODBC driver is installed to.
+Driver=/opt/cloudera/impalaodbc/lib/universal/libclouderaimpalaodbc.dylib
+
+# The DriverUnicodeEncoding setting is only used for SimbaDM
+# When set to 1, SimbaDM runs in UTF-16 mode.
+# When set to 2, SimbaDM runs in UTF-8 mode.
+#DriverUnicodeEncoding=2
+
+# Values for HOST, PORT, KrbFQDN, and KrbServiceName should be set here.
+# They can also be specified on the connection string.
+HOST=hostname.sample.example.com
+PORT=21050
+Schema=default
+
+# The authentication mechanism.
+# 0 - No authentication (NOSASL)
+# 1 - Kerberos authentication (SASL)
+# 2 - Username authentication (SASL)
+# 3 - Username/password authentication (SASL)
+# 4 - Username/password authentication with SSL (SASL)
+# 5 - No authentication with SSL (NOSASL)
+# 6 - Username/password authentication (NOSASL)
+AuthMech=0
+
+# Kerberos related settings.
+KrbFQDN=
+KrbRealm=
+KrbServiceName=
+
+# Username/password authentication with SSL settings.
+UID=
+PWD
+CAIssuedCertNamesMismatch=1
+TrustedCerts=/opt/cloudera/impalaodbc/lib/universal/cacerts.pem
+
+# Specify the proxy user ID to use.
+#DelegationUID=
+
+# General settings
+TSaslTransportBufSize=1000
+RowsFetchedPerBlock=10000
+SocketTimeout=0
+StringColumnLength=32767
+UseNativeQuery=0
+$ pwd
+/opt/cloudera/impalaodbc/Setup
+$ cd $installer_dir
+$ open BI_Tool_Installer.dmg
+<varname>Install the BI tool using its installer</varname>
+$ ls /Applications | grep BI_Tool
+BI_Tool.app
+$ open -a BI_Tool.app
+<varname>In the BI tool, connect to a data source using port 21050</varname>
+</codeblock>
+
+    </conbody>
+  </concept>
+
+  <concept rev="2.3.0" id="jdbc_odbc_notes">
+    <title>Notes about JDBC and ODBC Interaction with Impala SQL Features</title>
+    <conbody>
+
+      <p>
+        Most Impala SQL features work equivalently through the <cmdname>impala-shell</cmdname> interpreter
+        of the JDBC or ODBC APIs. The following are some exceptions to keep in mind when switching between
+        the interactive shell and applications using the APIs:
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/proxy_jdbc_caveat"/>
+
+      <ul>
+        <li>
+          <p conref="../shared/impala_common.xml#common/jdbc_odbc_complex_types"/>
+        </li>
+        <li>
+          <p conref="../shared/impala_common.xml#common/jdbc_odbc_complex_types_views"/>
+        </li>
+      </ul>
+
+    </conbody>
+  </concept>
+
+</concept>

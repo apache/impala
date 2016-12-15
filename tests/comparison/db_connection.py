@@ -796,7 +796,7 @@ class ImpalaCursor(DbCursor):
         # Impala into Postgres anyway. 3 was chosen for the buckets because our
         # minicluster tends to have 3 tablet servers, but otherwise it's arbitrary and
         # provides valid syntax for creating Kudu tables in Impala.
-        sql += '\nDISTRIBUTE BY HASH ({col}) INTO 3 BUCKETS'.format(
+        sql += '\nPARTITION BY HASH ({col}) PARTITIONS 3'.format(
             col=table.primary_key_names[0])
       else:
         raise Exception(

@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.impala.catalog.ArrayType;
@@ -87,7 +88,7 @@ public class Subquery extends Expr {
 
     // Set the subquery type based on the types of the exprs in the
     // result list of the associated SelectStmt.
-    ArrayList<Expr> stmtResultExprs = stmt_.getResultExprs();
+    List<Expr> stmtResultExprs = stmt_.getResultExprs();
     if (stmtResultExprs.size() == 1) {
       type_ = stmtResultExprs.get(0).getType();
       Preconditions.checkState(!type_.isComplexType());
@@ -109,7 +110,7 @@ public class Subquery extends Expr {
    * Check if the subquery's SelectStmt returns a single column of scalar type.
    */
   public boolean returnsScalarColumn() {
-    ArrayList<Expr> stmtResultExprs = stmt_.getResultExprs();
+    List<Expr> stmtResultExprs = stmt_.getResultExprs();
     if (stmtResultExprs.size() == 1 && stmtResultExprs.get(0).getType().isScalarType()) {
       return true;
     }
@@ -120,10 +121,10 @@ public class Subquery extends Expr {
    * Create a StrucType from the result expr list of a subquery's SelectStmt.
    */
   private StructType createStructTypeFromExprList() {
-    ArrayList<Expr> stmtResultExprs = stmt_.getResultExprs();
+    List<Expr> stmtResultExprs = stmt_.getResultExprs();
     ArrayList<StructField> structFields = Lists.newArrayList();
     // Check if we have unique labels
-    ArrayList<String> labels = stmt_.getColLabels();
+    List<String> labels = stmt_.getColLabels();
     boolean hasUniqueLabels = true;
     if (Sets.newHashSet(labels).size() != labels.size()) hasUniqueLabels = false;
 

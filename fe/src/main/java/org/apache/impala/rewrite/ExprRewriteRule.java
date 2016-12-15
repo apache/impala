@@ -27,6 +27,11 @@ import org.apache.impala.common.AnalysisException;
  * An ExprRewriteRule is intended to apply its transformation on a single Expr and not
  * recursively on all its children. The recursive and repeated application of
  * ExprRewriteRules is driven by an ExprRewriter.
+ * An ExprRewriteRule should preserve the type of the transformed expression to avoid
+ * having to re-analyze its parent (if any). This behavior guarantees that the Expr
+ * tree remains valid even if arbitrary subexpressions are transformed. It also means
+ * that the transformed expression may have a wider type than necessary. Callers are
+ * free to reset() and analyze() the result if they desire the minimal type.
  */
 public interface ExprRewriteRule {
   /**

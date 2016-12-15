@@ -582,7 +582,7 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: b.smallint_col = c.smallint_col
-|  other predicates: b.id < 10
+|  other predicates: a.int_col < b.int_col, b.id < 10
 |  runtime filters: RF000 <- c.smallint_col
 |
 |--02:SCAN HDFS [functional.alltypes c]
@@ -590,7 +590,6 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = b.id
-|  other predicates: a.int_col < b.int_col
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
@@ -749,7 +748,7 @@ PLAN-ROOT SINK
 |
 |--00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: (CASE WHEN a.id > 100 THEN a.timestamp_col ELSE a.timestamp_col END) >= CAST('2001-01-01 00:00:00' AS TIMESTAMP)
+|     predicates: (CASE WHEN a.id > 100 THEN a.timestamp_col ELSE a.timestamp_col END) >= TIMESTAMP '2001-01-01 00:00:00'
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB
@@ -889,4 +888,131 @@ PLAN-ROOT SINK
 |
 04:SCAN HDFS [functional.alltypestiny e]
    partitions=4/4 files=4 size=460B
+====
+# IMPALA-3125: Test that the On-clause predicates from an outer join are assigned to the
+# corresponding outer-join node, even if the predicates do not reference the join rhs.
+select a.id aid, b.id bid, a.int_col aint, b.int_col bint
+from functional.alltypes a
+inner join functional.alltypes b
+  on a.int_col = b.int_col
+left outer join functional.alltypes c
+  on a.id = b.id and b.bigint_col = c.bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: b.bigint_col = c.bigint_col
+|  other join predicates: a.id = b.id
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: b.int_col = a.int_col
+|  runtime filters: RF000 <- a.int_col
+|
+|--00:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|
+01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> b.int_col
+====
+# IMPALA-3167: Test correct assignment of a WHERE-clause predicate through an inline view
+# that has a grouping aggregation and an outer join. The predicate can be assigned at the
+# scan on the nullable side of the outer join, but it must also be evaluated after the join.
+select v2.id, v2.s
+from (select v1.id, sum(bigint_col) s
+      from functional.alltypes t1
+      left outer join (select t2.int_col, t2.id
+                       from functional.alltypessmall t2) v1
+      on t1.int_col = v1.int_col
+      group by v1.id) v2
+where v2.id < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: sum(bigint_col)
+|  group by: t2.id
+|  having: v1.id < 10
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 files=4 size=6.32KB
+|     predicates: t2.id < 10
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-3126: Test assignment of an inner join On-clause predicate. The predicate
+# may not be assigned below the join materializing 'd'.
+select 1 from functional.alltypes a
+left outer join functional.alltypes b
+  on a.id = b.id
+right outer join functional.alltypes c
+  on b.id = c.id
+inner join functional.alltypes d
+  on a.int_col = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+06:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: a.int_col = b.int_col
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: b.id = c.id
+|  runtime filters: RF000 <- c.id
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> b.id
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-3126: Same as above but with a semi join at the end.
+select 1 from functional.alltypes a
+left outer join functional.alltypes b
+  on a.id = b.id
+right outer join functional.alltypes c
+  on b.id = c.id
+left semi join functional.alltypes d
+  on a.int_col = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+06:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  join predicates: a.int_col = b.int_col
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: b.id = c.id
+|  runtime filters: RF000 <- c.id
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> b.id
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
 ====

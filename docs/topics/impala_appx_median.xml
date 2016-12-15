@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.2.1" id="appx_median">
+
+  <title>APPX_MEDIAN Function</title>
+  <titlealts audience="PDF"><navtitle>APPX_MEDIAN</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Querying"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">appx_median() function</indexterm>
+      An aggregate function that returns a value that is approximately the median (midpoint) of values in the set
+      of input values.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>APPX_MEDIAN([DISTINCT | ALL] <varname>expression</varname>)
+</codeblock>
+
+    <p>
+      This function works with any input type, because the only requirement is that the type supports less-than and
+      greater-than comparison operators.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      Because the return value represents the estimated midpoint, it might not reflect the precise midpoint value,
+      especially if the cardinality of the input values is very high. If the cardinality is low (up to
+      approximately 20,000), the result is more accurate because the sampling considers all or almost all of the
+      different values.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/return_type_same_except_string"/>
+
+    <p>
+      The return value is always the same as one of the input values, not an <q>in-between</q> value produced by
+      averaging.
+    </p>
+
+<!-- <p conref="../shared/impala_common.xml#common/restrictions_sliding_window"/> -->
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/analytic_not_allowed_caveat"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following example uses a table of a million random floating-point numbers ranging up to approximately
+      50,000. The average is approximately 25,000. Because of the random distribution, we would expect the median
+      to be close to this same number. Computing the precise median is a more intensive operation than computing
+      the average, because it requires keeping track of every distinct value and how many times each occurs. The
+      <codeph>APPX_MEDIAN()</codeph> function uses a sampling algorithm to return an approximate result, which in
+      this case is close to the expected value. To make sure that the value is not substantially out of range due
+      to a skewed distribution, subsequent queries confirm that there are approximately 500,000 values higher than
+      the <codeph>APPX_MEDIAN()</codeph> value, and approximately 500,000 values lower than the
+      <codeph>APPX_MEDIAN()</codeph> value.
+    </p>
+
+<codeblock>[localhost:21000] &gt; select min(x), max(x), avg(x) from million_numbers;
++-------------------+-------------------+-------------------+
+| min(x)            | max(x)            | avg(x)            |
++-------------------+-------------------+-------------------+
+| 4.725693727250069 | 49994.56852674231 | 24945.38563793553 |
++-------------------+-------------------+-------------------+
+[localhost:21000] &gt; select appx_median(x) from million_numbers;
++----------------+
+| appx_median(x) |
++----------------+
+| 24721.6        |
++----------------+
+[localhost:21000] &gt; select count(x) as higher from million_numbers where x &gt; (select appx_median(x) from million_numbers);
++--------+
+| higher |
++--------+
+| 502013 |
++--------+
+[localhost:21000] &gt; select count(x) as lower from million_numbers where x &lt; (select appx_median(x) from million_numbers);
++--------+
+| lower  |
++--------+
+| 497987 |
++--------+
+</codeblock>
+
+    <p>
+      The following example computes the approximate median using a subset of the values from the table, and then
+      confirms that the result is a reasonable estimate for the midpoint.
+    </p>
+
+<codeblock>[localhost:21000] &gt; select appx_median(x) from million_numbers where x between 1000 and 5000;
++-------------------+
+| appx_median(x)    |
++-------------------+
+| 3013.107787358159 |
++-------------------+
+[localhost:21000] &gt; select count(x) as higher from million_numbers where x between 1000 and 5000 and x &gt; 3013.107787358159;
++--------+
+| higher |
++--------+
+| 37692  |
++--------+
+[localhost:21000] &gt; select count(x) as lower from million_numbers where x between 1000 and 5000 and x &lt; 3013.107787358159;
++-------+
+| lower |
++-------+
+| 37089 |
++-------+
+</codeblock>
+  </conbody>
+</concept>

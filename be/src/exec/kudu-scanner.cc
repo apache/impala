@@ -20,6 +20,7 @@
 #include <kudu/client/row_result.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <vector>
+#include <string>
 
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
@@ -43,6 +44,9 @@ using kudu::client::KuduScanBatch;
 using kudu::client::KuduSchema;
 using kudu::client::KuduTable;
 
+DEFINE_string(kudu_read_mode, "READ_LATEST", "(Advanced) Sets the Kudu scan ReadMode. "
+    "Supported Kudu read modes are READ_LATEST and READ_AT_SNAPSHOT. Invalid values "
+    "result in using READ_LATEST.");
 DEFINE_bool(pick_only_leaders_for_tests, false,
             "Whether to pick only leader replicas, for tests purposes only.");
 DEFINE_int32(kudu_scanner_keep_alive_period_sec, 15,
@@ -52,6 +56,8 @@ DEFINE_int32(kudu_scanner_keep_alive_period_sec, 15,
 DECLARE_int32(kudu_operation_timeout_ms);
 
 namespace impala {
+
+const string MODE_READ_AT_SNAPSHOT = "READ_AT_SNAPSHOT";
 
 KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state)
   : scan_node_(scan_node),
@@ -99,12 +105,11 @@ Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
     RETURN_IF_CANCELLED(state_);
 
     if (cur_kudu_batch_num_read_ < cur_kudu_batch_.NumRows()) {
-      bool batch_done;
-      RETURN_IF_ERROR(DecodeRowsIntoRowBatch(row_batch, &tuple, &batch_done));
-      if (batch_done) break;
+      RETURN_IF_ERROR(DecodeRowsIntoRowBatch(row_batch, &tuple));
+      if (row_batch->AtCapacity()) break;
     }
 
-    if (scanner_->HasMoreRows()) {
+    if (scanner_->HasMoreRows() && !scan_node_->ReachedLimit()) {
       RETURN_IF_ERROR(GetNextScannerBatch());
       continue;
     }
@@ -132,9 +137,15 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
     KUDU_RETURN_IF_ERROR(scanner_->SetSelection(kudu::client::KuduClient::LEADER_ONLY),
                          "Could not set replica selection.");
   }
-
+  kudu::client::KuduScanner::ReadMode mode =
+      MODE_READ_AT_SNAPSHOT == FLAGS_kudu_read_mode ?
+          kudu::client::KuduScanner::READ_AT_SNAPSHOT :
+          kudu::client::KuduScanner::READ_LATEST;
+  KUDU_RETURN_IF_ERROR(scanner_->SetReadMode(mode), "Could not set scanner ReadMode");
   KUDU_RETURN_IF_ERROR(scanner_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms),
       "Could not set scanner timeout");
+  VLOG_ROW << "Starting KuduScanner with ReadMode=" << mode << " timeout=" <<
+      FLAGS_kudu_operation_timeout_ms;
 
   {
     SCOPED_TIMER(state_->total_storage_wait_timer());
@@ -149,26 +160,19 @@ void KuduScanner::CloseCurrentClientScanner() {
   scanner_.reset();
 }
 
-Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch, bool* batch_done) {
+Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch) {
   int num_rows_remaining = cur_kudu_batch_.NumRows() - cur_kudu_batch_num_read_;
   int rows_to_add = std::min(row_batch->capacity() - row_batch->num_rows(),
       num_rows_remaining);
   cur_kudu_batch_num_read_ += rows_to_add;
   row_batch->CommitRows(rows_to_add);
-  // If we've reached the capacity, or the LIMIT for the scan, return.
-  if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) {
-    *batch_done = true;
-  }
   return Status::OK();
 }
 
-Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_mem,
-    bool* batch_done) {
-  *batch_done = false;
-
+Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_mem) {
   // Short-circuit the count(*) case.
   if (scan_node_->tuple_desc_->slots().empty()) {
-    return HandleEmptyProjection(row_batch, batch_done);
+    return HandleEmptyProjection(row_batch);
   }
 
   // Iterate through the Kudu rows, evaluate conjuncts and deep-copy survivors into
@@ -193,10 +197,7 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
     row->SetTuple(0, *tuple_mem);
     row_batch->CommitLastRow();
     // If we've reached the capacity, or the LIMIT for the scan, return.
-    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) {
-      *batch_done = true;
-      break;
-    }
+    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
     // Move to the next tuple in the tuple buffer.
     *tuple_mem = next_tuple(*tuple_mem);
   }

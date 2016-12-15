@@ -42,6 +42,12 @@ Status ThriftClientImpl::Open() {
       transport_->open();
     }
   } catch (const TException& e) {
+    try {
+      transport_->close();
+    } catch (const TException& e) {
+      VLOG(1) << "Error closing socket to: " << address_ << ", ignoring (" << e.what()
+                << ")";
+    }
     return Status(Substitute("Couldn't open transport for $0 ($1)",
         lexical_cast<string>(address_), e.what()));
   }

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="scan_node_codegen_threshold" rev="2.5.0 IMPALA-1755">
+
+  <title>SCAN_NODE_CODEGEN_THRESHOLD Query Option (<keyword keyref="impala25"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle></navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.5.0 IMPALA-1755">
+      <indexterm audience="Cloudera">SCAN_NODE_CODEGEN_THRESHOLD query option</indexterm>
+      The <codeph>SCAN_NODE_CODEGEN_THRESHOLD</codeph> query option
+      adjusts the aggressiveness of the code generation optimization process
+      when performing I/O read operations. It can help to work around performance problems
+      for queries where the table is small and the <codeph>WHERE</codeph> clause is complicated.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+
+    <p>
+      <b>Default:</b> 1800000 (1.8 million)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_250"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      This query option is intended mainly for the case where a query with a very complicated
+      <codeph>WHERE</codeph> clause, such as an <codeph>IN</codeph> operator with thousands
+      of entries, is run against a small table, especially a small table using Parquet format.
+      The code generation phase can become the dominant factor in the query response time,
+      making the query take several seconds even though there is relatively little work to do.
+      In this case, increase the value of this option to a much larger amount, anything up to
+      the maximum for a 32-bit integer.
+    </p>
+
+    <p>
+      Because this option only affects the code generation phase for the portion of the
+      query that performs I/O (the <term>scan nodes</term> within the query plan), it
+      lets you continue to keep code generation enabled for other queries, and other parts
+      of the same query, that can benefit from it. In contrast, the
+      <codeph>IMPALA_DISABLE_CODEGEN</codeph> query option turns off code generation entirely.
+    </p>
+
+    <p>
+      Because of the way the work for queries is divided internally, this option might not
+      affect code generation for all kinds of queries. If a plan fragment contains a scan
+      node and some other kind of plan node, code generation still occurs regardless of
+      this option setting.
+    </p>
+
+    <p>
+      To use this option effectively, you should be familiar with reading query profile output
+      to determine the proportion of time spent in the code generation phase, and whether
+      code generation is enabled or not for specific plan fragments.
+    </p>
+
+<!--
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+    </p>
+-->
+
+  </conbody>
+</concept>

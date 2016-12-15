@@ -29,6 +29,7 @@ import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TFloatLiteral;
 import org.apache.impala.thrift.TIntLiteral;
+
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
@@ -46,6 +47,8 @@ public class NumericLiteral extends LiteralExpr {
   // it by 10) does not unnecessarily change the unscaled value. Special care
   // needs to be taken when converting between the big decimals unscaled value
   // and ours. (See getUnscaledValue()).
+  // A BigDecimal cannot represent special float values like NaN, infinity, or
+  // negative zero.
   private BigDecimal value_;
 
   // If true, this literal has been explicitly cast to a type and should not
@@ -107,6 +110,18 @@ public class NumericLiteral extends LiteralExpr {
     super(other);
     value_ = other.value_;
     explicitlyCast_ = other.explicitlyCast_;
+  }
+
+  /**
+   * Returns true if 'v' can be represented by a NumericLiteral, false otherwise.
+   * Special float values like NaN, infinity, and negative zero cannot be represented
+   * by a NumericLiteral.
+   */
+  public static boolean isValidLiteral(double v) {
+    if (Double.isNaN(v) || Double.isInfinite(v)) return false;
+    // Check for negative zero.
+    if (v == 0 && 1.0 / v == Double.NEGATIVE_INFINITY) return false;
+    return true;
   }
 
   @Override

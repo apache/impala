@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.0.0" id="subqueries">
+
+  <title>Subqueries in Impala SELECT Statements</title>
+  <titlealts audience="PDF"><navtitle>Subqueries</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.0.0">
+      <indexterm audience="Cloudera">subqueries</indexterm>
+      A <term>subquery</term> is a query that is nested within another query. Subqueries let queries on one table
+      dynamically adapt based on the contents of another table. This technique provides great flexibility and
+      expressive power for SQL queries.
+    </p>
+
+    <p>
+      A subquery can return a result set for use in the <codeph>FROM</codeph> or <codeph>WITH</codeph> clauses, or
+      with operators such as <codeph>IN</codeph> or <codeph>EXISTS</codeph>.
+    </p>
+
+    <p>
+      A <term>scalar subquery</term> produces a result set with a single row containing a single column, typically
+      produced by an aggregation function such as <codeph>MAX()</codeph> or <codeph>SUM()</codeph>. This single
+      result value can be substituted in scalar contexts such as arguments to comparison operators. If the result
+      set is empty, the value of the scalar subquery is <codeph>NULL</codeph>. For example, the following query
+      finds the maximum value of <codeph>T2.Y</codeph> and then substitutes that value into the
+      <codeph>WHERE</codeph> clause of the outer block that queries <codeph>T1</codeph>:
+    </p>
+
+<codeblock>SELECT x FROM t1 WHERE x &gt; (SELECT MAX(y) FROM t2);
+</codeblock>
+
+    <p>
+      <term>Uncorrelated subqueries</term> do not refer to any tables from the outer block of the query. The same
+      value or set of values produced by the subquery is used when evaluating each row from the outer query block.
+      In this example, the subquery returns an arbitrary number of values from <codeph>T2.Y</codeph>, and each
+      value of <codeph>T1.X</codeph> is tested for membership in that same set of values:
+    </p>
+
+<codeblock>SELECT x FROM t1 WHERE x IN (SELECT y FROM t2);
+</codeblock>
+
+    <p>
+      <term>Correlated subqueries</term> compare one or more values from the outer query block to values referenced
+      in the <codeph>WHERE</codeph> clause of the subquery. Each row evaluated by the outer <codeph>WHERE</codeph>
+      clause can be evaluated using a different set of values. These kinds of subqueries are restricted in the
+      kinds of comparisons they can do between columns of the inner and outer tables. (See the following
+      <b>Restrictions</b> item.)
+    </p>
+
+    <p>
+      For example, the following query finds all the employees with salaries that are higher than average for their
+      department. The subquery potentially computes a different <codeph>AVG()</codeph> value for each employee.
+    </p>
+
+<!-- TK: Construct an EMPLOYEES schema to try out examples like these. -->
+
+<codeblock>SELECT employee_name, employee_id FROM employees one WHERE
+  salary &gt; (SELECT avg(salary) FROM employees two WHERE one.dept_id = two.dept_id);
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+    <p>
+      <b>Subquery in the <codeph>FROM</codeph> clause:</b>
+    </p>
+
+<codeblock>SELECT <varname>select_list</varname> FROM <varname>table_ref</varname> [, <varname>table_ref</varname> ...]
+
+<varname>table_ref</varname> ::= <varname>table_name</varname> | (<varname>select_statement</varname>)
+</codeblock>
+
+    <p>
+      <b>Subqueries in <codeph>WHERE</codeph> clause:</b>
+    </p>
+
+<codeblock>WHERE <varname>value</varname> <varname>comparison_operator</varname> (<varname>scalar_select_statement</varname>)
+WHERE <varname>value</varname> [NOT] IN (<varname>select_statement</varname>)
+WHERE [NOT] EXISTS (<varname>correlated_select_statement</varname>)
+WHERE NOT EXISTS (<varname>correlated_select_statement</varname>)
+</codeblock>
+
+    <p>
+      <codeph>comparison_operator</codeph> is a numeric comparison such as <codeph>=</codeph>,
+      <codeph>&lt;=</codeph>, <codeph>!=</codeph>, and so on, or a string comparison operator such as
+      <codeph>LIKE</codeph> or <codeph>REGEXP</codeph>.
+    </p>
+
+    <p rev="2.0.0">
+      Although you can use non-equality comparison operators such as <codeph>&lt;</codeph> or
+      <codeph>&gt;=</codeph>, the subquery must include at least one equality comparison between the columns of the
+      inner and outer query blocks.
+    </p>
+
+    <p>
+      All syntax is available for both correlated and uncorrelated queries, except that the <codeph>NOT
+      EXISTS</codeph> clause cannot be used with an uncorrelated subquery.
+    </p>
+
+    <p>
+      Impala subqueries can be nested arbitrarily deep.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/sql1999"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      This example illustrates how subqueries can be used in the <codeph>FROM</codeph> clause to organize the table
+      names, column names, and column values by producing intermediate result sets, especially for join queries.
+    </p>
+
+<codeblock>SELECT avg(t1.x), max(t2.y) FROM
+  (SELECT id, cast(a AS DECIMAL(10,5)) AS x FROM raw_data WHERE a BETWEEN 0 AND 100) AS t1
+  JOIN
+  (SELECT id, length(s) AS y FROM raw_data WHERE s LIKE 'A%') AS t2;
+  USING (id);
+</codeblock>
+
+    <p rev="2.0.0">
+      These examples show how a query can test for the existence of values in a separate table using the
+      <codeph>EXISTS()</codeph> operator with a subquery.
+<!--
+Internally, these queries are processed in a way similar to join queries.
+Because the values from the second table are not part of the result set, the subquery
+is more efficient than the equivalent join query.
+-->
+    </p>
+
+    <p>
+      The following examples show how a value can be compared against a set of values returned by a subquery.
+    </p>
+
+<codeblock rev="2.0.0">SELECT count(x) FROM t1 WHERE EXISTS(SELECT 1 FROM t2 WHERE t1.x = t2.y * 10);
+
+SELECT x FROM t1 WHERE x IN (SELECT y FROM t2 WHERE state = 'CA');
+</codeblock>
+
+    <p>
+      The following examples demonstrate scalar subqueries. When a subquery is known to return a single value, you
+      can substitute it where you would normally put a constant value.
+    </p>
+
+<codeblock>SELECT x FROM t1 WHERE y = (SELECT max(z) FROM t2);
+SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
+</codeblock>
+
+<!-- <p conref="../shared/impala_common.xml#common/partitioning_blurb"/> -->
+
+<!--
+<p conref="../shared/impala_common.xml#common/hbase_blurb"/>
+<p>
+Currently, the <codeph>IN (<varname>subquery</varname>)</codeph> operator results in a full table scan
+of an HBase table, rather than being translated into a series of single-row lookups.
+Therefore, this is not an efficient construct to use with Impala queries for HBase tables.
+</p>
+-->
+
+<!--
+<p conref="../shared/impala_common.xml#common/parquet_blurb"/>
+<p conref="../shared/impala_common.xml#common/text_blurb"/>
+<p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
+-->
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      If the same table is referenced in both the outer and inner query blocks, construct a table alias in the
+      outer query block and use a fully qualified name to distinguish the inner and outer table references:
+    </p>
+
+<!-- TK: verify the logic of this example. Probably have other similar ones that could be reused here. -->
+
+<codeblock>SELECT * FROM t1 one WHERE id IN (SELECT parent FROM t1 two WHERE t1.parent = t2.id);
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/internals_blurb"/>
+
+    <p>
+      Internally, subqueries involving <codeph>IN</codeph>, <codeph>NOT IN</codeph>, <codeph>EXISTS</codeph>, or
+      <codeph>NOT EXISTS</codeph> clauses are rewritten into join queries. Depending on the syntax, the subquery
+      might be rewritten to an outer join, semi join, cross join, or anti join.
+    </p>
+
+    <p>
+      A query is processed differently depending on whether the subquery calls any aggregation functions. There are
+      correlated and uncorrelated forms, with and without calls to aggregation functions. Each of these four
+      categories is rewritten differently.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/column_stats_blurb"/>
+
+    <p>
+      Because queries that include correlated and uncorrelated subqueries in the <codeph>WHERE</codeph> clause are
+      written into join queries, to achieve best performance, follow the same guidelines for running the
+      <codeph>COMPUTE STATS</codeph> statement as you do for tables involved in regular join queries. Run the
+      <codeph>COMPUTE STATS</codeph> statement for each associated tables after loading or substantially changing
+      the data in that table. See <xref href="impala_perf_stats.xml#perf_stats"/> for details.
+    </p>
+
+    <p>
+      <b>Added in:</b> Subqueries are substantially enhanced starting in Impala 2.0 for CDH 4, and CDH 5.2.0. Now,
+      they can be used in the <codeph>WHERE</codeph> clause, in combination with clauses such as
+      <codeph>EXISTS</codeph> and <codeph>IN</codeph>, rather than just in the <codeph>FROM</codeph> clause.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+    <p>
+      The initial Impala support for nested subqueries addresses the most common use cases. Some restrictions
+      remain:
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          Although you can use subqueries in a query involving <codeph>UNION</codeph> or <codeph>UNION ALL</codeph>
+          in Impala 2.1.0 and higher, currently you cannot construct a union of two subqueries (for example, in the
+          argument of an <codeph>IN</codeph> or <codeph>EXISTS</codeph> operator).
+        </p>
+      </li>
+
+      <li>
+        <p>
+          Subqueries returning scalar values cannot be used with the operators <codeph>ANY</codeph> or
+          <codeph>ALL</codeph>. (Impala does not currently have a <codeph>SOME</codeph> operator, but if it did,
+          the same restriction would apply.)
+        </p>
+      </li>
+
+      <li>
+        <p>
+          For the <codeph>EXISTS</codeph> and <codeph>NOT EXISTS</codeph> clauses, any subquery comparing values
+          from the outer query block to another table must use at least one equality comparison, not exclusively
+          other kinds of comparisons such as less than, greater than, <codeph>BETWEEN</codeph>, or
+          <codeph>!=</codeph>.
+        </p>
+      </li>
+
+      <li>
+<!-- TK: think this is no longer true. -->
+        <p>
+          Currently, a scalar subquery cannot be used as the first or second argument to the
+          <codeph>BETWEEN</codeph> operator.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          A subquery cannot be used inside an <codeph>OR</codeph> conjunction. Expressions inside a subquery, for
+          example in the <codeph>WHERE</codeph> clause, can use <codeph>OR</codeph> conjunctions; the restriction
+          only applies to parts of the query <q>above</q> the subquery.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          Scalar subqueries are only supported in numeric contexts. You cannot use a scalar subquery as an argument
+          to the <codeph>LIKE</codeph>, <codeph>REGEXP</codeph>, or <codeph>RLIKE</codeph> operators, or compare it
+          to a value of a non-numeric type such as <codeph>TIMESTAMP</codeph> or <codeph>BOOLEAN</codeph>.
+        </p>
+      </li>
+
+      <li>
+        <p>
+<!-- A subquery cannot be used to generate a scalar value for a function call. -->
+          You cannot use subqueries with the <codeph>CASE</codeph> function to generate the comparison value, the
+          values to be compared against, or the return value.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          A subquery is not allowed in the filter condition for the <codeph>HAVING</codeph> clause. (Strictly
+          speaking, a subquery cannot appear anywhere outside the <codeph>WITH</codeph>, <codeph>FROM</codeph>, and
+          <codeph>WHERE</codeph> clauses.)
+        </p>
+      </li>
+
+      <li>
+        <p>
+          You must use a fully qualified name
+          (<codeph><varname>table_name</varname>.<varname>column_name</varname></codeph> or
+          <codeph><varname>database_name</varname>.<varname>table_name</varname>.<varname>column_name</varname></codeph>)
+          when referring to any column from the outer query block within a subquery.
+        </p>
+      </li>
+    </ul>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p rev="2.3.0">
+      For the complex types (<codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>)
+      available in <keyword keyref="impala23_full"/> and higher, the join queries that <q>unpack</q> complex type
+      columns often use correlated subqueries in the <codeph>FROM</codeph> clause.
+      For example, if the first table in the join clause is <codeph>CUSTOMER</codeph>, the second
+      join clause might have a subquery that selects from the column <codeph>CUSTOMER.C_ORDERS</codeph>,
+      which is an <codeph>ARRAY</codeph>. The subquery re-evaluates the <codeph>ARRAY</codeph> elements
+      corresponding to each row from the <codeph>CUSTOMER</codeph> table.
+      See <xref href="impala_complex_types.xml#complex_types"/> for details and examples of
+      using subqueries with complex types.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_operators.xml#exists"/>, <xref href="impala_operators.xml#in"/>
+    </p>
+  </conbody>
+</concept>

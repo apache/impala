@@ -45,6 +45,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/types.h"
+#include "statestore/statestore-subscriber.h"
 
 namespace impala {
 
@@ -78,15 +79,14 @@ class TGetExecSummaryReq;
 /// This class is partially thread-safe. To ensure freedom from deadlock, if multiple
 /// locks are acquired, lower-numbered locks must be acquired before higher-numbered
 /// locks:
-/// 1. connection_to_sessions_map_lock_
-/// 2. session_state_map_lock_
-/// 3. SessionState::lock
-/// 4. query_expiration_lock_
-/// 5. query_exec_state_map_lock_
-/// 6. QueryExecState::fetch_rows_lock
-/// 7. QueryExecState::lock
-/// 8. QueryExecState::expiration_data_lock_
-/// 9. Coordinator::exec_summary_lock
+/// 1. session_state_map_lock_
+/// 2. SessionState::lock
+/// 3. query_expiration_lock_
+/// 4. query_exec_state_map_lock_
+/// 5. QueryExecState::fetch_rows_lock
+/// 6. QueryExecState::lock
+/// 7. QueryExecState::expiration_data_lock_
+/// 8. Coordinator::exec_summary_lock
 ///
 /// Coordinator::lock_ should not be acquired at the same time as the
 /// ImpalaServer/SessionState/QueryExecState locks. Aside from
@@ -99,6 +99,7 @@ class TGetExecSummaryReq;
 /// * query_locations_lock_
 /// * uuid_lock_
 /// * catalog_version_lock_
+/// * connection_to_sessions_map_lock_
 ///
 /// TODO: The state of a running query is currently not cleaned up if the
 /// query doesn't experience any errors at runtime and close() doesn't get called.
@@ -259,8 +260,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   ///  - incoming_topic_deltas: all changes to registered statestore topics
   ///  - subscriber_topic_updates: output parameter to publish any topic updates to.
   ///                              Currently unused.
-  void MembershipCallback(const StatestoreSubscriber::TopicDeltaMap&
-      incoming_topic_deltas, std::vector<TTopicDelta>* subscriber_topic_updates);
+  void MembershipCallback(
+      const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
+      std::vector<TTopicDelta>* subscriber_topic_updates);
 
   void CatalogUpdateCallback(const StatestoreSubscriber::TopicDeltaMap& topic_deltas,
       std::vector<TTopicDelta>* topic_updates);

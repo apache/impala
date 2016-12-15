@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="max_scan_range_length">
+
+  <title>MAX_SCAN_RANGE_LENGTH Query Option</title>
+  <titlealts audience="PDF"><navtitle>MAX_SCAN_RANGE_LENGTH</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">MAX_SCAN_RANGE_LENGTH query option</indexterm>
+      Maximum length of the scan range. Interacts with the number of HDFS blocks in the table to determine how many
+      CPU cores across the cluster are involved with the processing for a query. (Each core processes one scan
+      range.)
+    </p>
+
+    <p>
+      Lowering the value can sometimes increase parallelism if you have unused CPU capacity, but a too-small value
+      can limit query performance because each scan range involves extra overhead.
+    </p>
+
+    <p>
+      Only applicable to HDFS tables. Has no effect on Parquet tables. Unspecified or 0 indicates backend default,
+      which is the same as the HDFS block size for each table.
+    </p>
+
+    <p>
+      Although the scan range can be arbitrarily long, Impala internally uses an 8 MB read buffer so that it can
+      query tables with huge block sizes without allocating equivalent blocks of memory.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p rev="IMPALA-3799 CDH-43746">
+      In <keyword keyref="impala27_full"/> and higher, the argument value can include unit specifiers,
+      such as <codeph>100m</codeph> or <codeph>100mb</codeph>. In previous versions,
+      Impala interpreted such formatted values as 0, leading to query failures.
+    </p>
+
+    <p>
+      <b>Default:</b> 0
+    </p>
+  </conbody>
+</concept>

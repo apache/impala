@@ -2531,3 +2531,109 @@ select count(shiftleft(int_col, 1)) from functional_parquet.alltypes
 ---- TYPES
 bigint
 ====
+---- QUERY
+# Test constant timestamp expressions in various query clauses. Exercises
+# timestamp literals when run with expr rewrites enabled.
+select count(now()) c, avg(cast('2016-11-22 16:40:00.00' as timestamp)) a,
+  cast('2016-11-22 16:40:00.00' as timestamp) as g
+from functional_parquet.alltypes
+where timestamp_col < cast('2013-02-18 20:46:00.01' as timestamp)
+group by g
+having a = cast('2016-11-22 16:40:00.00' as timestamp)
+order by c, cast('2016-11-22 16:40:00.00' as timestamp)
+---- RESULTS
+7300,2016-11-22 16:40:00,2016-11-22 16:40:00
+---- TYPES
+BIGINT, TIMESTAMP, TIMESTAMP
+====
+---- QUERY
+# Constant timestamp expresisons in a join condition / runtime filter as well
+# as a select node.
+select count(*) from (
+  select a.timestamp_col from
+  functional_parquet.alltypessmall a
+  inner join functional_parquet.alltypestiny b
+  on cast('2013-02-18 20:46:00.01' as timestamp) + interval a.id years =
+     cast('2013-02-18 20:46:00.01' as timestamp) + interval b.id years
+  order by a.timestamp_col limit 10
+) v
+where timestamp_col < cast('2013-02-18 20:46:00.01' as timestamp)
+---- RESULTS
+8
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-4550: Regression test for proper cast analysis after slot substitution within a
+# no-op explicit cast.
+select /* +straight_join */ a.id
+from   functional.alltypestiny a
+join   functional.alltypestiny b on a.string_col = b.timestamp_col
+where  (cast(a.string_col as string) > 'a');
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Test from_utc_timestamp() returning out-of-range result.
+select from_utc_timestamp(CAST("1400-01-01 05:00:00" as TIMESTAMP), "PST")
+from alltypes
+limit 1
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+---- ERRORS
+UDF WARNING: Timestamp '1400-01-01 05:00:00' did not convert to a valid local time in timezone 'PST'
+====
+---- QUERY
+# Test from_utc_timestamp() returning out-of-range result.
+select to_utc_timestamp(CAST("1400-01-01 05:00:00" as TIMESTAMP), "JST")
+from alltypes
+limit 1
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+---- ERRORS
+UDF WARNING: Timestamp '1400-01-01 05:00:00' in timezone 'JST' could not be converted to UTC
+====
+---- QUERY
+# Test out-of-range value handling when adding dates.
+select CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 367 DAYS
+from alltypes
+limit 1
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+---- ERRORS
+UDF WARNING: Cannot add interval 367: Year is out of valid range: 1400..10000
+====
+---- QUERY
+# Test out-of-range value handling when subtracting dates.
+select CAST('1400-01-01 21:00:00' AS TIMESTAMP) - INTERVAL 1 DAYS
+from alltypes
+limit 1
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+---- ERRORS
+UDF WARNING: Cannot subtract interval 1: Year is out of valid range: 1400..10000
+====
+---- QUERY
+# IMPALA-4574: UUID() is not a constant expression.
+select count(*) from functional.alltypestiny group by concat(uuid(), "_test")
+---- RESULTS
+1
+1
+1
+1
+1
+1
+1
+1
+---- TYPES
+BIGINT
+====

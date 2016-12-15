@@ -71,9 +71,9 @@ Status ExprContext::Open(RuntimeState* state) {
 }
 
 void ExprContext::Close(RuntimeState* state) {
-  DCHECK(!closed_);
+  if (closed_) return;
   FunctionContext::FunctionStateScope scope =
-      is_clone_? FunctionContext::THREAD_LOCAL : FunctionContext::FRAGMENT_LOCAL;
+      is_clone_ ? FunctionContext::THREAD_LOCAL : FunctionContext::FRAGMENT_LOCAL;
   root_->Close(state, this, scope);
 
   for (int i = 0; i < fn_contexts_.size(); ++i) {
@@ -150,13 +150,9 @@ void ExprContext::FreeLocalAllocations(const vector<FunctionContext*>& fn_ctxs) 
   }
 }
 
-void ExprContext::GetValue(const TupleRow* row, bool as_ascii, TColumnValue* col_val) {
-  void* value = GetValue(row);
-  if (as_ascii) {
-    RawValue::PrintValue(value, root_->type_, root_->output_scale_, &col_val->string_val);
-    col_val->__isset.string_val = true;
-    return;
-  }
+void ExprContext::EvaluateWithoutRow(TColumnValue* col_val) {
+  DCHECK_EQ(0, root_->GetSlotIds());
+  void* value = GetValue(NULL);
   if (value == NULL) return;
 
   StringValue* string_val = NULL;
@@ -206,19 +202,23 @@ void ExprContext::GetValue(const TupleRow* row, bool as_ascii, TColumnValue* col
     case TYPE_VARCHAR:
       string_val = reinterpret_cast<StringValue*>(value);
       tmp.assign(static_cast<char*>(string_val->ptr), string_val->len);
-      col_val->string_val.swap(tmp);
-      col_val->__isset.string_val = true;
+      col_val->binary_val.swap(tmp);
+      col_val->__isset.binary_val = true;
       break;
     case TYPE_CHAR:
       tmp.assign(StringValue::CharSlotToPtr(value, root_->type_), root_->type_.len);
-      col_val->string_val.swap(tmp);
-      col_val->__isset.string_val = true;
+      col_val->binary_val.swap(tmp);
+      col_val->__isset.binary_val = true;
       break;
-    case TYPE_TIMESTAMP:
+    case TYPE_TIMESTAMP: {
+      uint8_t* uint8_val = reinterpret_cast<uint8_t*>(value);
+      col_val->binary_val.assign(uint8_val, uint8_val + root_->type_.GetSlotSize());
+      col_val->__isset.binary_val = true;
       RawValue::PrintValue(
           value, root_->type_, root_->output_scale_, &col_val->string_val);
       col_val->__isset.string_val = true;
       break;
+    }
     default:
       DCHECK(false) << "bad GetValue() type: " << root_->type_.DebugString();
   }

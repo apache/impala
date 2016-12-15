@@ -400,10 +400,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         StringParser::ParseResult result;
         const int32_t dop =
             StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
-        if (result != StringParser::PARSE_SUCCESS || dop < 0 || dop > 128) {
+        if (result != StringParser::PARSE_SUCCESS || dop < 0 || dop > 64) {
           return Status(
               Substitute("$0 is not valid for mt_dop. Valid values are in "
-                "[0, 128].", value));
+                "[0, 64].", value));
         }
         query_options->__set_mt_dop(dop);
         break;

@@ -67,6 +67,7 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
+  *eos = false;
 
   DCHECK(scan_range_ == NULL || scanner_ != NULL);
   if (scan_range_ == NULL || scanner_->eos()) {
@@ -97,6 +98,7 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
     num_owned_io_buffers_.Add(-row_batch->num_io_buffers());
     return status;
   }
+  InitNullCollectionValues(row_batch);
 
   num_rows_returned_ += row_batch->num_rows();
   if (ReachedLimit()) {
@@ -117,6 +119,7 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
 
 void HdfsScanNodeMt::Close(RuntimeState* state) {
   if (is_closed()) return;
+  if (scanner_.get() != nullptr) scanner_->Close(nullptr);
   scanner_.reset();
   scanner_ctx_.reset();
   HdfsScanNodeBase::Close(state);

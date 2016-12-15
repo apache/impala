@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.1" id="security_webui">
+
+  <title>Securing the Impala Web User Interface</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The instructions in this section presume you are familiar with the
+      <xref href="http://en.wikipedia.org/wiki/.htpasswd" scope="external" format="html">
+      <filepath>.htpasswd</filepath> mechanism</xref> commonly used to password-protect pages on web servers.
+    </p>
+
+    <p>
+      Password-protect the Impala web UI that listens on port 25000 by default. Set up a
+      <filepath>.htpasswd</filepath> file in the <codeph>$IMPALA_HOME</codeph> directory, or start both the
+      <cmdname>impalad</cmdname> and <cmdname>statestored</cmdname> daemons with the
+      <codeph>--webserver_password_file</codeph> option to specify a different location (including the filename).
+    </p>
+
+    <p>
+      This file should only be readable by the Impala process and machine administrators, because it contains
+      (hashed) versions of passwords. The username / password pairs are not derived from Unix usernames, Kerberos
+      users, or any other system. The <codeph>domain</codeph> field in the password file must match the domain
+      supplied to Impala by the new command-line option <codeph>--webserver_authentication_domain</codeph>. The
+      default is <codeph>mydomain.com</codeph>.
+<!-- Password generator cited by Henry: <xref href="http://www.askapache.com/online-tools/htpasswd-generator/" scope="external" format="html"/> -->
+    </p>
+
+    <p>
+      Impala also supports using HTTPS for secure web traffic. To do so, set
+      <codeph>--webserver_certificate_file</codeph> to refer to a valid <codeph>.pem</codeph> TLS/SSL certificate file.
+      Impala will automatically start using HTTPS once the TLS/SSL certificate has been read and validated. A
+      <codeph>.pem</codeph> file is basically a private key, followed by a signed TLS/SSL certificate; make sure to
+      concatenate both parts when constructing the <codeph>.pem</codeph> file.
+<!-- Certificate info cited by Henry: <xref href="http://www.akadia.com/services/ssh_test_certificate.html" scope="external" format="html"/>
+This page was very useful for creating a certificate and private key file;
+the last step which was missing was to append one file to the other to make the <codeph>.pem</codeph> file. -->
+    </p>
+
+    <p>
+      If Impala cannot find or parse the <codeph>.pem</codeph> file, it prints an error message and quits.
+    </p>
+
+    <note>
+      <p>
+        If the private key is encrypted using a passphrase, Impala will ask for that passphrase on startup, which
+        is not useful for a large cluster. In that case, remove the passphrase and make the <codeph>.pem</codeph>
+        file readable only by Impala and administrators.
+      </p>
+      <p>
+        When you turn on TLS/SSL for the Impala web UI, the associated URLs change from <codeph>http://</codeph>
+        prefixes to <codeph>https://</codeph>. Adjust any bookmarks or application code that refers to those URLs.
+      </p>
+    </note>
+  </conbody>
+</concept>

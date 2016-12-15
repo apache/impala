@@ -62,10 +62,14 @@ struct THdfsTableSink {
   1: required list<Exprs.TExpr> partition_key_exprs
   2: required bool overwrite
 
-  /// The 'skip.header.line.count' property of the target Hdfs table. We will insert this
-  /// many empty lines at the beginning of new text files, which will be skipped by the
-  /// scanners while reading from the files.
+  // The 'skip.header.line.count' property of the target Hdfs table. We will insert this
+  // many empty lines at the beginning of new text files, which will be skipped by the
+  // scanners while reading from the files.
   3: optional i32 skip_header_line_count
+
+  // This property indicates to the table sink whether the input is ordered by the
+  // partition keys, meaning partitions can be opened, written, and closed one by one.
+  4: required bool input_is_clustered
 }
 
 // Structure to encapsulate specific options that are passed down to the KuduTableSink
@@ -73,7 +77,10 @@ struct TKuduTableSink {
   // The position in this vector is equal to the position in the output expressions of the
   // sink and holds the index of the corresponsding column in the Kudu schema,
   // e.g. 'exprs[i]' references 'kudu_table.column(referenced_cols[i])'
-  1: optional list<i32> referenced_columns;
+  1: optional list<i32> referenced_columns
+
+  // Defines if duplicate or not found keys should be ignored
+  2: optional bool ignore_not_found_or_duplicate
 }
 
 // Sink to create the build side of a JoinNode.

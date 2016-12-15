@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="misc_functions">
+
+  <title>Impala Miscellaneous Functions</title>
+  <titlealts audience="PDF"><navtitle>Miscellaneous Functions</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Impala supports the following utility functions that do not operate on a particular column or data type:
+    </p>
+
+    <dl>
+      <dlentry rev="1.3.0" id="current_database">
+
+        <dt>
+          <codeph>current_database()</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">current_database() function</indexterm>
+          <b>Purpose:</b> Returns the database that the session is currently using, either <codeph>default</codeph>
+          if no database has been selected, or whatever database the session switched to through a
+          <codeph>USE</codeph> statement or the <cmdname>impalad</cmdname><codeph>-d</codeph> option.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="5.4.5" id="effective_user">
+
+        <dt>
+          <codeph>effective_user()</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">effective_user() function</indexterm>
+          <b>Purpose:</b> Typically returns the same value as <codeph>user()</codeph>,
+          except if delegation is enabled, in which case it returns the ID of the delegated user.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p>
+            <b>Added in:</b> CDH 5.4.5
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="1.3.0" id="pid">
+
+        <dt>
+          <codeph>pid()</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">pid() function</indexterm>
+          <b>Purpose:</b> Returns the process ID of the <cmdname>impalad</cmdname> daemon that the session is
+          connected to. You can use it during low-level debugging, to issue Linux commands that trace, show the
+          arguments, and so on the <cmdname>impalad</cmdname> process.
+          <p>
+            <b>Return type:</b> <codeph>int</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry audience="Cloudera" id="sleep">
+
+        <dt>
+          <codeph>sleep(int ms)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">sleep() function</indexterm>
+          <b>Purpose:</b> Pauses the query for a specified number of milliseconds. For slowing down queries with
+          small result sets enough to monitor runtime execution, memory usage, or other factors that otherwise
+          would be difficult to capture during the brief interval of query execution. When used in the
+          <codeph>SELECT</codeph> list, it is called once for each row in the result set; adjust the number of
+          milliseconds accordingly. For example, a query <codeph>SELECT *, sleep(5) FROM
+          table_with_1000_rows</codeph> would take at least 5 seconds to complete (5 milliseconds * 1000 rows in
+          result set). To avoid an excessive number of concurrent queries, use this function for troubleshooting on
+          test and development systems, not for production queries.
+          <p>
+            <b>Return type:</b> N/A
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="1.1" id="user">
+
+        <dt>
+          <codeph>user()</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">user() function</indexterm>
+          <b>Purpose:</b> Returns the username of the Linux user who is connected to the <cmdname>impalad</cmdname>
+          daemon. Typically called a single time, in a query without any <codeph>FROM</codeph> clause, to
+          understand how authorization settings apply in a security context; once you know the logged-in username,
+          you can check which groups that user belongs to, and from the list of groups you can check which roles
+          are available to those groups through the authorization policy file.
+          <p conref="../shared/impala_common.xml#common/user_kerberized"/>
+          <p>
+            When delegation is enabled, consider calling the <codeph>effective_user()</codeph> function instead.
+          </p>
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry rev="2.5.0 IMPALA-1477" id="uuid">
+
+        <dt>
+          <codeph>uuid()</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">uuid() function</indexterm>
+          <b>Purpose:</b> Returns a <xref href="https://en.wikipedia.org/wiki/Universally_unique_identifier" scope="external" format="html">universal unique identifier</xref>, a 128-bit value encoded as a string with groups of hexadecimal digits separated by dashes.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_250"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            Ascending numeric sequences of type <codeph>BIGINT</codeph> are often used
+            as identifiers within a table, and as join keys across multiple tables.
+            The <codeph>uuid()</codeph> value is a convenient alternative that does not
+            require storing or querying the highest sequence number. For example, you
+            can use it to quickly construct new unique identifiers during a data import job,
+            or to combine data from different tables without the likelihood of ID collisions.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>
+-- Each call to uuid() produces a new arbitrary value.
+select uuid();
++--------------------------------------+
+| uuid()                               |
++--------------------------------------+
+| c7013e25-1455-457f-bf74-a2046e58caea |
++--------------------------------------+
+
+-- If you get a UUID for each row of a result set, you can use it as a
+-- unique identifier within a table, or even a unique ID across tables.
+select uuid() from four_row_table;
++--------------------------------------+
+| uuid()                               |
++--------------------------------------+
+| 51d3c540-85e5-4cb9-9110-604e53999e2e |
+| 0bb40071-92f6-4a59-a6a4-60d46e9703e2 |
+| 5e9d7c36-9842-4a96-862d-c13cd0457c02 |
+| cae29095-0cc0-4053-a5ea-7fcd3c780861 |
++--------------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="version">
+
+        <dt>
+          <codeph>version()</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="Cloudera">version() function</indexterm>
+          <b>Purpose:</b> Returns information such as the precise version number and build date for the
+          <codeph>impalad</codeph> daemon that you are currently connected to. Typically used to confirm that you
+          are connected to the expected level of Impala to use a particular feature, or to connect to several nodes
+          and confirm they are all running the same level of <cmdname>impalad</cmdname>.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph> (with one or more embedded newlines)
+          </p>
+        </dd>
+
+      </dlentry>
+    </dl>
+  </conbody>
+</concept>

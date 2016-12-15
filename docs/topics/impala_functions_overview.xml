@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="functions">
+
+  <title>Overview of Impala Functions</title>
+  <titlealts audience="PDF"><navtitle>Functions</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Functions let you apply arithmetic, string, or other computations and transformations to Impala data. You
+      typically use them in <codeph>SELECT</codeph> lists and <codeph>WHERE</codeph> clauses to filter and format
+      query results so that the result set is exactly what you want, with no further processing needed on the
+      application side.
+    </p>
+
+    <p>
+      Scalar functions return a single result for each input row. See <xref href="impala_functions.xml#builtins"/>.
+    </p>
+
+<codeblock>[localhost:21000] > select name, population from country where continent = 'North America' order by population desc limit 4;
+[localhost:21000] > select upper(name), population from country where continent = 'North America' order by population desc limit 4;
++-------------+------------+
+| upper(name) | population |
++-------------+------------+
+| USA         | 320000000  |
+| MEXICO      | 122000000  |
+| CANADA      | 25000000   |
+| GUATEMALA   | 16000000   |
++-------------+------------+
+</codeblock>
+    <p>
+      Aggregate functions combine the results from multiple rows:
+      either a single result for the entire table, or a separate result for each group of rows.
+      Aggregate functions are frequently used in combination with <codeph>GROUP BY</codeph>
+      and <codeph>HAVING</codeph> clauses in the <codeph>SELECT</codeph> statement.
+      See <xref href="impala_aggregate_functions.xml#aggregate_functions"/>.
+    </p>
+
+<codeblock>[localhost:21000] > select continent, <b>sum(population)</b> as howmany from country <b>group by continent</b> order by howmany desc;
++---------------+------------+
+| continent     | howmany    |
++---------------+------------+
+| Asia          | 4298723000 |
+| Africa        | 1110635000 |
+| Europe        | 742452000  |
+| North America | 565265000  |
+| South America | 406740000  |
+| Oceania       | 38304000   |
++---------------+------------+
+</codeblock>
+
+    <p>
+      User-defined functions (UDFs) let you code your own logic.  They can be either scalar or aggregate functions.
+      UDFs let you implement important business or scientific logic using high-performance code for Impala to automatically parallelize.
+      You can also use UDFs to implement convenience functions to simplify reporting or porting SQL from other database systems.
+      See <xref href="impala_udf.xml#udfs"/>.
+    </p>
+
+<codeblock>[localhost:21000] > select <b>rot13('Hello world!')</b> as 'Weak obfuscation';
++------------------+
+| weak obfuscation |
++------------------+
+| Uryyb jbeyq!     |
++------------------+
+[localhost:21000] > select <b>likelihood_of_new_subatomic_particle(sensor1, sensor2, sensor3)</b> as probability
+                  > from experimental_results group by experiment;
+</codeblock>
+
+    <p>
+      Each function is associated with a specific database. For example, if you issue a <codeph>USE somedb</codeph>
+      statement followed by <codeph>CREATE FUNCTION somefunc</codeph>, the new function is created in the
+      <codeph>somedb</codeph> database, and you could refer to it through the fully qualified name
+      <codeph>somedb.somefunc</codeph>. You could then issue another <codeph>USE</codeph> statement
+      and create a function with the same name in a different database.
+    </p>
+
+    <p>
+      Impala built-in functions are associated with a special database named <codeph>_impala_builtins</codeph>,
+      which lets you refer to them from any database without qualifying the name.
+    </p>
+
+<codeblock>[localhost:21000] > show databases;
++-------------------------+
+| name                    |
++-------------------------+
+| <b>_impala_builtins</b>        |
+| analytic_functions      |
+| avro_testing            |
+| data_file_size          |
+...
+[localhost:21000] > show functions in _impala_builtins like '*subs*';
++-------------+-----------------------------------+
+| return type | signature                         |
++-------------+-----------------------------------+
+| STRING      | substr(STRING, BIGINT)            |
+| STRING      | substr(STRING, BIGINT, BIGINT)    |
+| STRING      | substring(STRING, BIGINT)         |
+| STRING      | substring(STRING, BIGINT, BIGINT) |
++-------------+-----------------------------------+
+</codeblock>
+
+    <p>
+      <b>Related statements:</b> <xref href="impala_create_function.xml#create_function"/>,
+      <xref href="impala_drop_function.xml#drop_function"/>
+    </p>
+  </conbody>
+</concept>

@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="select">
+
+  <title>SELECT Statement</title>
+  <titlealts audience="PDF"><navtitle>SELECT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Reports"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <!-- This is such an important statement, think if there are more applicable categories. -->
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">SELECT statement</indexterm>
+      The <codeph>SELECT</codeph> statement performs queries, retrieving data from one or more tables and producing
+      result sets consisting of rows and columns.
+    </p>
+
+    <p>
+      The Impala <codeph><xref href="impala_insert.xml#insert">INSERT</xref></codeph> statement also typically ends
+      with a <codeph>SELECT</codeph> statement, to define data to copy from one table to another.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>[WITH <i>name</i> AS (<i>select_expression</i>) [, ...] ]
+SELECT
+  [ALL | DISTINCT]
+  [STRAIGHT_JOIN]
+  <i>expression</i> [, <i>expression</i> ...]
+FROM <i>table_reference</i> [, <i>table_reference</i> ...]
+[[FULL | [LEFT | RIGHT] INNER | [LEFT | RIGHT] OUTER | [LEFT | RIGHT] SEMI | [LEFT | RIGHT] ANTI | CROSS]
+  JOIN <i>table_reference</i>
+  [ON <i>join_equality_clauses</i> | USING (<varname>col1</varname>[, <varname>col2</varname> ...]] ...
+WHERE <i>conditions</i>
+GROUP BY { <i>column</i> | <i>expression</i> [ASC | DESC] [NULLS FIRST | NULLS LAST] [, ...] }
+HAVING <codeph>conditions</codeph>
+GROUP BY { <i>column</i> | <i>expression</i> [ASC | DESC] [, ...] }
+LIMIT <i>expression</i> [OFFSET <i>expression</i>]
+[UNION [ALL] <i>select_statement</i>] ...]
+</codeblock>
+
+    <p>
+      Impala <codeph>SELECT</codeph> queries support:
+    </p>
+
+    <ul>
+      <li>
+        SQL scalar data types: <codeph><xref href="impala_boolean.xml#boolean">BOOLEAN</xref></codeph>,
+        <codeph><xref href="impala_tinyint.xml#tinyint">TINYINT</xref></codeph>,
+        <codeph><xref href="impala_smallint.xml#smallint">SMALLINT</xref></codeph>,
+        <codeph><xref href="impala_int.xml#int">INT</xref></codeph>,
+        <codeph><xref href="impala_bigint.xml#bigint">BIGINT</xref></codeph>,
+        <codeph><xref href="impala_decimal.xml#decimal">DECIMAL</xref></codeph>
+        <codeph><xref href="impala_float.xml#float">FLOAT</xref></codeph>,
+        <codeph><xref href="impala_double.xml#double">DOUBLE</xref></codeph>,
+        <codeph><xref href="impala_timestamp.xml#timestamp">TIMESTAMP</xref></codeph>,
+        <codeph><xref href="impala_string.xml#string">STRING</xref></codeph>,
+        <codeph><xref href="impala_varchar.xml#varchar">VARCHAR</xref></codeph>,
+        <codeph><xref href="impala_char.xml#char">CHAR</xref></codeph>.
+      </li>
+
+<!-- To do: Consider promoting 'querying complex types' to its own subtopic or pseudo-heading. -->
+      <li rev="2.3.0">
+        The complex data types <codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>,
+        are available in <keyword keyref="impala23_full"/> and higher.
+        Queries involving these types typically involve special qualified names
+        using dot notation for referring to the complex column fields,
+        and join clauses for bringing the complex columns into the result set.
+        See <xref href="impala_complex_types.xml#complex_types"/> for details.
+      </li>
+
+      <li rev="1.1">
+        An optional <xref href="impala_with.xml#with"><codeph>WITH</codeph> clause</xref> before the
+        <codeph>SELECT</codeph> keyword, to define a subquery whose name or column names can be referenced from
+        later in the main query. This clause lets you abstract repeated clauses, such as aggregation functions,
+        that are referenced multiple times in the same query.
+      </li>
+
+      <li>
+        By default, one <codeph>DISTINCT</codeph> clause per query. See <xref href="impala_distinct.xml#distinct"/>
+        for details. See <xref href="impala_appx_count_distinct.xml#appx_count_distinct"/> for a query option to
+        allow multiple <codeph>COUNT(DISTINCT)</codeph> impressions in the same query.
+      </li>
+
+      <li>
+        Subqueries in a <codeph>FROM</codeph> clause. In <keyword keyref="impala20_full"/> and higher,
+        subqueries can also go in the <codeph>WHERE</codeph> clause, for example with the
+        <codeph>IN()</codeph>, <codeph>EXISTS</codeph>, and <codeph>NOT EXISTS</codeph> operators.
+      </li>
+
+      <li>
+        <codeph>WHERE</codeph>, <codeph>GROUP BY</codeph>, <codeph>HAVING</codeph> clauses.
+      </li>
+
+      <li rev="obwl">
+        <codeph><xref href="impala_order_by.xml#order_by">ORDER BY</xref></codeph>. Prior to Impala 1.4.0, Impala
+        required that queries using an <codeph>ORDER BY</codeph> clause also include a
+        <codeph><xref href="impala_limit.xml#limit">LIMIT</xref></codeph> clause. In Impala 1.4.0 and higher, this
+        restriction is lifted; sort operations that would exceed the Impala memory limit automatically use a
+        temporary disk work area to perform the sort.
+      </li>
+
+      <li>
+        <p conref="../shared/impala_common.xml#common/join_types"/>
+        <p>
+          See <xref href="impala_joins.xml#joins"/> for details and examples of join queries.
+        </p>
+      </li>
+
+      <li>
+        <codeph>UNION ALL</codeph>.
+      </li>
+
+      <li>
+        <codeph>LIMIT</codeph>.
+      </li>
+
+      <li>
+        External tables.
+      </li>
+
+      <li>
+        Relational operators such as greater than, less than, or equal to.
+      </li>
+
+      <li>
+        Arithmetic operators such as addition or subtraction.
+      </li>
+
+      <li>
+        Logical/Boolean operators <codeph>AND</codeph>, <codeph>OR</codeph>, and <codeph>NOT</codeph>. Impala does
+        not support the corresponding symbols <codeph>&amp;&amp;</codeph>, <codeph>||</codeph>, and
+        <codeph>!</codeph>.
+      </li>
+
+      <li>
+        Common SQL built-in functions such as <codeph>COUNT</codeph>, <codeph>SUM</codeph>, <codeph>CAST</codeph>,
+        <codeph>LIKE</codeph>, <codeph>IN</codeph>, <codeph>BETWEEN</codeph>, and <codeph>COALESCE</codeph>. Impala
+        specifically supports built-ins described in <xref href="impala_functions.xml#builtins"/>.
+      </li>
+    </ul>
+
+    <p conref="../shared/impala_common.xml#common/ignore_file_extensions"/>
+
+    <p conref="../shared/impala_common.xml#common/security_blurb"/>
+    <p conref="../shared/impala_common.xml#common/redaction_yes"/>
+
+    <p conref="../shared/impala_common.xml#common/s3_blurb"/>
+    <p conref="../shared/impala_common.xml#common/s3_block_splitting"/>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_yes"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
+    <p rev="CDH-19187">
+      The user ID that the <cmdname>impalad</cmdname> daemon runs under,
+      typically the <codeph>impala</codeph> user, must have read
+      permissions for the files in all applicable directories in all source tables,
+      and read and execute permissions for the relevant data directories.
+      (A <codeph>SELECT</codeph> operation could read files from multiple different HDFS directories
+      if the source table is partitioned.)
+      If a query attempts to read a data file and is unable to because of an HDFS permission error,
+      the query halts and does not return any further results.
+    </p>
+
+    <p outputclass="toc"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      The <codeph>SELECT</codeph> syntax is so extensive that it forms its own category of statements: queries. The
+      other major classifications of SQL statements are data definition language (see
+      <xref href="impala_ddl.xml#ddl"/>) and data manipulation language (see <xref href="impala_dml.xml#dml"/>).
+    </p>
+
+    <p>
+      Because the focus of Impala is on fast queries with interactive response times over huge data sets, query
+      performance and scalability are important considerations. See
+      <xref href="impala_performance.xml#performance"/> and <xref href="impala_scalability.xml#scalability"/> for
+      details.
+    </p>
+  </conbody>
+
+  <concept id="where" audience="Cloudera">
+
+<!-- WHERE hidden for the moment until there's the chance to add some reasonably comprehensive content
+
+     and make it its own file. -->
+
+    <title>WHERE Clause</title>
+
+    <conbody>
+
+      <p/>
+    </conbody>
+  </concept>
+</concept>

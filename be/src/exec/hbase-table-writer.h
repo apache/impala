@@ -41,13 +41,13 @@ class RowBatch;
 ///    HBaseTableWriter::InitJni();
 ///    writer = new HBaseTableWriter(state, table_desc_, output_exprs_);
 ///    writer.Init(state);
-///    writer.AppendRowBatch(batch);
+///    writer.AppendRows(batch);
 class HBaseTableWriter {
  public:
   HBaseTableWriter(HBaseTableDescriptor* table_desc,
                    const std::vector<ExprContext*>& output_expr_ctxs,
                    RuntimeProfile* profile);
-  Status AppendRowBatch(RowBatch* batch);
+  Status AppendRows(RowBatch* batch);
 
   /// Calls to Close release the HBaseTable.
   void Close(RuntimeState* state);

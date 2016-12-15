@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_shell">
+
+  <title>Using the Impala Shell (impala-shell Command)</title>
+  <titlealts audience="PDF"><navtitle>The Impala Shell</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="impala-shell"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Stub Pages"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">impala-shell</indexterm>
+      You can use the Impala shell tool (<codeph>impala-shell</codeph>) to set up databases and tables, insert
+      data, and issue queries. For ad hoc queries and exploration, you can submit SQL statements in an interactive
+      session. To automate your work, you can specify command-line options to process a single statement or a
+      script file. The <cmdname>impala-shell</cmdname> interpreter accepts all the same SQL statements listed in
+      <xref href="impala_langref_sql.xml#langref_sql"/>, plus some shell-only commands that you can use for tuning
+      performance and diagnosing problems.
+    </p>
+
+    <p>
+      The <codeph>impala-shell</codeph> command fits into the familiar Unix toolchain:
+    </p>
+
+    <ul>
+      <li>
+        The <codeph>-q</codeph> option lets you issue a single query from the command line, without starting the
+        interactive interpreter. You could use this option to run <codeph>impala-shell</codeph> from inside a shell
+        script or with the command invocation syntax from a Python, Perl, or other kind of script.
+      </li>
+
+      <li>
+        The <codeph>-f</codeph> option lets you process a file containing multiple SQL statements,
+        such as a set of reports or DDL statements to create a group of tables and views.
+      </li>
+
+      <li rev="2.5.0 IMPALA-2179">
+        The <codeph>--var</codeph> option lets you pass substitution variables to the statements that
+        are executed by that <cmdname>impala-shell</cmdname> session, for example the statements
+        in a script file processed by the <codeph>-f</codeph> option. You encode the substitution variable
+        on the command line using the notation
+        <codeph>--var=<varname>variable_name</varname>=<varname>value</varname></codeph>.
+        Within a SQL statement, you substitute the value by using the notation <codeph>${var:<varname>variable_name</varname>}</codeph>.
+        This feature is available in <keyword keyref="impala25_full"/> and higher.
+      </li>
+
+      <li>
+        The <codeph>-o</codeph> option lets you save query output to a file.
+      </li>
+
+      <li>
+        The <codeph>-B</codeph> option turns off pretty-printing, so that you can produce comma-separated,
+        tab-separated, or other delimited text files as output. (Use the <codeph>--output_delimiter</codeph> option
+        to choose the delimiter character; the default is the tab character.)
+      </li>
+
+      <li>
+        In non-interactive mode, query output is printed to <codeph>stdout</codeph> or to the file specified by the
+        <codeph>-o</codeph> option, while incidental output is printed to <codeph>stderr</codeph>, so that you can
+        process just the query output as part of a Unix pipeline.
+      </li>
+
+      <li>
+        In interactive mode, <codeph>impala-shell</codeph> uses the <codeph>readline</codeph> facility to recall
+        and edit previous commands.
+      </li>
+    </ul>
+
+    <p>
+      For information on installing the Impala shell, see <xref href="impala_install.xml#install"/>. In Cloudera
+      Manager 4.1 and higher, Cloudera Manager installs <cmdname>impala-shell</cmdname> automatically. You might
+      install <cmdname>impala-shell</cmdname> manually on other systems not managed by Cloudera Manager, so that
+      you can issue queries from client systems that are not also running the Impala daemon or other Apache Hadoop
+      components.
+    </p>
+
+    <p>
+      For information about establishing a connection to a DataNode running the <codeph>impalad</codeph> daemon
+      through the <codeph>impala-shell</codeph> command, see <xref href="impala_connecting.xml#connecting"/>.
+    </p>
+
+    <p>
+      For a list of the <codeph>impala-shell</codeph> command-line options, see
+      <xref href="impala_shell_options.xml#shell_options"/>. For reference information about the
+      <codeph>impala-shell</codeph> interactive commands, see
+      <xref href="impala_shell_commands.xml#shell_commands"/>.
+    </p>
+
+    <p outputclass="toc"/>
+  </conbody>
+</concept>

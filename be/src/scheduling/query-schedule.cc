@@ -78,7 +78,7 @@ void QuerySchedule::Init() {
   if (request_.stmt_type == TStmtType::QUERY) {
     fragment_exec_params_[root_fragment.idx].is_coord_fragment = true;
     // the coordinator instance gets index 0, generated instance ids start at 1
-    next_instance_id_.lo = 1;
+    next_instance_id_ = CreateInstanceId(next_instance_id_, 1);
   }
 
   // find max node id

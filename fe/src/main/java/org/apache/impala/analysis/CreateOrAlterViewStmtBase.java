@@ -114,7 +114,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
       List<String> labels = viewDefStmt_.getColLabels();
       Preconditions.checkState(exprs.size() == labels.size());
       for (int i = 0; i < viewDefStmt_.getColLabels().size(); ++i) {
-        ColumnDef colDef = new ColumnDef(labels.get(i), null, null);
+        ColumnDef colDef = new ColumnDef(labels.get(i), null);
         colDef.setType(exprs.get(i).getType());
         finalColDefs_.add(colDef);
       }
@@ -124,7 +124,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     // duplicate column names.
     Set<String> distinctColNames = Sets.newHashSet();
     for (ColumnDef colDesc: finalColDefs_) {
-      colDesc.analyze();
+      colDesc.analyze(null);
       if (!distinctColNames.add(colDesc.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDesc.getColName());
       }
@@ -166,7 +166,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     }
     graph.addTargetColumnLabels(colDefs);
     graph.computeLineageGraph(viewDefStmt_.getResultExprs(), analyzer);
-    LOG.trace("lineage: " + graph.debugString());
+    if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
   }
 
   public TCreateOrAlterViewParams toThrift() {

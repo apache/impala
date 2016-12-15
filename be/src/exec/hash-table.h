@@ -553,6 +553,11 @@ class HashTable {
     } bucketData;
   };
 
+  static_assert(BitUtil::IsPowerOf2(sizeof(Bucket)),
+      "We assume that Hash-table bucket directories are a power-of-two sizes because "
+      "allocating only bucket directories with power-of-two byte sizes avoids internal "
+      "fragmentation in the simple buddy allocator.");
+
  public:
   class Iterator;
 

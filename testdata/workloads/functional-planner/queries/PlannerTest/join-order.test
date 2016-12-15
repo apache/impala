@@ -1487,7 +1487,7 @@ PLAN-ROOT SINK
 select * from functional.alltypes a
 left semi join
 (select * from functional.alltypes
-where timestamp_col = now()) b
+ where timestamp_col = cast("2016-11-20" as timestamp)) b
 on (a.id = b.id)
 and a.date_string_col = ''
 ---- PLAN
@@ -1499,7 +1499,7 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: timestamp_col = now()
+|     predicates: timestamp_col = TIMESTAMP '2016-11-20 00:00:00'
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
@@ -1511,7 +1511,7 @@ left semi join
 (select * from functional.alltypes
 where date_string_col = '') b
 on (a.id = b.id)
-and a.timestamp_col = now()
+and a.timestamp_col = cast("2016-11-20" as timestamp)
 ---- PLAN
 PLAN-ROOT SINK
 |
@@ -1521,7 +1521,7 @@ PLAN-ROOT SINK
 |
 |--00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: a.timestamp_col = now()
+|     predicates: a.timestamp_col = TIMESTAMP '2016-11-20 00:00:00'
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -1532,7 +1532,7 @@ PLAN-ROOT SINK
 select * from functional.alltypes a
 left semi join
 (select * from functional.alltypes
-where timestamp_col <=> now()) b
+where timestamp_col <=> cast("2016-11-20" as timestamp)) b
 on (a.id = b.id)
 and a.date_string_col <=> ''
 ---- PLAN
@@ -1544,7 +1544,7 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: timestamp_col IS NOT DISTINCT FROM now()
+|     predicates: timestamp_col IS NOT DISTINCT FROM TIMESTAMP '2016-11-20 00:00:00'
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
@@ -1556,7 +1556,7 @@ left semi join
 (select * from functional.alltypes
 where date_string_col <=> '') b
 on (a.id = b.id)
-and a.timestamp_col <=> now()
+and a.timestamp_col <=> cast("2016-11-20" as timestamp)
 ---- PLAN
 PLAN-ROOT SINK
 |
@@ -1566,7 +1566,7 @@ PLAN-ROOT SINK
 |
 |--00:SCAN HDFS [functional.alltypes a]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: a.timestamp_col IS NOT DISTINCT FROM now()
+|     predicates: a.timestamp_col IS NOT DISTINCT FROM TIMESTAMP '2016-11-20 00:00:00'
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB

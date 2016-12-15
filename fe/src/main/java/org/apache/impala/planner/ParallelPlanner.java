@@ -83,13 +83,11 @@ public class ParallelPlanner {
    * Assign fragment's plan id and cohort id to children.
    */
   private void createBuildPlans(PlanFragment fragment, CohortId buildCohortId) {
-    LOG.info("createbuildplans fragment " + fragment.getId().toString());
     List<JoinNode> joins = Lists.newArrayList();
     collectJoins(fragment.getPlanRoot(), joins);
     if (!joins.isEmpty()) {
       List<String> joinIds = Lists.newArrayList();
       for (JoinNode join: joins) joinIds.add(join.getId().toString());
-      LOG.info("collected joins " + Joiner.on(" ").join(joinIds));
 
       if (buildCohortId == null) buildCohortId = cohortIdGenerator_.getNextId();
       for (JoinNode join: joins) createBuildPlan(join, buildCohortId);
@@ -98,8 +96,6 @@ public class ParallelPlanner {
     if (!fragment.getChildren().isEmpty()) {
       List<String> ids = Lists.newArrayList();
       for (PlanFragment c: fragment.getChildren()) ids.add(c.getId().toString());
-      LOG.info("collected children " + Joiner.on(" ").join(ids) + " parent "
-          + fragment.getId().toString());
     }
     for (PlanFragment child: fragment.getChildren()) {
       child.setPlanId(fragment.getPlanId());
@@ -147,7 +143,6 @@ public class ParallelPlanner {
    * Also assigns the new plan a plan id.
    */
   private void createBuildPlan(JoinNode join, CohortId cohortId) {
-    LOG.info("createbuildplan " + join.getId().toString());
     Preconditions.checkNotNull(cohortId);
     // collect all ExchangeNodes on the build side and their corresponding input
     // fragments
@@ -183,8 +178,6 @@ public class ParallelPlanner {
 
     // move input fragments
     for (int i = 0; i < exchNodes.size(); ++i) {
-      LOG.info("re-link fragment " + inputFragments.get(i).getId().toString() + " to "
-          + exchNodes.get(i).getFragment().getId().toString());
       Preconditions.checkState(exchNodes.get(i).getFragment() == buildFragment);
       join.getFragment().removeChild(inputFragments.get(i));
       buildFragment.getChildren().add(inputFragments.get(i));
@@ -196,9 +189,11 @@ public class ParallelPlanner {
     buildFragment.setCohortId(cohortId);
 
     planRoots_.add(buildFragment);
-    LOG.info("new build fragment " + buildFragment.getId().toString());
-    LOG.info("in cohort " + buildFragment.getCohortId().toString());
-    LOG.info("for join node " + join.getId().toString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("new build fragment " + buildFragment.getId().toString());
+      LOG.trace("in cohort " + buildFragment.getCohortId().toString());
+      LOG.trace("for join node " + join.getId().toString());
+    }
     createBuildPlans(buildFragment, null);
   }
 

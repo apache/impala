@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.catalog.Db;
@@ -29,6 +28,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -125,7 +125,7 @@ public class InPredicate extends Predicate {
       // the subquery are type compatible. No need to perform any
       // casting at this point. Any casting needed will be performed when the
       // subquery is unnested.
-      ArrayList<Expr> subqueryExprs = subquery.getStatement().getResultExprs();
+      List<Expr> subqueryExprs = subquery.getStatement().getResultExprs();
       Expr compareExpr = children_.get(0);
       Expr subqueryExpr = subqueryExprs.get(0);
       analyzer.getCompatibleType(compareExpr.getType(), compareExpr, subqueryExpr);

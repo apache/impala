@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="real">
+
+  <title>REAL Data Type</title>
+  <titlealts audience="PDF"><navtitle>REAL</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      An alias for the <codeph>DOUBLE</codeph> data type. See <xref href="impala_double.xml#double"/> for details.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      These examples show how you can use the type names <codeph>REAL</codeph> and <codeph>DOUBLE</codeph>
+      interchangeably, and behind the scenes Impala treats them always as <codeph>DOUBLE</codeph>.
+    </p>
+
+<codeblock>[localhost:21000] &gt; create table r1 (x real);
+[localhost:21000] &gt; describe r1;
++------+--------+---------+
+| name | type   | comment |
++------+--------+---------+
+| x    | double |         |
++------+--------+---------+
+[localhost:21000] &gt; insert into r1 values (1.5), (cast (2.2 as double));
+[localhost:21000] &gt; select cast (1e6 as real);
++---------------------------+
+| cast(1000000.0 as double) |
++---------------------------+
+| 1000000                   |
++---------------------------+</codeblock>
+  </conbody>
+</concept>

@@ -17,9 +17,12 @@
 
 import pytest
 
-from tests.comparison.model_translator import SqlWriter
+from tests.comparison.model_translator import (
+    ImpalaSqlWriter,
+    PostgresqlSqlWriter,
+    SqlWriter)
 
-from query_object_testdata import QUERY_TEST_CASES
+from query_object_testdata import INSERT_QUERY_TEST_CASES, SELECT_QUERY_TEST_CASES
 
 
 def _idfn(query_test):
@@ -28,7 +31,7 @@ def _idfn(query_test):
 
 def verify_select_clause_items(query, expected_item_counts):
   """
-  Verify that a well-formed Query() object's select_clause (SelectClause instance)
+  Verify that a well-formed SelectQuery() object's select_clause (SelectClause instance)
   reports correct item counts. expected_item_counts should be a dictionary with keys
   matching SelectItem property methods that report item counts and values for the
   counts.
@@ -63,21 +66,28 @@ def verify_sql_matches(actual, expected, strip=True):
 
 
 @pytest.yield_fixture
-def sql_writer():
+def sql_writer(request):
   """
   Return a SqlWriter object that is torn down at the end of each test.
   """
-  # TODO: Later, we can parametrize on dialect, but for now, this is just PoC.
-  yield SqlWriter.create(dialect='IMPALA')
+  yield SqlWriter.create(dialect=request.param)
 
 
-@pytest.mark.parametrize('query_test', QUERY_TEST_CASES, ids=_idfn)
+@pytest.mark.parametrize('query_test', SELECT_QUERY_TEST_CASES, ids=_idfn)
 def test_select_clause_items(query_test):
   verify_select_clause_items(query_test.query, query_test.select_item_counts)
 
 
-@pytest.mark.parametrize('query_test', QUERY_TEST_CASES, ids=_idfn)
+@pytest.mark.parametrize('query_test', SELECT_QUERY_TEST_CASES + INSERT_QUERY_TEST_CASES,
+                         ids=_idfn)
+@pytest.mark.parametrize('sql_writer', ['IMPALA', 'POSTGRESQL'], indirect=True)
 def test_write_query(sql_writer, query_test):
+  if isinstance(sql_writer, ImpalaSqlWriter):
+    expected_string = getattr(query_test, 'impala_query_string')
+  elif isinstance(sql_writer, PostgresqlSqlWriter):
+    expected_string = getattr(query_test, 'postgres_query_string')
+  else:
+    raise Exception('unsupported writer: {0}'.format(sql_writer))
   verify_sql_matches(
       sql_writer.write_query(query_test.query),
-      query_test.impala_query_string)
+      expected_string)

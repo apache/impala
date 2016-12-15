@@ -24,6 +24,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableAddReplaceColsParams;
@@ -79,6 +80,12 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
           "supported on HBase tables.");
     }
 
+    boolean isKuduTable = t instanceof KuduTable;
+    if (isKuduTable && replaceExistingCols_) {
+      throw new AnalysisException("ALTER TABLE REPLACE COLUMNS is not " +
+          "supported on Kudu tables.");
+    }
+
     // Build a set of the partition keys for the table.
     Set<String> existingPartitionKeys = Sets.newHashSet();
     for (FieldSchema fs: t.getMetaStoreTable().getPartitionKeys()) {
@@ -90,7 +97,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     // partition columns.
     Set<String> colNames = Sets.newHashSet();
     for (ColumnDef c: columnDefs_) {
-      c.analyze();
+      c.analyze(analyzer);
       String colName = c.getColName().toLowerCase();
       if (existingPartitionKeys.contains(colName)) {
         throw new AnalysisException(
@@ -102,6 +109,27 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
         throw new AnalysisException("Column already exists: " + colName);
       } else if (!colNames.add(colName)) {
         throw new AnalysisException("Duplicate column name: " + colName);
+      }
+
+      if (isKuduTable) {
+        if (c.getType().isComplexType()) {
+          throw new AnalysisException("Kudu tables do not support complex types: " +
+              c.toString());
+        }
+        if (c.isPrimaryKey()) {
+          throw new AnalysisException("Cannot add a primary key using an ALTER TABLE " +
+              "ADD COLUMNS statement: " + c.toString());
+        }
+        if (c.hasEncoding() || c.hasCompression() || c.hasBlockSize()) {
+          // Kudu API doesn't support specifying encoding, compression and desired
+          // block size on a newly added column (see KUDU-1746).
+          throw new AnalysisException("ENCODING, COMPRESSION and " +
+              "BLOCK_SIZE options cannot be specified in an ALTER TABLE ADD COLUMNS " +
+              "statement: " + c.toString());
+        }
+      } else if (c.hasKuduOptions()) {
+        throw new AnalysisException("The specified column options are only supported " +
+            "in Kudu tables: " + c.toString());
       }
     }
   }

@@ -28,6 +28,9 @@ class TExprNode;
 class NullLiteral: public Expr {
  public:
   NullLiteral(PrimitiveType type) : Expr(type) { }
+
+  virtual bool IsLiteral() const;
+
   virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
 
   virtual impala_udf::BooleanVal GetBooleanVal(ExprContext*, const TupleRow*);
@@ -46,7 +49,7 @@ class NullLiteral: public Expr {
 
  protected:
   friend class Expr;
-  
+
   NullLiteral(const TExprNode& node) : Expr(node) { }
 };
 

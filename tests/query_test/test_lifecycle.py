@@ -61,8 +61,9 @@ class TestFragmentLifecycle(ImpalaTestSuite):
       pass
 
     for v in verifiers:
-      # Long timeout required because fragments may be blocked while sending data, default
-      # timeout is 60s before they wake up and cancel themselves.
+      # Long timeout required because fragments may be blocked while sending data. The
+      # default value of --datastream_sender_timeout_ms is 120s before they wake up and
+      # cancel themselves.
       #
       # TODO: Fix when we have cancellable RPCs.
-      v.wait_for_metric(self.IN_FLIGHT_FRAGMENTS, 0, timeout=65)
+      v.wait_for_metric(self.IN_FLIGHT_FRAGMENTS, 0, timeout=125)

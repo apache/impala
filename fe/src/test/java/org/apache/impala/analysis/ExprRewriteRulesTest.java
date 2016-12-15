@@ -26,6 +26,7 @@ import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
+import org.apache.impala.rewrite.FoldConstantsRule;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -38,7 +39,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
 
   public Expr RewritesOk(String expr, ExprRewriteRule rule, String expectedExpr)
       throws AnalysisException {
-    String stmtStr = "select " + expr + " from functional.alltypes";
+    String stmtStr = "select " + expr + " from functional.alltypessmall";
     SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
     Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
     stmt.analyze(analyzer);
@@ -197,5 +198,36 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
         "(int_col < 10 and id < 20)", rule,
         "int_col < 10 AND " +
         "((bigint_col < 10) OR (string_col = '10') OR (id < 20) OR (id < 20))");
+  }
+
+  /**
+   * Only contains very basic tests for a few interesting cases. More thorough
+   * testing is done in expr-test.cc.
+   */
+  @Test
+  public void TestFoldConstantsRule() throws AnalysisException {
+    ExprRewriteRule rule = FoldConstantsRule.INSTANCE;
+
+    RewritesOk("1 + 1", rule, "2");
+    RewritesOk("1 + 1 + 1 + 1 + 1", rule, "5");
+    RewritesOk("10 - 5 - 2 - 1 - 8", rule, "-6");
+    RewritesOk("cast('2016-11-09' as timestamp)", rule,
+        "TIMESTAMP '2016-11-09 00:00:00'");
+    RewritesOk("cast('2016-11-09' as timestamp) + interval 1 year", rule,
+        "TIMESTAMP '2017-11-09 00:00:00'");
+
+    // Tests correct handling of strings with escape sequences.
+    RewritesOk("'_' LIKE '\\\\_'", rule, "TRUE");
+    RewritesOk("base64decode(base64encode('\\047\\001\\132\\060')) = " +
+      "'\\047\\001\\132\\060'", rule, "TRUE");
+
+    // Tests correct handling of strings with chars > 127. Should not be folded.
+    RewritesOk("hex(unhex(hex(unhex('D3'))))", rule, null);
+    // Tests that non-deterministic functions are not folded.
+    RewritesOk("rand()", rule, null);
+    RewritesOk("random()", rule, null);
+    RewritesOk("uuid()", rule, null);
+    // Tests that exprs that warn during their evaluation are not folded.
+    RewritesOk("coalesce(1.8, cast(int_col as decimal(38,38)))", rule, null);
   }
 }

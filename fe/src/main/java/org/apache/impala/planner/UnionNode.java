@@ -97,7 +97,9 @@ public class UnionNode extends PlanNode {
     // (VALUES(1 x, 1 y)) b ON (a.x = b.y)). We need to set the correct value.
     if (numNodes_ == -1) numNodes_ = 1;
     cardinality_ = capAtLimit(cardinality_);
-    LOG.debug("stats Union: cardinality=" + Long.toString(cardinality_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("stats Union: cardinality=" + Long.toString(cardinality_));
+    }
   }
 
   /**
@@ -122,7 +124,7 @@ public class UnionNode extends PlanNode {
     List<Pair<Long, Integer>> memByChildIdx = Lists.newArrayList();
     for (int i = 0; i < children_.size(); ++i) {
       PlanNode child = children_.get(i);
-      child.computeCosts(analyzer.getQueryCtx().request.getQuery_options());
+      child.computeCosts(analyzer.getQueryCtx().client_request.getQuery_options());
       memByChildIdx.add(new Pair<Long, Integer>(child.getPerHostMemCost(), i));
     }
 

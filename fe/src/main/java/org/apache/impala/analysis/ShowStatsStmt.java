@@ -18,25 +18,29 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
+import com.google.common.base.Preconditions;
 
 /**
  * Representation of a SHOW TABLE/COLUMN STATS statement for
  * displaying column and table/partition statistics for a given table.
  */
 public class ShowStatsStmt extends StatementBase {
-  protected final boolean isShowColStats_;
+  protected final TShowStatsOp op_;
   protected final TableName tableName_;
 
   // Set during analysis.
   protected Table table_;
 
-  public ShowStatsStmt(TableName tableName, boolean isShowColStats) {
+  public ShowStatsStmt(TableName tableName, TShowStatsOp op) {
+    this.op_ = op;
     this.tableName_ = tableName;
-    this.isShowColStats_ = isShowColStats;
   }
 
   @Override
@@ -45,21 +49,57 @@ public class ShowStatsStmt extends StatementBase {
   }
 
   protected String getSqlPrefix() {
-    return "SHOW " + ((isShowColStats_) ? "COLUMN" : "TABLE") + " STATS";
+    if (op_ == TShowStatsOp.TABLE_STATS) {
+      return "SHOW TABLE STATS";
+    } else if (op_ == TShowStatsOp.COLUMN_STATS) {
+      return "SHOW COLUMN STATS";
+    } else if (op_ == TShowStatsOp.PARTITIONS) {
+      return "SHOW PARTITIONS";
+    } else if (op_ == TShowStatsOp.RANGE_PARTITIONS) {
+      return "SHOW RANGE PARTITIONS";
+    } else {
+      Preconditions.checkState(false);
+      return "";
+    }
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     table_ = analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
+    Preconditions.checkNotNull(table_);
     if (table_ instanceof View) {
       throw new AnalysisException(String.format(
           "%s not applicable to a view: %s", getSqlPrefix(), table_.getFullName()));
+    }
+    if (table_ instanceof HdfsTable) {
+      if (table_.getNumClusteringCols() == 0 && op_ == TShowStatsOp.PARTITIONS) {
+        throw new AnalysisException("Table is not partitioned: " + table_.getFullName());
+      }
+      if (op_ == TShowStatsOp.RANGE_PARTITIONS) {
+        throw new AnalysisException(getSqlPrefix() + " must target a Kudu table: " +
+            table_.getFullName());
+      }
+    } else if (table_ instanceof KuduTable) {
+      KuduTable kuduTable = (KuduTable) table_;
+      if (op_ == TShowStatsOp.RANGE_PARTITIONS &&
+          kuduTable.getRangePartitioningColNames().isEmpty()) {
+        throw new AnalysisException(getSqlPrefix() + " requested but table does not " +
+            "have range partitions: " + table_.getFullName());
+      }
+    } else {
+      if (op_ == TShowStatsOp.RANGE_PARTITIONS) {
+        throw new AnalysisException(getSqlPrefix() + " must target a Kudu table: " +
+            table_.getFullName());
+      } else if (op_ == TShowStatsOp.PARTITIONS) {
+        throw new AnalysisException(getSqlPrefix() + " must target an HDFS table: " +
+            table_.getFullName());
+      }
     }
   }
 
   public TShowStatsParams toThrift() {
     // Ensure the DB is set in the table_name field by using table and not tableName.
-    return new TShowStatsParams(isShowColStats_,
+    return new TShowStatsParams(op_,
         new TableName(table_.getDb().getName(), table_.getName()).toThrift());
   }
 }

@@ -1,0 +1,586 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="explain_plan">
+
+  <title>Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles</title>
+  <titlealts audience="PDF"><navtitle>EXPLAIN Plans and Query Profiles</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Reports"/>
+      <data name="Category" value="Concepts"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      To understand the high-level performance considerations for Impala queries, read the output of the
+      <codeph>EXPLAIN</codeph> statement for the query. You can get the <codeph>EXPLAIN</codeph> plan without
+      actually running the query itself.
+    </p>
+
+    <p rev="1.4.0">
+      For an overview of the physical performance characteristics for a query, issue the <codeph>SUMMARY</codeph>
+      statement in <cmdname>impala-shell</cmdname> immediately after executing a query. This condensed information
+      shows which phases of execution took the most time, and how the estimates for memory usage and number of rows
+      at each phase compare to the actual values.
+    </p>
+
+    <p>
+      To understand the detailed performance characteristics for a query, issue the <codeph>PROFILE</codeph>
+      statement in <cmdname>impala-shell</cmdname> immediately after executing a query. This low-level information
+      includes physical details about memory, CPU, I/O, and network usage, and thus is only available after the
+      query is actually run.
+    </p>
+
+    <p outputclass="toc inpage"/>
+
+    <p>
+      Also, see <xref href="impala_hbase.xml#hbase_performance"/>
+      and <xref href="impala_s3.xml#s3_performance"/>
+      for examples of interpreting
+      <codeph>EXPLAIN</codeph> plans for queries against HBase tables
+      <ph rev="2.2.0">and data stored in the Amazon Simple Storage System (S3)</ph>.
+    </p>
+  </conbody>
+
+  <concept id="perf_explain">
+
+    <title>Using the EXPLAIN Plan for Performance Tuning</title>
+
+    <conbody>
+
+      <p>
+        The <codeph><xref href="impala_explain.xml#explain">EXPLAIN</xref></codeph> statement gives you an outline
+        of the logical steps that a query will perform, such as how the work will be distributed among the nodes
+        and how intermediate results will be combined to produce the final result set. You can see these details
+        before actually running the query. You can use this information to check that the query will not operate in
+        some very unexpected or inefficient way.
+      </p>
+
+<!-- Turn into a conref in ciiu_langref too. Relocate to common.xml. -->
+
+<codeblock conref="impala_explain.xml#explain/explain_plan_simple"/>
+
+      <p conref="../shared/impala_common.xml#common/explain_interpret"/>
+
+      <p>
+        The <codeph>EXPLAIN</codeph> plan is also printed at the beginning of the query profile report described in
+        <xref href="#perf_profile"/>, for convenience in examining both the logical and physical aspects of the
+        query side-by-side.
+      </p>
+
+      <p rev="1.2">
+        The amount of detail displayed in the <codeph>EXPLAIN</codeph> output is controlled by the
+        <xref href="impala_explain_level.xml#explain_level">EXPLAIN_LEVEL</xref> query option. You typically
+        increase this setting from <codeph>normal</codeph> to <codeph>verbose</codeph> (or from <codeph>0</codeph>
+        to <codeph>1</codeph>) when doublechecking the presence of table and column statistics during performance
+        tuning, or when estimating query resource usage in conjunction with the resource management features in CDH
+        5.
+      </p>
+
+      <!-- To do:
+        This is a good place to have a few examples.
+      -->
+    </conbody>
+  </concept>
+
+  <concept id="perf_summary">
+
+    <title>Using the SUMMARY Report for Performance Tuning</title>
+
+    <conbody>
+
+      <p>
+        The <codeph><xref href="impala_shell_commands.xml#shell_commands">SUMMARY</xref></codeph> command within
+        the <cmdname>impala-shell</cmdname> interpreter gives you an easy-to-digest overview of the timings for the
+        different phases of execution for a query. Like the <codeph>EXPLAIN</codeph> plan, it is easy to see
+        potential performance bottlenecks. Like the <codeph>PROFILE</codeph> output, it is available after the
+        query is run and so displays actual timing numbers.
+      </p>
+
+      <p>
+        The <codeph>SUMMARY</codeph> report is also printed at the beginning of the query profile report described
+        in <xref href="#perf_profile"/>, for convenience in examining high-level and low-level aspects of the query
+        side-by-side.
+      </p>
+
+      <p>
+        For example, here is a query involving an aggregate function, on a single-node VM. The different stages of
+        the query and their timings are shown (rolled up for all nodes), along with estimated and actual values
+        used in planning the query. In this case, the <codeph>AVG()</codeph> function is computed for a subset of
+        data on each node (stage 01) and then the aggregated results from all nodes are combined at the end (stage
+        03). You can see which stages took the most time, and whether any estimates were substantially different
+        than the actual data distribution. (When examining the time values, be sure to consider the suffixes such
+        as <codeph>us</codeph> for microseconds and <codeph>ms</codeph> for milliseconds, rather than just looking
+        for the largest numbers.)
+      </p>
+
+<codeblock>[localhost:21000] &gt; select avg(ss_sales_price) from store_sales where ss_coupon_amt = 0;
++---------------------+
+| avg(ss_sales_price) |
++---------------------+
+| 37.80770926328327   |
++---------------------+
+[localhost:21000] &gt; summary;
++--------------+--------+----------+----------+-------+------------+----------+---------------+-----------------+
+| Operator     | #Hosts | Avg Time | Max Time | #Rows | Est. #Rows | Peak Mem | Est. Peak Mem | Detail          |
++--------------+--------+----------+----------+-------+------------+----------+---------------+-----------------+
+| 03:AGGREGATE | 1      | 1.03ms   | 1.03ms   | 1     | 1          | 48.00 KB | -1 B          | MERGE FINALIZE  |
+| 02:EXCHANGE  | 1      | 0ns      | 0ns      | 1     | 1          | 0 B      | -1 B          | UNPARTITIONED   |
+| 01:AGGREGATE | 1      | 30.79ms  | 30.79ms  | 1     | 1          | 80.00 KB | 10.00 MB      |                 |
+| 00:SCAN HDFS | 1      | 5.45s    | 5.45s    | 2.21M | -1         | 64.05 MB | 432.00 MB     | tpc.store_sales |
++--------------+--------+----------+----------+-------+------------+----------+---------------+-----------------+
+</codeblock>
+
+      <p>
+        Notice how the longest initial phase of the query is measured in seconds (s), while later phases working on
+        smaller intermediate results are measured in milliseconds (ms) or even nanoseconds (ns).
+      </p>
+
+      <p>
+        Here is an example from a more complicated query, as it would appear in the <codeph>PROFILE</codeph>
+        output:
+      </p>
+
+<!-- This example taken from: https://github.com/cloudera/Impala/commit/af85d3b518089b8840ddea4356947e40d1aca9bd -->
+
+<codeblock>Operator              #Hosts   Avg Time   Max Time    #Rows  Est. #Rows  Peak Mem  Est. Peak Mem  Detail
+------------------------------------------------------------------------------------------------------------------------
+09:MERGING-EXCHANGE        1   79.738us   79.738us        5           5         0        -1.00 B  UNPARTITIONED
+05:TOP-N                   3   84.693us   88.810us        5           5  12.00 KB       120.00 B
+04:AGGREGATE               3    5.263ms    6.432ms        5           5  44.00 KB       10.00 MB  MERGE FINALIZE
+08:AGGREGATE               3   16.659ms   27.444ms   52.52K     600.12K   3.20 MB       15.11 MB  MERGE
+07:EXCHANGE                3    2.644ms      5.1ms   52.52K     600.12K         0              0  HASH(o_orderpriority)
+03:AGGREGATE               3  342.913ms  966.291ms   52.52K     600.12K  10.80 MB       15.11 MB
+02:HASH JOIN               3    2s165ms    2s171ms  144.87K     600.12K  13.63 MB      941.01 KB  INNER JOIN, BROADCAST
+|--06:EXCHANGE             3    8.296ms    8.692ms   57.22K      15.00K         0              0  BROADCAST
+|  01:SCAN HDFS            2    1s412ms    1s978ms   57.22K      15.00K  24.21 MB      176.00 MB  tpch.orders o
+00:SCAN HDFS               3    8s032ms    8s558ms    3.79M     600.12K  32.29 MB      264.00 MB  tpch.lineitem l
+</codeblock>
+    </conbody>
+  </concept>
+
+  <concept id="perf_profile">
+
+    <title>Using the Query Profile for Performance Tuning</title>
+
+    <conbody>
+
+      <p>
+        The <codeph>PROFILE</codeph> statement, available in the <cmdname>impala-shell</cmdname> interpreter,
+        produces a detailed low-level report showing how the most recent query was executed. Unlike the
+        <codeph>EXPLAIN</codeph> plan described in <xref href="#perf_explain"/>, this information is only available
+        after the query has finished. It shows physical details such as the number of bytes read, maximum memory
+        usage, and so on for each node. You can use this information to determine if the query is I/O-bound or
+        CPU-bound, whether some network condition is imposing a bottleneck, whether a slowdown is affecting some
+        nodes but not others, and to check that recommended configuration settings such as short-circuit local
+        reads are in effect.
+      </p>
+
+      <p rev="CDH-29157">
+        By default, time values in the profile output reflect the wall-clock time taken by an operation.
+        For values denoting system time or user time, the measurement unit is reflected in the metric
+        name, such as <codeph>ScannerThreadsSysTime</codeph> or <codeph>ScannerThreadsUserTime</codeph>.
+        For example, a multi-threaded I/O operation might show a small figure for wall-clock time,
+        while the corresponding system time is larger, representing the sum of the CPU time taken by each thread.
+        Or a wall-clock time figure might be larger because it counts time spent waiting, while
+        the corresponding system and user time figures only measure the time while the operation
+        is actively using CPU cycles.
+      </p>
+
+      <p>
+        The <xref href="impala_explain_plan.xml#perf_explain"><codeph>EXPLAIN</codeph> plan</xref> is also printed
+        at the beginning of the query profile report, for convenience in examining both the logical and physical
+        aspects of the query side-by-side. The
+        <xref href="impala_explain_level.xml#explain_level">EXPLAIN_LEVEL</xref> query option also controls the
+        verbosity of the <codeph>EXPLAIN</codeph> output printed by the <codeph>PROFILE</codeph> command.
+      </p>
+
+      <!-- To do:
+        This is a good place to have a few more examples.
+      -->
+
+      <p>
+        Here is an example of a query profile, from a relatively straightforward query on a single-node
+        pseudo-distributed cluster to keep the output relatively brief.
+      </p>
+
+<codeblock>[localhost:21000] &gt; profile;
+Query Runtime Profile:
+Query (id=6540a03d4bee0691:4963d6269b210ebd):
+  Summary:
+    Session ID: ea4a197f1c7bf858:c74e66f72e3a33ba
+    Session Type: BEESWAX
+    Start Time: 2013-12-02 17:10:30.263067000
+    End Time: 2013-12-02 17:10:50.932044000
+    Query Type: QUERY
+    Query State: FINISHED
+    Query Status: OK
+    Impala Version: impalad version 1.2.1 RELEASE (build edb5af1bcad63d410bc5d47cc203df3a880e9324)
+    User: cloudera
+    Network Address: 127.0.0.1:49161
+    Default Db: stats_testing
+    Sql Statement: select t1.s, t2.s from t1 join t2 on (t1.id = t2.parent)
+    Plan:
+----------------
+Estimated Per-Host Requirements: Memory=2.09GB VCores=2
+
+PLAN FRAGMENT 0
+  PARTITION: UNPARTITIONED
+
+  4:EXCHANGE
+     cardinality: unavailable
+     per-host memory: unavailable
+     tuple ids: 0 1
+
+PLAN FRAGMENT 1
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  2:HASH JOIN
+  |  join op: INNER JOIN (BROADCAST)
+  |  hash predicates:
+  |    t1.id = t2.parent
+  |  cardinality: unavailable
+  |  per-host memory: 2.00GB
+  |  tuple ids: 0 1
+  |
+  |----3:EXCHANGE
+  |       cardinality: unavailable
+  |       per-host memory: 0B
+  |       tuple ids: 1
+  |
+  0:SCAN HDFS
+     table=stats_testing.t1 #partitions=1/1 size=33B
+     table stats: unavailable
+     column stats: unavailable
+     cardinality: unavailable
+     per-host memory: 32.00MB
+     tuple ids: 0
+
+PLAN FRAGMENT 2
+  PARTITION: RANDOM
+
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  1:SCAN HDFS
+     table=stats_testing.t2 #partitions=1/1 size=960.00KB
+     table stats: unavailable
+     column stats: unavailable
+     cardinality: unavailable
+     per-host memory: 96.00MB
+     tuple ids: 1
+----------------
+    Query Timeline: 20s670ms
+       - Start execution: 2.559ms (2.559ms)
+       - Planning finished: 23.587ms (21.27ms)
+       - Rows available: 666.199ms (642.612ms)
+       - First row fetched: 668.919ms (2.719ms)
+       - Unregister query: 20s668ms (20s000ms)
+  ImpalaServer:
+     - ClientFetchWaitTimer: 19s637ms
+     - RowMaterializationTimer: 167.121ms
+  Execution Profile 6540a03d4bee0691:4963d6269b210ebd:(Active: 837.815ms, % non-child: 0.00%)
+    Per Node Peak Memory Usage: impala-1.example.com:22000(7.42 MB)
+     - FinalizationTimer: 0ns
+    Coordinator Fragment:(Active: 195.198ms, % non-child: 0.00%)
+      MemoryUsage(500.0ms): 16.00 KB, 7.42 MB, 7.33 MB, 7.10 MB, 6.94 MB, 6.71 MB, 6.56 MB, 6.40 MB, 6.17 MB, 6.02 MB, 5.79 MB, 5.63 MB, 5.48 MB, 5.25 MB, 5.09 MB, 4.86 MB, 4.71 MB, 4.47 MB, 4.32 MB, 4.09 MB, 3.93 MB, 3.78 MB, 3.55 MB, 3.39 MB, 3.16 MB, 3.01 MB, 2.78 MB, 2.62 MB, 2.39 MB, 2.24 MB, 2.08 MB, 1.85 MB, 1.70 MB, 1.54 MB, 1.31 MB, 1.16 MB, 948.00 KB, 790.00 KB, 553.00 KB, 395.00 KB, 237.00 KB
+      ThreadUsage(500.0ms): 1
+       - AverageThreadTokens: 1.00
+       - PeakMemoryUsage: 7.42 MB
+       - PrepareTime: 36.144us
+       - RowsProduced: 98.30K (98304)
+       - TotalCpuTime: 20s449ms
+       - TotalNetworkWaitTime: 191.630ms
+       - TotalStorageWaitTime: 0ns
+      CodeGen:(Active: 150.679ms, % non-child: 77.19%)
+         - CodegenTime: 0ns
+         - CompileTime: 139.503ms
+         - LoadTime: 10.7ms
+         - ModuleFileSize: 95.27 KB
+      EXCHANGE_NODE (id=4):(Active: 194.858ms, % non-child: 99.83%)
+         - BytesReceived: 2.33 MB
+         - ConvertRowBatchTime: 2.732ms
+         - DataArrivalWaitTime: 191.118ms
+         - DeserializeRowBatchTimer: 14.943ms
+         - FirstBatchArrivalWaitTime: 191.117ms
+         - PeakMemoryUsage: 7.41 MB
+         - RowsReturned: 98.30K (98304)
+         - RowsReturnedRate: 504.49 K/sec
+         - SendersBlockedTimer: 0ns
+         - SendersBlockedTotalTimer(*): 0ns
+    Averaged Fragment 1:(Active: 442.360ms, % non-child: 0.00%)
+      split sizes:  min: 33.00 B, max: 33.00 B, avg: 33.00 B, stddev: 0.00
+      completion times: min:443.720ms  max:443.720ms  mean: 443.720ms  stddev:0ns
+      execution rates: min:74.00 B/sec  max:74.00 B/sec  mean:74.00 B/sec  stddev:0.00 /sec
+      num instances: 1
+       - AverageThreadTokens: 1.00
+       - PeakMemoryUsage: 6.06 MB
+       - PrepareTime: 7.291ms
+       - RowsProduced: 98.30K (98304)
+       - TotalCpuTime: 784.259ms
+       - TotalNetworkWaitTime: 388.818ms
+       - TotalStorageWaitTime: 3.934ms
+      CodeGen:(Active: 312.862ms, % non-child: 70.73%)
+         - CodegenTime: 2.669ms
+         - CompileTime: 302.467ms
+         - LoadTime: 9.231ms
+         - ModuleFileSize: 95.27 KB
+      DataStreamSender (dst_id=4):(Active: 80.63ms, % non-child: 18.10%)
+         - BytesSent: 2.33 MB
+         - NetworkThroughput(*): 35.89 MB/sec
+         - OverallThroughput: 29.06 MB/sec
+         - PeakMemoryUsage: 5.33 KB
+         - SerializeBatchTime: 26.487ms
+         - ThriftTransmitTime(*): 64.814ms
+         - UncompressedRowBatchSize: 6.66 MB
+      HASH_JOIN_NODE (id=2):(Active: 362.25ms, % non-child: 3.92%)
+         - BuildBuckets: 1.02K (1024)
+         - BuildRows: 98.30K (98304)
+         - BuildTime: 12.622ms
+         - LoadFactor: 0.00
+         - PeakMemoryUsage: 6.02 MB
+         - ProbeRows: 3
+         - ProbeTime: 3.579ms
+         - RowsReturned: 98.30K (98304)
+         - RowsReturnedRate: 271.54 K/sec
+        EXCHANGE_NODE (id=3):(Active: 344.680ms, % non-child: 77.92%)
+           - BytesReceived: 1.15 MB
+           - ConvertRowBatchTime: 2.792ms
+           - DataArrivalWaitTime: 339.936ms
+           - DeserializeRowBatchTimer: 9.910ms
+           - FirstBatchArrivalWaitTime: 199.474ms
+           - PeakMemoryUsage: 156.00 KB
+           - RowsReturned: 98.30K (98304)
+           - RowsReturnedRate: 285.20 K/sec
+           - SendersBlockedTimer: 0ns
+           - SendersBlockedTotalTimer(*): 0ns
+      HDFS_SCAN_NODE (id=0):(Active: 13.616us, % non-child: 0.00%)
+         - AverageHdfsReadThreadConcurrency: 0.00
+         - AverageScannerThreadConcurrency: 0.00
+         - BytesRead: 33.00 B
+         - BytesReadLocal: 33.00 B
+         - BytesReadShortCircuit: 33.00 B
+         - NumDisksAccessed: 1
+         - NumScannerThreadsStarted: 1
+         - PeakMemoryUsage: 46.00 KB
+         - PerReadThreadRawHdfsThroughput: 287.52 KB/sec
+         - RowsRead: 3
+         - RowsReturned: 3
+         - RowsReturnedRate: 220.33 K/sec
+         - ScanRangesComplete: 1
+         - ScannerThreadsInvoluntaryContextSwitches: 26
+         - ScannerThreadsTotalWallClockTime: 55.199ms
+           - DelimiterParseTime: 2.463us
+           - MaterializeTupleTime(*): 1.226us
+           - ScannerThreadsSysTime: 0ns
+           - ScannerThreadsUserTime: 42.993ms
+         - ScannerThreadsVoluntaryContextSwitches: 1
+         - TotalRawHdfsReadTime(*): 112.86us
+         - TotalReadThroughput: 0.00 /sec
+    Averaged Fragment 2:(Active: 190.120ms, % non-child: 0.00%)
+      split sizes:  min: 960.00 KB, max: 960.00 KB, avg: 960.00 KB, stddev: 0.00
+      completion times: min:191.736ms  max:191.736ms  mean: 191.736ms  stddev:0ns
+      execution rates: min:4.89 MB/sec  max:4.89 MB/sec  mean:4.89 MB/sec  stddev:0.00 /sec
+      num instances: 1
+       - AverageThreadTokens: 0.00
+       - PeakMemoryUsage: 906.33 KB
+       - PrepareTime: 3.67ms
+       - RowsProduced: 98.30K (98304)
+       - TotalCpuTime: 403.351ms
+       - TotalNetworkWaitTime: 34.999ms
+       - TotalStorageWaitTime: 108.675ms
+      CodeGen:(Active: 162.57ms, % non-child: 85.24%)
+         - CodegenTime: 3.133ms
+         - CompileTime: 148.316ms
+         - LoadTime: 12.317ms
+         - ModuleFileSize: 95.27 KB
+      DataStreamSender (dst_id=3):(Active: 70.620ms, % non-child: 37.14%)
+         - BytesSent: 1.15 MB
+         - NetworkThroughput(*): 23.30 MB/sec
+         - OverallThroughput: 16.23 MB/sec
+         - PeakMemoryUsage: 5.33 KB
+         - SerializeBatchTime: 22.69ms
+         - ThriftTransmitTime(*): 49.178ms
+         - UncompressedRowBatchSize: 3.28 MB
+      HDFS_SCAN_NODE (id=1):(Active: 118.839ms, % non-child: 62.51%)
+         - AverageHdfsReadThreadConcurrency: 0.00
+         - AverageScannerThreadConcurrency: 0.00
+         - BytesRead: 960.00 KB
+         - BytesReadLocal: 960.00 KB
+         - BytesReadShortCircuit: 960.00 KB
+         - NumDisksAccessed: 1
+         - NumScannerThreadsStarted: 1
+         - PeakMemoryUsage: 869.00 KB
+         - PerReadThreadRawHdfsThroughput: 130.21 MB/sec
+         - RowsRead: 98.30K (98304)
+         - RowsReturned: 98.30K (98304)
+         - RowsReturnedRate: 827.20 K/sec
+         - ScanRangesComplete: 15
+         - ScannerThreadsInvoluntaryContextSwitches: 34
+         - ScannerThreadsTotalWallClockTime: 189.774ms
+           - DelimiterParseTime: 15.703ms
+           - MaterializeTupleTime(*): 3.419ms
+           - ScannerThreadsSysTime: 1.999ms
+           - ScannerThreadsUserTime: 44.993ms
+         - ScannerThreadsVoluntaryContextSwitches: 118
+         - TotalRawHdfsReadTime(*): 7.199ms
+         - TotalReadThroughput: 0.00 /sec
+    Fragment 1:
+      Instance 6540a03d4bee0691:4963d6269b210ebf (host=impala-1.example.com:22000):(Active: 442.360ms, % non-child: 0.00%)
+        Hdfs split stats (&lt;volume id&gt;:&lt;# splits&gt;/&lt;split lengths&gt;): 0:1/33.00 B
+        MemoryUsage(500.0ms): 69.33 KB
+        ThreadUsage(500.0ms): 1
+         - AverageThreadTokens: 1.00
+         - PeakMemoryUsage: 6.06 MB
+         - PrepareTime: 7.291ms
+         - RowsProduced: 98.30K (98304)
+         - TotalCpuTime: 784.259ms
+         - TotalNetworkWaitTime: 388.818ms
+         - TotalStorageWaitTime: 3.934ms
+        CodeGen:(Active: 312.862ms, % non-child: 70.73%)
+           - CodegenTime: 2.669ms
+           - CompileTime: 302.467ms
+           - LoadTime: 9.231ms
+           - ModuleFileSize: 95.27 KB
+        DataStreamSender (dst_id=4):(Active: 80.63ms, % non-child: 18.10%)
+           - BytesSent: 2.33 MB
+           - NetworkThroughput(*): 35.89 MB/sec
+           - OverallThroughput: 29.06 MB/sec
+           - PeakMemoryUsage: 5.33 KB
+           - SerializeBatchTime: 26.487ms
+           - ThriftTransmitTime(*): 64.814ms
+           - UncompressedRowBatchSize: 6.66 MB
+        HASH_JOIN_NODE (id=2):(Active: 362.25ms, % non-child: 3.92%)
+          ExecOption: Build Side Codegen Enabled, Probe Side Codegen Enabled, Hash Table Built Asynchronously
+           - BuildBuckets: 1.02K (1024)
+           - BuildRows: 98.30K (98304)
+           - BuildTime: 12.622ms
+           - LoadFactor: 0.00
+           - PeakMemoryUsage: 6.02 MB
+           - ProbeRows: 3
+           - ProbeTime: 3.579ms
+           - RowsReturned: 98.30K (98304)
+           - RowsReturnedRate: 271.54 K/sec
+          EXCHANGE_NODE (id=3):(Active: 344.680ms, % non-child: 77.92%)
+             - BytesReceived: 1.15 MB
+             - ConvertRowBatchTime: 2.792ms
+             - DataArrivalWaitTime: 339.936ms
+             - DeserializeRowBatchTimer: 9.910ms
+             - FirstBatchArrivalWaitTime: 199.474ms
+             - PeakMemoryUsage: 156.00 KB
+             - RowsReturned: 98.30K (98304)
+             - RowsReturnedRate: 285.20 K/sec
+             - SendersBlockedTimer: 0ns
+             - SendersBlockedTotalTimer(*): 0ns
+        HDFS_SCAN_NODE (id=0):(Active: 13.616us, % non-child: 0.00%)
+          Hdfs split stats (&lt;volume id&gt;:&lt;# splits&gt;/&lt;split lengths&gt;): 0:1/33.00 B
+          Hdfs Read Thread Concurrency Bucket: 0:0% 1:0%
+          File Formats: TEXT/NONE:1
+          ExecOption: Codegen enabled: 1 out of 1
+           - AverageHdfsReadThreadConcurrency: 0.00
+           - AverageScannerThreadConcurrency: 0.00
+           - BytesRead: 33.00 B
+           - BytesReadLocal: 33.00 B
+           - BytesReadShortCircuit: 33.00 B
+           - NumDisksAccessed: 1
+           - NumScannerThreadsStarted: 1
+           - PeakMemoryUsage: 46.00 KB
+           - PerReadThreadRawHdfsThroughput: 287.52 KB/sec
+           - RowsRead: 3
+           - RowsReturned: 3
+           - RowsReturnedRate: 220.33 K/sec
+           - ScanRangesComplete: 1
+           - ScannerThreadsInvoluntaryContextSwitches: 26
+           - ScannerThreadsTotalWallClockTime: 55.199ms
+             - DelimiterParseTime: 2.463us
+             - MaterializeTupleTime(*): 1.226us
+             - ScannerThreadsSysTime: 0ns
+             - ScannerThreadsUserTime: 42.993ms
+           - ScannerThreadsVoluntaryContextSwitches: 1
+           - TotalRawHdfsReadTime(*): 112.86us
+           - TotalReadThroughput: 0.00 /sec
+    Fragment 2:
+      Instance 6540a03d4bee0691:4963d6269b210ec0 (host=impala-1.example.com:22000):(Active: 190.120ms, % non-child: 0.00%)
+        Hdfs split stats (&lt;volume id&gt;:&lt;# splits&gt;/&lt;split lengths&gt;): 0:15/960.00 KB
+         - AverageThreadTokens: 0.00
+         - PeakMemoryUsage: 906.33 KB
+         - PrepareTime: 3.67ms
+         - RowsProduced: 98.30K (98304)
+         - TotalCpuTime: 403.351ms
+         - TotalNetworkWaitTime: 34.999ms
+         - TotalStorageWaitTime: 108.675ms
+        CodeGen:(Active: 162.57ms, % non-child: 85.24%)
+           - CodegenTime: 3.133ms
+           - CompileTime: 148.316ms
+           - LoadTime: 12.317ms
+           - ModuleFileSize: 95.27 KB
+        DataStreamSender (dst_id=3):(Active: 70.620ms, % non-child: 37.14%)
+           - BytesSent: 1.15 MB
+           - NetworkThroughput(*): 23.30 MB/sec
+           - OverallThroughput: 16.23 MB/sec
+           - PeakMemoryUsage: 5.33 KB
+           - SerializeBatchTime: 22.69ms
+           - ThriftTransmitTime(*): 49.178ms
+           - UncompressedRowBatchSize: 3.28 MB
+        HDFS_SCAN_NODE (id=1):(Active: 118.839ms, % non-child: 62.51%)
+          Hdfs split stats (&lt;volume id&gt;:&lt;# splits&gt;/&lt;split lengths&gt;): 0:15/960.00 KB
+          Hdfs Read Thread Concurrency Bucket: 0:0% 1:0%
+          File Formats: TEXT/NONE:15
+          ExecOption: Codegen enabled: 15 out of 15
+           - AverageHdfsReadThreadConcurrency: 0.00
+           - AverageScannerThreadConcurrency: 0.00
+           - BytesRead: 960.00 KB
+           - BytesReadLocal: 960.00 KB
+           - BytesReadShortCircuit: 960.00 KB
+           - NumDisksAccessed: 1
+           - NumScannerThreadsStarted: 1
+           - PeakMemoryUsage: 869.00 KB
+           - PerReadThreadRawHdfsThroughput: 130.21 MB/sec
+           - RowsRead: 98.30K (98304)
+           - RowsReturned: 98.30K (98304)
+           - RowsReturnedRate: 827.20 K/sec
+           - ScanRangesComplete: 15
+           - ScannerThreadsInvoluntaryContextSwitches: 34
+           - ScannerThreadsTotalWallClockTime: 189.774ms
+             - DelimiterParseTime: 15.703ms
+             - MaterializeTupleTime(*): 3.419ms
+             - ScannerThreadsSysTime: 1.999ms
+             - ScannerThreadsUserTime: 44.993ms
+           - ScannerThreadsVoluntaryContextSwitches: 118
+           - TotalRawHdfsReadTime(*): 7.199ms
+           - TotalReadThroughput: 0.00 /sec</codeblock>
+    </conbody>
+  </concept>
+</concept>

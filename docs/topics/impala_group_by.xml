@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="group_by">
+
+  <title>GROUP BY Clause</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Specify the <codeph>GROUP BY</codeph> clause in queries that use aggregation functions, such as
+      <codeph><xref href="impala_count.xml#count">COUNT()</xref></codeph>,
+      <codeph><xref href="impala_sum.xml#sum">SUM()</xref></codeph>,
+      <codeph><xref href="impala_avg.xml#avg">AVG()</xref></codeph>,
+      <codeph><xref href="impala_min.xml#min">MIN()</xref></codeph>, and
+      <codeph><xref href="impala_max.xml#max">MAX()</xref></codeph>. Specify in the
+      <codeph><xref href="impala_group_by.xml#group_by">GROUP BY</xref></codeph> clause the names of all the
+      columns that do not participate in the aggregation operation.
+    </p>
+
+    <!-- Good to show an example of cases where ORDER BY does and doesn't work with complex types. -->
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p rev="2.3.0">
+      In <keyword keyref="impala23_full"/> and higher, the complex data types <codeph>STRUCT</codeph>,
+      <codeph>ARRAY</codeph>, and <codeph>MAP</codeph> are available. These columns cannot
+      be referenced directly in the <codeph>ORDER BY</codeph> clause.
+      When you query a complex type column, you use join notation to <q>unpack</q> the elements
+      of the complex type, and within the join query you can include an <codeph>ORDER BY</codeph>
+      clause to control the order in the result set of the scalar elements from the complex type.
+      See <xref href="impala_complex_types.xml#complex_types"/> for details about Impala support for complex types.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/zero_length_strings"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      For example, the following query finds the 5 items that sold the highest total quantity (using the
+      <codeph>SUM()</codeph> function, and also counts the number of sales transactions for those items (using the
+      <codeph>COUNT()</codeph> function). Because the column representing the item IDs is not used in any
+      aggregation functions, we specify that column in the <codeph>GROUP BY</codeph> clause.
+    </p>
+
+<codeblock>select
+  <b>ss_item_sk</b> as Item,
+  <b>count</b>(ss_item_sk) as Times_Purchased,
+  <b>sum</b>(ss_quantity) as Total_Quantity_Purchased
+from store_sales
+  <b>group by ss_item_sk</b>
+  order by sum(ss_quantity) desc
+  limit 5;
++-------+-----------------+--------------------------+
+| item  | times_purchased | total_quantity_purchased |
++-------+-----------------+--------------------------+
+| 9325  | 372             | 19072                    |
+| 4279  | 357             | 18501                    |
+| 7507  | 371             | 18475                    |
+| 5953  | 369             | 18451                    |
+| 16753 | 375             | 18446                    |
++-------+-----------------+--------------------------+</codeblock>
+
+    <p>
+      The <codeph>HAVING</codeph> clause lets you filter the results of aggregate functions, because you cannot
+      refer to those expressions in the <codeph>WHERE</codeph> clause. For example, to find the 5 lowest-selling
+      items that were included in at least 100 sales transactions, we could use this query:
+    </p>
+
+<codeblock>select
+  <b>ss_item_sk</b> as Item,
+  <b>count</b>(ss_item_sk) as Times_Purchased,
+  <b>sum</b>(ss_quantity) as Total_Quantity_Purchased
+from store_sales
+  <b>group by ss_item_sk</b>
+  <b>having times_purchased &gt;= 100</b>
+  order by sum(ss_quantity)
+  limit 5;
++-------+-----------------+--------------------------+
+| item  | times_purchased | total_quantity_purchased |
++-------+-----------------+--------------------------+
+| 13943 | 105             | 4087                     |
+| 2992  | 101             | 4176                     |
+| 4773  | 107             | 4204                     |
+| 14350 | 103             | 4260                     |
+| 11956 | 102             | 4275                     |
++-------+-----------------+--------------------------+</codeblock>
+
+    <p>
+      When performing calculations involving scientific or financial data, remember that columns with type
+      <codeph>FLOAT</codeph> or <codeph>DOUBLE</codeph> are stored as true floating-point numbers, which cannot
+      precisely represent every possible fractional value. Thus, if you include a <codeph>FLOAT</codeph> or
+      <codeph>DOUBLE</codeph> column in a <codeph>GROUP BY</codeph> clause, the results might not precisely match
+      literal values in your query or from an original Text data file. Use rounding operations, the
+      <codeph>BETWEEN</codeph> operator, or another arithmetic technique to match floating-point values that are
+      <q>near</q> literal values you expect. For example, this query on the <codeph>ss_wholesale_cost</codeph>
+      column returns cost values that are close but not identical to the original figures that were entered as
+      decimal fractions.
+    </p>
+
+<codeblock>select ss_wholesale_cost, avg(ss_quantity * ss_sales_price) as avg_revenue_per_sale
+  from sales
+  group by ss_wholesale_cost
+  order by avg_revenue_per_sale desc
+  limit 5;
++-------------------+----------------------+
+| ss_wholesale_cost | avg_revenue_per_sale |
++-------------------+----------------------+
+| 96.94000244140625 | 4454.351539300434    |
+| 95.93000030517578 | 4423.119941283189    |
+| 98.37999725341797 | 4332.516490316291    |
+| 97.97000122070312 | 4330.480601655014    |
+| 98.52999877929688 | 4291.316953108634    |
++-------------------+----------------------+</codeblock>
+
+    <p>
+      Notice how wholesale cost values originally entered as decimal fractions such as <codeph>96.94</codeph> and
+      <codeph>98.38</codeph> are slightly larger or smaller in the result set, due to precision limitations in the
+      hardware floating-point types. The imprecise representation of <codeph>FLOAT</codeph> and
+      <codeph>DOUBLE</codeph> values is why financial data processing systems often store currency using data types
+      that are less space-efficient but avoid these types of rounding errors.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_select.xml#select"/>,
+      <xref href="impala_aggregate_functions.xml#aggregate_functions"/>
+    </p>
+
+  </conbody>
+</concept>

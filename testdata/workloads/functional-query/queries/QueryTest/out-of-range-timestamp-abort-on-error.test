@@ -1,0 +1,8 @@
+====
+---- QUERY
+# IMPALA-4363: Verify that if an out of range parquet timestamp is read,
+# the query is aborted with the right error message.
+SELECT * FROM out_of_range_timestamp;
+---- CATCH
+Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp/out_of_range_timestamp.parquet' column 'ts' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.
+====

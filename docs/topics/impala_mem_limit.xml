@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="mem_limit">
+
+  <title>MEM_LIMIT Query Option</title>
+  <titlealts audience="PDF"><navtitle>MEM_LIMIT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Scalability"/>
+      <data name="Category" value="Memory"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">MEM_LIMIT query option</indexterm>
+      When resource management is not enabled, defines the maximum amount of memory a query can allocate on each node.
+      Therefore, the total memory that can be used by a query is the <codeph>MEM_LIMIT</codeph> times the number of nodes.
+    </p>
+
+    <p rev="CDH-32135">
+      There are two levels of memory limit for Impala.
+      The <codeph>-mem_limit</codeph> startup option sets an overall limit for the <cmdname>impalad</cmdname> process
+      (which handles multiple queries concurrently).
+      That limit is typically expressed in terms of a percentage of the RAM available on the host, such as <codeph>-mem_limit=70%</codeph>.
+      The <codeph>MEM_LIMIT</codeph> query option, which you set through <cmdname>impala-shell</cmdname>
+      or the <codeph>SET</codeph> statement in a JDBC or ODBC application, applies to each individual query.
+      The <codeph>MEM_LIMIT</codeph> query option is usually expressed as a fixed size such as <codeph>10gb</codeph>,
+      and must always be less than the <cmdname>impalad</cmdname> memory limit.
+    </p>
+
+    <p rev="CDH-32135">
+      If query processing exceeds the specified memory limit on any node, either the per-query limit or the
+      <cmdname>impalad</cmdname> limit, Impala cancels the query automatically.
+      Memory limits are checked periodically during query processing, so the actual memory in use
+      might briefly exceed the limit without the query being cancelled.
+    </p>
+
+    <p>
+      When resource management is enabled in CDH 5, the mechanism for this option changes. If set, it overrides the
+      automatic memory estimate from Impala. Impala requests this amount of memory from YARN on each node, and the
+      query does not proceed until that much memory is available. The actual memory used by the query could be
+      lower, since some queries use much less memory than others. With resource management, the
+      <codeph>MEM_LIMIT</codeph> setting acts both as a hard limit on the amount of memory a query can use on any
+      node (enforced by YARN) and a guarantee that that much memory will be available on each node while the query
+      is being executed. When resource management is enabled but no <codeph>MEM_LIMIT</codeph> setting is
+      specified, Impala estimates the amount of memory needed on each node for each query, requests that much
+      memory from YARN before starting the query, and then internally sets the <codeph>MEM_LIMIT</codeph> on each
+      node to the requested amount of memory during the query. Thus, if the query takes more memory than was
+      originally estimated, Impala detects that the <codeph>MEM_LIMIT</codeph> is exceeded and cancels the query
+      itself.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p rev="CDH-32135">
+      <b>Units:</b> A numeric argument represents memory size in bytes; you can also use a suffix of <codeph>m</codeph> or <codeph>mb</codeph>
+      for megabytes, or more commonly <codeph>g</codeph> or <codeph>gb</codeph> for gigabytes. If you specify a value with unrecognized
+      formats, subsequent queries fail with an error.
+    </p>
+
+    <p rev="CDH-32135">
+      <b>Default:</b> 0 (unlimited)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p rev="CDH-32135">
+      The <codeph>MEM_LIMIT</codeph> setting is primarily useful in a high-concurrency setting,
+      or on a cluster with a workload shared between Impala and other data processing components.
+      You can prevent any query from accidentally using much more memory than expected,
+      which could negatively impact other Impala queries.
+    </p>
+
+    <p rev="CDH-32135">
+      Use the output of the <codeph>SUMMARY</codeph> command in <cmdname>impala-shell</cmdname>
+      to get a report of memory used for each phase of your most heavyweight queries on each node,
+      and then set a <codeph>MEM_LIMIT</codeph> somewhat higher than that.
+      See <xref href="impala_explain_plan.xml#perf_summary"/> for usage information about
+      the <codeph>SUMMARY</codeph> command.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb" rev="CDH-32135"/>
+
+    <p rev="CDH-32135">
+      The following examples show how to set the <codeph>MEM_LIMIT</codeph> query option
+      using a fixed number of bytes, or suffixes representing gigabytes or megabytes.
+    </p>
+
+<codeblock rev="CDH-32135">
+[localhost:21000] > set mem_limit=3000000000;
+MEM_LIMIT set to 3000000000
+[localhost:21000] > select 5;
+Query: select 5
++---+
+| 5 |
++---+
+| 5 |
++---+
+
+[localhost:21000] > set mem_limit=3g;
+MEM_LIMIT set to 3g
+[localhost:21000] > select 5;
+Query: select 5
++---+
+| 5 |
++---+
+| 5 |
++---+
+
+[localhost:21000] > set mem_limit=3gb;
+MEM_LIMIT set to 3gb
+[localhost:21000] > select 5;
++---+
+| 5 |
++---+
+| 5 |
++---+
+
+[localhost:21000] > set mem_limit=3m;
+MEM_LIMIT set to 3m
+[localhost:21000] > select 5;
++---+
+| 5 |
++---+
+| 5 |
++---+
+[localhost:21000] > set mem_limit=3mb;
+MEM_LIMIT set to 3mb
+[nightly55-2.vpc.cloudera.com:21000] > select 5;
++---+
+| 5 |
++---+
+</codeblock>
+
+    <p rev="CDH-32135">
+      The following examples show how unrecognized <codeph>MEM_LIMIT</codeph>
+      values lead to errors for subsequent queries.
+    </p>
+
+<codeblock rev="CDH-32135">
+[localhost:21000] > set mem_limit=3tb;
+MEM_LIMIT set to 3tb
+[localhost:21000] > select 5;
+ERROR: Failed to parse query memory limit from '3tb'.
+
+[localhost:21000] > set mem_limit=xyz;
+MEM_LIMIT set to xyz
+[localhost:21000] > select 5;
+Query: select 5
+ERROR: Failed to parse query memory limit from 'xyz'.
+</codeblock>
+
+    <p rev="CDH-32135">
+      The following examples shows the automatic query cancellation
+      when the <codeph>MEM_LIMIT</codeph> value is exceeded
+      on any host involved in the Impala query. First it runs a
+      successful query and checks the largest amount of memory
+      used on any node for any stage of the query.
+      Then it sets an artificially low <codeph>MEM_LIMIT</codeph>
+      setting so that the same query cannot run.
+    </p>
+
+<codeblock rev="CDH-32135">
+[localhost:21000] > select count(*) from customer;
+Query: select count(*) from customer
++----------+
+| count(*) |
++----------+
+| 150000   |
++----------+
+
+[localhost:21000] > select count(distinct c_name) from customer;
+Query: select count(distinct c_name) from customer
++------------------------+
+| count(distinct c_name) |
++------------------------+
+| 150000                 |
++------------------------+
+
+[localhost:21000] > summary;
++--------------+--------+----------+----------+---------+------------+----------+---------------+---------------+
+| Operator     | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail        |
++--------------+--------+----------+----------+---------+------------+----------+---------------+---------------+
+| 06:AGGREGATE | 1      | 230.00ms | 230.00ms | 1       | 1          | 16.00 KB | -1 B          | FINALIZE      |
+| 05:EXCHANGE  | 1      | 43.44us  | 43.44us  | 1       | 1          | 0 B      | -1 B          | UNPARTITIONED |
+| 02:AGGREGATE | 1      | 227.14ms | 227.14ms | 1       | 1          | 12.00 KB | 10.00 MB      |               |
+| 04:AGGREGATE | 1      | 126.27ms | 126.27ms | 150.00K | 150.00K    | 15.17 MB | 10.00 MB      |               |
+| 03:EXCHANGE  | 1      | 44.07ms  | 44.07ms  | 150.00K | 150.00K    | 0 B      | 0 B           | HASH(c_name)  |
+<b>| 01:AGGREGATE | 1      | 361.94ms | 361.94ms | 150.00K | 150.00K    | 23.04 MB | 10.00 MB      |               |</b>
+| 00:SCAN HDFS | 1      | 43.64ms  | 43.64ms  | 150.00K | 150.00K    | 24.19 MB | 64.00 MB      | tpch.customer |
++--------------+--------+----------+----------+---------+------------+----------+---------------+---------------+
+
+[localhost:21000] > set mem_limit=15mb;
+MEM_LIMIT set to 15mb
+[localhost:21000] > select count(distinct c_name) from customer;
+Query: select count(distinct c_name) from customer
+ERROR:
+Memory limit exceeded
+Query did not have enough memory to get the minimum required buffers in the block manager.
+</codeblock>
+
+  </conbody>
+</concept>

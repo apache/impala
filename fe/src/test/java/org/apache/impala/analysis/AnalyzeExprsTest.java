@@ -404,8 +404,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     AnalysisError("select cast('foo' as varchar(0))",
         "Varchar size must be > 0: 0");
-    AnalysisError("select cast('foo' as varchar(65356))",
-        "Varchar size must be <= 65355: 65356");
+    AnalysisError("select cast('foo' as varchar(65536))",
+        "Varchar size must be <= 65535: 65536");
     AnalysisError("select cast('foo' as char(0))",
         "Char size must be > 0: 0");
     AnalysisError("select cast('foo' as char(256))",
@@ -1242,7 +1242,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     SelectStmt select = (SelectStmt) AnalyzesOk(queryStr);
     Expr expr = null;
     if (arithmeticMode) {
-      ArrayList<Expr> selectListExprs = select.getResultExprs();
+      List<Expr> selectListExprs = select.getResultExprs();
       assertNotNull(selectListExprs);
       assertEquals(selectListExprs.size(), 1);
       // check the first expr in select list
@@ -1270,7 +1270,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   private void checkReturnType(String stmt, Type resultType) {
     SelectStmt select = (SelectStmt) AnalyzesOk(stmt);
-    ArrayList<Expr> selectListExprs = select.getResultExprs();
+    List<Expr> selectListExprs = select.getResultExprs();
     assertNotNull(selectListExprs);
     assertEquals(selectListExprs.size(), 1);
     // check the first expr in select list

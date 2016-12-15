@@ -135,6 +135,7 @@ Status UnnestNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
 
   // Populate the output row_batch with tuples from the collection.
   DCHECK(coll_value_ != NULL);
+  DCHECK_GE(coll_value_->num_tuples, 0);
   while (item_idx_ < coll_value_->num_tuples) {
     Tuple* item =
         reinterpret_cast<Tuple*>(coll_value_->ptr + item_idx_ * item_byte_size_);

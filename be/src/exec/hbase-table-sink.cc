@@ -53,8 +53,8 @@ Status HBaseTableSink::PrepareExprs(RuntimeState* state) {
   return Status::OK();
 }
 
-Status HBaseTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
-  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
+Status HBaseTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   SCOPED_TIMER(profile()->total_time_counter());
 
   // Get the hbase table descriptor.  The table name will be used.
@@ -89,7 +89,7 @@ Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch) {
   ExprContext::FreeLocalAllocations(output_expr_ctxs_);
   RETURN_IF_ERROR(state->CheckQueryState());
   // Since everything is set up just forward everything to the writer.
-  RETURN_IF_ERROR(hbase_table_writer_->AppendRowBatch(batch));
+  RETURN_IF_ERROR(hbase_table_writer_->AppendRows(batch));
   (*state->per_partition_status())[ROOT_PARTITION_KEY].num_modified_rows +=
       batch->num_rows();
   return Status::OK();

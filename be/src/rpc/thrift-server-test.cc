@@ -42,6 +42,10 @@ const string& SERVER_CERT =
     Substitute("$0/be/src/testutil/server-cert.pem", IMPALA_HOME);
 const string& PRIVATE_KEY =
     Substitute("$0/be/src/testutil/server-key.pem", IMPALA_HOME);
+const string& BAD_SERVER_CERT =
+    Substitute("$0/be/src/testutil/bad-cert.pem", IMPALA_HOME);
+const string& BAD_PRIVATE_KEY =
+    Substitute("$0/be/src/testutil/bad-key.pem", IMPALA_HOME);
 const string& PASSWORD_PROTECTED_PRIVATE_KEY =
     Substitute("$0/be/src/testutil/server-key-password.pem", IMPALA_HOME);
 
@@ -191,6 +195,27 @@ TEST(ConcurrencyTest, DISABLED_ManyConcurrentConnections) {
       });
   for (int i = 0; i < 1024 * 16; ++i) pool.Offer(i);
   pool.DrainAndShutdown();
+}
+
+TEST(NoPasswordPemFile, BadServerCertificate) {
+  ThriftServer* server = new ThriftServer("DummyStatestore", MakeProcessor(),
+      FLAGS_state_store_port + 5, NULL, NULL, 5);
+  EXPECT_OK(server->EnableSsl(BAD_SERVER_CERT, BAD_PRIVATE_KEY));
+  EXPECT_OK(server->Start());
+  FLAGS_ssl_client_ca_certificate = SERVER_CERT;
+  ThriftClient<StatestoreServiceClient> ssl_client(
+      "localhost", FLAGS_state_store_port + 5, "", NULL, true);
+  EXPECT_OK(ssl_client.Open());
+  TRegisterSubscriberResponse resp;
+  EXPECT_THROW({
+    ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest());
+  }, TSSLException);
+  // Close and reopen the socket
+  ssl_client.Close();
+  EXPECT_OK(ssl_client.Open());
+  EXPECT_THROW({
+    ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest());
+  }, TSSLException);
 }
 
 IMPALA_TEST_MAIN();

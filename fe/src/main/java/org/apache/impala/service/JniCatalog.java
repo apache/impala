@@ -17,6 +17,10 @@
 
 package org.apache.impala.service;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -56,10 +60,6 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-
 /**
  * JNI-callable interface for the CatalogService. The main point is to serialize
  * and de-serialize thrift structures between C and Java parts of the CatalogService.
@@ -87,6 +87,7 @@ public class JniCatalog {
     BackendConfig.create(cfg);
 
     Preconditions.checkArgument(cfg.num_metadata_loading_threads > 0);
+    Preconditions.checkArgument(cfg.initial_hms_cnxn_timeout_s > 0);
     // This trick saves having to pass a TLogLevel enum, which is an object and more
     // complex to pass through JNI.
     GlogAppender.Install(TLogLevel.values()[cfg.impala_log_lvl],
@@ -101,8 +102,8 @@ public class JniCatalog {
     LOG.info(JniUtil.getJavaVersion());
 
     catalog_ = new CatalogServiceCatalog(cfg.load_catalog_in_background,
-        cfg.num_metadata_loading_threads, sentryConfig, getServiceId(), cfg.principal,
-        cfg.local_library_path);
+        cfg.num_metadata_loading_threads, cfg.initial_hms_cnxn_timeout_s, sentryConfig,
+        getServiceId(), cfg.principal, cfg.local_library_path);
     try {
       catalog_.reset();
     } catch (CatalogException e) {

@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8"?><!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="order_by">
+
+  <title>ORDER BY Clause</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The familiar <codeph>ORDER BY</codeph> clause of a <codeph>SELECT</codeph> statement sorts the result set
+      based on the values from one or more columns.
+    </p>
+
+    <p>
+      For distributed queries, this is a relatively expensive operation, because the entire result set must be
+      produced and transferred to one node before the sorting can happen. This can require more memory capacity
+      than a query without <codeph>ORDER BY</codeph>. Even if the query takes approximately the same time to finish
+      with or without the <codeph>ORDER BY</codeph> clause, subjectively it can appear slower because no results
+      are available until all processing is finished, rather than results coming back gradually as rows matching
+      the <codeph>WHERE</codeph> clause are found. Therefore, if you only need the first N results from the sorted
+      result set, also include the <codeph>LIMIT</codeph> clause, which reduces network overhead and the memory
+      requirement on the coordinator node.
+    </p>
+
+    <note>
+      <p rev="1.4.0 obwl">
+        In Impala 1.4.0 and higher, the <codeph>LIMIT</codeph> clause is now optional (rather than required) for
+        queries that use the <codeph>ORDER BY</codeph> clause. Impala automatically uses a temporary disk work area
+        to perform the sort if the sort operation would otherwise exceed the Impala memory limit for a particular
+        DataNode.
+      </p>
+    </note>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+    <p>
+      The full syntax for the <codeph>ORDER BY</codeph> clause is:
+    </p>
+
+<codeblock rev="1.2.1">ORDER BY <varname>col_ref</varname> [, <varname>col_ref</varname> ...] [ASC | DESC] [NULLS FIRST | NULLS LAST]
+
+col_ref ::= <varname>column_name</varname> | <varname>integer_literal</varname>
+</codeblock>
+
+    <p>
+      Although the most common usage is <codeph>ORDER BY <varname>column_name</varname></codeph>, you can also
+      specify <codeph>ORDER BY 1</codeph> to sort by the first column of the result set, <codeph>ORDER BY
+      2</codeph> to sort by the second column, and so on. The number must be a numeric literal, not some other kind
+      of constant expression. (If the argument is some other expression, even a <codeph>STRING</codeph> value, the
+      query succeeds but the order of results is undefined.)
+    </p>
+
+    <p>
+      <codeph>ORDER BY <varname>column_number</varname></codeph> can only be used when the query explicitly lists
+      the columns in the <codeph>SELECT</codeph> list, not with <codeph>SELECT *</codeph> queries.
+    </p>
+
+    <p>
+      <b>Ascending and descending sorts:</b>
+    </p>
+
+    <p>
+      The default sort order (the same as using the <codeph>ASC</codeph> keyword) puts the smallest values at the
+      start of the result set, and the largest values at the end. Specifying the <codeph>DESC</codeph> keyword
+      reverses that order.
+    </p>
+
+    <p>
+      <b>Sort order for NULL values:</b>
+    </p>
+
+    <p rev="1.2.1">
+      See <xref href="impala_literals.xml#null"/> for details about how <codeph>NULL</codeph> values are positioned
+      in the sorted result set, and how to use the <codeph>NULLS FIRST</codeph> and <codeph>NULLS LAST</codeph>
+      clauses. (The sort position for <codeph>NULL</codeph> values in <codeph>ORDER BY ... DESC</codeph> queries is
+      changed in Impala 1.2.1 and higher to be more standards-compliant, and the <codeph>NULLS FIRST</codeph> and
+      <codeph>NULLS LAST</codeph> keywords are new in Impala 1.2.1.)
+    </p>
+
+    <p rev="obwl" conref="../shared/impala_common.xml#common/order_by_limit"/>
+
+    <!-- Good to show an example of cases where ORDER BY does and doesn't work with complex types. -->
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p rev="2.3.0">
+      In <keyword keyref="impala23_full"/> and higher, the complex data types <codeph>STRUCT</codeph>,
+      <codeph>ARRAY</codeph>, and <codeph>MAP</codeph> are available. These columns cannot
+      be referenced directly in the <codeph>ORDER BY</codeph> clause.
+      When you query a complex type column, you use join notation to <q>unpack</q> the elements
+      of the complex type, and within the join query you can include an <codeph>ORDER BY</codeph>
+      clause to control the order in the result set of the scalar elements from the complex type.
+      See <xref href="impala_complex_types.xml#complex_types"/> for details about Impala support for complex types.
+    </p>
+
+    <p>
+      The following query shows how a complex type column cannot be directly used in an <codeph>ORDER BY</codeph> clause:
+    </p>
+
+<codeblock>CREATE TABLE games (id BIGINT, score ARRAY &lt;BIGINT&gt;) STORED AS PARQUET;
+...use LOAD DATA to load externally created Parquet files into the table...
+SELECT id FROM games ORDER BY score DESC;
+ERROR: AnalysisException: ORDER BY expression 'score' with complex type 'ARRAY&lt;BIGINT&gt;' is not supported.
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following query retrieves the user ID and score, only for scores greater than one million,
+      with the highest scores for each user listed first.
+      Because the individual array elements are now represented as separate rows in the result set,
+      they can be used in the <codeph>ORDER BY</codeph> clause, referenced using the <codeph>ITEM</codeph>
+      pseudocolumn that represents each array element.
+    </p>
+
+<codeblock>SELECT id, item FROM games, games.score
+  WHERE item &gt; 1000000
+ORDER BY id, item desc;
+</codeblock>
+
+    <p>
+      The following queries use similar <codeph>ORDER BY</codeph> techniques with variations of the <codeph>GAMES</codeph>
+      table, where the complex type is an <codeph>ARRAY</codeph> containing <codeph>STRUCT</codeph> or <codeph>MAP</codeph>
+      elements to represent additional details about each game that was played.
+      For an array of structures, the fields of the structure are referenced as <codeph>ITEM.<varname>field_name</varname></codeph>.
+      For an array of maps, the keys and values within each array element are referenced as <codeph>ITEM.KEY</codeph>
+      and <codeph>ITEM.VALUE</codeph>.
+    </p>
+
+<codeblock>CREATE TABLE games2 (id BIGINT, play array &lt; struct &lt;game_name: string, score: BIGINT, high_score: boolean&gt; &gt;) STORED AS PARQUET
+...use LOAD DATA to load externally created Parquet files into the table...
+SELECT id, item.game_name, item.score FROM games2, games2.play
+  WHERE item.score &gt; 1000000
+ORDER BY id, item.score DESC;
+
+CREATE TABLE games3 (id BIGINT, play ARRAY &lt; MAP &lt;STRING, BIGINT&gt; &gt;) STORED AS PARQUET;
+...use LOAD DATA to load externally created Parquet files into the table...
+SELECT id, info.key AS k, info.value AS v from games3, games3.play AS plays, games3.play.item AS info
+  WHERE info.KEY = 'score' AND info.VALUE &gt; 1000000
+ORDER BY id, info.value desc;
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      Although the <codeph>LIMIT</codeph> clause is now optional on <codeph>ORDER BY</codeph> queries, if your
+      query only needs some number of rows that you can predict in advance, use the <codeph>LIMIT</codeph> clause
+      to reduce unnecessary processing. For example, if the query has a clause <codeph>LIMIT 10</codeph>, each data
+      node sorts its portion of the relevant result set and only returns 10 rows to the coordinator node. The
+      coordinator node picks the 10 highest or lowest row values out of this small intermediate result set.
+    </p>
+
+    <p>
+      If an <codeph>ORDER BY</codeph> clause is applied to an early phase of query processing, such as a subquery
+      or a view definition, Impala ignores the <codeph>ORDER BY</codeph> clause. To get ordered results from a
+      subquery or view, apply an <codeph>ORDER BY</codeph> clause to the outermost or final <codeph>SELECT</codeph>
+      level.
+    </p>
+
+    <p>
+      <codeph>ORDER BY</codeph> is often used in combination with <codeph>LIMIT</codeph> to perform <q>top-N</q>
+      queries:
+    </p>
+
+<codeblock>SELECT user_id AS "Top 10 Visitors", SUM(page_views) FROM web_stats
+  GROUP BY page_views, user_id
+  ORDER BY SUM(page_views) DESC LIMIT 10;
+</codeblock>
+
+    <p>
+      <codeph>ORDER BY</codeph> is sometimes used in combination with <codeph>OFFSET</codeph> and
+      <codeph>LIMIT</codeph> to paginate query results, although it is relatively inefficient to issue multiple
+      queries like this against the large tables typically used with Impala:
+    </p>
+
+<codeblock>SELECT page_title AS "Page 1 of search results", page_url FROM search_content
+  WHERE LOWER(page_title) LIKE '%game%')
+  ORDER BY page_title LIMIT 10 OFFSET 0;
+SELECT page_title AS "Page 2 of search results", page_url FROM search_content
+  WHERE LOWER(page_title) LIKE '%game%')
+  ORDER BY page_title LIMIT 10 OFFSET 10;
+SELECT page_title AS "Page 3 of search results", page_url FROM search_content
+  WHERE LOWER(page_title) LIKE '%game%')
+  ORDER BY page_title LIMIT 10 OFFSET 20;
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/internals_blurb"/>
+
+    <p>
+      Impala sorts the intermediate results of an <codeph>ORDER BY</codeph> clause in memory whenever practical. In
+      a cluster of N DataNodes, each node sorts roughly 1/Nth of the result set, the exact proportion varying
+      depending on how the data matching the query is distributed in HDFS.
+    </p>
+
+    <p>
+      If the size of the sorted intermediate result set on any DataNode would cause the query to exceed the Impala
+      memory limit, Impala sorts as much as practical in memory, then writes partially sorted data to disk. (This
+      technique is known in industry terminology as <q>external sorting</q> and <q>spilling to disk</q>.) As each
+      8 MB batch of data is written to disk, Impala frees the corresponding memory to sort a new 8 MB batch of
+      data. When all the data has been processed, a final merge sort operation is performed to correctly order the
+      in-memory and on-disk results as the result set is transmitted back to the coordinator node. When external
+      sorting becomes necessary, Impala requires approximately 60 MB of RAM at a minimum for the buffers needed to
+      read, write, and sort the intermediate results. If more RAM is available on the DataNode, Impala will use
+      the additional RAM to minimize the amount of disk I/O for sorting.
+    </p>
+
+    <p>
+      This external sort technique is used as appropriate on each DataNode (possibly including the coordinator
+      node) to sort the portion of the result set that is processed on that node. When the sorted intermediate
+      results are sent back to the coordinator node to produce the final result set, the coordinator node uses a
+      merge sort technique to produce a final sorted result set without using any extra resources on the
+      coordinator node.
+    </p>
+
+    <p rev="obwl">
+      <b>Configuration for disk usage:</b>
+    </p>
+
+    <p rev="obwl" conref="../shared/impala_common.xml#common/order_by_scratch_dir"/>
+
+<!-- Here is actually the more logical place to collect all those examples, move them from SELECT and cross-reference to here. -->
+
+<!--     <p rev="obwl" conref="../shared/impala_common.xml#common/restrictions_blurb"/> -->
+
+    <p rev="obwl" conref="../shared/impala_common.xml#common/insert_sort_blurb"/>
+
+    <p rev="obwl" conref="../shared/impala_common.xml#common/order_by_view_restriction"/>
+
+    <p>
+      With the lifting of the requirement to include a <codeph>LIMIT</codeph> clause in every <codeph>ORDER
+      BY</codeph> query (in Impala 1.4 and higher):
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          Now the use of scratch disk space raises the possibility of an <q>out of disk space</q> error on a
+          particular DataNode, as opposed to the previous possibility of an <q>out of memory</q> error. Make sure
+          to keep at least 1 GB free on the filesystem used for temporary sorting work.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          The query options
+          <xref href="impala_default_order_by_limit.xml#default_order_by_limit">DEFAULT_ORDER_BY_LIMIT</xref> and
+          <xref href="impala_abort_on_default_limit_exceeded.xml#abort_on_default_limit_exceeded">ABORT_ON_DEFAULT_LIMIT_EXCEEDED</xref>,
+          which formerly controlled the behavior of <codeph>ORDER BY</codeph> queries with no limit specified, are
+          now ignored.
+        </p>
+      </li>
+    </ul>
+
+    <p rev="obwl" conref="../shared/impala_common.xml#common/null_sorting_change"/>
+<codeblock>[localhost:21000] > create table numbers (x int);
+[localhost:21000] > insert into numbers values (1), (null), (2), (null), (3);
+[localhost:21000] > select x from numbers order by x nulls first;
++------+
+| x    |
++------+
+| NULL |
+| NULL |
+| 1    |
+| 2    |
+| 3    |
++------+
+[localhost:21000] > select x from numbers order by x desc nulls first;
++------+
+| x    |
++------+
+| NULL |
+| NULL |
+| 3    |
+| 2    |
+| 1    |
++------+
+[localhost:21000] > select x from numbers order by x nulls last;
++------+
+| x    |
++------+
+| 1    |
+| 2    |
+| 3    |
+| NULL |
+| NULL |
++------+
+[localhost:21000] > select x from numbers order by x desc nulls last;
++------+
+| x    |
++------+
+| 3    |
+| 2    |
+| 1    |
+| NULL |
+| NULL |
++------+
+</codeblock>
+
+    <p rev="obwl" conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p rev="obwl">
+      See <xref href="impala_select.xml#select"/> for further examples of queries with the <codeph>ORDER
+      BY</codeph> clause.
+    </p>
+
+    <p>
+      Analytic functions use the <codeph>ORDER BY</codeph> clause in a different context to define the sequence in
+      which rows are analyzed. See <xref href="impala_analytic_functions.xml#analytic_functions"/> for details.
+    </p>
+  </conbody>
+</concept>

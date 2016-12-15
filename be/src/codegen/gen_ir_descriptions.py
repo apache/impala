@@ -186,6 +186,8 @@ ir_functions = [
    "_ZNK6impala11HdfsScanner14GetConjunctCtxEi"],
   ["PROCESS_SCRATCH_BATCH",
    "_ZN6impala18HdfsParquetScanner19ProcessScratchBatchEPNS_8RowBatchE"],
+  ["PARQUET_SCANNER_EVAL_RUNTIME_FILTER",
+   "_ZN6impala18HdfsParquetScanner17EvalRuntimeFilterEiPNS_8TupleRowE"],
   ["STRING_TO_BOOL", "IrStringToBool"],
   ["STRING_TO_INT8", "_Z14IrStringToInt8PKciPN6impala12StringParser11ParseResultE"],
   ["STRING_TO_INT16", "IrStringToInt16"],
@@ -202,7 +204,9 @@ ir_functions = [
   ["MEMPOOL_ALLOCATE",
    "_ZN6impala7MemPool8AllocateILb0EEEPhli"],
   ["MEMPOOL_CHECKED_ALLOCATE",
-   "_ZN6impala7MemPool8AllocateILb1EEEPhli"]
+   "_ZN6impala7MemPool8AllocateILb1EEEPhli"],
+  ["RUNTIME_FILTER_EVAL",
+   "_ZNK6impala13RuntimeFilter4EvalEPvRKNS_10ColumnTypeE"]
 ]
 
 enums_preamble = '\

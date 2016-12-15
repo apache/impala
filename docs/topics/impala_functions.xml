@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="builtins">
+
+  <title id="title_functions">Impala Built-In Functions</title>
+  <titlealts audience="PDF"><navtitle>Built-In Functions</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <!-- To do:
+      Opportunity to conref some material between here and the "Functions" topic under "Schema Objects".
+    -->
+
+    <p>
+      Impala supports several categories of built-in functions. These functions let you perform mathematical
+      calculations, string manipulation, date calculations, and other kinds of data transformations directly in
+      <codeph>SELECT</codeph> statements. The built-in functions let a SQL query return results with all
+      formatting, calculating, and type conversions applied, rather than performing time-consuming postprocessing
+      in another application. By applying function calls where practical, you can make a SQL query that is as
+      convenient as an expression in a procedural programming language or a formula in a spreadsheet.
+    </p>
+
+    <p>
+      The categories of functions supported by Impala are:
+    </p>
+
+    <ul>
+      <li>
+        <xref href="impala_math_functions.xml#math_functions"/>
+      </li>
+
+      <li>
+        <xref href="impala_conversion_functions.xml#conversion_functions"/>
+      </li>
+
+      <li>
+        <xref href="impala_datetime_functions.xml#datetime_functions"/>
+      </li>
+
+      <li>
+        <xref href="impala_conditional_functions.xml#conditional_functions"/>
+      </li>
+
+      <li>
+        <xref href="impala_string_functions.xml#string_functions"/>
+      </li>
+
+      <li>
+        Aggregation functions, explained in <xref href="impala_aggregate_functions.xml#aggregate_functions"/>.
+      </li>
+    </ul>
+
+    <p>
+      You call any of these functions through the <codeph>SELECT</codeph> statement. For most functions, you can
+      omit the <codeph>FROM</codeph> clause and supply literal values for any required arguments:
+    </p>
+
+<codeblock>select abs(-1);
++---------+
+| abs(-1) |
++---------+
+| 1       |
++---------+
+
+select concat('The rain ', 'in Spain');
++---------------------------------+
+| concat('the rain ', 'in spain') |
++---------------------------------+
+| The rain in Spain               |
++---------------------------------+
+
+select power(2,5);
++-------------+
+| power(2, 5) |
++-------------+
+| 32          |
++-------------+
+</codeblock>
+
+    <p>
+      When you use a <codeph>FROM</codeph> clause and specify a column name as a function argument, the function is
+      applied for each item in the result set:
+    </p>
+
+<!-- TK: make real output for these; change the queries if necessary to use tables I already have. -->
+
+<codeblock>select concat('Country = ',country_code) from all_countries where population &gt; 100000000;
+select round(price) as dollar_value from product_catalog where price between 0.0 and 100.0;
+</codeblock>
+
+    <p>
+      Typically, if any argument to a built-in function is <codeph>NULL</codeph>, the result value is also
+      <codeph>NULL</codeph>:
+    </p>
+
+<codeblock>select cos(null);
++-----------+
+| cos(null) |
++-----------+
+| NULL      |
++-----------+
+
+select power(2,null);
++----------------+
+| power(2, null) |
++----------------+
+| NULL           |
++----------------+
+
+select concat('a',null,'b');
++------------------------+
+| concat('a', null, 'b') |
++------------------------+
+| NULL                   |
++------------------------+
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/aggr1"/>
+
+<codeblock conref="../shared/impala_common.xml#common/aggr2"/>
+
+    <p conref="../shared/impala_common.xml#common/aggr3"/>
+
+    <p>
+      Aggregate functions are a special category with different rules. These functions calculate a return value
+      across all the items in a result set, so they do require a <codeph>FROM</codeph> clause in the query:
+    </p>
+
+<!-- TK: make real output for these; change the queries if necessary to use tables I already have. -->
+
+<codeblock>select count(product_id) from product_catalog;
+select max(height), avg(height) from census_data where age &gt; 20;
+</codeblock>
+
+    <p>
+      Aggregate functions also ignore <codeph>NULL</codeph> values rather than returning a <codeph>NULL</codeph>
+      result. For example, if some rows have <codeph>NULL</codeph> for a particular column, those rows are ignored
+      when computing the AVG() for that column. Likewise, specifying <codeph>COUNT(col_name)</codeph> in a query
+      counts only those rows where <codeph>col_name</codeph> contains a non-<codeph>NULL</codeph> value.
+    </p>
+
+    <p rev="2.0.0">
+      Analytic functions are a variation on aggregate functions. Instead of returning a single value, or an
+      identical value for each group of rows, they can compute values that vary based on a <q>window</q> consisting
+      of other rows around them in the result set.
+    </p>
+
+    <p outputclass="toc"/>
+
+  </conbody>
+
+</concept>

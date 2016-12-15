@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.0.0" id="compression_codec">
+
+  <title>COMPRESSION_CODEC Query Option (<keyword keyref="impala20"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>COMPRESSION_CODEC</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Compression"/>
+      <data name="Category" value="File Formats"/>
+      <data name="Category" value="Parquet"/>
+      <data name="Category" value="Snappy"/>
+      <data name="Category" value="Gzip"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+<!-- The initial part of this paragraph is copied straight from the #parquet_compression topic. -->
+
+<!-- Could turn into a conref. -->
+
+    <p rev="2.0.0">
+      <indexterm audience="Cloudera">COMPRESSION_CODEC query option</indexterm>
+      When Impala writes Parquet data files using the <codeph>INSERT</codeph> statement, the underlying compression
+      is controlled by the <codeph>COMPRESSION_CODEC</codeph> query option.
+    </p>
+
+    <note>
+      Prior to Impala 2.0, this option was named <codeph>PARQUET_COMPRESSION_CODEC</codeph>. In Impala 2.0 and
+      later, the <codeph>PARQUET_COMPRESSION_CODEC</codeph> name is not recognized. Use the more general name
+      <codeph>COMPRESSION_CODEC</codeph> for new code.
+    </note>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>SET COMPRESSION_CODEC=<varname>codec_name</varname>;</codeblock>
+
+    <p>
+      The allowed values for this query option are <codeph>SNAPPY</codeph> (the default), <codeph>GZIP</codeph>,
+      and <codeph>NONE</codeph>.
+    </p>
+
+    <note>
+      A Parquet file created with <codeph>COMPRESSION_CODEC=NONE</codeph> is still typically smaller than the
+      original data, due to encoding schemes such as run-length encoding and dictionary encoding that are applied
+      separately from compression.
+    </note>
+
+    <p></p>
+
+    <p>
+      The option value is not case-sensitive.
+    </p>
+
+    <p>
+      If the option is set to an unrecognized value, all kinds of queries will fail due to the invalid option
+      setting, not just queries involving Parquet tables. (The value <codeph>BZIP2</codeph> is also recognized, but
+      is not compatible with Parquet tables.)
+    </p>
+
+    <p>
+      <b>Type:</b> <codeph>STRING</codeph>
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>SNAPPY</codeph>
+    </p>
+
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>set compression_codec=gzip;
+insert into parquet_table_highly_compressed select * from t1;
+
+set compression_codec=snappy;
+insert into parquet_table_compression_plus_fast_queries select * from t1;
+
+set compression_codec=none;
+insert into parquet_table_no_compression select * from t1;
+
+set compression_codec=foo;
+select * from t1 limit 5;
+ERROR: Invalid compression codec: foo
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      For information about how compressing Parquet data files affects query performance, see
+      <xref href="impala_parquet.xml#parquet_compression"/>.
+    </p>
+  </conbody>
+</concept>

@@ -129,6 +129,18 @@ def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
                                  disable_codegen_options=ALL_DISABLE_CODEGEN_OPTIONS,
                                  batch_sizes=ALL_BATCH_SIZES,
                                  sync_ddl=None, exec_single_node_option=[0]):
+  exec_option_dimensions = {
+      'abort_on_error': [1],
+      'exec_single_node_rows_threshold': exec_single_node_option,
+      'batch_size': batch_sizes,
+      'disable_codegen': disable_codegen_options,
+      'num_nodes': cluster_sizes}
+
+  if sync_ddl is not None:
+    exec_option_dimensions['sync_ddl'] = sync_ddl
+  return create_exec_option_dimension_from_dict(exec_option_dimensions)
+
+def create_exec_option_dimension_from_dict(exec_option_dimensions):
   """
   Builds a query exec option test dimension
 
@@ -140,16 +152,6 @@ def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
   TODO: In the future we could generate these values using pairwise to reduce total
   execution time.
   """
-  exec_option_dimensions = {
-      'abort_on_error': [1],
-      'exec_single_node_rows_threshold': exec_single_node_option,
-      'batch_size': batch_sizes,
-      'disable_codegen': disable_codegen_options,
-      'num_nodes': cluster_sizes}
-
-  if sync_ddl is not None:
-    exec_option_dimensions['sync_ddl'] = sync_ddl
-
   # Generate the cross product (all combinations) of the exec options specified. Then
   # store them in exec_option dictionary format.
   keys = sorted(exec_option_dimensions)

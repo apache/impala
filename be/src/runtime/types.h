@@ -74,9 +74,9 @@ struct ColumnType {
   PrimitiveType type;
   /// Only set if type == TYPE_CHAR or type == TYPE_VARCHAR
   int len;
-  static const int MAX_VARCHAR_LENGTH = 65355;
-  static const int MAX_CHAR_LENGTH = 255;
-  static const int MAX_CHAR_INLINE_LENGTH = 128;
+  static const int MAX_VARCHAR_LENGTH = (1 << 16) - 1; // 65535
+  static const int MAX_CHAR_LENGTH = (1 << 8) - 1; // 255
+  static const int MAX_CHAR_INLINE_LENGTH = (1 << 7); // 128
 
   /// Only set if type == TYPE_DECIMAL
   int precision, scale;
@@ -95,6 +95,8 @@ struct ColumnType {
 
   /// Only set if type == TYPE_STRUCT. The field name of each child.
   std::vector<std::string> field_names;
+
+  static const char* LLVM_CLASS_NAME;
 
   ColumnType(PrimitiveType type = INVALID_TYPE)
     : type(type), len(-1), precision(-1), scale(-1) {
@@ -279,8 +281,6 @@ struct ColumnType {
   /// Recursive implementation of ToThrift() that populates 'thrift_type' with the
   /// TTypeNodes for this type and its children.
   void ToThrift(TColumnType* thrift_type) const;
-
-  static const char* LLVM_CLASS_NAME;
 };
 
 std::ostream& operator<<(std::ostream& os, const ColumnType& type);

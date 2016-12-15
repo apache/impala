@@ -33,6 +33,7 @@ import org.apache.impala.thrift.TAggregateExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TFunctionBinaryType;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -232,11 +233,26 @@ public class FunctionCallExpr extends Expr {
   }
 
   /**
-   * Aggregate functions are never constant.
+   * Needs to be kept in sync with the BE understanding of constness in
+   * scalar-fn-call.h/cc.
    */
   @Override
   public boolean isConstant() {
-    if (fn_ != null && fn_ instanceof AggregateFunction) return false;
+    // Aggregate functions are never constant.
+    if (fn_ instanceof AggregateFunction) return false;
+    String fnName = fnName_.getFunction();
+    if (fnName == null) {
+      // This expr has not been analyzed yet, get the function name from the path.
+      List<String> path = fnName_.getFnNamePath();
+      fnName = path.get(path.size() - 1);
+    }
+    // Non-deterministic functions are never constant.
+    if (fnName.equalsIgnoreCase("rand") || fnName.equalsIgnoreCase("random")
+        || fnName.equalsIgnoreCase("uuid")) {
+      return false;
+    }
+    // Sleep is a special function for testing.
+    if (fnName.equalsIgnoreCase("sleep")) return false;
     return super.isConstant();
   }
 

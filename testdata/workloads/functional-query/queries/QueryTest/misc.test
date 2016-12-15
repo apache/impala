@@ -136,3 +136,23 @@ SELECT count(*) from functional.alltypes group by bool_col having bool_col
 ---- TYPES
 bigint
 ====
+---- QUERY
+# IMPALA-3812: Verfiy that the correct error message is shown when the star expansion adds
+# the DATE unsupported type to the select list.
+select * from functional.unsupported_types
+---- CATCH
+Unsupported type 'DATE' in 'functional.unsupported_types.date_col'.
+====
+---- QUERY
+# IMPALA-3812: Verfiy that DATE type is displayed correctly in the describe table.
+describe functional.unsupported_types
+---- RESULTS
+'int_col','int',''
+'dec_col','decimal(10,0)',''
+'date_col','date',''
+'str_col','string',''
+'bin_col','binary',''
+'bigint_col','bigint',''
+---- TYPES
+STRING, STRING, STRING
+====

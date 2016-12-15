@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="perf_ddl">
+
+  <title>Performance Considerations for DDL Statements</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      These tips and guidelines apply to the Impala DDL statements, which are listed in
+      <xref href="impala_ddl.xml#ddl"/>.
+    </p>
+
+    <p>
+      Because Impala DDL statements operate on the metastore database, the performance considerations for those
+      statements are totally different than for distributed queries that operate on HDFS
+      <ph rev="2.2.0">or S3</ph> data files, or on HBase tables.
+    </p>
+
+    <p>
+      Each DDL statement makes a relatively small update to the metastore database. The overhead for each statement
+      is proportional to the overall number of Impala and Hive tables, and (for a partitioned table) to the overall
+      number of partitions in that table. Issuing large numbers of DDL statements (such as one for each table or
+      one for each partition) also has the potential to encounter a bottleneck with access to the metastore
+      database. Therefore, for efficient DDL, try to design your application logic and ETL pipeline to avoid a huge
+      number of tables and a huge number of partitions within each table. In this context, <q>huge</q> is in the
+      range of tens of thousands or hundreds of thousands.
+    </p>
+
+    <note conref="../shared/impala_common.xml#common/add_partition_set_location"/>
+  </conbody>
+</concept>

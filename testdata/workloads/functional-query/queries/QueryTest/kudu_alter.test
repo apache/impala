@@ -1,11 +1,17 @@
 ====
 ---- QUERY
 create table simple (id int primary key, name string, valf float, vali bigint)
-  distribute by hash (id) into 3 buckets stored as kudu
+  partition by hash (id) partitions 3 stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
--- Alter master address to a different location
+# Hash partitions cannot be enumerated as range partitions
+show range partitions simple
+---- CATCH
+AnalysisException: SHOW RANGE PARTITIONS requested but table does not have range partitions: $DATABASE.simple
+====
+---- QUERY
+# Alter master address to a different location
 alter table simple set tblproperties (
   'kudu.master_addresses' = 'localhost'
 )
@@ -15,7 +21,7 @@ alter table simple set tblproperties (
 STRING
 ====
 ---- QUERY
--- Show that new address is picked up
+# Show that new address is picked up
 describe formatted simple
 ---- RESULTS: VERIFY_IS_SUBSET
 '','kudu.master_addresses','localhost           '
@@ -30,7 +36,7 @@ alter table simple set tblproperties ('kudu.master_addresses' = '127.0.0.1')
 STRING
 ====
 ---- QUERY
--- Try to use an invalid master address
+# Try to use an invalid master address
 alter table simple set tblproperties ('kudu.master_addresses' = 'invalid_host')
 ---- CATCH
 ImpalaRuntimeException: Kudu table 'impala::$DATABASE.simple' does not exist on master 'invalid_host'
@@ -43,6 +49,373 @@ alter table simple rename to simple_new;
 select count(*) from simple_new;
 ---- RESULTS
 0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Create a table with range distribution
+create table tbl_to_alter (id int primary key, name string null, vali bigint not null)
+  partition by range (id) (partition 1 < values <= 10) stored as kudu
+---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+====
+---- QUERY
+# Add a range partition
+alter table tbl_to_alter add range partition 10 < values <= 20
+---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+'11 <= VALUES < 21'
+====
+---- QUERY
+# Insert a row to the new partition
+insert into tbl_to_alter values (15, 'name', 100)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALI
+---- DML_RESULTS: tbl_to_alter
+15,'name',100
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# Add a singleton range partition
+alter table tbl_to_alter add range partition value = 100
+---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+'11 <= VALUES < 21'
+'VALUE = 100'
+====
+---- QUERY
+# Insert a row to the new partition
+insert into tbl_to_alter values (100, 'name1', 1000)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALI
+---- DML_RESULTS: tbl_to_alter
+100,'name1',1000
+15,'name',100
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# Add an unbounded range partition
+alter table tbl_to_alter add range partition 1000 < values
+---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+'11 <= VALUES < 21'
+'VALUE = 100'
+'VALUES >= 1001'
+====
+---- QUERY
+# Try to insert a partition that overlaps with an existing partition
+alter table tbl_to_alter add range partition 10 < values <= 30
+---- CATCH
+NonRecoverableException: New range partition conflicts with existing range partition: 11 <= VALUES < 31
+====
+---- QUERY
+# Try to insert a partition that overlaps with an existing partition, use IF NOT EXISTS
+# to hide the error
+alter table tbl_to_alter add if not exists range partition 10 < values <= 30
+---- RESULTS
+====
+---- QUERY
+# Drop one of the recently inserted partitions
+alter table tbl_to_alter drop range partition value = 100
+---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+'11 <= VALUES < 21'
+'VALUES >= 1001'
+====
+---- QUERY
+# Select table rows after one partition was dropped
+select * from tbl_to_alter
+---- RESULTS
+15,'name',100
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# Drop an existing range partition
+alter table tbl_to_alter drop range partition 11 <= values < 21
+---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 11'
+'VALUES >= 1001'
+====
+---- QUERY
+# Drop all the range partitions
+alter table tbl_to_alter drop range partition 1 < values <= 10;
+alter table tbl_to_alter drop range partition 1000 < values
+---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+''
+====
+---- QUERY
+# Retrieve the rows of a table after all the partitions got dropped
+select count(*), count(id) from tbl_to_alter
+  where id = 1 and cast(sin(id) as boolean) = true
+---- RESULTS
+0,0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# Insert into a table that has no partitions
+insert into tbl_to_alter values (1, 'name', 100)
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 1
+====
+---- QUERY
+# Add non-nullable columns
+alter table tbl_to_alter add range partition 1 < values <= 20;
+alter table tbl_to_alter add columns (new_col1 int not null default 10,
+  new_col2 bigint not null default 1000)
+---- RESULTS
+====
+---- QUERY
+# Verify partition layout
+show range partitions tbl_to_alter;
+---- RESULTS
+'2 <= VALUES < 21'
+====
+---- QUERY
+# Insert a row that has values for the new columns
+insert into tbl_to_alter values (2, 'test', 100, 1, 100)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2
+---- DML_RESULTS: tbl_to_alter
+2,'test',100,1,100
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT
+====
+---- QUERY
+# Insert a row that doesn't have values for the new columns; defaults are used
+insert into tbl_to_alter (id,name,vali) values (3, 'test', 200)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2
+---- DML_RESULTS: tbl_to_alter
+2,'test',100,1,100
+3,'test',200,10,1000
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT
+====
+---- QUERY
+# Insert a row that has nulls on non-nullable columns with default values
+insert into tbl_to_alter values (9, 'test', 300, null, null)
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 1
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2
+---- DML_RESULTS: tbl_to_alter
+2,'test',100,1,100
+3,'test',200,10,1000
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT
+====
+---- QUERY
+# Add a nullable column
+alter table tbl_to_alter add columns (new_col3 string null)
+---- RESULTS
+====
+---- QUERY
+# Add a row
+insert into tbl_to_alter values ((4, 'test', 300, 1, 100, null),
+  (5, 'test', 400, 2, 200, 'names'))
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3
+---- DML_RESULTS: tbl_to_alter
+2,'test',100,1,100,'NULL'
+3,'test',200,10,1000,'NULL'
+4,'test',300,1,100,'NULL'
+5,'test',400,2,200,'names'
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT,STRING
+====
+---- QUERY
+# Add a row that doesn't have a value for the last added column
+insert into tbl_to_alter (id, name, vali, new_col1, new_col2)
+  values (6, 'test', 500, 3, 300)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3
+---- DML_RESULTS: tbl_to_alter
+2,'test',100,1,100,'NULL'
+3,'test',200,10,1000,'NULL'
+4,'test',300,1,100,'NULL'
+5,'test',400,2,200,'names'
+6,'test',500,3,300,'NULL'
+---- TYPES
+INT,STRING,BIGINT,INT,BIGINT,STRING
+====
+---- QUERY
+# Add a nullable column with a default value
+alter table tbl_to_alter add columns (invalid_col int null default 10)
+---- CATCH
+Error adding nullable column to Kudu table
+====
+---- QUERY
+# Add a non-nullable column without a default value
+alter table tbl_to_alter add columns (invalid_col int not null)
+---- CATCH
+Error adding non-nullable column to Kudu table
+====
+---- QUERY
+# Drop a column
+alter table tbl_to_alter drop column vali
+---- RESULTS
+====
+---- QUERY
+# Retrieve table rows after column got dropped
+select * from tbl_to_alter
+---- RESULTS
+2,'test',1,100,'NULL'
+3,'test',10,1000,'NULL'
+4,'test',1,100,'NULL'
+5,'test',2,200,'names'
+6,'test',3,300,'NULL'
+---- TYPES
+INT,STRING,INT,BIGINT,STRING
+====
+---- QUERY
+# Try to drop a primary key column
+alter table tbl_to_alter drop column id
+---- CATCH
+NonRecoverableException: cannot remove a key column
+====
+---- QUERY
+# Rename a column
+alter table tbl_to_alter change column new_col3 last_name string
+---- RESULTS
+====
+---- QUERY
+# Ensure the renamed column is accessible
+select id, last_name from tbl_to_alter
+---- RESULTS
+2,'NULL'
+3,'NULL'
+4,'NULL'
+5,'names'
+6,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Rename the underlying Kudu table
+alter table tbl_to_alter set tblproperties('kudu.table_name'='kudu_tbl_to_alter')
+---- RESULTS
+'Updated table.'
+====
+---- QUERY
+# Create a new table and try to rename to an existing kudu table
+create table copy_of_tbl (a int primary key) partition by hash (a) partitions 3
+  stored as kudu tblproperties('kudu.table_name'='copy_of_tbl');
+alter table copy_of_tbl set tblproperties('kudu.table_name'='kudu_tbl_to_alter')
+---- CATCH
+ImpalaRuntimeException: Error renaming Kudu table copy_of_tbl to kudu_tbl_to_alter
+====
+---- QUERY
+# Ensure the Kudu table is accessible
+select count(*) from tbl_to_alter
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Rename the Impala table
+alter table tbl_to_alter rename to kudu_tbl_to_alter
+---- RESULTS
+====
+---- QUERY
+# Ensure the Impala table is accessible after it got renamed
+select count(*) from kudu_tbl_to_alter
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Rename Kudu table and insert a number of rows
+alter table copy_of_tbl set tblproperties('kudu.table_name'='shared_kudu_tbl');
+insert into copy_of_tbl values (1), (2), (3)
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumRowErrors: 0
+---- LABELS
+A
+---- DML_RESULTS: copy_of_tbl
+1
+2
+3
+---- TYPES
+INT
+====
+---- QUERY
+# Create an external table
+create external table external_tbl stored as kudu
+tblproperties('kudu.table_name'='kudu_tbl_to_alter');
+select count(*) from external_tbl
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Change the external table to point to a different Kudu table
+alter table external_tbl set tblproperties('kudu.table_name'='shared_kudu_tbl');
+select count(*) from external_tbl
+---- RESULTS
+3
 ---- TYPES
 BIGINT
 ====

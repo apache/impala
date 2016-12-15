@@ -65,7 +65,7 @@ public class UpdateStmt extends ModifyStmt {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
     DataSink dataSink = TableSink.create(table_, TableSink.Op.UPDATE,
-        ImmutableList.<Expr>of(), referencedColumns_, false);
+        ImmutableList.<Expr>of(), referencedColumns_, false, false);
     Preconditions.checkState(!referencedColumns_.isEmpty());
     return dataSink;
   }

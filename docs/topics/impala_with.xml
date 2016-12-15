@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.1" id="with">
+
+  <title>WITH Clause</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      A clause that can be added before a <codeph>SELECT</codeph> statement, to define aliases for complicated
+      expressions that are referenced multiple times within the body of the <codeph>SELECT</codeph>. Similar to
+      <codeph>CREATE VIEW</codeph>, except that the table and column names defined in the <codeph>WITH</codeph>
+      clause do not persist after the query finishes, and do not conflict with names used in actual tables or
+      views. Also known as <q>subquery factoring</q>.
+    </p>
+
+    <p>
+      You can rewrite a query using subqueries to work the same as with the <codeph>WITH</codeph> clause. The
+      purposes of the <codeph>WITH</codeph> clause are:
+    </p>
+
+    <ul>
+      <li>
+        Convenience and ease of maintenance from less repetition with the body of the query. Typically used with
+        queries involving <codeph>UNION</codeph>, joins, or aggregation functions where the similar complicated
+        expressions are referenced multiple times.
+      </li>
+
+      <li>
+        SQL code that is easier to read and understand by abstracting the most complex part of the query into a
+        separate block.
+      </li>
+
+      <li>
+        Improved compatibility with SQL from other database systems that support the same clause (primarily Oracle
+        Database).
+        <note>
+          <p>
+            The Impala <codeph>WITH</codeph> clause does not support recursive queries in the
+            <codeph>WITH</codeph>, which is supported in some other database systems.
+          </p>
+        </note>
+      </li>
+    </ul>
+
+    <p conref="../shared/impala_common.xml#common/sql1999"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>-- Define 2 subqueries that can be referenced from the body of a longer query.
+with t1 as (select 1), t2 as (select 2) insert into tab select * from t1 union all select * from t2;
+
+-- Define one subquery at the outer level, and another at the inner level as part of the
+-- initial stage of the UNION ALL query.
+with t1 as (select 1) (with t2 as (select 2) select * from t2) union all select * from t1;</codeblock>
+  </conbody>
+</concept>

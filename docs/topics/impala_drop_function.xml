@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.2" id="drop_function">
+
+  <title>DROP FUNCTION Statement</title>
+  <titlealts audience="PDF"><navtitle>DROP FUNCTION</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="UDFs"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">DROP FUNCTION statement</indexterm>
+      Removes a user-defined function (UDF), so that it is not available for execution during Impala
+      <codeph>SELECT</codeph> or <codeph>INSERT</codeph> operations.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+    <p>
+      To drop C++ UDFs and UDAs:
+    </p>
+
+<codeblock>DROP [AGGREGATE] FUNCTION [IF EXISTS] [<varname>db_name</varname>.]<varname>function_name</varname>(<varname>type</varname>[, <varname>type</varname>...])</codeblock>
+
+    <note rev="2.5.0 IMPALA-2843 CDH-39148">
+      <p rev="2.5.0 IMPALA-2843 CDH-39148">
+        The preceding syntax, which includes the function signature, also applies to Java UDFs that were created
+        using the corresponding <codeph>CREATE FUNCTION</codeph> syntax that includes the argument and return types.
+        After upgrading to <keyword keyref="impala25_full"/> or higher, consider re-creating all Java UDFs with the
+        <codeph>CREATE FUNCTION</codeph> syntax that does not include the function signature. Java UDFs created this
+        way are now persisted in the metastore database and do not need to be re-created after an Impala restart.
+      </p>
+    </note>
+
+    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+      To drop Java UDFs (created using the <codeph>CREATE FUNCTION</codeph> syntax with no function signature):
+    </p>
+
+<codeblock rev="2.5.0">DROP FUNCTION [IF EXISTS] [<varname>db_name</varname>.]<varname>function_name</varname></codeblock>
+
+<!--
+Examples:
+CREATE FUNCTION IF NOT EXISTS foo location '/path/to/jar' SYMBOL='TestUdf';
+CREATE FUNCTION bar location '/path/to/jar' SYMBOL='TestUdf2';
+DROP FUNCTION foo;
+DROP FUNCTION IF EXISTS bar;
+-->
+
+    <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      Because the same function name could be overloaded with different argument signatures, you specify the
+      argument types to identify the exact function to drop.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/udf_persistence_restriction"/>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
+    <p rev="CDH-19187">
+      The user ID that the <cmdname>impalad</cmdname> daemon runs under,
+      typically the <codeph>impala</codeph> user, does not need any
+      particular HDFS permissions to perform this statement.
+      All read and write operations are on the metastore database,
+      not HDFS files and directories.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+      The following example shows how to drop Java functions created with the signatureless
+      <codeph>CREATE FUNCTION</codeph> syntax in <keyword keyref="impala25_full"/> and higher.
+      Issuing <codeph>DROP FUNCTION <varname>function_name</varname></codeph> removes all the
+      overloaded functions under that name.
+      (See <xref href="impala_create_function.xml#create_function"/> for a longer example
+      showing how to set up such functions in the first place.)
+    </p>
+<codeblock rev="2.5.0 IMPALA-2843 CDH-39148">
+create function my_func location '/user/impala/udfs/udf-examples-cdh570.jar'
+  symbol='com.cloudera.impala.TestUdf';
+
+show functions;
++-------------+---------------------------------------+-------------+---------------+
+| return type | signature                             | binary type | is persistent |
++-------------+---------------------------------------+-------------+---------------+
+| BIGINT      | my_func(BIGINT)                       | JAVA        | true          |
+| BOOLEAN     | my_func(BOOLEAN)                      | JAVA        | true          |
+| BOOLEAN     | my_func(BOOLEAN, BOOLEAN)             | JAVA        | true          |
+...
+| BIGINT      | testudf(BIGINT)                       | JAVA        | true          |
+| BOOLEAN     | testudf(BOOLEAN)                      | JAVA        | true          |
+| BOOLEAN     | testudf(BOOLEAN, BOOLEAN)             | JAVA        | true          |
+...
+
+drop function my_func;
+show functions;
++-------------+---------------------------------------+-------------+---------------+
+| return type | signature                             | binary type | is persistent |
++-------------+---------------------------------------+-------------+---------------+
+| BIGINT      | testudf(BIGINT)                       | JAVA        | true          |
+| BOOLEAN     | testudf(BOOLEAN)                      | JAVA        | true          |
+| BOOLEAN     | testudf(BOOLEAN, BOOLEAN)             | JAVA        | true          |
+...
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_udf.xml#udfs"/>, <xref href="impala_create_function.xml#create_function"/>
+    </p>
+  </conbody>
+</concept>

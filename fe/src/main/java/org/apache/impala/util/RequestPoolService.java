@@ -274,9 +274,12 @@ public class RequestPoolService {
     JniUtil.deserializeThrift(protocolFactory_, resolvePoolParams,
         thriftResolvePoolParams);
     TResolveRequestPoolResult result = resolveRequestPool(resolvePoolParams);
-    LOG.info("resolveRequestPool(pool={}, user={}): resolved_pool={}, has_access={}",
-        new Object[] { resolvePoolParams.getRequested_pool(), resolvePoolParams.getUser(),
-                       result.resolved_pool, result.has_access });
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("resolveRequestPool(pool={}, user={}): resolved_pool={}, has_access={}",
+          new Object[] {
+            resolvePoolParams.getRequested_pool(), resolvePoolParams.getUser(),
+            result.resolved_pool, result.has_access });
+    }
     try {
       return new TSerializer(protocolFactory_).serialize(result);
     } catch (TException e) {
@@ -372,10 +375,12 @@ public class RequestPoolService {
       result.setDefault_query_options(getLlamaPoolConfigValue(currentLlamaConf, pool,
           QUERY_OPTIONS_KEY, ""));
     }
-    LOG.info("getPoolConfig(pool={}): max_mem_resources={}, max_requests={}, " +
-        "max_queued={},  queue_timeout_ms={}, default_query_options={}",
-        new Object[] { pool, result.max_mem_resources, result.max_requests,
-            result.max_queued, result.queue_timeout_ms, result.default_query_options });
+    if (LOG.isTraceEnabled()) {
+      LOG.debug("getPoolConfig(pool={}): max_mem_resources={}, max_requests={}, " +
+          "max_queued={},  queue_timeout_ms={}, default_query_options={}",
+          new Object[] { pool, result.max_mem_resources, result.max_requests,
+              result.max_queued, result.queue_timeout_ms, result.default_query_options });
+    }
     return result;
   }
 

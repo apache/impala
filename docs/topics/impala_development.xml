@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="intro_dev">
+
+  <title>Developing Impala Applications</title>
+  <titlealts audience="PDF"><navtitle>Developing Applications</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Concepts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The core development language with Impala is SQL. You can also use Java or other languages to interact with
+      Impala through the standard JDBC and ODBC interfaces used by many business intelligence tools. For
+      specialized kinds of analysis, you can supplement the SQL built-in functions by writing
+      <xref href="impala_udf.xml#udfs">user-defined functions (UDFs)</xref> in C++ or Java.
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="intro_sql">
+
+    <title>Overview of the Impala SQL Dialect</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Concepts"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        The Impala SQL dialect is highly compatible with the SQL syntax used in the Apache Hive component (HiveQL). As
+        such, it is familiar to users who are already familiar with running SQL queries on the Hadoop
+        infrastructure. Currently, Impala SQL supports a subset of HiveQL statements, data types, and built-in
+        functions. Impala also includes additional built-in functions for common industry features, to simplify
+        porting SQL from non-Hadoop systems.
+      </p>
+
+      <p>
+        For users coming to Impala from traditional database or data warehousing backgrounds, the following aspects of the SQL dialect
+        might seem familiar:
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            The <xref href="impala_select.xml#select">SELECT statement</xref> includes familiar clauses such as <codeph>WHERE</codeph>,
+            <codeph>GROUP BY</codeph>, <codeph>ORDER BY</codeph>, and <codeph>WITH</codeph>.
+            You will find familiar notions such as
+            <xref href="impala_joins.xml#joins">joins</xref>, <xref href="impala_functions.xml#builtins">built-in
+            functions</xref> for processing strings, numbers, and dates,
+            <xref href="impala_aggregate_functions.xml#aggregate_functions">aggregate functions</xref>,
+            <xref href="impala_subqueries.xml#subqueries">subqueries</xref>, and
+            <xref href="impala_operators.xml#comparison_operators">comparison operators</xref>
+            such as <codeph>IN()</codeph> and <codeph>BETWEEN</codeph>.
+            The <codeph>SELECT</codeph> statement is the place where SQL standards compliance is most important.
+          </p>
+        </li>
+
+        <li>
+          <p>
+          From the data warehousing world, you will recognize the notion of
+          <xref href="impala_partitioning.xml#partitioning">partitioned tables</xref>.
+          One or more columns serve as partition keys, and the data is physically arranged so that
+          queries that refer to the partition key columns in the <codeph>WHERE</codeph> clause
+          can skip partitions that do not match the filter conditions. For example, if you have 10
+          years worth of data and use a clause such as <codeph>WHERE year = 2015</codeph>,
+          <codeph>WHERE year &gt; 2010</codeph>, or <codeph>WHERE year IN (2014, 2015)</codeph>,
+          Impala skips all the data for non-matching years, greatly reducing the amount of I/O
+          for the query.
+          </p>
+        </li>
+
+        <li rev="1.2">
+          <p>
+          In Impala 1.2 and higher, <xref href="impala_udf.xml#udfs">UDFs</xref> let you perform custom comparisons
+          and transformation logic during <codeph>SELECT</codeph> and <codeph>INSERT...SELECT</codeph> statements.
+          </p>
+        </li>
+      </ul>
+
+      <p>
+        For users coming to Impala from traditional database or data warehousing backgrounds, the following aspects of the SQL dialect
+        might require some learning and practice for you to become proficient in the Hadoop environment:
+      </p>
+
+      <ul>
+        <li>
+          <p>
+          Impala SQL is focused on queries and includes relatively little DML. There is no <codeph>UPDATE</codeph>
+          or <codeph>DELETE</codeph> statement. Stale data is typically discarded (by <codeph>DROP TABLE</codeph>
+          or <codeph>ALTER TABLE ... DROP PARTITION</codeph> statements) or replaced (by <codeph>INSERT
+          OVERWRITE</codeph> statements).
+          </p>
+        </li>
+
+        <li>
+          <p>
+          All data creation is done by <codeph>INSERT</codeph> statements, which typically insert data in bulk by
+          querying from other tables. There are two variations, <codeph>INSERT INTO</codeph> which appends to the
+          existing data, and <codeph>INSERT OVERWRITE</codeph> which replaces the entire contents of a table or
+          partition (similar to <codeph>TRUNCATE TABLE</codeph> followed by a new <codeph>INSERT</codeph>).
+          Although there is an <codeph>INSERT ... VALUES</codeph> syntax to create a small number of values in
+          a single statement, it is far more efficient to use the <codeph>INSERT ... SELECT</codeph> to copy
+          and transform large amounts of data from one table to another in a single operation.
+          </p>
+        </li>
+
+        <li>
+          <p>
+          You often construct Impala table definitions and data files in some other environment, and then attach
+          Impala so that it can run real-time queries. The same data files and table metadata are shared with other
+          components of the Hadoop ecosystem. In particular, Impala can access tables created by Hive or data
+          inserted by Hive, and Hive can access tables and data produced by Impala. Many other Hadoop components
+          can write files in formats such as Parquet and Avro, that can then be queried by Impala.
+          </p>
+        </li>
+
+        <li>
+          <p>
+          Because Hadoop and Impala are focused on data warehouse-style operations on large data sets, Impala SQL
+          includes some idioms that you might find in the import utilities for traditional database systems. For
+          example, you can create a table that reads comma-separated or tab-separated text files, specifying the
+          separator in the <codeph>CREATE TABLE</codeph> statement. You can create <b>external tables</b> that read
+          existing data files but do not move or transform them.
+          </p>
+        </li>
+
+        <li>
+          <p>
+          Because Impala reads large quantities of data that might not be perfectly tidy and predictable, it does
+          not require length constraints on string data types. For example, you can define a database column as
+          <codeph>STRING</codeph> with unlimited length, rather than <codeph>CHAR(1)</codeph> or
+          <codeph>VARCHAR(64)</codeph>. <ph rev="2.0.0">(Although in Impala 2.0 and later, you can also use
+          length-constrained <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph> types.)</ph>
+          </p>
+        </li>
+
+      </ul>
+
+      <p>
+        <b>Related information:</b> <xref href="impala_langref.xml#langref"/>, especially
+        <xref href="impala_langref_sql.xml#langref_sql"/> and <xref href="impala_functions.xml#builtins"/>
+      </p>
+    </conbody>
+  </concept>
+
+<!-- Bunch of potential concept topics for future consideration. Major areas of Impala modelled on areas of discussion for Oracle Database, and distributed databases in general. -->
+
+  <concept id="intro_datatypes" audience="Cloudera">
+
+    <title>Overview of Impala SQL Data Types</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="intro_network" audience="Cloudera">
+
+    <title>Overview of Impala Network Topology</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="intro_cluster" audience="Cloudera">
+
+    <title>Overview of Impala Cluster Topology</title>
+
+    <conbody/>
+  </concept>
+
+  <concept id="intro_apis">
+
+    <title>Overview of Impala Programming Interfaces</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="JDBC"/>
+      <data name="Category" value="ODBC"/>
+      <data name="Category" value="Hue"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        You can connect and submit requests to the Impala daemons through:
+      </p>
+
+      <ul>
+        <li>
+          The <codeph><xref href="impala_impala_shell.xml#impala_shell">impala-shell</xref></codeph> interactive
+          command interpreter.
+        </li>
+
+        <li>
+          The <xref href="http://gethue.com/" scope="external" format="html">Hue</xref> web-based user interface.
+        </li>
+
+        <li>
+          <xref href="impala_jdbc.xml#impala_jdbc">JDBC</xref>.
+        </li>
+
+        <li>
+          <xref href="impala_odbc.xml#impala_odbc">ODBC</xref>.
+        </li>
+      </ul>
+
+      <p>
+        With these options, you can use Impala in heterogeneous environments, with JDBC or ODBC applications
+        running on non-Linux platforms. You can also use Impala on combination with various Business Intelligence
+        tools that use the JDBC and ODBC interfaces.
+      </p>
+
+      <p>
+        Each <codeph>impalad</codeph> daemon process, running on separate nodes in a cluster, listens to
+        <xref href="impala_ports.xml#ports">several ports</xref> for incoming requests. Requests from
+        <codeph>impala-shell</codeph> and Hue are routed to the <codeph>impalad</codeph> daemons through the same
+        port. The <codeph>impalad</codeph> daemons listen on separate ports for JDBC and ODBC requests.
+      </p>
+    </conbody>
+  </concept>
+</concept>

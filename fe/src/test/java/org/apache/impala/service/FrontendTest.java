@@ -32,7 +32,6 @@ import org.apache.hive.service.rpc.thrift.TGetInfoReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.junit.Test;
-
 import org.apache.impala.analysis.AuthorizationTest;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.Catalog;
@@ -41,11 +40,14 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
 import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -99,7 +101,7 @@ public class FrontendTest {
     System.out.println(stmt);
     TQueryCtx queryCtx = TestUtils.createQueryContext(
         Catalog.DEFAULT_DB, AuthorizationTest.USER.getName());
-    queryCtx.request.setStmt(stmt);
+    queryCtx.client_request.setStmt(stmt);
     try {
       fe.createExecRequest(queryCtx, new StringBuilder());
     } catch (Exception e) {
@@ -114,7 +116,7 @@ public class FrontendTest {
   private void testCatalogIsNotReady(String stmt, Frontend fe) {
     TQueryCtx queryCtx = TestUtils.createQueryContext(
         Catalog.DEFAULT_DB, AuthorizationTest.USER.getName());
-    queryCtx.request.setStmt(stmt);
+    queryCtx.client_request.setStmt(stmt);
     try {
       fe.createExecRequest(queryCtx, new StringBuilder());
       fail("Expected failure to due uninitialized catalog.");

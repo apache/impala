@@ -36,6 +36,7 @@
 
 #include <ldap.h>
 
+#include "exec/kudu-util.h"
 #include "rpc/auth-provider.h"
 #include "rpc/thrift-server.h"
 #include "transport/TSaslClientTransport.h"
@@ -521,6 +522,32 @@ void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   }
 }
 
+namespace {
+
+// SASL requires mutexes for thread safety, but doesn't implement
+// them itself. So, we have to hook them up to our mutex implementation.
+static void* SaslMutexAlloc() {
+  return static_cast<void*>(new mutex());
+}
+static void SaslMutexFree(void* m) {
+  delete static_cast<mutex*>(m);
+}
+static int SaslMutexLock(void* m) {
+  static_cast<mutex*>(m)->lock();
+  return 0; // indicates success.
+}
+static int SaslMutexUnlock(void* m) {
+  static_cast<mutex*>(m)->unlock();
+  return 0; // indicates success.
+}
+
+void SaslSetMutex() {
+  sasl_set_mutex(&SaslMutexAlloc, &SaslMutexLock, &SaslMutexUnlock, &SaslMutexFree);
+}
+
+}
+
+
 Status InitAuth(const string& appname) {
   // We only set up Sasl things if we are indeed going to be using Sasl.
   // Checking of these flags for sanity is done later, but this check is good
@@ -601,6 +628,7 @@ Status InitAuth(const string& appname) {
       LDAP_EXT_CALLBACKS[3].id = SASL_CB_LIST_END;
     }
 
+    SaslSetMutex();
     try {
       // We assume all impala processes are both server and client.
       sasl::TSaslServer::SaslInit(GENERAL_CALLBACKS, appname);
@@ -609,6 +637,15 @@ Status InitAuth(const string& appname) {
       stringstream err_msg;
       err_msg << "Could not initialize Sasl library: " << e.what();
       return Status(err_msg.str());
+    }
+
+    // Kudu client shouldn't attempt to initialize SASL which would conflict with
+    // Impala's SASL initialization. This must be called before any KuduClients are
+    // created to ensure that Kudu doesn't init SASL first, and this returns an error if
+    // Kudu has already initialized SASL.
+    if (impala::KuduIsAvailable()) {
+      KUDU_RETURN_IF_ERROR(kudu::client::DisableSaslInitialization(),
+          "Unable to disable Kudu SASL initialization.");
     }
 
     // Add our auxprop plugin, which gives us a hook before authentication
@@ -993,7 +1030,6 @@ Status AuthManager::Init() {
       kerberos_internal_principal = FLAGS_be_principal;
     }
   }
-
   // This is written from the perspective of the daemons - thus "internal"
   // means "I am used for communication with other daemons, both as a client
   // and as a server".  "External" means that "I am used when being a server

@@ -17,9 +17,7 @@
 
 package org.apache.impala.analysis;
 
-import java.text.SimpleDateFormat;
 import java.util.Collection;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -369,20 +367,13 @@ public class ColumnLineageGraph {
     Preconditions.checkNotNull(analyzer);
     Preconditions.checkState(analyzer.isRootAnalyzer());
     TQueryCtx queryCtx = analyzer.getQueryCtx();
-    if (queryCtx.request.isSetRedacted_stmt()) {
-      queryStr_ = queryCtx.request.redacted_stmt;
+    if (queryCtx.client_request.isSetRedacted_stmt()) {
+      queryStr_ = queryCtx.client_request.redacted_stmt;
     } else {
-      queryStr_ = queryCtx.request.stmt;
+      queryStr_ = queryCtx.client_request.stmt;
     }
     Preconditions.checkNotNull(queryStr_);
-    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    try {
-      timestamp_ = df.parse(queryCtx.now_string).getTime() / 1000;
-    } catch (java.text.ParseException e) {
-      LOG.error("Error parsing timestamp value: " + queryCtx.now_string +
-          " " + e.getMessage());
-      timestamp_ = new Date().getTime() / 1000;
-    }
+    timestamp_ = queryCtx.start_unix_millis / 1000;
     descTbl_ = analyzer.getDescTbl();
     user_ = analyzer.getUser().getName();
   }

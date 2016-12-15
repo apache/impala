@@ -122,7 +122,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
-   kudu predicates: id <= 60, id < 40, id < 103
+   kudu predicates: id < 103, id <= 60, id < 40
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
@@ -133,7 +133,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
-   kudu predicates: id <= 60, id < 40, id < 103
+   kudu predicates: id < 103, id <= 60, id < 40
 ====
 # Some predicates can be pushed down but others can't (predicate on an non-const value).
 select * from functional_kudu.testtbl
@@ -202,7 +202,7 @@ PLAN-ROOT SINK
 |  order by: c ASC
 |
 00:SCAN KUDU [tpch_kudu.orders]
-   predicates: CAST(o_orderdate AS TIMESTAMP) <= CAST('1995-01-01 00:00:00' AS TIMESTAMP)
+   predicates: CAST(o_orderdate AS TIMESTAMP) <= TIMESTAMP '1995-01-01 00:00:00'
    kudu predicates: o_orderkey < 10
 ====
 # IMPALA-4213: Planner not pushing some predicates with constant exprs to Kudu
@@ -280,4 +280,37 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.alltypes]
    kudu predicates: bool_col = FALSE
+====
+# IMPALA-4578: Test predicate propagation for Kudu scans.
+select /* +straight_join */ count(*)
+from functional_kudu.alltypes a
+inner join functional_kudu.alltypessmall b
+  on a.id = b.id
+left outer join functional_kudu.alltypestiny c
+  on b.int_col = c.int_col
+where a.id > 10 and c.int_col > 20
+  and cast(b.id as string) > '123'
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: b.int_col = c.int_col
+|  other predicates: c.int_col > 20
+|
+|--02:SCAN KUDU [functional_kudu.alltypestiny c]
+|     kudu predicates: c.int_col > 20
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN KUDU [functional_kudu.alltypessmall b]
+|     predicates: CAST(b.id AS STRING) > '123'
+|     kudu predicates: b.id > 10
+|
+00:SCAN KUDU [functional_kudu.alltypes a]
+   predicates: CAST(a.id AS STRING) > '123'
+   kudu predicates: a.id > 10
 ====

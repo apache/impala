@@ -21,32 +21,34 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 
-import java_cup.runtime.Symbol;
-
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
-
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TStringLiteral;
+
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+
+import java_cup.runtime.Symbol;
 
 public class StringLiteral extends LiteralExpr {
   private final String value_;
 
+  // Indicates whether this value needs to be unescaped in toThrift().
+  private final boolean needsUnescaping_;
+
   public StringLiteral(String value) {
-    this.value_ = value;
-    type_ = ScalarType.STRING;
-    evalCost_ = LITERAL_COST;
+    this(value, ScalarType.STRING, true);
   }
 
-  public StringLiteral(String value, Type type) {
-    this.value_ = value;
+  public StringLiteral(String value, Type type, boolean needsUnescaping) {
+    value_ = value;
     type_ = type;
     evalCost_ = LITERAL_COST;
+    needsUnescaping_ = needsUnescaping;
   }
 
   /**
@@ -55,26 +57,27 @@ public class StringLiteral extends LiteralExpr {
   protected StringLiteral(StringLiteral other) {
     super(other);
     value_ = other.value_;
+    needsUnescaping_ = other.needsUnescaping_;
   }
 
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) return false;
-    return ((StringLiteral) obj).value_.equals(value_);
+    StringLiteral other = (StringLiteral) obj;
+    return needsUnescaping_ == other.needsUnescaping_ && value_.equals(other.value_);
   }
 
   @Override
   public int hashCode() { return value_.hashCode(); }
 
   @Override
-  public String toSqlImpl() {
-    return "'" + value_ + "'";
-  }
+  public String toSqlImpl() { return "'" + value_ + "'"; }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.STRING_LITERAL;
-    msg.string_literal = new TStringLiteral(getUnescapedValue());
+    String val = (needsUnescaping_) ? getUnescapedValue() : value_;
+    msg.string_literal = new TStringLiteral(val);
   }
 
   public String getValue() { return value_; }

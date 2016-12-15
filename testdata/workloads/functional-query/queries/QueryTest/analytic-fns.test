@@ -1907,3 +1907,13 @@ BIGINT
 ---- RESULTS
 7299
 ====
+---- QUERY
+# Regression test for IMPALA-4518: Distinguishes between empty string and null string.
+select f,lead(b,1,null) over (order by f)
+from (select * from nulltable union all select * from nulltable) x;
+---- TYPES
+STRING, STRING
+---- RESULTS
+'a\x00b',''
+'a\x00b','NULL'
+====

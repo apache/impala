@@ -52,22 +52,18 @@ public class UnionStmt extends QueryStmt {
   }
 
   /**
-   * Represents an operand to a union, created by the parser.
-   * Contains a query statement and the all/distinct qualifier
-   * of the union operator (null for the first queryStmt).
+   * Represents an operand to a union. It consists of a query statement and its left
+   * all/distinct qualifier (null for the first operand).
    */
   public static class UnionOperand {
-    // Qualifier as seen by the parser. Null for the first operand.
-    private final Qualifier originalQualifier_;
+    // Effective qualifier. Should not be reset() to preserve changes made during
+    // distinct propagation and unnesting that are needed after rewriting Subqueries.
+    private Qualifier qualifier_;
 
     /////////////////////////////////////////
     // BEGIN: Members that need to be reset()
 
     private final QueryStmt queryStmt_;
-
-    // Effective qualifier. Possibly different from parsedQualifier_ due
-    // to DISTINCT propagation.
-    private Qualifier qualifier_;
 
     // Analyzer used for this operand. Set in analyze().
     // We must preserve the conjuncts registered in the analyzer for partition pruning.
@@ -81,7 +77,6 @@ public class UnionStmt extends QueryStmt {
 
     public UnionOperand(QueryStmt queryStmt, Qualifier qualifier) {
       queryStmt_ = queryStmt;
-      originalQualifier_ = qualifier;
       qualifier_ = qualifier;
       smap_ = new ExprSubstitutionMap();
     }
@@ -114,7 +109,6 @@ public class UnionStmt extends QueryStmt {
      */
     private UnionOperand(UnionOperand other) {
       queryStmt_ = other.queryStmt_.clone();
-      originalQualifier_ = other.originalQualifier_;
       qualifier_ = other.qualifier_;
       analyzer_ = other.analyzer_;
       smap_ = other.smap_.clone();
@@ -122,7 +116,6 @@ public class UnionStmt extends QueryStmt {
 
     public void reset() {
       queryStmt_.reset();
-      qualifier_ = originalQualifier_;
       analyzer_ = null;
       smap_.clear();
     }
@@ -373,6 +366,9 @@ public class UnionStmt extends QueryStmt {
       unnestOperand(allOperands_, Qualifier.ALL, operands_.get(i));
     }
 
+    for (UnionOperand op: distinctOperands_) op.setQualifier(Qualifier.DISTINCT);
+    for (UnionOperand op: allOperands_) op.setQualifier(Qualifier.ALL);
+
     operands_.clear();
     operands_.addAll(distinctOperands_);
     operands_.addAll(allOperands_);
@@ -466,7 +462,9 @@ public class UnionStmt extends QueryStmt {
     TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor("union");
     tupleDesc.setIsMaterialized(true);
     tupleId_ = tupleDesc.getId();
-    LOG.trace("UnionStmt.createMetadata: tupleId=" + tupleId_.toString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("UnionStmt.createMetadata: tupleId=" + tupleId_.toString());
+    }
 
     // One slot per expr in the select blocks. Use first select block as representative.
     List<Expr> firstSelectExprs = operands_.get(0).getQueryStmt().getResultExprs();
@@ -598,7 +596,7 @@ public class UnionStmt extends QueryStmt {
   }
 
   @Override
-  public ArrayList<String> getColLabels() {
+  public List<String> getColLabels() {
     Preconditions.checkState(operands_.size() > 0);
     return operands_.get(0).getQueryStmt().getColLabels();
   }
@@ -606,6 +604,13 @@ public class UnionStmt extends QueryStmt {
   @Override
   public UnionStmt clone() { return new UnionStmt(this); }
 
+  /**
+   * Undoes all changes made by analyze() except distinct propagation and unnesting.
+   * After analysis, operands_ contains the list of unnested operands with qualifiers
+   * adjusted to reflect distinct propagation. Every operand in that list is reset().
+   * The distinctOperands_ and allOperands_ are cleared because they are redundant
+   * with operands_.
+   */
   @Override
   public void reset() {
     super.reset();

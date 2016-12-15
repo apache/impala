@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.4.0" id="create_role">
+
+  <title>CREATE ROLE Statement (<keyword keyref="impala20"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>CREATE ROLE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Sentry"/>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Roles"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+      <!-- Consider whether to go deeper into categories like Security for the Sentry-related statements. -->
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">CREATE ROLE statement</indexterm>
+<!-- Copied from Sentry docs. Turn into conref. -->
+      The <codeph>CREATE ROLE</codeph> statement creates a role to which privileges can be granted. Privileges can
+      be granted to roles, which can then be assigned to users. A user that has been assigned a role will only be
+      able to exercise the privileges of that role. Only users that have administrative privileges can create/drop
+      roles. By default, the <codeph>hive</codeph>, <codeph>impala</codeph> and <codeph>hue</codeph> users have
+      administrative privileges in Sentry.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>CREATE ROLE <varname>role_name</varname>
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
+
+    <p>
+      Only administrative users (those with <codeph>ALL</codeph> privileges on the server, defined in the Sentry
+      policy file) can use this statement.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
+
+    <p>
+      Impala makes use of any roles and privileges specified by the <codeph>GRANT</codeph> and
+      <codeph>REVOKE</codeph> statements in Hive, and Hive makes use of any roles and privileges specified by the
+      <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Impala. The Impala <codeph>GRANT</codeph>
+      and <codeph>REVOKE</codeph> statements for privileges do not require the <codeph>ROLE</codeph> keyword to be
+      repeated before each role name, unlike the equivalent Hive statements.
+    </p>
+
+<!-- To do: nail down the new SHOW syntax, e.g. SHOW ROLES, SHOW CURRENT ROLES, SHOW GROUPS. -->
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_authorization.xml#authorization"/>, <xref href="impala_grant.xml#grant"/>,
+      <xref href="impala_revoke.xml#revoke"/>, <xref href="impala_drop_role.xml#drop_role"/>,
+      <xref href="impala_show.xml#show"/>
+    </p>
+  </conbody>
+</concept>

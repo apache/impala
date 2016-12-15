@@ -141,7 +141,9 @@ public class SingleNodePlanner {
       analyzer.materializeSlots(queryStmt.getBaseTblResultExprs());
     }
 
-    LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
+    }
     PlanNode singleNodePlan = createQueryPlan(queryStmt, analyzer,
         ctx_.getQueryOptions().isDisable_outermost_topn());
     Preconditions.checkNotNull(singleNodePlan);
@@ -156,14 +158,18 @@ public class SingleNodePlanner {
    * Throws a NotImplementedException if plan validation fails.
    */
   public void validatePlan(PlanNode planNode) throws NotImplementedException {
-    if (ctx_.getQueryOptions().mt_dop > 0 && !RuntimeEnv.INSTANCE.isTestEnv()
+    if (ctx_.getQueryOptions().isSetMt_dop() && ctx_.getQueryOptions().mt_dop > 0
+        && !RuntimeEnv.INSTANCE.isTestEnv()
         && (planNode instanceof JoinNode || ctx_.hasTableSink())) {
       throw new NotImplementedException(
           "MT_DOP not supported for plans with base table joins or table sinks.");
     }
 
-    // As long as MT_DOP == 0 any join can run in a single-node plan.
-    if (ctx_.isSingleNodeExec() && ctx_.getQueryOptions().mt_dop == 0) return;
+    // As long as MT_DOP is unset or 0 any join can run in a single-node plan.
+    if (ctx_.isSingleNodeExec() &&
+        (!ctx_.getQueryOptions().isSetMt_dop() || ctx_.getQueryOptions().mt_dop == 0)) {
+      return;
+    }
 
     if (planNode instanceof NestedLoopJoinNode) {
       JoinNode joinNode = (JoinNode) planNode;
@@ -363,15 +369,19 @@ public class SingleNodePlanner {
         // use 0 for the size to avoid it becoming the leftmost input
         // TODO: Consider raw size of scanned partitions in the absence of stats.
         candidates.add(new Pair(ref, new Long(0)));
-        LOG.trace("candidate " + ref.getUniqueAlias() + ": 0");
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("candidate " + ref.getUniqueAlias() + ": 0");
+        }
         continue;
       }
       Preconditions.checkState(ref.isAnalyzed());
       long materializedSize =
           (long) Math.ceil(plan.getAvgRowSize() * (double) plan.getCardinality());
       candidates.add(new Pair(ref, new Long(materializedSize)));
-      LOG.trace(
-          "candidate " + ref.getUniqueAlias() + ": " + Long.toString(materializedSize));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(
+            "candidate " + ref.getUniqueAlias() + ": " + Long.toString(materializedSize));
+      }
     }
     if (candidates.isEmpty()) return null;
 
@@ -402,7 +412,9 @@ public class SingleNodePlanner {
       List<Pair<TableRef, PlanNode>> refPlans, List<SubplanRef> subplanRefs)
       throws ImpalaException {
 
-    LOG.trace("createJoinPlan: " + leftmostRef.getUniqueAlias());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("createJoinPlan: " + leftmostRef.getUniqueAlias());
+    }
     // the refs that have yet to be joined
     List<Pair<TableRef, PlanNode>> remainingRefs = Lists.newArrayList();
     PlanNode root = null;  // root of accumulated join plan
@@ -458,7 +470,9 @@ public class SingleNodePlanner {
         analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
         PlanNode candidate = createJoinNode(root, entry.second, ref, analyzer);
         if (candidate == null) continue;
-        LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
+        }
 
         // Use 'candidate' as the new root; don't consider any other table refs at this
         // position in the plan.
@@ -489,10 +503,12 @@ public class SingleNodePlanner {
       long lhsCardinality = root.getCardinality();
       long rhsCardinality = minEntry.second.getCardinality();
       numOps += lhsCardinality + rhsCardinality;
-      LOG.debug(Integer.toString(i) + " chose " + minEntry.first.getUniqueAlias()
-          + " #lhs=" + Long.toString(lhsCardinality)
-          + " #rhs=" + Long.toString(rhsCardinality)
-          + " #ops=" + Long.toString(numOps));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(Integer.toString(i) + " chose " + minEntry.first.getUniqueAlias()
+            + " #lhs=" + Long.toString(lhsCardinality)
+            + " #rhs=" + Long.toString(rhsCardinality)
+            + " #ops=" + Long.toString(numOps));
+      }
       remainingRefs.remove(minEntry);
       joinedRefs.add(minEntry.first);
       root = newRoot;
@@ -585,7 +601,7 @@ public class SingleNodePlanner {
     // of table scans. This is only feasible if all materialized aggregate expressions
     // have distinct semantics. Please see createHdfsScanPlan() for details.
     boolean fastPartitionKeyScans =
-        analyzer.getQueryCtx().getRequest().query_options.optimize_partition_key_scans &&
+        analyzer.getQueryCtx().client_request.query_options.optimize_partition_key_scans &&
         aggInfo != null && aggInfo.hasAllDistinctAgg();
 
     // Separate table refs into parent refs (uncorrelated or absolute) and
@@ -898,7 +914,7 @@ public class SingleNodePlanner {
   private PlanNode createConstantSelectPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws InternalException {
     Preconditions.checkState(selectStmt.getTableRefs().isEmpty());
-    ArrayList<Expr> resultExprs = selectStmt.getResultExprs();
+    List<Expr> resultExprs = selectStmt.getResultExprs();
     // Create tuple descriptor for materialized tuple.
     TupleDescriptor tupleDesc = createResultTupleDescriptor(selectStmt, "union", analyzer);
     UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), tupleDesc.getId());
@@ -925,8 +941,8 @@ public class SingleNodePlanner {
         debugName);
     tupleDesc.setIsMaterialized(true);
 
-    ArrayList<Expr> resultExprs = selectStmt.getResultExprs();
-    ArrayList<String> colLabels = selectStmt.getColLabels();
+    List<Expr> resultExprs = selectStmt.getResultExprs();
+    List<String> colLabels = selectStmt.getColLabels();
     for (int i = 0; i < resultExprs.size(); ++i) {
       Expr resultExpr = resultExprs.get(i);
       String colLabel = colLabels.get(i);
@@ -1179,7 +1195,6 @@ public class SingleNodePlanner {
    */
   private PlanNode createHdfsScanPlan(TableRef hdfsTblRef, boolean fastPartitionKeyScans,
       Analyzer analyzer) throws ImpalaException {
-    HdfsTable hdfsTable = (HdfsTable)hdfsTblRef.getTable();
     TupleDescriptor tupleDesc = hdfsTblRef.getDesc();
 
     // Get all predicates bound by the tuple.
@@ -1192,6 +1207,7 @@ public class SingleNodePlanner {
     analyzer.markConjunctsAssigned(unassigned);
 
     analyzer.createEquivConjuncts(tupleDesc.getId(), conjuncts);
+    Expr.removeDuplicates(conjuncts);
 
     // Do partition pruning before deciding which slots to materialize,
     // We might end up removing some predicates.

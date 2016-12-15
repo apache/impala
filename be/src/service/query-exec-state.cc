@@ -24,6 +24,8 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/exec-env.h"
+#include "scheduling/scheduler.h"
 #include "service/frontend.h"
 #include "service/impala-server.h"
 #include "service/query-options.h"
@@ -114,7 +116,7 @@ ImpalaServer::QueryExecState::QueryExecState(
   summary_profile_.AddInfoString("Network Address",
       lexical_cast<string>(session_->network_address));
   summary_profile_.AddInfoString("Default Db", default_db());
-  summary_profile_.AddInfoString("Sql Statement", query_ctx_.request.stmt);
+  summary_profile_.AddInfoString("Sql Statement", query_ctx_.client_request.stmt);
   summary_profile_.AddInfoString("Coordinator",
       TNetworkAddressToString(exec_env->backend_address()));
 }
@@ -145,7 +147,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   summary_profile_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   summary_profile_.AddInfoString("Query Options (non default)",
-      DebugQueryOptions(query_ctx_.request.query_options));
+      DebugQueryOptions(query_ctx_.client_request.query_options));
 
   switch (exec_request->stmt_type) {
     case TStmtType::QUERY:
@@ -615,7 +617,7 @@ void ImpalaServer::QueryExecState::Wait() {
     UpdateQueryStatus(status);
   }
   if (status.ok()) {
-    UpdateNonErrorQueryState(QueryState::FINISHED);
+    UpdateNonErrorQueryState(beeswax::QueryState::FINISHED);
   }
 }
 
@@ -691,16 +693,17 @@ Status ImpalaServer::QueryExecState::RestartFetch() {
   return Status::OK();
 }
 
-void ImpalaServer::QueryExecState::UpdateNonErrorQueryState(QueryState::type query_state) {
+void ImpalaServer::QueryExecState::UpdateNonErrorQueryState(
+    beeswax::QueryState::type query_state) {
   lock_guard<mutex> l(lock_);
-  DCHECK(query_state != QueryState::EXCEPTION);
+  DCHECK(query_state != beeswax::QueryState::EXCEPTION);
   if (query_state_ < query_state) query_state_ = query_state;
 }
 
 Status ImpalaServer::QueryExecState::UpdateQueryStatus(const Status& status) {
   // Preserve the first non-ok status
   if (!status.ok() && query_status_.ok()) {
-    query_state_ = QueryState::EXCEPTION;
+    query_state_ = beeswax::QueryState::EXCEPTION;
     query_status_ = status;
     summary_profile_.AddInfoString("Query Status", query_status_.GetDetail());
   }
@@ -710,12 +713,12 @@ Status ImpalaServer::QueryExecState::UpdateQueryStatus(const Status& status) {
 
 Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
     QueryResultSet* fetched_rows) {
-  DCHECK(query_state_ != QueryState::EXCEPTION);
+  DCHECK(query_state_ != beeswax::QueryState::EXCEPTION);
 
   if (eos_) return Status::OK();
 
   if (request_result_set_ != NULL) {
-    query_state_ = QueryState::FINISHED;
+    query_state_ = beeswax::QueryState::FINISHED;
     int num_rows = 0;
     const vector<TResultRow>& all_rows = (*(request_result_set_.get()));
     // max_rows <= 0 means no limit
@@ -743,7 +746,7 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
     if (num_rows_fetched_from_cache >= max_rows) return Status::OK();
   }
 
-  query_state_ = QueryState::FINISHED;  // results will be ready after this call
+  query_state_ = beeswax::QueryState::FINISHED;  // results will be ready after this call
 
   // Maximum number of rows to be fetched from the coord.
   int32_t max_coord_rows = max_rows;
@@ -847,12 +850,12 @@ Status ImpalaServer::QueryExecState::Cancel(bool check_inflight, const Status* c
   {
     lock_guard<mutex> lock(lock_);
     // If the query is completed or cancelled, no need to update state.
-    bool already_done = eos_ || query_state_ == QueryState::EXCEPTION;
+    bool already_done = eos_ || query_state_ == beeswax::QueryState::EXCEPTION;
     if (!already_done && cause != NULL) {
       DCHECK(!cause->ok());
       UpdateQueryStatus(*cause);
       query_events_->MarkEvent("Cancelled");
-      DCHECK_EQ(query_state_, QueryState::EXCEPTION);
+      DCHECK_EQ(query_state_, beeswax::QueryState::EXCEPTION);
     }
     // Get a copy of the coordinator pointer while holding 'lock_'.
     coord = coord_.get();

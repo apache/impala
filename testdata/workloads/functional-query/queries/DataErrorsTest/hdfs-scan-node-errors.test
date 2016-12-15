@@ -1,69 +1,63 @@
 ====
 ---- QUERY
-## TODO: IMPALA-1862: Invalid bool value not reported as a scanner error
-##
-## TODO: the error info should be sufficient to pin point the data location: filename and
-## offset
-## TODO: printing the entire record will break column level security (when it is
-## implemented).
-#select id, bool_col, tinyint_col, smallint_col from alltypeserror
-#---- ERRORS
-#Error converting column: 3 to SMALLINT
-#file: hdfs://regex:.$
-#Error converting column: 2 to TINYINT
-#file: hdfs://regex:.$
-#Error converting column: 2 to TINYINT
-#Error converting column: 3 to SMALLINT
-#file: hdfs://regex:.$
-#Error converting column: 2 to TINYINT
-#file: hdfs://regex:.$
-#Error converting column: 1 to BOOLEAN
-#file: hdfs://regex:.$
-#Error converting column: 2 to TINYINT
-#file: hdfs://regex:.$
-#Error converting column: 3 to SMALLINT
-#file: hdfs://regex:.$
-#Error converting column: 1 to BOOLEAN
-#Error converting column: 2 to TINYINT
-#Error converting column: 3 to SMALLINT
-#file: hdfs://regex:.$
-#
-#---- RESULTS
-#0,NULL,NULL,0
-#1,NULL,NULL,1
-#10,NULL,NULL,NULL
-#11,false,NULL,NULL
-#12,true,2,NULL
-#13,false,3,3
-#14,true,4,4
-#15,false,NULL,5
-#16,NULL,NULL,NULL
-#17,false,7,7
-#18,true,8,8
-#19,false,9,9
-#2,true,NULL,NULL
-#20,true,0,0
-#21,false,1,1
-#22,true,2,2
-#23,false,3,NULL
-#24,true,4,4
-#25,false,5,5
-#26,true,6,6
-#27,false,NULL,7
-#28,true,8,8
-#29,false,9,9
-#3,false,3,NULL
-#30,NULL,NULL,NULL
-#4,true,4,4
-#5,false,5,5
-#6,true,6,6
-#7,NULL,NULL,7
-#8,false,NULL,NULL
-#9,NULL,NULL,NULL
-#---- TYPES
-#int, boolean, tinyint, smallint
-#====
-#---- QUERY
+select id, bool_col, tinyint_col, smallint_col from alltypeserror order by id
+---- ERRORS
+Error converting column: 3 to SMALLINT
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 2 to TINYINT
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to BOOLEAN
+Error converting column: 2 to TINYINT
+Error converting column: 3 to SMALLINT
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 2 to TINYINT
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to BOOLEAN
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 2 to TINYINT
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 3 to SMALLINT
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to BOOLEAN
+Error converting column: 2 to TINYINT
+Error converting column: 3 to SMALLINT
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+---- RESULTS
+0,NULL,NULL,0
+1,NULL,NULL,1
+2,true,NULL,NULL
+3,false,3,NULL
+4,true,4,4
+5,false,5,5
+6,true,6,6
+7,NULL,NULL,7
+8,false,NULL,NULL
+9,NULL,NULL,NULL
+10,NULL,NULL,NULL
+11,false,NULL,NULL
+12,true,2,NULL
+13,false,3,3
+14,true,4,4
+15,false,NULL,5
+16,NULL,NULL,NULL
+17,false,7,7
+18,true,8,8
+19,false,9,9
+20,true,0,0
+21,false,1,1
+22,true,2,2
+23,false,3,NULL
+24,true,4,4
+25,false,5,5
+26,true,6,6
+27,false,NULL,7
+28,true,8,8
+29,false,9,9
+30,NULL,NULL,NULL
+---- TYPES
+int, boolean, tinyint, smallint
+====
+---- QUERY
 select count(*) from functional_text_lzo.bad_text_lzo
 ---- ERRORS
 Blocksize: 536870911 is greater than LZO_MAX_BLOCK_SIZE: 67108864

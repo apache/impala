@@ -147,14 +147,14 @@ struct TDescribeDbParams {
 // given TDescribeOutputStyle.
 // NOTE: This struct should only be used for intra-process communication.
 struct TDescribeTableParams {
-  1: required string db
-  2: required string table_name
-
   // Controls the output style for this describe command.
-  3: required TDescribeOutputStyle output_style
+  1: required TDescribeOutputStyle output_style
 
-  // Struct type with fields to display for the MINIMAL output style.
-  4: optional Types.TColumnType result_struct
+  // Set when describing a table.
+  2: optional CatalogObjects.TTableName table_name
+
+  // Set when describing a path to a nested collection.
+  3: optional Types.TColumnType result_struct
 }
 
 // Results of a call to describeDb() and describeTable()
@@ -177,9 +177,17 @@ struct TShowDbsParams {
   1: optional string show_pattern
 }
 
-// Parameters for SHOW TABLE/COLUMN STATS commands
+// Used by SHOW STATS and SHOW PARTITIONS to control what information is returned.
+enum TShowStatsOp {
+  TABLE_STATS,
+  COLUMN_STATS,
+  PARTITIONS,
+  RANGE_PARTITIONS
+}
+
+// Parameters for SHOW TABLE/COLUMN STATS and SHOW PARTITIONS commands
 struct TShowStatsParams {
-  1: required bool is_show_col_stats
+  1: TShowStatsOp op
   2: CatalogObjects.TTableName table_name
 }
 

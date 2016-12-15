@@ -99,10 +99,10 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   // join_conjunct_ctxs_ are evaluated in the context of rows assembled from
   // all inner and outer tuples.
   RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
-  RETURN_IF_ERROR(Expr::Prepare(
-      join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
+  RETURN_IF_ERROR(
+      Expr::Prepare(join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
 
-  builder_.reset(new NljBuilder(child(1)->row_desc(), state, mem_tracker()));
+  builder_.reset(new NljBuilder(child(1)->row_desc(), state));
   RETURN_IF_ERROR(builder_->Prepare(state, mem_tracker()));
   runtime_profile()->PrependChild(builder_->profile());
 

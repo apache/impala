@@ -29,8 +29,6 @@ using namespace std;
 
 namespace impala {
 
-BloomFilter* const BloomFilter::ALWAYS_TRUE_FILTER = NULL;
-
 constexpr uint32_t BloomFilter::REHASH[8] __attribute__((aligned(32)));
 
 BloomFilter::BloomFilter(const int log_heap_space)
@@ -86,7 +84,7 @@ void BloomFilter::ToThrift(const BloomFilter* filter, TBloomFilter* thrift) {
 // The SIMD reinterpret_casts technically violate C++'s strict aliasing rules. However, we
 // compile with -fno-strict-aliasing.
 
-void BloomFilter::BucketInsert(const uint32_t bucket_idx, const uint32_t hash) {
+void BloomFilter::BucketInsert(const uint32_t bucket_idx, const uint32_t hash) noexcept {
   // new_bucket will be all zeros except for eight 1-bits, one in each 32-bit word. It is
   // 16-byte aligned so it can be read as a __m128i using aligned SIMD loads in the second
   // part of this method.
@@ -119,7 +117,7 @@ __m256i BloomFilter::MakeMask(const uint32_t hash) {
 }
 
 void BloomFilter::BucketInsertAVX2(
-    const uint32_t bucket_idx, const uint32_t hash) {
+    const uint32_t bucket_idx, const uint32_t hash) noexcept {
   const __m256i mask = MakeMask(hash);
   __m256i* const bucket = &reinterpret_cast<__m256i*>(directory_)[bucket_idx];
   _mm256_store_si256(bucket, _mm256_or_si256(*bucket, mask));
@@ -129,7 +127,7 @@ void BloomFilter::BucketInsertAVX2(
 }
 
 bool BloomFilter::BucketFindAVX2(
-    const uint32_t bucket_idx, const uint32_t hash) const {
+    const uint32_t bucket_idx, const uint32_t hash) const noexcept {
   const __m256i mask = MakeMask(hash);
   const __m256i bucket = reinterpret_cast<__m256i*>(directory_)[bucket_idx];
   // We should return true if 'bucket' has a one wherever 'mask' does. _mm256_testc_si256
@@ -142,7 +140,7 @@ bool BloomFilter::BucketFindAVX2(
 }
 
 bool BloomFilter::BucketFind(
-    const uint32_t bucket_idx, const uint32_t hash) const {
+    const uint32_t bucket_idx, const uint32_t hash) const noexcept {
   for (int i = 0; i < BUCKET_WORDS; ++i) {
     BucketWord hval =
         (REHASH[i] * hash) >> ((1 << LOG_BUCKET_WORD_BITS) - LOG_BUCKET_WORD_BITS);

@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.3.0" id="live_summary">
+
+  <title>LIVE_SUMMARY Query Option (<keyword keyref="impala23"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>LIVE_SUMMARY</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Reports"/>
+      <data name="Category" value="impala-shell"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.3.0">
+      <indexterm audience="Cloudera">LIVE_SUMMARY query option</indexterm>
+      For queries submitted through the <cmdname>impala-shell</cmdname> command,
+      displays the same output as the <codeph>SUMMARY</codeph> command,
+      with the measurements updated in real time as the query progresses.
+      When the query finishes, the final <codeph>SUMMARY</codeph> output remains
+      visible in the <cmdname>impala-shell</cmdname> console output.
+    </p>
+
+    <p>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+
+    <p conref="../shared/impala_common.xml#common/command_line_blurb"/>
+    <p>
+      You can enable this query option within <cmdname>impala-shell</cmdname>
+      by starting the shell with the <codeph>--live_summary</codeph>
+      command-line option.
+      You can still turn this setting off and on again within the shell through the
+      <codeph>SET</codeph> command.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>
+      The live summary output can be useful for evaluating long-running queries,
+      to evaluate which phase of execution takes up the most time, or if some hosts
+      take much longer than others for certain operations, dragging overall performance down.
+      By making the information available in real time, this feature lets you decide what
+      action to take even before you cancel a query that is taking much longer than normal.
+    </p>
+    <p>
+      For example, you might see the HDFS scan phase taking a long time, and therefore revisit
+      performance-related aspects of your schema design such as constructing a partitioned table,
+      switching to the Parquet file format, running the <codeph>COMPUTE STATS</codeph> statement
+      for the table, and so on.
+      Or you might see a wide variation between the average and maximum times for all hosts to
+      perform some phase of the query, and therefore investigate if one particular host
+      needed more memory or was experiencing a network problem.
+    </p>
+    <p conref="../shared/impala_common.xml#common/live_reporting_details"/>
+    <p>
+      For a simple and concise way of tracking the progress of an interactive query, see
+      <xref href="impala_live_progress.xml#live_progress"/>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+    <p conref="../shared/impala_common.xml#common/impala_shell_progress_reports_compute_stats_caveat"/>
+    <p conref="../shared/impala_common.xml#common/impala_shell_progress_reports_shell_only_caveat"/>
+
+    <p conref="../shared/impala_common.xml#common/added_in_230"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following example shows a series of <codeph>LIVE_SUMMARY</codeph> reports that
+      are displayed during the course of a query, showing how the numbers increase to
+      show the progress of different phases of the distributed query. When you do the same
+      in <cmdname>impala-shell</cmdname>, only a single report is displayed at any one time,
+      with each update overwriting the previous numbers.
+    </p>
+
+<codeblock><![CDATA[[localhost:21000] > set live_summary=true;
+LIVE_SUMMARY set to true
+[localhost:21000] > select count(*) from customer t1 cross join customer t2;
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 0      | 0ns      | 0ns      | 0       | 22.50B     | 0 B      | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 0      | 0ns      | 0ns      | 0       | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 0      | 0ns      | 0ns      | 0       | 150.00K    | 0 B      | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 1      | 0ns      | 0ns      | 0       | 1          | 20.00 KB | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 1      | 17.62s   | 17.62s   | 81.14M  | 22.50B     | 3.23 MB  | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 1      | 26.29ms  | 26.29ms  | 150.00K | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 1      | 247.53ms | 247.53ms | 1.02K   | 150.00K    | 24.39 MB | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 1      | 0ns      | 0ns      | 0       | 1          | 20.00 KB | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 1      | 61.85s   | 61.85s   | 283.43M | 22.50B     | 3.23 MB  | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 1      | 26.29ms  | 26.29ms  | 150.00K | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 1      | 247.59ms | 247.59ms | 2.05K   | 150.00K    | 24.39 MB | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+]]>
+</codeblock>
+
+<!-- Keeping this sample output that illustrates a couple of glitches in the LIVE_SUMMARY display, hidden, to help filing JIRAs. -->
+<codeblock audience="Cloudera"><![CDATA[[
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 1      | 0ns      | 0ns      | 0       | 1          | 20.00 KB | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 1      | 91.34s   | 91.34s   | 419.48M | 22.50B     | 3.23 MB  | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 1      | 26.29ms  | 26.29ms  | 150.00K | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 1      | 247.63ms | 247.63ms | 3.07K   | 150.00K    | 24.39 MB | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 1      | 0ns      | 0ns      | 0       | 1          | 20.00 KB | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 1      | 140.49s  | 140.49s  | 646.82M | 22.50B     | 3.23 MB  | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 1      | 26.29ms  | 26.29ms  | 150.00K | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 1      | 247.73ms | 247.73ms | 5.12K   | 150.00K    | 24.39 MB | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 1      | 0ns      | 0ns      | 0       | 1          | 20.00 KB | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 1      | 228.96s  | 228.96s  | 1.06B   | 22.50B     | 3.23 MB  | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 1      | 26.29ms  | 26.29ms  | 150.00K | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 1      | 247.83ms | 247.83ms | 7.17K   | 150.00K    | 24.39 MB | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 1      | 0ns      | 0ns      | 0       | 1          | 20.00 KB | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 1      | 563.11s  | 563.11s  | 2.59B   | 22.50B     | 3.23 MB  | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 1      | 26.29ms  | 26.29ms  | 150.00K | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 1      | 248.11ms | 248.11ms | 17.41K  | 150.00K    | 24.39 MB | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 1      | 0ns      | 0ns      | 0       | 1          | 20.00 KB | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 1      | 985.71s  | 985.71s  | 4.54B   | 22.50B     | 3.23 MB  | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 1      | 26.29ms  | 26.29ms  | 150.00K | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 1      | 248.49ms | 248.49ms | 30.72K  | 150.00K    | 24.39 MB | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 1      | 0ns      | 0ns      | 0       | 1          | 20.00 KB | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 1      | None     | None     | 5.42B   | 22.50B     | 3.23 MB  | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 1      | 26.29ms  | 26.29ms  | 150.00K | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 1      | 248.66ms | 248.66ms | 36.86K  | 150.00K    | 24.39 MB | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
+[localhost:21000] > select count(*) from customer t1 cross join customer t2;
+Query: select count(*) from customer t1 cross join customer t2
+[####################################################################################################] 100%
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
+]]>
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/live_progress_live_summary_asciinema"/>
+
+  </conbody>
+</concept>

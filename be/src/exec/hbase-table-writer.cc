@@ -114,7 +114,7 @@ Status HBaseTableWriter::InitJNI() {
   return Status::OK();
 }
 
-Status HBaseTableWriter::AppendRowBatch(RowBatch* batch) {
+Status HBaseTableWriter::AppendRows(RowBatch* batch) {
   JNIEnv* env = getJNIEnv();
   if (env == NULL) return Status("Error getting JNIEnv.");
 
@@ -270,9 +270,9 @@ void HBaseTableWriter::Close(RuntimeState* state) {
     table_.reset();
   }
 
-  // The jni should already have everything cleaned at this point
-  // but try again just in case there was an error that caused
-  // AppendRowBatch to exit out before calling CleanUpJni.
+  // The jni should already have everything cleaned at this point but try again just in
+  // case there was an error that caused AppendRows() to exit out before calling
+  // CleanUpJni.
   Status status = CleanUpJni();
   if (!status.ok()) {
     stringstream ss;

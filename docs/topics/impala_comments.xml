@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="comments">
+
+  <title>Comments</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">comments (SQL)</indexterm>
+      Impala supports the familiar styles of SQL comments:
+    </p>
+
+    <ul>
+      <li>
+        All text from a <codeph>--</codeph> sequence to the end of the line is considered a comment and ignored.
+        This type of comment can occur on a single line by itself, or after all or part of a statement.
+      </li>
+
+      <li>
+        All text from a <codeph>/*</codeph> sequence to the next <codeph>*/</codeph> sequence is considered a
+        comment and ignored. This type of comment can stretch over multiple lines. This type of comment can occur
+        on one or more lines by itself, in the middle of a statement, or before or after a statement.
+      </li>
+    </ul>
+
+    <p>
+      For example:
+    </p>
+
+<codeblock>-- This line is a comment about a table.
+create table ...;
+
+/*
+This is a multi-line comment about a query.
+*/
+select ...;
+
+select * from t /* This is an embedded comment about a query. */ where ...;
+
+select * from t -- This is a trailing comment within a multi-line command.
+where ...;
+</codeblock>
+  </conbody>
+</concept>

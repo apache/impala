@@ -22,9 +22,13 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/benchmarks")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/benchmarks")
 
+# Add custom target to only build the backend benchmarks
+add_custom_target(be-benchmarks)
+
 FUNCTION(ADD_BE_BENCHMARK BENCHMARK_NAME)
   ADD_EXECUTABLE(${BENCHMARK_NAME} ${BENCHMARK_NAME}.cc)
   TARGET_LINK_LIBRARIES(${BENCHMARK_NAME} ${IMPALA_LINK_LIBS})
+  ADD_DEPENDENCIES(be-benchmarks ${BENCHMARK_NAME})
 ENDFUNCTION()
 
 ADD_BE_BENCHMARK(atod-benchmark)

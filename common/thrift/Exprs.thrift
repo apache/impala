@@ -21,22 +21,22 @@ namespace java org.apache.impala.thrift
 include "Types.thrift"
 
 enum TExprNodeType {
+  NULL_LITERAL,
   BOOL_LITERAL,
+  INT_LITERAL,
+  FLOAT_LITERAL,
+  STRING_LITERAL,
+  DECIMAL_LITERAL,
+  TIMESTAMP_LITERAL,
   CASE_EXPR,
   COMPOUND_PRED,
-  FLOAT_LITERAL,
-  INT_LITERAL,
   IN_PRED,
   IS_NULL_PRED,
   LIKE_PRED,
-  LITERAL_PRED,
-  NULL_LITERAL,
   SLOT_REF,
-  STRING_LITERAL,
   TUPLE_IS_NULL_PRED,
   FUNCTION_CALL,
   AGGREGATE_EXPR,
-  DECIMAL_LITERAL,
   IS_NOT_EMPTY_PRED
 }
 
@@ -65,6 +65,11 @@ struct TFloatLiteral {
 
 struct TIntLiteral {
   1: required i64 value
+}
+
+struct TTimestampLiteral {
+  // 16-byte raw representation of a TimestampValue
+  1: required binary value
 }
 
 // The units which can be used when extracting a Timestamp. TExtractField is never used
@@ -137,6 +142,7 @@ struct TExprNode {
   16: optional TTupleIsNullPredicate tuple_is_null_pred
   17: optional TDecimalLiteral decimal_literal
   18: optional TAggregateExpr agg_expr
+  19: optional TTimestampLiteral timestamp_literal
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

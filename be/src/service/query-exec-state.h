@@ -184,8 +184,10 @@ class ImpalaServer::QueryExecState {
   const RuntimeProfile& summary_profile() const { return summary_profile_; }
   const TimestampValue& start_time() const { return start_time_; }
   const TimestampValue& end_time() const { return end_time_; }
-  const std::string& sql_stmt() const { return query_ctx_.request.stmt; }
-  const TQueryOptions& query_options() const { return query_ctx_.request.query_options; }
+  const std::string& sql_stmt() const { return query_ctx_.client_request.stmt; }
+  const TQueryOptions& query_options() const {
+    return query_ctx_.client_request.query_options;
+  }
   /// Returns 0:0 if this is a root query
   TUniqueId parent_query_id() const { return query_ctx_.parent_query_id; }
 

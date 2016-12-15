@@ -72,7 +72,18 @@ enum THdfsCompression {
   SNAPPY,
   SNAPPY_BLOCKED,
   LZO,
-  LZ4
+  LZ4,
+  ZLIB
+}
+
+enum TColumnEncoding {
+  AUTO,
+  PLAIN,
+  PREFIX,
+  GROUP_VARINT,
+  RLE,
+  DICTIONARY,
+  BIT_SHUFFLE
 }
 
 enum THdfsSeqCompressionMode {
@@ -191,11 +202,14 @@ struct TColumn {
   8: optional string column_qualifier
   9: optional bool is_binary
 
-  // Indicates whether this is a Kudu column. If true implies all following Kudu specific
-  // fields are set.
+  // All the following are Kudu-specific column properties
   10: optional bool is_kudu_column
   11: optional bool is_key
   12: optional bool is_nullable
+  13: optional TColumnEncoding encoding
+  14: optional THdfsCompression compression
+  15: optional Exprs.TExpr default_value
+  16: optional i32 block_size
 }
 
 // Represents a block in an HDFS file
@@ -343,10 +357,10 @@ struct TDataSourceTable {
   2: required string init_string
 }
 
-// Parameters needed for hash distribution
-struct TDistributeByHashParam {
+// Parameters needed for hash partitioning
+struct TKuduPartitionByHashParam {
   1: required list<string> columns
-  2: required i32 num_buckets
+  2: required i32 num_partitions
 }
 
 struct TRangePartition {
@@ -356,16 +370,16 @@ struct TRangePartition {
   4: optional bool is_upper_bound_inclusive
 }
 
-// A range distribution is identified by a list of columns and a list of range partitions.
-struct TDistributeByRangeParam {
+// A range partitioning is identified by a list of columns and a list of range partitions.
+struct TKuduPartitionByRangeParam {
   1: required list<string> columns
   2: optional list<TRangePartition> range_partitions
 }
 
-// Parameters for the DISTRIBUTE BY clause.
-struct TDistributeParam {
-  1: optional TDistributeByHashParam by_hash_param;
-  2: optional TDistributeByRangeParam by_range_param;
+// Parameters for the PARTITION BY clause.
+struct TKuduPartitionParam {
+  1: optional TKuduPartitionByHashParam by_hash_param;
+  2: optional TKuduPartitionByRangeParam by_range_param;
 }
 
 // Represents a Kudu table
@@ -378,8 +392,8 @@ struct TKuduTable {
   // Name of the key columns
   3: required list<string> key_columns
 
-  // Distribution schemes
-  4: required list<TDistributeParam> distribute_by
+  // Partitioning
+  4: required list<TKuduPartitionParam> partition_by
 }
 
 // Represents a table or view.

@@ -56,13 +56,11 @@ class RuntimeFilter {
   /// once per filter. Does not acquire the memory associated with 'bloom_filter'.
   inline void SetBloomFilter(BloomFilter* bloom_filter);
 
-  /// Returns false iff the bloom_filter filter has been set via SetBloomFilter() and
-  /// hash[val] is not in that bloom_filter. Otherwise returns true. Is safe to call
-  /// concurrently with SetBloomFilter().
-  ///
-  /// Templatized in preparation for templatized hashes.
-  template<typename T>
-  inline bool Eval(T* val, const ColumnType& col_type) const;
+  /// Returns false iff 'bloom_filter_' has been set via SetBloomFilter() and hash[val] is
+  /// not in that 'bloom_filter_'. Otherwise returns true. Is safe to call concurrently
+  /// with SetBloomFilter(). 'val' is a value derived from evaluating a tuple row against
+  /// the expression of the owning filter context. 'col_type' is the value's type.
+  bool Eval(void* val, const ColumnType& col_type) const noexcept;
 
   /// Returns the amount of time waited since registration for the filter to
   /// arrive. Returns 0 if filter has not yet arrived.
@@ -82,6 +80,9 @@ class RuntimeFilter {
 
   /// Frequency with which to check for filter arrival in WaitForArrival()
   static const int SLEEP_PERIOD_MS;
+
+  /// Class name in LLVM IR.
+  static const char* LLVM_CLASS_NAME;
 
  private:
   /// Membership bloom_filter. May be NULL even after arrival_time_ is set. This is a

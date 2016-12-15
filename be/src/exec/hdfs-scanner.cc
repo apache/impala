@@ -332,6 +332,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
         node->hdfs_table()->null_column_value().data(),
         node->hdfs_table()->null_column_value().size(), true, state->strict_mode());
     if (fn == NULL) return Status("CodegenWriteSlot failed.");
+    if (i >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) codegen->SetNoInline(fn);
     slot_fns.push_back(fn);
   }
 
@@ -456,6 +457,21 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
       Value* data = builder.CreateLoad(data_ptr, "data");
       Value* len = builder.CreateLoad(len_ptr, "len");
 
+      // Convert length to positive if it is negative. Negative lengths are assigned to
+      // slots that contain escape characters.
+      // TODO: CodegenWriteSlot() currently does not handle text that requres unescaping.
+      // However, if it is modified to handle that case, we need to detect it here and
+      // send a 'need_escape' bool to CodegenWriteSlot(), since we are making the length
+      // positive here.
+      Value* len_lt_zero = builder.CreateICmpSLT(len,
+          codegen->GetIntConstant(TYPE_INT, 0), "len_lt_zero");
+      Value* ones_compliment_len = builder.CreateNot(len, "ones_compliment_len");
+      Value* positive_len = builder.CreateAdd(
+          ones_compliment_len, codegen->GetIntConstant(TYPE_INT, 1),
+          "positive_len");
+      len = builder.CreateSelect(len_lt_zero, positive_len, len,
+          "select_positive_len");
+
       // Call slot parse function
       Function* slot_fn = slot_fns[slot_idx];
       Value* slot_parsed = builder.CreateCall(slot_fn,
@@ -487,6 +503,10 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
         fn->eraseFromParent();
         return status;
       }
+      if (node->materialized_slots().size() + conjunct_idx
+          >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) {
+        codegen->SetNoInline(conjunct_fn);
+      }
 
       Function* get_ctx_fn =
           codegen->GetFunction(IRFunction::HDFS_SCANNER_GET_CONJUNCT_CTX, false);
@@ -505,6 +525,10 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   builder.SetInsertPoint(eval_fail_block);
   builder.CreateRet(codegen->false_value());
 
+  if (node->materialized_slots().size() + conjunct_ctxs.size()
+      > LlvmCodeGen::CODEGEN_INLINE_EXPR_BATCH_THRESHOLD) {
+    codegen->SetNoInline(fn);
+  }
   *write_complete_tuple_fn = codegen->FinalizeFunction(fn);
   if (*write_complete_tuple_fn == NULL) {
     return Status("Failed to finalize write_complete_tuple_fn.");

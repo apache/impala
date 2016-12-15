@@ -56,26 +56,30 @@ const static string& ROOT_PARTITION_KEY =
     g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
 
 HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
-    const vector<TExpr>& select_list_texprs,
-    const TDataSink& tsink)
-    :  DataSink(row_desc),
-       table_desc_(NULL),
-       default_partition_(NULL),
-       current_row_(NULL),
-       table_id_(tsink.table_sink.target_table_id),
-       skip_header_line_count_(
-           tsink.table_sink.hdfs_table_sink.__isset.skip_header_line_count
-           ? tsink.table_sink.hdfs_table_sink.skip_header_line_count : 0),
-       select_list_texprs_(select_list_texprs),
-       partition_key_texprs_(tsink.table_sink.hdfs_table_sink.partition_key_exprs),
-       overwrite_(tsink.table_sink.hdfs_table_sink.overwrite) {
+    const vector<TExpr>& select_list_texprs, const TDataSink& tsink)
+  : DataSink(row_desc),
+    table_desc_(nullptr),
+    default_partition_(nullptr),
+    table_id_(tsink.table_sink.target_table_id),
+    skip_header_line_count_(
+        tsink.table_sink.hdfs_table_sink.__isset.skip_header_line_count ?
+            tsink.table_sink.hdfs_table_sink.skip_header_line_count :
+            0),
+    select_list_texprs_(select_list_texprs),
+    partition_key_texprs_(tsink.table_sink.hdfs_table_sink.partition_key_exprs),
+    overwrite_(tsink.table_sink.hdfs_table_sink.overwrite),
+    input_is_clustered_(tsink.table_sink.hdfs_table_sink.input_is_clustered),
+    current_clustered_partition_(nullptr) {
   DCHECK(tsink.__isset.table_sink);
 }
 
 OutputPartition::OutputPartition()
-    : hdfs_connection(NULL), tmp_hdfs_file(NULL), num_rows(0), num_files(0),
-      partition_descriptor(NULL), block_size(0) {
-}
+  : hdfs_connection(nullptr),
+    tmp_hdfs_file(nullptr),
+    num_rows(0),
+    num_files(0),
+    partition_descriptor(nullptr),
+    block_size(0) {}
 
 Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   // Prepare select list expressions.
@@ -104,8 +108,8 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   return Status::OK();
 }
 
-Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
-  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
+Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   unique_id_str_ = PrintId(state->fragment_instance_id(), "-");
   SCOPED_TIMER(profile()->total_time_counter());
 
@@ -125,7 +129,7 @@ Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
   table_desc_ = static_cast<const HdfsTableDescriptor*>(
       state->desc_tbl().GetTableDescriptor(table_id_));
 
-  if (table_desc_ == NULL) {
+  if (table_desc_ == nullptr) {
     stringstream error_msg("Failed to get table descriptor for table id: ");
     error_msg << table_id_;
     return Status(error_msg.str());
@@ -192,14 +196,17 @@ Status HdfsTableSink::Open(RuntimeState* state) {
           // partition keys. So only keep a reference to the partition which matches
           // partition_key_values for constant values, since only that is written to.
           void* table_partition_key_value =
-              partition->partition_key_value_ctxs()[i]->GetValue(NULL);
-          void* target_partition_key_value = partition_key_expr_ctxs_[i]->GetValue(NULL);
-          if (table_partition_key_value == NULL && target_partition_key_value == NULL) {
+              partition->partition_key_value_ctxs()[i]->GetValue(nullptr);
+          void* target_partition_key_value =
+              partition_key_expr_ctxs_[i]->GetValue(nullptr);
+          if (table_partition_key_value == nullptr
+              && target_partition_key_value == nullptr) {
             continue;
           }
-          if (table_partition_key_value == NULL || target_partition_key_value == NULL
+          if (table_partition_key_value == nullptr
+              || target_partition_key_value == nullptr
               || !RawValue::Eq(table_partition_key_value, target_partition_key_value,
-                               partition_key_expr_ctxs_[i]->root()->type())) {
+                     partition_key_expr_ctxs_[i]->root()->type())) {
             relevant_partition = false;
             break;
           }
@@ -207,17 +214,16 @@ Status HdfsTableSink::Open(RuntimeState* state) {
       }
       if (relevant_partition) {
         string key;
-        // It's ok if current_row_ is NULL (which it should be here), since all of these
-        // expressions are constant, and can therefore be evaluated without a valid row
-        // context.
-        GetHashTblKey(dynamic_partition_key_value_ctxs, &key);
+        // Pass nullptr as row, since all of these expressions are constant, and can
+        // therefore be evaluated without a valid row context.
+        GetHashTblKey(nullptr, dynamic_partition_key_value_ctxs, &key);
         DCHECK(partition_descriptor_map_.find(key) == partition_descriptor_map_.end())
             << "Partitions with duplicate 'static' keys found during INSERT";
         partition_descriptor_map_[key] = partition;
       }
     }
   }
-  if (default_partition_ == NULL) {
+  if (default_partition_ == nullptr) {
     return Status("No default partition found for HdfsTextTableSink");
   }
   return Status::OK();
@@ -262,6 +268,87 @@ void HdfsTableSink::BuildHdfsFileNames(
   output_partition->num_files = 0;
 }
 
+Status HdfsTableSink::WriteRowsToPartition(
+    RuntimeState* state, RowBatch* batch, PartitionPair* partition_pair) {
+  // The rows of this batch may span multiple files. We repeatedly pass the row batch to
+  // the writer until it sets new_file to false, indicating that all rows have been
+  // written. The writer tracks where it is in the batch when it returns with new_file
+  // set.
+  bool new_file;
+  while (true) {
+    OutputPartition* output_partition = partition_pair->first;
+    RETURN_IF_ERROR(
+        output_partition->writer->AppendRows(batch, partition_pair->second, &new_file));
+    if (!new_file) break;
+    RETURN_IF_ERROR(FinalizePartitionFile(state, output_partition));
+    RETURN_IF_ERROR(CreateNewTmpFile(state, output_partition));
+  }
+  partition_pair->second.clear();
+  return Status::OK();
+}
+
+Status HdfsTableSink::WriteClusteredRowBatch(RuntimeState* state, RowBatch* batch) {
+  DCHECK_GT(batch->num_rows(), 0);
+  DCHECK(!dynamic_partition_key_expr_ctxs_.empty());
+  DCHECK(input_is_clustered_);
+
+  // Initialize the clustered partition and key.
+  if (current_clustered_partition_ == nullptr) {
+    const TupleRow* current_row = batch->GetRow(0);
+    GetHashTblKey(
+        current_row, dynamic_partition_key_expr_ctxs_, &current_clustered_partition_key_);
+    RETURN_IF_ERROR(GetOutputPartition(state, current_row,
+        current_clustered_partition_key_, &current_clustered_partition_, false));
+  }
+
+  // Compare the last row of the batch to the last current partition key. If they match,
+  // then all the rows in the batch have the same key and can be written as a whole.
+  string last_row_key;
+  GetHashTblKey(batch->GetRow(batch->num_rows() - 1), dynamic_partition_key_expr_ctxs_,
+      &last_row_key);
+  if (last_row_key == current_clustered_partition_key_) {
+    DCHECK(current_clustered_partition_->second.empty());
+    RETURN_IF_ERROR(WriteRowsToPartition(state, batch, current_clustered_partition_));
+    return Status::OK();
+  }
+
+  // Not all rows in this batch match the previously written partition key, so we process
+  // them individually.
+  for (int i = 0; i < batch->num_rows(); ++i) {
+    const TupleRow* current_row = batch->GetRow(i);
+
+    string key;
+    GetHashTblKey(current_row, dynamic_partition_key_expr_ctxs_, &key);
+
+    if (current_clustered_partition_key_ != key) {
+      DCHECK(current_clustered_partition_ != nullptr);
+      // Done with previous partition - write rows and close.
+      if (!current_clustered_partition_->second.empty()) {
+        RETURN_IF_ERROR(WriteRowsToPartition(state, batch, current_clustered_partition_));
+        current_clustered_partition_->second.clear();
+      }
+      RETURN_IF_ERROR(FinalizePartitionFile(state, current_clustered_partition_->first));
+      if (current_clustered_partition_->first->writer.get() != nullptr) {
+        current_clustered_partition_->first->writer->Close();
+      }
+      partition_keys_to_output_partitions_.erase(current_clustered_partition_key_);
+      current_clustered_partition_key_ = std::move(key);
+      RETURN_IF_ERROR(GetOutputPartition(state, current_row,
+          current_clustered_partition_key_, &current_clustered_partition_, false));
+    }
+#ifdef DEBUG
+    string debug_row_key;
+    GetHashTblKey(current_row, dynamic_partition_key_expr_ctxs_, &debug_row_key);
+    DCHECK_EQ(current_clustered_partition_key_, debug_row_key);
+#endif
+    DCHECK(current_clustered_partition_ != nullptr);
+    current_clustered_partition_->second.push_back(i);
+  }
+  // Write final set of rows to the partition but keep its file open.
+  RETURN_IF_ERROR(WriteRowsToPartition(state, batch, current_clustered_partition_));
+  return Status::OK();
+}
+
 Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
     OutputPartition* output_partition) {
   SCOPED_TIMER(ADD_TIMER(profile(), "TmpFileCreateTimer"));
@@ -295,7 +382,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
       tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, block_size);
 
   VLOG_FILE << "hdfsOpenFile() file=" << tmp_hdfs_file_name_cstr;
-  if (output_partition->tmp_hdfs_file == NULL) {
+  if (output_partition->tmp_hdfs_file == nullptr) {
     return Status(GetHdfsErrorMsg("Failed to open HDFS file for writing: ",
         output_partition->current_file_name));
   }
@@ -310,7 +397,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
     // files, we get the block size by stat-ing the file.
     hdfsFileInfo* info = hdfsGetPathInfo(output_partition->hdfs_connection,
         output_partition->current_file_name.c_str());
-    if (info == NULL) {
+    if (info == nullptr) {
       return Status(GetHdfsErrorMsg("Failed to get info on temporary HDFS file: ",
           output_partition->current_file_name));
     }
@@ -338,16 +425,16 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
 }
 
 Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
-    const HdfsPartitionDescriptor& partition_descriptor,
+    const HdfsPartitionDescriptor& partition_descriptor, const TupleRow* row,
     OutputPartition* output_partition, bool empty_partition) {
   // Build the unique name for this partition from the partition keys, e.g. "j=1/f=foo/"
   // etc.
   stringstream partition_name_ss;
   for (int j = 0; j < partition_key_expr_ctxs_.size(); ++j) {
     partition_name_ss << table_desc_->col_descs()[j].name() << "=";
-    void* value = partition_key_expr_ctxs_[j]->GetValue(current_row_);
-    // NULL partition keys get a special value to be compatible with Hive.
-    if (value == NULL) {
+    void* value = partition_key_expr_ctxs_[j]->GetValue(row);
+    // nullptr partition keys get a special value to be compatible with Hive.
+    if (value == nullptr) {
       partition_name_ss << table_desc_->null_partition_key_value();
     } else {
       string value_str;
@@ -362,7 +449,7 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
       // decoded partition key value.
       string encoded_str;
       UrlEncode(value_str, &encoded_str, true);
-      // If the string is empty, map it to NULL (mimicking Hive's behaviour)
+      // If the string is empty, map it to nullptr (mimicking Hive's behaviour)
       partition_name_ss << (encoded_str.empty() ?
                         table_desc_->null_partition_key_value() : encoded_str);
     }
@@ -459,24 +546,25 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   return CreateNewTmpFile(state, output_partition);
 }
 
-void HdfsTableSink::GetHashTblKey(const vector<ExprContext*>& ctxs, string* key) {
+void HdfsTableSink::GetHashTblKey(
+    const TupleRow* row, const vector<ExprContext*>& ctxs, string* key) {
   stringstream hash_table_key;
   for (int i = 0; i < ctxs.size(); ++i) {
     RawValue::PrintValueAsBytes(
-        ctxs[i]->GetValue(current_row_), ctxs[i]->root()->type(), &hash_table_key);
+        ctxs[i]->GetValue(row), ctxs[i]->root()->type(), &hash_table_key);
     // Additionally append "/" to avoid accidental key collisions.
     hash_table_key << "/";
   }
   *key = hash_table_key.str();
 }
 
-inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state,
+inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state, const TupleRow* row,
     const string& key, PartitionPair** partition_pair, bool no_more_rows) {
+  DCHECK(row != nullptr || key == ROOT_PARTITION_KEY);
   PartitionMap::iterator existing_partition;
   existing_partition = partition_keys_to_output_partitions_.find(key);
   if (existing_partition == partition_keys_to_output_partitions_.end()) {
-    // Create a new OutputPartition, and add it to
-    // partition_keys_to_output_partitions.
+    // Create a new OutputPartition, and add it to partition_keys_to_output_partitions.
     const HdfsPartitionDescriptor* partition_descriptor = default_partition_;
     PartitionDescriptorMap::const_iterator it = partition_descriptor_map_.find(key);
     if (it != partition_descriptor_map_.end()) {
@@ -484,13 +572,13 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state,
     }
 
     OutputPartition* partition = state->obj_pool()->Add(new OutputPartition());
-    Status status = InitOutputPartition(state, *partition_descriptor, partition,
-        no_more_rows);
+    Status status =
+        InitOutputPartition(state, *partition_descriptor, row, partition, no_more_rows);
     if (!status.ok()) {
       // We failed to create the output partition successfully. Clean it up now
       // as it is not added to partition_keys_to_output_partitions_ so won't be
       // cleaned up in Close().
-      if (partition->writer.get() != NULL) partition->writer->Close();
+      if (partition->writer.get() != nullptr) partition->writer->Close();
       return status;
     }
 
@@ -533,45 +621,25 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
     // If there are no dynamic keys just use an empty key.
     PartitionPair* partition_pair;
     RETURN_IF_ERROR(
-        GetOutputPartition(state, ROOT_PARTITION_KEY, &partition_pair, false));
-    // Pass the row batch to the writer. If new_file is returned true then the current
-    // file is finalized and a new file is opened.
-    // The writer tracks where it is in the batch when it returns with new_file set.
-    OutputPartition* output_partition = partition_pair->first;
-    bool new_file;
-    do {
-      RETURN_IF_ERROR(output_partition->writer->AppendRowBatch(
-          batch, partition_pair->second, &new_file));
-      if (new_file) {
-        RETURN_IF_ERROR(FinalizePartitionFile(state, output_partition));
-        RETURN_IF_ERROR(CreateNewTmpFile(state, output_partition));
-      }
-    } while (new_file);
+        GetOutputPartition(state, nullptr, ROOT_PARTITION_KEY, &partition_pair, false));
+    RETURN_IF_ERROR(WriteRowsToPartition(state, batch, partition_pair));
+  } else if (input_is_clustered_) {
+    WriteClusteredRowBatch(state, batch);
   } else {
     for (int i = 0; i < batch->num_rows(); ++i) {
-      current_row_ = batch->GetRow(i);
+      const TupleRow* current_row = batch->GetRow(i);
 
       string key;
-      GetHashTblKey(dynamic_partition_key_expr_ctxs_, &key);
-      PartitionPair* partition_pair = NULL;
-      RETURN_IF_ERROR(GetOutputPartition(state, key, &partition_pair, false));
+      GetHashTblKey(current_row, dynamic_partition_key_expr_ctxs_, &key);
+      PartitionPair* partition_pair = nullptr;
+      RETURN_IF_ERROR(
+          GetOutputPartition(state, current_row, key, &partition_pair, false));
       partition_pair->second.push_back(i);
     }
-    for (PartitionMap::iterator partition = partition_keys_to_output_partitions_.begin();
-         partition != partition_keys_to_output_partitions_.end(); ++partition) {
-      OutputPartition* output_partition = partition->second.first;
-      if (partition->second.second.empty()) continue;
-
-      bool new_file;
-      do {
-        RETURN_IF_ERROR(output_partition->writer->AppendRowBatch(
-            batch, partition->second.second, &new_file));
-        if (new_file) {
-          RETURN_IF_ERROR(FinalizePartitionFile(state, output_partition));
-          RETURN_IF_ERROR(CreateNewTmpFile(state, output_partition));
-        }
-      } while (new_file);
-      partition->second.second.clear();
+    for (PartitionMap::value_type& partition : partition_keys_to_output_partitions_) {
+      if (!partition.second.second.empty()) {
+        RETURN_IF_ERROR(WriteRowsToPartition(state, batch, &partition.second));
+      }
     }
   }
   return Status::OK();
@@ -579,11 +647,11 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
 
 Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
                                             OutputPartition* partition) {
-  if (partition->tmp_hdfs_file == NULL && !overwrite_) return Status::OK();
+  if (partition->tmp_hdfs_file == nullptr && !overwrite_) return Status::OK();
   SCOPED_TIMER(ADD_TIMER(profile(), "FinalizePartitionFileTimer"));
 
-  // OutputPartition writer could be NULL if there is no row to output.
-  if (partition->writer.get() != NULL) {
+  // OutputPartition writer could be nullptr if there is no row to output.
+  if (partition->writer.get() != nullptr) {
     RETURN_IF_ERROR(partition->writer->Finalize());
 
     // Track total number of appended rows per partition in runtime
@@ -604,10 +672,10 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
 
 Status HdfsTableSink::ClosePartitionFile(
     RuntimeState* state, OutputPartition* partition) {
-  if (partition->tmp_hdfs_file == NULL) return Status::OK();
+  if (partition->tmp_hdfs_file == nullptr) return Status::OK();
   int hdfs_ret = hdfsCloseFile(partition->hdfs_connection, partition->tmp_hdfs_file);
   VLOG_FILE << "hdfsCloseFile() file=" << partition->current_file_name;
-  partition->tmp_hdfs_file = NULL;
+  partition->tmp_hdfs_file = nullptr;
   ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(-1);
   if (hdfs_ret != 0) {
     return Status(ErrorMsg(TErrorCode::GENERAL,
@@ -625,7 +693,7 @@ Status HdfsTableSink::FlushFinal(RuntimeState* state) {
     // Make sure we create an output partition even if the input is empty because we need
     // it to delete the existing data for 'insert overwrite'.
     PartitionPair* dummy;
-    RETURN_IF_ERROR(GetOutputPartition(state, ROOT_PARTITION_KEY, &dummy, true));
+    RETURN_IF_ERROR(GetOutputPartition(state, nullptr, ROOT_PARTITION_KEY, &dummy, true));
   }
 
   // Close Hdfs files, and update stats in runtime state.
@@ -646,7 +714,7 @@ void HdfsTableSink::Close(RuntimeState* state) {
           partition_keys_to_output_partitions_.begin();
       cur_partition != partition_keys_to_output_partitions_.end();
       ++cur_partition) {
-    if (cur_partition->second.first->writer.get() != NULL) {
+    if (cur_partition->second.first->writer.get() != nullptr) {
       cur_partition->second.first->writer->Close();
     }
     Status close_status = ClosePartitionFile(state, cur_partition->second.first);

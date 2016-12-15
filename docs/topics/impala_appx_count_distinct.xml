@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.0.0" id="appx_count_distinct">
+
+  <title>APPX_COUNT_DISTINCT Query Option (<keyword keyref="impala20"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>APPX_COUNT_DISTINCT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.0.0">
+      <indexterm audience="Cloudera">APPX_COUNT_DISTINCT query option</indexterm>
+      Allows multiple <codeph>COUNT(DISTINCT)</codeph> operations within a single query, by internally rewriting
+      each <codeph>COUNT(DISTINCT)</codeph> to use the <codeph>NDV()</codeph> function. The resulting count is
+      approximate rather than precise.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following examples show how the <codeph>APPX_COUNT_DISTINCT</codeph> lets you work around the restriction
+      where a query can only evaluate <codeph>COUNT(DISTINCT <varname>col_name</varname>)</codeph> for a single
+      column. By default, you can count the distinct values of one column or another, but not both in a single
+      query:
+    </p>
+
+<codeblock>[localhost:21000] &gt; select count(distinct x) from int_t;
++-------------------+
+| count(distinct x) |
++-------------------+
+| 10                |
++-------------------+
+[localhost:21000] &gt; select count(distinct property) from int_t;
++--------------------------+
+| count(distinct property) |
++--------------------------+
+| 7                        |
++--------------------------+
+[localhost:21000] &gt; select count(distinct x), count(distinct property) from int_t;
+ERROR: AnalysisException: all DISTINCT aggregate functions need to have the same set of parameters
+as count(DISTINCT x); deviating function: count(DISTINCT property)
+</codeblock>
+
+    <p>
+      When you enable the <codeph>APPX_COUNT_DISTINCT</codeph> query option, now the query with multiple
+      <codeph>COUNT(DISTINCT)</codeph> works. The reason this behavior requires a query option is that each
+      <codeph>COUNT(DISTINCT)</codeph> is rewritten internally to use the <codeph>NDV()</codeph> function instead,
+      which provides an approximate result rather than a precise count.
+    </p>
+
+<codeblock>[localhost:21000] &gt; set APPX_COUNT_DISTINCT=true;
+[localhost:21000] &gt; select count(distinct x), count(distinct property) from int_t;
++-------------------+--------------------------+
+| count(distinct x) | count(distinct property) |
++-------------------+--------------------------+
+| 10                | 7                        |
++-------------------+--------------------------+
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_count.xml#count"/>,
+      <xref href="impala_distinct.xml#distinct"/>,
+      <xref href="impala_ndv.xml#ndv"/>
+    </p>
+
+  </conbody>
+</concept>

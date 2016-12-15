@@ -31,8 +31,25 @@
 
 #include "common/names.h"
 
-DEFINE_int32(kudu_mutation_buffer_size, 100 * 1024 * 1024, "The size (bytes) of the "
-    "Kudu client buffer for mutations.");
+#define DEFAULT_KUDU_MUTATION_BUFFER_SIZE 10 * 1024 * 1024
+
+DEFINE_int32(kudu_mutation_buffer_size, DEFAULT_KUDU_MUTATION_BUFFER_SIZE,
+    "The size (bytes) of the Kudu client buffer for mutations.");
+
+// The memory (bytes) that this node needs to consume in order to operate. This is
+// necessary because the KuduClient allocates non-trivial amounts of untracked memory,
+// and is potentially unbounded due to how Kudu's async error reporting works.
+// Until Kudu's client memory usage can be bounded (KUDU-1752), we estimate that 2x the
+// mutation buffer size is enough memory, and that seems to provide acceptable results in
+// testing. This is still exposed as a flag for now though, because it may be possible
+// that in some cases this is always too high (in which case tracked mem >> RSS and the
+// memory is underutilized), or this may not be high enough (e.g. we underestimate the
+// size of error strings, and RSS grows until the process is killed).
+// TODO: Handle DML w/ small or known resource requirements (e.g. VALUES specified or
+// query has LIMIT) specially to avoid over-consumption.
+DEFINE_int32(kudu_sink_mem_required, 2 * DEFAULT_KUDU_MUTATION_BUFFER_SIZE,
+    "(Advanced) The memory required (bytes) for a KuduTableSink. The default value is "
+    " 2x the kudu_mutation_buffer_size. This flag is subject to change or removal.");
 
 DECLARE_int32(kudu_operation_timeout_ms);
 
@@ -77,8 +94,8 @@ Status KuduTableSink::PrepareExprs(RuntimeState* state) {
   return Status::OK();
 }
 
-Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
-  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
+Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   SCOPED_TIMER(profile()->total_time_counter());
   RETURN_IF_ERROR(PrepareExprs(state));
 
@@ -116,8 +133,21 @@ Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
 
 Status KuduTableSink::Open(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, state));
-  RETURN_IF_ERROR(CreateKuduClient(table_desc_->kudu_master_addresses(), &client_));
 
+  int64_t required_mem = FLAGS_kudu_sink_mem_required;
+  if (!mem_tracker_->TryConsume(required_mem)) {
+    return mem_tracker_->MemLimitExceeded(state,
+        "Could not allocate memory for KuduTableSink", required_mem);
+  }
+
+  Status s = CreateKuduClient(table_desc_->kudu_master_addresses(), &client_);
+  if (!s.ok()) {
+    // Close() releases memory if client_ is not NULL, but since the memory was consumed
+    // and the client failed to be created, it must be released.
+    DCHECK(client_.get() == NULL);
+    mem_tracker_->Release(required_mem);
+    return s;
+  }
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc_->table_name(), &table_),
       "Unable to open Kudu table");
 
@@ -143,10 +173,11 @@ Status KuduTableSink::Open(RuntimeState* state) {
   // Internally, the Kudu client keeps one or more buffers for writing operations. When a
   // single buffer is flushed, it is locked (that space cannot be reused) until all
   // operations within it complete, so it is important to have a number of buffers. In
-  // our testing, we found that allowing a total of 100MB of buffer space to provide good
+  // our testing, we found that allowing a total of 10MB of buffer space to provide good
   // results; this is the default.  Then, because of some existing 8MB limits in Kudu, we
   // want to have that total space broken up into 7MB buffers (INDIVIDUAL_BUFFER_SIZE).
   // The mutation flush watermark is set to flush every INDIVIDUAL_BUFFER_SIZE.
+  // TODO: simplify/remove this logic when Kudu simplifies the API (KUDU-1808).
   int num_buffers = FLAGS_kudu_mutation_buffer_size / INDIVIDUAL_BUFFER_SIZE;
   if (num_buffers == 0) num_buffers = 1;
   KUDU_RETURN_IF_ERROR(session_->SetMutationBufferFlushWatermark(1.0 / num_buffers),
@@ -195,17 +226,13 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
     bool add_row = true;
 
     for (int j = 0; j < output_expr_ctxs_.size(); ++j) {
-      // For INSERT, output_expr_ctxs_ will contain all columns of the table in order.
-      // For UPDATE and UPSERT, output_expr_ctxs_ only contains the columns that the op
+      // output_expr_ctxs_ only contains the columns that the op
       // applies to, i.e. columns explicitly mentioned in the query, and
       // referenced_columns is then used to map to actual column positions.
       int col = kudu_table_sink_.referenced_columns.empty() ?
           j : kudu_table_sink_.referenced_columns[j];
 
       void* value = output_expr_ctxs_[j]->GetValue(current_row);
-
-      // If the value is NULL, we only need to explicitly set it for UPDATE and UPSERT.
-      // For INSERT, it can be ignored as unspecified cols will be implicitly set to NULL.
       if (value == NULL) {
         if (table_schema.Column(j).is_nullable()) {
           KUDU_RETURN_IF_ERROR(write->mutable_row()->SetNull(col),
@@ -354,6 +381,10 @@ Status KuduTableSink::FlushFinal(RuntimeState* state) {
 
 void KuduTableSink::Close(RuntimeState* state) {
   if (closed_) return;
+  if (client_.get() != NULL) {
+    mem_tracker_->Release(FLAGS_kudu_sink_mem_required);
+    client_.reset();
+  }
   SCOPED_TIMER(profile()->total_time_counter());
   Expr::Close(output_expr_ctxs_, state);
   DataSink::Close(state);

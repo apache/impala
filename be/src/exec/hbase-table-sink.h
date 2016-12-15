@@ -36,10 +36,9 @@ namespace impala {
 class HBaseTableSink : public DataSink {
  public:
   HBaseTableSink(const RowDescriptor& row_desc,
-                 const std::vector<TExpr>& select_list_texprs,
-                 const TDataSink& tsink);
+      const std::vector<TExpr>& select_list_texprs, const TDataSink& tsink);
   virtual std::string GetName() { return "HBaseTableSink"; }
-  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
+  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
   virtual Status Open(RuntimeState* state);
   virtual Status Send(RuntimeState* state, RowBatch* batch);
   virtual Status FlushFinal(RuntimeState* state);

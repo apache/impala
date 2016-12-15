@@ -207,9 +207,11 @@ public class InlineViewRef extends TableRef {
         analyzer.createAuxEquivPredicate(new SlotRef(slotDesc), colExpr.clone());
       }
     }
-    LOG.trace("inline view " + getUniqueAlias() + " smap: " + smap_.debugString());
-    LOG.trace("inline view " + getUniqueAlias() + " baseTblSmap: " +
-        baseTblSmap_.debugString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("inline view " + getUniqueAlias() + " smap: " + smap_.debugString());
+      LOG.trace("inline view " + getUniqueAlias() + " baseTblSmap: " +
+          baseTblSmap_.debugString());
+    }
 
     analyzeHints(analyzer);
     // Now do the remaining join analysis

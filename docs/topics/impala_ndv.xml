@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.2.1" id="ndv">
+
+  <title>NDV Function</title>
+  <titlealts audience="PDF"><navtitle>NDV</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">ndv() function</indexterm>
+      An aggregate function that returns an approximate value similar to the result of <codeph>COUNT(DISTINCT
+      <varname>col</varname>)</codeph>, the <q>number of distinct values</q>. It is much faster than the
+      combination of <codeph>COUNT</codeph> and <codeph>DISTINCT</codeph>, and uses a constant amount of memory and
+      thus is less memory-intensive for columns with high cardinality.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>NDV([DISTINCT | ALL] <varname>expression</varname>)</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p rev="1.2.2">
+      This is the mechanism used internally by the <codeph>COMPUTE STATS</codeph> statement for computing the
+      number of distinct values in a column.
+    </p>
+
+    <p>
+      Because this number is an estimate, it might not reflect the precise number of different values in the
+      column, especially if the cardinality is very low or very high. If the estimated number is higher than the
+      number of rows in the table, Impala adjusts the value internally during query planning.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/former_odd_return_type_string"/>
+
+<!-- <p conref="../shared/impala_common.xml#common/restrictions_sliding_window"/> -->
+
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_aggregation_explanation"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_aggregation_example"/>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/analytic_not_allowed_caveat"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following example queries a billion-row table to illustrate the relative performance of
+      <codeph>COUNT(DISTINCT)</codeph> and <codeph>NDV()</codeph>. It shows how <codeph>COUNT(DISTINCT)</codeph>
+      gives a precise answer, but is inefficient for large-scale data where an approximate result is sufficient.
+      The <codeph>NDV()</codeph> function gives an approximate result but is much faster.
+    </p>
+
+<codeblock>select count(distinct col1) from sample_data;
++---------------------+
+| count(distinct col1)|
++---------------------+
+| 100000              |
++---------------------+
+Fetched 1 row(s) in 20.13s
+
+select cast(ndv(col1) as bigint) as col1 from sample_data;
++----------+
+| col1     |
++----------+
+| 139017   |
++----------+
+Fetched 1 row(s) in 8.91s
+</codeblock>
+
+    <p>
+      The following example shows how you can code multiple <codeph>NDV()</codeph> calls in a single query, to
+      easily learn which columns have substantially more or fewer distinct values. This technique is faster than
+      running a sequence of queries with <codeph>COUNT(DISTINCT)</codeph> calls.
+    </p>
+
+<codeblock>select cast(ndv(col1) as bigint) as col1, cast(ndv(col2) as bigint) as col2,
+    cast(ndv(col3) as bigint) as col3, cast(ndv(col4) as bigint) as col4
+  from sample_data;
++----------+-----------+------------+-----------+
+| col1     | col2      | col3       | col4      |
++----------+-----------+------------+-----------+
+| 139017   | 282       | 46         | 145636240 |
++----------+-----------+------------+-----------+
+Fetched 1 row(s) in 34.97s
+
+select count(distinct col1) from sample_data;
++---------------------+
+| count(distinct col1)|
++---------------------+
+| 100000              |
++---------------------+
+Fetched 1 row(s) in 20.13s
+
+select count(distinct col2) from sample_data;
++----------------------+
+| count(distinct col2) |
++----------------------+
+| 278                  |
++----------------------+
+Fetched 1 row(s) in 20.09s
+
+select count(distinct col3) from sample_data;
++-----------------------+
+| count(distinct col3)  |
++-----------------------+
+| 46                    |
++-----------------------+
+Fetched 1 row(s) in 19.12s
+
+select count(distinct col4) from sample_data;
++----------------------+
+| count(distinct col4) |
++----------------------+
+| 147135880            |
++----------------------+
+Fetched 1 row(s) in 266.95s
+</codeblock>
+  </conbody>
+</concept>

@@ -22,7 +22,7 @@
 #include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 
-#include "bufferpool/reservation-tracker-counters.h"
+#include "runtime/bufferpool/reservation-tracker-counters.h"
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"

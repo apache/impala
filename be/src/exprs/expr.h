@@ -165,14 +165,20 @@ class Expr {
   /// expr has an error set.
   Status GetFnContextError(ExprContext* ctx);
 
-  /// Returns true if GetValue(NULL) can be called on this expr and always returns the same
-  /// result (e.g., exprs that don't contain slotrefs). The default implementation returns
+  /// Returns true if the expression is considered constant. This must match the
+  /// definition of Expr.isConstant() in the frontend. The default implementation returns
   /// true if all children are constant.
+  /// TODO: IMPALA-4617 - plumb through the value from the frontend and remove duplicate
+  /// logic.
   virtual bool IsConstant() const;
 
-  /// Returns the slots that are referenced by this expr tree in 'slot_ids'.
-  /// Returns the number of slots added to the vector
-  virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const;
+  /// Returns true if this is a literal expression.
+  virtual bool IsLiteral() const;
+
+  /// Returns the number of SlotRef nodes in the expr tree. If this returns 0, it means it
+  /// is valid to call GetValue(nullptr) on the expr tree.
+  /// If 'slot_ids' is non-null, add the slot ids to it.
+  virtual int GetSlotIds(std::vector<SlotId>* slot_ids = nullptr) const;
 
   /// Returns true iff the expression 'texpr' contains UDF available only as LLVM IR. In
   /// which case, it's impossible to interpret this expression and codegen must be used.
@@ -361,6 +367,7 @@ class Expr {
 
   /// recognize if this node is a slotref in order to speed up GetValue()
   const bool is_slotref_;
+
   /// analysis is done, types are fixed at this point
   const ColumnType type_;
   std::vector<Expr*> children_;

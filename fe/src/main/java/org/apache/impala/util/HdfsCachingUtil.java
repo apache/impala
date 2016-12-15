@@ -130,7 +130,9 @@ public class HdfsCachingUtil {
   public static void uncacheTbl(org.apache.hadoop.hive.metastore.api.Table table)
       throws ImpalaRuntimeException {
     Preconditions.checkNotNull(table);
-    LOG.debug("Uncaching table: " + table.getDbName() + "." + table.getTableName());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Uncaching table: " + table.getDbName() + "." + table.getTableName());
+    }
     Long id = getCacheDirectiveId(table.getParameters());
     if (id == null) return;
     HdfsCachingUtil.removeDirective(id);
@@ -236,8 +238,10 @@ public class HdfsCachingUtil {
 
     bytesNeeded = cacheDir.getStats().getBytesNeeded();
     currentBytesCached = cacheDir.getStats().getBytesCached();
-    LOG.debug(String.format("Waiting on cache directive id: %d. Bytes " +
-        "cached (%d) / needed (%d)", directiveId, currentBytesCached, bytesNeeded));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Waiting on cache directive id: %d. Bytes " +
+          "cached (%d) / needed (%d)", directiveId, currentBytesCached, bytesNeeded));
+    }
     // All the bytes are cached, just return.
     if (bytesNeeded == currentBytesCached) return;
 
@@ -258,9 +262,11 @@ public class HdfsCachingUtil {
       currentBytesCached = cacheDir.getStats().getBytesCached();
       bytesNeeded = cacheDir.getStats().getBytesNeeded();
       if (currentBytesCached == bytesNeeded) {
-        LOG.debug(String.format("Cache directive id: %d has completed." +
-            "Bytes cached (%d) / needed (%d)", directiveId, currentBytesCached,
-            bytesNeeded));
+        if (LOG.isTraceEnabled()) {
+          LOG.trace(String.format("Cache directive id: %d has completed." +
+              "Bytes cached (%d) / needed (%d)", directiveId, currentBytesCached,
+              bytesNeeded));
+        }
         return;
       }
 
@@ -295,7 +301,9 @@ public class HdfsCachingUtil {
         .setPool(poolName)
         .setReplication(replication)
         .setPath(path).build();
-    LOG.debug("Submitting cache directive: " + info.toString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Submitting cache directive: " + info.toString());
+    }
     try {
       return getDfs().addCacheDirective(info);
     } catch (IOException e) {
@@ -347,7 +355,9 @@ public class HdfsCachingUtil {
         .setPool(poolName)
         .setReplication(replication)
         .setPath(path).build();
-    LOG.debug("Modifying cache directive: " + info.toString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Modifying cache directive: " + info.toString());
+    }
     try {
       getDfs().modifyCacheDirective(info);
     } catch (IOException e) {
@@ -362,7 +372,7 @@ public class HdfsCachingUtil {
    * directive.
    */
   private static void removeDirective(long directiveId) throws ImpalaRuntimeException {
-    LOG.debug("Removing cache directive id: " + directiveId);
+    if (LOG.isTraceEnabled()) LOG.trace("Removing cache directive id: " + directiveId);
     try {
       getDfs().removeCacheDirective(directiveId);
     } catch (IOException e) {
@@ -379,7 +389,9 @@ public class HdfsCachingUtil {
    */
   private static CacheDirectiveEntry getDirective(long directiveId)
       throws ImpalaRuntimeException {
-    LOG.trace("Getting cache directive id: " + directiveId);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Getting cache directive id: " + directiveId);
+    }
     CacheDirectiveInfo filter = new CacheDirectiveInfo.Builder()
         .setId(directiveId)
         .build();

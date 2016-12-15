@@ -73,8 +73,8 @@ class Planner {
 
   Status GeneratePlan(const string& stmt, TExecRequest* result) {
     TQueryCtx query_ctx;
-    query_ctx.request.stmt = stmt;
-    query_ctx.request.query_options = query_options_;
+    query_ctx.client_request.stmt = stmt;
+    query_ctx.client_request.query_options = query_options_;
     query_ctx.__set_session(session_state_);
     ImpalaServer::PrepareQueryContext(&query_ctx);
 

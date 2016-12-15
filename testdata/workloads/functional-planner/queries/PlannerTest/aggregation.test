@@ -709,7 +709,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  group by: bool_col, CAST(NULL AS INT)
+|  group by: bool_col, NULL
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
@@ -1037,12 +1037,12 @@ PLAN-ROOT SINK
 |--05:EXCHANGE [HASH(o_custkey)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.orders]
-|     partitions=1/1 files=2 size=54.93MB
+|     partitions=1/1 files=2 size=54.00MB
 |
 04:EXCHANGE [HASH(c_custkey)]
 |
 00:SCAN HDFS [tpch_parquet.customer]
-   partitions=1/1 files=1 size=12.47MB
+   partitions=1/1 files=1 size=12.27MB
    predicates: c_nationkey = 16
    runtime filters: RF000 -> c_custkey
 ====
@@ -1077,12 +1077,12 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [HASH(c_custkey)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.customer]
-|     partitions=1/1 files=1 size=12.47MB
+|     partitions=1/1 files=1 size=12.27MB
 |
 05:EXCHANGE [HASH(o_custkey)]
 |
 00:SCAN HDFS [tpch_parquet.orders]
-   partitions=1/1 files=2 size=54.93MB
+   partitions=1/1 files=2 size=54.00MB
    runtime filters: RF000 -> o_custkey
 ====
 # Distinct grouping aggregation where input is partitioned on distinct and grouping exprs.
@@ -1110,12 +1110,12 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [HASH(c_custkey)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.customer]
-|     partitions=1/1 files=1 size=12.47MB
+|     partitions=1/1 files=1 size=12.27MB
 |
 05:EXCHANGE [HASH(o_custkey)]
 |
 00:SCAN HDFS [tpch_parquet.orders]
-   partitions=1/1 files=2 size=54.93MB
+   partitions=1/1 files=2 size=54.00MB
    runtime filters: RF000 -> o_custkey
 ====
 # Complex aggregation when two joins and an agg end up in same fragment.
@@ -1149,7 +1149,7 @@ PLAN-ROOT SINK
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpch_parquet.customer]
-|     partitions=1/1 files=1 size=12.47MB
+|     partitions=1/1 files=1 size=12.27MB
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey, l_returnflag = o_clerk
@@ -1158,12 +1158,12 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [HASH(o_orderkey,o_clerk)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.orders]
-|     partitions=1/1 files=2 size=54.93MB
+|     partitions=1/1 files=2 size=54.00MB
 |     runtime filters: RF000 -> o_custkey, RF001 -> o_comment
 |
 06:EXCHANGE [HASH(l_orderkey,l_returnflag)]
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   partitions=1/1 files=3 size=195.85MB
+   partitions=1/1 files=3 size=193.61MB
    runtime filters: RF002 -> l_orderkey, RF003 -> l_returnflag
 ====

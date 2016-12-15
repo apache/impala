@@ -191,7 +191,8 @@ struct TQueryOptions {
   // query per backend.
   // > 0: multi-threaded execution mode, with given dop
   // 0: single-threaded execution mode
-  44: optional i32 mt_dop = 0
+  // unset: may be set automatically to > 0 in createExecRequest(), otherwise same as 0
+  44: optional i32 mt_dop
 
   // If true, INSERT writes to S3 go directly to their final location rather than being
   // copied there by the coordinator. We cannot do this for INSERT OVERWRITES because for
@@ -266,8 +267,7 @@ struct TClientRequest {
 // TODO: Separate into FE/BE initialized vars.
 struct TQueryCtx {
   // Client request containing stmt to execute and query options.
-  // TODO: rename to client_request, we have too many requests
-  1: required TClientRequest request
+  1: required TClientRequest client_request
 
   // A globally unique id assigned to the entire query in the BE.
   // The bottom 4 bytes are 0 (for details see be/src/util/uid-util.h).
@@ -311,6 +311,14 @@ struct TQueryCtx {
   // Contains only the union of those descriptors referenced by list of fragments destined
   // for a single host. Optional for frontend tests.
   12: optional Descriptors.TDescriptorTable desc_tbl
+
+  // Milliseconds since UNIX epoch at the start of query execution.
+  13: required i64 start_unix_millis
+
+  // Hint to disable codegen. Set by planner for single-node optimization or by the
+  // backend in NativeEvalExprsWithoutRow() in FESupport. This flag is only advisory to
+  // avoid the overhead of codegen and can be ignored if codegen is needed functionally.
+  14: optional bool disable_codegen_hint = false;
 }
 
 // Context to collect information, which is shared among all instances of that plan

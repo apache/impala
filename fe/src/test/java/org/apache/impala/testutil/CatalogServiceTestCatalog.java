@@ -30,9 +30,10 @@ import org.apache.impala.thrift.TUniqueId;
 public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
 
   public CatalogServiceTestCatalog(boolean loadInBackground, int numLoadingThreads,
-      SentryConfig sentryConfig, TUniqueId catalogServiceId) {
-    super(loadInBackground, numLoadingThreads, sentryConfig, catalogServiceId, null,
-        System.getProperty("java.io.tmpdir"));
+      int initialHmsCnxnTimeoutSec, SentryConfig sentryConfig,
+      TUniqueId catalogServiceId) {
+    super(loadInBackground, numLoadingThreads, initialHmsCnxnTimeoutSec, sentryConfig,
+        catalogServiceId, null, System.getProperty("java.io.tmpdir"));
 
     // Cache pools are typically loaded asynchronously, but as there is no fixed execution
     // order for tests, the cache pools are loaded synchronously before the tests are
@@ -51,7 +52,7 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
    */
   public static CatalogServiceCatalog createWithAuth(SentryConfig config) {
     CatalogServiceCatalog cs =
-        new CatalogServiceTestCatalog(false, 16, config, new TUniqueId());
+        new CatalogServiceTestCatalog(false, 16, 0, config, new TUniqueId());
     try {
       cs.reset();
     } catch (CatalogException e) {

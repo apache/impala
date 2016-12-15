@@ -23,6 +23,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
+#include "runtime/query-state.h"
 
 namespace impala {
 
@@ -38,17 +39,13 @@ class TestEnv {
   void InitTmpFileMgr(const std::vector<std::string>& tmp_dirs, bool one_dir_per_device);
 
   /// Create a RuntimeState for a query with a new block manager and the given query
-  /// options. The RuntimeState is owned by the TestEnv.
+  /// options. The RuntimeState is owned by the TestEnv. Returns an error if
+  /// CreateQueryState() has been called with the same query ID already.
   Status CreateQueryState(int64_t query_id, int max_buffers, int block_size,
-      RuntimeState** runtime_state, TQueryOptions* query_options = NULL);
-
-  /// Create multiple separate RuntimeStates with associated block managers, e.g. as if
-  /// multiple queries were executing. The RuntimeStates are owned by TestEnv.
-  Status CreateQueryStates(int64_t start_query_id, int num_mgrs, int buffers_per_mgr,
-      int block_size, std::vector<RuntimeState*>* runtime_states);
+      const TQueryOptions* query_options, RuntimeState** runtime_state);
 
   /// Destroy all RuntimeStates and block managers created by this TestEnv.
-  void TearDownQueryStates();
+  void TearDownRuntimeStates();
 
   /// Calculate memory limit accounting for overflow and negative values.
   /// If max_buffers is -1, no memory limit will apply.
@@ -63,13 +60,8 @@ class TestEnv {
   TmpFileMgr* tmp_file_mgr() { return tmp_file_mgr_.get(); }
 
  private:
-
   /// Recreate global metric groups.
   void InitMetrics();
-
-  /// Create a new RuntimeState sharing global environment with given query options
-  RuntimeState* CreateRuntimeState(int64_t query_id,
-      TQueryOptions* query_options = NULL);
 
   /// Global state for test environment.
   static boost::scoped_ptr<MetricGroup> static_metrics_;
@@ -78,8 +70,9 @@ class TestEnv {
   boost::scoped_ptr<MetricGroup> metrics_;
   boost::scoped_ptr<TmpFileMgr> tmp_file_mgr_;
 
-  /// Per-query states with associated block managers.
-  vector<std::shared_ptr<RuntimeState>> query_states_;
+  /// Per-query states with associated block managers. Key is the integer query ID passed
+  /// to CreatePerQueryState().
+  std::unordered_map<int64_t, std::shared_ptr<RuntimeState>> runtime_states_;
 };
 
 }

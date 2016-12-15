@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="array">
+
+  <title>ARRAY Complex Type (<keyword keyref="impala23"/> or higher only)</title>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      A complex data type that can represent an arbitrary number of ordered elements.
+      The elements can be scalars or another complex type (<codeph>ARRAY</codeph>,
+      <codeph>STRUCT</codeph>, or <codeph>MAP</codeph>).
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<!-- To do: make sure there is sufficient syntax info under the SELECT statement to understand how to query all the complex types. -->
+
+<codeblock><varname>column_name</varname> ARRAY &lt; <varname>type</varname> &gt;
+
+type ::= <varname>primitive_type</varname> | <varname>complex_type</varname>
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_combo"/>
+
+      <p>
+        The elements of the array have no names. You refer to the value of the array item using the
+        <codeph>ITEM</codeph> pseudocolumn, or its position in the array with the <codeph>POS</codeph>
+        pseudocolumn. See <xref href="impala_complex_types.xml#item"/> for information about
+        these pseudocolumns.
+      </p>
+
+<!-- Array is a frequently used idiom; don't recommend MAP right up front, since that is more rarely used. STRUCT has all different considerations.
+      <p>
+        If it would be logical to have a fixed number of elements and give each one a name, consider using a
+        <codeph>MAP</codeph> (when all elements are of the same type) or a <codeph>STRUCT</codeph> (if different
+        elements have different types) instead of an <codeph>ARRAY</codeph>.
+      </p>
+-->
+
+    <p>
+      Each row can have a different number of elements (including none) in the array for that row.
+    </p>
+
+<!-- Since you don't use numeric indexes, this assertion and advice doesn't make sense.
+      <p>
+        If you attempt to refer to a non-existent array element, the result is <codeph>NULL</codeph>. Therefore,
+        when using operations such as addition or string concatenation involving array elements, you might use
+        conditional functions to substitute default values such as 0 or <codeph>""</codeph> in the place of missing
+        array elements.
+      </p>
+-->
+
+      <p>
+        When an array contains items of scalar types, you can use aggregation functions on the array elements without using join notation. For
+        example, you can find the <codeph>COUNT()</codeph>, <codeph>AVG()</codeph>, <codeph>SUM()</codeph>, and so on of numeric array
+        elements, or the <codeph>MAX()</codeph> and <codeph>MIN()</codeph> of any scalar array elements by referring to
+        <codeph><varname>table_name</varname>.<varname>array_column</varname></codeph> in the <codeph>FROM</codeph> clause of the query. When
+        you need to cross-reference values from the array with scalar values from the same row, such as by including a <codeph>GROUP
+        BY</codeph> clause to produce a separate aggregated result for each row, then the join clause is required.
+      </p>
+
+      <p>
+        A common usage pattern with complex types is to have an array as the top-level type for the column:
+        an array of structs, an array of maps, or an array of arrays.
+        For example, you can model a denormalized table by creating a column that is an <codeph>ARRAY</codeph>
+        of <codeph>STRUCT</codeph> elements; each item in the array represents a row from a table that would
+        normally be used in a join query. This kind of data structure lets you essentially denormalize tables by
+        associating multiple rows from one table with the matching row in another table.
+      </p>
+
+      <p>
+        You typically do not create more than one top-level <codeph>ARRAY</codeph> column, because if there is
+        some relationship between the elements of multiple arrays, it is convenient to model the data as
+        an array of another complex type element (either <codeph>STRUCT</codeph> or <codeph>MAP</codeph>).
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_describe"/>
+
+      <p conref="../shared/impala_common.xml#common/added_in_230"/>
+
+      <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+      <ul conref="../shared/impala_common.xml#common/complex_types_restrictions">
+        <li/>
+      </ul>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <note conref="../shared/impala_common.xml#common/complex_type_schema_pointer"/>
+
+      <p>
+        The following example shows how to construct a table with various kinds of <codeph>ARRAY</codeph> columns,
+        both at the top level and nested within other complex types.
+        Whenever the <codeph>ARRAY</codeph> consists of a scalar value, such as in the <codeph>PETS</codeph>
+        column or the <codeph>CHILDREN</codeph> field, you can see that future expansion is limited.
+        For example, you could not easily evolve the schema to record the kind of pet or the child's birthday alongside the name.
+        Therefore, it is more common to use an <codeph>ARRAY</codeph> whose elements are of <codeph>STRUCT</codeph> type,
+        to associate multiple fields with each array element.
+      </p>
+
+      <note>
+        Practice the <codeph>CREATE TABLE</codeph> and query notation for complex type columns
+        using empty tables, until you can visualize a complex data structure and construct corresponding SQL statements reliably.
+      </note>
+
+<!-- To do: verify and flesh out this example. -->
+
+<codeblock><![CDATA[CREATE TABLE array_demo
+(
+  id BIGINT,
+  name STRING,
+-- An ARRAY of scalar type as a top-level column.
+  pets ARRAY <STRING>,
+
+-- An ARRAY with elements of complex type (STRUCT).
+  places_lived ARRAY < STRUCT <
+    place: STRING,
+    start_year: INT
+  >>,
+
+-- An ARRAY as a field (CHILDREN) within a STRUCT.
+-- (The STRUCT is inside another ARRAY, because it is rare
+-- for a STRUCT to be a top-level column.)
+  marriages ARRAY < STRUCT <
+    spouse: STRING,
+    children: ARRAY <STRING>
+  >>,
+
+-- An ARRAY as the value part of a MAP.
+-- The first MAP field (the key) would be a value such as
+-- 'Parent' or 'Grandparent', and the corresponding array would
+-- represent 2 parents, 4 grandparents, and so on.
+  ancestors MAP < STRING, ARRAY <STRING> >
+)
+STORED AS PARQUET;
+]]>
+</codeblock>
+
+    <p>
+      The following example shows how to examine the structure of a table containing one or more <codeph>ARRAY</codeph> columns by using the
+      <codeph>DESCRIBE</codeph> statement. You can visualize each <codeph>ARRAY</codeph> as its own two-column table, with columns
+      <codeph>ITEM</codeph> and <codeph>POS</codeph>.
+    </p>
+
+<!-- To do: extend the examples to include MARRIAGES and ANCESTORS columns, or get rid of those columns. -->
+
+<codeblock><![CDATA[DESCRIBE array_demo;
++--------------+---------------------------+
+| name         | type                      |
++--------------+---------------------------+
+| id           | bigint                    |
+| name         | string                    |
+| pets         | array<string>             |
+| marriages    | array<struct<             |
+|              |   spouse:string,          |
+|              |   children:array<string>  |
+|              | >>                        |
+| places_lived | array<struct<             |
+|              |   place:string,           |
+|              |   start_year:int          |
+|              | >>                        |
+| ancestors    | map<string,array<string>> |
++--------------+---------------------------+
+
+DESCRIBE array_demo.pets;
++------+--------+
+| name | type   |
++------+--------+
+| item | string |
+| pos  | bigint |
++------+--------+
+
+DESCRIBE array_demo.marriages;
++------+--------------------------+
+| name | type                     |
++------+--------------------------+
+| item | struct<                  |
+|      |   spouse:string,         |
+|      |   children:array<string> |
+|      | >                        |
+| pos  | bigint                   |
++------+--------------------------+
+
+DESCRIBE array_demo.places_lived;
++------+------------------+
+| name | type             |
++------+------------------+
+| item | struct<          |
+|      |   place:string,  |
+|      |   start_year:int |
+|      | >                |
+| pos  | bigint           |
++------+------------------+
+
+DESCRIBE array_demo.ancestors;
++-------+---------------+
+| name  | type          |
++-------+---------------+
+| key   | string        |
+| value | array<string> |
++-------+---------------+
+]]>
+</codeblock>
+
+    <p>
+      The following example shows queries involving <codeph>ARRAY</codeph> columns containing elements of scalar or complex types. You
+      <q>unpack</q> each <codeph>ARRAY</codeph> column by referring to it in a join query, as if it were a separate table with
+      <codeph>ITEM</codeph> and <codeph>POS</codeph> columns. If the array element is a scalar type, you refer to its value using the
+      <codeph>ITEM</codeph> pseudocolumn. If the array element is a <codeph>STRUCT</codeph>, you refer to the <codeph>STRUCT</codeph> fields
+      using dot notation and the field names. If the array element is another <codeph>ARRAY</codeph> or a <codeph>MAP</codeph>, you use
+      another level of join to unpack the nested collection elements.
+    </p>
+
+<!-- To do: have some sample output to show for these queries. -->
+
+<codeblock><![CDATA[-- Array of scalar values.
+-- Each array element represents a single string, plus we know its position in the array.
+SELECT id, name, pets.pos, pets.item FROM array_demo, array_demo.pets;
+
+-- Array of structs.
+-- Now each array element has named fields, possibly of different types.
+-- You can consider an ARRAY of STRUCT to represent a table inside another table.
+SELECT id, name, places_lived.pos, places_lived.item.place, places_lived.item.start_year
+FROM array_demo, array_demo.places_lived;
+
+-- The .ITEM name is optional for array elements that are structs.
+-- The following query is equivalent to the previous one, with .ITEM
+-- removed from the column references.
+SELECT id, name, places_lived.pos, places_lived.place, places_lived.start_year
+  FROM array_demo, array_demo.places_lived;
+
+-- To filter specific items from the array, do comparisons against the .POS or .ITEM
+-- pseudocolumns, or names of struct fields, in the WHERE clause.
+SELECT id, name, pets.item FROM array_demo, array_demo.pets
+  WHERE pets.pos in (0, 1, 3);
+
+SELECT id, name, pets.item FROM array_demo, array_demo.pets
+  WHERE pets.item LIKE 'Mr. %';
+
+SELECT id, name, places_lived.pos, places_lived.place, places_lived.start_year
+  FROM array_demo, array_demo.places_lived
+WHERE places_lived.place like '%California%';
+]]>
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_complex_types.xml#complex_types"/>,
+<!-- <xref href="impala_array.xml#array"/>, -->
+      <xref href="impala_struct.xml#struct"/>, <xref href="impala_map.xml#map"/>
+    </p>
+
+  </conbody>
+
+</concept>

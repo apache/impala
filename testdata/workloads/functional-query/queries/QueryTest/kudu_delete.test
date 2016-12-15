@@ -1,0 +1,370 @@
+====
+---- QUERY
+create table tdata
+  (id int primary key, valf float null, vali bigint null, valv string null,
+   valb boolean null, valt tinyint null, vals smallint null, vald double null)
+  PARTITION BY RANGE (PARTITION VALUES < 100, PARTITION 100 <= VALUES < 1000,
+  PARTITION 1000 <= VALUES <= 10000) STORED AS KUDU
+---- RESULTS
+====
+---- QUERY
+insert into table tdata values
+(1, 1.0, 1, 'one', true, 1, 1, 1),
+(2, -2, 20, 'two', false, 0, 1, NULL),
+(3, 0, NULL, 'three', false, 10, 20, 30),
+(4, 5, 6, 'four', true, 7, 8, 9),
+(5, 0, 10, 'five', NULL, 15, 20, 25),
+(6, 9, 12, 'six', true, -1, -2, cast('inf' as double)),
+(7, NULL, 7, 'seven', false, 77, 777, NULL),
+(8, 0, 80, NULL, true, 10, 11, 12),
+(9, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(127, 1, 2, '127', false, 3, 4, 5)
+---- RESULTS
+: 10
+====
+---- QUERY
+# single row, predicate on key
+delete from tdata where id = 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+3,0,NULL,'three',false,10,20,30
+4,5,6,'four',true,7,8,9
+5,0,10,'five',NULL,15,20,25
+6,9,12,'six',true,-1,-2,Infinity
+7,NULL,7,'seven',false,77,777,NULL
+8,0,80,'NULL',true,10,11,12
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
+127,1,2,'127',false,3,4,5
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# predicate on key, NULL
+delete from tdata where id is NULL
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+3,0,NULL,'three',false,10,20,30
+4,5,6,'four',true,7,8,9
+5,0,10,'five',NULL,15,20,25
+6,9,12,'six',true,-1,-2,Infinity
+7,NULL,7,'seven',false,77,777,NULL
+8,0,80,'NULL',true,10,11,12
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
+127,1,2,'127',false,3,4,5
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# predicate on key, nothing is deleted
+delete from tdata where id = 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+3,0,NULL,'three',false,10,20,30
+4,5,6,'four',true,7,8,9
+5,0,10,'five',NULL,15,20,25
+6,9,12,'six',true,-1,-2,Infinity
+7,NULL,7,'seven',false,77,777,NULL
+8,0,80,'NULL',true,10,11,12
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
+127,1,2,'127',false,3,4,5
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# predicate on key, boundary value
+delete from tdata where id = max_tinyint()
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+3,0,NULL,'three',false,10,20,30
+4,5,6,'four',true,7,8,9
+5,0,10,'five',NULL,15,20,25
+6,9,12,'six',true,-1,-2,Infinity
+7,NULL,7,'seven',false,77,777,NULL
+8,0,80,'NULL',true,10,11,12
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# compound predicate on key
+delete from tdata where id > 6 and id < 8
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+3,0,NULL,'three',false,10,20,30
+4,5,6,'four',true,7,8,9
+5,0,10,'five',NULL,15,20,25
+6,9,12,'six',true,-1,-2,Infinity
+8,0,80,'NULL',true,10,11,12
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# predicate on key, multiple rows
+delete from tdata where id % 4 = 0
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+3,0,NULL,'three',false,10,20,30
+5,0,10,'five',NULL,15,20,25
+6,9,12,'six',true,-1,-2,Infinity
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# insert new values, including some that were previously deleted
+insert into table tdata values
+(10, 20, 30, 'ten', true, 40, 50, 60),
+(1, 1.0, 1, 'one', true, 1, 1, 1),
+(11, -11, 11, 'eleven', false, 1, 11, 111),
+(8, 0, 80, NULL, true, 10, 11, 12)
+====
+---- QUERY
+# single row, predicate on non-key
+delete from tdata where valv = 'five'
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+3,0,NULL,'three',false,10,20,30
+6,9,12,'six',true,-1,-2,Infinity
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
+10,20,30,'ten',true,40,50,60
+1,1.0,1,'one',true,1,1,1
+11,-11,11,'eleven',false,1,11,111
+8,0,80,'NULL',true,10,11,12
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# predicate on non-key, NULL
+delete from tdata where valb is NULL
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+3,0,NULL,'three',false,10,20,30
+6,9,12,'six',true,-1,-2,Infinity
+10,20,30,'ten',true,40,50,60
+1,1.0,1,'one',true,1,1,1
+11,-11,11,'eleven',false,1,11,111
+8,0,80,'NULL',true,10,11,12
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# predicate on non-key, nothing is deleted
+delete from tdata where vals = -100
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+3,0,NULL,'three',false,10,20,30
+6,9,12,'six',true,-1,-2,Infinity
+10,20,30,'ten',true,40,50,60
+1,1.0,1,'one',true,1,1,1
+11,-11,11,'eleven',false,1,11,111
+8,0,80,'NULL',true,10,11,12
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# predicate on non-key, compound predicate
+delete from tdata where valf = 0 and vali = 80
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+3,0,NULL,'three',false,10,20,30
+6,9,12,'six',true,-1,-2,Infinity
+10,20,30,'ten',true,40,50,60
+1,1.0,1,'one',true,1,1,1
+11,-11,11,'eleven',false,1,11,111
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# predicate on non-key, multiple rows
+delete from tdata where vals % 10 = 0
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+6,9,12,'six',true,-1,-2,Infinity
+1,1.0,1,'one',true,1,1,1
+11,-11,11,'eleven',false,1,11,111
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# 'from' syntax - the join results in four deletes, 3 of which fail
+delete a from tdata a, tdata b where a.id = 11
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 3
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+6,9,12,'six',true,-1,-2,Infinity
+1,1.0,1,'one',true,1,1,1
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+# Try to delete a row with a primary key value that is not covered by the existing range
+# partitions. This doesn't actually end up selecting any rows to modify.
+delete from tdata where id = 10001
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+2,-2,20,'two',false,0,1,NULL
+6,9,12,'six',true,-1,-2,Infinity
+1,1.0,1,'one',true,1,1,1
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+insert into tdata
+select cast(id + 100 as int), float_col, bigint_col, string_col, bool_col, tinyint_col,
+smallint_col, double_col
+from functional_kudu.alltypes
+---- RESULTS
+: 7300
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+====
+---- QUERY
+# Test a larger DELETE
+delete from tdata where id > -1
+---- RUNTIME_PROFILE
+NumModifiedRows: 7303
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+---- DML_RESULTS: tdata
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+====
+---- QUERY
+create table multiple_key_cols
+  (string_col string, bigint_col bigint, tinyint_col tinyint,
+   smallint_col smallint, bool_col boolean null, int_col int null,
+   double_col double null, float_col float null,
+   primary key (string_col, bigint_col, tinyint_col, smallint_col))
+  PARTITION BY HASH (string_col) PARTITIONS 16 STORED AS KUDU
+====
+---- QUERY
+insert into multiple_key_cols values
+('a', 1, 2, 3, true, 4, 5, NULL),
+('b', 1, 2, 3, false, 7, NULL, 9),
+('c', 4, 5, 6, true, 0, -1, 0),
+('d', 10, 20, 30, false, NULL, 40, 50)
+---- RESULTS
+: 4
+====
+---- QUERY
+# multiple key cols, predicate on one of them
+delete from multiple_key_cols where bigint_col = 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+---- LABELS
+STRING_COL, BIGINT_COL, TINYINT_COL, SMALLINT_COL, BOOL_COL, INT_COL, DOUBLE_COL, FLOAT_COL
+---- DML_RESULTS: multiple_key_cols
+'c',4,5,6,true,0,-1,0
+'d',10,20,30,false,NULL,40,50
+---- TYPES
+STRING,BIGINT,TINYINT,SMALLINT,BOOLEAN,INT,DOUBLE,FLOAT
+====
+---- QUERY
+# multiple key cols, predicate on non-key col
+delete from multiple_key_cols where bool_col = false
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+STRING_COL, BIGINT_COL, TINYINT_COL, SMALLINT_COL, BOOL_COL, INT_COL, DOUBLE_COL, FLOAT_COL
+---- DML_RESULTS: multiple_key_cols
+'c',4,5,6,true,0,-1,0
+---- TYPES
+STRING,BIGINT,TINYINT,SMALLINT,BOOLEAN,INT,DOUBLE,FLOAT
+====
+---- QUERY
+# IMPALA-3454: A delete that requires a rewrite may not get the Kudu column order correct
+# if the Kudu columns are of different types.
+create table impala_3454 (key_1 tinyint, key_2 bigint, PRIMARY KEY (key_1, key_2))
+  PARTITION BY HASH PARTITIONS 3 STORED AS KUDU
+---- RESULTS
+====
+---- QUERY
+insert into impala_3454 values
+(1, 1),
+(2, 2),
+(3, 3)
+---- RESULTS
+: 3
+====
+---- QUERY
+delete from impala_3454 where key_1 < (select max(key_2) from impala_3454)
+---- RESULTS
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+====
+---- QUERY
+select * from impala_3454
+---- RESULTS
+3,3
+---- TYPES
+TINYINT,BIGINT
+====

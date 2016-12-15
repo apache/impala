@@ -19,19 +19,16 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
-import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarFunction;
-import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.hive.executor.UdfExecutor.JavaUdfDataType;
 import org.apache.impala.thrift.TFunctionBinaryType;
-import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.thrift.TSymbolType;
+
 import com.google.common.base.Preconditions;
 
 /**

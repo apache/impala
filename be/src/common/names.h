@@ -120,6 +120,14 @@ using std::shared_ptr;
 using std::unique_ptr;
 #endif
 
+#ifdef _GLIBCXX_UTILITY
+using std::move;
+#endif
+
+#ifdef _NEW
+using std::nothrow;
+#endif
+
 #ifdef BOOST_THREAD_THREAD_COMMON_HPP
 using boost::thread;
 #endif

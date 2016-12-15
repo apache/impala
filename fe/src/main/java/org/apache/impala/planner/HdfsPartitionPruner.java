@@ -36,14 +36,13 @@ import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
-import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.InternalException;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.slf4j.Logger;
@@ -95,7 +94,7 @@ public class HdfsPartitionPruner {
    */
   public List<HdfsPartition> prunePartitions(
       Analyzer analyzer, List<Expr> conjuncts, boolean allowEmpty)
-      throws InternalException, AnalysisException {
+      throws ImpalaException {
     // Start with creating a collection of partition filters for the applicable conjuncts.
     List<HdfsPartitionFilter> partitionFilters = Lists.newArrayList();
     // Conjuncts that can be evaluated from the partition key values.
@@ -174,7 +173,7 @@ public class HdfsPartitionPruner {
     if (expr instanceof BinaryPredicate) {
       // Evaluate any constant expression in the BE
       try {
-        expr.foldConstantChildren(analyzer);
+        analyzer.getConstantFolder().rewrite(expr, analyzer);
       } catch (AnalysisException e) {
         LOG.error("Error evaluating constant expressions in the BE: " + e.getMessage());
         return false;
@@ -198,7 +197,7 @@ public class HdfsPartitionPruner {
     } else if (expr instanceof InPredicate) {
       // Evaluate any constant expressions in the BE
       try {
-        expr.foldConstantChildren(analyzer);
+        analyzer.getConstantFolder().rewrite(expr, analyzer);
       } catch (AnalysisException e) {
         LOG.error("Error evaluating constant expressions in the BE: " + e.getMessage());
         return false;
@@ -439,7 +438,7 @@ public class HdfsPartitionPruner {
    * filters that could not be evaluated from the partition key values.
    */
   private void evalPartitionFiltersInBe(List<HdfsPartitionFilter> filters,
-      HashSet<Long> matchingPartitionIds, Analyzer analyzer) throws InternalException {
+      HashSet<Long> matchingPartitionIds, Analyzer analyzer) throws ImpalaException {
     Map<Long, HdfsPartition> partitionMap = tbl_.getPartitionMap();
     // Set of partition ids that pass a filter
     HashSet<Long> matchingIds = Sets.newHashSet();

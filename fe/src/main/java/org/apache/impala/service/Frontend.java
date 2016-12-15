@@ -20,13 +20,11 @@ package org.apache.impala.service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -35,22 +33,18 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.impala.catalog.KuduTable;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
 import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.AnalysisContext;
-import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
 import org.apache.impala.analysis.CreateUdaStmt;
 import org.apache.impala.analysis.CreateUdfStmt;
+import org.apache.impala.analysis.DescribeTableStmt;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.DropDataSrcStmt;
 import org.apache.impala.analysis.DropFunctionStmt;
@@ -66,7 +60,6 @@ import org.apache.impala.analysis.ShowGrantRoleStmt;
 import org.apache.impala.analysis.ShowRolesStmt;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TruncateStmt;
-import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
@@ -85,7 +78,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog;
-import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -93,7 +86,6 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
@@ -101,7 +93,6 @@ import org.apache.impala.thrift.TCatalogOpRequest;
 import org.apache.impala.thrift.TCatalogOpType;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumn;
-import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecRequest;
@@ -110,7 +101,6 @@ import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TExecRequest;
-import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExplainResult;
 import org.apache.impala.thrift.TFinalizeParams;
 import org.apache.impala.thrift.TFunctionCategory;
@@ -122,14 +112,15 @@ import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
-import org.apache.impala.thrift.TPlanFragmentTree;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TShowFilesParams;
+import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TTableName;
@@ -141,11 +132,13 @@ import org.apache.impala.util.MembershipSnapshot;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.impala.util.TSessionStateUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -319,11 +312,22 @@ public class Frontend {
           new TColumn("comment", Type.STRING.toThrift())));
     } else if (analysis.isDescribeTableStmt()) {
       ddl.op_type = TCatalogOpType.DESCRIBE_TABLE;
-      ddl.setDescribe_table_params(analysis.getDescribeTableStmt().toThrift());
-      metadata.setColumns(Arrays.asList(
+      DescribeTableStmt descStmt = analysis.getDescribeTableStmt();
+      ddl.setDescribe_table_params(descStmt.toThrift());
+      List<TColumn> columns = Lists.newArrayList(
           new TColumn("name", Type.STRING.toThrift()),
           new TColumn("type", Type.STRING.toThrift()),
-          new TColumn("comment", Type.STRING.toThrift())));
+          new TColumn("comment", Type.STRING.toThrift()));
+      if (descStmt.getTable() instanceof KuduTable
+          && descStmt.getOutputStyle() == TDescribeOutputStyle.MINIMAL) {
+        columns.add(new TColumn("primary_key", Type.STRING.toThrift()));
+        columns.add(new TColumn("nullable", Type.STRING.toThrift()));
+        columns.add(new TColumn("default_value", Type.STRING.toThrift()));
+        columns.add(new TColumn("encoding", Type.STRING.toThrift()));
+        columns.add(new TColumn("compression", Type.STRING.toThrift()));
+        columns.add(new TColumn("block_size", Type.STRING.toThrift()));
+      }
+      metadata.setColumns(columns);
     } else if (analysis.isAlterTableStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -712,7 +716,7 @@ public class Frontend {
   /**
    * Generate result set and schema for a SHOW TABLE STATS command.
    */
-  public TResultSet getTableStats(String dbName, String tableName)
+  public TResultSet getTableStats(String dbName, String tableName, TShowStatsOp op)
       throws ImpalaException {
     Table table = impaladCatalog_.getTable(dbName, tableName);
     if (table instanceof HdfsTable) {
@@ -722,7 +726,11 @@ public class Frontend {
     } else if (table instanceof DataSourceTable) {
       return ((DataSourceTable) table).getTableStats();
     } else if (table instanceof KuduTable) {
-      return ((KuduTable) table).getTableStats();
+      if (op == TShowStatsOp.RANGE_PARTITIONS) {
+        return ((KuduTable) table).getRangePartitions();
+      } else {
+        return ((KuduTable) table).getTableStats();
+      }
     } else {
       throw new InternalException("Invalid table class: " + table.getClass());
     }
@@ -773,16 +781,14 @@ public class Frontend {
    * Throws an exception if the table or db is not found or if there is an error loading
    * the table metadata.
    */
-  public TDescribeResult describeTable(String dbName, String tableName,
-      TDescribeOutputStyle outputStyle, TColumnType tResultStruct)
-          throws ImpalaException {
+  public TDescribeResult describeTable(TTableName tableName,
+      TDescribeOutputStyle outputStyle) throws ImpalaException {
+    Table table = impaladCatalog_.getTable(tableName.db_name, tableName.table_name);
     if (outputStyle == TDescribeOutputStyle.MINIMAL) {
-      StructType resultStruct = (StructType)Type.fromThrift(tResultStruct);
-      return DescribeResultFactory.buildDescribeMinimalResult(resultStruct);
+      return DescribeResultFactory.buildDescribeMinimalResult(table);
     } else {
       Preconditions.checkArgument(outputStyle == TDescribeOutputStyle.FORMATTED ||
           outputStyle == TDescribeOutputStyle.EXTENDED);
-      Table table = impaladCatalog_.getTable(dbName, tableName);
       return DescribeResultFactory.buildDescribeFormattedResult(table);
     }
   }
@@ -839,8 +845,10 @@ public class Frontend {
         return false;
       }
 
-      LOG.trace(String.format("Waiting for table(s) to complete loading: %s",
-          Joiner.on(", ").join(missingTbls)));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format("Waiting for table(s) to complete loading: %s",
+            Joiner.on(", ").join(missingTbls)));
+      }
       getCatalog().waitForCatalogUpdate(MAX_CATALOG_UPDATE_WAIT_TIME_MS);
       missingTbls = getMissingTbls(missingTbls);
       // TODO: Check for query cancellation here.
@@ -879,7 +887,7 @@ public class Frontend {
 
     AnalysisContext analysisCtx = new AnalysisContext(impaladCatalog_, queryCtx,
         authzConfig_);
-    LOG.debug("analyze query " + queryCtx.request.stmt);
+    if (LOG.isTraceEnabled()) LOG.trace("analyze query " + queryCtx.client_request.stmt);
 
     // Run analysis in a loop until it any of the following events occur:
     // 1) Analysis completes successfully.
@@ -888,7 +896,7 @@ public class Frontend {
     try {
       while (true) {
         try {
-          analysisCtx.analyze(queryCtx.request.stmt);
+          analysisCtx.analyze(queryCtx.client_request.stmt);
           Preconditions.checkState(analysisCtx.getAnalyzer().getMissingTbls().isEmpty());
           return analysisCtx.getAnalysisResult();
         } catch (AnalysisException e) {
@@ -898,8 +906,10 @@ public class Frontend {
 
           // Some tables/views were missing, request and wait for them to load.
           if (!requestTblLoadAndWait(missingTbls, MISSING_TBL_LOAD_WAIT_TIMEOUT_MS)) {
-            LOG.info(String.format("Missing tables were not received in %dms. Load " +
-                "request will be retried.", MISSING_TBL_LOAD_WAIT_TIMEOUT_MS));
+            if (LOG.isTraceEnabled()) {
+              LOG.trace(String.format("Missing tables were not received in %dms. Load " +
+                  "request will be retried.", MISSING_TBL_LOAD_WAIT_TIMEOUT_MS));
+            }
           }
         }
       }
@@ -955,7 +965,7 @@ public class Frontend {
     } catch (Exception e) {
       // Turn exceptions into a warning to allow the query to execute.
       LOG.error("Failed to compute resource requirements for query\n" +
-          queryCtx.request.getStmt(), e);
+          queryCtx.client_request.getStmt(), e);
     }
 
     // The fragment at this point has all state set, serialize it to thrift.
@@ -974,16 +984,17 @@ public class Frontend {
       Planner planner, StringBuilder explainString) throws ImpalaException {
     TQueryCtx queryCtx = planner.getQueryCtx();
     AnalysisContext.AnalysisResult analysisResult = planner.getAnalysisResult();
-    boolean isMtExec =
-        analysisResult.isQueryStmt() && queryCtx.request.query_options.mt_dop > 0;
+    boolean isMtExec = analysisResult.isQueryStmt()
+        && queryCtx.client_request.query_options.isSetMt_dop()
+        && queryCtx.client_request.query_options.mt_dop > 0;
 
     List<PlanFragment> planRoots = Lists.newArrayList();
     TQueryExecRequest result = new TQueryExecRequest();
     if (isMtExec) {
-      LOG.debug("create mt plan");
+      LOG.trace("create mt plan");
       planRoots.addAll(planner.createParallelPlans());
     } else {
-      LOG.debug("create plan");
+      LOG.trace("create plan");
       planRoots.add(planner.createPlan().get(0));
     }
 
@@ -998,7 +1009,7 @@ public class Frontend {
     // Optionally disable spilling in the backend. Allow spilling if there are plan hints
     // or if all tables have stats.
     boolean disableSpilling =
-        queryCtx.request.query_options.isDisable_unsafe_spills()
+        queryCtx.client_request.query_options.isDisable_unsafe_spills()
           && !queryCtx.tables_missing_stats.isEmpty()
           && !analysisResult.getAnalyzer().hasPlanHints();
     // for now, always disable spilling for multi-threaded execution
@@ -1030,10 +1041,11 @@ public class Frontend {
     timeline.markEvent("Analysis finished");
     Preconditions.checkNotNull(analysisResult.getStmt());
     TExecRequest result = new TExecRequest();
-    result.setQuery_options(queryCtx.request.getQuery_options());
+    result.setQuery_options(queryCtx.client_request.getQuery_options());
     result.setAccess_events(analysisResult.getAccessEvents());
     result.analysis_warnings = analysisResult.getAnalyzer().getWarnings();
 
+    TQueryOptions queryOptions = queryCtx.client_request.query_options;
     if (analysisResult.isCatalogOp()) {
       result.stmt_type = TStmtType.DDL;
       createCatalogOpRequest(analysisResult, result);
@@ -1041,6 +1053,15 @@ public class Frontend {
       if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
         result.catalog_op_request.setLineage_graph(thriftLineageGraph);
       }
+      // Set MT_DOP=4 for COMPUTE STATS on Parquet tables, unless the user has already
+      // provided another value for MT_DOP.
+      if (!queryOptions.isSetMt_dop() &&
+          analysisResult.isComputeStatsStmt() &&
+          analysisResult.getComputeStatsStmt().isParquetOnly()) {
+        queryOptions.setMt_dop(4);
+      }
+      // If unset, set MT_DOP to 0 to simplify the rest of the code.
+      if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
       // All DDL operations except for CTAS are done with analysis at this point.
       if (!analysisResult.isCreateTableAsSelectStmt()) return result;
     } else if (analysisResult.isLoadDataStmt()) {
@@ -1057,6 +1078,8 @@ public class Frontend {
       result.setSet_query_option_request(analysisResult.getSetStmt().toThrift());
       return result;
     }
+    // If unset, set MT_DOP to 0 to simplify the rest of the code.
+    if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
 
     // create TQueryExecRequest
     Preconditions.checkState(analysisResult.isQueryStmt() || analysisResult.isDmlStmt()
@@ -1084,7 +1107,7 @@ public class Frontend {
     result.setQuery_exec_request(queryExecRequest);
     if (analysisResult.isQueryStmt()) {
       // fill in the metadata
-      LOG.debug("create result set metadata");
+      LOG.trace("create result set metadata");
       result.stmt_type = TStmtType.QUERY;
       result.query_exec_request.stmt_type = result.stmt_type;
       TResultSetMetadata metadata = new TResultSetMetadata();

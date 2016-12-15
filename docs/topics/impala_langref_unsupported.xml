@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="langref_hiveql_delta">
+
+  <title>SQL Differences Between Impala and Hive</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Hive"/>
+      <data name="Category" value="Porting"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">Hive</indexterm>
+      <indexterm audience="Cloudera">HiveQL</indexterm>
+      Impala's SQL syntax follows the SQL-92 standard, and includes many industry extensions in areas such as
+      built-in functions. See <xref href="impala_porting.xml#porting"/> for a general discussion of adapting SQL
+      code from a variety of database systems to Impala.
+    </p>
+
+    <p>
+      Because Impala and Hive share the same metastore database and their tables are often used interchangeably,
+      the following section covers differences between Impala and Hive in detail.
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="langref_hiveql_unsupported">
+
+    <title>HiveQL Features not Available in Impala</title>
+
+    <conbody>
+
+      <p>
+        The current release of Impala does not support the following SQL features that you might be familiar with
+        from HiveQL:
+      </p>
+
+      <!-- To do:
+        Yeesh, too many separate lists of unsupported Hive syntax.
+        Here, the FAQ, and in some of the intro topics.
+        Some discussion in IMP-1061 about how best to reorg.
+        Lots of opportunities for conrefs.
+      -->
+
+      <ul>
+<!-- Now supported in <keyword keyref="impala23_full"/> and higher. Find places on this page (like already done under lateral views) to note the new data type support.
+        <li>
+          Non-scalar data types such as maps, arrays, structs.
+        </li>
+-->
+
+        <li rev="1.2">
+          Extensibility mechanisms such as <codeph>TRANSFORM</codeph>, custom file formats, or custom SerDes.
+        </li>
+
+        <li rev="CDH-41376">
+          The <codeph>DATE</codeph> data type.
+        </li>
+
+        <li>
+          XML and JSON functions.
+        </li>
+
+        <li>
+          Certain aggregate functions from HiveQL: <codeph>covar_pop</codeph>, <codeph>covar_samp</codeph>,
+          <codeph>corr</codeph>, <codeph>percentile</codeph>, <codeph>percentile_approx</codeph>,
+          <codeph>histogram_numeric</codeph>, <codeph>collect_set</codeph>; Impala supports the set of aggregate
+          functions listed in <xref href="impala_aggregate_functions.xml#aggregate_functions"/> and analytic
+          functions listed in <xref href="impala_analytic_functions.xml#analytic_functions"/>.
+        </li>
+
+        <li>
+          Sampling.
+        </li>
+
+        <li>
+          Lateral views. In <keyword keyref="impala23_full"/> and higher, Impala supports queries on complex types
+          (<codeph>STRUCT</codeph>, <codeph>ARRAY</codeph>, or <codeph>MAP</codeph>), using join notation
+          rather than the <codeph>EXPLODE()</codeph> keyword.
+          See <xref href="impala_complex_types.xml#complex_types"/> for details about Impala support for complex types.
+        </li>
+
+        <li>
+          Multiple <codeph>DISTINCT</codeph> clauses per query, although Impala includes some workarounds for this
+          limitation.
+          <note conref="../shared/impala_common.xml#common/multiple_count_distinct"/>
+        </li>
+      </ul>
+
+      <p>
+        User-defined functions (UDFs) are supported starting in Impala 1.2. See <xref href="impala_udf.xml#udfs"/>
+        for full details on Impala UDFs.
+        <ul>
+          <li>
+            <p>
+              Impala supports high-performance UDFs written in C++, as well as reusing some Java-based Hive UDFs.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              Impala supports scalar UDFs and user-defined aggregate functions (UDAFs). Impala does not currently
+              support user-defined table generating functions (UDTFs).
+            </p>
+          </li>
+
+          <li>
+            <p>
+              Only Impala-supported column types are supported in Java-based UDFs.
+            </p>
+          </li>
+
+          <li>
+            <p conref="../shared/impala_common.xml#common/current_user_caveat"/>
+          </li>
+        </ul>
+      </p>
+
+      <p>
+        Impala does not currently support these HiveQL statements:
+      </p>
+
+      <ul>
+        <li>
+          <codeph>ANALYZE TABLE</codeph> (the Impala equivalent is <codeph>COMPUTE STATS</codeph>)
+        </li>
+
+        <li>
+          <codeph>DESCRIBE COLUMN</codeph>
+        </li>
+
+        <li>
+          <codeph>DESCRIBE DATABASE</codeph>
+        </li>
+
+        <li>
+          <codeph>EXPORT TABLE</codeph>
+        </li>
+
+        <li>
+          <codeph>IMPORT TABLE</codeph>
+        </li>
+
+        <li>
+          <codeph>SHOW TABLE EXTENDED</codeph>
+        </li>
+
+        <li>
+          <codeph>SHOW INDEXES</codeph>
+        </li>
+
+        <li>
+          <codeph>SHOW COLUMNS</codeph>
+        </li>
+
+        <li rev="DOCS-656">
+          <codeph>INSERT OVERWRITE DIRECTORY</codeph>; use <codeph>INSERT OVERWRITE <varname>table_name</varname></codeph>
+          or <codeph>CREATE TABLE AS SELECT</codeph> to materialize query results into the HDFS directory associated
+          with an Impala table.
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+
+  <concept id="langref_hiveql_semantics">
+
+    <title>Semantic Differences Between Impala and HiveQL Features</title>
+
+    <conbody>
+
+      <p>
+        This section covers instances where Impala and Hive have similar functionality, sometimes including the
+        same syntax, but there are differences in the runtime semantics of those features.
+      </p>
+
+      <p>
+        <b>Security:</b>
+      </p>
+
+      <p>
+        Impala utilizes the <xref href="http://sentry.incubator.apache.org/" scope="external" format="html">Apache
+        Sentry </xref> authorization framework, which provides fine-grained role-based access control
+        to protect data against unauthorized access or tampering.
+      </p>
+
+      <p>
+        The Hive component included in <ph rev="upstream">CDH 5.1</ph> and higher now includes Sentry-enabled <codeph>GRANT</codeph>,
+        <codeph>REVOKE</codeph>, and <codeph>CREATE/DROP ROLE</codeph> statements. Earlier Hive releases had a
+        privilege system with <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements that were primarily
+        intended to prevent accidental deletion of data, rather than a security mechanism to protect against
+        malicious users.
+      </p>
+
+      <p>
+        Impala can make use of privileges set up through Hive <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements.
+        Impala has its own <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Impala 2.0 and higher.
+        See <xref href="impala_authorization.xml#authorization"/> for the details of authorization in Impala, including
+        how to switch from the original policy file-based privilege model to the Sentry service using privileges
+        stored in the metastore database.
+      </p>
+
+      <p>
+        <b>SQL statements and clauses:</b>
+      </p>
+
+      <p>
+        The semantics of Impala SQL statements varies from HiveQL in some cases where they use similar SQL
+        statement and clause names:
+      </p>
+
+      <ul>
+        <li>
+          Impala uses different syntax and names for query hints, <codeph>[SHUFFLE]</codeph> and
+          <codeph>[NOSHUFFLE]</codeph> rather than <codeph>MapJoin</codeph> or <codeph>StreamJoin</codeph>. See
+          <xref href="impala_joins.xml#joins"/> for the Impala details.
+        </li>
+
+        <li>
+          Impala does not expose MapReduce specific features of <codeph>SORT BY</codeph>, <codeph>DISTRIBUTE
+          BY</codeph>, or <codeph>CLUSTER BY</codeph>.
+        </li>
+
+        <li>
+          Impala does not require queries to include a <codeph>FROM</codeph> clause.
+        </li>
+      </ul>
+
+      <p>
+        <b>Data types:</b>
+      </p>
+
+      <ul>
+        <li>
+          Impala supports a limited set of implicit casts. This can help avoid undesired results from unexpected
+          casting behavior.
+          <ul>
+            <li>
+              Impala does not implicitly cast between string and numeric or Boolean types. Always use
+              <codeph>CAST()</codeph> for these conversions.
+            </li>
+
+            <li>
+              Impala does perform implicit casts among the numeric types, when going from a smaller or less precise
+              type to a larger or more precise one. For example, Impala will implicitly convert a
+              <codeph>SMALLINT</codeph> to a <codeph>BIGINT</codeph> or <codeph>FLOAT</codeph>, but to convert from
+              <codeph>DOUBLE</codeph> to <codeph>FLOAT</codeph> or <codeph>INT</codeph> to <codeph>TINYINT</codeph>
+              requires a call to <codeph>CAST()</codeph> in the query.
+            </li>
+
+            <li>
+              Impala does perform implicit casts from string to timestamp. Impala has a restricted set of literal
+              formats for the <codeph>TIMESTAMP</codeph> data type and the <codeph>from_unixtime()</codeph> format
+              string; see <xref href="impala_timestamp.xml#timestamp"/> for details.
+            </li>
+          </ul>
+          <p>
+            See <xref href="impala_datatypes.xml#datatypes"/> for full details on implicit and explicit casting for
+            all types, and <xref href="impala_conversion_functions.xml#conversion_functions"/> for details about
+            the <codeph>CAST()</codeph> function.
+          </p>
+        </li>
+
+        <li>
+          Impala does not store or interpret timestamps using the local timezone, to avoid undesired results from
+          unexpected time zone issues. Timestamps are stored and interpreted relative to UTC. This difference can
+          produce different results for some calls to similarly named date/time functions between Impala and Hive.
+          See <xref href="impala_datetime_functions.xml#datetime_functions"/> for details about the Impala
+          functions. See <xref href="impala_timestamp.xml#timestamp"/> for a discussion of how Impala handles
+          time zones, and configuration options you can use to make Impala match the Hive behavior more closely
+          when dealing with Parquet-encoded <codeph>TIMESTAMP</codeph> data or when converting between
+          the local time zone and UTC.
+        </li>
+
+        <li>
+          The Impala <codeph>TIMESTAMP</codeph> type can represent dates ranging from 1400-01-01 to 9999-12-31.
+          This is different from the Hive date range, which is 0000-01-01 to 9999-12-31.
+        </li>
+
+        <li>
+          <p conref="../shared/impala_common.xml#common/int_overflow_behavior"/>
+        </li>
+
+      </ul>
+
+      <p>
+        <b>Miscellaneous features:</b>
+      </p>
+
+      <ul>
+        <li>
+          Impala does not provide virtual columns.
+        </li>
+
+        <li>
+          Impala does not expose locking.
+        </li>
+
+        <li>
+          Impala does not expose some configuration properties.
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+</concept>

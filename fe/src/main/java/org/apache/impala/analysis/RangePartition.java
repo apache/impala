@@ -110,26 +110,26 @@ public class RangePartition implements ParseNode {
     throw new IllegalStateException("Not implemented");
   }
 
-  public void analyze(Analyzer analyzer, List<ColumnDef> distributionColDefs)
+  public void analyze(Analyzer analyzer, List<ColumnDef> partColDefs)
       throws AnalysisException {
-    analyzeBoundaryValues(lowerBound_, distributionColDefs, analyzer);
+    analyzeBoundaryValues(lowerBound_, partColDefs, analyzer);
     if (!isSingletonRange_) {
-      analyzeBoundaryValues(upperBound_, distributionColDefs, analyzer);
+      analyzeBoundaryValues(upperBound_, partColDefs, analyzer);
     }
   }
 
   private void analyzeBoundaryValues(List<Expr> boundaryValues,
-      List<ColumnDef> distributionColDefs, Analyzer analyzer) throws AnalysisException {
+      List<ColumnDef> partColDefs, Analyzer analyzer) throws AnalysisException {
     if (!boundaryValues.isEmpty()
-        && boundaryValues.size() != distributionColDefs.size()) {
+        && boundaryValues.size() != partColDefs.size()) {
       throw new AnalysisException(String.format("Number of specified range " +
-          "partition values is different than the number of distribution " +
+          "partition values is different than the number of partitioning " +
           "columns: (%d vs %d). Range partition: '%s'", boundaryValues.size(),
-          distributionColDefs.size(), toSql()));
+          partColDefs.size(), toSql()));
     }
     for (int i = 0; i < boundaryValues.size(); ++i) {
       LiteralExpr literal = analyzeBoundaryValue(boundaryValues.get(i),
-          distributionColDefs.get(i), analyzer);
+          partColDefs.get(i), analyzer);
       Preconditions.checkNotNull(literal);
       boundaryValues.set(i, literal);
     }
@@ -162,7 +162,7 @@ public class RangePartition implements ParseNode {
     if (!org.apache.impala.catalog.Type.isImplicitlyCastable(literalType, colType,
         true)) {
       throw new AnalysisException(String.format("Range partition value %s " +
-          "(type: %s) is not type compatible with distribution column '%s' (type: %s).",
+          "(type: %s) is not type compatible with partitioning column '%s' (type: %s).",
           literal.toSql(), literalType, pkColumn.getColName(), colType.toSql()));
     }
     if (!literalType.equals(colType)) {

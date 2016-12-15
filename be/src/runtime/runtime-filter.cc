@@ -25,6 +25,8 @@ using namespace impala;
 
 const int RuntimeFilter::SLEEP_PERIOD_MS = 20;
 
+const char* RuntimeFilter::LLVM_CLASS_NAME = "class.impala::RuntimeFilter";
+
 bool RuntimeFilter::WaitForArrival(int32_t timeout_ms) const {
   do {
     if (HasBloomFilter()) return true;

@@ -49,6 +49,8 @@ class ExprContext {
 
   /// Prepare expr tree for evaluation.
   /// Allocations from this context will be counted against 'tracker'.
+  /// If Prepare() is called, Close() must be called before destruction to release
+  /// resources, regardless of whether Prepare() succeeded.
   Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
                  MemTracker* tracker);
 
@@ -68,28 +70,27 @@ class ExprContext {
   Status Clone(RuntimeState* state, ExprContext** new_context);
 
   /// Closes all FunctionContexts. Must be called on every ExprContext, including clones.
+  /// Has no effect if already closed.
   void Close(RuntimeState* state);
 
   /// Calls the appropriate Get*Val() function on this context's expr tree and stores the
   /// result in result_.
   void* GetValue(const TupleRow* row);
 
-  /// Convenience function: extract value into col_val and sets the
-  /// appropriate __isset flag.
-  /// If the value is NULL and as_ascii is false, nothing is set.
-  /// If 'as_ascii' is true, writes the value in ascii into stringVal
-  /// (nulls turn into "NULL");
-  /// if it is false, the specific field in col_val that receives the value is
-  /// based on the type of the expr:
+  /// Convenience function for evaluating Exprs that don't reference slots from the FE.
+  /// Extracts value into 'col_val' and sets the appropriate __isset flag. No fields are
+  /// set for NULL values. The specific field in 'col_val' that receives the value is
+  /// based on the expr type:
   /// TYPE_BOOLEAN: boolVal
   /// TYPE_TINYINT/SMALLINT/INT: intVal
   /// TYPE_BIGINT: longVal
   /// TYPE_FLOAT/DOUBLE: doubleVal
-  /// TYPE_STRING: stringVal
-  /// TYPE_TIMESTAMP: stringVal
-  /// Note: timestamp is converted to string via RawValue::PrintValue because HiveServer2
-  /// requires timestamp in a string format.
-  void GetValue(const TupleRow* row, bool as_ascii, TColumnValue* col_val);
+  /// TYPE_STRING: binaryVal. Do not populate stringVal directly because BE/FE
+  ///              conversions do not work properly for strings with ASCII chars
+  ///              above 127. Pass the raw bytes so the caller can decide what to
+  ///              do with the result (e.g., bail constant folding).
+  /// TYPE_TIMESTAMP: binaryVal has the raw data, stringVal its string representation.
+  void EvaluateWithoutRow(TColumnValue* col_val);
 
   /// Convenience functions: print value into 'str' or 'stream'.  NULL turns into "NULL".
   void PrintValue(const TupleRow* row, std::string* str);

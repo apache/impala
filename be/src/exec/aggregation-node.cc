@@ -158,14 +158,15 @@ Status AggregationNode::Prepare(RuntimeState* state) {
       vector<ExprContext*>(), 1, true,  vector<bool>(build_expr_ctxs_.size(), true), id(),
       mem_tracker(), vector<RuntimeFilter*>(), true));
 
-  if (!state->codegen_enabled()) {
-    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
-  }
+  AddCodegenDisabledMessage(state);
   return Status::OK();
 }
 
 void AggregationNode::Codegen(RuntimeState* state) {
-  DCHECK(state->codegen_enabled());
+  DCHECK(state->ShouldCodegen());
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+
   bool codegen_enabled = false;
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
@@ -180,7 +181,6 @@ void AggregationNode::Codegen(RuntimeState* state) {
     }
   }
   runtime_profile()->AddCodegenMsg(codegen_enabled);
-  ExecNode::Codegen(state);
 }
 
 Status AggregationNode::Open(RuntimeState* state) {

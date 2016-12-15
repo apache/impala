@@ -245,7 +245,9 @@ public final class RuntimeFilterGenerator {
       // Ensure that the targer expr does not contain TupleIsNull predicates as these
       // can't be evaluated at a scan node.
       targetExpr = TupleIsNullPredicate.unwrapExpr(targetExpr.clone());
-      LOG.trace("Generating runtime filter from predicate " + joinPredicate);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Generating runtime filter from predicate " + joinPredicate);
+      }
       return new RuntimeFilter(idGen.getNextId(), filterSrcNode,
           srcExpr, targetExpr, targetSlots);
     }
@@ -424,7 +426,7 @@ public final class RuntimeFilterGenerator {
     }
     for (RuntimeFilter filter:
          filters.subList(0, Math.min(filters.size(), maxNumFilters))) {
-      LOG.trace("Runtime filter: " + filter.debugString());
+      if (LOG.isTraceEnabled()) LOG.trace("Runtime filter: " + filter.debugString());
       filter.assignToPlanNodes();
     }
   }
@@ -443,13 +445,13 @@ public final class RuntimeFilterGenerator {
   /**
    * Generates the runtime filters for a query by recursively traversing the single-node
    * plan tree rooted at 'root'. In the top-down traversal of the plan tree, candidate
-   * runtime filters are generated from equi-join predicates. In the bottom-up traversal
-   * of the plan tree, the filters are assigned to destination (scan) nodes. Filters
-   * that cannot be assigned to a scan node are discarded.
+   * runtime filters are generated from equi-join predicates assigned to hash-join nodes.
+   * In the bottom-up traversal of the plan tree, the filters are assigned to destination
+   * (scan) nodes. Filters that cannot be assigned to a scan node are discarded.
    */
   private void generateFilters(Analyzer analyzer, PlanNode root) {
-    if (root instanceof JoinNode) {
-      JoinNode joinNode = (JoinNode) root;
+    if (root instanceof HashJoinNode) {
+      HashJoinNode joinNode = (HashJoinNode) root;
       List<Expr> joinConjuncts = Lists.newArrayList();
       if (!joinNode.getJoinOp().isLeftOuterJoin()
           && !joinNode.getJoinOp().isFullOuterJoin()

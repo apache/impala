@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.0.0" id="query_timeout_s">
+
+  <title>QUERY_TIMEOUT_S Query Option (<keyword keyref="impala20"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>QUERY_TIMEOUT_S</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.0.0">
+      <indexterm audience="Cloudera">QUERY_TIMEOUT_S query option</indexterm>
+      Sets the idle query timeout value for the session, in seconds. Queries that sit idle for longer than the
+      timeout value are automatically cancelled. If the system administrator specified the
+      <codeph>--idle_query_timeout</codeph> startup option, <codeph>QUERY_TIMEOUT_S</codeph> must be smaller than
+      or equal to the <codeph>--idle_query_timeout</codeph> value.
+    </p>
+
+    <note conref="../shared/impala_common.xml#common/timeout_clock_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>SET QUERY_TIMEOUT_S=<varname>seconds</varname>;</codeblock>
+
+<!-- Don't have a compelling example to show at this time because the 'idle' aspect only applies
+     when the client is careless and leaves the query open. Can't easily demonstrate in impala-shell.
+
+     <p conref="../shared/impala_common.xml#common/example_blurb"/>
+-->
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p>
+      <b>Default:</b> 0 (no timeout if <codeph>--idle_query_timeout</codeph> not in effect; otherwise, use
+      <codeph>--idle_query_timeout</codeph> value)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_20"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_timeouts.xml#timeouts"/>
+    </p>
+  </conbody>
+</concept>

@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.common.AnalysisException;
@@ -87,8 +88,8 @@ public class CreateTableStmt extends StatementBase {
   public List<ColumnDef> getPartitionColumnDefs() {
     return tableDef_.getPartitionColumnDefs();
   }
-  public List<DistributeParam> getDistributeParams() {
-    return tableDef_.getDistributeParams();
+  public List<KuduPartitionParam> getKuduPartitionParams() {
+    return tableDef_.getKuduPartitionParams();
   }
   public String getComment() { return tableDef_.getComment(); }
   Map<String, String> getTblProperties() { return tableDef_.getTblProperties(); }
@@ -145,8 +146,8 @@ public class CreateTableStmt extends StatementBase {
     params.setIf_not_exists(getIfNotExists());
     params.setTable_properties(getTblProperties());
     params.setSerde_properties(getSerdeProperties());
-    for (DistributeParam d: getDistributeParams()) {
-      params.addToDistribute_by(d.toThrift());
+    for (KuduPartitionParam d: getKuduPartitionParams()) {
+      params.addToPartition_by(d.toThrift());
     }
     for (ColumnDef pkColDef: getPrimaryKeyColumnDefs()) {
       params.addToPrimary_key_column_names(pkColDef.getColName());
@@ -187,8 +188,8 @@ public class CreateTableStmt extends StatementBase {
           getTblProperties().get(KuduTable.KEY_STORAGE_HANDLER))) {
         throw new AnalysisException(KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
       }
-      AnalysisUtils.throwIfNotEmpty(getDistributeParams(),
-          "Only Kudu tables can use the DISTRIBUTE BY clause.");
+      AnalysisUtils.throwIfNotEmpty(getKuduPartitionParams(),
+          "Only Kudu tables can use the PARTITION BY clause.");
       if (hasPrimaryKey()) {
         throw new AnalysisException("Only Kudu tables can specify a PRIMARY KEY.");
       }
@@ -197,7 +198,7 @@ public class CreateTableStmt extends StatementBase {
 
     analyzeKuduTableProperties(analyzer);
     if (isExternal()) {
-      analyzeExternalKuduTableParams();
+      analyzeExternalKuduTableParams(analyzer);
     } else {
       analyzeManagedKuduTableParams(analyzer);
     }
@@ -238,7 +239,17 @@ public class CreateTableStmt extends StatementBase {
   /**
    * Analyzes and checks parameters specified for external Kudu tables.
    */
-  private void analyzeExternalKuduTableParams() throws AnalysisException {
+  private void analyzeExternalKuduTableParams(Analyzer analyzer)
+      throws AnalysisException {
+    if (analyzer.getAuthzConfig().isEnabled()) {
+      // Today there is no comprehensive way of enforcing a Sentry authorization policy
+      // against tables stored in Kudu. This is why only users with ALL privileges on
+      // SERVER may create external Kudu tables. See IMPALA-4000 for details.
+      String authzServer = analyzer.getAuthzConfig().getServerName();
+      Preconditions.checkNotNull(authzServer);
+      analyzer.registerPrivReq(new PrivilegeRequestBuilder().onServer(
+          authzServer).all().toRequest());
+    }
     AnalysisUtils.throwIfNull(getTblProperties().get(KuduTable.KEY_TABLE_NAME),
         String.format("Table property %s must be specified when creating " +
             "an external Kudu table.", KuduTable.KEY_TABLE_NAME));
@@ -252,8 +263,8 @@ public class CreateTableStmt extends StatementBase {
             KuduTable.KEY_TABLET_REPLICAS));
     AnalysisUtils.throwIfNotEmpty(getColumnDefs(),
         "Columns cannot be specified with an external Kudu table.");
-    AnalysisUtils.throwIfNotEmpty(getDistributeParams(),
-        "DISTRIBUTE BY cannot be used with an external Kudu table.");
+    AnalysisUtils.throwIfNotEmpty(getKuduPartitionParams(),
+        "PARTITION BY cannot be used with an external Kudu table.");
   }
 
   /**
@@ -294,29 +305,29 @@ public class CreateTableStmt extends StatementBase {
       }
     }
 
-    if (!getDistributeParams().isEmpty()) {
-      analyzeDistributeParams(analyzer);
+    if (!getKuduPartitionParams().isEmpty()) {
+      analyzeKuduPartitionParams(analyzer);
     } else {
-      throw new AnalysisException("Table distribution must be specified for " +
+      throw new AnalysisException("Table partitioning must be specified for " +
           "managed Kudu tables.");
     }
   }
 
   /**
-   * Analyzes the distribution schemes specified in the CREATE TABLE statement.
+   * Analyzes the partitioning schemes specified in the CREATE TABLE statement.
    */
-  private void analyzeDistributeParams(Analyzer analyzer) throws AnalysisException {
+  private void analyzeKuduPartitionParams(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(getFileFormat() == THdfsFileFormat.KUDU);
     Map<String, ColumnDef> pkColDefsByName =
         ColumnDef.mapByColumnNames(getPrimaryKeyColumnDefs());
-    for (DistributeParam distributeParam: getDistributeParams()) {
-      // If no column names were specified in this distribution scheme, use all the
+    for (KuduPartitionParam partitionParam: getKuduPartitionParams()) {
+      // If no column names were specified in this partitioning scheme, use all the
       // primary key columns.
-      if (!distributeParam.hasColumnNames()) {
-        distributeParam.setColumnNames(pkColDefsByName.keySet());
+      if (!partitionParam.hasColumnNames()) {
+        partitionParam.setColumnNames(pkColDefsByName.keySet());
       }
-      distributeParam.setPkColumnDefMap(pkColDefsByName);
-      distributeParam.analyze(analyzer);
+      partitionParam.setPkColumnDefMap(pkColDefsByName);
+      partitionParam.analyze(analyzer);
     }
   }
 

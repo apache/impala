@@ -55,7 +55,7 @@ HdfsSequenceScanner::~HdfsSequenceScanner() {
 Status HdfsSequenceScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ExprContext*>& conjunct_ctxs, Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = NULL;
-  DCHECK(node->runtime_state()->codegen_enabled());
+  DCHECK(node->runtime_state()->ShouldCodegen());
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
   DCHECK(codegen != NULL);
   Function* write_complete_tuple_fn;

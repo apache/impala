@@ -1008,3 +1008,25 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=3/11 files=3 size=222.34KB
 ====
+# IMPALA-4470: Partition pruning with a constant expr that evaluates to NaN/infinity.
+# 0 / 0 --> NaN and 1 / 0 --> Infinity
+select * from functional.alltypes
+where year = (cast(0 as double) / cast(0 as double))
+  and month = (cast(1 as float) / cast(0 as float))
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=0/24 files=0 size=0B
+====
+# IMPALA-4592: Test that we bail on evaluating non-deterministic predicates when trying
+# to prune partitions.
+select * from functional.alltypes where rand() > 100
+---- PLAN
+not implemented: Unsupported non-deterministic predicate: rand() > 100
+====
+# IMPALA-4592: Same as above but the predicate references a partition column.
+select * from functional.alltypes where rand() > year
+---- PLAN
+not implemented: Unsupported non-deterministic predicate: rand() > year
+====

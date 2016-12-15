@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="schedule_random_replica" rev="2.5.0">
+
+  <title>SCHEDULE_RANDOM_REPLICA Query Option (<keyword keyref="impala25"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>SCHEDULE_RANDOM_REPLICA</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.5.0">
+      <indexterm audience="Cloudera">SCHEDULE_RANDOM_REPLICA query option</indexterm>
+    </p>
+
+    <p>
+      The <codeph>SCHEDULE_RANDOM_REPLICA</codeph> query option fine-tunes the algorithm for deciding which host
+      processes each HDFS data block. It only applies to tables and partitions that are not enabled
+      for the HDFS caching feature.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+
+    <p conref="../shared/impala_common.xml#common/default_false"/>
+
+    <p conref="../shared/impala_common.xml#common/added_in_250"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      In the presence of HDFS cached replicas, Impala randomizes
+      which host processes each cached data block.
+      To ensure that HDFS data blocks are cached on more
+      than one host, use the <codeph>WITH REPLICATION</codeph> clause along with
+      the <codeph>CACHED IN</codeph> clause in a
+      <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph> statement.
+      Specify a replication value greater than or equal to the HDFS block replication factor.
+    </p>
+
+    <p>
+      The <codeph>SCHEDULE_RANDOM_REPLICA</codeph> query option applies to tables and partitions
+      that <i>do not</i> use HDFS caching.
+      By default, Impala estimates how much work each host has done for
+      the query, and selects the host that has the lowest workload.
+      This algorithm is intended to reduce CPU hotspots arising when the
+      same host is selected to process multiple data blocks, but hotspots
+      might still arise for some combinations of queries and data layout.
+      When the <codeph>SCHEDULE_RANDOM_REPLICA</codeph> option is enabled,
+      Impala further randomizes the scheduling algorithm for non-HDFS cached blocks,
+      which can further reduce the chance of CPU hotspots.
+    </p>
+
+    <p rev="CDH-43739 IMPALA-2979">
+      This query option works in conjunction with the work scheduling improvements
+      in <keyword keyref="impala25_full"/> and higher. The scheduling improvements
+      distribute the processing for cached HDFS data blocks to minimize hotspots:
+      if a data block is cached on more than one host, Impala chooses which host
+      to process each block based on which host has read the fewest bytes during
+      the current query. Enable <codeph>SCHEDULE_RANDOM_REPLICA</codeph> setting if CPU hotspots
+      still persist because of cases where hosts are <q>tied</q> in terms of
+      the amount of work done; by default, Impala picks the first eligible host
+      in this case.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/>,
+      <xref href="impala_scalability.xml#scalability_hotspots"/>
+      , <xref href="impala_replica_preference.xml#replica_preference"/>
+    </p>
+
+  </conbody>
+</concept>

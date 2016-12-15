@@ -286,19 +286,25 @@ def apply_error_match_filter(error_list, replace_filenames=True):
   return [replace_fn(row) for row in error_list]
 
 def verify_raw_results(test_section, exec_result, file_format, update_section=False,
-                       replace_filenames=True):
+                       replace_filenames=True, result_section='RESULTS'):
   """
-  Accepts a raw exec_result object and verifies it matches the expected results.
+  Accepts a raw exec_result object and verifies it matches the expected results,
+  including checking the ERRORS, TYPES, and LABELS test sections.
   If update_section is true, updates test_section with the actual results
   if they don't match the expected results. If update_section is false, failed
   verifications result in assertion failures, otherwise they are ignored.
 
   This process includes the parsing/transformation of the raw data results into the
   result format used in the tests.
+
+  The result_section parameter can be used to make this function check the results in
+  a DML_RESULTS section instead of the regular RESULTS section.
+  TODO: separate out the handling of sections like ERRORS from checking of query results
+  to allow regular RESULTS/ERRORS sections in tests with DML_RESULTS (IMPALA-4471).
   """
   expected_results = None
-  if 'RESULTS' in test_section:
-    expected_results = remove_comments(test_section['RESULTS'])
+  if result_section in test_section:
+    expected_results = remove_comments(test_section[result_section])
   else:
     assert 'ERRORS' not in test_section, "'ERRORS' section must have accompanying 'RESULTS' section"
     LOG.info("No results found. Skipping verification");
@@ -398,7 +404,7 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
     VERIFIER_MAP[verifier](expected, actual)
   except AssertionError:
     if update_section:
-      test_section['RESULTS'] = join_section_lines(actual.result_list)
+      test_section[results_section] = join_section_lines(actual.result_list)
     else:
       raise
 

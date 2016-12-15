@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="union">
+
+  <title>UNION Clause</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>UNION</codeph> clause lets you combine the result sets of multiple queries. By default, the
+      result sets are combined as if the <codeph>DISTINCT</codeph> operator was applied.
+<!--
+Because duplicate elimination can be a memory-intensive process, the more useful
+variation for most Impala queries is <codeph>UNION ALL</codeph>, which returns
+all results from both queries, even if there are duplicates.
+-->
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>query_1</varname> UNION [DISTINCT | ALL] <varname>query_2</varname></codeblock>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      The <codeph>UNION</codeph> keyword by itself is the same as <codeph>UNION DISTINCT</codeph>. Because
+      eliminating duplicates can be a memory-intensive process for a large result set, prefer <codeph>UNION
+      ALL</codeph> where practical. (That is, when you know the different queries in the union will not produce any
+      duplicates, or where the duplicate values are acceptable.)
+    </p>
+
+    <p rev="obwl">
+      When an <codeph>ORDER BY</codeph> clause applies to a <codeph>UNION ALL</codeph> or <codeph>UNION</codeph>
+      query, in Impala 1.4 and higher, the <codeph>LIMIT</codeph> clause is no longer required. To make the
+      <codeph>ORDER BY</codeph> and <codeph>LIMIT</codeph> clauses apply to the entire result set, turn the
+      <codeph>UNION</codeph> query into a subquery, <codeph>SELECT</codeph> from the subquery, and put the
+      <codeph>ORDER BY</codeph> clause at the end, outside the subquery.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      First, we set up some sample data, including duplicate <codeph>1</codeph> values.
+    </p>
+
+<codeblock rev="obwl">[localhost:21000] &gt; create table few_ints (x int);
+[localhost:21000] &gt; insert into few_ints values (1), (1), (2), (3);
+[localhost:21000] &gt; set default_order_by_limit=1000;</codeblock>
+
+    <p>
+      This example shows how <codeph>UNION ALL</codeph> returns all rows from both queries, without any additional
+      filtering to eliminate duplicates. For the large result sets common with Impala queries, this is the most
+      memory-efficient technique.
+    </p>
+
+<codeblock>[localhost:21000] &gt; select x from few_ints order by x;
++---+
+| x |
++---+
+| 1 |
+| 1 |
+| 2 |
+| 3 |
++---+
+Returned 4 row(s) in 0.41s
+[localhost:21000] &gt; select x from few_ints union all select x from few_ints;
++---+
+| x |
++---+
+| 1 |
+| 1 |
+| 2 |
+| 3 |
+| 1 |
+| 1 |
+| 2 |
+| 3 |
++---+
+Returned 8 row(s) in 0.42s
+[localhost:21000] &gt; select * from (select x from few_ints union all select x from few_ints) as t1 order by x;
++---+
+| x |
++---+
+| 1 |
+| 1 |
+| 1 |
+| 1 |
+| 2 |
+| 2 |
+| 3 |
+| 3 |
++---+
+Returned 8 row(s) in 0.53s
+[localhost:21000] &gt; select x from few_ints union all select 10;
++----+
+| x  |
++----+
+| 10 |
+| 1  |
+| 1  |
+| 2  |
+| 3  |
++----+
+Returned 5 row(s) in 0.38s</codeblock>
+
+    <p>
+      This example shows how the <codeph>UNION</codeph> clause without the <codeph>ALL</codeph> keyword condenses
+      the result set to eliminate all duplicate values, making the query take more time and potentially more
+      memory. The extra processing typically makes this technique not recommended for queries that return result
+      sets with millions or billions of values.
+    </p>
+
+<codeblock>[localhost:21000] &gt; select x from few_ints union select x+1 from few_ints;
++---+
+| x |
++---+
+| 3 |
+| 4 |
+| 1 |
+| 2 |
++---+
+Returned 4 row(s) in 0.51s
+[localhost:21000] &gt; select x from few_ints union select 10;
++----+
+| x  |
++----+
+| 2  |
+| 10 |
+| 1  |
+| 3  |
++----+
+Returned 4 row(s) in 0.49s
+[localhost:21000] &gt; select * from (select x from few_ints union select x from few_ints) as t1 order by x;
++---+
+| x |
++---+
+| 1 |
+| 2 |
+| 3 |
++---+
+Returned 3 row(s) in 0.53s</codeblock>
+  </conbody>
+</concept>

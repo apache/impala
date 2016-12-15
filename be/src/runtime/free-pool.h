@@ -23,6 +23,7 @@
 #include <string.h>
 #include <string>
 #include <sstream>
+#include "common/atomic.h"
 #include "common/logging.h"
 #include "gutil/bits.h"
 #include "runtime/mem-pool.h"
@@ -60,9 +61,8 @@ class FreePool {
   uint8_t* Allocate(int64_t size) {
     DCHECK_GE(size, 0);
 #ifndef NDEBUG
-    static int32_t alloc_counts = 0;
     if (FLAGS_stress_free_pool_alloc > 0 &&
-        (++alloc_counts % FLAGS_stress_free_pool_alloc) == 0) {
+        (alloc_counts_.Add(1) % FLAGS_stress_free_pool_alloc) == 0) {
       return NULL;
     }
 #endif
@@ -121,9 +121,8 @@ class FreePool {
   /// free the memory buffer pointed to by "ptr" in this case.
   uint8_t* Reallocate(uint8_t* ptr, int64_t size) {
 #ifndef NDEBUG
-    static int32_t alloc_counts = 0;
     if (FLAGS_stress_free_pool_alloc > 0 &&
-        (++alloc_counts % FLAGS_stress_free_pool_alloc) == 0) {
+        (alloc_counts_.Add(1) % FLAGS_stress_free_pool_alloc) == 0) {
       return NULL;
     }
 #endif
@@ -209,6 +208,12 @@ class FreePool {
 
   /// Diagnostic counter that tracks (# Allocates - # Frees)
   int64_t net_allocations_;
+
+#ifndef NDEBUG
+  /// Counter for tracking the number of allocations. Used only if the
+  /// the stress flag FLAGS_stress_free_pool_alloc is set.
+  static AtomicInt32 alloc_counts_;
+#endif
 };
 
 }

@@ -440,20 +440,6 @@ BOOLEAN
 true
 ====
 ---- QUERY
-select count_rows() from functional.alltypestiny
----- TYPES
-BIGINT
----- RESULTS
-1
-2
-3
-4
-5
-6
-7
-8
-====
----- QUERY
 select constant_arg(1), constant_arg(int_col) from functional.alltypestiny limit 1;
 ---- TYPES
 int,int
@@ -535,4 +521,11 @@ select twenty_args(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20);
 INT
 ---- RESULTS
 210
+====
+---- QUERY
+select pow(3,2), xpow(3,2);
+---- TYPES
+DOUBLE, DOUBLE
+---- RESULTS
+9,9
 ====

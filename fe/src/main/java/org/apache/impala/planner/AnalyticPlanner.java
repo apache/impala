@@ -310,7 +310,9 @@ public class AnalyticPlanner {
 
     SortInfo sortInfo = new SortInfo(
         Expr.substituteList(sortExprs, sortSmap, analyzer_, false), isAsc, nullsFirst);
-    LOG.trace("sortinfo exprs: " + Expr.debugString(sortInfo.getOrderingExprs()));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("sortinfo exprs: " + Expr.debugString(sortInfo.getOrderingExprs()));
+    }
     sortInfo.setMaterializedTupleInfo(sortTupleDesc, sortSlotExprs);
     return sortInfo;
   }
@@ -373,7 +375,9 @@ public class AnalyticPlanner {
       sortTupleId = sortNode.tupleIds_.get(0);
       bufferedTupleDesc =
           analyzer_.getDescTbl().copyTupleDescriptor(sortTupleId, "buffered-tuple");
-      LOG.trace("desctbl: " + analyzer_.getDescTbl().debugString());
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("desctbl: " + analyzer_.getDescTbl().debugString());
+      }
 
       List<SlotDescriptor> inputSlots = analyzer_.getTupleDesc(sortTupleId).getSlots();
       List<SlotDescriptor> bufferedSlots = bufferedTupleDesc.getSlots();
@@ -399,7 +403,9 @@ public class AnalyticPlanner {
         partitionByEq = createNullMatchingEquals(
             Expr.substituteList(windowGroup.partitionByExprs, sortSmap, analyzer_, false),
             sortTupleId, bufferedSmap);
-        LOG.trace("partitionByEq: " + partitionByEq.debugString());
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("partitionByEq: " + partitionByEq.debugString());
+        }
       }
       Expr orderByEq = null;
       if (!windowGroup.orderByElements.isEmpty()) {
@@ -407,7 +413,9 @@ public class AnalyticPlanner {
             OrderByElement.getOrderByExprs(OrderByElement.substitute(
                 windowGroup.orderByElements, sortSmap, analyzer_)),
             sortTupleId, bufferedSmap);
-        LOG.trace("orderByEq: " + orderByEq.debugString());
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("orderByEq: " + orderByEq.debugString());
+        }
       }
 
       root = new AnalyticEvalNode(ctx_.getNextNodeId(), root,

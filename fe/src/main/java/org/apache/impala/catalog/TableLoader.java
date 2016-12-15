@@ -55,7 +55,7 @@ public class TableLoader {
    */
   public Table load(Db db, String tblName) {
     String fullTblName = db.getName() + "." + tblName;
-    LOG.info("Loading metadata for: " + fullTblName);
+    if (LOG.isTraceEnabled()) LOG.trace("Loading metadata for: " + fullTblName);
     Table table;
     // turn all exceptions into TableLoadingException
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {

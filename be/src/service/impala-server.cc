@@ -54,7 +54,6 @@
 #include "runtime/lib-cache.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/tmp-file-mgr.h"
-#include "service/fragment-exec-state.h"
 #include "service/impala-internal-service.h"
 #include "service/impala-http-handler.h"
 #include "service/query-exec-state.h"
@@ -72,6 +71,8 @@
 #include "util/string-parser.h"
 #include "util/summary-util.h"
 #include "util/uid-util.h"
+#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
@@ -375,10 +376,9 @@ Status ImpalaServer::LogLineageRecord(const QueryExecState& query_exec_state) {
   } else {
     return Status::OK();
   }
-  // Set the query end time in TLineageGraph
-  time_t utc_end_time;
-  query_exec_state.end_time().ToUnixTimeInUTC(&utc_end_time);
-  lineage_graph.__set_ended(utc_end_time);
+  // Set the query end time in TLineageGraph. Must use UNIX time directly rather than
+  // e.g. converting from query_exec_state.end_time() (IMPALA-4440).
+  lineage_graph.__set_ended(UnixMillis() / 1000);
   string lineage_record;
   LineageUtil::TLineageToJSON(lineage_graph, &lineage_record);
   const Status& status = lineage_logger_->AppendEntry(lineage_record);
@@ -743,7 +743,7 @@ void ImpalaServer::AddPoolQueryOptions(TQueryCtx* ctx,
            << " override_options_mask=" << override_options_mask.to_string()
            << " set_pool_mask=" << set_pool_options_mask.to_string()
            << " overlay_mask=" << overlay_mask.to_string();
-  OverlayQueryOptions(pool_options, overlay_mask, &ctx->request.query_options);
+  OverlayQueryOptions(pool_options, overlay_mask, &ctx->client_request.query_options);
 }
 
 Status ImpalaServer::Execute(TQueryCtx* query_ctx,
@@ -753,9 +753,9 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx,
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
 
   // Redact the SQL stmt and update the query context
-  string stmt = replace_all_copy(query_ctx->request.stmt, "\n", " ");
+  string stmt = replace_all_copy(query_ctx->client_request.stmt, "\n", " ");
   Redact(&stmt);
-  query_ctx->request.__set_redacted_stmt((const string) stmt);
+  query_ctx->client_request.__set_redacted_stmt((const string) stmt);
 
   bool registered_exec_state;
   Status status = ExecuteInternal(*query_ctx, session_state, &registered_exec_state,
@@ -836,6 +836,7 @@ Status ImpalaServer::ExecuteInternal(
 void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
   query_ctx->__set_pid(getpid());
   query_ctx->__set_now_string(TimestampValue::LocalTime().DebugString());
+  query_ctx->__set_start_unix_millis(UnixMillis());
   query_ctx->__set_coord_address(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
 
   // Creating a random_generator every time is not free, but
@@ -1654,24 +1655,32 @@ void ImpalaServer::ConnectionStart(
 
 void ImpalaServer::ConnectionEnd(
     const ThriftServer::ConnectionContext& connection_context) {
-  unique_lock<mutex> l(connection_to_sessions_map_lock_);
-  ConnectionToSessionMap::iterator it =
-      connection_to_sessions_map_.find(connection_context.connection_id);
 
-  // Not every connection must have an associated session
-  if (it == connection_to_sessions_map_.end()) return;
+  vector<TUniqueId> sessions_to_close;
+  {
+    unique_lock<mutex> l(connection_to_sessions_map_lock_);
+    ConnectionToSessionMap::iterator it =
+        connection_to_sessions_map_.find(connection_context.connection_id);
+
+    // Not every connection must have an associated session
+    if (it == connection_to_sessions_map_.end()) return;
+
+    // We don't expect a large number of sessions per connection, so we copy it, so that
+    // we can drop the map lock early.
+    sessions_to_close = it->second;
+    connection_to_sessions_map_.erase(it);
+  }
 
   LOG(INFO) << "Connection from client " << connection_context.network_address
-            << " closed, closing " << it->second.size() << " associated session(s)";
+            << " closed, closing " << sessions_to_close.size() << " associated session(s)";
 
-  for (const TUniqueId& session_id: it->second) {
+  for (const TUniqueId& session_id: sessions_to_close) {
     Status status = CloseSessionInternal(session_id, true);
     if (!status.ok()) {
       LOG(WARNING) << "Error closing session " << session_id << ": "
                    << status.GetDetail();
     }
   }
-  connection_to_sessions_map_.erase(it);
 }
 
 void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {

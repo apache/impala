@@ -1,0 +1,38 @@
+====
+---- QUERY
+# First create a partitioned table
+create table p1_hdfs (i int) partitioned by(j int, k string);
+# Add some partitions
+alter table p1_hdfs add partition (j=1,k="a");
+alter table p1_hdfs add partition (j=1,k="b");
+alter table p1_hdfs add partition (j=1,k="c");
+alter table p1_hdfs add partition (j=2,k="d");
+alter table p1_hdfs add partition (j=2,k="e");
+alter table p1_hdfs add partition (j=2,k="f");
+alter table p1_hdfs add partition (j=2,k=NULL);
+alter table p1_hdfs add partition (j=NULL,k="g");
+alter table p1_hdfs add partition (j=NULL,k=NULL);
+# Populate the table
+insert into p1_hdfs partition (j, k) values (100, 1, "a"), (200, 1, "b"), (300, 1, "c");
+====
+---- QUERY
+alter table p1_hdfs partition (j<2, k in ("b", "c")) set cached in 'testPool'
+---- RESULTS
+'Cached 2 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1_hdfs partition (j<2, j>0, k<>"d") set uncached
+---- RESULTS
+'Uncached 2 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1_hdfs partition (j=3 or j=2, k like "%") set uncached
+---- RESULTS
+'Uncached 0 partition(s).'
+---- TYPES
+STRING
+====

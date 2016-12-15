@@ -25,10 +25,10 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
@@ -148,9 +148,7 @@ public abstract class ModifyStmt extends StatementBase {
 
     // Make sure that the user is allowed to modify the target table, since no
     // UPDATE / DELETE privilege exists, we reuse the INSERT one.
-    analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-        .onTable(table_.getDb().getName(), table_.getName())
-        .allOf(Privilege.INSERT).toRequest());
+    analyzer.registerAuthAndAuditEvent(dstTbl, Privilege.INSERT);
 
     // Validates the assignments_ and creates the sourceStmt_.
     if (sourceStmt_ == null) createSourceStmt(analyzer);
@@ -281,6 +279,14 @@ public abstract class ModifyStmt extends StatementBase {
       selectList.add(new SelectListItem(rhsExpr, null));
       referencedColumns.add(colIndexMap.get(c.getName()));
     }
+  }
+
+  @Override
+  public List<Expr> getResultExprs() { return sourceStmt_.getResultExprs(); }
+
+  @Override
+  public void castResultExprs(List<Type> types) throws AnalysisException {
+    sourceStmt_.castResultExprs(types);
   }
 
   @Override

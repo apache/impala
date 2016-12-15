@@ -19,6 +19,7 @@
 #ifndef IMPALA_EXEC_HDFS_PARQUET_SCANNER_H
 #define IMPALA_EXEC_HDFS_PARQUET_SCANNER_H
 
+#include "codegen/impala-ir.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/parquet-common.h"
 #include "exec/parquet-scratch-tuple-batch.h"
@@ -336,6 +337,7 @@ class HdfsParquetScanner : public HdfsScanner {
   /// 'process_scratch_batch_fn' if codegen was successful or NULL otherwise.
   static Status Codegen(HdfsScanNodeBase* node,
       const std::vector<ExprContext*>& conjunct_ctxs,
+      const std::vector<FilterContext>& filter_ctxs,
       llvm::Function** process_scratch_batch_fn);
 
   /// The repetition level is set to this value to indicate the end of a row group.
@@ -355,6 +357,9 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Size of the file footer.  This is a guess.  If this value is too little, we will
   /// need to issue another read.
   static const int64_t FOOTER_SIZE = 1024 * 100;
+
+  /// Class name in LLVM IR.
+  static const char* LLVM_CLASS_NAME;
 
   /// Index of the current row group being processed. Initialized to -1 which indicates
   /// that we have not started processing the first row group yet (GetNext() has not yet
@@ -403,6 +408,9 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Close().
   vector<LocalFilterStats> filter_stats_;
 
+  /// Number of scratch batches processed so far.
+  int64_t row_batches_produced_;
+
   /// Column reader for each materialized columns for this file.
   std::vector<ParquetColumnReader*> column_readers_;
 
@@ -443,6 +451,10 @@ class HdfsParquetScanner : public HdfsScanner {
 
   virtual Status GetNextInternal(RowBatch* row_batch);
 
+  /// Check runtime filters' effectiveness every BATCHES_PER_FILTER_SELECTIVITY_CHECK
+  /// row batches. Will update 'filter_stats_'.
+  void CheckFiltersEffectiveness();
+
   /// Advances 'row_group_idx_' to the next non-empty row group and initializes
   /// the column readers to scan it. Recoverable errors are logged to the runtime
   /// state. Only returns a non-OK status if a non-recoverable error is encountered
@@ -481,10 +493,22 @@ class HdfsParquetScanner : public HdfsScanner {
   /// materialized tuples. This is a separate function so it can be codegened.
   int ProcessScratchBatch(RowBatch* dst_batch);
 
+  /// Evaluates 'row' against the i-th runtime filter for this scan node and returns
+  /// true if 'row' finds a match in the filter. Returns false otherwise.
+  bool EvalRuntimeFilter(int i, TupleRow* row);
+
   /// Evaluates runtime filters (if any) against the given row. Returns true if
   /// they passed, false otherwise. Maintains the runtime filter stats, determines
-  /// whether the filters are effective, and disables them if they are not.
+  /// whether the filters are effective, and disables them if they are not. This is
+  /// replaced by generated code at runtime.
   bool EvalRuntimeFilters(TupleRow* row);
+
+  /// Codegen EvalRuntimeFilters() by unrolling the loop in the interpreted version
+  /// and emitting a customized version of EvalRuntimeFilter() for each filter in
+  /// 'filter_ctxs'. Return error status on failure. The generated function is returned
+  /// via 'fn'.
+  static Status CodegenEvalRuntimeFilters(LlvmCodeGen* codegen,
+      const std::vector<FilterContext>& filter_ctxs, llvm::Function** fn);
 
   /// Reads data using 'column_readers' to materialize the tuples of a CollectionValue
   /// allocated from 'coll_value_builder'.

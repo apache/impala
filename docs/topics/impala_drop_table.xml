@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="drop_table">
+
+  <title>DROP TABLE Statement</title>
+  <titlealts audience="PDF"><navtitle>DROP TABLE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="S3"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">DROP TABLE statement</indexterm>
+      Removes an Impala table. Also removes the underlying HDFS data files for internal tables, although not for
+      external tables.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>DROP TABLE [IF EXISTS] [<varname>db_name</varname>.]<varname>table_name</varname> <ph rev="2.3.0">[PURGE]</ph></codeblock>
+
+    <p>
+      <b>IF EXISTS clause:</b>
+    </p>
+
+    <p>
+      The optional <codeph>IF EXISTS</codeph> clause makes the statement succeed whether or not the table exists.
+      If the table does exist, it is dropped; if it does not exist, the statement has no effect. This capability is
+      useful in standardized setup scripts that remove existing schema objects and create new ones. By using some
+      combination of <codeph>IF EXISTS</codeph> for the <codeph>DROP</codeph> statements and <codeph>IF NOT
+      EXISTS</codeph> clauses for the <codeph>CREATE</codeph> statements, the script can run successfully the first
+      time you run it (when the objects do not exist yet) and subsequent times (when some or all of the objects do
+      already exist).
+    </p>
+
+    <p rev="2.3.0">
+      <b>PURGE clause:</b>
+    </p>
+
+    <p rev="2.3.0"> The optional <codeph>PURGE</codeph> keyword, available in
+      <keyword keyref="impala23_full"/> and higher, causes Impala to remove the associated
+      HDFS data files immediately, rather than going through the HDFS trashcan
+      mechanism. Use this keyword when dropping a table if it is crucial to
+      remove the data as quickly as possible to free up space, or if there is a
+      problem with the trashcan, such as the trash cannot being configured or
+      being in a different HDFS encryption zone than the data files. </p>
+
+    <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      By default, Impala removes the associated HDFS directory and data files for the table. If you issue a
+      <codeph>DROP TABLE</codeph> and the data files are not deleted, it might be for the following reasons:
+    </p>
+
+    <ul>
+      <li>
+        If the table was created with the
+        <codeph><xref href="impala_tables.xml#external_tables">EXTERNAL</xref></codeph> clause, Impala leaves all
+        files and directories untouched. Use external tables when the data is under the control of other Hadoop
+        components, and Impala is only used to query the data files from their original locations.
+      </li>
+
+      <li>
+        Impala might leave the data files behind unintentionally, if there is no HDFS location available to hold
+        the HDFS trashcan for the <codeph>impala</codeph> user. See
+        <xref href="impala_prereqs.xml#prereqs_account"/> for the procedure to set up the required HDFS home
+        directory.
+      </li>
+    </ul>
+
+    <p>
+      Make sure that you are in the correct database before dropping a table, either by issuing a
+      <codeph>USE</codeph> statement first or by using a fully qualified name
+      <codeph><varname>db_name</varname>.<varname>table_name</varname></codeph>.
+    </p>
+
+    <p>
+      If you intend to issue a <codeph>DROP DATABASE</codeph> statement, first issue <codeph>DROP TABLE</codeph>
+      statements to remove all the tables in that database.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>create database temporary;
+use temporary;
+create table unimportant (x int);
+create table trivial (s string);
+-- Drop a table in the current database.
+drop table unimportant;
+-- Switch to a different database.
+use default;
+-- To drop a table in a different database...
+drop table trivial;
+<i>ERROR: AnalysisException: Table does not exist: default.trivial</i>
+-- ...use a fully qualified name.
+drop table temporary.trivial;</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/disk_space_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/s3_blurb"/>
+    <p rev="2.6.0 CDH-39913 IMPALA-1878">
+      The <codeph>DROP TABLE</codeph> statement can remove data files from S3
+      if the associated S3 table is an internal table.
+      In <keyword keyref="impala26_full"/> and higher, as part of improved support for writing
+      to S3, Impala also removes the associated folder when dropping an internal table
+      that resides on S3.
+      See <xref href="impala_s3.xml#s3"/> for details about working with S3 tables.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/s3_drop_table_purge"/>
+
+    <p conref="../shared/impala_common.xml#common/s3_ddl"/>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
+    <p rev="CDH-19187">
+      For an internal table, the user ID that the <cmdname>impalad</cmdname> daemon runs under,
+      typically the <codeph>impala</codeph> user, must have write
+      permission for all the files and directories that make up the table.
+    </p>
+    <p>
+      For an external table, dropping the table only involves changes to metadata in the metastore database.
+      Because Impala does not remove any HDFS files or directories when external tables are dropped,
+      no particular permissions are needed for the associated HDFS files or directories.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_tables.xml#tables"/>,
+      <xref href="impala_alter_table.xml#alter_table"/>, <xref href="impala_create_table.xml#create_table"/>,
+      <xref href="impala_partitioning.xml#partitioning"/>, <xref href="impala_tables.xml#internal_tables"/>,
+      <xref href="impala_tables.xml#external_tables"/>
+    </p>
+
+  </conbody>
+</concept>

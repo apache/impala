@@ -60,8 +60,8 @@ class HdfsTextTableWriter : public HdfsTableWriter {
   /// Appends delimited string representation of the rows in the batch to output partition.
   /// The resulting output is buffered until HDFS_FLUSH_WRITE_SIZE before being written
   /// to HDFS.
-  Status AppendRowBatch(RowBatch* current_row,
-                        const std::vector<int32_t>& row_group_indices, bool* new_file);
+  Status AppendRows(RowBatch* current_row, const std::vector<int32_t>& row_group_indices,
+      bool* new_file);
 
  private:
   /// Escapes occurrences of field_delim_ and escape_char_ with escape_char_ and

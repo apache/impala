@@ -107,6 +107,7 @@ import com.google.common.collect.Sets;
 public class CatalogServiceCatalog extends Catalog {
   private static final Logger LOG = Logger.getLogger(CatalogServiceCatalog.class);
 
+  private static final int INITIAL_META_STORE_CLIENT_POOL_SIZE = 10;
   private final TUniqueId catalogServiceId_;
 
   // Fair lock used to synchronize reads/writes of catalogVersion_. Because this lock
@@ -148,13 +149,16 @@ public class CatalogServiceCatalog extends Catalog {
   private static String localLibraryPath_;
 
   /**
-   * Initialize the CatalogServiceCatalog. If loadInBackground is true, table metadata
-   * will be loaded in the background
+   * Initialize the CatalogServiceCatalog. If 'loadInBackground' is true, table metadata
+   * will be loaded in the background. 'initialHmsCnxnTimeoutSec' specifies the time (in
+   * seconds) CatalogServiceCatalog will wait to establish an initial connection to the
+   * HMS before giving up. Using this setting allows catalogd and HMS to be started
+   * simultaneously.
    */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      SentryConfig sentryConfig, TUniqueId catalogServiceId, String kerberosPrincipal,
-      String localLibraryPath) {
-    super(true);
+      int initialHmsCnxnTimeoutSec, SentryConfig sentryConfig, TUniqueId catalogServiceId,
+      String kerberosPrincipal, String localLibraryPath) {
+    super(INITIAL_META_STORE_CLIENT_POOL_SIZE, initialHmsCnxnTimeoutSec);
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;
@@ -190,7 +194,9 @@ public class CatalogServiceCatalog extends Catalog {
     }
 
     public void run() {
-      LOG.trace("Reloading cache pool names from HDFS");
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Reloading cache pool names from HDFS");
+      }
       // Map of cache pool name to CachePoolInfo. Stored in a map to allow Set operations
       // to be performed on the keys.
       Map<String, CachePoolInfo> currentCachePools = Maps.newHashMap();
@@ -292,8 +298,10 @@ public class CatalogServiceCatalog extends Catalog {
               try {
                 catalogTbl.setTable(tbl.toThrift());
               } catch (Exception e) {
-                LOG.debug(String.format("Error calling toThrift() on table %s.%s: %s",
-                    db.getName(), tblName, e.getMessage()), e);
+                if (LOG.isTraceEnabled()) {
+                  LOG.trace(String.format("Error calling toThrift() on table %s.%s: %s",
+                      db.getName(), tblName, e.getMessage()), e);
+                }
                 continue;
               }
               catalogTbl.setCatalog_version(tbl.getCatalogVersion());
@@ -515,7 +523,9 @@ public class CatalogServiceCatalog extends Catalog {
   private void loadFunctionsFromDbParams(Db db,
       org.apache.hadoop.hive.metastore.api.Database msDb) {
     if (msDb == null || msDb.getParameters() == null) return;
-    LOG.info("Loading native functions for database: " + db.getName());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Loading native functions for database: " + db.getName());
+    }
     TCompactProtocol.Factory protocolFactory = new TCompactProtocol.Factory();
     for (String key: msDb.getParameters().keySet()) {
       if (!key.startsWith(Db.FUNCTION_INDEX_PREFIX)) continue;
@@ -541,7 +551,9 @@ public class CatalogServiceCatalog extends Catalog {
   private void loadJavaFunctions(Db db,
       List<org.apache.hadoop.hive.metastore.api.Function> functions) {
     Preconditions.checkNotNull(functions);
-    LOG.info("Loading Java functions for database: " + db.getName());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Loading Java functions for database: " + db.getName());
+    }
     for (org.apache.hadoop.hive.metastore.api.Function function: functions) {
       try {
         for (Function fn: extractFunctions(db.getName(), function)) {
@@ -876,7 +888,9 @@ public class CatalogServiceCatalog extends Catalog {
    * Throws a CatalogException if there is an error loading table metadata.
    */
   public Table reloadTable(Table tbl) throws CatalogException {
-    LOG.debug(String.format("Refreshing table metadata: %s", tbl.getFullName()));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Refreshing table metadata: %s", tbl.getFullName()));
+    }
     TTableName tblName = new TTableName(tbl.getDb().getName().toLowerCase(),
         tbl.getName().toLowerCase());
     Db db = tbl.getDb();
@@ -914,7 +928,7 @@ public class CatalogServiceCatalog extends Catalog {
           throw new TableLoadingException("Error loading metadata for table: " +
               db.getName() + "." + tblName.getTable_name(), e);
         }
-        tbl.load(true, msClient.getHiveClient(), msTbl);
+        tbl.load(false, msClient.getHiveClient(), msTbl);
       }
       tbl.setCatalogVersion(newCatalogVersion);
       return tbl;
@@ -1005,8 +1019,10 @@ public class CatalogServiceCatalog extends Catalog {
     Preconditions.checkNotNull(updatedObjects);
     updatedObjects.first = null;
     updatedObjects.second = null;
-    LOG.debug(String.format("Invalidating table metadata: %s.%s",
-        tableName.getDb_name(), tableName.getTable_name()));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Invalidating table metadata: %s.%s",
+          tableName.getDb_name(), tableName.getTable_name()));
+    }
     String dbName = tableName.getDb_name();
     String tblName = tableName.getTable_name();
 
@@ -1245,8 +1261,10 @@ public class CatalogServiceCatalog extends Catalog {
       String partitionName = hdfsPartition == null
           ? HdfsTable.constructPartitionName(partitionSpec)
           : hdfsPartition.getPartitionName();
-      LOG.debug(String.format("Refreshing Partition metadata: %s %s",
-          hdfsTable.getFullName(), partitionName));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format("Refreshing Partition metadata: %s %s",
+            hdfsTable.getFullName(), partitionName));
+      }
       try (MetaStoreClient msClient = getMetaStoreClient()) {
         org.apache.hadoop.hive.metastore.api.Partition hmsPartition = null;
         try {

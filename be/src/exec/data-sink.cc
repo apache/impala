@@ -176,12 +176,13 @@ string DataSink::OutputDmlStats(const PartitionStatusMap& stats,
   return ss.str();
 }
 
-Status DataSink::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
-  DCHECK(mem_tracker != NULL);
+Status DataSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
+  DCHECK(parent_mem_tracker != NULL);
   profile_ = state->obj_pool()->Add(new RuntimeProfile(state->obj_pool(), GetName()));
-  mem_tracker_ = mem_tracker;
+  const string& name = GetName();
+  mem_tracker_.reset(new MemTracker(profile_, -1, name, parent_mem_tracker));
   expr_mem_tracker_.reset(
-      new MemTracker(-1, Substitute("$0 Exprs", GetName()), mem_tracker, false));
+      new MemTracker(-1, Substitute("$0 Exprs", name), mem_tracker_.get(), false));
   return Status::OK();
 }
 
@@ -190,6 +191,10 @@ void DataSink::Close(RuntimeState* state) {
   if (expr_mem_tracker_ != NULL) {
     expr_mem_tracker_->UnregisterFromParent();
     expr_mem_tracker_.reset();
+  }
+  if (mem_tracker_ != NULL) {
+    mem_tracker_->UnregisterFromParent();
+    mem_tracker_.reset();
   }
   closed_ = true;
 }

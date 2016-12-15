@@ -98,7 +98,7 @@ Status PhjBuilder::Init(RuntimeState* state,
     }
     FilterContext filter_ctx;
     filter_ctx.filter = state->filter_bank()->RegisterFilter(filter, true);
-    RETURN_IF_ERROR(Expr::CreateExprTree(&pool_, filter.src_expr, &filter_ctx.expr));
+    RETURN_IF_ERROR(Expr::CreateExprTree(&pool_, filter.src_expr, &filter_ctx.expr_ctx));
     filters_.push_back(filter_ctx);
   }
   return Status::OK();
@@ -108,23 +108,24 @@ string PhjBuilder::GetName() {
   return Substitute("Hash Join Builder (join_node_id=$0)", join_node_id_);
 }
 
-Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
-  RETURN_IF_ERROR(DataSink::Prepare(state, mem_tracker));
+Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   RETURN_IF_ERROR(
       Expr::Prepare(build_expr_ctxs_, state, row_desc_, expr_mem_tracker_.get()));
   expr_ctxs_to_free_.insert(
       expr_ctxs_to_free_.end(), build_expr_ctxs_.begin(), build_expr_ctxs_.end());
 
   for (const FilterContext& ctx : filters_) {
-    RETURN_IF_ERROR(ctx.expr->Prepare(state, row_desc_, expr_mem_tracker_.get()));
-    expr_ctxs_to_free_.push_back(ctx.expr);
+    RETURN_IF_ERROR(ctx.expr_ctx->Prepare(state, row_desc_, expr_mem_tracker_.get()));
+    expr_ctxs_to_free_.push_back(ctx.expr_ctx);
   }
   RETURN_IF_ERROR(HashTableCtx::Create(state, build_expr_ctxs_, build_expr_ctxs_,
       HashTableStoresNulls(), is_not_distinct_from_, state->fragment_hash_seed(),
-      MAX_PARTITION_DEPTH, row_desc_.tuple_descriptors().size(), mem_tracker_, &ht_ctx_));
+      MAX_PARTITION_DEPTH, row_desc_.tuple_descriptors().size(), mem_tracker_.get(),
+      &ht_ctx_));
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
       Substitute("PartitionedHashJoin id=$0 builder=$1", join_node_id_, this),
-      MinRequiredBuffers(), true, mem_tracker, state, &block_mgr_client_));
+      MinRequiredBuffers(), true, mem_tracker_.get(), state, &block_mgr_client_));
 
   partitions_created_ = ADD_COUNTER(profile(), "PartitionsCreated", TUnit::UNIT);
   largest_partition_percent_ =
@@ -140,15 +141,19 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* mem_tracker) {
   partition_build_rows_timer_ = ADD_TIMER(profile(), "BuildRowsPartitionTime");
   build_hash_table_timer_ = ADD_TIMER(profile(), "HashTablesBuildTime");
   repartition_timer_ = ADD_TIMER(profile(), "RepartitionTime");
-  if (!state->codegen_enabled()) {
+  if (state->CodegenDisabledByQueryOption()) {
     profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
+  } else if (state->CodegenDisabledByHint()) {
+    profile()->AddCodegenMsg(false, "disabled due to optimization hints");
   }
   return Status::OK();
 }
 
 Status PhjBuilder::Open(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
-  for (const FilterContext& filter : filters_) RETURN_IF_ERROR(filter.expr->Open(state));
+  for (const FilterContext& filter : filters_) {
+    RETURN_IF_ERROR(filter.expr_ctx->Open(state));
+  }
   RETURN_IF_ERROR(CreateHashPartitions(0));
   AllocateRuntimeFilters();
 
@@ -224,7 +229,7 @@ void PhjBuilder::Close(RuntimeState* state) {
   CloseAndDeletePartitions();
   if (ht_ctx_ != NULL) ht_ctx_->Close();
   Expr::Close(build_expr_ctxs_, state);
-  for (const FilterContext& ctx : filters_) ctx.expr->Close(state);
+  for (const FilterContext& ctx : filters_) ctx.expr_ctx->Close(state);
   if (block_mgr_client_ != NULL) state->block_mgr()->ClearReservations(block_mgr_client_);
   pool_.Clear();
   DataSink::Close(state);

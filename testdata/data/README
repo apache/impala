@@ -78,3 +78,13 @@ Contains 1 column, uncompressed data size < 8M
 large_pbzip2.bz2
 Generated with pbzip2, contains multiple bzip2 stream
 Contains 1 column, uncompressed data size > 8M
+
+out_of_range_timestamp.parquet:
+-----------
+Generated with a hacked version of Impala parquet writer.
+Contains a single timestamp column with 4 values, 2 of which are out of range
+and should be read as NULL by Impala:
+   1399-12-31 00:00:00 (invalid - date too small)
+   1400-01-01 00:00:00
+   9999-12-31 00:00:00
+  10000-01-01 00:00:00 (invalid - date too large)

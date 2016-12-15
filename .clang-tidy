@@ -71,7 +71,6 @@ Checks: "-*,clang*,\
 
 HeaderFilterRegex: "be/src/\
 (benchmarks\
-|bufferpool\
 |catalog\
 |codegen\
 |common\

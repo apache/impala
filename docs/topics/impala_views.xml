@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.1" id="views">
+
+  <title>Overview of Impala Views</title>
+  <titlealts audience="PDF"><navtitle>Views</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="Views"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Views are lightweight logical constructs that act as aliases for queries. You can specify a view name in a
+      query (a <codeph>SELECT</codeph> statement or the <codeph>SELECT</codeph> portion of an
+      <codeph>INSERT</codeph> statement) where you would usually specify a table name.
+    </p>
+
+    <p>
+      A view lets you:
+    </p>
+
+    <ul>
+      <li>
+        Issue complicated queries with compact and simple syntax:
+<codeblock>-- Take a complicated reporting query, plug it into a CREATE VIEW statement...
+create view v1 as select c1, c2, avg(c3) from t1 group by c3 order by c1 desc limit 10;
+-- ... and now you can produce the report with 1 line of code.
+select * from v1;</codeblock>
+      </li>
+
+      <li>
+        Reduce maintenance, by avoiding the duplication of complicated queries across multiple applications in
+        multiple languages:
+<codeblock>create view v2 as select t1.c1, t1.c2, t2.c3 from t1 join t2 on (t1.id = t2.id);
+-- This simple query is safer to embed in reporting applications than the longer query above.
+-- The view definition can remain stable even if the structure of the underlying tables changes.
+select c1, c2, c3 from v2;</codeblock>
+      </li>
+
+      <li>
+        Build a new, more refined query on top of the original query by adding new clauses, select-list
+        expressions, function calls, and so on:
+<codeblock>create view average_price_by_category as select category, avg(price) as avg_price from products group by category;
+create view expensive_categories as select category, avg_price from average_price_by_category order by avg_price desc limit 10000;
+create view top_10_expensive_categories as select category, avg_price from expensive_categories limit 10;</codeblock>
+        This technique lets you build up several more or less granular variations of the same query, and switch
+        between them when appropriate.
+<!-- My original assumption was confirmed correct by Alex: outer ORDER BY not actually needed.
+In this case, we put an <codeph>ORDER BY</codeph> clause on the <q>top 10</q> view, even though there was already an <codeph>ORDER BY</codeph>
+on the <q>top 10000</q> view, because when a query is executed in parallel and distributed among multiple nodes, the ordering is only
+guaranteed if there is an <codeph>ORDER BY</codeph> clause at the outermost level.
+-->
+      </li>
+
+      <li>
+        Set up aliases with intuitive names for tables, columns, result sets from joins, and so on:
+<codeblock>-- The original tables might have cryptic names inherited from a legacy system.
+create view action_items as select rrptsk as assignee, treq as due_date, dmisc as notes from vxy_t1_br;
+-- You can leave original names for compatibility, build new applications using more intuitive ones.
+select assignee, due_date, notes from action_items;</codeblock>
+      </li>
+
+      <li>
+        Swap tables with others that use different file formats, partitioning schemes, and so on without any
+        downtime for data copying or conversion:
+<codeblock>create table slow (x int, s string) stored as textfile;
+create view report as select s from slow where x between 20 and 30;
+-- Query is kind of slow due to inefficient table definition, but it works.
+select * from report;
+
+create table fast (s string) partitioned by (x int) stored as parquet;
+-- ...Copy data from SLOW to FAST. Queries against REPORT view continue to work...
+
+-- After changing the view definition, queries will be faster due to partitioning,
+-- binary format, and compression in the new table.
+alter view report as select s from fast where x between 20 and 30;
+select * from report;</codeblock>
+      </li>
+
+      <li>
+        Avoid coding lengthy subqueries and repeating the same subquery text in many other queries.
+      </li>
+
+      <li rev="2.3.0 collevelauth">
+        Set up fine-grained security where a user can query some columns from a table but not other columns.
+        Because <keyword keyref="impala23_full"/> and higher support column-level authorization, this technique is no longer
+        required. If you formerly implemented column-level security through views, see
+        <xref audience="integrated" href="sg_hive_sql.xml#concept_c2q_4qx_p4/col_level_auth_sentry"/><xref audience="standalone" href="https://www.cloudera.com/documentation/enterprise/latest/topics/sg_hive_sql.html" format="html" scope="external"/>
+        for details about the
+        column-level authorization feature.
+        <!-- See <xref href="impala_authorization.xml#security_examples/sec_ex_views"/> for details. -->
+      </li>
+    </ul>
+
+    <p>
+      The SQL statements that configure views are <xref href="impala_create_view.xml#create_view"/>,
+      <xref href="impala_alter_view.xml#alter_view"/>, and <xref href="impala_drop_view.xml#drop_view"/>. You can
+      specify view names when querying data (<xref href="impala_select.xml#select"/>) and copying data from one
+      table to another (<xref href="impala_insert.xml#insert"/>). The <xref href="impala_with.xml#with">WITH</xref>
+      clause creates an inline view, that only exists for the duration of a single query.
+    </p>
+
+<codeblock>[localhost:21000] &gt; create view trivial as select * from customer;
+[localhost:21000] &gt; create view some_columns as select c_first_name, c_last_name, c_login from customer;
+[localhost:21000] &gt; select * from some_columns limit 5;
+Query finished, fetching results ...
++--------------+-------------+---------+
+| c_first_name | c_last_name | c_login |
++--------------+-------------+---------+
+| Javier       | Lewis       |         |
+| Amy          | Moses       |         |
+| Latisha      | Hamilton    |         |
+| Michael      | White       |         |
+| Robert       | Moran       |         |
++--------------+-------------+---------+
+[localhost:21000] &gt; create view ordered_results as select * from some_columns order by c_last_name desc, c_first_name desc limit 1000;
+[localhost:21000] &gt; select * from ordered_results limit 5;
+Query: select * from ordered_results limit 5
+Query finished, fetching results ...
++--------------+-------------+---------+
+| c_first_name | c_last_name | c_login |
++--------------+-------------+---------+
+| Thomas       | Zuniga      |         |
+| Sarah        | Zuniga      |         |
+| Norma        | Zuniga      |         |
+| Lloyd        | Zuniga      |         |
+| Lisa         | Zuniga      |         |
++--------------+-------------+---------+
+Returned 5 row(s) in 0.48s</codeblock>
+
+    <p>
+      The previous example uses descending order for <codeph>ORDERED_RESULTS</codeph> because in the sample TPCD-H
+      data, there are some rows with empty strings for both <codeph>C_FIRST_NAME</codeph> and
+      <codeph>C_LAST_NAME</codeph>, making the lowest-ordered names unuseful in a sample query.
+    </p>
+
+<codeblock>create view visitors_by_day as select day, count(distinct visitors) as howmany from web_traffic group by day;
+create view top_10_days as select day, howmany from visitors_by_day order by howmany limit 10;
+select * from top_10_days;</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/describe_formatted_view"/>
+
+    <p conref="../shared/impala_common.xml#common/create_table_like_view"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_views"/>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+    <ul>
+      <li>
+        <p>
+          You cannot insert into an Impala view. (In some database systems, this operation is allowed and inserts
+          rows into the base table.) You can use a view name on the right-hand side of an <codeph>INSERT</codeph>
+          statement, in the <codeph>SELECT</codeph> part.
+        </p>
+      </li>
+
+      <li>
+<!-- This same text is conref'ed in the #views and the #partition_pruning topics. -->
+        <p conref="../shared/impala_common.xml#common/partitions_and_views"/>
+      </li>
+
+      <li rev="1.4.0">
+        <p conref="../shared/impala_common.xml#common/order_by_view_restriction"/>
+      </li>
+    </ul>
+
+    <p>
+      <b>Related statements:</b> <xref href="impala_create_view.xml#create_view"/>,
+      <xref href="impala_alter_view.xml#alter_view"/>, <xref href="impala_drop_view.xml#drop_view"/>
+    </p>
+  </conbody>
+</concept>

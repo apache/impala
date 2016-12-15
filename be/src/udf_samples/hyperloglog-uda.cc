@@ -16,6 +16,7 @@
 // under the License.
 
 #include <assert.h>
+#include <limits.h>
 #include <math.h>
 #include <algorithm>
 #include <sstream>
@@ -71,13 +72,14 @@ void HllUpdate(FunctionContext* ctx, const IntVal& src, StringVal* dst) {
   assert(!dst->is_null);
   assert(dst->len == pow(2, HLL_PRECISION));
   uint64_t hash_value = Hash(src);
-  if (hash_value != 0) {
-    // Use the lower bits to index into the number of streams and then
-    // find the first 1 bit after the index bits.
-    int idx = hash_value % dst->len;
-    uint8_t first_one_bit = __builtin_ctzl(hash_value >> HLL_PRECISION) + 1;
-    dst->ptr[idx] = ::max(dst->ptr[idx], first_one_bit);
-  }
+  // Use the lower bits to index into the number of streams and then find the first 1 bit
+  // after the index bits.
+  int idx = hash_value % dst->len;
+  const uint64_t hash_top_bits = hash_value >> HLL_PRECISION;
+  uint8_t first_one_bit =
+      1 + ((hash_top_bits != 0) ? __builtin_ctzll(hash_top_bits) :
+                                  (sizeof(hash_value) * CHAR_BIT - HLL_PRECISION));
+  dst->ptr[idx] = ::max(dst->ptr[idx], first_one_bit);
 }
 
 void HllMerge(FunctionContext* ctx, const StringVal& src, StringVal* dst) {

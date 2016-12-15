@@ -24,9 +24,9 @@ import java.util.Set;
 
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.PlanRootSink;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
@@ -327,11 +327,6 @@ public abstract class QueryStmt extends StatementBase {
   }
 
   /**
-   * UnionStmt and SelectStmt have different implementations.
-   */
-  public abstract ArrayList<String> getColLabels();
-
-  /**
    * Returns the materialized tuple ids of the output of this stmt.
    * Used in case this stmt is part of an @InlineViewRef,
    * since we need to know the materialized tupls ids of a TableRef.
@@ -347,6 +342,9 @@ public abstract class QueryStmt extends StatementBase {
    */
   public abstract void collectTableRefs(List<TableRef> tblRefs);
 
+  @Override
+  public List<Expr> getResultExprs() { return resultExprs_; }
+
   public void setWithClause(WithClause withClause) { this.withClause_ = withClause; }
   public boolean hasWithClause() { return withClause_ != null; }
   public WithClause getWithClause() { return withClause_; }
@@ -357,7 +355,6 @@ public abstract class QueryStmt extends StatementBase {
   public long getOffset() { return limitElement_.getOffset(); }
   public SortInfo getSortInfo() { return sortInfo_; }
   public boolean evaluateOrderBy() { return evaluateOrderBy_; }
-  public ArrayList<Expr> getResultExprs() { return resultExprs_; }
   public ArrayList<Expr> getBaseTblResultExprs() { return baseTblResultExprs_; }
   public void setLimit(long limit) throws AnalysisException {
     Preconditions.checkState(limit >= 0);

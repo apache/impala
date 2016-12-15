@@ -120,6 +120,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // set in computeCosts(); invalid: -1
   protected long perHostMemCost_ = -1;
 
+  // If true, disable codegen for this plan node.
+  protected boolean disableCodegen_;
+
   // Runtime filters assigned to this node.
   protected List<RuntimeFilter> runtimeFilters_ = Lists.newArrayList();
 
@@ -144,6 +147,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     cardinality_ = -1;
     numNodes_ = -1;
     displayName_ = displayName;
+    disableCodegen_ = false;
   }
 
   /**
@@ -159,6 +163,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     cardinality_ = -1;
     numNodes_ = -1;
     displayName_ = displayName;
+    disableCodegen_ = node.disableCodegen_;
   }
 
   /**
@@ -393,9 +398,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       msg.addToConjuncts(e.treeToThrift());
     }
     // Serialize any runtime filters
-    for (RuntimeFilter filter: runtimeFilters_) {
+    for (RuntimeFilter filter : runtimeFilters_) {
       msg.addToRuntime_filters(filter.toThrift());
     }
+    msg.setDisable_codegen(disableCodegen_);
     toThrift(msg);
     container.addToNodes(msg);
     // For the purpose of the BE consider ExchangeNodes to have no children.
@@ -717,5 +723,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
 
     return sortedConjuncts;
+  }
+
+  public void setDisableCodegen(boolean disableCodegen) {
+    disableCodegen_ = disableCodegen;
   }
 }

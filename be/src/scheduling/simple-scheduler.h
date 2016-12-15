@@ -256,6 +256,10 @@ class SimpleScheduler : public Scheduler {
   /// during scheduling.
   BackendConfigPtr backend_config_;
 
+  /// A backend configuration which only contains the local backend. It is used when
+  /// scheduling on the coordinator.
+  BackendConfig coord_only_backend_config_;
+
   /// Protect access to backend_config_ which might otherwise be updated asynchronously
   /// with respect to reads.
   mutable boost::mutex backend_config_lock_;

@@ -23,15 +23,19 @@ from kudu.schema import (
     INT32,
     INT64,
     INT8,
+    SchemaBuilder,
     STRING,
     BINARY,
     UNIXTIME_MICROS)
+from kudu.client import Partitioning
 import logging
 import pytest
 import textwrap
 
 from tests.common import KUDU_MASTER_HOSTS
 from tests.common.kudu_test_suite import KuduTestSuite
+from tests.common.impala_cluster import ImpalaCluster
+from tests.verifiers.metric_verifier import MetricVerifier
 
 LOG = logging.getLogger(__name__)
 
@@ -43,17 +47,95 @@ class TestKuduOperations(KuduTestSuite):
   def test_kudu_scan_node(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database)
 
-  def test_kudu_crud(self, vector, unique_database):
-    self.run_test_case('QueryTest/kudu_crud', vector, use_db=unique_database)
+  def test_kudu_insert(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_insert', vector, use_db=unique_database)
+
+  def test_kudu_update(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_update', vector, use_db=unique_database)
+
+  def test_kudu_upsert(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_upsert', vector, use_db=unique_database)
+
+  def test_kudu_delete(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_delete', vector, use_db=unique_database)
 
   def test_kudu_partition_ddl(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_partition_ddl', vector, use_db=unique_database)
 
+  @pytest.mark.execute_serially
   def test_kudu_alter_table(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_alter', vector, use_db=unique_database)
 
   def test_kudu_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_stats', vector, use_db=unique_database)
+
+  def test_kudu_describe(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_describe', vector, use_db=unique_database)
+
+  def test_kudu_column_options(self, cursor, kudu_client, unique_database):
+    """Test Kudu column options"""
+    encodings = ["ENCODING PLAIN_ENCODING", ""]
+    compressions = ["COMPRESSION SNAPPY", ""]
+    nullability = ["NOT NULL", "NULL", ""]
+    defaults = ["DEFAULT 1", ""]
+    blocksizes = ["BLOCK_SIZE 32768", ""]
+    indx = 1
+    for encoding in encodings:
+      for compression in compressions:
+        for default in defaults:
+          for blocksize in blocksizes:
+            for nullable in nullability:
+              impala_tbl_name = "test_column_options_%s" % str(indx)
+              cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY
+                  %s %s %s %s, b INT %s %s %s %s %s) PARTITION BY HASH (a)
+                  PARTITIONS 3 STORED AS KUDU""" % (unique_database, impala_tbl_name,
+                  encoding, compression, default, blocksize, nullable, encoding,
+                  compression, default, blocksize))
+              indx = indx + 1
+              kudu_tbl_name = "impala::%s.%s" % (unique_database, impala_tbl_name)
+              assert kudu_client.table_exists(kudu_tbl_name)
+
+  def test_kudu_rename_table(self, cursor, kudu_client, unique_database):
+    """Test Kudu table rename"""
+    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY) PARTITION BY HASH(a)
+        PARTITIONS 3 STORED AS KUDU""" % unique_database)
+    kudu_tbl_name = "impala::%s.foo" % unique_database
+    assert kudu_client.table_exists(kudu_tbl_name)
+    new_kudu_tbl_name = "blah"
+    cursor.execute("ALTER TABLE %s.foo SET TBLPROPERTIES('kudu.table_name'='%s')" % (
+        unique_database, new_kudu_tbl_name))
+    assert kudu_client.table_exists(new_kudu_tbl_name)
+    assert not kudu_client.table_exists(kudu_tbl_name)
+
+  def test_kudu_show_unbounded_range_partition(self, cursor, kudu_client,
+                                               unique_database):
+    """Check that a single unbounded range partition gets printed correctly."""
+    schema_builder = SchemaBuilder()
+    column_spec = schema_builder.add_column("id", INT64)
+    column_spec.nullable(False)
+    schema_builder.set_primary_keys(["id"])
+    schema = schema_builder.build()
+
+    name = unique_database + ".unbounded_range_table"
+
+    try:
+      kudu_client.create_table(name, schema,
+                        partitioning=Partitioning().set_range_partition_columns(["id"]))
+      kudu_table = kudu_client.table(name)
+
+      impala_table_name = self.get_kudu_table_base_name(kudu_table.name)
+      props = "TBLPROPERTIES('kudu.table_name'='%s')" % kudu_table.name
+      cursor.execute("CREATE EXTERNAL TABLE %s STORED AS KUDU %s" % (impala_table_name,
+          props))
+      with self.drop_impala_table_after_context(cursor, impala_table_name):
+        cursor.execute("SHOW RANGE PARTITIONS %s" % impala_table_name)
+        assert cursor.description == [
+          ('RANGE (id)', 'STRING', None, None, None, None, None)]
+        assert cursor.fetchall() == [('UNBOUNDED',)]
+
+    finally:
+      if kudu_client.table_exists(name):
+        kudu_client.delete_table(name)
 
 
 class TestCreateExternalTable(KuduTestSuite):
@@ -90,7 +172,7 @@ class TestCreateExternalTable(KuduTestSuite):
       with self.drop_impala_table_after_context(cursor, impala_table_name):
         cursor.execute("DESCRIBE %s" % impala_table_name)
         kudu_schema = kudu_table.schema
-        for i, (col_name, col_type, _) in enumerate(cursor):
+        for i, (col_name, col_type, _, _, _, _, _, _, _) in enumerate(cursor):
           kudu_col = kudu_schema[i]
           assert col_name == kudu_col.name
           assert col_type.upper() == \
@@ -169,7 +251,9 @@ class TestCreateExternalTable(KuduTestSuite):
                 impala_table_name, preferred_kudu_table.name))
         with self.drop_impala_table_after_context(cursor, impala_table_name):
           cursor.execute("DESCRIBE %s" % impala_table_name)
-          assert cursor.fetchall() == [("a", "bigint", "")]
+          assert cursor.fetchall() == \
+              [("a", "bigint", "", "true", "false", "", "AUTO_ENCODING",
+                "DEFAULT_COMPRESSION", "0")]
 
   def test_explicit_name_doesnt_exist(self, cursor, kudu_client):
     kudu_table_name = self.random_table_name()
@@ -219,77 +303,78 @@ class TestShowCreateTable(KuduTestSuite):
 
   def test_primary_key_and_distribution(self, cursor):
     # TODO: Add test cases with column comments once KUDU-1711 is fixed.
+    # TODO: Add case with BLOCK_SIZE
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT PRIMARY KEY)
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS STORED AS KUDU""",
+        PARTITION BY HASH (c) PARTITIONS 3 STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) PARTITIONS 3
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
-        CREATE TABLE {table} (c INT PRIMARY KEY, d STRING)
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c)
+        CREATE TABLE {table} (c INT PRIMARY KEY, d STRING NULL)
+        PARTITION BY HASH (c) PARTITIONS 3, RANGE (c)
         (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
          PARTITION 2 < VALUES) STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
-          d STRING,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          d STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, RANGE (c) (...)
+        PARTITION BY HASH (c) PARTITIONS 3, RANGE (c) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
-        CREATE TABLE {table} (c INT, PRIMARY KEY (c))
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS STORED AS KUDU""",
+        CREATE TABLE {table} (c INT ENCODING PLAIN_ENCODING, PRIMARY KEY (c))
+        PARTITION BY HASH (c) PARTITIONS 3 STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
+          c INT NOT NULL ENCODING PLAIN_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) PARTITIONS 3
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
-        CREATE TABLE {table} (c INT, d STRING, PRIMARY KEY(c, d))
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS,
+        CREATE TABLE {table} (c INT COMPRESSION LZ4, d STRING, PRIMARY KEY(c, d))
+        PARTITION BY HASH (c) PARTITIONS 3, HASH (d) PARTITIONS 3,
         RANGE (c, d) (PARTITION VALUE = (1, 'aaa'), PARTITION VALUE = (2, 'bbb'))
         STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
-          d STRING,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION LZ4,
+          d STRING NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c, d)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS, HASH (d) INTO 3 BUCKETS, RANGE (c, d) (...)
+        PARTITION BY HASH (c) PARTITIONS 3, HASH (d) PARTITIONS 3, RANGE (c, d) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
-        CREATE TABLE {table} (c INT, d STRING, e INT, PRIMARY KEY(c, d))
-        DISTRIBUTE BY RANGE (c) (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
+        CREATE TABLE {table} (c INT, d STRING, e INT NULL DEFAULT 10, PRIMARY KEY(c, d))
+        PARTITION BY RANGE (c) (PARTITION VALUES <= 1, PARTITION 1 < VALUES <= 2,
         PARTITION 2 < VALUES <= 3, PARTITION 3 < VALUES) STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
-          d STRING,
-          e INT,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          d STRING NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          e INT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION DEFAULT 10,
           PRIMARY KEY (c, d)
         )
-        DISTRIBUTE BY RANGE (c) (...)
+        PARTITION BY RANGE (c) (...)
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
@@ -302,15 +387,15 @@ class TestShowCreateTable(KuduTestSuite):
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {{table}} (c INT PRIMARY KEY)
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) PARTITIONS 3
         STORED AS KUDU
         TBLPROPERTIES ({props})""".format(props=props),
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) PARTITIONS 3
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}', {props})""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS, props=props))
@@ -321,15 +406,15 @@ class TestShowCreateTable(KuduTestSuite):
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {{table}} (c INT PRIMARY KEY)
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) PARTITIONS 3
         STORED AS KUDU
         TBLPROPERTIES ({props})""".format(props=props),
         """
         CREATE TABLE {db}.{{table}} (
-          c INT,
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           PRIMARY KEY (c)
         )
-        DISTRIBUTE BY HASH (c) INTO 3 BUCKETS
+        PARTITION BY HASH (c) PARTITIONS 3
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
@@ -371,7 +456,7 @@ class TestDropDb(KuduTestSuite):
       # Create a managed Kudu table
       managed_table_name = self.random_table_name()
       unique_cursor.execute("""
-          CREATE TABLE %s (a INT PRIMARY KEY) DISTRIBUTE BY HASH (a) INTO 3 BUCKETS
+          CREATE TABLE %s (a INT PRIMARY KEY) PARTITION BY HASH (a) PARTITIONS 3
           STORED AS KUDU TBLPROPERTIES ('kudu.table_name' = '%s')"""
           % (managed_table_name, managed_table_name))
       assert kudu_client.table_exists(managed_table_name)
@@ -384,7 +469,7 @@ class TestDropDb(KuduTestSuite):
       unique_cursor.execute("USE DEFAULT")
       unique_cursor.execute("DROP DATABASE %s CASCADE" % db_name)
       unique_cursor.execute("SHOW DATABASES")
-      assert db_name not in unique_cursor.fetchall()
+      assert (db_name, '') not in unique_cursor.fetchall()
       assert kudu_client.table_exists(kudu_table.name)
       assert not kudu_client.table_exists(managed_table_name)
 
@@ -401,7 +486,9 @@ class TestImpalaKuduIntegration(KuduTestSuite):
       cursor.execute("CREATE EXTERNAL TABLE %s STORED AS KUDU %s" % (
           impala_table_name, props))
       cursor.execute("DESCRIBE %s" % (impala_table_name))
-      assert cursor.fetchall() == [("a", "int", "")]
+      assert cursor.fetchall() == \
+          [("a", "int", "", "true", "false", "", "AUTO_ENCODING",
+            "DEFAULT_COMPRESSION", "0")]
 
       # Drop the underlying Kudu table and replace it with another Kudu table that has
       # the same name but different schema
@@ -417,12 +504,15 @@ class TestImpalaKuduIntegration(KuduTestSuite):
         # Kudu.
         cursor.execute("REFRESH %s" % (impala_table_name))
         cursor.execute("DESCRIBE %s" % (impala_table_name))
-        assert cursor.fetchall() == [("b", "string", ""), ("c", "string", "")]
+        assert cursor.fetchall() == \
+            [("b", "string", "", "true", "false", "", "AUTO_ENCODING",
+              "DEFAULT_COMPRESSION", "0"),
+             ("c", "string", "", "false", "true", "", "AUTO_ENCODING",
+              "DEFAULT_COMPRESSION", "0")]
 
   def test_delete_external_kudu_table(self, cursor, kudu_client):
     """Check that Impala can recover from the case where the underlying Kudu table of
-        an external table is dropped using the Kudu client. The external table can be
-        dropped using DROP TABLE IF EXISTS statement.
+        an external table is dropped using the Kudu client.
     """
     with self.temp_kudu_table(kudu_client, [INT32]) as kudu_table:
       # Create an external Kudu table
@@ -431,7 +521,9 @@ class TestImpalaKuduIntegration(KuduTestSuite):
       cursor.execute("CREATE EXTERNAL TABLE %s STORED AS KUDU %s" % (
           impala_table_name, props))
       cursor.execute("DESCRIBE %s" % (impala_table_name))
-      assert cursor.fetchall() == [("a", "int", "")]
+      assert cursor.fetchall() == \
+          [("a", "int", "", "true", "false", "", "AUTO_ENCODING",
+            "DEFAULT_COMPRESSION", "0")]
       # Drop the underlying Kudu table
       kudu_client.delete_table(kudu_table.name)
       assert not kudu_client.table_exists(kudu_table.name)
@@ -440,23 +532,24 @@ class TestImpalaKuduIntegration(KuduTestSuite):
         cursor.execute("REFRESH %s" % (impala_table_name))
       except Exception as e:
         assert err_msg in str(e)
-      cursor.execute("DROP TABLE IF EXISTS %s" % (impala_table_name))
+      cursor.execute("DROP TABLE %s" % (impala_table_name))
       cursor.execute("SHOW TABLES")
-      assert impala_table_name not in cursor.fetchall()
+      assert (impala_table_name,) not in cursor.fetchall()
+
 
   def test_delete_managed_kudu_table(self, cursor, kudu_client, unique_database):
     """Check that dropping a managed Kudu table works even if the underlying Kudu table
         has been dropped externally."""
     impala_tbl_name = "foo"
-    cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY) DISTRIBUTE BY HASH (a)
-        INTO 3 BUCKETS STORED AS KUDU""" % (unique_database, impala_tbl_name))
+    cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY) PARTITION BY HASH (a)
+        PARTITIONS 3 STORED AS KUDU""" % (unique_database, impala_tbl_name))
     kudu_tbl_name = "impala::%s.%s" % (unique_database, impala_tbl_name)
     assert kudu_client.table_exists(kudu_tbl_name)
     kudu_client.delete_table(kudu_tbl_name)
     assert not kudu_client.table_exists(kudu_tbl_name)
-    cursor.execute("DROP TABLE IF EXISTS %s" % (impala_tbl_name))
-    cursor.execute("SHOW TABLES")
-    assert impala_tbl_name not in cursor.fetchall()
+    cursor.execute("DROP TABLE %s.%s" % (unique_database, impala_tbl_name))
+    cursor.execute("SHOW TABLES IN %s" % unique_database)
+    assert (impala_tbl_name,) not in cursor.fetchall()
 
 class TestKuduMemLimits(KuduTestSuite):
 
@@ -487,7 +580,7 @@ class TestKuduMemLimits(KuduTestSuite):
     l_shipmode STRING,
     l_comment STRING,
     PRIMARY KEY (l_orderkey, l_linenumber))
-  DISTRIBUTE BY HASH (l_orderkey, l_linenumber) INTO 3 BUCKETS
+  PARTITION BY HASH (l_orderkey, l_linenumber) PARTITIONS 3
   STORED AS KUDU"""
 
   LOAD = """
@@ -523,3 +616,12 @@ class TestKuduMemLimits(KuduTestSuite):
         if (mem_limit > self.QUERY_MEM_LIMITS[i]):
           raise
         assert "Memory limit exceeded" in str(e)
+
+    # IMPALA-4654: Validate the fix for a bug where LimitReached() wasn't respected in
+    # the KuduScanner and the limit query above would result in a fragment running an
+    # additional minute. This ensures that the num fragments 'in flight' reaches 0 in
+    # less time than IMPALA-4654 was reproducing (~60sec) but yet still enough time that
+    # this test won't be flaky.
+    verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
+    for v in verifiers:
+      v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=30)

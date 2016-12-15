@@ -16,8 +16,12 @@
 // under the License.
 
 #include <udf/udf.h>
+#include <cmath>
 
 using namespace impala_udf;
+
+#define NO_INLINE __attribute__((noinline))
+#define WEAK_SYM  __attribute__((weak))
 
 // These functions are intended to test the "glue" that runs UDFs. Thus, the UDFs
 // themselves are kept very simple.
@@ -122,7 +126,7 @@ DecimalVal VarSum(FunctionContext* context, int n, const DecimalVal* args) {
   return DecimalVal(result);
 }
 
-DoubleVal __attribute__((noinline)) VarSumMultiply(FunctionContext* context,
+DoubleVal NO_INLINE VarSumMultiply(FunctionContext* context,
     const DoubleVal& d, int n, const IntVal* args) {
   if (d.is_null) return DoubleVal::null();
 
@@ -149,9 +153,56 @@ extern "C" StringVal
         FunctionContext* context, const StringVal& str);
 
 StringVal ToLower(FunctionContext* context, const StringVal& str) {
+  // StringVal::null() doesn't inline its callee when compiled without optimization.
+  // Useful for testing cases such as IMPALA-4595.
+  if (str.is_null) return StringVal::null();
   return
       _ZN6impala15StringFunctions5LowerEPN10impala_udf15FunctionContextERKNS1_9StringValE(
           context, str);
+}
+
+typedef DoubleVal (*TestFn)(const DoubleVal& base, const DoubleVal& exp);
+
+// This function is dropped upon linking when tested as IR UDF as it has internal linkage
+// and its only caller Pow() will be overriden upon linking.
+static DoubleVal NO_INLINE PrivateFn1(const DoubleVal& base, const DoubleVal& exp) {
+#ifdef IR_COMPILE
+  return DoubleVal::null();
+#else
+  return DoubleVal(std::pow(base.val, exp.val));
+#endif
+}
+
+// This function is referenced in global variable 'global_array_2' even though it
+// has no caller. This is to exercise IMPALA-4595 which verifies that this function
+// still exists after linking.
+static DoubleVal PrivateFn2(const DoubleVal& base, const DoubleVal& exp) {
+  return DoubleVal(base.val + exp.val);
+}
+
+// This is a constant array with internal linkage type. Its only reference is from Pow()
+// which will be overridden during linking. This array will essentially not be in the
+// module after linking. Used to exercise IMPALA-4595 when testing IR UDF.
+static volatile const TestFn global_array[1] = {PrivateFn1};
+
+volatile const TestFn global_array_2[1] = {PrivateFn2};
+
+namespace impala {
+  class MathFunctions {
+    static DoubleVal Pow(FunctionContext* ctx, const DoubleVal& base,
+        const DoubleVal& exp);
+  };
+}
+
+// This function has the same signature as a built-in function (pow()) in Impalad.
+// It has a weak linkage type so it can be overridden at linking when tested as IR UDF.
+DoubleVal WEAK_SYM impala::MathFunctions::Pow(FunctionContext* context,
+    const DoubleVal& base, const DoubleVal& exp) {
+  // Just references 'global_array' to stop the compiler from complaining.
+  // This function will be overridden after linking so 'global_array' is dead
+  // when tested as an IR UDF.
+  if (base.is_null || exp.is_null || global_array[0] == NULL) return DoubleVal::null();
+  return PrivateFn1(base, exp);
 }
 
 BooleanVal TestError(FunctionContext* context) {

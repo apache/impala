@@ -20,29 +20,30 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 
 import org.apache.commons.lang3.StringUtils;
-
-import parquet.Strings;
-
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeTableParams;
+
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
 /**
- * Representation of a DESCRIBE table statement which returns metadata on
- * a specified table:
+ * Representation of a DESCRIBE statement which returns metadata on a specified
+ * table or path:
  * Syntax: DESCRIBE <path>
  *         DESCRIBE FORMATTED|EXTENDED <table>
  *
  * If FORMATTED|EXTENDED is not specified and the path refers to a table, the statement
- * only returns info on the given table's column definition (column name, data type, and
- * comment). If the path refers to a complex typed field within a column, the statement
- * returns the field names, types, and comments.
+ * only returns info on the given table's column definitions (column name, data type,
+ * comment, and table-type-specific info like nullability, etc.). If the path refers to
+ * a complex typed field within a column, the statement returns the field names, types,
+ * and comments.
  * If FORMATTED|EXTENDED is specified, extended metadata on the table is returned
  * (in addition to the column definitions). This metadata includes info about the table
  * properties, SerDe properties, StorageDescriptor properties, and more.
@@ -51,15 +52,16 @@ public class DescribeTableStmt extends StatementBase {
   private final TDescribeOutputStyle outputStyle_;
 
   /// "."-separated path from the describe statement.
-  private ArrayList<String> rawPath_;
+  private final ArrayList<String> rawPath_;
 
   /// The resolved path to describe, set after analysis.
   private Path path_;
 
   /// The fully qualified name of the root table, set after analysis.
-  private TableName tableName_;
+  private Table table_;
 
   /// Struct type with the fields to display for the described path.
+  /// Only set when describing a path to a nested collection.
   private StructType resultStruct_;
 
   public DescribeTableStmt(ArrayList<String> rawPath, TDescribeOutputStyle outputStyle) {
@@ -68,7 +70,6 @@ public class DescribeTableStmt extends StatementBase {
     rawPath_ = rawPath;
     outputStyle_ = outputStyle;
     path_ = null;
-    tableName_ = null;
     resultStruct_ = null;
   }
 
@@ -81,9 +82,8 @@ public class DescribeTableStmt extends StatementBase {
     return sb.toString() + StringUtils.join(rawPath_, ".");
   }
 
-  public TableName getTableName() { return tableName_; }
+  public Table getTable() { return table_; }
   public TDescribeOutputStyle getOutputStyle() { return outputStyle_; }
-
 
   /**
    * Get the privilege requirement, which depends on the output style.
@@ -122,31 +122,37 @@ public class DescribeTableStmt extends StatementBase {
       throw new AnalysisException(tle.getMessage(), tle);
     }
 
-    tableName_ = analyzer.getFqTableName(path_.getRootTable().getTableName());
-    analyzer.getTable(tableName_, getPrivilegeRequirement());
+    table_ = path_.getRootTable();
+    // Register authorization and audit events.
+    analyzer.getTable(table_.getTableName(), getPrivilegeRequirement());
 
-    if (path_.destTable() != null) {
-      resultStruct_ = path_.getRootTable().getHiveColumnsAsStruct();
-    } else if (path_.destType().isComplexType()) {
+    // Describing a table.
+    if (path_.destTable() != null) return;
+
+    if (path_.destType().isComplexType()) {
       if (outputStyle_ == TDescribeOutputStyle.FORMATTED ||
           outputStyle_ == TDescribeOutputStyle.EXTENDED) {
         throw new AnalysisException("DESCRIBE FORMATTED|EXTENDED must refer to a table");
       }
+      // Describing a nested collection.
       Preconditions.checkState(outputStyle_ == TDescribeOutputStyle.MINIMAL);
       resultStruct_ = Path.getTypeAsStruct(path_.destType());
     } else {
       throw new AnalysisException("Cannot describe path '" +
-          Strings.join(rawPath_, ".") + "' targeting scalar type: " +
+          Joiner.on('.').join(rawPath_) + "' targeting scalar type: " +
           path_.destType().toSql());
     }
   }
 
   public TDescribeTableParams toThrift() {
     TDescribeTableParams params = new TDescribeTableParams();
-    params.setTable_name(getTableName().getTbl());
-    params.setDb(getTableName().getDb());
     params.setOutput_style(outputStyle_);
-    params.setResult_struct(resultStruct_.toThrift());
+    if (resultStruct_ != null) {
+      params.setResult_struct(resultStruct_.toThrift());
+    } else {
+      Preconditions.checkNotNull(table_);
+      params.setTable_name(table_.getTableName().toThrift());
+    }
     return params;
   }
 }

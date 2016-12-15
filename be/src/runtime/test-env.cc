@@ -19,6 +19,8 @@
 #include "util/disk-info.h"
 #include "util/impalad-metrics.h"
 
+#include "gutil/strings/substitute.h"
+
 #include <memory>
 
 #include "common/names.h"
@@ -47,8 +49,7 @@ void TestEnv::InitMetrics() {
   metrics_.reset(new MetricGroup("test-env-metrics"));
 }
 
-void TestEnv::InitTmpFileMgr(const std::vector<std::string>& tmp_dirs,
-    bool one_dir_per_device) {
+void TestEnv::InitTmpFileMgr(const vector<string>& tmp_dirs, bool one_dir_per_device) {
   // Need to recreate metrics to avoid error when registering metric twice.
   InitMetrics();
   tmp_file_mgr_.reset(new TmpFileMgr);
@@ -57,57 +58,17 @@ void TestEnv::InitTmpFileMgr(const std::vector<std::string>& tmp_dirs,
 
 TestEnv::~TestEnv() {
   // Queries must be torn down first since they are dependent on global state.
-  TearDownQueryStates();
+  TearDownRuntimeStates();
   exec_env_.reset();
   io_mgr_tracker_.reset();
   tmp_file_mgr_.reset();
   metrics_.reset();
 }
 
-RuntimeState* TestEnv::CreateRuntimeState(int64_t query_id,
-    TQueryOptions* query_options) {
-  TExecPlanFragmentParams plan_params = TExecPlanFragmentParams();
-  if (query_options != NULL) plan_params.query_ctx.request.query_options = *query_options;
-  plan_params.query_ctx.query_id.hi = 0;
-  plan_params.query_ctx.query_id.lo = query_id;
-  return new RuntimeState(plan_params, exec_env_.get());
+void TestEnv::TearDownRuntimeStates() {
+  for (auto& runtime_state : runtime_states_) runtime_state.second->ReleaseResources();
+  runtime_states_.clear();
 }
-
-Status TestEnv::CreateQueryState(int64_t query_id, int max_buffers, int block_size,
-    RuntimeState** runtime_state, TQueryOptions* query_options) {
-  *runtime_state = CreateRuntimeState(query_id, query_options);
-  if (*runtime_state == NULL) {
-    return Status("Unexpected error creating RuntimeState");
-  }
-
-  (*runtime_state)->InitMemTrackers(TUniqueId(), NULL, -1);
-
-  shared_ptr<BufferedBlockMgr> mgr;
-  RETURN_IF_ERROR(BufferedBlockMgr::Create(*runtime_state,
-      (*runtime_state)->query_mem_tracker(), (*runtime_state)->runtime_profile(),
-      tmp_file_mgr_.get(), CalculateMemLimit(max_buffers, block_size), block_size, &mgr));
-  (*runtime_state)->set_block_mgr(mgr);
-
-  query_states_.push_back(shared_ptr<RuntimeState>(*runtime_state));
-  return Status::OK();
-}
-
-Status TestEnv::CreateQueryStates(int64_t start_query_id, int num_mgrs,
-    int buffers_per_mgr, int block_size,
-    vector<RuntimeState*>* runtime_states) {
-  for (int i = 0; i < num_mgrs; ++i) {
-    RuntimeState* runtime_state;
-    RETURN_IF_ERROR(CreateQueryState(start_query_id + i, buffers_per_mgr, block_size,
-        &runtime_state));
-    runtime_states->push_back(runtime_state);
-  }
-  return Status::OK();
-}
-
-void TestEnv::TearDownQueryStates() {
-  query_states_.clear();
-}
-
 
 int64_t TestEnv::CalculateMemLimit(int max_buffers, int block_size) {
   DCHECK_GE(max_buffers, -1);
@@ -117,9 +78,34 @@ int64_t TestEnv::CalculateMemLimit(int max_buffers, int block_size) {
 
 int64_t TestEnv::TotalQueryMemoryConsumption() {
   int64_t total = 0;
-  for (shared_ptr<RuntimeState>& query_state : query_states_) {
-    total += query_state->query_mem_tracker()->consumption();
+  for (const auto& runtime_state : runtime_states_) {
+    total += runtime_state.second->query_mem_tracker()->consumption();
   }
   return total;
 }
+
+Status TestEnv::CreateQueryState(int64_t query_id, int max_buffers, int block_size,
+    const TQueryOptions* query_options, RuntimeState** runtime_state) {
+  // Enforce invariant that each query ID can be registered at most once.
+  if (runtime_states_.find(query_id) != runtime_states_.end()) {
+    return Status(Substitute("Duplicate query id found: $0", query_id));
+  }
+
+  TQueryCtx query_ctx;
+  if (query_options != nullptr) query_ctx.client_request.query_options = *query_options;
+  query_ctx.query_id.hi = 0;
+  query_ctx.query_id.lo = query_id;
+  *runtime_state = new RuntimeState(query_ctx, exec_env_.get());
+  (*runtime_state)->InitMemTrackers(nullptr, -1);
+
+  shared_ptr<BufferedBlockMgr> mgr;
+  RETURN_IF_ERROR(BufferedBlockMgr::Create(*runtime_state,
+      (*runtime_state)->query_mem_tracker(), (*runtime_state)->runtime_profile(),
+      tmp_file_mgr_.get(), CalculateMemLimit(max_buffers, block_size), block_size, &mgr));
+  (*runtime_state)->set_block_mgr(mgr);
+
+  runtime_states_[query_id] = shared_ptr<RuntimeState>(*runtime_state);
+  return Status::OK();
+}
+
 }

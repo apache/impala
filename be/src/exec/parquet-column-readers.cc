@@ -254,7 +254,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   }
 
  protected:
-  template <bool IN_COLLECTION>
+  template<bool IN_COLLECTION>
   inline bool ReadValue(MemPool* pool, Tuple* tuple) {
     // NextLevels() should have already been called and def and rep levels should be in
     // valid range.
@@ -268,9 +268,9 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     if (MATERIALIZED) {
       if (def_level_ >= max_def_level()) {
         if (page_encoding_ == parquet::Encoding::PLAIN_DICTIONARY) {
-          if (!ReadSlot<true>(tuple->GetSlot(tuple_offset_), pool)) return false;
+          if (!ReadSlot<true>(tuple, pool)) return false;
         } else {
-          if (!ReadSlot<false>(tuple->GetSlot(tuple_offset_), pool)) return false;
+          if (!ReadSlot<false>(tuple, pool)) return false;
         }
       } else {
         tuple->SetNull(null_indicator_offset_);
@@ -382,8 +382,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
 
       if (MATERIALIZED) {
         if (def_level >= max_def_level()) {
-          bool continue_execution =
-              ReadSlot<IS_DICT_ENCODED>(tuple->GetSlot(tuple_offset_), pool);
+          bool continue_execution = ReadSlot<IS_DICT_ENCODED>(tuple, pool);
           if (UNLIKELY(!continue_execution)) return false;
         } else {
           tuple->SetNull(null_indicator_offset_);
@@ -443,13 +442,15 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   }
 
  private:
-  /// Writes the next value into *slot using pool if necessary.
+  /// Writes the next value into the appropriate destination slot in 'tuple' using pool
+  /// if necessary.
   ///
   /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
   template<bool IS_DICT_ENCODED>
-  inline bool ReadSlot(void* slot, MemPool* pool) {
+  inline bool ReadSlot(Tuple* tuple, MemPool* pool) {
+    void* slot = tuple->GetSlot(tuple_offset_);
     T val;
     T* val_ptr = NeedsConversion() ? &val : reinterpret_cast<T*>(slot);
     if (IS_DICT_ENCODED) {
@@ -468,8 +469,13 @@ class ScalarColumnReader : public BaseScalarColumnReader {
       }
       data_ += encoded_len;
     }
+
+    if (UNLIKELY(NeedsValidation() && !ValidateSlot(val_ptr, tuple))) {
+      return false;
+    }
     if (UNLIKELY(NeedsConversion() &&
-            !ConvertSlot(&val, reinterpret_cast<T*>(slot), pool))) {
+        !tuple->IsNull(null_indicator_offset_) &&
+        !ConvertSlot(&val, reinterpret_cast<T*>(slot), pool))) {
       return false;
     }
     return true;
@@ -483,14 +489,28 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     return false;
   }
 
+  /// Similar to NeedsCoversion(), most column readers do not require validation,
+  /// so to avoid branches, we return constant false. In general, types where not
+  /// all possible bit representations of the data type are valid should be
+  /// validated.
+  inline bool NeedsValidation() const {
+    return false;
+  }
+
   /// Converts and writes src into dst based on desc_->type()
   bool ConvertSlot(const T* src, T* dst, MemPool* pool) {
     DCHECK(false);
     return false;
   }
 
-  /// Pull out slow-path Status construction code from ReadRepetitionLevel()/
-  /// ReadDefinitionLevel() for performance.
+  /// Sets error message and returns false if the slot value is invalid, e.g., due to
+  /// being out of the valid value range.
+  bool ValidateSlot(T* src, Tuple* tuple) const {
+    DCHECK(false);
+    return false;
+  }
+
+  /// Pull out slow-path Status construction code
   void __attribute__((noinline)) SetDictDecodeError() {
     parent_->parse_status_ = Status(TErrorCode::PARQUET_DICT_DECODE_FAILURE, filename(),
         slot_desc_->type().DebugString(), stream_->file_offset());
@@ -562,6 +582,27 @@ bool ScalarColumnReader<TimestampValue, true>::ConvertSlot(
   return true;
 }
 
+template<>
+inline bool ScalarColumnReader<TimestampValue, true>::NeedsValidation() const {
+  return true;
+}
+
+template<>
+bool ScalarColumnReader<TimestampValue, true>::ValidateSlot(
+    TimestampValue* src, Tuple* tuple) const {
+  if (UNLIKELY(!src->IsValidDate())) {
+    ErrorMsg msg(TErrorCode::PARQUET_TIMESTAMP_OUT_OF_RANGE,
+        filename(), node_.element->name);
+    Status status = parent_->state_->LogOrReturnError(msg);
+    if (!status.ok()) {
+      parent_->parse_status_ = status;
+      return false;
+    }
+    tuple->SetNull(null_indicator_offset_);
+  }
+  return true;
+}
+
 class BoolColumnReader : public BaseScalarColumnReader {
  public:
   BoolColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
@@ -614,7 +655,7 @@ class BoolColumnReader : public BaseScalarColumnReader {
         "Caller should have called NextLevels() until we are ready to read a value";
 
     if (def_level_ >= max_def_level()) {
-      return ReadSlot<IN_COLLECTION>(tuple->GetSlot(tuple_offset_), pool);
+      return ReadSlot<IN_COLLECTION>(tuple, pool);
     } else {
       // Null value
       tuple->SetNull(null_indicator_offset_);
@@ -622,14 +663,15 @@ class BoolColumnReader : public BaseScalarColumnReader {
     }
   }
 
-  /// Writes the next value into *slot using pool if necessary. Also advances def_level_
-  /// and rep_level_ via NextLevels().
+  /// Writes the next value into the next slot in the *tuple using pool if necessary.
+  /// Also advances def_level_ and rep_level_ via NextLevels().
   ///
   /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
-  template <bool IN_COLLECTION>
-  inline bool ReadSlot(void* slot, MemPool* pool)  {
+  template<bool IN_COLLECTION>
+  inline bool ReadSlot(Tuple* tuple, MemPool* pool)  {
+    void* slot = tuple->GetSlot(tuple_offset_);
     if (!bool_values_.GetValue(1, reinterpret_cast<bool*>(slot))) {
       parent_->parse_status_ = Status("Invalid bool column.");
       return false;
@@ -954,7 +996,7 @@ Status BaseScalarColumnReader::ReadDataPage() {
   return Status::OK();
 }
 
-template <bool ADVANCE_REP_LEVEL>
+template<bool ADVANCE_REP_LEVEL>
 bool BaseScalarColumnReader::NextLevels() {
   if (!ADVANCE_REP_LEVEL) DCHECK_EQ(max_rep_level(), 0) << slot_desc()->DebugString();
 
@@ -1020,7 +1062,7 @@ bool CollectionColumnReader::ReadValue(MemPool* pool, Tuple* tuple) {
   if (tuple_offset_ == -1) {
     return CollectionColumnReader::NextLevels();
   } else if (def_level_ >= max_def_level()) {
-    return ReadSlot(tuple->GetSlot(tuple_offset_), pool);
+    return ReadSlot(tuple, pool);
   } else {
     // Null value
     tuple->SetNull(null_indicator_offset_);
@@ -1033,12 +1075,13 @@ bool CollectionColumnReader::ReadNonRepeatedValue(
   return CollectionColumnReader::ReadValue(pool, tuple);
 }
 
-bool CollectionColumnReader::ReadSlot(void* slot, MemPool* pool) {
+bool CollectionColumnReader::ReadSlot(Tuple* tuple, MemPool* pool) {
   DCHECK(!children_.empty());
   DCHECK_LE(rep_level_, new_collection_rep_level());
 
   // Recursively read the collection into a new CollectionValue.
-  CollectionValue* coll_slot = reinterpret_cast<CollectionValue*>(slot);
+  CollectionValue* coll_slot = reinterpret_cast<CollectionValue*>(
+      tuple->GetSlot(tuple_offset_));
   *coll_slot = CollectionValue();
   CollectionValueBuilder builder(
       coll_slot, *slot_desc_->collection_item_descriptor(), pool, parent_->state_);

@@ -30,6 +30,8 @@
 #include "service/query-result-set.h"
 #include "util/impalad-metrics.h"
 #include "util/webserver.h"
+#include "util/runtime-profile.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 
@@ -66,7 +68,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   RAISE_IF_ERROR(Execute(&query_ctx, session, &exec_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
-  exec_state->UpdateNonErrorQueryState(QueryState::RUNNING);
+  exec_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
   exec_state->WaitAsync();
@@ -107,7 +109,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   RAISE_IF_ERROR(Execute(&query_ctx, session, &exec_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
-  exec_state->UpdateNonErrorQueryState(QueryState::RUNNING);
+  exec_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
   Status status = SetQueryInflight(session, exec_state);
@@ -123,7 +125,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
 
-  exec_state->UpdateNonErrorQueryState(QueryState::FINISHED);
+  exec_state->UpdateNonErrorQueryState(beeswax::QueryState::FINISHED);
   TUniqueIdToQueryHandle(exec_state->query_id(), &query_handle);
 
   // If the input log context id is an empty string, then create a new number and
@@ -146,7 +148,7 @@ void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& que
       exec_env_->frontend()->GetExplainPlan(query_ctx, &query_explanation.textual),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
   query_explanation.__isset.textual = true;
-  VLOG_QUERY << "explain():\nstmt=" << query_ctx.request.stmt
+  VLOG_QUERY << "explain():\nstmt=" << query_ctx.client_request.stmt
              << "\nplan: " << query_explanation.textual;
 }
 
@@ -233,7 +235,7 @@ void ImpalaServer::close(const QueryHandle& handle) {
   RAISE_IF_ERROR(UnregisterQuery(query_id, true), SQLSTATE_GENERAL_ERROR);
 }
 
-QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
+beeswax::QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
   ScopedSessionState session_handle(this);
   RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
       SQLSTATE_GENERAL_ERROR);
@@ -250,7 +252,7 @@ QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
     RaiseBeeswaxException("Invalid query handle", SQLSTATE_GENERAL_ERROR);
   }
   // dummy to keep compiler happy
-  return QueryState::FINISHED;
+  return beeswax::QueryState::FINISHED;
 }
 
 void ImpalaServer::echo(string& echo_string, const string& input_string) {
@@ -393,7 +395,7 @@ void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& req
 
 Status ImpalaServer::QueryToTQueryContext(const Query& query,
     TQueryCtx* query_ctx) {
-  query_ctx->request.stmt = query.query;
+  query_ctx->client_request.stmt = query.query;
   VLOG_QUERY << "query: " << ThriftDebugString(query);
   QueryOptionsMask set_query_options_mask;
   {
@@ -407,7 +409,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
       // set yet, set it now.
       lock_guard<mutex> l(session->lock);
       if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
-      query_ctx->request.query_options = session->default_query_options;
+      query_ctx->client_request.query_options = session->default_query_options;
       set_query_options_mask = session->set_query_options_mask;
     }
     session->ToThrift(session_id, &query_ctx->session);
@@ -416,7 +418,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
   // Override default query options with Query.Configuration
   if (query.__isset.configuration) {
     for (const string& option: query.configuration) {
-      RETURN_IF_ERROR(ParseQueryOptions(option, &query_ctx->request.query_options,
+      RETURN_IF_ERROR(ParseQueryOptions(option, &query_ctx->client_request.query_options,
           &set_query_options_mask));
     }
   }
@@ -425,7 +427,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
   // pool options.
   AddPoolQueryOptions(query_ctx, ~set_query_options_mask);
   VLOG_QUERY << "TClientRequest.queryOptions: "
-             << ThriftDebugString(query_ctx->request.query_options);
+             << ThriftDebugString(query_ctx->client_request.query_options);
   return Status::OK();
 }
 
@@ -520,13 +522,22 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
       // Note that when IMPALA-87 is fixed (INSERT without FROM clause) we might
       // need to revisit this, since that might lead us to insert a row without a
       // coordinator, depending on how we choose to drive the table sink.
+      int64_t num_row_errors = 0;
+      bool has_kudu_stats = false;
       if (exec_state->coord() != NULL) {
         for (const PartitionStatusMap::value_type& v:
              exec_state->coord()->per_partition_status()) {
           const pair<string, TInsertPartitionStatus> partition_status = v;
           insert_result->rows_modified[partition_status.first] =
               partition_status.second.num_modified_rows;
+
+          if (partition_status.second.__isset.stats &&
+              partition_status.second.stats.__isset.kudu_stats) {
+            has_kudu_stats = true;
+          }
+          num_row_errors += partition_status.second.stats.kudu_stats.num_row_errors;
         }
+        if (has_kudu_stats) insert_result->__set_num_row_errors(num_row_errors);
       }
     }
   }

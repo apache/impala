@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="noncm_installation">
+
+  <title>Installing Impala without Cloudera Manager</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Installing"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Before installing Impala manually, make sure all applicable nodes have the appropriate hardware
+      configuration, levels of operating system and CDH, and any other software prerequisites. See
+      <xref href="impala_prereqs.xml#prereqs"/> for details.
+    </p>
+
+    <p>
+      You can install Impala across many hosts or on one host:
+    </p>
+
+    <ul>
+      <li>
+        Installing Impala across multiple machines creates a distributed configuration. For best performance,
+        install Impala on <b>all</b> DataNodes.
+      </li>
+
+      <li>
+        Installing Impala on a single machine produces a pseudo-distributed cluster.
+      </li>
+    </ul>
+
+    <p>
+      <b>To install Impala on a host:</b>
+    </p>
+
+    <ol>
+      <li>
+        Install CDH as described in the Installation section of the
+<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/CDH5-Installation-Guide.html -->
+        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/installation.html" scope="external" format="html">CDH
+        5 Installation Guide</xref>.
+      </li>
+
+      <li>
+        <p>
+          Install the Hive metastore somewhere in your cluster, as described in the Hive Installation topic in the
+<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_hive_installation.html -->
+          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hive_installation.html" scope="external" format="html">CDH
+          5 Installation Guide</xref>. As part of this process, you configure the Hive metastore to use an external
+          database as a metastore. Impala uses this same database for its own table metadata. You can choose either
+          a MySQL or PostgreSQL database as the metastore. The process for configuring each type of database is
+          described in the CDH Installation Guide).
+        </p>
+        <p>
+          <ph rev="upstream">Cloudera</ph> recommends setting up a Hive metastore service rather than connecting directly to the metastore
+          database; this configuration is required when running Impala under CDH 4.1. Make sure the
+          <filepath>/etc/impala/conf/hive-site.xml</filepath> file contains the following setting, substituting the
+          appropriate hostname for <varname>metastore_server_host</varname>:
+        </p>
+<codeblock>&lt;property&gt;
+&lt;name&gt;hive.metastore.uris&lt;/name&gt;
+&lt;value&gt;thrift://<varname>metastore_server_host</varname>:9083&lt;/value&gt;
+&lt;/property&gt;
+&lt;property&gt;
+&lt;name&gt;hive.metastore.client.socket.timeout&lt;/name&gt;
+&lt;value&gt;3600&lt;/value&gt;
+&lt;description&gt;MetaStore Client socket timeout in seconds&lt;/description&gt;
+&lt;/property&gt;</codeblock>
+      </li>
+
+      <li>
+        (Optional) If you installed the full Hive component on any host, you can verify that the metastore is
+        configured properly by starting the Hive console and querying for the list of available tables. Once you
+        confirm that the console starts, exit the console to continue the installation:
+<codeblock>$ hive
+Hive history file=/tmp/root/hive_job_log_root_201207272011_678722950.txt
+hive&gt; show tables;
+table1
+table2
+hive&gt; quit;
+$</codeblock>
+      </li>
+
+      <li>
+        Confirm that your package management command is aware of the Impala repository settings, as described in
+        <xref href="impala_prereqs.xml#prereqs"/>. (For CDH 4, this is a different repository than for CDH.) You
+        might need to download a repo or list file into a system directory underneath <filepath>/etc</filepath>.
+      </li>
+
+      <li>
+        Use <b>one</b> of the following sets of commands to install the Impala package:
+        <p>
+          <b>For RHEL, Oracle Linux, or CentOS systems:</b>
+        </p>
+<codeblock rev="1.2">$ sudo yum install impala             # Binaries for daemons
+$ sudo yum install impala-server      # Service start/stop script
+$ sudo yum install impala-state-store # Service start/stop script
+$ sudo yum install impala-catalog     # Service start/stop script
+</codeblock>
+        <p>
+          <b>For SUSE systems:</b>
+        </p>
+<codeblock rev="1.2">$ sudo zypper install impala             # Binaries for daemons
+$ sudo zypper install impala-server      # Service start/stop script
+$ sudo zypper install impala-state-store # Service start/stop script
+$ sudo zypper install impala-catalog     # Service start/stop script
+</codeblock>
+        <p>
+          <b>For Debian or Ubuntu systems:</b>
+        </p>
+<codeblock rev="1.2">$ sudo apt-get install impala             # Binaries for daemons
+$ sudo apt-get install impala-server      # Service start/stop script
+$ sudo apt-get install impala-state-store # Service start/stop script
+$ sudo apt-get install impala-catalog     # Service start/stop script
+</codeblock>
+        <note>
+          <ph rev="upstream">Cloudera</ph> recommends that you not install Impala on any HDFS NameNode. Installing Impala on NameNodes
+          provides no additional data locality, and executing queries with such a configuration might cause memory
+          contention and negatively impact the HDFS NameNode.
+        </note>
+      </li>
+
+      <li>
+        Copy the client <codeph>hive-site.xml</codeph>, <codeph>core-site.xml</codeph>,
+        <codeph>hdfs-site.xml</codeph>, and <codeph>hbase-site.xml</codeph> configuration files to the Impala
+        configuration directory, which defaults to <codeph>/etc/impala/conf</codeph>. Create this directory if it
+        does not already exist.
+      </li>
+
+      <li>
+        Use <b>one</b> of the following commands to install <codeph>impala-shell</codeph> on the machines from
+        which you want to issue queries. You can install <codeph>impala-shell</codeph> on any supported machine
+        that can connect to DataNodes that are running <codeph>impalad</codeph>.
+        <p>
+          <b>For RHEL/CentOS systems:</b>
+        </p>
+<codeblock>$ sudo yum install impala-shell</codeblock>
+        <p>
+          <b>For SUSE systems:</b>
+        </p>
+<codeblock>$ sudo zypper install impala-shell</codeblock>
+        <p>
+          <b>For Debian/Ubuntu systems:</b>
+        </p>
+<codeblock>$ sudo apt-get install impala-shell</codeblock>
+      </li>
+
+      <li>
+        Complete any required or recommended configuration, as described in
+        <xref href="impala_config_performance.xml#config_performance"/>. Some of these configuration changes are
+        mandatory. (They are applied automatically when you install using Cloudera Manager.)
+      </li>
+    </ol>
+
+    <p>
+      Once installation and configuration are complete, see <xref href="impala_processes.xml#processes"/> for how
+      to activate the software on the appropriate nodes in your cluster.
+    </p>
+
+    <p>
+      If this is your first time setting up and using Impala in this cluster, run through some of the exercises in
+      <xref href="impala_tutorial.xml#tutorial"/> to verify that you can do basic operations such as creating
+      tables and querying them.
+    </p>
+  </conbody>
+</concept>

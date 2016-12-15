@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="limit">
+
+  <title>LIMIT Clause</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Reports"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>LIMIT</codeph> clause in a <codeph>SELECT</codeph> query sets a maximum number of rows for the
+      result set. Pre-selecting the maximum size of the result set helps Impala to optimize memory usage while
+      processing a distributed query.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>LIMIT <varname>constant_integer_expression</varname></codeblock>
+
+    <p>
+      The argument to the <codeph>LIMIT</codeph> clause must evaluate to a constant value. It can be a numeric
+      literal, or another kind of numeric expression involving operators, casts, and function return values. You
+      cannot refer to a column or use a subquery.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      This clause is useful in contexts such as:
+    </p>
+
+    <ul>
+      <li>
+        To return exactly N items from a top-N query, such as the 10 highest-rated items in a shopping category or
+        the 50 hostnames that refer the most traffic to a web site.
+      </li>
+
+      <li>
+        To demonstrate some sample values from a table or a particular query. (To display some arbitrary items, use
+        a query with no <codeph>ORDER BY</codeph> clause. An <codeph>ORDER BY</codeph> clause causes additional
+        memory and/or disk usage during the query.)
+      </li>
+
+      <li>
+        To keep queries from returning huge result sets by accident if a table is larger than expected, or a
+        <codeph>WHERE</codeph> clause matches more rows than expected.
+      </li>
+    </ul>
+
+    <p rev="1.2.1">
+      Originally, the value for the <codeph>LIMIT</codeph> clause had to be a numeric literal. In Impala 1.2.1 and
+      higher, it can be a numeric expression.
+    </p>
+
+    <p rev="obwl" conref="../shared/impala_common.xml#common/order_by_limit"/>
+
+    <p>
+      See <xref href="impala_order_by.xml#order_by"/> for details.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/limit_and_offset"/>
+
+    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/subquery_no_limit"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following example shows how the <codeph>LIMIT</codeph> clause caps the size of the result set, with the
+      limit being applied after any other clauses such as <codeph>WHERE</codeph>.
+    </p>
+
+<codeblock>[localhost:21000] &gt; create database limits;
+[localhost:21000] &gt; use limits;
+[localhost:21000] &gt; create table numbers (x int);
+[localhost:21000] &gt; insert into numbers values (1), (3), (4), (5), (2);
+Inserted 5 rows in 1.34s
+[localhost:21000] &gt; select x from numbers limit 100;
++---+
+| x |
++---+
+| 1 |
+| 3 |
+| 4 |
+| 5 |
+| 2 |
++---+
+Returned 5 row(s) in 0.26s
+[localhost:21000] &gt; select x from numbers limit 3;
++---+
+| x |
++---+
+| 1 |
+| 3 |
+| 4 |
++---+
+Returned 3 row(s) in 0.27s
+[localhost:21000] &gt; select x from numbers where x &gt; 2 limit 2;
++---+
+| x |
++---+
+| 3 |
+| 4 |
++---+
+Returned 2 row(s) in 0.27s</codeblock>
+
+    <p>
+      For top-N and bottom-N queries, you use the <codeph>ORDER BY</codeph> and <codeph>LIMIT</codeph> clauses
+      together:
+    </p>
+
+<codeblock rev="obwl">[localhost:21000] &gt; select x as "Top 3" from numbers order by x desc limit 3;
++-------+
+| top 3 |
++-------+
+| 5     |
+| 4     |
+| 3     |
++-------+
+[localhost:21000] &gt; select x as "Bottom 3" from numbers order by x limit 3;
++----------+
+| bottom 3 |
++----------+
+| 1        |
+| 2        |
+| 3        |
++----------+
+</codeblock>
+
+    <p>
+      You can use constant values besides integer literals as the <codeph>LIMIT</codeph> argument:
+    </p>
+
+<codeblock>-- Other expressions that yield constant integer values work too.
+SELECT x FROM t1 LIMIT 1e6;                        -- Limit is one million.
+SELECT x FROM t1 LIMIT length('hello world');      -- Limit is 11.
+SELECT x FROM t1 LIMIT 2+2;                        -- Limit is 4.
+SELECT x FROM t1 LIMIT cast(truncate(9.9) AS INT); -- Limit is 9.
+</codeblock>
+  </conbody>
+</concept>

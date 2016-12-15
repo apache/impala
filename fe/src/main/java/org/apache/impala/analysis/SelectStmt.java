@@ -110,6 +110,9 @@ public class SelectStmt extends QueryStmt {
    */
   public Expr getHavingPred() { return havingPred_; }
 
+  @Override
+  public List<String> getColLabels() { return colLabels_; }
+
   public List<TableRef> getTableRefs() { return fromClause_.getTableRefs(); }
   public boolean hasWhereClause() { return whereClause_ != null; }
   public boolean hasGroupByClause() { return groupingExprs_ != null; }
@@ -120,8 +123,6 @@ public class SelectStmt extends QueryStmt {
   public AnalyticInfo getAnalyticInfo() { return analyticInfo_; }
   public boolean hasAnalyticInfo() { return analyticInfo_ != null; }
   public boolean hasHavingClause() { return havingClause_ != null; }
-  @Override
-  public ArrayList<String> getColLabels() { return colLabels_; }
   public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
 
   // Column alias generator used during query rewriting.
@@ -271,7 +272,9 @@ public class SelectStmt extends QueryStmt {
       graph.addDependencyPredicates(sortInfo_.getOrderingExprs());
     }
 
-    if (aggInfo_ != null) LOG.debug("post-analysis " + aggInfo_.debugString());
+    if (aggInfo_ != null) {
+      if (LOG.isTraceEnabled()) LOG.trace("post-analysis " + aggInfo_.debugString());
+    }
   }
 
   /**
@@ -330,7 +333,7 @@ public class SelectStmt extends QueryStmt {
         analyzer.getUnassignedConjuncts(getTableRefIds(), true);
     List<Expr> unassignedJoinConjuncts = Lists.newArrayList();
     for (Expr e: unassigned) {
-      if (analyzer.evalByJoin(e)) unassignedJoinConjuncts.add(e);
+      if (analyzer.evalAfterJoin(e)) unassignedJoinConjuncts.add(e);
     }
     List<Expr> baseTblJoinConjuncts =
         Expr.substituteList(unassignedJoinConjuncts, baseTblSmap_, analyzer, false);
@@ -396,9 +399,11 @@ public class SelectStmt extends QueryStmt {
     }
     baseTblResultExprs_ =
         Expr.trySubstituteList(resultExprs_, baseTblSmap_, analyzer, false);
-    LOG.trace("baseTblSmap_: " + baseTblSmap_.debugString());
-    LOG.trace("resultExprs: " + Expr.debugString(resultExprs_));
-    LOG.trace("baseTblResultExprs: " + Expr.debugString(baseTblResultExprs_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("baseTblSmap_: " + baseTblSmap_.debugString());
+      LOG.trace("resultExprs: " + Expr.debugString(resultExprs_));
+      LOG.trace("baseTblResultExprs: " + Expr.debugString(baseTblResultExprs_));
+    }
   }
 
   public List<TupleId> getTableRefIds() {
@@ -636,7 +641,7 @@ public class SelectStmt extends QueryStmt {
 
     // Optionally rewrite all count(distinct <expr>) into equivalent NDV() calls.
     ExprSubstitutionMap ndvSmap = null;
-    if (analyzer.getQueryCtx().getRequest().query_options.appx_count_distinct) {
+    if (analyzer.getQueryCtx().client_request.query_options.appx_count_distinct) {
       ndvSmap = new ExprSubstitutionMap();
       for (FunctionCallExpr aggExpr: aggExprs) {
         if (!aggExpr.isDistinct()
@@ -685,14 +690,18 @@ public class SelectStmt extends QueryStmt {
 
     ExprSubstitutionMap combinedSmap =
         ExprSubstitutionMap.compose(countAllMap, finalAggInfo.getOutputSmap(), analyzer);
-    LOG.trace("combined smap: " + combinedSmap.debugString());
 
     // change select list, having and ordering exprs to point to agg output. We need
     // to reanalyze the exprs at this point.
-    LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
-    LOG.trace("resultexprs: " + Expr.debugString(resultExprs_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("combined smap: " + combinedSmap.debugString());
+      LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
+      LOG.trace("resultexprs: " + Expr.debugString(resultExprs_));
+    }
     resultExprs_ = Expr.substituteList(resultExprs_, combinedSmap, analyzer, false);
-    LOG.trace("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
+    }
     if (havingPred_ != null) {
       // Make sure the predicate in the HAVING clause does not contain a
       // subquery.
@@ -700,12 +709,16 @@ public class SelectStmt extends QueryStmt {
           Predicates.instanceOf(Subquery.class)));
       havingPred_ = havingPred_.substitute(combinedSmap, analyzer, false);
       analyzer.registerConjuncts(havingPred_, true);
-      LOG.debug("post-agg havingPred: " + havingPred_.debugString());
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("post-agg havingPred: " + havingPred_.debugString());
+      }
     }
     if (sortInfo_ != null) {
       sortInfo_.substituteOrderingExprs(combinedSmap, analyzer);
-      LOG.debug("post-agg orderingExprs: " +
-          Expr.debugString(sortInfo_.getOrderingExprs()));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("post-agg orderingExprs: " +
+            Expr.debugString(sortInfo_.getOrderingExprs()));
+      }
     }
 
     // check that all post-agg exprs point to agg output
@@ -854,13 +867,16 @@ public class SelectStmt extends QueryStmt {
     }
     // change select list and ordering exprs to point to analytic output. We need
     // to reanalyze the exprs at this point.
-    resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer,
-        false);
-    LOG.trace("post-analytic selectListExprs: " + Expr.debugString(resultExprs_));
+    resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, false);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("post-analytic selectListExprs: " + Expr.debugString(resultExprs_));
+    }
     if (sortInfo_ != null) {
       sortInfo_.substituteOrderingExprs(smap, analyzer);
-      LOG.trace("post-analytic orderingExprs: " +
-          Expr.debugString(sortInfo_.getOrderingExprs()));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("post-analytic orderingExprs: " +
+            Expr.debugString(sortInfo_.getOrderingExprs()));
+      }
     }
   }
 
@@ -879,7 +895,7 @@ public class SelectStmt extends QueryStmt {
     if (havingClause_ != null) {
       havingClause_ = rewriter.rewrite(havingClause_, analyzer_);
     }
-    if (groupingExprs_ != null) rewriter.applyList(groupingExprs_, analyzer_);
+    if (groupingExprs_ != null) rewriter.rewriteList(groupingExprs_, analyzer_);
     if (orderByElements_ != null) {
       for (OrderByElement orderByElem: orderByElements_) {
         orderByElem.setExpr(rewriter.rewrite(orderByElem.getExpr(), analyzer_));

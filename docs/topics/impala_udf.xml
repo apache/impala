@@ -1,0 +1,1951 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.2" id="udfs">
+
+  <title>Impala User-Defined Functions (UDFs)</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="UDFs"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      User-defined functions (frequently abbreviated as UDFs) let you code your own application logic for
+      processing column values during an Impala query. For example, a UDF could perform calculations using an
+      external math library, combine several column values into one, do geospatial calculations, or other kinds of
+      tests and transformations that are outside the scope of the built-in SQL operators and functions.
+    </p>
+
+    <p>
+      You can use UDFs to simplify query logic when producing reports, or to transform data in flexible ways when
+      copying from one table to another with the <codeph>INSERT ... SELECT</codeph> syntax.
+    </p>
+
+    <p>
+      You might be familiar with this feature from other database products, under names such as stored functions or
+      stored routines.
+<!--
+    , user-defined aggregate functions (UDAFs), table functions, or window functions.
+    -->
+    </p>
+
+    <p>
+      Impala support for UDFs is available in Impala 1.2 and higher:
+    </p>
+
+    <ul>
+      <li>
+        In Impala 1.1, using UDFs in a query required using the Hive shell. (Because Impala and Hive share the same
+        metastore database, you could switch to Hive to run just those queries requiring UDFs, then switch back to
+        Impala.)
+      </li>
+
+      <li>
+        Starting in Impala 1.2, Impala can run both high-performance native code UDFs written in C++, and
+        Java-based Hive UDFs that you might already have written.
+      </li>
+
+      <li>
+        Impala can run scalar UDFs that return a single value for each row of the result set, and user-defined
+        aggregate functions (UDAFs) that return a value based on a set of rows. Currently, Impala does not support
+        user-defined table functions (UDTFs) or window functions.
+      </li>
+    </ul>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="udf_concepts">
+
+    <title>UDF Concepts</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Concepts"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        Depending on your use case, you might write all-new functions, reuse Java UDFs that you have already
+        written for Hive, or port Hive Java UDF code to higher-performance native Impala UDFs in C++. You can code
+        either scalar functions for producing results one row at a time, or more complex aggregate functions for
+        doing analysis across. The following sections discuss these different aspects of working with UDFs.
+      </p>
+
+      <p outputclass="toc inpage"/>
+    </conbody>
+
+    <concept id="udfs_udafs">
+
+      <title>UDFs and UDAFs</title>
+
+      <conbody>
+
+        <p>
+          Depending on your use case, the user-defined functions (UDFs) you write might accept or produce different
+          numbers of input and output values:
+        </p>
+
+        <ul>
+          <li>
+            The most general kind of user-defined function (the one typically referred to by the abbreviation UDF)
+            takes a single input value and produces a single output value. When used in a query, it is called once
+            for each row in the result set. For example:
+<codeblock>select customer_name, is_frequent_customer(customer_id) from customers;
+select obfuscate(sensitive_column) from sensitive_data;</codeblock>
+          </li>
+
+          <li>
+            A user-defined aggregate function (UDAF) accepts a group of values and returns a single value. You use
+            UDAFs to summarize and condense sets of rows, in the same style as the built-in <codeph>COUNT</codeph>,
+            <codeph>MAX()</codeph>, <codeph>SUM()</codeph>, and <codeph>AVG()</codeph> functions. When called in a
+            query that uses the <codeph>GROUP BY</codeph> clause, the function is called once for each combination
+            of <codeph>GROUP BY</codeph> values. For example:
+<codeblock>-- Evaluates multiple rows but returns a single value.
+select closest_restaurant(latitude, longitude) from places;
+
+-- Evaluates batches of rows and returns a separate value for each batch.
+select most_profitable_location(store_id, sales, expenses, tax_rate, depreciation) from franchise_data group by year;</codeblock>
+          </li>
+
+          <li>
+            Currently, Impala does not support other categories of user-defined functions, such as user-defined
+            table functions (UDTFs) or window functions.
+          </li>
+
+<!--
+<li>
+A user-defined table function (UDTF) returns an arbitrary number of rows (zero, one, or many) for each input row.
+These functions filter, explode, or transform the input data in a variety of ways.
+Currently, Impala does not support UDTFs.
+For example:
+<codeblock>select anomalous_event() from web_traffic;
+select price_change() from stock_ticker;
+select real_words(letters) from word_games;</codeblock>
+</li>
+-->
+        </ul>
+      </conbody>
+    </concept>
+
+    <concept id="native_udfs">
+
+      <title>Native Impala UDFs</title>
+
+      <conbody>
+
+        <p>
+          Impala supports UDFs written in C++, in addition to supporting existing Hive UDFs written in Java.
+          <ph rev="upstream">Cloudera</ph> recommends using C++ UDFs because the compiled native code can yield higher performance, with
+          UDF execution time often 10x faster for a C++ UDF than the equivalent Java UDF.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="udfs_hive">
+
+      <title>Using Hive UDFs with Impala</title>
+
+      <conbody>
+
+        <p>
+          Impala can run Java-based user-defined functions (UDFs), originally written for Hive, with no changes,
+          subject to the following conditions:
+        </p>
+
+        <ul>
+          <li>
+            The parameters and return value must all use scalar data types supported by Impala. For example, complex or nested
+            types are not supported.
+          </li>
+
+          <li>
+            Currently, Hive UDFs that accept or return the <codeph>TIMESTAMP</codeph> type are not supported.
+          </li>
+
+          <li>
+            Prior to <keyword keyref="impala25_full"/> the return type must be a <q>Writable</q> type such as <codeph>Text</codeph> or
+            <codeph>IntWritable</codeph>, rather than a Java primitive type such as <codeph>String</codeph> or
+            <codeph>int</codeph>. Otherwise, the UDF returns <codeph>NULL</codeph>.
+            <ph rev="2.5.0">In <keyword keyref="impala25_full"/> and higher, this restriction is lifted, and both
+            UDF arguments and return values can be Java primitive types.</ph>
+          </li>
+
+          <li>
+            Hive UDAFs and UDTFs are not supported.
+          </li>
+
+          <li>
+            Typically, a Java UDF will execute several times slower in Impala than the equivalent native UDF
+            written in C++.
+          </li>
+          <li rev="2.5.0 IMPALA-2843 CDH-39148">
+            In <keyword keyref="impala25_full"/> and higher, you can transparently call Hive Java UDFs through Impala,
+            or call Impala Java UDFs through Hive. This feature does not apply to built-in Hive functions.
+            Any Impala Java UDFs created with older versions must be re-created using new <codeph>CREATE FUNCTION</codeph>
+            syntax, without any signature for arguments or the return value.
+          </li>
+        </ul>
+
+        <p>
+          To take full advantage of the Impala architecture and performance features, you can also write
+          Impala-specific UDFs in C++.
+        </p>
+
+        <p>
+          For background about Java-based Hive UDFs, see the
+          <xref href="https://cwiki.apache.org/confluence/display/Hive/LanguageManual+UDF" scope="external" format="html">Hive
+          documentation for UDFs</xref>. For examples or tutorials for writing such UDFs, search the web for
+          related blog posts.
+        </p>
+
+        <p>
+          The ideal way to understand how to reuse Java-based UDFs (originally written for Hive) with Impala is to
+          take some of the Hive built-in functions (implemented as Java UDFs) and take the applicable JAR files
+          through the UDF deployment process for Impala, creating new UDFs with different names:
+        </p>
+
+        <ol>
+          <li>
+            Take a copy of the Hive JAR file containing the Hive built-in functions. For example, the path might be
+            like <filepath>/usr/lib/hive/lib/hive-exec-0.10.0-cdh4.2.0.jar</filepath>, with different version
+            numbers corresponding to your specific level of CDH.
+          </li>
+
+          <li>
+            Use <codeph>jar tf <varname>jar_file</varname></codeph> to see a list of the classes inside the JAR.
+            You will see names like <codeph>org/apache/hadoop/hive/ql/udf/UDFLower.class</codeph> and
+            <codeph>org/apache/hadoop/hive/ql/udf/UDFOPNegative.class</codeph>. Make a note of the names of the
+            functions you want to experiment with. When you specify the entry points for the Impala <codeph>CREATE
+            FUNCTION</codeph> statement, change the slash characters to dots and strip off the
+            <codeph>.class</codeph> suffix, for example <codeph>org.apache.hadoop.hive.ql.udf.UDFLower</codeph> and
+            <codeph>org.apache.hadoop.hive.ql.udf.UDFOPNegative</codeph>.
+          </li>
+
+          <li>
+            Copy that file to an HDFS location that Impala can read. (In the examples here, we renamed the file to
+            <filepath>hive-builtins.jar</filepath> in HDFS for simplicity.)
+          </li>
+
+          <li>
+            For each Java-based UDF that you want to call through Impala, issue a <codeph>CREATE FUNCTION</codeph>
+            statement, with a <codeph>LOCATION</codeph> clause containing the full HDFS path of the JAR file, and a
+            <codeph>SYMBOL</codeph> clause with the fully qualified name of the class, using dots as separators and
+            without the <codeph>.class</codeph> extension. Remember that user-defined functions are associated with
+            a particular database, so issue a <codeph>USE</codeph> statement for the appropriate database first, or
+            specify the SQL function name as
+            <codeph><varname>db_name</varname>.<varname>function_name</varname></codeph>. Use completely new names
+            for the SQL functions, because Impala UDFs cannot have the same name as Impala built-in functions.
+          </li>
+
+          <li>
+            Call the function from your queries, passing arguments of the correct type to match the function
+            signature. These arguments could be references to columns, arithmetic or other kinds of expressions,
+            the results of <codeph>CAST</codeph> functions to ensure correct data types, and so on.
+          </li>
+        </ol>
+
+        <example>
+
+          <title>Java UDF Example: Reusing lower() Function</title>
+
+          <p>
+            For example, the following <cmdname>impala-shell</cmdname> session creates an Impala UDF
+            <codeph>my_lower()</codeph> that reuses the Java code for the Hive <codeph>lower()</codeph>: built-in
+            function. We cannot call it <codeph>lower()</codeph> because Impala does not allow UDFs to have the
+            same name as built-in functions. From SQL, we call the function in a basic way (in a query with no
+            <codeph>WHERE</codeph> clause), directly on a column, and on the results of a string expression:
+          </p>
+
+<!-- To do: adapt for signatureless syntax per CDH-39148 / IMPALA-2843. -->
+<codeblock>[localhost:21000] &gt; create database udfs;
+[localhost:21000] &gt; use udfs;
+localhost:21000] &gt; create function lower(string) returns string location '/user/hive/udfs/hive.jar' symbol='org.apache.hadoop.hive.ql.udf.UDFLower';
+ERROR: AnalysisException: Function cannot have the same name as a builtin: lower
+[localhost:21000] &gt; create function my_lower(string) returns string location '/user/hive/udfs/hive.jar' symbol='org.apache.hadoop.hive.ql.udf.UDFLower';
+[localhost:21000] &gt; select my_lower('Some String NOT ALREADY LOWERCASE');
++----------------------------------------------------+
+| udfs.my_lower('some string not already lowercase') |
++----------------------------------------------------+
+| some string not already lowercase                  |
++----------------------------------------------------+
+Returned 1 row(s) in 0.11s
+[localhost:21000] &gt; create table t2 (s string);
+[localhost:21000] &gt; insert into t2 values ('lower'),('UPPER'),('Init cap'),('CamelCase');
+Inserted 4 rows in 2.28s
+[localhost:21000] &gt; select * from t2;
++-----------+
+| s         |
++-----------+
+| lower     |
+| UPPER     |
+| Init cap  |
+| CamelCase |
++-----------+
+Returned 4 row(s) in 0.47s
+[localhost:21000] &gt; select my_lower(s) from t2;
++------------------+
+| udfs.my_lower(s) |
++------------------+
+| lower            |
+| upper            |
+| init cap         |
+| camelcase        |
++------------------+
+Returned 4 row(s) in 0.54s
+[localhost:21000] &gt; select my_lower(concat('ABC ',s,' XYZ')) from t2;
++------------------------------------------+
+| udfs.my_lower(concat('abc ', s, ' xyz')) |
++------------------------------------------+
+| abc lower xyz                            |
+| abc upper xyz                            |
+| abc init cap xyz                         |
+| abc camelcase xyz                        |
++------------------------------------------+
+Returned 4 row(s) in 0.22s</codeblock>
+
+        </example>
+
+        <example>
+
+          <title>Java UDF Example: Reusing negative() Function</title>
+
+          <p>
+            Here is an example that reuses the Hive Java code for the <codeph>negative()</codeph> built-in
+            function. This example demonstrates how the data types of the arguments must match precisely with the
+            function signature. At first, we create an Impala SQL function that can only accept an integer
+            argument. Impala cannot find a matching function when the query passes a floating-point argument,
+            although we can call the integer version of the function by casting the argument. Then we overload the
+            same function name to also accept a floating-point argument.
+          </p>
+
+<codeblock>[localhost:21000] &gt; create table t (x int);
+[localhost:21000] &gt; insert into t values (1), (2), (4), (100);
+Inserted 4 rows in 1.43s
+[localhost:21000] &gt; create function my_neg(bigint) returns bigint location '/user/hive/udfs/hive.jar' symbol='org.apache.hadoop.hive.ql.udf.UDFOPNegative';
+[localhost:21000] &gt; select my_neg(4);
++----------------+
+| udfs.my_neg(4) |
++----------------+
+| -4             |
++----------------+
+[localhost:21000] &gt; select my_neg(x) from t;
++----------------+
+| udfs.my_neg(x) |
++----------------+
+| -2             |
+| -4             |
+| -100           |
++----------------+
+Returned 3 row(s) in 0.60s
+[localhost:21000] &gt; select my_neg(4.0);
+ERROR: AnalysisException: No matching function with signature: udfs.my_neg(FLOAT).
+[localhost:21000] &gt; select my_neg(cast(4.0 as int));
++-------------------------------+
+| udfs.my_neg(cast(4.0 as int)) |
++-------------------------------+
+| -4                            |
++-------------------------------+
+Returned 1 row(s) in 0.11s
+[localhost:21000] &gt; create function my_neg(double) returns double location '/user/hive/udfs/hive.jar' symbol='org.apache.hadoop.hive.ql.udf.UDFOPNegative';
+[localhost:21000] &gt; select my_neg(4.0);
++------------------+
+| udfs.my_neg(4.0) |
++------------------+
+| -4               |
++------------------+
+Returned 1 row(s) in 0.11s</codeblock>
+
+          <p>
+            You can find the sample files mentioned here in
+            <xref href="https://github.com/cloudera/impala/tree/master/be/src/udf_samples" scope="external" format="html">the
+            Impala github repo</xref>.
+<!-- Internal-only repo, don't know an external equivalent.
+and other examples demonstrating this technique in
+<xref href="http://github.sf.cloudera.com/CDH/Impala/blob/master/testdata/workloads/functional-query/queries/QueryTest/load-hive-udfs.test" scope="external" format="html">the Impala test files</xref>.
+-->
+          </p>
+
+        </example>
+      </conbody>
+    </concept>
+  </concept>
+
+  <concept id="udf_runtime">
+    <title>Runtime Environment for UDFs</title>
+    <conbody>
+      <p>
+        By default, Impala copies UDFs into <filepath>/tmp</filepath>,
+        and you can configure this location through the <codeph>--local_library_dir</codeph>
+        startup flag for the <cmdname>impalad</cmdname> daemon.
+      </p>
+    </conbody>
+  </concept>
+
+
+  <concept id="udf_demo_env">
+
+    <title>Installing the UDF Development Package</title>
+
+    <conbody>
+
+      <p rev="CDH-37080">
+        To develop UDFs for Impala, download and install the <codeph>impala-udf-devel</codeph> package (RHEL-based
+        distributions) or <codeph>impala-udf-dev</codeph> (Ubuntu and Debian). This package contains
+        header files, sample source, and build configuration files.
+      </p>
+
+      <ol>
+        <li>
+          Start at <xref href="https://archive.cloudera.com/cdh5/" scope="external" format="html"/> for the CDH 5
+          package, or <xref href="https://archive.cloudera.com/impala/" scope="external" format="html"/> for the CDH
+          4 package.
+        </li>
+
+        <li>
+          Locate the appropriate <codeph>.repo</codeph> or list file for your operating system version, such as
+          <xref href="https://archive.cloudera.com/impala/redhat/6/x86_64/impala/cloudera-impala.repo" scope="external" format="html">the
+          <codeph>.repo</codeph> file for CDH 4 on RHEL 6</xref>.
+        </li>
+
+        <li rev="CDH-37080">
+          Use the familiar <codeph>yum</codeph>, <codeph>zypper</codeph>, or <codeph>apt-get</codeph> commands
+          depending on your operating system. For the package name, specify <codeph>impala-udf-devel</codeph>
+          (RHEL-based distributions) or <codeph>impala-udf-dev</codeph> (Ubuntu and Debian).
+        </li>
+      </ol>
+
+      <note>
+        The UDF development code does not rely on Impala being installed on the same machine. You can write and
+        compile UDFs on a minimal development system, then deploy them on a different one for use with Impala. If
+        you develop UDFs on a server managed by Cloudera Manager through the parcel mechanism, you still install
+        the UDF development kit through the package mechanism; this small standalone package does not interfere
+        with the parcels containing the main Impala code.
+      </note>
+
+      <p>
+        When you are ready to start writing your own UDFs, download the sample code and build scripts from
+        <xref href="https://github.com/cloudera/impala-udf-samples" scope="external" format="html">the Cloudera
+        sample UDF github</xref>. Then see <xref href="impala_udf.xml#udf_coding"/> for how to code UDFs, and
+        <xref href="impala_udf.xml#udf_tutorial"/> for how to build and run UDFs.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="udf_coding">
+
+    <title>Writing User-Defined Functions (UDFs)</title>
+
+    <conbody>
+
+      <p>
+        Before starting UDF development, make sure to install the development package and download the UDF code
+        samples, as described in <xref href="#udf_demo_env"/>.
+      </p>
+
+      <p>
+        When writing UDFs:
+      </p>
+
+      <ul>
+        <li>
+          Keep in mind the data type differences as you transfer values from the high-level SQL to your lower-level
+          UDF code. For example, in the UDF code you might be much more aware of how many bytes different kinds of
+          integers require.
+        </li>
+
+        <li>
+          Use best practices for function-oriented programming: choose arguments carefully, avoid side effects,
+          make each function do a single thing, and so on.
+        </li>
+      </ul>
+
+      <p outputclass="toc inpage"/>
+    </conbody>
+
+    <concept id="udf_exploring">
+
+      <title>Getting Started with UDF Coding</title>
+  <prolog>
+    <metadata>
+      <!-- OK, this is not something a Hadoop newbie would tackle, but being lenient and inclusive in this initial pass, so including the GS tag. -->
+      <data name="Category" value="Getting Started"/>
+    </metadata>
+  </prolog>
+
+      <conbody>
+
+        <p>
+          To understand the layout and member variables and functions of the predefined UDF data types, examine the
+          header file <filepath>/usr/include/impala_udf/udf.h</filepath>:
+        </p>
+
+<codeblock>// This is the only Impala header required to develop UDFs and UDAs. This header
+// contains the types that need to be used and the FunctionContext object. The context
+// object serves as the interface object between the UDF/UDA and the impala process. </codeblock>
+
+        <p>
+          For the basic declarations needed to write a scalar UDF, see the header file
+          <xref href="https://github.com/cloudera/impala-udf-samples/blob/master/udf-sample.h" scope="external" format="html"><filepath>udf-sample.h</filepath></xref>
+          within the sample build environment, which defines a simple function
+          named <codeph>AddUdf()</codeph>:
+        </p>
+
+<!-- Downloadable version of this file: https://raw.githubusercontent.com/cloudera/impala-udf-samples/master/udf-sample.h -->
+<codeblock>#ifndef IMPALA_UDF_SAMPLE_UDF_H
+#define IMPALA_UDF_SAMPLE_UDF_H
+
+#include &lt;impala_udf/udf.h&gt;
+
+using namespace impala_udf;
+
+IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp; arg2);
+
+#endif
+</codeblock>
+
+        <p>
+          For sample C++ code for a simple function named <codeph>AddUdf()</codeph>, see the source file
+          <filepath>udf-sample.cc</filepath> within the sample build environment:
+        </p>
+
+<!-- Downloadable version of this file: https://raw.githubusercontent.com/cloudera/impala-udf-samples/master/udf-sample.cc -->
+<codeblock>#include "udf-sample.h"
+
+// In this sample we are declaring a UDF that adds two ints and returns an int.
+IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp; arg2) {
+  if (arg1.is_null || arg2.is_null) return IntVal::null();
+  return IntVal(arg1.val + arg2.val);
+}
+
+// Multiple UDFs can be defined in the same file</codeblock>
+      </conbody>
+    </concept>
+
+    <concept id="udfs_args">
+
+      <title>Data Types for Function Arguments and Return Values</title>
+
+      <conbody>
+
+        <p>
+          Each value that a user-defined function can accept as an argument or return as a result value must map to
+          a SQL data type that you could specify for a table column.
+        </p>
+
+        <p conref="../shared/impala_common.xml#common/udfs_no_complex_types"/>
+
+        <p>
+          Each data type has a corresponding structure defined in the C++ and Java header files, with two member
+          fields and some predefined comparison operators and constructors:
+        </p>
+
+        <ul>
+          <li>
+            <p>
+              <codeph>is_null</codeph> indicates whether the value is <codeph>NULL</codeph> or not.
+              <codeph>val</codeph> holds the actual argument or return value when it is non-<codeph>NULL</codeph>.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              Each struct also defines a <codeph>null()</codeph> member function that constructs an instance of the
+              struct with the <codeph>is_null</codeph> flag set.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              The built-in SQL comparison operators and clauses such as <codeph>&lt;</codeph>,
+              <codeph>&gt;=</codeph>, <codeph>BETWEEN</codeph>, and <codeph>ORDER BY</codeph> all work
+              automatically based on the SQL return type of each UDF. For example, Impala knows how to evaluate
+              <codeph>BETWEEN 1 AND udf_returning_int(col1)</codeph> or <codeph>ORDER BY
+              udf_returning_string(col2)</codeph> without you declaring any comparison operators within the UDF
+              itself.
+            </p>
+            <p>
+              For convenience within your UDF code, each struct defines <codeph>==</codeph> and <codeph>!=</codeph>
+              operators for comparisons with other structs of the same type. These are for typical C++ comparisons
+              within your own code, not necessarily reproducing SQL semantics. For example, if the
+              <codeph>is_null</codeph> flag is set in both structs, they compare as equal. That behavior of
+              <codeph>null</codeph> comparisons is different from SQL (where <codeph>NULL == NULL</codeph> is
+              <codeph>NULL</codeph> rather than <codeph>true</codeph>), but more in line with typical C++ behavior.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              Each kind of struct has one or more constructors that define a filled-in instance of the struct,
+              optionally with default values.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              Each kind of struct has a <codeph>null()</codeph> member function that returns an instance of the
+              struct with the <codeph>is_null</codeph> flag set.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              Because Impala currently does not support composite or nested types, Impala cannot process UDFs that
+              accept such types as arguments or return them as result values. This limitation applies both to
+              Impala UDFs written in C++ and Java-based Hive UDFs.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              You can overload functions by creating multiple functions with the same SQL name but different
+              argument types. For overloaded functions, you must use different C++ or Java entry point names in the
+              underlying functions.
+            </p>
+          </li>
+        </ul>
+
+        <p>
+          The data types defined on the C++ side (in <filepath>/usr/include/impala_udf/udf.h</filepath>) are:
+        </p>
+
+        <ul>
+          <li>
+            <p>
+              <codeph>IntVal</codeph> represents an <codeph>INT</codeph> column.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>BigIntVal</codeph> represents a <codeph>BIGINT</codeph> column. Even if you do not need the
+              full range of a <codeph>BIGINT</codeph> value, it can be useful to code your function arguments as
+              <codeph>BigIntVal</codeph> to make it convenient to call the function with different kinds of integer
+              columns and expressions as arguments. Impala automatically casts smaller integer types to larger ones
+              when appropriate, but does not implicitly cast large integer types to smaller ones.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>SmallIntVal</codeph> represents a <codeph>SMALLINT</codeph> column.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>TinyIntVal</codeph> represents a <codeph>TINYINT</codeph> column.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>StringVal</codeph> represents a <codeph>STRING</codeph> column. It has a <codeph>len</codeph>
+              field representing the length of the string, and a <codeph>ptr</codeph> field pointing to the string
+              data. It has constructors that create a new <codeph>StringVal</codeph> struct based on a
+              null-terminated C-style string, or a pointer plus a length; these new structs still refer to the
+              original string data rather than allocating a new buffer for the data. It also has a constructor that
+              takes a pointer to a <codeph>FunctionContext</codeph> struct and a length, that does allocate space
+              for a new copy of the string data, for use in UDFs that return string values.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>BooleanVal</codeph> represents a <codeph>BOOLEAN</codeph> column.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>FloatVal</codeph> represents a <codeph>FLOAT</codeph> column.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>DoubleVal</codeph> represents a <codeph>DOUBLE</codeph> column.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>TimestampVal</codeph> represents a <codeph>TIMESTAMP</codeph> column. It has a
+              <codeph>date</codeph> field, a 32-bit integer representing the Gregorian date, that is, the days past
+              the epoch date. It also has a <codeph>time_of_day</codeph> field, a 64-bit integer representing the
+              current time of day in nanoseconds.
+            </p>
+          </li>
+
+<!--
+  <li>
+    <p>
+      <codeph>AnyVal</codeph> is the parent type of all the other
+      structs. They inherit the <codeph>is_null</codeph> field from it.
+      You do not use this type directly in your code.
+    </p>
+  </li>
+-->
+        </ul>
+      </conbody>
+    </concept>
+
+    <concept id="udf_varargs">
+
+      <title>Variable-Length Argument Lists</title>
+
+      <conbody>
+
+        <p>
+          UDFs typically take a fixed number of arguments, with each one named explicitly in the signature of your
+          C++ function. Your function can also accept additional optional arguments, all of the same type. For
+          example, you can concatenate two strings, three strings, four strings, and so on. Or you can compare two
+          numbers, three numbers, four numbers, and so on.
+        </p>
+
+        <p>
+          To accept a variable-length argument list, code the signature of your function like this:
+        </p>
+
+<codeblock>StringVal Concat(FunctionContext* context, const StringVal&amp; separator,
+  int num_var_args, const StringVal* args);</codeblock>
+
+        <p>
+          In the <codeph>CREATE FUNCTION</codeph> statement, after the type of the first optional argument, include
+          <codeph>...</codeph> to indicate it could be followed by more arguments of the same type. For example,
+          the following function accepts a <codeph>STRING</codeph> argument, followed by one or more additional
+          <codeph>STRING</codeph> arguments:
+        </p>
+
+<codeblock>[localhost:21000] &gt; create function my_concat(string, string ...) returns string location '/user/test_user/udfs/sample.so' symbol='Concat';
+</codeblock>
+
+        <p>
+          The call from the SQL query must pass at least one argument to the variable-length portion of the
+          argument list.
+        </p>
+
+        <p>
+          When Impala calls the function, it fills in the initial set of required arguments, then passes the number
+          of extra arguments and a pointer to the first of those optional arguments.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="udf_null">
+
+      <title>Handling NULL Values</title>
+
+      <conbody>
+
+        <p>
+          For correctness, performance, and reliability, it is important for each UDF to handle all situations
+          where any <codeph>NULL</codeph> values are passed to your function. For example, when passed a
+          <codeph>NULL</codeph>, UDFs typically also return <codeph>NULL</codeph>. In an aggregate function, which
+          could be passed a combination of real and <codeph>NULL</codeph> values, you might make the final value
+          into a <codeph>NULL</codeph> (as in <codeph>CONCAT()</codeph>), ignore the <codeph>NULL</codeph> value
+          (as in <codeph>AVG()</codeph>), or treat it the same as a numeric zero or empty string.
+        </p>
+
+        <p>
+          Each parameter type, such as <codeph>IntVal</codeph> or <codeph>StringVal</codeph>, has an
+          <codeph>is_null</codeph> Boolean member.
+<!--
+If your function has no effect when passed <codeph>NULL</codeph>
+values,
+-->
+          Test this flag immediately for each argument to your function, and if it is set, do not refer to the
+          <codeph>val</codeph> field of the argument structure. The <codeph>val</codeph> field is undefined when
+          the argument is <codeph>NULL</codeph>, so your function could go into an infinite loop or produce
+          incorrect results if you skip the special handling for <codeph>NULL</codeph>.
+<!-- and return if so.
+For <codeph>void</codeph> intermediate functions
+within UDAs, you can return without specifying a value.
+-->
+        </p>
+
+        <p>
+          If your function returns <codeph>NULL</codeph> when passed a <codeph>NULL</codeph> value, or in other
+          cases such as when a search string is not found, you can construct a null instance of the return type by
+          using its <codeph>null()</codeph> member function.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="udf_malloc">
+
+      <title>Memory Allocation for UDFs</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Memory"/>
+    </metadata>
+  </prolog>
+
+      <conbody>
+
+        <p>
+          By default, memory allocated within a UDF is deallocated when the function exits, which could be before
+          the query is finished. The input arguments remain allocated for the lifetime of the function, so you can
+          refer to them in the expressions for your return values. If you use temporary variables to construct
+          all-new string values, use the <codeph>StringVal()</codeph> constructor that takes an initial
+          <codeph>FunctionContext*</codeph> argument followed by a length, and copy the data into the newly
+          allocated memory buffer.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept rev="1.3.0" id="udf_threads">
+
+      <title>Thread-Safe Work Area for UDFs</title>
+
+      <conbody>
+
+        <p>
+          One way to improve performance of UDFs is to specify the optional <codeph>PREPARE_FN</codeph> and
+          <codeph>CLOSE_FN</codeph> clauses on the <codeph>CREATE FUNCTION</codeph> statement. The <q>prepare</q>
+          function sets up a thread-safe data structure in memory that you can use as a work area. The <q>close</q>
+          function deallocates that memory. Each subsequent call to the UDF within the same thread can access that
+          same memory area. There might be several such memory areas allocated on the same host, as UDFs are
+          parallelized using multiple threads.
+        </p>
+
+        <p>
+          Within this work area, you can set up predefined lookup tables, or record the results of complex
+          operations on data types such as <codeph>STRING</codeph> or <codeph>TIMESTAMP</codeph>. Saving the
+          results of previous computations rather than repeating the computation each time is an optimization known
+          as <xref href="http://en.wikipedia.org/wiki/Memoization" scope="external" format="html"/>. For example,
+          if your UDF performs a regular expression match or date manipulation on a column that repeats the same
+          value over and over, you could store the last-computed value or a hash table of already-computed values,
+          and do a fast lookup to find the result for subsequent iterations of the UDF.
+        </p>
+
+        <p>
+          Each such function must have the signature:
+        </p>
+
+<codeblock>void <varname>function_name</varname>(impala_udf::FunctionContext*, impala_udf::FunctionContext::FunctionScope)
+</codeblock>
+
+        <p>
+          Currently, only <codeph>THREAD_SCOPE</codeph> is implemented, not <codeph>FRAGMENT_SCOPE</codeph>. See
+          <filepath>udf.h</filepath> for details about the scope values.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="udf_error_handling">
+
+      <title>Error Handling for UDFs</title>
+  <prolog>
+    <metadata>
+      <!-- A little bit of a stretch, but if you're doing UDFs and you need to debug you might look up Troubleshooting. -->
+      <data name="Category" value="Troubleshooting"/>
+    </metadata>
+  </prolog>
+
+      <conbody>
+
+        <p>
+          To handle errors in UDFs, you call functions that are members of the initial
+          <codeph>FunctionContext*</codeph> argument passed to your function.
+        </p>
+
+        <p>
+          A UDF can record one or more warnings, for conditions that indicate minor, recoverable problems that do
+          not cause the query to stop. The signature for this function is:
+        </p>
+
+<codeblock>bool AddWarning(const char* warning_msg);</codeblock>
+
+        <p>
+          For a serious problem that requires cancelling the query, a UDF can set an error flag that prevents the
+          query from returning any results. The signature for this function is:
+        </p>
+
+<codeblock>void SetError(const char* error_msg);</codeblock>
+      </conbody>
+    </concept>
+  </concept>
+
+  <concept id="udafs">
+
+    <title>Writing User-Defined Aggregate Functions (UDAFs)</title>
+
+    <conbody>
+
+      <p>
+        User-defined aggregate functions (UDAFs or UDAs) are a powerful and flexible category of user-defined
+        functions. If a query processes N rows, calling a UDAF during the query condenses the result set, anywhere
+        from a single value (such as with the <codeph>SUM</codeph> or <codeph>MAX</codeph> functions), or some
+        number less than or equal to N (as in queries using the <codeph>GROUP BY</codeph> or
+        <codeph>HAVING</codeph> clause).
+      </p>
+
+      <p outputclass="toc inpage"/>
+    </conbody>
+
+    <concept id="uda_functions">
+
+      <title>The Underlying Functions for a UDA</title>
+
+      <conbody>
+
+        <p>
+          A UDAF must maintain a state value across subsequent calls, so that it can accumulate a result across a
+          set of calls, rather than derive it purely from one set of arguments. For that reason, a UDAF is
+          represented by multiple underlying functions:
+        </p>
+
+        <ul>
+          <li>
+            An initialization function that sets any counters to zero, creates empty buffers, and does any other
+            one-time setup for a query.
+          </li>
+
+          <li>
+            An update function that processes the arguments for each row in the query result set and accumulates an
+            intermediate result for each node. For example, this function might increment a counter, append to a
+            string buffer, or set flags.
+          </li>
+
+          <li>
+            A merge function that combines the intermediate results from two different nodes.
+          </li>
+
+          <li rev="2.0.0">
+            A serialize function that flattens any intermediate values containing pointers, and frees any memory
+            allocated during the init, update, and merge phases.
+          </li>
+
+          <li>
+            A finalize function that either passes through the combined result unchanged, or does one final
+            transformation.
+          </li>
+        </ul>
+
+        <p>
+          In the SQL syntax, you create a UDAF by using the statement <codeph>CREATE AGGREGATE FUNCTION</codeph>.
+          You specify the entry points of the underlying C++ functions using the clauses <codeph>INIT_FN</codeph>,
+          <codeph>UPDATE_FN</codeph>, <codeph>MERGE_FN</codeph>, <codeph rev="2.0.0">SERIALIZE_FN</codeph>, and
+          <codeph>FINALIZE_FN</codeph>.
+        </p>
+
+        <p>
+          <!-- To do:
+            Need an example to demonstrate exactly what tokens are used for init, merge, finalize in
+            this substitution.
+          -->
+          For convenience, you can use a naming convention for the underlying functions and Impala automatically
+          recognizes those entry points. Specify the <codeph>UPDATE_FN</codeph> clause, using an entry point name
+          containing the string <codeph>update</codeph> or <codeph>Update</codeph>. When you omit the other
+          <codeph>_FN</codeph> clauses from the SQL statement, Impala looks for entry points with names formed by
+          substituting the <codeph>update</codeph> or <codeph>Update</codeph> portion of the specified name.
+        </p>
+
+<!--
+[INIT_FN '<varname>function</varname>]
+[UPDATE_FN '<varname>function</varname>]
+[MERGE_FN '<varname>function</varname>]
+[FINALIZE_FN '<varname>function</varname>]
+-->
+
+        <p>
+          <filepath>uda-sample.h</filepath>:
+        </p>
+
+        <p> See this file online at: <xref
+            href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.h"
+            scope="external" format="html" /></p>
+
+<codeblock audience="Cloudera">#ifndef SAMPLES_UDA_H
+#define SAMPLES_UDA_H
+
+#include &lt;impala_udf/udf.h&gt;
+
+using namespace impala_udf;
+
+// This is an example of the COUNT aggregate function.
+//
+// Usage: &gt; create aggregate function my_count(int) returns bigint
+//          location '/user/cloudera/libudasample.so' update_fn='CountUpdate';
+//        &gt; select my_count(col) from tbl;
+
+void CountInit(FunctionContext* context, BigIntVal* val);
+void CountUpdate(FunctionContext* context, const IntVal&amp; input, BigIntVal* val);
+void CountMerge(FunctionContext* context, const BigIntVal&amp; src, BigIntVal* dst);
+BigIntVal CountFinalize(FunctionContext* context, const BigIntVal&amp; val);
+
+
+// This is an example of the AVG(double) aggregate function. This function needs to
+// maintain two pieces of state, the current sum and the count. We do this using
+// the StringVal intermediate type. When this UDA is registered, it would specify
+// 16 bytes (8 byte sum + 8 byte count) as the size for this buffer.
+//
+// Usage: &gt; create aggregate function my_avg(double) returns string 
+//          location '/user/cloudera/libudasample.so' update_fn='AvgUpdate';
+//        &gt; select cast(my_avg(col) as double) from tbl;
+
+void AvgInit(FunctionContext* context, StringVal* val);
+void AvgUpdate(FunctionContext* context, const DoubleVal&amp; input, StringVal* val);
+void AvgMerge(FunctionContext* context, const StringVal&amp; src, StringVal* dst);
+const StringVal AvgSerialize(FunctionContext* context, const StringVal&amp; val);
+StringVal AvgFinalize(FunctionContext* context, const StringVal&amp; val);
+
+
+// This is a sample of implementing the STRING_CONCAT aggregate function.
+//
+// Usage: &gt; create aggregate function string_concat(string, string) returns string
+//          location '/user/cloudera/libudasample.so' update_fn='StringConcatUpdate';
+//        &gt; select string_concat(string_col, ",") from table;
+
+void StringConcatInit(FunctionContext* context, StringVal* val);
+void StringConcatUpdate(FunctionContext* context, const StringVal&amp; arg1,
+    const StringVal&amp; arg2, StringVal* val);
+void StringConcatMerge(FunctionContext* context, const StringVal&amp; src, StringVal* dst);
+const StringVal StringConcatSerialize(FunctionContext* context, const StringVal&amp; val);
+StringVal StringConcatFinalize(FunctionContext* context, const StringVal&amp; val);
+
+
+// This is a example of the variance aggregate function.
+//
+// Usage: &gt; create aggregate function var(double) returns string
+//          location '/user/cloudera/libudasample.so' update_fn='VarianceUpdate';
+//        &gt; select cast(var(col) as double) from tbl;
+
+void VarianceInit(FunctionContext* context, StringVal* val);
+void VarianceUpdate(FunctionContext* context, const DoubleVal&amp; input, StringVal* val);
+void VarianceMerge(FunctionContext* context, const StringVal&amp; src, StringVal* dst);
+const StringVal VarianceSerialize(FunctionContext* context, const StringVal&amp; val);
+StringVal VarianceFinalize(FunctionContext* context, const StringVal&amp; val);
+
+
+// An implementation of the Knuth online variance algorithm, which is also single pass and
+// more numerically stable.
+//
+// Usage: &gt; create aggregate function knuth_var(double) returns string
+//          location '/user/cloudera/libudasample.so' update_fn='KnuthVarianceUpdate';
+//        &gt; select cast(knuth_var(col) as double) from tbl;
+
+void KnuthVarianceInit(FunctionContext* context, StringVal* val);
+void KnuthVarianceUpdate(FunctionContext* context, const DoubleVal&amp; input, StringVal* val);
+void KnuthVarianceMerge(FunctionContext* context, const StringVal&amp; src, StringVal* dst);
+const StringVal KnuthVarianceSerialize(FunctionContext* context, const StringVal&amp; val);
+StringVal KnuthVarianceFinalize(FunctionContext* context, const StringVal&amp; val);
+
+
+// The different steps of the UDA are composable. In this case, we'the UDA will use the
+// other steps from the Knuth variance computation.
+//
+// Usage: &gt; create aggregate function stddev(double) returns string
+//          location '/user/cloudera/libudasample.so' update_fn='KnuthVarianceUpdate'
+//          finalize_fn="StdDevFinalize";
+//        &gt; select cast(stddev(col) as double) from tbl;
+
+StringVal StdDevFinalize(FunctionContext* context, const StringVal&amp; val);
+
+
+// Utility function for serialization to StringVal
+template &lt;typename T&gt;
+StringVal ToStringVal(FunctionContext* context, const T&amp; val);
+
+#endif</codeblock>
+
+        <p>
+          <filepath>uda-sample.cc</filepath>:
+        </p>
+
+        <p> See this file online at: <xref
+            href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.cc"
+            scope="external" format="html" />
+        </p>
+
+<codeblock audience="Cloudera">#include "uda-sample.h"
+#include &lt;assert.h&gt;
+#include &lt;sstream&gt;
+
+using namespace impala_udf;
+using namespace std;
+
+template &lt;typename T&gt;
+StringVal ToStringVal(FunctionContext* context, const T&amp; val) {
+  stringstream ss;
+  ss &lt;&lt; val;
+  string str = ss.str();
+  StringVal string_val(context, str.size());
+  memcpy(string_val.ptr, str.c_str(), str.size());
+  return string_val;
+}
+
+template &lt;&gt;
+StringVal ToStringVal&lt;DoubleVal&gt;(FunctionContext* context, const DoubleVal&amp; val) {
+  if (val.is_null) return StringVal::null();
+  return ToStringVal(context, val.val);
+}
+
+// ---------------------------------------------------------------------------
+// This is a sample of implementing a COUNT aggregate function.
+// ---------------------------------------------------------------------------
+void CountInit(FunctionContext* context, BigIntVal* val) {
+  val-&gt;is_null = false;
+  val-&gt;val = 0;
+}
+
+void CountUpdate(FunctionContext* context, const IntVal&amp; input, BigIntVal* val) {
+  if (input.is_null) return;
+  ++val-&gt;val;
+}
+
+void CountMerge(FunctionContext* context, const BigIntVal&amp; src, BigIntVal* dst) {
+  dst-&gt;val += src.val;
+}
+
+BigIntVal CountFinalize(FunctionContext* context, const BigIntVal&amp; val) {
+  return val;
+}
+
+// ---------------------------------------------------------------------------
+// This is a sample of implementing a AVG aggregate function.
+// ---------------------------------------------------------------------------
+struct AvgStruct {
+  double sum;
+  int64_t count;
+};
+
+// Initialize the StringVal intermediate to a zero'd AvgStruct
+void AvgInit(FunctionContext* context, StringVal* val) {
+  val-&gt;is_null = false;
+  val-&gt;len = sizeof(AvgStruct);
+  val-&gt;ptr = context-&gt;Allocate(val-&gt;len);
+  memset(val-&gt;ptr, 0, val-&gt;len);
+}
+
+void AvgUpdate(FunctionContext* context, const DoubleVal&amp; input, StringVal* val) {
+  if (input.is_null) return;
+  assert(!val-&gt;is_null);
+  assert(val-&gt;len == sizeof(AvgStruct));
+  AvgStruct* avg = reinterpret_cast&lt;AvgStruct*&gt;(val-&gt;ptr);
+  avg-&gt;sum += input.val;
+  ++avg-&gt;count;
+}
+
+void AvgMerge(FunctionContext* context, const StringVal&amp; src, StringVal* dst) {
+  if (src.is_null) return;
+  const AvgStruct* src_avg = reinterpret_cast&lt;const AvgStruct*&gt;(src.ptr);
+  AvgStruct* dst_avg = reinterpret_cast&lt;AvgStruct*&gt;(dst-&gt;ptr);
+  dst_avg-&gt;sum += src_avg-&gt;sum;
+  dst_avg-&gt;count += src_avg-&gt;count;
+}
+
+// A serialize function is necesary to free the intermediate state allocation. We use the
+// StringVal constructor to allocate memory owned by Impala, copy the intermediate state,
+// and free the original allocation. Note that memory allocated by the StringVal ctor is
+// not necessarily persisted across UDA function calls, which is why we don't use it in
+// AvgInit().
+const StringVal AvgSerialize(FunctionContext* context, const StringVal&amp; val) {
+  assert(!val.is_null);
+  StringVal result(context, val.len);
+  memcpy(result.ptr, val.ptr, val.len);
+  context-&gt;Free(val.ptr);
+  return result;
+}
+
+StringVal AvgFinalize(FunctionContext* context, const StringVal&amp; val) {
+  assert(!val.is_null);
+  assert(val.len == sizeof(AvgStruct));
+  AvgStruct* avg = reinterpret_cast&lt;AvgStruct*&gt;(val.ptr);
+  StringVal result;
+  if (avg-&gt;count == 0) {
+    result = StringVal::null();
+  } else {
+    // Copies the result to memory owned by Impala
+    result = ToStringVal(context, avg-&gt;sum / avg-&gt;count);
+  }
+  context-&gt;Free(val.ptr);
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// This is a sample of implementing the STRING_CONCAT aggregate function.
+// Example: select string_concat(string_col, ",") from table
+// ---------------------------------------------------------------------------
+// Delimiter to use if the separator is NULL.
+static const StringVal DEFAULT_STRING_CONCAT_DELIM((uint8_t*)", ", 2);
+
+void StringConcatInit(FunctionContext* context, StringVal* val) {
+  val-&gt;is_null = true;
+}
+
+void StringConcatUpdate(FunctionContext* context, const StringVal&amp; str,
+    const StringVal&amp; separator, StringVal* result) {
+  if (str.is_null) return;
+  if (result-&gt;is_null) {
+    // This is the first string, simply set the result to be the value.
+    uint8_t* copy = context-&gt;Allocate(str.len);
+    memcpy(copy, str.ptr, str.len);
+    *result = StringVal(copy, str.len);
+    return;
+  }
+
+  const StringVal* sep_ptr = separator.is_null ? &amp;DEFAULT_STRING_CONCAT_DELIM :
+      &amp;separator;
+
+  // We need to grow the result buffer and then append the new string and
+  // separator.
+  int new_size = result-&gt;len + sep_ptr-&gt;len + str.len;
+  result-&gt;ptr = context-&gt;Reallocate(result-&gt;ptr, new_size);
+  memcpy(result-&gt;ptr + result-&gt;len, sep_ptr-&gt;ptr, sep_ptr-&gt;len);
+  result-&gt;len += sep_ptr-&gt;len;
+  memcpy(result-&gt;ptr + result-&gt;len, str.ptr, str.len);
+  result-&gt;len += str.len;
+}
+
+void StringConcatMerge(FunctionContext* context, const StringVal&amp; src, StringVal* dst) {
+  if (src.is_null) return;
+  StringConcatUpdate(context, src, ",", dst);
+}
+
+// A serialize function is necesary to free the intermediate state allocation. We use the
+// StringVal constructor to allocate memory owned by Impala, copy the intermediate
+// StringVal, and free the intermediate's memory. Note that memory allocated by the
+// StringVal ctor is not necessarily persisted across UDA function calls, which is why we
+// don't use it in StringConcatUpdate().
+const StringVal StringConcatSerialize(FunctionContext* context, const StringVal&amp; val) {
+  if (val.is_null) return val;
+  StringVal result(context, val.len);
+  memcpy(result.ptr, val.ptr, val.len);
+  context-&gt;Free(val.ptr);
+  return result;
+}
+
+// Same as StringConcatSerialize().
+StringVal StringConcatFinalize(FunctionContext* context, const StringVal&amp; val) {
+  if (val.is_null) return val;
+  StringVal result(context, val.len);
+  memcpy(result.ptr, val.ptr, val.len);
+  context-&gt;Free(val.ptr);
+  return result;
+}</codeblock>
+      </conbody>
+    </concept>
+
+    <concept rev="2.3.0 IMPALA-1829 CDH-30572" id="udf_intermediate">
+
+      <title>Intermediate Results for UDAs</title>
+
+      <conbody>
+
+        <p>
+          A user-defined aggregate function might produce and combine intermediate results during some phases of
+          processing, using a different data type than the final return value. For example, if you implement a
+          function similar to the built-in <codeph>AVG()</codeph> function, it must keep track of two values, the
+          number of values counted and the sum of those values. Or, you might accumulate a string value over the
+          course of a UDA, then in the end return a numeric or Boolean result.
+        </p>
+
+        <p>
+          In such a case, specify the data type of the intermediate results using the optional <codeph>INTERMEDIATE
+          <varname>type_name</varname></codeph> clause of the <codeph>CREATE AGGREGATE FUNCTION</codeph> statement.
+          If the intermediate data is a typeless byte array (for example, to represent a C++ struct or array),
+          specify the type name as <codeph>CHAR(<varname>n</varname>)</codeph>, with <varname>n</varname>
+          representing the number of bytes in the intermediate result buffer.
+        </p>
+
+        <p>
+          For an example of this technique, see the <codeph>trunc_sum()</codeph> aggregate function, which accumulates
+          intermediate results of type <codeph>DOUBLE</codeph> and returns <codeph>BIGINT</codeph> at the end.
+          View
+          <xref href="https://github.com/cloudera/Impala/blob/cdh5-trunk/tests/query_test/test_udfs.py" scope="external" format="html">the <codeph>CREATE FUNCTION</codeph> statement</xref>
+          and
+          <xref href="http://github.com/Cloudera/Impala/blob/cdh5-trunk/be/src/testutil/test-udas.cc" scope="external" format="html">the implementation of the underlying TruncSum*() functions</xref>
+          on Github.
+        </p>
+      </conbody>
+    </concept>
+  </concept>
+
+  <concept id="udf_building">
+
+    <title>Building and Deploying UDFs</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Deploying"/>
+      <data name="Category" value="Building"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        This section explains the steps to compile Impala UDFs from C++ source code, and deploy the resulting
+        libraries for use in Impala queries.
+      </p>
+
+      <p>
+        Impala ships with a sample build environment for UDFs, that you can study, experiment with, and adapt for
+        your own use. This sample build environment starts with the <cmdname>cmake</cmdname> configuration command,
+        which reads the file <filepath>CMakeLists.txt</filepath> and generates a <filepath>Makefile</filepath>
+        customized for your particular directory paths. Then the <cmdname>make</cmdname> command runs the actual
+        build steps based on the rules in the <filepath>Makefile</filepath>.
+      </p>
+
+      <p>
+        Impala loads the shared library from an HDFS location. After building a shared library containing one or
+        more UDFs, use <codeph>hdfs dfs</codeph> or <codeph>hadoop fs</codeph> commands to copy the binary file to
+        an HDFS location readable by Impala.
+      </p>
+
+      <p>
+        The final step in deployment is to issue a <codeph>CREATE FUNCTION</codeph> statement in the
+        <cmdname>impala-shell</cmdname> interpreter to make Impala aware of the new function. See
+        <xref href="impala_create_function.xml#create_function"/> for syntax details. Because each function is
+        associated with a particular database, always issue a <codeph>USE</codeph> statement to the appropriate
+        database before creating a function, or specify a fully qualified name, that is, <codeph>CREATE FUNCTION
+        <varname>db_name</varname>.<varname>function_name</varname></codeph>.
+      </p>
+
+      <p>
+        As you update the UDF code and redeploy updated versions of a shared library, use <codeph>DROP
+        FUNCTION</codeph> and <codeph>CREATE FUNCTION</codeph> to let Impala pick up the latest version of the
+        code.
+      </p>
+
+      <note>
+        <p conref="../shared/impala_common.xml#common/udf_persistence_restriction"/>
+        <p>
+          See <xref href="impala_create_function.xml#create_function"/> and <xref href="impala_drop_function.xml#drop_function"/>
+          for the new syntax for the persistent Java UDFs.
+        </p>
+      </note>
+
+      <p>
+        Prerequisites for the build environment are:
+      </p>
+
+<codeblock rev="CDH-37080"># Use the appropriate package installation command for your Linux distribution.
+sudo yum install gcc-c++ cmake boost-devel
+sudo yum install impala-udf-devel
+# The package name on Ubuntu and Debian is impala-udf-dev.
+</codeblock>
+
+      <p>
+        Then, unpack the sample code in <filepath>udf_samples.tar.gz</filepath> and use that as a template to set
+        up your build environment.
+      </p>
+
+      <p>
+        To build the original samples:
+      </p>
+
+<codeblock># Process CMakeLists.txt and set up appropriate Makefiles.
+cmake .
+# Generate shared libraries from UDF and UDAF sample code,
+# udf_samples/libudfsample.so and udf_samples/libudasample.so
+make</codeblock>
+
+      <p>
+        The sample code to examine, experiment with, and adapt is in these files:
+      </p>
+
+      <ul>
+        <li>
+          <filepath>udf-sample.h</filepath>: Header file that declares the signature for a scalar UDF
+          (<codeph>AddUDF</codeph>).
+        </li>
+
+        <li>
+          <filepath>udf-sample.cc</filepath>: Sample source for a simple UDF that adds two integers. Because
+          Impala can reference multiple function entry points from the same shared library, you could add other UDF
+          functions in this file and add their signatures to the corresponding header file.
+        </li>
+
+        <li>
+          <filepath>udf-sample-test.cc</filepath>: Basic unit tests for the sample UDF.
+        </li>
+
+        <li>
+          <filepath>uda-sample.h</filepath>: Header file that declares the signature for sample aggregate
+          functions. The SQL functions will be called <codeph>COUNT</codeph>, <codeph>AVG</codeph>, and
+          <codeph>STRINGCONCAT</codeph>. Because aggregate functions require more elaborate coding to handle the
+          processing for multiple phases, there are several underlying C++ functions such as
+          <codeph>CountInit</codeph>, <codeph>AvgUpdate</codeph>, and <codeph>StringConcatFinalize</codeph>.
+        </li>
+
+        <li>
+          <filepath>uda-sample.cc</filepath>: Sample source for simple UDAFs that demonstrate how to manage the
+          state transitions as the underlying functions are called during the different phases of query processing.
+          <ul>
+            <li>
+              The UDAF that imitates the <codeph>COUNT</codeph> function keeps track of a single incrementing
+              number; the merge functions combine the intermediate count values from each Impala node, and the
+              combined number is returned verbatim by the finalize function.
+            </li>
+
+            <li>
+              The UDAF that imitates the <codeph>AVG</codeph> function keeps track of two numbers, a count of rows
+              processed and the sum of values for a column. These numbers are updated and merged as with
+              <codeph>COUNT</codeph>, then the finalize function divides them to produce and return the final
+              average value.
+            </li>
+
+            <li>
+              The UDAF that concatenates string values into a comma-separated list demonstrates how to manage
+              storage for a string that increases in length as the function is called for multiple rows.
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          <filepath>uda-sample-test.cc</filepath>: basic unit tests for the sample UDAFs.
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+
+  <concept id="udf_performance">
+
+    <title>Performance Considerations for UDFs</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Performance"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        Because a UDF typically processes each row of a table, potentially being called billions of times, the
+        performance of each UDF is a critical factor in the speed of the overall ETL or ELT pipeline. Tiny
+        optimizations you can make within the function body can pay off in a big way when the function is called
+        over and over when processing a huge result set.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="udf_tutorial">
+
+    <title>Examples of Creating and Using UDFs</title>
+
+    <conbody>
+
+      <p>
+        This section demonstrates how to create and use all kinds of user-defined functions (UDFs).
+      </p>
+
+      <p>
+        For downloadable examples that you can experiment with, adapt, and use as templates for your own functions,
+        see <xref href="https://github.com/cloudera/impala-udf-samples" scope="external" format="html">the Cloudera
+        sample UDF github</xref>. You must have already installed the appropriate header files, as explained in
+        <xref href="impala_udf.xml#udf_demo_env"/>.
+      </p>
+
+<!-- Limitation: mini-TOC currently doesn't include the <example> tags. -->
+
+<!-- <p outputclass="toc inpage"/> -->
+
+      <example id="udf_sample_udf">
+
+        <title>Sample C++ UDFs: HasVowels, CountVowels, StripVowels</title>
+
+        <p>
+          This example shows 3 separate UDFs that operate on strings and return different data types. In the C++
+          code, the functions are <codeph>HasVowels()</codeph> (checks if a string contains any vowels),
+          <codeph>CountVowels()</codeph> (returns the number of vowels in a string), and
+          <codeph>StripVowels()</codeph> (returns a new string with vowels removed).
+        </p>
+
+        <p>
+          First, we add the signatures for these functions to <filepath>udf-sample.h</filepath> in the demo build
+          environment:
+        </p>
+
+<codeblock>BooleanVal HasVowels(FunctionContext* context, const StringVal&amp; input);
+IntVal CountVowels(FunctionContext* context, const StringVal&amp; arg1);
+StringVal StripVowels(FunctionContext* context, const StringVal&amp; arg1);</codeblock>
+
+        <p>
+          Then, we add the bodies of these functions to <filepath>udf-sample.cc</filepath>:
+        </p>
+
+<codeblock>BooleanVal HasVowels(FunctionContext* context, const StringVal&amp; input)
+{
+        if (input.is_null) return BooleanVal::null();
+
+        int index;
+        uint8_t *ptr;
+
+        for (ptr = input.ptr, index = 0; index &lt;= input.len; index++, ptr++)
+        {
+                uint8_t c = tolower(*ptr);
+                if (c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u')
+                {
+                        return BooleanVal(true);
+                }
+        }
+        return BooleanVal(false);
+}
+
+IntVal CountVowels(FunctionContext* context, const StringVal&amp; arg1)
+{
+        if (arg1.is_null) return IntVal::null();
+
+        int count;
+        int index;
+        uint8_t *ptr;
+
+        for (ptr = arg1.ptr, count = 0, index = 0; index &lt;= arg1.len; index++, ptr++)
+        {
+                uint8_t c = tolower(*ptr);
+                if (c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u')
+                {
+                        count++;
+                }
+        }
+        return IntVal(count);
+}
+
+StringVal StripVowels(FunctionContext* context, const StringVal&amp; arg1)
+{
+        if (arg1.is_null) return StringVal::null();
+
+        int index;
+        std::string original((const char *)arg1.ptr,arg1.len);
+        std::string shorter("");
+
+        for (index = 0; index &lt; original.length(); index++)
+        {
+                uint8_t c = original[index];
+                uint8_t l = tolower(c);
+
+                if (l == 'a' || l == 'e' || l == 'i' || l == 'o' || l == 'u')
+                {
+                        ;
+                }
+                else
+                {
+                    shorter.append(1, (char)c);
+                }
+        }
+// The modified string is stored in 'shorter', which is destroyed when this function ends. We need to make a string val
+// and copy the contents.
+        StringVal result(context, shorter.size()); // Only the version of the ctor that takes a context object allocates new memory
+        memcpy(result.ptr, shorter.c_str(), shorter.size());
+        return result;
+}</codeblock>
+
+        <p>
+          We build a shared library, <filepath>libudfsample.so</filepath>, and put the library file into HDFS
+          where Impala can read it:
+        </p>
+
+<codeblock>$ make
+[  0%] Generating udf_samples/uda-sample.ll
+[ 16%] Built target uda-sample-ir
+[ 33%] Built target udasample
+[ 50%] Built target uda-sample-test
+[ 50%] Generating udf_samples/udf-sample.ll
+[ 66%] Built target udf-sample-ir
+Scanning dependencies of target udfsample
+[ 83%] Building CXX object CMakeFiles/udfsample.dir/udf-sample.o
+Linking CXX shared library udf_samples/libudfsample.so
+[ 83%] Built target udfsample
+Linking CXX executable udf_samples/udf-sample-test
+[100%] Built target udf-sample-test
+$ hdfs dfs -put ./udf_samples/libudfsample.so /user/hive/udfs/libudfsample.so</codeblock>
+
+        <p>
+          Finally, we go into the <cmdname>impala-shell</cmdname> interpreter where we set up some sample data,
+          issue <codeph>CREATE FUNCTION</codeph> statements to set up the SQL function names, and call the
+          functions in some queries:
+        </p>
+
+<codeblock>[localhost:21000] &gt; create database udf_testing;
+[localhost:21000] &gt; use udf_testing;
+
+[localhost:21000] &gt; create function has_vowels (string) returns boolean location '/user/hive/udfs/libudfsample.so' symbol='HasVowels';
+[localhost:21000] &gt; select has_vowels('abc');
++------------------------+
+| udfs.has_vowels('abc') |
++------------------------+
+| true                   |
++------------------------+
+Returned 1 row(s) in 0.13s
+[localhost:21000] &gt; select has_vowels('zxcvbnm');
++----------------------------+
+| udfs.has_vowels('zxcvbnm') |
++----------------------------+
+| false                      |
++----------------------------+
+Returned 1 row(s) in 0.12s
+[localhost:21000] &gt; select has_vowels(null);
++-----------------------+
+| udfs.has_vowels(null) |
++-----------------------+
+| NULL                  |
++-----------------------+
+Returned 1 row(s) in 0.11s
+[localhost:21000] &gt; select s, has_vowels(s) from t2;
++-----------+--------------------+
+| s         | udfs.has_vowels(s) |
++-----------+--------------------+
+| lower     | true               |
+| UPPER     | true               |
+| Init cap  | true               |
+| CamelCase | true               |
++-----------+--------------------+
+Returned 4 row(s) in 0.24s
+
+[localhost:21000] &gt; create function count_vowels (string) returns int location '/user/hive/udfs/libudfsample.so' symbol='CountVowels';
+[localhost:21000] &gt; select count_vowels('cat in the hat');
++-------------------------------------+
+| udfs.count_vowels('cat in the hat') |
++-------------------------------------+
+| 4                                   |
++-------------------------------------+
+Returned 1 row(s) in 0.12s
+[localhost:21000] &gt; select s, count_vowels(s) from t2;
++-----------+----------------------+
+| s         | udfs.count_vowels(s) |
++-----------+----------------------+
+| lower     | 2                    |
+| UPPER     | 2                    |
+| Init cap  | 3                    |
+| CamelCase | 4                    |
++-----------+----------------------+
+Returned 4 row(s) in 0.23s
+[localhost:21000] &gt; select count_vowels(null);
++-------------------------+
+| udfs.count_vowels(null) |
++-------------------------+
+| NULL                    |
++-------------------------+
+Returned 1 row(s) in 0.12s
+
+[localhost:21000] &gt; create function strip_vowels (string) returns string location '/user/hive/udfs/libudfsample.so' symbol='StripVowels';
+[localhost:21000] &gt; select strip_vowels('abcdefg');
++------------------------------+
+| udfs.strip_vowels('abcdefg') |
++------------------------------+
+| bcdfg                        |
++------------------------------+
+Returned 1 row(s) in 0.11s
+[localhost:21000] &gt; select strip_vowels('ABCDEFG');
++------------------------------+
+| udfs.strip_vowels('abcdefg') |
++------------------------------+
+| BCDFG                        |
++------------------------------+
+Returned 1 row(s) in 0.12s
+[localhost:21000] &gt; select strip_vowels(null);
++-------------------------+
+| udfs.strip_vowels(null) |
++-------------------------+
+| NULL                    |
++-------------------------+
+Returned 1 row(s) in 0.16s
+[localhost:21000] &gt; select s, strip_vowels(s) from t2;
++-----------+----------------------+
+| s         | udfs.strip_vowels(s) |
++-----------+----------------------+
+| lower     | lwr                  |
+| UPPER     | PPR                  |
+| Init cap  | nt cp                |
+| CamelCase | CmlCs                |
++-----------+----------------------+
+Returned 4 row(s) in 0.24s</codeblock>
+
+      </example>
+
+      <example id="udf_sample_uda">
+
+        <title>Sample C++ UDA: SumOfSquares</title>
+
+        <p>
+          This example demonstrates a user-defined aggregate function (UDA) that produces the sum of the squares of
+          its input values.
+        </p>
+
+        <p>
+          The coding for a UDA is a little more involved than a scalar UDF, because the processing is split into
+          several phases, each implemented by a different function. Each phase is relatively straightforward: the
+          <q>update</q> and <q>merge</q> phases, where most of the work is done, read an input value and combine it
+          with some accumulated intermediate value.
+        </p>
+
+        <p>
+          As in our sample UDF from the previous example, we add function signatures to a header file (in this
+          case, <filepath>uda-sample.h</filepath>). Because this is a math-oriented UDA, we make two versions of
+          each function, one accepting an integer value and the other accepting a floating-point value.
+        </p>
+
+<codeblock>void SumOfSquaresInit(FunctionContext* context, BigIntVal* val);
+void SumOfSquaresInit(FunctionContext* context, DoubleVal* val);
+
+void SumOfSquaresUpdate(FunctionContext* context, const BigIntVal&amp; input, BigIntVal* val);
+void SumOfSquaresUpdate(FunctionContext* context, const DoubleVal&amp; input, DoubleVal* val);
+
+void SumOfSquaresMerge(FunctionContext* context, const BigIntVal&amp; src, BigIntVal* dst);
+void SumOfSquaresMerge(FunctionContext* context, const DoubleVal&amp; src, DoubleVal* dst);
+
+BigIntVal SumOfSquaresFinalize(FunctionContext* context, const BigIntVal&amp; val);
+DoubleVal SumOfSquaresFinalize(FunctionContext* context, const DoubleVal&amp; val);</codeblock>
+
+        <p>
+          We add the function bodies to a C++ source file (in this case, <filepath>uda-sample.cc</filepath>):
+        </p>
+
+<codeblock>void SumOfSquaresInit(FunctionContext* context, BigIntVal* val) {
+  val-&gt;is_null = false;
+  val-&gt;val = 0;
+}
+void SumOfSquaresInit(FunctionContext* context, DoubleVal* val) {
+  val-&gt;is_null = false;
+  val-&gt;val = 0.0;
+}
+
+void SumOfSquaresUpdate(FunctionContext* context, const BigIntVal&amp; input, BigIntVal* val) {
+  if (input.is_null) return;
+  val-&gt;val += input.val * input.val;
+}
+void SumOfSquaresUpdate(FunctionContext* context, const DoubleVal&amp; input, DoubleVal* val) {
+  if (input.is_null) return;
+  val-&gt;val += input.val * input.val;
+}
+
+void SumOfSquaresMerge(FunctionContext* context, const BigIntVal&amp; src, BigIntVal* dst) {
+  dst-&gt;val += src.val;
+}
+void SumOfSquaresMerge(FunctionContext* context, const DoubleVal&amp; src, DoubleVal* dst) {
+  dst-&gt;val += src.val;
+}
+
+BigIntVal SumOfSquaresFinalize(FunctionContext* context, const BigIntVal&amp; val) {
+  return val;
+}
+DoubleVal SumOfSquaresFinalize(FunctionContext* context, const DoubleVal&amp; val) {
+  return val;
+}</codeblock>
+
+        <p>
+          As with the sample UDF, we build a shared library and put it into HDFS:
+        </p>
+
+<codeblock>$ make
+[  0%] Generating udf_samples/uda-sample.ll
+[ 16%] Built target uda-sample-ir
+Scanning dependencies of target udasample
+[ 33%] Building CXX object CMakeFiles/udasample.dir/uda-sample.o
+Linking CXX shared library udf_samples/libudasample.so
+[ 33%] Built target udasample
+Scanning dependencies of target uda-sample-test
+[ 50%] Building CXX object CMakeFiles/uda-sample-test.dir/uda-sample-test.o
+Linking CXX executable udf_samples/uda-sample-test
+[ 50%] Built target uda-sample-test
+[ 50%] Generating udf_samples/udf-sample.ll
+[ 66%] Built target udf-sample-ir
+[ 83%] Built target udfsample
+[100%] Built target udf-sample-test
+$ hdfs dfs -put ./udf_samples/libudasample.so /user/hive/udfs/libudasample.so</codeblock>
+
+        <p>
+          To create the SQL function, we issue a <codeph>CREATE AGGREGATE FUNCTION</codeph> statement and specify
+          the underlying C++ function names for the different phases:
+        </p>
+
+<codeblock>[localhost:21000] &gt; use udf_testing;
+
+[localhost:21000] &gt; create table sos (x bigint, y double);
+[localhost:21000] &gt; insert into sos values (1, 1.1), (2, 2.2), (3, 3.3), (4, 4.4);
+Inserted 4 rows in 1.10s
+
+[localhost:21000] &gt; create aggregate function sum_of_squares(bigint) returns bigint
+  &gt; location '/user/hive/udfs/libudasample.so'
+  &gt; init_fn='SumOfSquaresInit'
+  &gt; update_fn='SumOfSquaresUpdate'
+  &gt; merge_fn='SumOfSquaresMerge'
+  &gt; finalize_fn='SumOfSquaresFinalize';
+
+[localhost:21000] &gt; -- Compute the same value using literals or the UDA;
+[localhost:21000] &gt; select 1*1 + 2*2 + 3*3 + 4*4;
++-------------------------------+
+| 1 * 1 + 2 * 2 + 3 * 3 + 4 * 4 |
++-------------------------------+
+| 30                            |
++-------------------------------+
+Returned 1 row(s) in 0.12s
+[localhost:21000] &gt; select sum_of_squares(x) from sos;
++------------------------+
+| udfs.sum_of_squares(x) |
++------------------------+
+| 30                     |
++------------------------+
+Returned 1 row(s) in 0.35s</codeblock>
+
+        <p>
+          Until we create the overloaded version of the UDA, it can only handle a single data type. To allow it to
+          handle <codeph>DOUBLE</codeph> as well as <codeph>BIGINT</codeph>, we issue another <codeph>CREATE
+          AGGREGATE FUNCTION</codeph> statement:
+        </p>
+
+<codeblock>[localhost:21000] &gt; select sum_of_squares(y) from sos;
+ERROR: AnalysisException: No matching function with signature: udfs.sum_of_squares(DOUBLE).
+
+[localhost:21000] &gt; create aggregate function sum_of_squares(double) returns double
+  &gt; location '/user/hive/udfs/libudasample.so'
+  &gt; init_fn='SumOfSquaresInit'
+  &gt; update_fn='SumOfSquaresUpdate'
+  &gt; merge_fn='SumOfSquaresMerge'
+  &gt; finalize_fn='SumOfSquaresFinalize';
+
+[localhost:21000] &gt; -- Compute the same value using literals or the UDA;
+[localhost:21000] &gt; select 1.1*1.1 + 2.2*2.2 + 3.3*3.3 + 4.4*4.4;
++-----------------------------------------------+
+| 1.1 * 1.1 + 2.2 * 2.2 + 3.3 * 3.3 + 4.4 * 4.4 |
++-----------------------------------------------+
+| 36.3                                          |
++-----------------------------------------------+
+Returned 1 row(s) in 0.12s
+[localhost:21000] &gt; select sum_of_squares(y) from sos;
++------------------------+
+| udfs.sum_of_squares(y) |
++------------------------+
+| 36.3                   |
++------------------------+
+Returned 1 row(s) in 0.35s</codeblock>
+
+        <p>
+          Typically, you use a UDA in queries with <codeph>GROUP BY</codeph> clauses, to produce a result set with
+          a separate aggregate value for each combination of values from the <codeph>GROUP BY</codeph> clause.
+          Let's change our sample table to use <codeph>0</codeph> to indicate rows containing even values, and
+          <codeph>1</codeph> to flag rows containing odd values. Then the <codeph>GROUP BY</codeph> query can
+          return two values, the sum of the squares for the even values, and the sum of the squares for the odd
+          values:
+        </p>
+
+<codeblock>[localhost:21000] &gt; insert overwrite sos values (1, 1), (2, 0), (3, 1), (4, 0);
+Inserted 4 rows in 1.24s
+
+[localhost:21000] &gt; -- Compute 1 squared + 3 squared, and 2 squared + 4 squared;
+[localhost:21000] &gt; select y, sum_of_squares(x) from sos group by y;
++---+------------------------+
+| y | udfs.sum_of_squares(x) |
++---+------------------------+
+| 1 | 10                     |
+| 0 | 20                     |
++---+------------------------+
+Returned 2 row(s) in 0.43s</codeblock>
+
+      </example>
+    </conbody>
+  </concept>
+
+  <concept id="udf_security">
+
+    <title>Security Considerations for User-Defined Functions</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Security"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+
+      <p>
+        When the Impala authorization feature is enabled:
+      </p>
+
+      <ul>
+        <li>
+          To call a UDF in a query, you must have the required read privilege for any databases and tables used in
+          the query.
+        </li>
+
+        <li>
+          Because incorrectly coded UDFs could cause performance or capacity problems, for example by going into
+          infinite loops or allocating excessive amounts of memory, only an administrative user can create UDFs.
+          That is, to execute the <codeph>CREATE FUNCTION</codeph> statement requires the <codeph>ALL</codeph>
+          privilege on the server.
+        </li>
+      </ul>
+
+      <p>
+        See <xref href="impala_authorization.xml#authorization"/> for details about authorization in Impala.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="udf_limits">
+
+    <title>Limitations and Restrictions for Impala UDFs</title>
+
+    <conbody>
+
+      <p>
+        The following limitations and restrictions apply to Impala UDFs in the current release:
+      </p>
+
+      <ul>
+        <li>
+          Impala does not support Hive UDFs that accept or return composite or nested types, or other types not
+          available in Impala tables.
+        </li>
+
+        <li>
+          <p conref="../shared/impala_common.xml#common/current_user_caveat"/>
+        </li>
+
+        <li>
+          All Impala UDFs must be deterministic, that is, produce the same output each time when passed the same
+          argument values. For example, an Impala UDF must not call functions such as <codeph>rand()</codeph> to
+          produce different values for each invocation. It must not retrieve data from external sources, such as
+          from disk or over the network.
+        </li>
+
+        <li>
+          An Impala UDF must not spawn other threads or processes.
+        </li>
+
+        <li rev="2.5.0 IMPALA-2843">
+          Prior to <keyword keyref="impala25_full"/> when the <cmdname>catalogd</cmdname> process is restarted,
+          all UDFs become undefined and must be reloaded. In <keyword keyref="impala25_full"/> and higher, this
+          limitation only applies to older Java UDFs. Re-create those UDFs using the new
+          <codeph>CREATE FUNCTION</codeph> syntax for Java UDFs, which excludes the function signature,
+          to remove the limitation entirely.
+        </li>
+
+        <li>
+          Impala currently does not support user-defined table functions (UDTFs).
+        </li>
+
+        <li rev="2.0.0">
+          The <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph> types cannot be used as input arguments or return
+          values for UDFs.
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+</concept>

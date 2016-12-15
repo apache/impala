@@ -25,6 +25,7 @@
 #include "catalog/catalog-util.h"
 #include "gen-cpp/beeswax_types.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/exec-env.h"
 #include "service/impala-server.h"
 #include "service/query-exec-state.h"
 #include "thrift/protocol/TDebugProtocol.h"

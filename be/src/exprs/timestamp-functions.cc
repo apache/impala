@@ -23,11 +23,12 @@
 
 #include "exprs/anyval-util.h"
 #include "exprs/timezone_db.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
-#include "udf/udf.h"
 #include "udf/udf-internal.h"
+#include "udf/udf.h"
 
 #include "common/names.h"
 
@@ -45,6 +46,24 @@ namespace impala {
 // it won't benefit much from inlining.
 string TimestampFunctions::ToIsoExtendedString(const TimestampValue& ts_value) {
   return to_iso_extended_string(ts_value.date());
+}
+
+namespace {
+/// Uses Boost's internal checking to throw an exception if 'date' is out of the
+/// supported range of boost::gregorian.
+void ThrowIfDateOutOfRange(const boost::gregorian::date& date) {
+  // Boost checks the ranges when instantiating the year/month/day representations.
+  boost::gregorian::greg_year year = date.year();
+  boost::gregorian::greg_month month = date.month();
+  boost::gregorian::greg_day day = date.day();
+  // Ensure Boost's validation is effective.
+  DCHECK_GE(year, boost::gregorian::greg_year::min());
+  DCHECK_LE(year, boost::gregorian::greg_year::max());
+  DCHECK_GE(month, boost::gregorian::greg_month::min());
+  DCHECK_LE(month, boost::gregorian::greg_month::max());
+  DCHECK_GE(day, boost::gregorian::greg_day::min());
+  DCHECK_LE(day, boost::gregorian::greg_day::max());
+}
 }
 
 // This function uses inline asm functions, which we believe to be from the boost library.
@@ -67,13 +86,22 @@ TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
     return ts_val;
   }
 
-  ptime temp;
-  ts_value.ToPtime(&temp);
-  local_date_time lt(temp, timezone);
-  TimestampValue return_value = lt.local_time();
-  TimestampVal return_val;
-  return_value.ToTimestampVal(&return_val);
-  return return_val;
+  try {
+    ptime temp;
+    ts_value.ToPtime(&temp);
+    local_date_time lt(temp, timezone);
+    ptime local_time = lt.local_time();
+    ThrowIfDateOutOfRange(local_time.date());
+    TimestampVal return_val;
+    TimestampValue(local_time).ToTimestampVal(&return_val);
+    return return_val;
+  } catch (boost::exception&) {
+    const string& msg = Substitute(
+        "Timestamp '$0' did not convert to a valid local time in timezone '$1'",
+        ts_value.DebugString(), tz_string_value.DebugString());
+    context->AddWarning(msg.c_str());
+    return TimestampVal::null();
+  }
 }
 
 // This function uses inline asm functions, which we believe to be from the boost library.
@@ -96,16 +124,26 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
     return ts_val;
   }
 
-  local_date_time lt(ts_value.date(), ts_value.time(),
-      timezone, local_date_time::NOT_DATE_TIME_ON_ERROR);
-  TimestampValue return_value(lt.utc_time());
-  TimestampVal return_val;
-  return_value.ToTimestampVal(&return_val);
-  return return_val;
+  try {
+    local_date_time lt(ts_value.date(), ts_value.time(), timezone,
+        local_date_time::NOT_DATE_TIME_ON_ERROR);
+    ptime utc_time = lt.utc_time();
+    // The utc_time() conversion does not check ranges - need to explicitly check.
+    ThrowIfDateOutOfRange(utc_time.date());
+    TimestampVal return_val;
+    TimestampValue(utc_time).ToTimestampVal(&return_val);
+    return return_val;
+  } catch (boost::exception&) {
+    const string& msg =
+        Substitute("Timestamp '$0' in timezone '$1' could not be converted to UTC",
+            ts_value.DebugString(), tz_string_value.DebugString());
+    context->AddWarning(msg.c_str());
+    return TimestampVal::null();
+  }
 }
 
-void TimestampFunctions::UnixAndFromUnixPrepare(FunctionContext* context,
-    FunctionContext::FunctionStateScope scope) {
+void TimestampFunctions::UnixAndFromUnixPrepare(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope != FunctionContext::THREAD_LOCAL) return;
   DateTimeFormatContext* dt_ctx = NULL;
   if (context->IsArgConstant(1)) {

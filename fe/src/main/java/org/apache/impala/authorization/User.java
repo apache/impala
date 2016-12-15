@@ -17,18 +17,17 @@
 
 package org.apache.impala.authorization;
 
-import com.google.common.base.Preconditions;
-import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.service.BackendConfig;
 
-import java.io.IOException;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 
-/*
+/**
  * Class that represents a User of an Impala session.
  */
 public class User {
@@ -37,7 +36,7 @@ public class User {
 
   // Refer to BackendConfig.initAuthToLocal() for initialization
   // of static auth_to_local configs in KerberosName class.
-  private KerberosName kerberosName_;
+  private final KerberosName kerberosName_;
 
   public User(String name) {
     Preconditions.checkNotNull(name);

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.0.0" id="grant">
+
+  <title>GRANT Statement (<keyword keyref="impala20"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>GRANT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Sentry"/>
+      <data name="Category" value="Roles"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+      <!-- Consider whether to go deeper into categories like Security for the Sentry-related statements. -->
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.0.0">
+      <indexterm audience="Cloudera">GRANT statement</indexterm>
+<!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
+      The <codeph>GRANT</codeph> statement grants roles or privileges on specified objects to groups. Only Sentry
+      administrative users can grant roles to a group.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock rev="2.3.0 collevelauth">GRANT ROLE <varname>role_name</varname> TO GROUP <varname>group_name</varname>
+
+GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
+   TO [ROLE] <varname>roleName</varname>
+   [WITH GRANT OPTION]
+
+<ph rev="2.3.0">privilege ::= SELECT | SELECT(<varname>column_name</varname>) | INSERT | ALL</ph>
+object_type ::= TABLE | DATABASE | SERVER | URI
+</codeblock>
+
+    <p>
+      Typically, the object name is an identifier. For URIs, it is a string literal.
+    </p>
+
+<!-- Turn privilege info into a conref or series of conrefs. (In both GRANT and REVOKE.) -->
+
+    <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
+
+    <p>
+<!-- To do: The wording here can be fluid, and it's reused in several statements. Turn into a conref. -->
+      Only administrative users (initially, a predefined set of users specified in the Sentry service configuration
+      file) can use this statement.
+    </p>
+
+    <p>
+      The <codeph>WITH GRANT OPTION</codeph> clause allows members of the specified role to issue
+      <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements for those same privileges
+<!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
+      Hence, if a role has the <codeph>ALL</codeph> privilege on a database and the <codeph>WITH GRANT
+      OPTION</codeph> set, users granted that role can execute <codeph>GRANT</codeph>/<codeph>REVOKE</codeph>
+      statements only for that database or child tables of the database. This means a user could revoke the
+      privileges of the user that provided them the <codeph>GRANT OPTION</codeph>.
+    </p>
+
+    <p>
+<!-- Copied from Sentry docs. Turn into conref. Except I changed Hive to Impala. -->
+      Impala does not currently support revoking only the <codeph>WITH GRANT OPTION</codeph> from a privilege
+      previously granted to a role. To remove the <codeph>WITH GRANT OPTION</codeph>, revoke the privilege and
+      grant it again without the <codeph>WITH GRANT OPTION</codeph> flag.
+    </p>
+
+    <p rev="2.3.0 collevelauth">
+      The ability to grant or revoke <codeph>SELECT</codeph> privilege on specific columns is available
+      in <keyword keyref="impala23_full"/> and higher. See
+      <xref audience="integrated" href="sg_hive_sql.xml#concept_c2q_4qx_p4/col_level_auth_sentry"/><xref audience="standalone" href="https://www.cloudera.com/documentation/enterprise/latest/topics/sg_hive_sql.html" format="html" scope="external"/>
+      for details.
+    </p>
+
+<!-- Turn compatibility info into a conref or series of conrefs. (In both GRANT and REVOKE.) -->
+
+<!-- If they diverge during development, consider the version here in GRANT the authoritative one. -->
+
+    <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
+
+    <p>
+      <ul>
+        <li>
+          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements are available in CDH 5.2 and
+          later.
+        </li>
+
+        <li>
+          In CDH 5.1 and later, Impala can make use of any roles and privileges specified by the
+          <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Hive, when your system is configured to
+          use the Sentry service instead of the file-based policy mechanism.
+        </li>
+
+        <li>
+          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements for privileges do not require
+          the <codeph>ROLE</codeph> keyword to be repeated before each role name, unlike the equivalent Hive
+          statements.
+        </li>
+
+        <li conref="../shared/impala_common.xml#common/grant_revoke_single"/>
+      </ul>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_authorization.xml#authorization"/>, <xref href="impala_revoke.xml#revoke"/>,
+      <xref href="impala_create_role.xml#create_role"/>, <xref href="impala_drop_role.xml#drop_role"/>,
+      <xref href="impala_show.xml#show"/>
+    </p>
+  </conbody>
+</concept>

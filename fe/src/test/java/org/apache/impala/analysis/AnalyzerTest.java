@@ -304,20 +304,20 @@ public class AnalyzerTest extends FrontendTestBase {
     // Unsupported type binary.
     AnalysisError("select bin_col from functional.unsupported_types",
         "Unsupported type 'BINARY' in 'bin_col'.");
-    // Unsupported type binary in a star expansion.
+    // Unsupported type date in a star expansion.
     AnalysisError("select * from functional.unsupported_types",
-        "Unsupported type 'BINARY' in 'functional.unsupported_types.bin_col'.");
+        "Unsupported type 'DATE' in 'functional.unsupported_types.date_col'.");
     // Mixed supported/unsupported types.
     AnalysisError("select int_col, str_col, bin_col " +
         "from functional.unsupported_types",
         "Unsupported type 'BINARY' in 'bin_col'.");
     AnalysisError("create table tmp as select * from functional.unsupported_types",
-        "Unsupported type 'BINARY' in 'functional.unsupported_types.bin_col'.");
+        "Unsupported type 'DATE' in 'functional.unsupported_types.date_col'.");
     // Unsupported type in the target insert table.
     AnalysisError("insert into functional.unsupported_types " +
-        "values(null, null, null, null, null)",
+        "values(null, null, null, null, null, null)",
         "Unable to INSERT into target table (functional.unsupported_types) because " +
-        "the column 'bin_col' has an unsupported type 'BINARY'");
+        "the column 'date_col' has an unsupported type 'DATE'");
     // Unsupported partition-column type.
     AnalysisError("select * from functional.unsupported_partition_types",
         "Failed to load metadata for table: 'functional.unsupported_partition_types'");

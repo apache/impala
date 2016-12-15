@@ -1,0 +1,135 @@
+====
+---- QUERY
+# First create a partitioned table
+create table p1 (i int) partitioned by(j int, k string);
+# Add some partitions
+alter table p1 add partition (j=1,k="a");
+alter table p1 add partition (j=1,k="b");
+alter table p1 add partition (j=1,k="c");
+alter table p1 add partition (j=2,k="d");
+alter table p1 add partition (j=2,k="e");
+alter table p1 add partition (j=2,k="f");
+alter table p1 add partition (j=2,k=NULL);
+alter table p1 add partition (j=NULL,k="g");
+alter table p1 add partition (j=NULL,k=NULL);
+# Populate the table
+insert into p1 partition (j, k) values (100, 1, "a"), (200, 1, "b"), (300, 1, "c");
+====
+---- QUERY
+show partitions p1
+---- RESULTS
+'NULL','NULL',-1,0,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=__HIVE_DEFAULT_PARTITION__/k=__HIVE_DEFAULT_PARTITION__
+'NULL','g',-1,0,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=__HIVE_DEFAULT_PARTITION__/k=g
+'1','a',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=1/k=a
+'1','b',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=1/k=b
+'1','c',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=1/k=c
+'2','NULL',-1,0,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=__HIVE_DEFAULT_PARTITION__
+'2','d',-1,0,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=d
+'2','e',-1,0,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=e
+'2','f',-1,0,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=f
+'Total','',-1,3,regex:.+,regex:.+,'','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show files in p1 partition (j<2, k="a")
+---- RESULTS
+regex:.+,regex:.+,'j=1/k=a'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+alter table p1 partition (j=2) set fileformat parquet
+---- RESULTS
+'Updated 4 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1 partition (k rlike ".*") set serdeproperties ('k'='v')
+---- RESULTS
+'Updated 7 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1 partition (k="") set serdeproperties ('k'='v')
+---- RESULTS
+'Updated 2 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1 partition (k=null) set serdeproperties ('k'='v')
+---- RESULTS
+'Updated 2 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1 partition (j is not null) set tblproperties ('k'='v')
+---- RESULTS
+'Updated 7 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+compute incremental stats p1 partition(j<2)
+---- RESULTS
+'Updated 3 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1 drop partition (j<2)
+---- RESULTS
+'Dropped 3 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1 drop partition (j<2)
+---- RESULTS
+'Dropped 0 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1 drop if exists partition (j<2)
+---- RESULTS
+'Dropped 0 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1 drop if exists partition (j=2, k="bla")
+---- RESULTS
+'Dropped 0 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1 drop partition (j=2, k=NULL)
+---- RESULTS
+'Dropped 1 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table p1 drop partition (j IS NULL AND k IS NULL);
+---- RESULTS
+'Dropped 1 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show partitions p1
+---- RESULTS
+'NULL','g',-1,0,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=__HIVE_DEFAULT_PARTITION__/k=g
+'2','d',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=d
+'2','e',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=e
+'2','f',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=f
+'Total','',0,0,regex:.+,regex:.+,'','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====

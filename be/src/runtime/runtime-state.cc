@@ -30,13 +30,16 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr.h"
+#include "exprs/scalar-fn-call.h"
 #include "runtime/buffered-block-mgr.h"
+#include "runtime/exec-env.h"
 #include "runtime/descriptors.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-filter-bank.h"
 #include "runtime/timestamp-value.h"
+#include "runtime/query-state.h"
 #include "util/bitmap.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -45,6 +48,7 @@
 #include "util/jni-util.h"
 #include "util/mem-info.h"
 #include "util/pretty-printer.h"
+#include "util/auth-util.h" // for GetEffectiveUser()
 
 #include "common/names.h"
 
@@ -68,88 +72,77 @@ static const int64_t BLOCK_MGR_MEM_MIN_REMAINING = 100 * 1024 * 1024;
 namespace impala {
 
 RuntimeState::RuntimeState(
-    const TExecPlanFragmentParams& fragment_params, ExecEnv* exec_env)
-  : obj_pool_(new ObjectPool()),
-    fragment_params_(fragment_params),
+    QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
+    const TPlanFragmentInstanceCtx& instance_ctx, ExecEnv* exec_env)
+  : desc_tbl_(nullptr),
+    obj_pool_(new ObjectPool()),
+    query_state_(query_state),
+    fragment_ctx_(&fragment_ctx),
+    instance_ctx_(&instance_ctx),
     now_(new TimestampValue(
-        query_ctx().now_string.c_str(), query_ctx().now_string.size())),
-    profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_ctx().fragment_instance_id)),
+        query_state->query_ctx().now_string.c_str(),
+        query_state->query_ctx().now_string.size())),
+    exec_env_(exec_env),
+    profile_(obj_pool_.get(), "Fragment " + PrintId(instance_ctx.fragment_instance_id)),
     is_cancelled_(false),
     root_node_id_(-1) {
-  Status status = Init(exec_env);
-  DCHECK(status.ok()) << status.GetDetail();
+  Init();
 }
 
-RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
+RuntimeState::RuntimeState(const TQueryCtx& query_ctx, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
-    now_(new TimestampValue(query_ctx.now_string.c_str(),
-        query_ctx.now_string.size())),
-    exec_env_(ExecEnv::GetInstance()),
+    query_state_(nullptr),
+    fragment_ctx_(nullptr),
+    instance_ctx_(nullptr),
+    local_query_ctx_(query_ctx),
+    now_(new TimestampValue(query_ctx.now_string.c_str(), query_ctx.now_string.size())),
+    exec_env_(exec_env == nullptr ? ExecEnv::GetInstance() : exec_env),
     profile_(obj_pool_.get(), "<unnamed>"),
     is_cancelled_(false),
     root_node_id_(-1) {
-  fragment_params_.__set_query_ctx(query_ctx);
-  fragment_params_.query_ctx.request.query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
+  Init();
 }
 
 RuntimeState::~RuntimeState() {
   block_mgr_.reset();
+
+  // Release codegen memory before tearing down trackers.
+  codegen_.reset();
 
   // query_mem_tracker_ must be valid as long as instance_mem_tracker_ is so
   // delete instance_mem_tracker_ first.
   // LogUsage() walks the MemTracker tree top-down when the memory limit is exceeded.
   // Break the link between the instance_mem_tracker and its parent (query_mem_tracker_)
   // before the instance_mem_tracker_ and its children are destroyed.
-  if (instance_mem_tracker_.get() != NULL) {
-    // May be NULL if InitMemTrackers() is not called, for example from tests.
-    instance_mem_tracker_->UnregisterFromParent();
-  }
-
+  // May be NULL if InitMemTrackers() is not called, for example from tests.
+  if (instance_mem_tracker_ != NULL) instance_mem_tracker_->UnregisterFromParent();
   instance_mem_tracker_.reset();
   query_mem_tracker_.reset();
 }
 
-Status RuntimeState::Init(ExecEnv* exec_env) {
+void RuntimeState::Init() {
   SCOPED_TIMER(profile_.total_time_counter());
-  exec_env_ = exec_env;
-  TQueryOptions& query_options =
-      fragment_params_.query_ctx.request.query_options;
-
-  // max_errors does not indicate how many errors in total have been recorded, but rather
-  // how many are distinct. It is defined as the sum of the number of generic errors and
-  // the number of distinct other errors.
-  if (query_options.max_errors <= 0) {
-    // TODO: fix linker error and uncomment this
-    //query_options_.max_errors = FLAGS_max_errors;
-    query_options.max_errors = 100;
-  }
-  if (query_options.batch_size <= 0) {
-    query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
-  }
 
   // Register with the thread mgr
-  if (exec_env != NULL) {
-    resource_pool_ = exec_env->thread_mgr()->RegisterPool();
+  if (exec_env_ != NULL) {
+    resource_pool_ = exec_env_->thread_mgr()->RegisterPool();
     DCHECK(resource_pool_ != NULL);
   }
 
-  total_cpu_timer_ = ADD_TIMER(runtime_profile(), "TotalCpuTime");
+  total_thread_statistics_ = ADD_THREAD_COUNTERS(runtime_profile(), "TotalThreads");
   total_storage_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalStorageWaitTime");
   total_network_send_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkSendTime");
   total_network_receive_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkReceiveTime");
-
-  return Status::OK();
 }
 
-void RuntimeState::InitMemTrackers(
-    const TUniqueId& query_id, const string* pool_name, int64_t query_bytes_limit) {
+void RuntimeState::InitMemTrackers(const string* pool_name, int64_t query_bytes_limit) {
   MemTracker* query_parent_tracker = exec_env_->process_mem_tracker();
   if (pool_name != NULL) {
     query_parent_tracker = MemTracker::GetRequestPoolMemTracker(*pool_name,
         query_parent_tracker);
   }
   query_mem_tracker_ =
-      MemTracker::GetQueryMemTracker(query_id, query_bytes_limit, query_parent_tracker);
+      MemTracker::GetQueryMemTracker(query_id(), query_bytes_limit, query_parent_tracker);
   instance_mem_tracker_.reset(new MemTracker(
       runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker_.get()));
 }
@@ -183,10 +176,18 @@ Status RuntimeState::CreateBlockMgr() {
 Status RuntimeState::CreateCodegen() {
   if (codegen_.get() != NULL) return Status::OK();
   // TODO: add the fragment ID to the codegen ID as well
-  RETURN_IF_ERROR(LlvmCodeGen::CreateImpalaCodegen(
-      obj_pool_.get(), PrintId(fragment_instance_id()), &codegen_));
+  RETURN_IF_ERROR(LlvmCodeGen::CreateImpalaCodegen(obj_pool_.get(),
+      instance_mem_tracker_.get(), PrintId(fragment_instance_id()), &codegen_));
   codegen_->EnableOptimizations(true);
   profile_.AddChild(codegen_->runtime_profile());
+  return Status::OK();
+}
+
+Status RuntimeState::CodegenScalarFns() {
+  for (ScalarFnCall* scalar_fn : scalar_fns_to_codegen_) {
+    Function* fn;
+    RETURN_IF_ERROR(scalar_fn->GetCodegendComputeFn(codegen_.get(), &fn));
+  }
   return Status::OK();
 }
 
@@ -295,6 +296,49 @@ void RuntimeState::UnregisterReaderContexts() {
     io_mgr()->UnregisterContext(context);
   }
   reader_contexts_.clear();
+}
+
+void RuntimeState::ReleaseResources() {
+  UnregisterReaderContexts();
+  if (desc_tbl_ != nullptr) desc_tbl_->ClosePartitionExprs(this);
+  if (filter_bank_ != nullptr) filter_bank_->Close();
+  if (resource_pool_ != nullptr) {
+    exec_env_->thread_mgr()->UnregisterPool(resource_pool_);
+  }
+}
+
+const std::string& RuntimeState::GetEffectiveUser() const {
+  return impala::GetEffectiveUser(query_ctx().session);
+}
+
+ImpalaBackendClientCache* RuntimeState::impalad_client_cache() {
+  return exec_env_->impalad_client_cache();
+}
+
+CatalogServiceClientCache* RuntimeState::catalogd_client_cache() {
+  return exec_env_->catalogd_client_cache();
+}
+
+DiskIoMgr* RuntimeState::io_mgr() {
+  return exec_env_->disk_io_mgr();
+}
+
+DataStreamMgr* RuntimeState::stream_mgr() {
+  return exec_env_->stream_mgr();
+}
+
+HBaseTableFactory* RuntimeState::htable_factory() {
+  return exec_env_->htable_factory();
+}
+
+const TQueryCtx& RuntimeState::query_ctx() const {
+  return query_state_ != nullptr ? query_state_->query_ctx() : local_query_ctx_;
+}
+
+const TQueryOptions& RuntimeState::query_options() const {
+  const TQueryCtx& query_ctx =
+      query_state_ != nullptr ? query_state_->query_ctx() : local_query_ctx_;
+  return query_ctx.client_request.query_options;
 }
 
 }

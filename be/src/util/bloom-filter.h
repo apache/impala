@@ -52,7 +52,8 @@ namespace impala {
 /// probabilities between 0.1% (for 15 bits) and 10% (for 5 bits).
 ///
 /// Our tiny BloomFilters are 32 bytes to take advantage of 32-byte SIMD in newer Intel
-/// machines.
+/// machines. 'noexcept' is added to various functions called from the cross-compiled code
+/// so LLVM will not generate exception related code at their call sites.
 class BloomFilter {
  public:
   /// Consumes at most (1 << log_heap_space) bytes on the heap.
@@ -61,7 +62,7 @@ class BloomFilter {
   ~BloomFilter();
 
   /// Representation of a filter which allows all elements to pass.
-  static BloomFilter* const ALWAYS_TRUE_FILTER;
+  static constexpr BloomFilter* const ALWAYS_TRUE_FILTER = NULL;
 
   /// Converts 'filter' to its corresponding Thrift representation. If the first argument
   /// is NULL, it is interpreted as a complete filter which contains all elements.
@@ -72,11 +73,11 @@ class BloomFilter {
   /// the set of values is 32-bit ints, the identity function is a valid hash function for
   /// this Bloom filter, since the collision probability (the probability that two
   /// non-equal values will have the same hash value) is 0.
-  void Insert(const uint32_t hash);
+  void Insert(const uint32_t hash) noexcept;
 
   /// Finds an element in the BloomFilter, returning true if it is found and false (with
   /// high probabilty) if it is not.
-  bool Find(const uint32_t hash) const;
+  bool Find(const uint32_t hash) const noexcept;
 
   /// Computes the logical OR of 'in' with 'out' and stores the result in 'out'.
   static void Or(const TBloomFilter& in, TBloomFilter* out);
@@ -131,16 +132,16 @@ class BloomFilter {
 
   /// Does the actual work of Insert(). bucket_idx is the index of the bucket to insert
   /// into and 'hash' is the value passed to Insert().
-  void BucketInsert(const uint32_t bucket_idx, const uint32_t hash);
+  void BucketInsert(const uint32_t bucket_idx, const uint32_t hash) noexcept;
 
   /// A faster SIMD version of BucketInsert().
-  void BucketInsertAVX2(const uint32_t bucket_idx, const uint32_t hash)
+  void BucketInsertAVX2(const uint32_t bucket_idx, const uint32_t hash) noexcept
       __attribute__((__target__("avx2")));
 
   /// BucketFind() and BucketFindAVX2() are just like BucketInsert() and
   /// BucketInsertAVX2(), but for Find().
-  bool BucketFind(const uint32_t bucket_idx, const uint32_t hash) const;
-  bool BucketFindAVX2(const uint32_t bucket_idx, const uint32_t hash) const
+  bool BucketFind(const uint32_t bucket_idx, const uint32_t hash) const noexcept;
+  bool BucketFindAVX2(const uint32_t bucket_idx, const uint32_t hash) const noexcept
       __attribute__((__target__("avx2")));
 
   /// A helper function for the AVX2 methods. Turns a 32-bit hash into a 256-bit Bucket
@@ -173,7 +174,7 @@ class BloomFilter {
 // the advantage of requiring fewer random bits: log2(32) * 8 = 5 * 8 = 40 random bits for
 // a split Bloom filter, but log2(256) * 8 = 64 random bits for a standard Bloom filter.
 
-inline void ALWAYS_INLINE BloomFilter::Insert(const uint32_t hash) {
+inline void ALWAYS_INLINE BloomFilter::Insert(const uint32_t hash) noexcept {
   const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
   if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
     BucketInsertAVX2(bucket_idx, hash);
@@ -182,7 +183,7 @@ inline void ALWAYS_INLINE BloomFilter::Insert(const uint32_t hash) {
   }
 }
 
-inline bool ALWAYS_INLINE BloomFilter::Find(const uint32_t hash) const {
+inline bool ALWAYS_INLINE BloomFilter::Find(const uint32_t hash) const noexcept {
   const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
   if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
     return BucketFindAVX2(bucket_idx, hash);

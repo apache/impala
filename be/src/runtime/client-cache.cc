@@ -110,14 +110,21 @@ Status ClientCacheHelper::CreateClient(const TNetworkAddress& address,
     ClientFactory factory_method, ClientKey* client_key) {
   shared_ptr<ThriftClientImpl> client_impl(factory_method(address, client_key));
   VLOG(2) << "CreateClient(): creating new client for " << client_impl->address();
-  Status status = client_impl->OpenWithRetry(num_tries_, wait_ms_);
-  if (!status.ok()) {
-    *client_key = NULL;
-    return status;
+
+  if (!client_impl->socket_create_status().ok()) {
+    *client_key = nullptr;
+    return client_impl->socket_create_status();
   }
+
   // Set the TSocket's send and receive timeouts.
   client_impl->setRecvTimeout(recv_timeout_ms_);
   client_impl->setSendTimeout(send_timeout_ms_);
+
+  Status status = client_impl->OpenWithRetry(num_tries_, wait_ms_);
+  if (!status.ok()) {
+    *client_key = nullptr;
+    return status;
+  }
 
   // Because the client starts life 'checked out', we don't add it to its host cache.
   {

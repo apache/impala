@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="1.1" id="load_data">
+
+  <title>LOAD DATA Statement</title>
+  <titlealts audience="PDF"><navtitle>LOAD DATA</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="ETL"/>
+      <data name="Category" value="Ingest"/>
+      <data name="Category" value="DML"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="HDFS"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="S3"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">LOAD DATA statement</indexterm>
+      The <codeph>LOAD DATA</codeph> statement streamlines the ETL process for an internal Impala table by moving a
+      data file or all the data files in a directory from an HDFS location into the Impala data directory for that
+      table.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>LOAD DATA INPATH '<varname>hdfs_file_or_directory_path</varname>' [OVERWRITE] INTO TABLE <varname>tablename</varname>
+  [PARTITION (<varname>partcol1</varname>=<varname>val1</varname>, <varname>partcol2</varname>=<varname>val2</varname> ...)]</codeblock>
+
+    <p>
+      When the <codeph>LOAD DATA</codeph> statement operates on a partitioned table,
+      it always operates on one partition at a time. Specify the <codeph>PARTITION</codeph> clauses
+      and list all the partition key columns, with a constant value specified for each.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/dml_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <ul>
+      <li>
+        The loaded data files are moved, not copied, into the Impala data directory.
+      </li>
+
+      <li>
+        You can specify the HDFS path of a single file to be moved, or the HDFS path of a directory to move all the
+        files inside that directory. You cannot specify any sort of wildcard to take only some of the files from a
+        directory. When loading a directory full of data files, keep all the data files at the top level, with no
+        nested directories underneath.
+      </li>
+
+      <li>
+        Currently, the Impala <codeph>LOAD DATA</codeph> statement only imports files from HDFS, not from the local
+        filesystem. It does not support the <codeph>LOCAL</codeph> keyword of the Hive <codeph>LOAD DATA</codeph>
+        statement. You must specify a path, not an <codeph>hdfs://</codeph> URI.
+      </li>
+
+      <li>
+        In the interest of speed, only limited error checking is done. If the loaded files have the wrong file
+        format, different columns than the destination table, or other kind of mismatch, Impala does not raise any
+        error for the <codeph>LOAD DATA</codeph> statement. Querying the table afterward could produce a runtime
+        error or unexpected results. Currently, the only checking the <codeph>LOAD DATA</codeph> statement does is
+        to avoid mixing together uncompressed and LZO-compressed text files in the same table.
+      </li>
+
+      <li>
+        When you specify an HDFS directory name as the <codeph>LOAD DATA</codeph> argument, any hidden files in
+        that directory (files whose names start with a <codeph>.</codeph>) are not moved to the Impala data
+        directory.
+      </li>
+
+      <li rev="2.5.0 IMPALA-2867">
+        The operation fails if the source directory contains any non-hidden directories.
+        Prior to <keyword keyref="impala25_full"/> if the source directory contained any subdirectory, even a hidden one such as
+        <filepath>_impala_insert_staging</filepath>, the <codeph>LOAD DATA</codeph> statement would fail.
+        In <keyword keyref="impala25_full"/> and higher, <codeph>LOAD DATA</codeph> ignores hidden subdirectories in the
+        source directory, and only fails if any of the subdirectories are non-hidden.
+      </li>
+
+      <li>
+        The loaded data files retain their original names in the new location, unless a name conflicts with an
+        existing data file, in which case the name of the new file is modified slightly to be unique. (The
+        name-mangling is a slight difference from the Hive <codeph>LOAD DATA</codeph> statement, which replaces
+        identically named files.)
+      </li>
+
+      <li>
+        By providing an easy way to transport files from known locations in HDFS into the Impala data directory
+        structure, the <codeph>LOAD DATA</codeph> statement lets you avoid memorizing the locations and layout of
+        HDFS directory tree containing the Impala databases and tables. (For a quick way to check the location of
+        the data files for an Impala table, issue the statement <codeph>DESCRIBE FORMATTED
+        <varname>table_name</varname></codeph>.)
+      </li>
+
+      <li>
+        The <codeph>PARTITION</codeph> clause is especially convenient for ingesting new data for a partitioned
+        table. As you receive new data for a time period, geographic region, or other division that corresponds to
+        one or more partitioning columns, you can load that data straight into the appropriate Impala data
+        directory, which might be nested several levels down if the table is partitioned by multiple columns. When
+        the table is partitioned, you must specify constant values for all the partitioning columns.
+      </li>
+    </ul>
+
+    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+    <p rev="2.3.0">
+      Because Impala currently cannot create Parquet data files containing complex types
+      (<codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>), the
+      <codeph>LOAD DATA</codeph> statement is especially important when working with
+      tables containing complex type columns. You create the Parquet data files outside
+      Impala, then use either <codeph>LOAD DATA</codeph>, an external table, or HDFS-level
+      file operations followed by <codeph>REFRESH</codeph> to associate the data files with
+      the corresponding table.
+      See <xref href="impala_complex_types.xml#complex_types"/> for details about using complex types.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
+
+    <note conref="../shared/impala_common.xml#common/compute_stats_next"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      First, we use a trivial Python script to write different numbers of strings (one per line) into files stored
+      in the <codeph>cloudera</codeph> HDFS user account. (Substitute the path for your own HDFS user account when
+      doing <cmdname>hdfs dfs</cmdname> operations like these.)
+    </p>
+
+<codeblock>$ random_strings.py 1000 | hdfs dfs -put - /user/cloudera/thousand_strings.txt
+$ random_strings.py 100 | hdfs dfs -put - /user/cloudera/hundred_strings.txt
+$ random_strings.py 10 | hdfs dfs -put - /user/cloudera/ten_strings.txt</codeblock>
+
+    <p>
+      Next, we create a table and load an initial set of data into it. Remember, unless you specify a
+      <codeph>STORED AS</codeph> clause, Impala tables default to <codeph>TEXTFILE</codeph> format with Ctrl-A (hex
+      01) as the field delimiter. This example uses a single-column table, so the delimiter is not significant. For
+      large-scale ETL jobs, you would typically use binary format data files such as Parquet or Avro, and load them
+      into Impala tables that use the corresponding file format.
+    </p>
+
+<codeblock>[localhost:21000] &gt; create table t1 (s string);
+[localhost:21000] &gt; load data inpath '/user/cloudera/thousand_strings.txt' into table t1;
+Query finished, fetching results ...
++----------------------------------------------------------+
+| summary                                                  |
++----------------------------------------------------------+
+| Loaded 1 file(s). Total files in destination location: 1 |
++----------------------------------------------------------+
+Returned 1 row(s) in 0.61s
+[kilo2-202-961.cs1cloud.internal:21000] &gt; select count(*) from t1;
+Query finished, fetching results ...
++------+
+| _c0  |
++------+
+| 1000 |
++------+
+Returned 1 row(s) in 0.67s
+[localhost:21000] &gt; load data inpath '/user/cloudera/thousand_strings.txt' into table t1;
+ERROR: AnalysisException: INPATH location '/user/cloudera/thousand_strings.txt' does not exist. </codeblock>
+
+    <p>
+      As indicated by the message at the end of the previous example, the data file was moved from its original
+      location. The following example illustrates how the data file was moved into the Impala data directory for
+      the destination table, keeping its original filename:
+    </p>
+
+<codeblock>$ hdfs dfs -ls /user/hive/warehouse/load_data_testing.db/t1
+Found 1 items
+-rw-r--r--   1 cloudera cloudera      13926 2013-06-26 15:40 /user/hive/warehouse/load_data_testing.db/t1/thousand_strings.txt</codeblock>
+
+    <p>
+      The following example demonstrates the difference between the <codeph>INTO TABLE</codeph> and
+      <codeph>OVERWRITE TABLE</codeph> clauses. The table already contains 1000 rows. After issuing the
+      <codeph>LOAD DATA</codeph> statement with the <codeph>INTO TABLE</codeph> clause, the table contains 100 more
+      rows, for a total of 1100. After issuing the <codeph>LOAD DATA</codeph> statement with the <codeph>OVERWRITE
+      INTO TABLE</codeph> clause, the former contents are gone, and now the table only contains the 10 rows from
+      the just-loaded data file.
+    </p>
+
+<codeblock>[localhost:21000] &gt; load data inpath '/user/cloudera/hundred_strings.txt' into table t1;
+Query finished, fetching results ...
++----------------------------------------------------------+
+| summary                                                  |
++----------------------------------------------------------+
+| Loaded 1 file(s). Total files in destination location: 2 |
++----------------------------------------------------------+
+Returned 1 row(s) in 0.24s
+[localhost:21000] &gt; select count(*) from t1;
+Query finished, fetching results ...
++------+
+| _c0  |
++------+
+| 1100 |
++------+
+Returned 1 row(s) in 0.55s
+[localhost:21000] &gt; load data inpath '/user/cloudera/ten_strings.txt' overwrite into table t1;
+Query finished, fetching results ...
++----------------------------------------------------------+
+| summary                                                  |
++----------------------------------------------------------+
+| Loaded 1 file(s). Total files in destination location: 1 |
++----------------------------------------------------------+
+Returned 1 row(s) in 0.26s
+[localhost:21000] &gt; select count(*) from t1;
+Query finished, fetching results ...
++-----+
+| _c0 |
++-----+
+| 10  |
++-----+
+Returned 1 row(s) in 0.62s</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/s3_blurb"/>
+    <p conref="../shared/impala_common.xml#common/s3_dml"/>
+    <p conref="../shared/impala_common.xml#common/s3_dml_performance"/>
+    <p>See <xref href="../topics/impala_s3.xml#s3"/> for details about reading and writing S3 data with Impala.</p>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
+    <p rev="CDH-19187">
+      The user ID that the <cmdname>impalad</cmdname> daemon runs under,
+      typically the <codeph>impala</codeph> user, must have read and write
+      permissions for the files in the source directory, and write
+      permission for the destination directory.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p conref="../shared/impala_common.xml#common/kudu_no_load_data"/>
+
+    <p conref="../shared/impala_common.xml#common/hbase_blurb"/>
+    <p conref="../shared/impala_common.xml#common/hbase_no_load_data"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      The <codeph>LOAD DATA</codeph> statement is an alternative to the
+      <codeph><xref href="impala_insert.xml#insert">INSERT</xref></codeph> statement.
+      Use <codeph>LOAD DATA</codeph>
+      when you have the data files in HDFS but outside of any Impala table.
+    </p>
+    <p>
+      The <codeph>LOAD DATA</codeph> statement is also an alternative
+      to the <codeph>CREATE EXTERNAL TABLE</codeph> statement. Use
+      <codeph>LOAD DATA</codeph> when it is appropriate to move the
+      data files under Impala control rather than querying them
+      from their original location. See <xref href="impala_tables.xml#external_tables"/>
+      for information about working with external tables.
+    </p>
+  </conbody>
+</concept>

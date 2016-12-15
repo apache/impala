@@ -19,8 +19,9 @@
 #define IMPALA_RUNTIME_TMP_FILE_MGR_H
 
 #include "common/status.h"
-#include "gen-cpp/Types_types.h"  // for TUniqueId
+#include "gen-cpp/Types_types.h" // for TUniqueId
 #include "util/collection-metrics.h"
+#include "util/runtime-profile.h"
 #include "util/spinlock.h"
 
 namespace impala {
@@ -51,16 +52,6 @@ class TmpFileMgr {
   /// Creation of the file is deferred until the first call to AllocateSpace().
   class File {
    public:
-    /// Allocates 'write_size' bytes in this file for a new block of data only if it
-    /// does not cross the allocation limit of its associated FileGroup.
-    /// The file size is increased by a call to truncate() if necessary.
-    /// The physical file is created on the first call to AllocateSpace().
-    /// Returns Status::OK() and sets offset on success.
-    /// Returns an error status if an unexpected error occurs or if allowing the
-    /// allocation would exceed the allocation limit of its associated FileGroup.
-    /// If an error status is returned, the caller can try a different temporary file.
-    Status AllocateSpace(int64_t write_size, int64_t* offset);
-
     /// Called to notify TmpFileMgr that an IO error was encountered for this file
     void ReportIOError(const ErrorMsg& msg);
 
@@ -71,6 +62,15 @@ class TmpFileMgr {
    private:
     friend class FileGroup;
     friend class TmpFileMgr;
+    friend class TmpFileMgrTest;
+
+    /// Allocates 'num_bytes' bytes in this file for a new block of data.
+    /// The file size is increased by a call to truncate() if necessary.
+    /// The physical file is created on the first call to AllocateSpace().
+    /// Returns Status::OK() and sets offset on success.
+    /// Returns an error status if an unexpected error occurs, e.g. the file could not
+    /// be created.
+    Status AllocateSpace(int64_t num_bytes, int64_t* offset);
 
     /// Delete the physical file on disk, if one was created.
     /// It is not valid to read or write to a file after calling Remove().
@@ -112,42 +112,49 @@ class TmpFileMgr {
     bool blacklisted_;
   };
 
-  /// Represents a group of files. The total allocated bytes of the group can be bound by
-  /// setting the space allocation limit. The owner of the FileGroup object is
-  /// responsible for calling the Close method to delete all the files in the group.
+  /// Represents a group of temporary files - one per disk with a scratch directory. The
+  /// total allocated bytes of the group can be bound by setting the space allocation
+  /// limit. The owner of the FileGroup object is responsible for calling the Close()
+  /// method to delete all the files in the group.
   class FileGroup {
-  public:
-    FileGroup(TmpFileMgr* tmp_file_mgr, int64_t bytes_limit = -1);
+   public:
+    /// Initialize a new file group, which will create files using 'tmp_file_mgr'.
+    /// Adds counters to 'profile' to track scratch space used. 'bytes_limit' is
+    /// the limit on the total file space to allocate.
+    FileGroup(
+        TmpFileMgr* tmp_file_mgr, RuntimeProfile* profile, int64_t bytes_limit = -1);
 
-    ~FileGroup(){
-      DCHECK_EQ(NumFiles(), 0);
-    }
+    ~FileGroup() { DCHECK_EQ(NumFiles(), 0); }
+
+    /// Initializes the file group with one temporary file per disk with a scratch
+    /// directory. 'unique_id' is a unique ID that should be used to prefix any
+    /// scratch file names. It is an error to create multiple FileGroups with the
+    /// same 'unique_id'. Returns OK if at least one temporary file could be created.
+    /// Returns an error if no temporary files were successfully created. Must only be
+    /// called once.
+    Status CreateFiles(const TUniqueId& unique_id);
+
+    /// Allocate num_bytes bytes in a temporary file. Try multiple disks if error occurs.
+    /// Returns an error only if no temporary files are usable or the scratch limit is
+    /// exceeded.
+    Status AllocateSpace(int64_t num_bytes, File** tmp_file, int64_t* file_offset);
+
+    /// Calls Remove() on all the files in the group and deletes them.
+    void Close();
+
+    /// Returns the number of files that are a part of the group.
+    int NumFiles() { return tmp_files_.size(); }
+
+   private:
+    friend class TmpFileMgrTest;
 
     /// Creates a new File with a unique path for a query instance, adds it to the
     /// group and returns a handle for that file. The file path is within the (single)
     /// tmp directory on the specified device id.
     /// If an error is encountered, e.g. the device is blacklisted, the file is not
     /// added to this group and a non-ok status is returned.
-    Status NewFile(const DeviceId& device_id, const TUniqueId& query_id,
-        File** new_file = NULL);
-
-    /// Returns a file handle at the specified index in the group.
-    File* GetFileAt(int index) {
-      DCHECK_GE(index, 0);
-      DCHECK_LT(index, NumFiles());
-      return tmp_files_[index].get();
-    }
-
-    /// Calls Remove() on all the files in the group and deletes them.
-    void Close();
-
-    /// Returns the number of files that are a part of the group.
-    int NumFiles() {
-      return tmp_files_.size();
-    }
-
-  private:
-    friend class File;
+    Status NewFile(
+        const DeviceId& device_id, const TUniqueId& unique_id, File** new_file = NULL);
 
     /// The TmpFileMgr it is associated with.
     TmpFileMgr* tmp_file_mgr_;
@@ -159,7 +166,15 @@ class TmpFileMgr {
     int64_t current_bytes_allocated_;
 
     /// Max write space allowed (-1 means no limit).
-    int64_t bytes_limit_;
+    const int64_t bytes_limit_;
+
+    /// Index into 'tmp_files' denoting the file to which the next temporary file range
+    /// should be allocated from. Used to implement round-robin allocation from temporary
+    /// files.
+    int next_allocation_index_;
+
+    /// Amount of scratch space allocated in bytes.
+    RuntimeProfile::Counter* scratch_space_bytes_used_counter_;
   };
 
   TmpFileMgr();
@@ -192,7 +207,7 @@ class TmpFileMgr {
   /// responsible for deleting it. The file is not created - creation is deferred until
   /// the first call to File::AllocateSpace().
   Status NewFile(FileGroup* file_group, const DeviceId& device_id,
-      const TUniqueId& query_id, std::unique_ptr<File>* new_file);
+      const TUniqueId& unique_id, std::unique_ptr<File>* new_file);
 
   /// Dir stores information about a temporary directory.
   class Dir {

@@ -87,7 +87,7 @@ public class ExprRewriter {
     return rewrittenExpr;
   }
 
-  public void applyList(List<Expr> exprs, Analyzer analyzer) throws AnalysisException {
+  public void rewriteList(List<Expr> exprs, Analyzer analyzer) throws AnalysisException {
     for (int i = 0; i < exprs.size(); ++i) exprs.set(i, rewrite(exprs.get(i), analyzer));
   }
 

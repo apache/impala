@@ -42,9 +42,9 @@ class LlvmCodeGenTest : public testing:: Test {
     ObjectPool pool;
     Status status;
     for (int i = 0; i < 10; ++i) {
-      LlvmCodeGen object1(&pool, "Test");
-      LlvmCodeGen object2(&pool, "Test");
-      LlvmCodeGen object3(&pool, "Test");
+      LlvmCodeGen object1(&pool, NULL, "Test");
+      LlvmCodeGen object2(&pool, NULL, "Test");
+      LlvmCodeGen object3(&pool, NULL, "Test");
 
       ASSERT_OK(object1.Init(unique_ptr<Module>(new Module("Test", object1.context()))));
       ASSERT_OK(object2.Init(unique_ptr<Module>(new Module("Test", object2.context()))));
@@ -53,16 +53,16 @@ class LlvmCodeGenTest : public testing:: Test {
   }
 
   // Wrapper to call private test-only methods on LlvmCodeGen object
-  static Status CreateFromFile(ObjectPool* pool, const string& filename,
-      scoped_ptr<LlvmCodeGen>* codegen) {
-    return LlvmCodeGen::CreateFromFile(pool, filename, "test", codegen);
+  static Status CreateFromFile(
+      ObjectPool* pool, const string& filename, scoped_ptr<LlvmCodeGen>* codegen) {
+    return LlvmCodeGen::CreateFromFile(pool, NULL, filename, "test", codegen);
   }
 
   static LlvmCodeGen* CreateCodegen(ObjectPool* pool) {
-    LlvmCodeGen* codegen = pool->Add(new LlvmCodeGen(pool, "Test"));
+    LlvmCodeGen* codegen = pool->Add(new LlvmCodeGen(pool, NULL, "Test"));
     if (codegen != NULL) {
-      Status status = codegen->Init(
-          unique_ptr<Module>(new Module("Test", codegen->context())));
+      Status status =
+          codegen->Init(unique_ptr<Module>(new Module("Test", codegen->context())));
       if (!status.ok()) return NULL;
     }
     return codegen;
@@ -82,10 +82,7 @@ class LlvmCodeGenTest : public testing:: Test {
     return codegen->VerifyFunction(fn);
   }
 
-  static Status FinalizeModule(LlvmCodeGen* codegen) {
-    return codegen->FinalizeModule();
-  }
-
+  static Status FinalizeModule(LlvmCodeGen* codegen) { return codegen->FinalizeModule(); }
 };
 
 // Simple test to just make and destroy llvmcodegen objects.  LLVM
@@ -109,7 +106,8 @@ TEST_F(LlvmCodeGenTest, BadIRFile) {
   ObjectPool pool;
   string module_file = "NonExistentFile.ir";
   scoped_ptr<LlvmCodeGen> codegen;
-  EXPECT_FALSE(LlvmCodeGenTest::CreateFromFile(&pool, module_file.c_str(), &codegen).ok());
+  EXPECT_FALSE(
+      LlvmCodeGenTest::CreateFromFile(&pool, module_file.c_str(), &codegen).ok());
 }
 
 // IR for the generated linner loop
@@ -289,7 +287,7 @@ TEST_F(LlvmCodeGenTest, StringValue) {
   ObjectPool pool;
 
   scoped_ptr<LlvmCodeGen> codegen;
-  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(&pool, "test", &codegen));
+  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(&pool, NULL, "test", &codegen));
   EXPECT_TRUE(codegen.get() != NULL);
 
   string str("Test");
@@ -332,7 +330,7 @@ TEST_F(LlvmCodeGenTest, MemcpyTest) {
   ObjectPool pool;
 
   scoped_ptr<LlvmCodeGen> codegen;
-  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(&pool, "test", &codegen));
+  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(&pool, NULL, "test", &codegen));
   ASSERT_TRUE(codegen.get() != NULL);
 
   LlvmCodeGen::FnPrototype prototype(codegen.get(), "MemcpyTest", codegen->void_type());
@@ -379,13 +377,13 @@ TEST_F(LlvmCodeGenTest, HashTest) {
   // Loop to test both the sse4 on/off paths
   for (int i = 0; i < 2; ++i) {
     scoped_ptr<LlvmCodeGen> codegen;
-    ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(&pool, "test", &codegen));
+    ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(&pool, NULL, "test", &codegen));
     ASSERT_TRUE(codegen.get() != NULL);
 
-    Value* llvm_data1 = codegen->CastPtrToLlvmPtr(codegen->ptr_type(),
-        const_cast<char*>(data1));
-    Value* llvm_data2 = codegen->CastPtrToLlvmPtr(codegen->ptr_type(),
-        const_cast<char*>(data2));
+    Value* llvm_data1 =
+        codegen->CastPtrToLlvmPtr(codegen->ptr_type(), const_cast<char*>(data1));
+    Value* llvm_data2 =
+        codegen->CastPtrToLlvmPtr(codegen->ptr_type(), const_cast<char*>(data2));
     Value* llvm_len1 = codegen->GetIntConstant(TYPE_INT, strlen(data1));
     Value* llvm_len2 = codegen->GetIntConstant(TYPE_INT, strlen(data2));
 

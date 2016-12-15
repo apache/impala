@@ -54,6 +54,14 @@ public class PrivilegeRequestBuilder {
   }
 
   /**
+   * Sets the authorizeable object to be a server.
+   */
+  public PrivilegeRequestBuilder onServer(String serverName) {
+    authorizeable_ = new AuthorizeableServer(serverName);
+    return this;
+  }
+
+  /**
    * Sets the authorizeable object to be a database.
    */
   public PrivilegeRequestBuilder onDb(String dbName) {

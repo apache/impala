@@ -52,4 +52,6 @@ struct TBackendGflags {
   15: required i32 read_size
 
   16: required i32 kudu_operation_timeout_ms
+
+  17: required i32 initial_hms_cnxn_timeout_s
 }

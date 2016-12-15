@@ -20,14 +20,13 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.DataPartition;
-import org.apache.impala.thrift.TPartitionType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -181,7 +180,7 @@ public class AggregateInfo extends AggregateInfoBase {
       Preconditions.checkState(tupleDesc == null);
       result.createDistinctAggInfo(groupingExprs, distinctAggExprs, analyzer);
     }
-    LOG.debug("agg info:\n" + result.debugString());
+    if (LOG.isTraceEnabled()) LOG.trace("agg info:\n" + result.debugString());
     return result;
   }
 
@@ -338,7 +337,9 @@ public class AggregateInfo extends AggregateInfoBase {
 
     // Preserve the root type for NULL literals.
     groupingExprs_ = Expr.substituteList(groupingExprs_, smap, analyzer, true);
-    LOG.trace("AggInfo: grouping_exprs=" + Expr.debugString(groupingExprs_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("AggInfo: grouping_exprs=" + Expr.debugString(groupingExprs_));
+    }
 
     // The smap in this case should not substitute the aggs themselves, only
     // their subexpressions.
@@ -349,7 +350,9 @@ public class AggregateInfo extends AggregateInfoBase {
       aggregateExprs_.add((FunctionCallExpr) substitutedAgg);
     }
 
-    LOG.trace("AggInfo: agg_exprs=" + Expr.debugString(aggregateExprs_));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("AggInfo: agg_exprs=" + Expr.debugString(aggregateExprs_));
+    }
     outputTupleSmap_.substituteLhs(smap, analyzer);
     intermediateTupleSmap_.substituteLhs(smap, analyzer);
     if (secondPhaseDistinctAggInfo_ != null) {
@@ -595,8 +598,10 @@ public class AggregateInfo extends AggregateInfoBase {
     }
     if (!requiresIntermediateTuple()) intermediateTupleSmap_ = outputTupleSmap_;
 
-    LOG.trace("output smap=" + outputTupleSmap_.debugString());
-    LOG.trace("intermediate smap=" + intermediateTupleSmap_.debugString());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("output smap=" + outputTupleSmap_.debugString());
+      LOG.trace("intermediate smap=" + intermediateTupleSmap_.debugString());
+    }
   }
 
   /**

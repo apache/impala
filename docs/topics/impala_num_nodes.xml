@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="num_nodes">
+
+  <title>NUM_NODES Query Option</title>
+  <titlealts audience="PDF"><navtitle>NUM_NODES</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Troubleshooting"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">NUM_NODES query option</indexterm>
+      Limit the number of nodes that process a query, typically during debugging.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+<p>
+      <b>Allowed values:</b> Only accepts the values 0
+      (meaning all nodes) or 1 (meaning all work is done on the coordinator node).
+</p>
+
+    <p>
+      <b>Default:</b> 0
+    </p>
+
+     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+     <p>
+       If you are diagnosing a problem that you suspect is due to a timing issue due to
+       distributed query processing, you can set <codeph>NUM_NODES=1</codeph> to verify
+       if the problem still occurs when all the work is done on a single node.
+     </p>
+
+    <p conref="../shared/impala_common.xml#common/num_nodes_tip"/>
+
+    <note type="warning" rev="DOCS-1161">
+    <p>
+      Because this option results in increased resource utilization on a single host,
+      it could cause problems due to contention with other Impala statements or
+      high resource usage. Symptoms could include queries running slowly, exceeding the memory limit,
+      or appearing to hang. Use it only in a single-user development/test environment;
+      <b>do not</b> use it in a production environment or in a cluster with a high-concurrency
+      or high-volume or performance-critical workload.
+    </p>
+    </note>
+
+
+  </conbody>
+</concept>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="disable_row_runtime_filtering" rev="2.5.0">
+
+  <title>DISABLE_ROW_RUNTIME_FILTERING Query Option (<keyword keyref="impala25"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>DISABLE_ROW_RUNTIME_FILTERING</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.5.0">
+      <indexterm audience="Cloudera">DISABLE_ROW_RUNTIME_FILTERING query option</indexterm>
+      The <codeph>DISABLE_ROW_RUNTIME_FILTERING</codeph> query option
+      reduces the scope of the runtime filtering feature. Queries still dynamically prune
+      partitions, but do not apply the filtering logic to individual rows within partitions.
+    </p>
+
+    <p>
+      Only applies to queries against Parquet tables. For other file formats, Impala
+      only prunes at the level of partitions, not individual rows.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false"/>
+
+    <p conref="../shared/impala_common.xml#common/added_in_250"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      Impala automatically evaluates whether the per-row filters are being
+      effective at reducing the amount of intermediate data. Therefore,
+      this option is typically only needed for the rare case where Impala
+      cannot accurately determine how effective the per-row filtering is
+      for a query.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/runtime_filtering_option_caveat"/>
+
+    <p>
+      Because this setting only improves query performance in very specific
+      circumstances, depending on the query characteristics and data distribution,
+      only use it when you determine through benchmarking that it improves
+      performance of specific expensive queries.
+      Consider setting this query option immediately before the expensive query and
+      unsetting it immediately afterward.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_runtime_filtering.xml"/>,
+      <xref href="impala_runtime_filter_mode.xml#runtime_filter_mode"/>
+      <!-- , <xref href="impala_partitioning.xml#dynamic_partition_pruning"/> -->
+    </p>
+
+  </conbody>
+</concept>

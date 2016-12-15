@@ -20,6 +20,7 @@
 #define IMPALA_RUNTIME_TIMESTAMP_VALUE_H
 
 #include <boost/date_time/compiler_config.hpp>
+#include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/conversion.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <ctime>
@@ -84,11 +85,6 @@ class TimestampValue {
   /// Unix time (seconds since 1970-01-01 UTC by definition) constructors.
   /// Conversion to local time will be done if
   /// FLAGS_use_local_tz_for_unix_timestamp_conversions is true.
-  template <typename Number>
-  explicit TimestampValue(Number unix_time) {
-    *this = UnixTimeToPtime(unix_time);
-  }
-
   TimestampValue(int64_t unix_time, int64_t nanos) {
     boost::posix_time::ptime temp = UnixTimeToPtime(unix_time);
     temp += boost::posix_time::nanoseconds(nanos);
@@ -143,6 +139,19 @@ class TimestampValue {
 
   std::string DebugString() const;
 
+  /// Verifies that the timestamp date falls into a valid range (years 1400..9999).
+  inline bool IsValidDate() const {
+    // Smallest valid day number.
+    const static int64_t MIN_DAY_NUMBER = static_cast<int64_t>(
+        boost::gregorian::date(boost::date_time::min_date_time).day_number());
+    // Largest valid day number.
+    const static int64_t MAX_DAY_NUMBER = static_cast<int64_t>(
+        boost::gregorian::date(boost::date_time::max_date_time).day_number());
+
+    return date_.day_number() >= MIN_DAY_NUMBER
+        && date_.day_number() <= MAX_DAY_NUMBER;
+  }
+
   /// Formats the timestamp using the given date/time context and places the result in the
   /// string buffer. The size of the buffer should be at least dt_ctx.fmt_out_len + 1. A
   /// string terminator will be appended to the string.
@@ -168,19 +177,6 @@ class TimestampValue {
     } else {
       *unix_time = timegm(&temp_tm);
     }
-    return true;
-  }
-
-  /// Converts to Unix time (seconds since the Unix epoch) in UTC corresponding to this
-  /// Timestamp instance.
-  /// Returns false if the conversion failed (utc_time will be undefined), otherwise
-  /// true.
-  bool ToUnixTimeInUTC(time_t* utc_time) const {
-    DCHECK(utc_time != NULL);
-    if (UNLIKELY(!HasDateAndTime())) return false;
-    const boost::posix_time::ptime temp(date_, time_);
-    tm temp_tm = boost::posix_time::to_tm(temp);
-    *utc_time = mktime(&temp_tm);
     return true;
   }
 

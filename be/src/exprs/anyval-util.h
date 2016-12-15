@@ -133,12 +133,19 @@ class AnyValUtil {
     return HashUtil::MurmurHash2_64(&tv, 12, seed);
   }
 
-  static uint64_t Hash64(const DecimalVal& v, const FunctionContext::TypeDesc& t,
-      int64_t seed) {
-    switch (ColumnType::GetDecimalByteSize(t.precision)) {
-      case 4: return HashUtil::MurmurHash2_64(&v.val4, 4, seed);
-      case 8: return HashUtil::MurmurHash2_64(&v.val8, 8, seed);
-      case 16: return HashUtil::MurmurHash2_64(&v.val16, 16, seed);
+  static uint64_t Hash64(
+      const DecimalVal& v, const FunctionContext::TypeDesc& t, int64_t seed) {
+    return HashDecimal64(v, ColumnType::GetDecimalByteSize(t.precision), seed);
+  }
+
+  static uint64_t HashDecimal64(const DecimalVal& v, int byte_size, int64_t seed) {
+    switch (byte_size) {
+      case 4:
+        return HashUtil::MurmurHash2_64(&v.val4, 4, seed);
+      case 8:
+        return HashUtil::MurmurHash2_64(&v.val8, 8, seed);
+      case 16:
+        return HashUtil::MurmurHash2_64(&v.val16, 16, seed);
       default:
         DCHECK(false);
         return 0;

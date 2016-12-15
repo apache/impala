@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="security">
+
+  <title><ph audience="standalone">Impala Security</ph><ph audience="integrated">Overview of Impala Security</ph></title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Concepts"/>
+      <data name="Category" value="Auditing"/>
+      <data name="Category" value="Governance"/>
+      <data name="Category" value="Authentication"/>
+      <data name="Category" value="Authorization"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Impala includes a fine-grained authorization framework for Hadoop, based on the Sentry
+      open source project. Sentry authorization was added in Impala 1.1.0. Together with the Kerberos authentication
+      framework, Sentry takes Hadoop security to a new level needed for the requirements of highly regulated industries
+      such as healthcare, financial services, and government. Impala also includes
+      an auditing capability; Impala generates the audit data, the Cloudera Navigator product consolidates
+      the audit data from all nodes in the cluster, and Cloudera Manager lets you filter, visualize, and produce
+      reports. The auditing feature was added in Impala 1.1.1.
+    </p>
+
+    <p>
+      The Impala security features have several objectives. At the most basic level, security prevents
+      accidents or mistakes that could disrupt application processing, delete or corrupt data, or reveal data to
+      unauthorized users. More advanced security features and practices can harden the system against malicious
+      users trying to gain unauthorized access or perform other disallowed operations. The auditing feature
+      provides a way to confirm that no unauthorized access occurred, and detect whether any such attempts were
+      made. This is a critical set of features for production deployments in large organizations that handle
+      important or sensitive data. It sets the stage for multi-tenancy, where multiple applications run
+      concurrently and are prevented from interfering with each other.
+    </p>
+
+    <p>
+      The material in this section presumes that you are already familiar with administering secure Linux systems.
+      That is, you should know the general security practices for Linux and Hadoop, and their associated commands
+      and configuration files. For example, you should know how to create Linux users and groups, manage Linux
+      group membership, set Linux and HDFS file permissions and ownership, and designate the default permissions
+      and ownership for new files. You should be familiar with the configuration of the nodes in your Hadoop
+      cluster, and know how to apply configuration changes or run a set of commands across all the nodes.
+    </p>
+
+    <p>
+      The security features are divided into these broad categories:
+    </p>
+
+    <dl>
+      <dlentry>
+
+        <dt>
+          authorization
+        </dt>
+
+        <dd>
+          Which users are allowed to access which resources, and what operations are they allowed to perform?
+          Impala relies on the open source Sentry project for authorization. By default (when authorization is not
+          enabled), Impala does all read and write operations with the privileges of the <codeph>impala</codeph>
+          user, which is suitable for a development/test environment but not for a secure production environment.
+          When authorization is enabled, Impala uses the OS user ID of the user who runs
+          <cmdname>impala-shell</cmdname> or other client program, and associates various privileges with each
+          user. See <xref href="impala_authorization.xml#authorization"/> for details about setting up and managing
+          authorization.
+        </dd>
+
+      </dlentry>
+
+      <dlentry>
+
+        <dt>
+          authentication
+        </dt>
+
+        <dd>
+          How does Impala verify the identity of the user to confirm that they really are allowed to exercise the
+          privileges assigned to that user? Impala relies on the Kerberos subsystem for authentication. See
+          <xref href="impala_kerberos.xml#kerberos"/> for details about setting up and managing authentication.
+        </dd>
+
+      </dlentry>
+
+      <dlentry>
+
+        <dt>
+          auditing
+        </dt>
+
+        <dd>
+          What operations were attempted, and did they succeed or not? This feature provides a way to look back and
+          diagnose whether attempts were made to perform unauthorized operations. You use this information to track
+          down suspicious activity, and to see where changes are needed in authorization policies. The audit data
+          produced by this feature is collected by the Cloudera Manager product and then presented in a
+          user-friendly form by the Cloudera Manager product. See <xref href="impala_auditing.xml#auditing"/> for
+          details about setting up and managing auditing.
+        </dd>
+
+      </dlentry>
+    </dl>
+
+    <p outputclass="toc"/>
+
+    <p audience="integrated">
+      These other topics in the <cite>Security Guide</cite> cover how Impala integrates with security frameworks
+      such as Kerberos, LDAP, and Sentry:
+      <ul>
+        <li>
+          <xref href="impala_authentication.xml#authentication"/>
+        </li>
+
+        <li>
+          <xref href="impala_authorization.xml#authorization"/>
+        </li>
+      </ul>
+    </p>
+  </conbody>
+</concept>

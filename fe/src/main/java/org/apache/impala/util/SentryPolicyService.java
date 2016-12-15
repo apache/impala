@@ -110,8 +110,10 @@ public class SentryPolicyService {
    */
   public void dropRole(User requestingUser, String roleName, boolean ifExists)
       throws ImpalaException {
-    LOG.trace(String.format("Dropping role: %s on behalf of: %s", roleName,
-        requestingUser.getName()));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Dropping role: %s on behalf of: %s", roleName,
+          requestingUser.getName()));
+    }
     SentryServiceClient client = new SentryServiceClient();
     try {
       if (ifExists) {
@@ -139,8 +141,10 @@ public class SentryPolicyService {
    */
   public void createRole(User requestingUser, String roleName, boolean ifNotExists)
       throws ImpalaException {
-    LOG.trace(String.format("Creating role: %s on behalf of: %s", roleName,
-        requestingUser.getName()));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Creating role: %s on behalf of: %s", roleName,
+          requestingUser.getName()));
+    }
     SentryServiceClient client = new SentryServiceClient();
     try {
       client.get().createRole(requestingUser.getShortName(), roleName);
@@ -167,8 +171,10 @@ public class SentryPolicyService {
    */
   public void grantRoleToGroup(User requestingUser, String roleName, String groupName)
       throws ImpalaException {
-    LOG.trace(String.format("Granting role '%s' to group '%s' on behalf of: %s",
-        roleName, groupName, requestingUser.getName()));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Granting role '%s' to group '%s' on behalf of: %s",
+          roleName, groupName, requestingUser.getName()));
+    }
     SentryServiceClient client = new SentryServiceClient();
     try {
       client.get().grantRoleToGroup(requestingUser.getShortName(), groupName, roleName);
@@ -193,8 +199,10 @@ public class SentryPolicyService {
    */
   public void revokeRoleFromGroup(User requestingUser, String roleName, String groupName)
       throws ImpalaException {
-    LOG.trace(String.format("Revoking role '%s' from group '%s' on behalf of: %s",
-        roleName, groupName, requestingUser.getName()));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Revoking role '%s' from group '%s' on behalf of: %s",
+          roleName, groupName, requestingUser.getName()));
+    }
     SentryServiceClient client = new SentryServiceClient();
     try {
       client.get().revokeRoleFromGroup(requestingUser.getShortName(),
@@ -231,9 +239,12 @@ public class SentryPolicyService {
     Preconditions.checkState(!privileges.isEmpty());
     TPrivilege privilege = privileges.get(0);
     TPrivilegeScope scope = privilege.getScope();
-    LOG.trace(String.format("Granting role '%s' '%s' privilege on '%s' on behalf of: %s",
-        roleName, privilege.getPrivilege_level().toString(), scope.toString(),
-        requestingUser.getName()));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format(
+          "Granting role '%s' '%s' privilege on '%s' on behalf of: %s",
+          roleName, privilege.getPrivilege_level().toString(), scope.toString(),
+          requestingUser.getName()));
+    }
     // Verify that all privileges have the same scope.
     for (int i = 1; i < privileges.size(); ++i) {
       Preconditions.checkState(privileges.get(i).getScope() == scope, "All the " +
@@ -306,9 +317,11 @@ public class SentryPolicyService {
     Preconditions.checkState(!privileges.isEmpty());
     TPrivilege privilege = privileges.get(0);
     TPrivilegeScope scope = privilege.getScope();
-    LOG.trace(String.format("Revoking from role '%s' '%s' privilege on '%s' on " +
-        "behalf of: %s", roleName, privilege.getPrivilege_level().toString(),
-        scope.toString(), requestingUser.getName()));
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("Revoking from role '%s' '%s' privilege on '%s' on " +
+          "behalf of: %s", roleName, privilege.getPrivilege_level().toString(),
+          scope.toString(), requestingUser.getName()));
+    }
     // Verify that all privileges have the same scope.
     for (int i = 1; i < privileges.size(); ++i) {
       Preconditions.checkState(privileges.get(i).getScope() == scope, "All the " +

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="5.4.3" id="impala_isilon">
+
+  <title>Using Impala with Isilon Storage</title>
+  <titlealts audience="PDF"><navtitle>Isilon Storage</navtitle></titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="CDH"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Isilon"/>
+      <data name="Category" value="Disk Storage"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">Isilon</indexterm>
+      You can use Impala to query data files that reside on EMC Isilon storage devices, rather than in HDFS.
+      This capability allows convenient query access to a storage system where you might already be
+      managing large volumes of data. The combination of the Impala query engine and Isilon storage is
+      certified on CDH 5.4.4 or higher.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/isilon_block_size_caveat"/>
+
+    <p>
+      The typical use case for Impala and Isilon together is to use Isilon for the
+      default filesystem, replacing HDFS entirely. In this configuration,
+      when you create a database, table, or partition, the data always resides on
+      Isilon storage and you do not need to specify any special <codeph>LOCATION</codeph>
+      attribute. If you do specify a <codeph>LOCATION</codeph> attribute, its value refers
+      to a path within the Isilon filesystem.
+      For example:
+    </p>
+<codeblock>-- If the default filesystem is Isilon, all Impala data resides there
+-- and all Impala databases and tables are located there.
+CREATE TABLE t1 (x INT, s STRING);
+
+-- You can specify LOCATION for database, table, or partition,
+-- using values from the Isilon filesystem.
+CREATE DATABASE d1 LOCATION '/some/path/on/isilon/server/d1.db';
+CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
+</codeblock>
+
+    <p>
+      Impala can write to, delete, and rename data files and database, table,
+      and partition directories on Isilon storage. Therefore, Impala statements such
+      as
+      <codeph>CREATE TABLE</codeph>, <codeph>DROP TABLE</codeph>,
+      <codeph>CREATE DATABASE</codeph>, <codeph>DROP DATABASE</codeph>,
+      <codeph>ALTER TABLE</codeph>,
+      and
+      <codeph>INSERT</codeph> work the same with Isilon storage as with HDFS.
+    </p>
+
+    <p>
+      When the Impala spill-to-disk feature is activated by a query that approaches
+      the memory limit, Impala writes all the temporary data to a local (not Isilon)
+      storage device. Because the I/O bandwidth for the temporary data depends on
+      the number of local disks, and clusters using Isilon storage might not have
+      as many local disks attached, pay special attention on Isilon-enabled clusters
+      to any queries that use the spill-to-disk feature. Where practical, tune the
+      queries or allocate extra memory for Impala to avoid spilling.
+      Although you can specify an Isilon storage device as the destination for
+      the temporary data for the spill-to-disk feature, that configuration is
+      not recommended due to the need to transfer the data both ways using remote I/O.
+    </p>
+
+    <p>
+      When tuning Impala queries on HDFS, you typically try to avoid any remote reads.
+      When the data resides on Isilon storage, all the I/O consists of remote reads.
+      Do not be alarmed when you see non-zero numbers for remote read measurements
+      in query profile output. The benefit of the Impala and Isilon integration is
+      primarily convenience of not having to move or copy large volumes of data to HDFS,
+      rather than raw query performance. You can increase the performance of Impala
+      I/O for Isilon systems by increasing the value for the
+      <codeph>num_remote_hdfs_io_threads</codeph> configuration parameter,
+      in the Cloudera Manager user interface for clusters using Cloudera Manager,
+      or through the <codeph>--num_remote_hdfs_io_threads</codeph> startup option
+      for the <cmdname>impalad</cmdname> daemon on clusters not using Cloudera Manager.
+    </p>
+
+    <p>
+<!--
+      For information about tasks performed on
+      Isilon OneFS, see the information hub for Cloudera on the EMC Community Network:
+      <xref href="https://community.emc.com/docs/DOC-39522" format="html" scope="external">https://community.emc.com/docs/DOC-39522</xref>.
+-->
+      <!-- This is a little bit of a circular loop when this topic is conrefed into the main Isilon page,
+           consider if there's a way to conditionalize it out in that case. -->
+      For information about managing Isilon storage devices through Cloudera Manager, see
+      <xref audience="integrated" href="cm_mc_isilon_service.xml"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_isilon_service.html" scope="external" format="html"/>.
+    </p>
+
+    <!-- <p outputclass="toc inpage"/> -->
+  </conbody>
+<concept id="isilon_cm_configs">
+<title>Required Configurations</title>
+<conbody>
+<p>Specify the following configurations in Cloudera Manager on the <menucascade><uicontrol>Clusters</uicontrol><uicontrol><varname>Isilon Service</varname></uicontrol><uicontrol>Configuration</uicontrol></menucascade> tab:<ul id="ul_vpx_bw5_vv">
+<li>In <uicontrol>HDFS Client Advanced Configuration Snippet (Safety Valve) for hdfs-site.xml</uicontrol> <codeph>hdfs-site.xml</codeph> and the <uicontrol>Cluster-wide Advanced Configuration Snippet (Safety Valve) for core-site.xml</uicontrol> properties for the Isilon service, set the value of the <codeph>dfs.client.file-block-storage-locations.timeout.millis</codeph> property to <codeph>10000</codeph>.</li>
+<li>In the Isilon <uicontrol>Cluster-wide Advanced Configuration Snippet (Safety Valve) for core-site.xml</uicontrol> property for the Isilon service, set the value of the <codeph>hadoop.security.token.service.use_ip</codeph> property to <codeph>FALSE</codeph>. </li>
+<li>If you see errors that reference the <codeph>.Trash</codeph> directory, make sure that the <uicontrol>Use Trash</uicontrol> property is selected.</li>
+</ul></p>
+
+</conbody>
+</concept>
+
+</concept>

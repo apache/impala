@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="identifiers">
+
+  <title>Overview of Impala Identifiers</title>
+  <titlealts audience="PDF"><navtitle>Identifiers</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Databases"/>
+      <data name="Category" value="Tables"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Identifiers are the names of databases, tables, or columns that you specify in a SQL statement. The rules for
+      identifiers govern what names you can give to things you create, the notation for referring to names
+      containing unusual characters, and other aspects such as case sensitivity.
+    </p>
+
+    <ul>
+      <li>
+        <p>
+        The minimum length of an identifier is 1 character.
+        </p>
+      </li>
+
+      <li>
+        <p>
+        The maximum length of an identifier is currently 128 characters, enforced by the metastore database.
+        </p>
+      </li>
+
+      <li>
+        <p>
+        An identifier must start with an alphabetic character. The remainder can contain any combination of
+        alphanumeric characters and underscores. Quoting the identifier with backticks has no effect on the allowed
+        characters in the name.
+        </p>
+      </li>
+
+      <li>
+        <p>
+        An identifier can contain only ASCII characters.
+        </p>
+      </li>
+
+      <li>
+        <p>
+        To use an identifier name that matches one of the Impala reserved keywords (listed in
+        <xref href="impala_reserved_words.xml#reserved_words"/>), surround the identifier with <codeph>``</codeph>
+        characters (backticks). Quote the reserved word even if it is part of a fully qualified name.
+        The following example shows how a reserved word can be used as a column name if it is quoted
+        with backticks in the <codeph>CREATE TABLE</codeph> statement, and how the column name
+        must also be quoted with backticks in a query:
+        </p>
+<codeblock>[localhost:21000] > create table reserved (`data` string);
+
+[localhost:21000] > select data from reserved;
+ERROR: AnalysisException: Syntax error in line 1:
+select data from reserved
+       ^
+Encountered: DATA
+Expected: ALL, CASE, CAST, DISTINCT, EXISTS, FALSE, IF, INTERVAL, NOT, NULL, STRAIGHT_JOIN, TRUE, IDENTIFIER
+CAUSED BY: Exception: Syntax error
+
+[localhost:21000] > select reserved.data from reserved;
+ERROR: AnalysisException: Syntax error in line 1:
+select reserved.data from reserved
+                ^
+Encountered: DATA
+Expected: IDENTIFIER
+CAUSED BY: Exception: Syntax error
+
+[localhost:21000] > select reserved.`data` from reserved;
+
+[localhost:21000] >
+</codeblock>
+
+        <note type="important">
+          Because the list of reserved words grows over time as new SQL syntax is added,
+          consider adopting coding conventions (especially for any automated scripts
+          or in packaged applications) to always quote all identifiers with backticks.
+          Quoting all identifiers protects your SQL from compatibility issues if
+          new reserved words are added in later releases.
+        </note>
+
+      </li>
+
+      <li>
+        <p>
+        Impala identifiers are always case-insensitive. That is, tables named <codeph>t1</codeph> and
+        <codeph>T1</codeph> always refer to the same table, regardless of quote characters. Internally, Impala
+        always folds all specified table and column names to lowercase. This is why the column headers in query
+        output are always displayed in lowercase.
+        </p>
+      </li>
+    </ul>
+
+    <p>
+      See <xref href="impala_aliases.xml#aliases"/> for how to define shorter or easier-to-remember aliases if the
+      original names are long or cryptic identifiers.
+      <ph conref="../shared/impala_common.xml#common/aliases_vs_identifiers"/>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/views_vs_identifiers"/>
+  </conbody>
+</concept>

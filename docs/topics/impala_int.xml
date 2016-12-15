@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="int">
+
+  <title>INT Data Type</title>
+  <titlealts audience="PDF"><navtitle>INT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      A 4-byte integer data type used in <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph> statements.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+    <p>
+      In the column definition of a <codeph>CREATE TABLE</codeph> statement:
+    </p>
+
+<codeblock><varname>column_name</varname> INT</codeblock>
+
+    <p>
+      <b>Range:</b> -2147483648 .. 2147483647. There is no <codeph>UNSIGNED</codeph> subtype.
+    </p>
+
+    <p>
+      <b>Conversions:</b> Impala automatically converts to a larger integer type (<codeph>BIGINT</codeph>) or a
+      floating-point type (<codeph>FLOAT</codeph> or <codeph>DOUBLE</codeph>) automatically. Use
+      <codeph>CAST()</codeph> to convert to <codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>,
+      <codeph>STRING</codeph>, or <codeph>TIMESTAMP</codeph>.
+      <ph conref="../shared/impala_common.xml#common/cast_int_to_timestamp"/>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      The data type <codeph>INTEGER</codeph> is an alias for <codeph>INT</codeph>.
+    </p>
+
+    <p>
+      For a convenient and automated way to check the bounds of the <codeph>INT</codeph> type, call the functions
+      <codeph>MIN_INT()</codeph> and <codeph>MAX_INT()</codeph>.
+    </p>
+
+    <p>
+      If an integer value is too large to be represented as a <codeph>INT</codeph>, use a <codeph>BIGINT</codeph>
+      instead.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/null_bad_numeric_cast"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>CREATE TABLE t1 (x INT);
+SELECT CAST(1000 AS INT);
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/partitioning_good"/>
+
+    <p conref="../shared/impala_common.xml#common/hbase_ok"/>
+
+    <p conref="../shared/impala_common.xml#common/parquet_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/text_bulky"/>
+
+<!-- <p conref="../shared/impala_common.xml#common/compatibility_blurb"/> -->
+
+    <p conref="../shared/impala_common.xml#common/internals_4_bytes"/>
+
+    <p conref="../shared/impala_common.xml#common/added_forever"/>
+
+    <p conref="../shared/impala_common.xml#common/column_stats_constant"/>
+
+<!-- <p conref="../shared/impala_common.xml#common/restrictions_blurb"/> -->
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_literals.xml#numeric_literals"/>, <xref href="impala_tinyint.xml#tinyint"/>,
+      <xref href="impala_smallint.xml#smallint"/>, <xref href="impala_int.xml#int"/>,
+      <xref href="impala_bigint.xml#bigint"/>, <xref href="impala_decimal.xml#decimal"/>,
+      <xref href="impala_math_functions.xml#math_functions"/>
+    </p>
+  </conbody>
+</concept>

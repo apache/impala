@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="string">
+
+  <title>STRING Data Type</title>
+  <titlealts audience="PDF"><navtitle>STRING</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      A data type used in <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph> statements.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+    <p>
+      In the column definition of a <codeph>CREATE TABLE</codeph> statement:
+    </p>
+
+<codeblock><varname>column_name</varname> STRING</codeblock>
+
+    <p>
+      <b>Length:</b> Maximum of 32,767 bytes. Do not use any length constraint when declaring
+      <codeph>STRING</codeph> columns, as you might be familiar with from <codeph>VARCHAR</codeph>,
+      <codeph>CHAR</codeph>, or similar column types from relational database systems. <ph rev="2.0.0">If you do
+      need to manipulate string values with precise or maximum lengths, in Impala 2.0 and higher you can declare
+      columns as <codeph>VARCHAR(<varname>max_length</varname>)</codeph> or
+      <codeph>CHAR(<varname>length</varname>)</codeph>, but for best performance use <codeph>STRING</codeph>
+      where practical.</ph>
+    </p>
+
+    <p>
+      <b>Character sets:</b> For full support in all Impala subsystems, restrict string values to the ASCII
+      character set. Although some UTF-8 character data can be stored in Impala and retrieved through queries, UTF-8 strings
+      containing non-ASCII characters are not guaranteed to work properly in combination with many SQL aspects,
+      including but not limited to:
+    </p>
+    <ul>
+      <li>
+        String manipulation functions.
+      </li>
+      <li>
+        Comparison operators.
+      </li>
+      <li>
+        The <codeph>ORDER BY</codeph> clause.
+      </li>
+      <li>
+        Values in partition key columns.
+      </li>
+    </ul>
+
+    <p>
+      For any national language aspects such as
+      collation order or interpreting extended ASCII variants such as ISO-8859-1 or ISO-8859-2 encodings, Impala
+      does not include such metadata with the table definition. If you need to sort, manipulate, or display data
+      depending on those national language characteristics of string data, use logic on the application side.
+    </p>
+
+    <p>
+      <b>Conversions:</b>
+    </p>
+
+    <ul>
+      <li>
+        <p>
+          Impala does not automatically convert <codeph>STRING</codeph> to any numeric type. Impala does
+          automatically convert <codeph>STRING</codeph> to <codeph>TIMESTAMP</codeph> if the value matches one of
+          the accepted <codeph>TIMESTAMP</codeph> formats; see <xref href="impala_timestamp.xml#timestamp"/> for
+          details.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          You can use <codeph>CAST()</codeph> to convert <codeph>STRING</codeph> values to
+          <codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>, <codeph>INT</codeph>, <codeph>BIGINT</codeph>,
+          <codeph>FLOAT</codeph>, <codeph>DOUBLE</codeph>, or <codeph>TIMESTAMP</codeph>.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          You cannot directly cast a <codeph>STRING</codeph> value to <codeph>BOOLEAN</codeph>. You can use a
+          <codeph>CASE</codeph> expression to evaluate string values such as <codeph>'T'</codeph>,
+          <codeph>'true'</codeph>, and so on and return Boolean <codeph>true</codeph> and <codeph>false</codeph>
+          values as appropriate.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          You can cast a <codeph>BOOLEAN</codeph> value to <codeph>STRING</codeph>, returning <codeph>'1'</codeph>
+          for <codeph>true</codeph> values and <codeph>'0'</codeph> for <codeph>false</codeph> values.
+        </p>
+      </li>
+    </ul>
+
+    <p conref="../shared/impala_common.xml#common/partitioning_blurb"/>
+
+    <p>
+      Although it might be convenient to use <codeph>STRING</codeph> columns for partition keys, even when those
+      columns contain numbers, for performance and scalability it is much better to use numeric columns as
+      partition keys whenever practical. Although the underlying HDFS directory name might be the same in either
+      case, the in-memory storage for the partition key columns is more compact, and computations are faster, if
+      partition key columns such as <codeph>YEAR</codeph>, <codeph>MONTH</codeph>, <codeph>DAY</codeph> and so on
+      are declared as <codeph>INT</codeph>, <codeph>SMALLINT</codeph>, and so on.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/zero_length_strings"/>
+
+<!-- <p conref="../shared/impala_common.xml#common/hbase_blurb"/> -->
+
+<!-- <p conref="../shared/impala_common.xml#common/parquet_blurb"/> -->
+
+    <p conref="../shared/impala_common.xml#common/text_bulky"/>
+
+    <p><b>Avro considerations:</b></p>
+    <p conref="../shared/impala_common.xml#common/avro_2gb_strings"/>
+
+<!-- <p conref="../shared/impala_common.xml#common/compatibility_blurb"/> -->
+
+<!-- <p conref="../shared/impala_common.xml#common/internals_blurb"/> -->
+
+<!-- <p conref="../shared/impala_common.xml#common/added_in_20"/> -->
+
+    <p conref="../shared/impala_common.xml#common/column_stats_variable"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following examples demonstrate double-quoted and single-quoted string literals, and required escaping for
+      quotation marks within string literals:
+    </p>
+
+<codeblock>SELECT 'I am a single-quoted string';
+SELECT "I am a double-quoted string";
+SELECT 'I\'m a single-quoted string with an apostrophe';
+SELECT "I\'m a double-quoted string with an apostrophe";
+SELECT 'I am a "short" single-quoted string containing quotes';
+SELECT "I am a \"short\" double-quoted string containing quotes";
+</codeblock>
+
+    <p>
+      The following examples demonstrate calls to string manipulation functions to concatenate strings, convert
+      numbers to strings, or pull out substrings:
+    </p>
+
+<codeblock>SELECT CONCAT("Once upon a time, there were ", CAST(3 AS STRING), ' little pigs.');
+SELECT SUBSTR("hello world",7,5);
+</codeblock>
+
+    <p>
+      The following examples show how to perform operations on <codeph>STRING</codeph> columns within a table:
+    </p>
+
+<codeblock>CREATE TABLE t1 (s1 STRING, s2 STRING);
+INSERT INTO t1 VALUES ("hello", 'world'), (CAST(7 AS STRING), "wonders");
+SELECT s1, s2, length(s1) FROM t1 WHERE s2 LIKE 'w%';
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_literals.xml#string_literals"/>, <xref href="impala_char.xml#char"/>,
+      <xref href="impala_varchar.xml#varchar"/>, <xref href="impala_string_functions.xml#string_functions"/>,
+      <xref href="impala_datetime_functions.xml#datetime_functions"/>
+    </p>
+  </conbody>
+</concept>

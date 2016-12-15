@@ -18,13 +18,18 @@
 #ifndef IMPALA_TESTUTIL_ROW_DESC_BUILDER_H_
 #define IMPALA_TESTUTIL_ROW_DESC_BUILDER_H_
 
+#include <vector>
+
 #include "runtime/runtime-state.h"
 #include "runtime/types.h"
+#include "gen-cpp/Descriptors_types.h"
 
 namespace impala {
 
+class Frontend;
 class ObjectPool;
 class TupleDescBuilder;
+class DescriptorTbl;
 
 /// Aids in the construction of a DescriptorTbl by declaring tuples and slots
 /// associated with those tuples.

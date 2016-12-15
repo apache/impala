@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="ssl">
+
+  <title id="tls">Configuring TLS/SSL for Impala</title>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="SSL"/>
+      <data name="Category" value="Encryption"/>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="Cloudera">SSL</indexterm>
+      Impala supports TLS/SSL network encryption, between Impala and client programs, and between the Impala-related daemons running on
+      different nodes in the cluster. This feature is important when you also use other features such as Kerberos authentication or Sentry
+      authorization, where credentials are being transmitted back and forth.
+      <!-- Formerly: conref="../shared/CDHVariables.xml#xd_583c10bfdbd326ba-3ca24a24-13d80143249- -7f9a/CMCDH_EitherOK" -->
+      <note type="important" id="CMCDH_EitherOK">
+        <ul id="ul_e2s_bcd_np">
+          <li>You can use either Cloudera Manager or the following command-line instructions
+            to complete this configuration.</li>
+          <!-- Took out another too-specific conref, to the CDH minor version also in CDHVariables.xml. -->
+          <li>This information applies specifically to the version of Impala shown in the HTML page header
+            or on the PDF title page.
+            If you use an earlier version of CDH, see the documentation for that version located at
+            <xref href="http://www.cloudera.com/content/support/en/documentation.html" format="html" scope="external">Cloudera Documentation</xref>.</li>
+        </ul></note>
+      />
+    </p>
+
+  </conbody>
+
+  <concept id="concept_gnk_2tt_qp">
+
+    <title>Using Cloudera Manager</title>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Cloudera Manager"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+
+      <p>
+        To configure Impala to listen for Beeswax and HiveServer2 requests on TLS/SSL-secured ports:
+        <ol id="ol_rnf_ftt_qp">
+          <li>
+            Open the Cloudera Manager Admin Console and go to the <uicontrol>Impala</uicontrol> service.
+          </li>
+
+          <!-- Formerly: conref="../shared/cm_common_elements.xml#cm/config_edit" -->
+          <li>Click the <uicontrol>Configuration</uicontrol> tab.</li>
+
+          <li>
+            Select <menucascade><uicontrol>Scope</uicontrol><uicontrol>Impala (Service-Wide)</uicontrol></menucascade>.
+          </li>
+
+          <li>
+            Select <menucascade><uicontrol>Category</uicontrol><uicontrol>Security</uicontrol></menucascade>.
+          </li>
+
+          <li>
+            Edit the following properties:
+            <table frame="all"
+              id="table_drf_ftt_qp">
+              <title>Impala SSL Properties</title>
+              <tgroup cols="2">
+                <colspec colname="c1" colnum="1" colwidth="1*"/>
+                <colspec colname="c2" colnum="2" colwidth="2.5*"/>
+                <thead>
+                  <row>
+                    <entry>
+                      Property
+                    </entry>
+                    <entry>
+                      Description
+                    </entry>
+                  </row>
+                </thead>
+                <tbody>
+                  <row>
+                    <entry>
+                      <b>Enable TLS/SSL for Impala Client Services</b>
+                    </entry>
+                    <entry>
+                      Encrypt communication between clients (like ODBC, JDBC, and the Impala shell) and the Impala daemon using Transport
+                      Layer Security (TLS) (formerly known as Secure Socket Layer (SSL)).
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <b>SSL/TLS Certificate for Clients</b>
+                    </entry>
+                    <entry>
+                      Local path to the X509 certificate that identifies the Impala daemon to clients during TLS/SSL connections. This
+                      file must be in PEM format.
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <b>SSL/TLS Private Key for Clients</b>
+                    </entry>
+                    <entry>
+                      Local path to the private key that matches the certificate specified in the Certificate for Clients. This file must be
+                      in PEM format.
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <b>SSL/TLS Private Key Password for Clients</b>
+                    </entry>
+                    <entry>
+                      A shell command for Impala to run on startup to retrieve the password for a password-protected private key file.
+                      The output of the command is truncated to a maximum of 1024 bytes, and any trailing whitespace (such as spaces
+                      or newline characters) is trimmed. If the command exits with an error, Impala does not start. If the password
+                      is incorrect, clients cannot connect to the server regardless of whether the public key is correct.
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <b>SSL/TLS CA Certificate</b>
+                    </entry>
+                    <entry>
+                      Must be specified for TLS/SSL encryption to be enabled for communication
+                      between internal Impala components.
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>
+                      <b>SSL/TLS Certificate for <varname>Impala component</varname> Webserver</b>
+                    </entry>
+                    <entry>
+                      There are three of these configuration settings, one each for <q>Impala Daemon</q>,
+                      <q>Catalog Server</q>, and <q>Statestore</q>.
+                      Each of these Impala components has its own internal web server that powers the
+                      associated web UI with diagnostic information.
+                      The configuration setting represents the local path to the X509 certificate that
+                      identifies the web server to clients during TLS/SSL connections. This
+                      file must be in PEM format.
+                    </entry>
+                  </row>
+                </tbody>
+              </tgroup>
+            </table>
+          </li>
+
+          <!-- Formerly: conref="../shared/cm_common_elements.xml#cm/save_changes_short" -->
+          <li>Click <uicontrol>Save Changes</uicontrol> to commit the changes.</li>
+
+          <li>
+            Restart the Impala service.
+          </li>
+        </ol>
+      </p>
+
+      <p>
+        For information on configuring TLS/SSL communication with the <codeph>impala-shell</codeph> interpreter, see
+        <xref href="#concept_q1p_j2d_rp/secref"/>.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="concept_q1p_j2d_rp">
+
+    <title>Using the Command Line</title>
+
+    <conbody>
+
+<!--
+Info from Henry, from https://docs.google.com/a/cloudera.com/document/d/1u00CJ8WRzXR-1AK_WnQlR6LMtY-7Rc3eHaKNgw3IZvA/edit
+-->
+
+      <p>
+        To enable SSL for when client applications connect to Impala, add both of the following flags to the <cmdname>impalad</cmdname> startup options:
+      </p>
+
+      <ul id="ul_i2p_m2d_rp">
+        <li>
+          <codeph>--ssl_server_certificate</codeph>: the full path to the server certificate, on the local filesystem.
+        </li>
+
+        <li>
+          <codeph>--ssl_private_key</codeph>: the full path to the server private key, on the local filesystem.
+        </li>
+      </ul>
+
+      <p rev="2.3.0">
+        In <keyword keyref="impala23_full"/> and higher, Impala can also use SSL for its own internal communication between the
+        <cmdname>impalad</cmdname>, <codeph>statestored</codeph>, and <codeph>catalogd</codeph> daemons.
+        To enable this additional SSL encryption, set the <codeph>--ssl_server_certificate</codeph>
+        and <codeph>--ssl_private_key</codeph> flags in the startup options for
+        <cmdname>impalad</cmdname>, <cmdname>catalogd</cmdname>, and <cmdname>statestored</cmdname>,
+        and also add the <codeph>--ssl_client_ca_certificate</codeph> flag for all three of those daemons.
+      </p>
+
+      <note conref="../shared/impala_common.xml#common/impala_kerberos_ssl_caveat"/>
+
+      <p>
+        If either of these flags are set, both must be set. In that case, Impala starts listening for Beeswax and HiveServer2 requests on
+        SSL-secured ports only. (The port numbers stay the same; see <xref href="impala_ports.xml#ports"/> for details.)
+      </p>
+
+      <p>
+        Since Impala uses passphrase-less certificates in PEM format, you can reuse a host's existing Java keystore by converting it to the
+        PEM format. For instructions, see
+        <xref audience="integrated" href="cm_sg_openssl_jks.xml#concept_ek3_sdl_rp"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_openssl_jks.html" scope="external" format="html"/>.
+      </p>
+
+      <section id="secref">
+
+        <title>Configuring TLS/SSL Communication for the Impala Shell</title>
+
+        <p>
+          Typically, a client program has corresponding configuration properties in Cloudera Manager to verify that it is connecting to the
+          right server. For example, with SSL enabled for Impala, you use the following options when starting the
+          <cmdname>impala-shell</cmdname> interpreter:
+        </p>
+
+        <ul id="ul_kgp_m2d_rp">
+          <li>
+            <codeph>--ssl</codeph>: enables TLS/SSL for <cmdname>impala-shell</cmdname>.
+          </li>
+
+          <li>
+            <codeph>--ca_cert</codeph>: the local pathname pointing to the third-party CA certificate, or to a copy of the server
+            certificate for self-signed server certificates.
+          </li>
+        </ul>
+
+        <p>
+          If <codeph>--ca_cert</codeph> is not set, <cmdname>impala-shell</cmdname> enables TLS/SSL, but does not validate the server
+          certificate. This is useful for connecting to a known-good Impala that is only running over TLS/SSL, when a copy of the
+          certificate is not available (such as when debugging customer installations).
+        </p>
+
+      </section>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="ssl_jdbc_odbc">
+    <title>Using TLS/SSL with Business Intelligence Tools</title>
+    <conbody>
+      <p>
+        You can use Kerberos authentication, TLS/SSL encryption, or both to secure
+        connections from JDBC and ODBC applications to Impala.
+        See <xref href="impala_jdbc.xml#impala_jdbc"/> and <xref href="impala_odbc.xml#impala_odbc"/>
+        for details.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/hive_jdbc_ssl_kerberos_caveat"/>
+    </conbody>
+  </concept>
+
+</concept>

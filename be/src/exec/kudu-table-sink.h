@@ -37,10 +37,10 @@ namespace impala {
 /// requires specifying a mutation buffer size and a buffer flush watermark percentage in
 /// the Kudu client. The mutation buffer needs to be large enough to buffer rows sent to
 /// all destination nodes because the buffer accounting is not specified per-tablet
-/// server (KUDU-1693). Tests showed that 100MB was a good default, and this is
+/// server (KUDU-1693). Tests showed that 10MB was a good default, and this is
 /// configurable via the gflag --kudu_mutation_buffer_size. The buffer flush watermark
 /// percentage is set to a value that results in Kudu flushing after 7MB is in a
-/// buffer for a particular destination (of the 100MB of the total mutation buffer space)
+/// buffer for a particular destination (of the 10MB of the total mutation buffer space)
 /// because Kudu currently has some 8MB buffer limits.
 ///
 /// Kudu doesn't have transactions yet, so some rows may fail to write while others are
@@ -60,7 +60,7 @@ class KuduTableSink : public DataSink {
 
   /// Prepares the expressions to be applied and creates a KuduSchema based on the
   /// expressions and KuduTableDescriptor.
-  virtual Status Prepare(RuntimeState* state, MemTracker* mem_tracker);
+  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
 
   /// Connects to Kudu and creates the KuduSession to be used for the writes.
   virtual Status Open(RuntimeState* state);

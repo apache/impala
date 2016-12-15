@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="prefetch_mode" rev="2.6.0 IMPALA-3286">
+
+  <title>PREFETCH_MODE Query Option (<keyword keyref="impala26"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>PREFETCH_MODE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.6.0 IMPALA-3286">
+      <indexterm audience="Cloudera">PREFETCH_MODE query option</indexterm>
+      Determines whether the prefetching optimization is applied during
+      join query processing.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric (0, 1)
+      or corresponding mnemonic strings (<codeph>NONE</codeph>, <codeph>HT_BUCKET</codeph>).
+    </p>
+
+    <p>
+      <b>Default:</b> 1 (equivalent to <codeph>HT_BUCKET</codeph>)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_260"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>
+      The default mode is 1, which means that hash table buckets are
+      prefetched during join query processing.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_joins.xml#joins"/>,
+      <xref href="impala_perf_joins.xml#perf_joins"/>.
+    </p>
+
+  </conbody>
+</concept>

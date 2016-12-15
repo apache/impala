@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="allow_unsupported_formats">
+
+  <title>ALLOW_UNSUPPORTED_FORMATS Query Option</title>
+  <titlealts audience="PDF"><navtitle>ALLOW_UNSUPPORTED_FORMATS</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Deprecated Features"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+<!--
+The original brief explanation with not enough detail comes from the comments at:
+  http://github.sf.cloudera.com/CDH/Impala/raw/master/common/thrift/ImpalaService.thrift
+Removing that wording from here after discussions with dev team. Just recording the URL for posterity.
+-->
+
+    <p>
+      An obsolete query option from early work on support for file formats. Do not use. Might be removed in the
+      future.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+  </conbody>
+</concept>

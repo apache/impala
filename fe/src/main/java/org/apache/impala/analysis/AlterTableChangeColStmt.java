@@ -18,14 +18,17 @@
 package org.apache.impala.analysis;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.HBaseTable;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableChangeColParams;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
+
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 /**
  * Represents an ALTER TABLE CHANGE COLUMN colName newColDef statement.
@@ -40,7 +43,7 @@ public class AlterTableChangeColStmt extends AlterTableStmt {
       ColumnDef newColDef) {
     super(tableName);
     Preconditions.checkNotNull(newColDef);
-    Preconditions.checkState(colName != null && !colName.isEmpty());
+    Preconditions.checkState(!Strings.isNullOrEmpty(colName));
     colName_ = colName;
     newColDef_ = newColDef;
   }
@@ -90,12 +93,24 @@ public class AlterTableChangeColStmt extends AlterTableStmt {
     }
 
     // Check that the new column def's name is valid.
-    newColDef_.analyze();
+    newColDef_.analyze(analyzer);
     // Verify that if the column name is being changed, the new name doesn't conflict
     // with an existing column.
     if (!colName_.toLowerCase().equals(newColDef_.getColName().toLowerCase()) &&
         t.getColumn(newColDef_.getColName()) != null) {
       throw new AnalysisException("Column already exists: " + newColDef_.getColName());
+    }
+    if (newColDef_.hasKuduOptions()) {
+      throw new AnalysisException("Unsupported column options in ALTER TABLE CHANGE " +
+          "COLUMN statement: " + newColDef_.toString());
+    }
+    if (t instanceof KuduTable) {
+      Column col = t.getColumn(colName_);
+      if (!col.getType().equals(newColDef_.getType())) {
+        throw new AnalysisException(String.format("Cannot change the type of a Kudu " +
+            "column using an ALTER TABLE CHANGE COLUMN statement: (%s vs %s)",
+            col.getType().toSql(), newColDef_.getType().toSql()));
+      }
     }
   }
 }

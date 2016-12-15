@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
+
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 

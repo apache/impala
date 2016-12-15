@@ -26,8 +26,8 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     TestDimension,
+    create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
-
 
 class TestQueryMemLimit(ImpalaTestSuite):
   """Test class to do functional validation of per query memory limits.
@@ -104,3 +104,21 @@ class TestQueryMemLimit(ImpalaTestSuite):
       assert should_succeed, "Query was expected to fail"
     except ImpalaBeeswaxException, e:
       assert not should_succeed, "Query should not have failed: %s" % e
+
+
+class TestCodegenMemLimit(ImpalaTestSuite):
+  """Tests that memory limit applies to codegen """
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestCodegenMemLimit, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    # Only run the query for parquet
+    cls.TestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_codegen_mem_limit(self, vector):
+    self.run_test_case('QueryTest/codegen-mem-limit', vector)

@@ -92,37 +92,36 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
 }
 
 void ScannerContext::Stream::ReleaseCompletedResources(RowBatch* batch, bool done) {
-  DCHECK((batch != NULL) || (batch == NULL && !contains_tuple_data_));
+  DCHECK(batch != nullptr || done);
   if (done) {
     // Mark any pending resources as completed
-    if (io_buffer_ != NULL) {
+    if (io_buffer_ != nullptr) {
       ++parent_->num_completed_io_buffers_;
       completed_io_buffers_.push_back(io_buffer_);
     }
-    // Set variables to NULL to make sure streams are not used again
-    io_buffer_ = NULL;
-    io_buffer_pos_ = NULL;
+    // Set variables to nullptr to make sure streams are not used again
+    io_buffer_ = nullptr;
+    io_buffer_pos_ = nullptr;
     io_buffer_bytes_left_ = 0;
     // Cancel the underlying scan range to clean up any queued buffers there
     scan_range_->Cancel(Status::CANCELLED);
   }
 
-  for (list<DiskIoMgr::BufferDescriptor*>::iterator it = completed_io_buffers_.begin();
-       it != completed_io_buffers_.end(); ++it) {
-    if (contains_tuple_data_) {
-      batch->AddIoBuffer(*it);
+  for (DiskIoMgr::BufferDescriptor* buffer: completed_io_buffers_) {
+    if (contains_tuple_data_ && batch != nullptr) {
+      batch->AddIoBuffer(buffer);
       // TODO: We can do row batch compaction here.  This is the only place io buffers are
       // queued.  A good heuristic is to check the number of io buffers queued and if
       // there are too many, we should compact.
     } else {
-      (*it)->Return();
+      buffer->Return();
       parent_->scan_node_->num_owned_io_buffers_.Add(-1);
     }
   }
   parent_->num_completed_io_buffers_ -= completed_io_buffers_.size();
   completed_io_buffers_.clear();
 
-  if (contains_tuple_data_) {
+  if (contains_tuple_data_ && batch != nullptr) {
     // If we're not done, keep using the last chunk allocated in boundary_pool_ so we
     // don't have to reallocate. If we are done, transfer it to the row batch.
     batch->tuple_data_pool()->AcquireData(boundary_pool_.get(), /* keep_current */ !done);

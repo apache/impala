@@ -52,7 +52,7 @@ class HdfsTableWriter {
   /// The sequence of calls to this object are:
   /// 1. Init()
   /// 2. InitNewFile()
-  /// 3. AppendRowBatch() - called repeatedly
+  /// 3. AppendRows() - called repeatedly
   /// 4. Finalize()
   /// For files formats that are splittable (and therefore can be written to an
   /// arbitrarily large file), 1-4 is called once.
@@ -65,17 +65,14 @@ class HdfsTableWriter {
   /// Called when a new file is started.
   virtual Status InitNewFile() = 0;
 
-  /// Appends the current batch of rows to the partition.  If there are multiple
-  /// partitions then row_group_indices will contain the rows that are for this
-  /// partition, otherwise all rows in the batch are appended.
-  /// If the current file is full, the writer stops appending and
-  /// returns with *new_file == true.  A new file will be opened and
-  /// the same row batch will be passed again.  The writer must track how
-  /// much of the batch it had already processed asking for a new file.
-  /// Otherwise the writer will return with *newfile == false.
-  virtual Status AppendRowBatch(RowBatch* batch,
-                                const std::vector<int32_t>& row_group_indices,
-                                bool* new_file) = 0;
+  /// Appends rows of 'batch' to the partition that are selected via 'row_group_indices',
+  /// and if the latter is empty, appends every row.
+  /// If the current file is full, the writer stops appending and returns with
+  /// *new_file == true. A new file will be opened and the same row batch will be passed
+  /// again. The writer must track how much of the batch it had already processed asking
+  /// for a new file. Otherwise the writer will return with *newfile == false.
+  virtual Status AppendRows(
+      RowBatch* batch, const std::vector<int32_t>& row_group_indices, bool* new_file) = 0;
 
   /// Finalize this partition. The writer needs to finish processing
   /// all data have written out after the return from this call.

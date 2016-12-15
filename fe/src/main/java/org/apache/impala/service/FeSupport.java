@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TCacheJarParams;
@@ -68,8 +69,8 @@ public class FeSupport {
   public native static void NativeFeTestInit();
 
   // Returns a serialized TResultRow
-  public native static byte[] NativeEvalConstExprs(byte[] thriftExprBatch,
-      byte[] thriftQueryGlobals);
+  public native static byte[] NativeEvalExprsWithoutRow(
+      byte[] thriftExprBatch, byte[] thriftQueryGlobals);
 
   // Returns a serialized TSymbolLookupResult
   public native static byte[] NativeLookupSymbol(byte[] thriftSymbolLookup);
@@ -118,16 +119,16 @@ public class FeSupport {
     return NativeCacheJar(thriftParams);
   }
 
-  public static TColumnValue EvalConstExpr(Expr expr, TQueryCtx queryCtx)
+  public static TColumnValue EvalExprWithoutRow(Expr expr, TQueryCtx queryCtx)
       throws InternalException {
-    Preconditions.checkState(expr.isConstant());
+    Preconditions.checkState(!expr.contains(SlotRef.class));
     TExprBatch exprBatch = new TExprBatch();
     exprBatch.addToExprs(expr.treeToThrift());
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     byte[] result;
     try {
-      result = EvalConstExprs(serializer.serialize(exprBatch),
-          serializer.serialize(queryCtx));
+      result = EvalExprsWithoutRow(
+          serializer.serialize(exprBatch), serializer.serialize(queryCtx));
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
       TResultRow val = new TResultRow();
@@ -165,14 +166,14 @@ public class FeSupport {
     }
   }
 
-  private static byte[] EvalConstExprs(byte[] thriftExprBatch,
-      byte[] thriftQueryContext) {
+  private static byte[] EvalExprsWithoutRow(
+      byte[] thriftExprBatch, byte[] thriftQueryContext) {
     try {
-      return NativeEvalConstExprs(thriftExprBatch, thriftQueryContext);
+      return NativeEvalExprsWithoutRow(thriftExprBatch, thriftQueryContext);
     } catch (UnsatisfiedLinkError e) {
       loadLibrary();
     }
-    return NativeEvalConstExprs(thriftExprBatch, thriftQueryContext);
+    return NativeEvalExprsWithoutRow(thriftExprBatch, thriftQueryContext);
   }
 
   public static boolean EvalPredicate(Expr pred, TQueryCtx queryCtx)
@@ -181,7 +182,7 @@ public class FeSupport {
     if (pred instanceof BoolLiteral) return ((BoolLiteral) pred).getValue();
     if (pred instanceof NullLiteral) return false;
     Preconditions.checkState(pred.getType().isBoolean());
-    TColumnValue val = EvalConstExpr(pred, queryCtx);
+    TColumnValue val = EvalExprWithoutRow(pred, queryCtx);
     // Return false if pred evaluated to false or NULL. True otherwise.
     return val.isBool_val() && val.bool_val;
   }
@@ -193,7 +194,8 @@ public class FeSupport {
    *
    * TODO: This function is currently used for improving the performance of
    * partition pruning (see IMPALA-887), hence it only supports boolean
-   * exprs. In the future, we can extend it to support arbitrary constant exprs.
+   * exprs. In the future, we can extend it to support arbitrary exprs without
+   * SlotRefs.
    */
   public static TResultRow EvalPredicateBatch(ArrayList<Expr> exprs,
       TQueryCtx queryCtx) throws InternalException {
@@ -202,13 +204,13 @@ public class FeSupport {
     for (Expr expr: exprs) {
       // Make sure we only process boolean exprs.
       Preconditions.checkState(expr.getType().isBoolean());
-      Preconditions.checkState(expr.isConstant());
+      Preconditions.checkState(!expr.contains(SlotRef.class));
       exprBatch.addToExprs(expr.treeToThrift());
     }
     byte[] result;
     try {
-      result = EvalConstExprs(serializer.serialize(exprBatch),
-          serializer.serialize(queryCtx));
+      result = EvalExprsWithoutRow(
+          serializer.serialize(exprBatch), serializer.serialize(queryCtx));
       Preconditions.checkNotNull(result);
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
       TResultRow val = new TResultRow();

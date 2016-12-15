@@ -68,6 +68,18 @@ ScalarFnCall::ScalarFnCall(const TExprNode& node)
   DCHECK_NE(fn_.binary_type, TFunctionBinaryType::JAVA);
 }
 
+Status ScalarFnCall::LoadPrepareAndCloseFn(LlvmCodeGen* codegen) {
+  if (fn_.scalar_fn.__isset.prepare_fn_symbol) {
+    RETURN_IF_ERROR(GetFunction(codegen, fn_.scalar_fn.prepare_fn_symbol,
+        reinterpret_cast<void**>(&prepare_fn_)));
+  }
+  if (fn_.scalar_fn.__isset.close_fn_symbol) {
+    RETURN_IF_ERROR(GetFunction(codegen, fn_.scalar_fn.close_fn_symbol,
+        reinterpret_cast<void**>(&close_fn_)));
+  }
+  return Status::OK();
+}
+
 Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
     ExprContext* context) {
   RETURN_IF_ERROR(Expr::Prepare(state, desc, context));
@@ -95,26 +107,33 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
   fn_context_index_ =
       context->Register(state, return_type, arg_types, ComputeVarArgsBufferSize());
 
-  // Use the interpreted path and call the builtin without codegen if:
-  // 1. codegen is disabled or
+  // Use the interpreted path and call the builtin without codegen if any of the
+  // followings is true:
+  // 1. codegen is disabled by query option
   // 2. there are char arguments (as they aren't supported yet)
+  // 3. there is an optimization hint to disable codegen and UDF can be interpreted.
+  //    IR UDF or UDF with more than MAX_INTERP_ARGS number of fixed arguments
+  //    cannot be interpreted.
   //
   // TODO: codegen for char arguments
-  bool codegen_enabled = state->codegen_enabled();
-  if (!codegen_enabled || has_char_arg_or_result) {
-    if (fn_.binary_type == TFunctionBinaryType::IR) {
+  bool is_ir_udf = fn_.binary_type == TFunctionBinaryType::IR;
+  bool too_many_args_to_interp = NumFixedArgs() > MAX_INTERP_ARGS;
+  bool udf_interpretable = !is_ir_udf && !too_many_args_to_interp;
+  if (state->CodegenDisabledByQueryOption() || has_char_arg_or_result ||
+      (state->CodegenHasDisableHint() && udf_interpretable)) {
+    if (is_ir_udf) {
       // CHAR or VARCHAR are not supported as input arguments or return values for UDFs.
-      DCHECK(!has_char_arg_or_result && !codegen_enabled);
+      DCHECK(!has_char_arg_or_result && state->CodegenDisabledByQueryOption());
       return Status(Substitute("Cannot interpret LLVM IR UDF '$0': Codegen is needed. "
           "Please set DISABLE_CODEGEN to false.", fn_.name.function_name));
     }
 
     // The templates for builtin or native UDFs used in the interpretation path
-    // support up to 20 arguments only.
-    if (NumFixedArgs() > MAX_INTERP_ARGS) {
+    // support up to MAX_INTERP_ARGS number of arguments only.
+    if (too_many_args_to_interp) {
       DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::NATIVE);
       // CHAR or VARCHAR are not supported as input arguments or return values for UDFs.
-      DCHECK(!has_char_arg_or_result && !codegen_enabled);
+      DCHECK(!has_char_arg_or_result && state->CodegenDisabledByQueryOption());
       return Status(Substitute("Cannot interpret native UDF '$0': number of arguments is "
           "more than $1. Codegen is needed. Please set DISABLE_CODEGEN to false.",
           fn_.name.function_name, MAX_INTERP_ARGS));
@@ -134,48 +153,26 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
       }
     }
   } else {
-    // If we got here, either codegen is enabled or we need codegen to run this function.
-    LlvmCodeGen* codegen = state->codegen();
-    DCHECK(codegen != NULL);
-
-    if (fn_.binary_type == TFunctionBinaryType::IR) {
-      string local_path;
-      RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
-          fn_.hdfs_location, LibCache::TYPE_IR, &local_path));
-      // Link the UDF module into this query's main module (essentially copy the UDF
-      // module into the main module) so the UDF's functions are available in the main
-      // module.
-      RETURN_IF_ERROR(codegen->LinkModule(local_path));
-    }
-
-    Function* ir_udf_wrapper;
-    RETURN_IF_ERROR(GetCodegendComputeFn(codegen, &ir_udf_wrapper));
-    // TODO: don't do this for child exprs
-    codegen->AddFunctionToJit(ir_udf_wrapper, &scalar_fn_wrapper_);
+    // Add the expression to the list of expressions to codegen in the codegen phase.
+    state->AddScalarFnToCodegen(this);
   }
 
-  if (fn_.scalar_fn.__isset.prepare_fn_symbol) {
-    RETURN_IF_ERROR(GetFunction(state, fn_.scalar_fn.prepare_fn_symbol,
-        reinterpret_cast<void**>(&prepare_fn_)));
-  }
-  if (fn_.scalar_fn.__isset.close_fn_symbol) {
-    RETURN_IF_ERROR(GetFunction(state, fn_.scalar_fn.close_fn_symbol,
-        reinterpret_cast<void**>(&close_fn_)));
-  }
-
+  // For IR UDF, the loading of the Prepare() and Close() functions is deferred until
+  // first time GetCodegendComputeFn() is invoked.
+  if (!is_ir_udf) RETURN_IF_ERROR(LoadPrepareAndCloseFn(NULL));
   return Status::OK();
 }
 
 Status ScalarFnCall::Open(RuntimeState* state, ExprContext* ctx,
-                          FunctionContext::FunctionStateScope scope) {
+    FunctionContext::FunctionStateScope scope) {
   // Opens and inits children
   RETURN_IF_ERROR(Expr::Open(state, ctx, scope));
   FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
 
-  if (scalar_fn_ != NULL) {
+  if (scalar_fn_wrapper_ == NULL) {
     // We're in the interpreted path (i.e. no JIT). Populate our FunctionContext's
     // staging_input_vals, which will be reused across calls to scalar_fn_.
-    DCHECK(scalar_fn_wrapper_ == NULL);
+    DCHECK(scalar_fn_ != NULL);
     vector<AnyVal*>* input_vals = fn_ctx->impl()->staging_input_vals();
     for (int i = 0; i < NumFixedArgs(); ++i) {
       AnyVal* input_val;
@@ -197,7 +194,7 @@ Status ScalarFnCall::Open(RuntimeState* state, ExprContext* ctx,
     fn_ctx->impl()->SetConstantArgs(move(constant_args));
   }
 
-  if (scalar_fn_ != NULL) {
+  if (scalar_fn_wrapper_ == NULL) {
     // Now we have the constant values, cache them so that the interpreted path can
     // call the UDF without reevaluating the arguments. 'staging_input_vals' and
     // 'varargs_buffer' in the FunctionContext are used to pass fixed and variable-length
@@ -214,11 +211,23 @@ Status ScalarFnCall::Open(RuntimeState* state, ExprContext* ctx,
         input_arg = reinterpret_cast<AnyVal*>(varargs_buffer);
         varargs_buffer += arg_bytes;
       }
-      const AnyVal* constant_arg = fn_ctx->impl()->constant_args()[i];
-      if (constant_arg == NULL) {
-        non_constant_args.emplace_back(children_[i], input_arg);
-      } else {
+      // IMPALA-4586: Cache constant arguments only if the frontend has rewritten them
+      // into literal expressions. This gives the frontend control over how expressions
+      // are evaluated. This means that setting enable_expr_rewrites=false will also
+      // disable caching of non-literal constant expressions, which gives the old
+      // behaviour (before this caching optimisation was added) of repeatedly evaluating
+      // exprs that are constant according to IsConstant(). For exprs that are not truly
+      // constant (yet IsConstant() returns true for) e.g. non-deterministic UDFs, this
+      // means that setting enable_expr_rewrites=false works as a safety valve to get
+      // back the old behaviour, before constant expr folding or caching was added.
+      // TODO: once we can annotate UDFs as non-deterministic (IMPALA-4606), we should
+      // be able to trust IsConstant() and switch back to that.
+      if (children_[i]->IsLiteral()) {
+        const AnyVal* constant_arg = fn_ctx->impl()->constant_args()[i];
+        DCHECK(constant_arg != NULL);
         memcpy(input_arg, constant_arg, arg_bytes);
+      } else {
+        non_constant_args.emplace_back(children_[i], input_arg);
       }
     }
     fn_ctx->impl()->SetNonConstantArgs(move(non_constant_args));
@@ -261,7 +270,10 @@ void ScalarFnCall::Close(RuntimeState* state, ExprContext* context,
 }
 
 bool ScalarFnCall::IsConstant() const {
-  if (fn_.name.function_name == "rand") return false;
+  if (fn_.name.function_name == "rand" || fn_.name.function_name == "random"
+      || fn_.name.function_name == "uuid" || fn_.name.function_name == "sleep") {
+    return false;
+  }
   return Expr::IsConstant();
 }
 
@@ -305,6 +317,18 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
       *fn = NULL;
       return Status("ScalarFnCall Codegen not supported for CHAR");
     }
+  }
+
+  if (fn_.binary_type == TFunctionBinaryType::IR) {
+    string local_path;
+    RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
+        fn_.hdfs_location, LibCache::TYPE_IR, &local_path));
+    // Link the UDF module into this query's main module (essentially copy the UDF
+    // module into the main module) so the UDF's functions are available in the main
+    // module.
+    RETURN_IF_ERROR(codegen->LinkModule(local_path));
+    // Load the Prepare() and Close() functions from the LLVM module.
+    RETURN_IF_ERROR(LoadPrepareAndCloseFn(codegen));
   }
 
   Function* udf;
@@ -407,6 +431,8 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
         TErrorCode::UDF_VERIFY_FAILED, fn_.scalar_fn.symbol, fn_.hdfs_location);
   }
   ir_compute_fn_ = *fn;
+  // TODO: don't do this for child exprs
+  codegen->AddFunctionToJit(ir_compute_fn_, &scalar_fn_wrapper_);
   return Status::OK();
 }
 
@@ -518,14 +544,13 @@ Status ScalarFnCall::GetUdf(LlvmCodeGen* codegen, Function** udf) {
   return Status::OK();
 }
 
-Status ScalarFnCall::GetFunction(RuntimeState* state, const string& symbol, void** fn) {
+Status ScalarFnCall::GetFunction(LlvmCodeGen* codegen, const string& symbol, void** fn) {
   if (fn_.binary_type == TFunctionBinaryType::NATIVE ||
       fn_.binary_type == TFunctionBinaryType::BUILTIN) {
     return LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location, symbol, fn,
-                                                  &cache_entry_);
+        &cache_entry_);
   } else {
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
-    LlvmCodeGen* codegen = state->codegen();
     DCHECK(codegen != NULL);
     Function* ir_fn = codegen->GetFunction(symbol, false);
     if (ir_fn == NULL) {
