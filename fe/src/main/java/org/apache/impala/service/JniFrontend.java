@@ -637,7 +637,6 @@ public class JniFrontend {
     output.append(checkLogFilePermission());
     output.append(checkFileSystem(CONF));
     output.append(checkShortCircuitRead(CONF));
-    output.append(checkBlockLocationTracking(CONF));
     return output.toString();
   }
 
@@ -704,42 +703,6 @@ public class JniFrontend {
       errorCause.append(prefix);
       errorCause.append(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL);
       errorCause.append(" should not be enabled.\n");
-    }
-
-    if (errorCause.length() > 0) {
-      output.append(errorMessage);
-      output.append(errorCause);
-    }
-
-    return output.toString();
-  }
-
-  /**
-   * Return an empty string if block location tracking is properly enabled. If not,
-   * return an error string describing the issues.
-   */
-  private String checkBlockLocationTracking(Configuration conf) {
-    StringBuilder output = new StringBuilder();
-    String errorMessage = "ERROR: block location tracking is not properly enabled " +
-        "because\n";
-    String prefix = "  - ";
-    StringBuilder errorCause = new StringBuilder();
-    if (!conf.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
-        DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT)) {
-      errorCause.append(prefix);
-      errorCause.append(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED);
-      errorCause.append(" is not enabled.\n");
-    }
-
-    // dfs.client.file-block-storage-locations.timeout.millis should be >= 10 seconds
-    int dfsClientFileBlockStorageLocationsTimeoutMs = conf.getInt(
-        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS,
-        DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS_DEFAULT);
-    if (dfsClientFileBlockStorageLocationsTimeoutMs <
-        MIN_DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS) {
-      errorCause.append(prefix);
-      errorCause.append(DFSConfigKeys.DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS);
-      errorCause.append(" is too low. It should be at least 10 seconds.\n");
     }
 
     if (errorCause.length() > 0) {
