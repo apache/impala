@@ -70,7 +70,7 @@ public class CastExpr extends Expr {
       Preconditions.checkState(false,
           "Implicit casts should never throw analysis exception.");
     }
-    isAnalyzed_ = true;
+    analysisDone();
   }
 
   /**
@@ -198,10 +198,8 @@ public class CastExpr extends Expr {
   public boolean isImplicit() { return isImplicit_; }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(!isImplicit_);
-    super.analyze(analyzer);
     targetTypeDef_.analyze(analyzer);
     type_ = targetTypeDef_.getType();
     analyze();

@@ -2179,7 +2179,7 @@ public class Analyzer {
   public void materializeSlots(List<Expr> exprs) {
     List<SlotId> slotIds = Lists.newArrayList();
     for (Expr e: exprs) {
-      Preconditions.checkState(e.isAnalyzed_);
+      Preconditions.checkState(e.isAnalyzed());
       e.getIds(null, slotIds);
     }
     globalState_.descTbl.markSlotsMaterialized(slotIds);
@@ -2187,7 +2187,7 @@ public class Analyzer {
 
   public void materializeSlots(Expr e) {
     List<SlotId> slotIds = Lists.newArrayList();
-    Preconditions.checkState(e.isAnalyzed_);
+    Preconditions.checkState(e.isAnalyzed());
     e.getIds(null, slotIds);
     globalState_.descTbl.markSlotsMaterialized(slotIds);
   }

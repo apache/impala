@@ -107,43 +107,37 @@ class LimitElement {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     isAnalyzed_ = true;
     if (limitExpr_ != null) {
-      if (!limitExpr_.isConstant()) {
-        throw new AnalysisException("LIMIT expression must be a constant expression: " +
-            limitExpr_.toSql());
-      }
-
-      limitExpr_.analyze(analyzer);
-      if (!limitExpr_.getType().isIntegerType()) {
-        throw new AnalysisException("LIMIT expression must be an integer type but is '" +
-            limitExpr_.getType() + "': " + limitExpr_.toSql());
-      }
       limit_ = evalIntegerExpr(analyzer, limitExpr_, "LIMIT");
     }
     if (limit_ == 0) analyzer.setHasEmptyResultSet();
-
     if (offsetExpr_ != null) {
-      if (!offsetExpr_.isConstant()) {
-        throw new AnalysisException("OFFSET expression must be a constant expression: " +
-            offsetExpr_.toSql());
-      }
-
-      offsetExpr_.analyze(analyzer);
-      if (!offsetExpr_.getType().isIntegerType()) {
-        throw new AnalysisException("OFFSET expression must be an integer type but " +
-            "is '" + offsetExpr_.getType() + "': " + offsetExpr_.toSql());
-      }
       offset_ = evalIntegerExpr(analyzer, offsetExpr_, "OFFSET");
     }
   }
 
   /**
-   * Evaluations an expression to a non-zero integral value, returned as a long. Throws
-   * if the expression cannot be evaluated, if the value evaluates to null, or if the
-   * result is negative. The 'name' parameter is used in exception messages, e.g.
+   * Analyzes and evaluates expression to a non-zero integral value, returned as a long.
+   * Throws if the expression cannot be evaluated, if the value evaluates to null, or if
+   * the result is negative. The 'name' parameter is used in exception messages, e.g.
    * "LIMIT expression evaluates to NULL".
    */
   private static long evalIntegerExpr(Analyzer analyzer, Expr expr, String name)
       throws AnalysisException {
+    // Check for slotrefs before analysis so we can provide a more helpful message than
+    // "Could not resolve column/field reference".
+    if (expr.contains(SlotRef.class)) {
+      throw new AnalysisException(name + " expression must be a constant expression: " +
+          expr.toSql());
+    }
+    expr.analyze(analyzer);
+    if (!expr.isConstant()) {
+      throw new AnalysisException(name + " expression must be a constant expression: " +
+          expr.toSql());
+    }
+    if (!expr.getType().isIntegerType()) {
+      throw new AnalysisException(name + " expression must be an integer type but is '" +
+          expr.getType() + "': " + expr.toSql());
+    }
     TColumnValue val = null;
     try {
       val = FeSupport.EvalExprWithoutRow(expr, analyzer.getQueryCtx());

@@ -494,6 +494,11 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalysisError("select id, bool_col from functional.AllTypes order by id limit 10 " +
         "offset id < 10",
         "OFFSET expression must be a constant expression: id < 10");
+    AnalysisError("select id, bool_col from functional.AllTypes limit count(*)",
+        "LIMIT expression must be a constant expression: count(*)");
+    AnalysisError("select id, bool_col from functional.AllTypes order by id limit 10 " +
+        "offset count(*)",
+        "OFFSET expression must be a constant expression: count(*)");
 
     // Offset is only valid with an order by
     AnalysisError("SELECT a FROM test LIMIT 10 OFFSET 5",

@@ -57,12 +57,6 @@ public class ExistsPredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
-  }
-
-  @Override
   protected void toThrift(TExprNode msg) {
     // Cannot serialize a nested predicate
     Preconditions.checkState(false);

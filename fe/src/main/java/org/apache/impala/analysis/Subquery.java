@@ -72,9 +72,7 @@ public class Subquery extends Expr {
    * Analyzes the subquery in a child analyzer.
    */
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     if (!(stmt_ instanceof SelectStmt)) {
       throw new AnalysisException("A subquery must contain a single select block: " +
         toSql());
@@ -100,11 +98,10 @@ public class Subquery extends Expr {
     if (!((SelectStmt)stmt_).returnsSingleRow()) type_ = new ArrayType(type_);
 
     Preconditions.checkNotNull(type_);
-    isAnalyzed_ = true;
   }
 
   @Override
-  public boolean isConstant() { return false; }
+  protected boolean isConstantImpl() { return false; }
 
   /**
    * Check if the subquery's SelectStmt returns a single column of scalar type.

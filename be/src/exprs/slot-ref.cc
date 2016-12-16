@@ -47,7 +47,7 @@ SlotRef::SlotRef(const TExprNode& node)
 }
 
 SlotRef::SlotRef(const SlotDescriptor* desc)
-  : Expr(desc->type(), true),
+  : Expr(desc->type(), false, true),
     slot_offset_(-1),
     null_indicator_offset_(0, 0),
     slot_id_(desc->id()) {
@@ -55,7 +55,7 @@ SlotRef::SlotRef(const SlotDescriptor* desc)
 }
 
 SlotRef::SlotRef(const SlotDescriptor* desc, const ColumnType& type)
-  : Expr(type, true),
+  : Expr(type, false, true),
     slot_offset_(-1),
     null_indicator_offset_(0, 0),
     slot_id_(desc->id()) {
@@ -63,7 +63,7 @@ SlotRef::SlotRef(const SlotDescriptor* desc, const ColumnType& type)
 }
 
   SlotRef::SlotRef(const ColumnType& type, int offset, const bool nullable /* = false */)
-  : Expr(type, true),
+  : Expr(type, false, true),
     tuple_idx_(0),
     slot_offset_(offset),
     null_indicator_offset_(0, nullable ? offset : -1),

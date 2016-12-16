@@ -176,7 +176,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   private boolean isAuxExpr_ = false;
 
   protected Type type_;  // result of analysis
-  protected boolean isAnalyzed_;  // true after analyze() has been called
+
   protected boolean isOnClauseConjunct_; // set by analyzer
 
   // Flag to indicate whether to wrap this expr's toSql() in parenthesis. Set by parser.
@@ -198,9 +198,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // set during analysis
   protected long numDistinctValues_;
 
+  // Cached value of IsConstant(), set during analyze() and valid if isAnalyzed_ is true.
+  private boolean isConstant_;
+
   // The function to call. This can either be a scalar or aggregate function.
   // Set in analyze().
   protected Function fn_;
+
+  // True after analysis successfully completed. Protected by accessors isAnalyzed() and
+  // analysisDone().
+  private boolean isAnalyzed_ = false;
 
   protected Expr() {
     super();
@@ -223,6 +230,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     selectivity_ = other.selectivity_;
     evalCost_ = other.evalCost_;
     numDistinctValues_ = other.numDistinctValues_;
+    isConstant_ = other.isConstant_;
     fn_ = other.fn_;
     children_ = Expr.cloneList(other.children_);
   }
@@ -253,7 +261,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Throws exception if any errors found.
    * @see org.apache.impala.parser.ParseNode#analyze(org.apache.impala.parser.Analyzer)
    */
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public final void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed()) return;
+
     // Check the expr child limit.
     if (children_.size() > EXPR_CHILDREN_LIMIT) {
       String sql = toSql();
@@ -275,11 +285,18 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     for (Expr child: children_) {
       child.analyze(analyzer);
     }
-    isAnalyzed_ = true;
+    if (analyzer != null) analyzer.decrementCallDepth();
     computeNumDistinctValues();
 
-    if (analyzer != null) analyzer.decrementCallDepth();
+    // Do all the analysis for the expr subclass before marking the Expr analyzed.
+    analyzeImpl(analyzer);
+    analysisDone();
   }
+
+  /**
+   * Does subclass-specific analysis. Subclasses should override analyzeImpl().
+   */
+  abstract protected void analyzeImpl(Analyzer analyzer) throws AnalysisException;
 
   /**
    * Helper function to analyze this expr and assert that the analysis was successful.
@@ -521,6 +538,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     Preconditions.checkState(!type_.isNull(), "Expr has type null!");
     TExprNode msg = new TExprNode();
     msg.type = type_.toThrift();
+    msg.is_constant = isConstant_;
     msg.num_children = children_.size();
     if (fn_ != null) {
       msg.setFn(fn_.toThrift());
@@ -802,6 +820,17 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * Set the expr to be analyzed and computes isConstant_.
+   */
+  protected void analysisDone() {
+    Preconditions.checkState(!isAnalyzed_);
+    // We need to compute the const-ness as the last step, since analysis may change
+    // the result, e.g. by resolving function.
+    isConstant_ = isConstantImpl();
+    isAnalyzed_ = true;
+  }
+
+  /**
    * Resets the internal state of this expr produced by analyze().
    * Only modifies this expr, and not its child exprs.
    */
@@ -946,12 +975,29 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * @return true if this expr can be evaluated with Expr::GetValue(NULL),
-   * i.e. if it doesn't contain any references to runtime variables (e.g. slot refs).
-   * Expr subclasses should override this if necessary (e.g. SlotRef, Subquery, etc.
-   * always return false).
+   * Returns true if this expression should be treated as constant. I.e. if the frontend
+   * and backend should assume that two evaluations of the expression within a query will
+   * return the same value. Examples of constant expressions include:
+   * - Literal values like 1, "foo", or NULL
+   * - Deterministic operators applied to constant arguments, e.g. 1 + 2, or
+   *   concat("foo", "bar")
+   * - Functions that should be always return the same value within a query but may
+   *   return different values for different queries. E.g. now(), which we want to
+   *   evaluate only once during planning.
+   * May incorrectly return true if the expression is not analyzed.
+   * TODO: isAnalyzed_ should be a precondition for isConstant(), since it is not always
+   * possible to correctly determine const-ness before analysis (e.g. see
+   * FunctionCallExpr.isConstant()).
    */
-  public boolean isConstant() {
+  public final boolean isConstant() {
+    if (isAnalyzed_) return isConstant_;
+    return isConstantImpl();
+  }
+
+  /**
+   * Implements isConstant() - computes the value without using 'isConstant_'.
+   */
+  protected boolean isConstantImpl() {
     for (Expr expr : children_) {
       if (!expr.isConstant()) return false;
     }

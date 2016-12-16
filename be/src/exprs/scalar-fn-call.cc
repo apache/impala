@@ -216,12 +216,12 @@ Status ScalarFnCall::Open(RuntimeState* state, ExprContext* ctx,
       // are evaluated. This means that setting enable_expr_rewrites=false will also
       // disable caching of non-literal constant expressions, which gives the old
       // behaviour (before this caching optimisation was added) of repeatedly evaluating
-      // exprs that are constant according to IsConstant(). For exprs that are not truly
-      // constant (yet IsConstant() returns true for) e.g. non-deterministic UDFs, this
+      // exprs that are constant according to is_constant(). For exprs that are not truly
+      // constant (yet is_constant() returns true for) e.g. non-deterministic UDFs, this
       // means that setting enable_expr_rewrites=false works as a safety valve to get
       // back the old behaviour, before constant expr folding or caching was added.
       // TODO: once we can annotate UDFs as non-deterministic (IMPALA-4606), we should
-      // be able to trust IsConstant() and switch back to that.
+      // be able to trust is_constant() and switch back to that.
       if (children_[i]->IsLiteral()) {
         const AnyVal* constant_arg = fn_ctx->impl()->constant_args()[i];
         DCHECK(constant_arg != NULL);
@@ -248,7 +248,7 @@ Status ScalarFnCall::Open(RuntimeState* state, ExprContext* ctx,
   // non-constant.
   if (fn_.name.function_name == "round" && type_.type == TYPE_DOUBLE) {
     DCHECK_EQ(children_.size(), 2);
-    if (children_[1]->IsConstant()) {
+    if (children_[1]->is_constant()) {
       IntVal scale_arg = children_[1]->GetIntVal(ctx, NULL);
       output_scale_ = scale_arg.val;
     }
@@ -267,14 +267,6 @@ void ScalarFnCall::Close(RuntimeState* state, ExprContext* context,
     }
   }
   Expr::Close(state, context, scope);
-}
-
-bool ScalarFnCall::IsConstant() const {
-  if (fn_.name.function_name == "rand" || fn_.name.function_name == "random"
-      || fn_.name.function_name == "uuid" || fn_.name.function_name == "sleep") {
-    return false;
-  }
-  return Expr::IsConstant();
 }
 
 // Dynamically loads the pre-compiled UDF and codegens a function that calls each child's

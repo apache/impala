@@ -145,7 +145,7 @@ public class AnalyticExpr extends Expr {
    * Analytic exprs cannot be constant.
    */
   @Override
-  public boolean isConstant() { return false; }
+  protected boolean isConstantImpl() { return false; }
 
   @Override
   public Expr clone() { return new AnalyticExpr(this); }
@@ -417,10 +417,8 @@ public class AnalyticExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     fnCall_.analyze(analyzer);
-    super.analyze(analyzer);
     type_ = getFnCall().getType();
 
     for (Expr e: partitionExprs_) {

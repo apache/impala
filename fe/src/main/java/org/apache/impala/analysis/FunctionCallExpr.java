@@ -96,7 +96,7 @@ public class FunctionCallExpr extends Expr {
    */
   public static FunctionCallExpr createMergeAggCall(
       FunctionCallExpr agg, List<Expr> params) {
-    Preconditions.checkState(agg.isAnalyzed_);
+    Preconditions.checkState(agg.isAnalyzed());
     Preconditions.checkState(agg.isAggregateFunction());
     FunctionCallExpr result = new FunctionCallExpr(
         agg.fnName_, new FunctionParams(false, params), true);
@@ -139,7 +139,7 @@ public class FunctionCallExpr extends Expr {
 
   @Override
   public void resetAnalysisState() {
-    isAnalyzed_ = false;
+    super.resetAnalysisState();
     // Resolving merge agg functions after substitution may fail e.g., if the
     // intermediate agg type is not the same as the output type. Preserve the original
     // fn_ such that analyze() hits the special-case code for merge agg fns that
@@ -232,14 +232,13 @@ public class FunctionCallExpr extends Expr {
     }
   }
 
-  /**
-   * Needs to be kept in sync with the BE understanding of constness in
-   * scalar-fn-call.h/cc.
-   */
   @Override
-  public boolean isConstant() {
+  protected boolean isConstantImpl() {
+    // TODO: we can't correctly determine const-ness before analyzing 'fn_'. We should
+    // rework logic so that we do not call this function on unanalyzed exprs.
     // Aggregate functions are never constant.
     if (fn_ instanceof AggregateFunction) return false;
+
     String fnName = fnName_.getFunction();
     if (fnName == null) {
       // This expr has not been analyzed yet, get the function name from the path.
@@ -253,7 +252,7 @@ public class FunctionCallExpr extends Expr {
     }
     // Sleep is a special function for testing.
     if (fnName.equalsIgnoreCase("sleep")) return false;
-    return super.isConstant();
+    return super.isConstantImpl();
   }
 
   // Provide better error message for some aggregate builtins. These can be
@@ -381,9 +380,7 @@ public class FunctionCallExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     fnName_.analyze(analyzer);
 
     if (isMergeAggFn_) {

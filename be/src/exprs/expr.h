@@ -158,19 +158,13 @@ class Expr {
 
   const ColumnType& type() const { return type_; }
   bool is_slotref() const { return is_slotref_; }
+  bool is_constant() const { return is_constant_; }
 
   const std::vector<Expr*>& children() const { return children_; }
 
   /// Returns an error status if the function context associated with the
   /// expr has an error set.
   Status GetFnContextError(ExprContext* ctx);
-
-  /// Returns true if the expression is considered constant. This must match the
-  /// definition of Expr.isConstant() in the frontend. The default implementation returns
-  /// true if all children are constant.
-  /// TODO: IMPALA-4617 - plumb through the value from the frontend and remove duplicate
-  /// logic.
-  virtual bool IsConstant() const;
 
   /// Returns true if this is a literal expression.
   virtual bool IsLiteral() const;
@@ -247,12 +241,12 @@ class Expr {
   /// appropriate type of AnyVal.
   virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) = 0;
 
-  /// If this expr is constant, evaluates the expr with no input row argument and returns
-  /// the result in 'const_val'. Sets 'const_val' to NULL if the argument is not constant.
-  /// The returned AnyVal and associated varlen data is owned by 'context'. This should
-  /// only be called after Open() has been called on this expr. Returns an error if there
-  /// was an error evaluating the expression or if memory could not be allocated for the
-  /// expression result.
+  /// If this expr is constant according to is_constant(), evaluates the expr with no
+  /// input row argument and returns the result in 'const_val'. Otherwise sets
+  /// 'const_val' to nullptr. The returned AnyVal and associated varlen data is owned by
+  /// 'context'. This should only be called after Open() has been called on this expr.
+  /// Returns an error if there was an error evaluating the expression or if memory could
+  /// not be allocated for the expression result.
   virtual Status GetConstVal(
       RuntimeState* state, ExprContext* context, AnyVal** const_val);
 
@@ -329,7 +323,7 @@ class Expr {
   friend class FunctionCall;
   friend class ScalarFnCall;
 
-  Expr(const ColumnType& type, bool is_slotref = false);
+  Expr(const ColumnType& type, bool is_constant, bool is_slotref);
   Expr(const TExprNode& node, bool is_slotref = false);
 
   /// Initializes this expr instance for execution. This does not include initializing
@@ -364,6 +358,11 @@ class Expr {
 
   /// Function description.
   TFunction fn_;
+
+  /// True if this expr should be treated as a constant expression. True if either:
+  /// * This expr was sent from the frontend and Expr.isConstant() was true.
+  /// * This expr is a constant literal created in the backend.
+  const bool is_constant_;
 
   /// recognize if this node is a slotref in order to speed up GetValue()
   const bool is_slotref_;

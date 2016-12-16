@@ -65,10 +65,6 @@ class ScalarFnCall: public Expr {
   virtual void Close(RuntimeState* state, ExprContext* context,
       FunctionContext::FunctionStateScope scope = FunctionContext::FRAGMENT_LOCAL);
 
-  /// Needs to be kept in sync with the FE understanding of constness in
-  /// FuctionCallExpr.java.
-  virtual bool IsConstant() const;
-
   virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
   virtual TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow*);
   virtual SmallIntVal GetSmallIntVal(ExprContext* context, const TupleRow*);

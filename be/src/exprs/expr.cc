@@ -99,8 +99,9 @@ FunctionContext* Expr::RegisterFunctionContext(ExprContext* ctx, RuntimeState* s
   return ctx->fn_context(fn_context_index_);
 }
 
-Expr::Expr(const ColumnType& type, bool is_slotref)
+Expr::Expr(const ColumnType& type, bool is_constant, bool is_slotref)
     : cache_entry_(NULL),
+      is_constant_(is_constant),
       is_slotref_(is_slotref),
       type_(type),
       output_scale_(-1),
@@ -110,6 +111,7 @@ Expr::Expr(const ColumnType& type, bool is_slotref)
 
 Expr::Expr(const TExprNode& node, bool is_slotref)
     : cache_entry_(NULL),
+      is_constant_(node.is_constant),
       is_slotref_(is_slotref),
       type_(ColumnType::FromThrift(node.type)),
       output_scale_(-1),
@@ -446,13 +448,6 @@ string Expr::DebugString(const vector<ExprContext*>& ctxs) {
   return DebugString(exprs);
 }
 
-bool Expr::IsConstant() const {
-  for (int i = 0; i < children_.size(); ++i) {
-    if (!children_[i]->IsConstant()) return false;
-  }
-  return true;
-}
-
 bool Expr::IsLiteral() const {
   return false;
 }
@@ -532,9 +527,10 @@ void Expr::InitBuiltinsDummy() {
   UtilityFunctions::Pid(NULL);
 }
 
-Status Expr::GetConstVal(RuntimeState* state, ExprContext* context, AnyVal** const_val) {
+Status Expr::GetConstVal(
+    RuntimeState* state, ExprContext* context, AnyVal** const_val) {
   DCHECK(context->opened_);
-  if (!IsConstant()) {
+  if (!is_constant()) {
     *const_val = NULL;
     return Status::OK();
   }
@@ -589,7 +585,7 @@ Status Expr::GetConstVal(RuntimeState* state, ExprContext* context, AnyVal** con
     default:
       DCHECK(false) << "Type not implemented: " << type();
   }
-  // Errors may have been set during the GetConstVal() call.
+  // Errors may have been set during expr evaluation.
   return GetFnContextError(context);
 }
 

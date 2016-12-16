@@ -41,8 +41,6 @@ class TupleIsNullPredicate: public Predicate {
   virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
   virtual std::string DebugString() const;
 
-  virtual bool IsConstant() const { return false; }
-
   virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow* row);
 
  private:

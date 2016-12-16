@@ -47,16 +47,14 @@ public class BetweenPredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
+    super.analyzeImpl(analyzer);
     if (children_.get(0) instanceof Subquery &&
         (children_.get(1) instanceof Subquery || children_.get(2) instanceof Subquery)) {
       throw new AnalysisException("Comparison between subqueries is not " +
           "supported in a BETWEEN predicate: " + toSqlImpl());
     }
     analyzer.castAllToCompatibleType(children_);
-    isAnalyzed_ = true;
   }
 
   public boolean isNotBetween() { return isNotBetween_; }

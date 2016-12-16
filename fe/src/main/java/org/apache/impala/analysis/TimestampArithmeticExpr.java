@@ -116,10 +116,7 @@ public class TimestampArithmeticExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
-
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     if (funcName_ != null) {
       // Set op based on funcName for function-call like version.
       if (funcName_.equals("date_add")) {

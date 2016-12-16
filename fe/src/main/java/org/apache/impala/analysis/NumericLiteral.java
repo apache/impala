@@ -56,7 +56,7 @@ public class NumericLiteral extends LiteralExpr {
   private boolean explicitlyCast_;
 
   public NumericLiteral(BigDecimal value) {
-    init(value);
+    value_ = value;
   }
 
   public NumericLiteral(String value, Type t) throws AnalysisException {
@@ -66,7 +66,7 @@ public class NumericLiteral extends LiteralExpr {
     } catch (NumberFormatException e) {
       throw new AnalysisException("invalid numeric literal: " + value, e);
     }
-    init(val);
+    value_ = val;
     this.analyze(null);
     if (type_.isDecimal() && t.isDecimal()) {
       // Verify that the input decimal value is consistent with the specified
@@ -88,19 +88,19 @@ public class NumericLiteral extends LiteralExpr {
    * type is preserved across substitutions and re-analysis.
    */
   public NumericLiteral(BigInteger value, Type type) {
-    isAnalyzed_ = true;
     value_ = new BigDecimal(value);
     type_ = type;
     evalCost_ = LITERAL_COST;
     explicitlyCast_ = true;
+    analysisDone();
   }
 
   public NumericLiteral(BigDecimal value, Type type) {
-    isAnalyzed_ = true;
     value_ = value;
     type_ = type;
     evalCost_ = LITERAL_COST;
     explicitlyCast_ = true;
+    analysisDone();
   }
 
   /**
@@ -178,9 +178,7 @@ public class NumericLiteral extends LiteralExpr {
   public BigDecimal getValue() { return value_; }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     if (!explicitlyCast_) {
       // Compute the precision and scale from the BigDecimal.
       type_ = TypesUtil.computeDecimalType(value_);
@@ -225,7 +223,6 @@ public class NumericLiteral extends LiteralExpr {
       }
     }
     evalCost_ = LITERAL_COST;
-    isAnalyzed_ = true;
   }
 
   /**
@@ -251,7 +248,7 @@ public class NumericLiteral extends LiteralExpr {
     if (targetType.isDecimal()) {
       ScalarType decimalType = (ScalarType) targetType;
       // analyze() ensures that value_ never exceeds the maximum scale and precision.
-      Preconditions.checkState(isAnalyzed_);
+      Preconditions.checkState(isAnalyzed());
       // Sanity check that our implicit casting does not allow a reduced precision or
       // truncating values from the right of the decimal point.
       Preconditions.checkState(value_.precision() <= decimalType.decimalPrecision());
@@ -276,11 +273,6 @@ public class NumericLiteral extends LiteralExpr {
     if (ret != 0) return ret;
     NumericLiteral other = (NumericLiteral) o;
     return value_.compareTo(other.value_);
-  }
-
-  private void init(BigDecimal value) {
-    isAnalyzed_ = false;
-    value_ = value;
   }
 
   // Returns the unscaled value of this literal. BigDecimal doesn't treat scale

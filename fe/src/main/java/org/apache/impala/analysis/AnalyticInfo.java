@@ -112,7 +112,7 @@ public class AnalyticInfo extends AggregateInfoBase {
   private List<Expr> computeCommonPartitionExprs() {
     List<Expr> result = Lists.newArrayList();
     for (Expr analyticExpr: analyticExprs_) {
-      Preconditions.checkState(analyticExpr.isAnalyzed_);
+      Preconditions.checkState(analyticExpr.isAnalyzed());
       List<Expr> partitionExprs = ((AnalyticExpr) analyticExpr).getPartitionExprs();
       if (partitionExprs == null) continue;
       if (result.isEmpty()) {

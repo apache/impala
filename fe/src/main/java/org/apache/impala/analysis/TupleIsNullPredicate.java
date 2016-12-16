@@ -57,9 +57,8 @@ public class TupleIsNullPredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
+    super.analyzeImpl(analyzer);
     analyzer_ = analyzer;
     evalCost_ = tupleIds_.size() * IS_NULL_COST;
   }
@@ -98,7 +97,7 @@ public class TupleIsNullPredicate extends Predicate {
   }
 
   @Override
-  public boolean isConstant() { return false; }
+  protected boolean isConstantImpl() { return false; }
 
   /**
    * Makes each input expr nullable, if necessary, by wrapping it as follows:

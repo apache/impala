@@ -36,10 +36,9 @@ class SlotRef : public Expr {
   /// Used for testing.  GetValue will return tuple + offset interpreted as 'type'
   SlotRef(const ColumnType& type, int offset, const bool nullable = false);
 
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
-                         ExprContext* context);
+  virtual Status Prepare(
+      RuntimeState* state, const RowDescriptor& row_desc, ExprContext* context);
   virtual std::string DebugString() const;
-  virtual bool IsConstant() const { return false; }
   virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const;
   const SlotId& slot_id() const { return slot_id_; }
 

@@ -27,7 +27,7 @@ class TExprNode;
 
 class NullLiteral: public Expr {
  public:
-  NullLiteral(PrimitiveType type) : Expr(type) { }
+  NullLiteral(PrimitiveType type) : Expr(type, true, false) { }
 
   virtual bool IsLiteral() const;
 

@@ -169,9 +169,7 @@ public class ArithmeticExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     for (Expr child: children_) {
       Expr operand = (Expr) child;
       if (!operand.type_.isNumericType() && !operand.type_.isNull()) {

@@ -118,10 +118,8 @@ public class CompoundPredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
-
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
+    super.analyzeImpl(analyzer);
     // Check that children are predicates.
     for (Expr e: children_) {
       if (!e.getType().isBoolean() && !e.getType().isNull()) {

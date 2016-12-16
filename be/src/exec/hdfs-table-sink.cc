@@ -93,7 +93,7 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   // Prepare partition key exprs and gather dynamic partition key exprs.
   for (size_t i = 0; i < partition_key_expr_ctxs_.size(); ++i) {
     // Remember non-constant partition key exprs for building hash table of Hdfs files.
-    if (!partition_key_expr_ctxs_[i]->root()->IsConstant()) {
+    if (!partition_key_expr_ctxs_[i]->root()->is_constant()) {
       dynamic_partition_key_expr_ctxs_.push_back(partition_key_expr_ctxs_[i]);
     }
   }
@@ -185,7 +185,7 @@ Status HdfsTableSink::Open(RuntimeState* state) {
       vector<ExprContext*> dynamic_partition_key_value_ctxs;
       for (size_t i = 0; i < partition_key_expr_ctxs_.size(); ++i) {
         // Remember non-constant partition key exprs for building hash table of Hdfs files
-        if (!partition_key_expr_ctxs_[i]->root()->IsConstant()) {
+        if (!partition_key_expr_ctxs_[i]->root()->is_constant()) {
           dynamic_partition_key_value_ctxs.push_back(
               partition->partition_key_value_ctxs()[i]);
         } else {

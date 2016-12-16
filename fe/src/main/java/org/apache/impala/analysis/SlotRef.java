@@ -71,13 +71,13 @@ public class SlotRef extends Expr {
     } else {
       rawPath_ = null;
     }
-    isAnalyzed_ = true;
     desc_ = desc;
     type_ = desc.getType();
     evalCost_ = SLOT_REF_COST;
     String alias = desc.getParent().getAlias();
     label_ = (alias != null ? alias + "." : "") + desc.getLabel();
     numDistinctValues_ = desc.getStats().getNumDistinctValues();
+    analysisDone();
   }
 
   /**
@@ -89,13 +89,10 @@ public class SlotRef extends Expr {
     label_ = other.label_;
     desc_ = other.desc_;
     type_ = other.type_;
-    isAnalyzed_ = other.isAnalyzed_;
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     Path resolvedPath = null;
     try {
       resolvedPath = analyzer.resolvePath(rawPath_, PathType.SLOT_REF);
@@ -124,26 +121,25 @@ public class SlotRef extends Expr {
       // The NDV cannot exceed the #rows in the table.
       numDistinctValues_ = Math.min(numDistinctValues_, rootTable.getNumRows());
     }
-    isAnalyzed_ = true;
   }
 
   @Override
-  public boolean isConstant() { return false; }
+  protected boolean isConstantImpl() { return false; }
 
   public SlotDescriptor getDesc() {
-    Preconditions.checkState(isAnalyzed_);
+    Preconditions.checkState(isAnalyzed());
     Preconditions.checkNotNull(desc_);
     return desc_;
   }
 
   public SlotId getSlotId() {
-    Preconditions.checkState(isAnalyzed_);
+    Preconditions.checkState(isAnalyzed());
     Preconditions.checkNotNull(desc_);
     return desc_.getId();
   }
 
   public Path getResolvedPath() {
-    Preconditions.checkState(isAnalyzed_);
+    Preconditions.checkState(isAnalyzed());
     return desc_.getPath();
   }
 
@@ -208,7 +204,7 @@ public class SlotRef extends Expr {
 
   @Override
   public boolean isBoundBySlotIds(List<SlotId> slotIds) {
-    Preconditions.checkState(isAnalyzed_);
+    Preconditions.checkState(isAnalyzed());
     return slotIds.contains(desc_.getId());
   }
 

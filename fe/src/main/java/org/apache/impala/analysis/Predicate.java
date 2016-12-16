@@ -42,9 +42,7 @@ public abstract class Predicate extends Expr {
   public void setIsEqJoinConjunct(boolean v) { isEqJoinConjunct_ = v; }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     type_ = Type.BOOLEAN;
     // values: true/false/null
     numDistinctValues_ = 3;

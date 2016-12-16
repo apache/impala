@@ -54,7 +54,7 @@ public final class ExprSubstitutionMap {
    * across query blocks. It is not required that the lhsExpr is analyzed.
    */
   public void put(Expr lhsExpr, Expr rhsExpr) {
-    Preconditions.checkState(rhsExpr.isAnalyzed_, "Rhs expr must be analyzed.");
+    Preconditions.checkState(rhsExpr.isAnalyzed(), "Rhs expr must be analyzed.");
     lhs_.add(lhsExpr);
     rhs_.add(rhsExpr);
   }
@@ -162,7 +162,7 @@ public final class ExprSubstitutionMap {
           Preconditions.checkState(false);
         }
       }
-      Preconditions.checkState(rhs_.get(i).isAnalyzed_);
+      Preconditions.checkState(rhs_.get(i).isAnalyzed());
     }
   }
 

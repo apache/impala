@@ -96,6 +96,11 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
     return (LiteralExpr) e.uncheckedCastTo(type);
   }
 
+  @Override
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
+    // Literals require no analysis.
+  }
+
   /**
    * Returns an analyzed literal from the thrift object.
    */

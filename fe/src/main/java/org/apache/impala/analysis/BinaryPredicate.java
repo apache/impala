@@ -168,10 +168,8 @@ public class BinaryPredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isAnalyzed_) return;
-    super.analyze(analyzer);
-
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
+    super.analyzeImpl(analyzer);
     convertNumericLiteralsFromDecimal(analyzer);
     String opName = op_.getName().equals("null_matching_eq") ? "eq" : op_.getName();
     fn_ = getBuiltinFunction(analyzer, opName, collectChildReturnTypes(),
