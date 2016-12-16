@@ -86,22 +86,9 @@ bool DeserializeThriftMsg(uint8_t* buf, uint32_t* len, bool compact,
 }
 
 string TypeMapping(Type::type t) {
-  switch (t) {
-    case Type::BOOLEAN:
-      return "BOOLEAN";
-    case Type::INT32:
-      return "INT32";
-    case Type::INT64:
-      return "INT64";
-    case Type::FLOAT:
-      return "FLOAT";
-    case Type::DOUBLE:
-      return "DOUBLE";
-    case Type::BYTE_ARRAY:
-      return "BYTE_ARRAY";
-    default:
-      return "UNKNOWN";
-  }
+  auto it = _Type_VALUES_TO_NAMES.find(t);
+  if (it != _Type_VALUES_TO_NAMES.end()) return it->second;
+  return "UNKNOWN";
 }
 
 void AppendSchema(const vector<SchemaElement>& schema, int level,
