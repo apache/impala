@@ -195,9 +195,9 @@ class ImpalaServer::QueryExecState {
     return exec_request_.analysis_warnings;
   }
 
-  inline int64_t last_active() const {
+  inline int64_t last_active_ms() const {
     boost::lock_guard<boost::mutex> l(expiration_data_lock_);
-    return last_active_time_;
+    return last_active_time_ms_;
   }
 
   /// Returns true if Impala is actively processing this query.
@@ -219,10 +219,12 @@ class ImpalaServer::QueryExecState {
   /// See "Locking" in the class comment for lock acquisition order.
   boost::mutex fetch_rows_lock_;
 
-  /// Protects last_active_time_ and ref_count_. Only held during short function calls -
-  /// no other locks should be acquired while holding this lock.
+  /// Protects last_active_time_ms_ and ref_count_. Only held during short function calls
+  /// - no other locks should be acquired while holding this lock.
   mutable boost::mutex expiration_data_lock_;
-  int64_t last_active_time_;
+
+  /// Stores the last time that the query was actively doing work, in Unix milliseconds.
+  int64_t last_active_time_ms_;
 
   /// ref_count_ > 0 if Impala is currently performing work on this query's behalf. Every
   /// time a client instructs Impala to do work on behalf of this query, the ref count is
@@ -335,11 +337,11 @@ class ImpalaServer::QueryExecState {
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.
   Status ExecLocalCatalogOp(const TCatalogOpRequest& catalog_op);
 
-  /// Updates last_active_time_ and ref_count_ to reflect that query is currently not doing
-  /// any work. Takes expiration_data_lock_.
+  /// Updates last_active_time_ms_ and ref_count_ to reflect that query is currently not
+  /// doing any work. Takes expiration_data_lock_.
   void MarkInactive();
 
-  /// Updates last_active_time_ and ref_count_ to reflect that query is currently being
+  /// Updates last_active_time_ms_ and ref_count_ to reflect that query is currently being
   /// actively processed. Takes expiration_data_lock_.
   void MarkActive();
 

@@ -119,6 +119,10 @@ class ImpalaCluster(object):
         # A process from get_pid_list() no longer exists, continue.
         LOG.info(e)
         continue
+    # If the operating system PIDs wrap around during startup of the local minicluster,
+    # the order of the impalads is incorrect. We order them by their backend port, so that
+    # get_first_impalad() always returns the first one.
+    impalads.sort(key = lambda i: i.service.be_port)
     return impalads, statestored, catalogd
 
 # Represents a process running on a machine and common actions that can be performed
@@ -130,7 +134,7 @@ class Process(object):
         'Process object must be created with valid command line argument list'
 
   def get_pid(self):
-    """Gets the pid of the process. Returns None if the PID cannot be determined"""
+    """Gets the PID of the process. Returns None if the PID cannot be determined"""
     LOG.info("Attempting to find PID for %s" % ' '.join(self.cmd))
     for pid in psutil.get_pid_list():
       try:

@@ -61,11 +61,11 @@ static const string PER_HOST_VCORES_KEY = "Estimated Per-Host VCores";
 static const string TABLES_MISSING_STATS_KEY = "Tables Missing Stats";
 static const string TABLES_WITH_CORRUPT_STATS_KEY = "Tables With Corrupt Table Stats";
 
-ImpalaServer::QueryExecState::QueryExecState(
-    const TQueryCtx& query_ctx, ExecEnv* exec_env, Frontend* frontend,
-    ImpalaServer* server, shared_ptr<SessionState> session)
+ImpalaServer::QueryExecState::QueryExecState(const TQueryCtx& query_ctx,
+    ExecEnv* exec_env, Frontend* frontend, ImpalaServer* server,
+    shared_ptr<SessionState> session)
   : query_ctx_(query_ctx),
-    last_active_time_(numeric_limits<int64_t>::max()),
+    last_active_time_ms_(numeric_limits<int64_t>::max()),
     ref_count_(0L),
     child_query_executor_(new ChildQueryExecutor),
     exec_env_(exec_env),
@@ -74,7 +74,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     schedule_(NULL),
     coord_(NULL),
     result_cache_max_size_(-1),
-    profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
+    profile_(&profile_pool_, "Query"), // assign name w/ id after planning
     server_profile_(&profile_pool_, "ImpalaServer"),
     summary_profile_(&profile_pool_, "Summary"),
     is_cancelled_(false),
@@ -994,7 +994,7 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
 void ImpalaServer::QueryExecState::MarkInactive() {
   client_wait_sw_.Start();
   lock_guard<mutex> l(expiration_data_lock_);
-  last_active_time_ = UnixMillis();
+  last_active_time_ms_ = UnixMillis();
   DCHECK(ref_count_ > 0) << "Invalid MarkInactive()";
   --ref_count_;
 }
@@ -1004,7 +1004,7 @@ void ImpalaServer::QueryExecState::MarkActive() {
   int64_t elapsed_time = client_wait_sw_.ElapsedTime();
   client_wait_timer_->Set(elapsed_time);
   lock_guard<mutex> l(expiration_data_lock_);
-  last_active_time_ = UnixMillis();
+  last_active_time_ms_ = UnixMillis();
   ++ref_count_;
 }
 

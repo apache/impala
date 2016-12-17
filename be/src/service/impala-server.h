@@ -494,7 +494,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     bool all_rows_returned;
 
     // The most recent time this query was actively being processed, in Unix milliseconds.
-    int64_t last_active_time;
+    int64_t last_active_time_ms;
 
     /// Request pool to which the request was submitted for admission, or an empty string
     /// if this request doesn't have a pool.

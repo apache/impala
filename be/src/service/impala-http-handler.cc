@@ -346,7 +346,7 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
   value->AddMember("waiting", waiting, document->GetAllocator());
   value->AddMember("executing", !waiting, document->GetAllocator());
 
-  int64_t waiting_time = impala::UnixMillis() - record.last_active_time;
+  int64_t waiting_time = impala::UnixMillis() - record.last_active_time_ms;
   string waiting_time_str = "";
   if (waiting_time > 0) {
     waiting_time_str = PrettyPrinter::Print(waiting_time, TUnit::TIME_MS);

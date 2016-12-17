@@ -1604,7 +1604,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
         plan_exec_info.fragments.begin(), plan_exec_info.fragments.end());
   }
   all_rows_returned = exec_state.eos();
-  last_active_time = exec_state.last_active();
+  last_active_time_ms = exec_state.last_active_ms();
   request_pool = exec_state.request_pool();
 }
 
@@ -1784,7 +1784,7 @@ void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
           // Use a non-zero timeout, if one exists
           timeout_s = max(FLAGS_idle_query_timeout, timeout_s);
         }
-        int64_t expiration = query_state->last_active() + (timeout_s * 1000L);
+        int64_t expiration = query_state->last_active_ms() + (timeout_s * 1000L);
         if (now < expiration) {
           // If the real expiration date is in the future we may need to re-insert the
           // query's expiration event at its correct location.
@@ -1801,9 +1801,10 @@ void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
           }
         } else if (!query_state->is_active()) {
           // Otherwise time to expire this query
-          VLOG_QUERY << "Expiring query due to client inactivity: "
-                     << expiration_event->second << ", last activity was at: "
-                     << TimestampValue(query_state->last_active()).DebugString();
+          VLOG_QUERY
+              << "Expiring query due to client inactivity: " << expiration_event->second
+              << ", last activity was at: "
+              << TimestampValue(query_state->last_active_ms() / 1000).DebugString();
           const string& err_msg = Substitute(
               "Query $0 expired due to client inactivity (timeout is $1)",
               PrintId(expiration_event->second),

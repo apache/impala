@@ -37,10 +37,10 @@ class TestQueryExpiration(CustomClusterTestSuite):
     assert actual == expected
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--idle_query_timeout=6")
-  def test_query_expiration(self, vector):
+  @CustomClusterTestSuite.with_args("--idle_query_timeout=6 --logbuflevel=-1")
+  def test_query_expiration_test(self, vector):
     """Confirm that single queries expire if not fetched"""
-    impalad = self.cluster.get_any_impalad()
+    impalad = self.cluster.get_first_impalad()
     client = impalad.service.create_beeswax_client()
     num_expired = impalad.service.get_metric_value('impala-server.num-queries-expired')
     handle = client.execute_async("SELECT SLEEP(1000000)")
@@ -59,6 +59,8 @@ class TestQueryExpiration(CustomClusterTestSuite):
     assert num_expired + 1 == impalad.service.get_metric_value(
       'impala-server.num-queries-expired')
     self._check_num_executing(impalad, 2)
+    self.assert_impalad_log_contains('INFO', "Expiring query due to client inactivity: "
+        "[0-9a-f]+:[0-9a-f]+, last activity was at: \d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d")
     impalad.service.wait_for_metric_value('impala-server.num-queries-expired',
                                           num_expired + 3)
 
