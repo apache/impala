@@ -1276,7 +1276,7 @@ select * from `cross`;</codeblock>
         to Impala 1.2.x in general.
       </p>
 
-      <p conref="../shared/impala_common.xml#common/cm48_upgrade"/>
+      <p audience="Cloudera" conref="../shared/impala_common.xml#common/cm48_upgrade"/>
 
 <!-- <note conref="common.xml#common/cdh4_cdh5_upgrade"/> -->
     </conbody>
@@ -1318,7 +1318,7 @@ select * from `cross`;</codeblock>
         <li/>
       </ul>
 
-      <p conref="../shared/impala_common.xml#common/cm48_upgrade"/>
+      <p audience="Cloudera" conref="../shared/impala_common.xml#common/cm48_upgrade"/>
 
 <!--  <note conref="common.xml#common/cdh4_cdh5_upgrade"/> -->
     </conbody>

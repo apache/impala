@@ -143,7 +143,7 @@ under the License.
           Run the load-balancing proxy server, pointing it at the configuration file that you set up.
         </li>
 
-        <li>
+        <li audience="Cloudera">
           On systems managed by Cloudera Manager, on the page
           <menucascade><uicontrol>Impala</uicontrol><uicontrol>Configuration</uicontrol><uicontrol>Impala Daemon
           Default Group</uicontrol></menucascade>, specify a value for the <uicontrol>Impala Daemons Load
@@ -269,7 +269,7 @@ under the License.
           running the <cmdname>impalad</cmdname> daemon.
         </li>
 
-        <li rev="CDH-40363">
+        <li rev="CDH-40363" audience="Cloudera">
           For a cluster managed by Cloudera Manager (5.4.2 or higher), fill in the Impala configuration setting
           <uicontrol>Impala Daemons Load Balancer</uicontrol> with the appropriate host:port combination.
           Then restart the Impala service.
@@ -320,7 +320,7 @@ under the License.
                 configuration snippet, add: <codeblock>--principal=impala/<varname>proxy_host</varname>@<varname>realm</varname>
   --be_principal=impala/<varname>actual_host</varname>@<varname>realm</varname>
   --keytab_file=<varname>path_to_merged_keytab</varname></codeblock>
-                <note>
+                <note audience="Cloudera">
                   <p>On a cluster managed by Cloudera Manager 5.1 (or higher),
                     when you set up Kerberos authentication using the wizard, you
                     can choose to allow Cloudera Manager to deploy the
@@ -335,7 +335,7 @@ under the License.
                 </note>
               </li>
 
-              <li>
+              <li audience="Cloudera">
                 On a cluster managed by Cloudera Manager, create a role group to set the configuration values from
                 the preceding step on a per-host basis.
               </li>
@@ -352,7 +352,7 @@ under the License.
             Restart Impala to make the changes take effect. Follow the appropriate steps depending on whether you use
             Cloudera Manager or not:
             <ul>
-              <li>
+              <li audience="Cloudera">
                 On a cluster managed by Cloudera Manager, restart the Impala service.
               </li>
 

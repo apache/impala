@@ -167,7 +167,7 @@ under the License.
           immediately.
         </li>
 
-        <li>
+        <li audience="Cloudera">
           Cloudera Manager has an Impala configuration setting that sets the <codeph>-logbuflevel</codeph> startup
           option.
         </li>
@@ -179,7 +179,7 @@ under the License.
 
   <concept id="logs_cm_noncm">
 
-    <title>Managing Impala Logs through Cloudera Manager or Manually</title>
+    <title>Managing Impala Logs</title>
   <prolog>
     <metadata>
       <data name="Category" value="Administrators"/>
@@ -189,7 +189,7 @@ under the License.
 
     <conbody>
 
-      <p>
+      <p rev="upstream" audience="Cloudera"><!-- Whole paragraph can probably go. -->
         <ph rev="upstream">Cloudera</ph> recommends installing Impala through the Cloudera Manager administration interface. To assist with
         troubleshooting, Cloudera Manager collects front-end and back-end logs together into a single view, and let
         you do a search across log data for all the managed nodes rather than examining the logs on each node
@@ -250,7 +250,7 @@ under the License.
         Linux tool or technique of choice. A value of 1 preserves only the very latest log file.
       </p>
 
-      <p>
+      <p audience="Cloudera">
         To set up log rotation on a system managed by Cloudera Manager 5.4.0 and higher, search for the
         <codeph>max_log_files</codeph> option name and set the appropriate value for the <userinput>Maximum Log
         Files</userinput> field for each Impala configuration category (Impala, Catalog Server, and StateStore).

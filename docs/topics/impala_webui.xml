@@ -104,7 +104,7 @@ under the License.
         suspect is having problems.
       </p>
 
-      <note>
+      <note audience="Cloudera">
         To get a convenient picture of the health of all Impala nodes in a cluster, use the Cloudera Manager
         interface, which collects the low-level operational information from all Impala nodes, and presents a
         unified view of the entire cluster.

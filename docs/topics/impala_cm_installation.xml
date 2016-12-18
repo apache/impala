@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept id="cm_installation">
+<concept id="cm_installation" audience="Cloudera">
 
   <title>Installing Impala with Cloudera Manager</title>
   <prolog>

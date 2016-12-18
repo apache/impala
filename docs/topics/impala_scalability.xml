@@ -469,7 +469,7 @@ Memory Usage: Additional Notes
               query.
             </li>
 
-            <li>
+            <li audience="Cloudera">
               The <uicontrol>Impala Queries</uicontrol> dialog in Cloudera Manager. You can see the peak memory
               usage for a query, combined across all nodes in the cluster.
             </li>

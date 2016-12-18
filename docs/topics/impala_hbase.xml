@@ -162,7 +162,7 @@ under the License.
 &lt;/property&gt;
 </codeblock>
 
-      <p>
+      <p audience="Cloudera">
         Currently, Cloudera Manager does not have an Impala-only override for HBase settings, so any HBase
         configuration change you make through Cloudera Manager would take affect for all HBase applications.
         Therefore, this change is not recommended on systems managed by Cloudera Manager.

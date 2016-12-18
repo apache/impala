@@ -69,7 +69,7 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
-  <concept id="starting_via_cm">
+  <concept id="starting_via_cm" audience="Cloudera">
 
     <title>Starting Impala through Cloudera Manager</title>
 

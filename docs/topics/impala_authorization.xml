@@ -222,7 +222,7 @@ under the License.
       </p>
 
       <ul>
-        <li>
+        <li audience="Cloudera">
           <p>
             In an environment managed by Cloudera Manager, the server name is specified through
             <menucascade><uicontrol>Impala (Service-Wide)</uicontrol><uicontrol>Category</uicontrol><uicontrol>Advanced</uicontrol><uicontrol>Sentry Service</uicontrol></menucascade> and
@@ -1586,7 +1586,7 @@ column-level security was by creating views that referenced particular sets of c
     </conbody>
   </concept>
 
-  <concept id="sentry_cm">
+  <concept id="sentry_cm" audience="Cloudera">
 
     <title>Managing Sentry for Impala through Cloudera Manager</title>
 

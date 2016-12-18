@@ -483,11 +483,11 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</codeblock>
         <ol>
           <li>
             <b>Prepare your systems to work with LZO by downloading and installing the appropriate libraries:</b>
-            <p>
+            <p audience="Cloudera">
               <b>On systems managed by Cloudera Manager using parcels:</b>
             </p>
 
-            <p>
+            <p audience="Cloudera">
               See the setup instructions for the LZO parcel in the Cloudera Manager documentation for
               <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_ig_install_gpl_extras.html" scope="external" format="html">Cloudera
               Manager 5</xref>.

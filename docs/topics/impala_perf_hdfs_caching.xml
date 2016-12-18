@@ -469,11 +469,11 @@ Found 122 entries
         </li>
       </ul>
 
-      <p>
+      <p audience="Cloudera">
         <b>Cloudera Manager:</b>
       </p>
 
-      <ul>
+      <ul audience="Cloudera">
         <li>
           You can enable or disable HDFS caching through Cloudera Manager, using the configuration setting
           <uicontrol>Maximum Memory Used for Caching</uicontrol> for the HDFS service. This control sets the HDFS

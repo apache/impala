@@ -714,8 +714,8 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   </topicref>
   <topicref audience="standalone" href="topics/impala_install.xml#install">
   <keydef href="topics/impala_install.xml" keys="install"/>
-    <topicref href="topics/impala_cm_installation.xml#cm_installation"/>
-    <keydef href="topics/impala_cm_installation.xml" keys="cm_installation"/>
+    <topicref href="topics/impala_cm_installation.xml#cm_installation" audience="Cloudera"/>
+    <keydef href="topics/impala_cm_installation.xml" keys="cm_installation" audience="Cloudera"/>
     <topicref href="topics/impala_noncm_installation.xml#noncm_installation"/>
     <keydef href="topics/impala_noncm_installation.xml" keys="noncm_installation"/>
 <!-- Removed when Hue docs were removed from main library. Might be worth resurrecting someday as general Impala+Hue topic. -->

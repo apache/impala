@@ -66,7 +66,7 @@ under the License.
 
   </conbody>
 
-  <concept id="config_options_cm">
+  <concept id="config_options_cm" audience="Cloudera">
 
     <title>Configuring Impala Startup Options through Cloudera Manager</title>
 
@@ -243,7 +243,7 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
             to:
           </p>
 <codeblock>export ENABLE_CORE_DUMPS=${ENABLE_COREDUMPS:-true}</codeblock>
-          <p>
+          <p audience="Cloudera">
             On systems managed by Cloudera Manager, enable the <uicontrol>Enable Core
             Dump</uicontrol> setting for the Impala service.
           </p>

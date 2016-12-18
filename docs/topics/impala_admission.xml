@@ -606,7 +606,7 @@ under the License.
       </section>
     </conbody>
 
-    <concept id="admission_config_cm">
+    <concept id="admission_config_cm" audience="Cloudera">
 
 <!-- TK: Maybe all this stuff overlaps with admin_impala_admission_control and can be delegated there. -->
 
@@ -708,7 +708,7 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
 
       <conbody>
 
-        <section id="section_fqn_qgb_rq">
+        <section id="section_fqn_qgb_rq" audience="Cloudera">
 
           <title>Example Admission Control Configurations Using Cloudera Manager</title>
 

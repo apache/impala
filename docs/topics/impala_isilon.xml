@@ -103,7 +103,7 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
       for the <cmdname>impalad</cmdname> daemon on clusters not using Cloudera Manager.
     </p>
 
-    <p>
+    <p audience="Cloudera">
 <!--
       For information about tasks performed on
       Isilon OneFS, see the information hub for Cloudera on the EMC Community Network:
@@ -117,7 +117,7 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
 
     <!-- <p outputclass="toc inpage"/> -->
   </conbody>
-<concept id="isilon_cm_configs">
+<concept id="isilon_cm_configs" audience="Cloudera">
 <title>Required Configurations</title>
 <conbody>
 <p>Specify the following configurations in Cloudera Manager on the <menucascade><uicontrol>Clusters</uicontrol><uicontrol><varname>Isilon Service</varname></uicontrol><uicontrol>Configuration</uicontrol></menucascade> tab:<ul id="ul_vpx_bw5_vv">
