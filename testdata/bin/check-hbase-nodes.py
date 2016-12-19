@@ -131,8 +131,10 @@ def check_znodes_list_for_errors(nodes, zookeeper_hosts, timeout):
         0 success, or else the number of unresponsive nodes
     """
     with closing(connect_to_zookeeper(zookeeper_hosts, timeout)) as zk_client:
-        errors = sum([check_znode(node, zk_client, timeout) for node in nodes])
-        zk_client.stop()
+        try:
+            errors = sum([check_znode(node, zk_client, timeout) for node in nodes])
+        finally:
+            zk_client.stop()
     return errors
 
 
