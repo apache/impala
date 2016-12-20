@@ -26,12 +26,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.UUID;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.fs.Path;
@@ -45,10 +45,6 @@ import org.apache.hadoop.hive.metastore.api.ResourceType;
 import org.apache.hadoop.hive.metastore.api.ResourceUri;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.ql.exec.FunctionUtils;
-import org.apache.log4j.Logger;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.apache.thrift.TException;
-
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
@@ -69,6 +65,10 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.SentryProxy;
+import org.apache.log4j.Logger;
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TCompactProtocol;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -866,14 +866,19 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Renames a table. Equivalent to an atomic drop + add of the table. Returns
-   * the new Table object with an incremented catalog version or null if operation
-   * was not successful.
+   * the new Table object with an incremented catalog version or null if the
+   * drop or add were unsuccessful. If null is returned, then the catalog cache
+   * is in one of the following two states:
+   * 1. Old table was not removed, and new table was not added
+   * 2. Old table was removed, but new table was not added
    */
   public Table renameTable(TTableName oldTableName, TTableName newTableName)
       throws CatalogException {
     // Remove the old table name from the cache and add the new table.
     Db db = getDb(oldTableName.getDb_name());
-    if (db != null) db.removeTable(oldTableName.getTable_name());
+    if (db == null) return null;
+    Table oldTable = db.removeTable(oldTableName.getTable_name());
+    if (oldTable == null) return null;
     return addTable(newTableName.getDb_name(), newTableName.getTable_name());
   }
 

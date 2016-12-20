@@ -49,7 +49,6 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
-import org.apache.impala.common.Reference;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
@@ -85,10 +84,11 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.JniCatalogConstants;
-import org.apache.impala.thrift.TAlterTableAddPartitionParams;
 import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
+import org.apache.impala.thrift.TAlterTableAddPartitionParams;
 import org.apache.impala.thrift.TAlterTableAddReplaceColsParams;
 import org.apache.impala.thrift.TAlterTableChangeColParams;
 import org.apache.impala.thrift.TAlterTableDropColParams;
@@ -585,8 +585,9 @@ public class CatalogOpExecutor {
    * version of the serialized table as the version of the catalog update result.
    */
   private static void addTableToCatalogUpdate(Table tbl, TCatalogUpdateResult result) {
-    TCatalogObject updatedCatalogObject = TableToTCatalogObject(tbl);
-    result.setUpdated_catalog_object_DEPRECATED(TableToTCatalogObject(tbl));
+    Preconditions.checkNotNull(tbl);
+    TCatalogObject updatedCatalogObject = tbl.toTCatalogObject();
+    result.setUpdated_catalog_object_DEPRECATED(updatedCatalogObject);
     result.setVersion(updatedCatalogObject.getCatalog_version());
   }
 
@@ -1056,18 +1057,16 @@ public class CatalogOpExecutor {
   private void dropDataSource(TDropDataSourceParams params, TDdlExecResponse resp)
       throws ImpalaException {
     if (LOG.isTraceEnabled()) LOG.trace("Drop DATA SOURCE: " + params.toString());
-    DataSource dataSource = catalog_.getDataSource(params.getData_source());
+    DataSource dataSource = catalog_.removeDataSource(params.getData_source());
     if (dataSource == null) {
       if (!params.if_exists) {
         throw new ImpalaRuntimeException("Data source " + params.getData_source() +
             " does not exists.");
       }
-      // The user specified IF EXISTS and the data source didn't exist, just
-      // return the current catalog version.
+      // No data source was removed.
       resp.result.setVersion(catalog_.getCatalogVersion());
       return;
     }
-    catalog_.removeDataSource(params.getData_source());
     TCatalogObject removedObject = new TCatalogObject();
     removedObject.setType(TCatalogObjectType.DATA_SOURCE);
     removedObject.setData_source(dataSource.toThrift());
@@ -1228,13 +1227,12 @@ public class CatalogOpExecutor {
             String.format(HMS_RPC_ERROR_FORMAT_STR, "dropDatabase"), e);
       }
       Db removedDb = catalog_.removeDb(params.getDb());
-      // If no db was removed as part of this operation just return the current catalog
-      // version.
       if (removedDb == null) {
-        removedObject.setCatalog_version(catalog_.getCatalogVersion());
-      } else {
-        removedObject.setCatalog_version(removedDb.getCatalogVersion());
+        // Nothing was removed from the catalogd's cache.
+        resp.result.setVersion(catalog_.getCatalogVersion());
+        return;
       }
+      removedObject.setCatalog_version(removedDb.getCatalogVersion());
     }
     removedObject.setType(TCatalogObjectType.DATABASE);
     removedObject.setDb(new TDatabase());
@@ -1349,32 +1347,33 @@ public class CatalogOpExecutor {
 
       Table table = catalog_.removeTable(params.getTable_name().db_name,
           params.getTable_name().table_name);
-      if (table != null) {
-        resp.result.setVersion(table.getCatalogVersion());
-        if (table instanceof HdfsTable) {
-          HdfsTable hdfsTable = (HdfsTable) table;
-          if (hdfsTable.isMarkedCached()) {
-            try {
-              HdfsCachingUtil.uncacheTbl(table.getMetaStoreTable());
-            } catch (Exception e) {
-              LOG.error("Unable to uncache table: " + table.getFullName(), e);
-            }
+      if (table == null) {
+        // Nothing was removed from the catalogd's cache.
+        resp.result.setVersion(catalog_.getCatalogVersion());
+        return;
+      }
+      resp.result.setVersion(table.getCatalogVersion());
+      if (table instanceof HdfsTable) {
+        HdfsTable hdfsTable = (HdfsTable) table;
+        if (hdfsTable.isMarkedCached()) {
+          try {
+            HdfsCachingUtil.uncacheTbl(table.getMetaStoreTable());
+          } catch (Exception e) {
+            LOG.error("Unable to uncache table: " + table.getFullName(), e);
           }
-          if (table.getNumClusteringCols() > 0) {
-            for (HdfsPartition partition: hdfsTable.getPartitions()) {
-              if (partition.isMarkedCached()) {
-                try {
-                  HdfsCachingUtil.uncachePartition(partition);
-                } catch (Exception e) {
-                  LOG.error("Unable to uncache partition: " +
-                      partition.getPartitionName(), e);
-                }
+        }
+        if (table.getNumClusteringCols() > 0) {
+          for (HdfsPartition partition: hdfsTable.getPartitions()) {
+            if (partition.isMarkedCached()) {
+              try {
+                HdfsCachingUtil.uncachePartition(partition);
+              } catch (Exception e) {
+                LOG.error("Unable to uncache partition: " +
+                    partition.getPartitionName(), e);
               }
             }
           }
         }
-      } else {
-        resp.result.setVersion(catalog_.getCatalogVersion());
       }
     }
     removedObject.setType(TCatalogObjectType.TABLE);
@@ -2076,17 +2075,25 @@ public class CatalogOpExecutor {
     }
     // Rename the table in the Catalog and get the resulting catalog object.
     // ALTER TABLE/VIEW RENAME is implemented as an ADD + DROP.
-    TCatalogObject newTable = TableToTCatalogObject(
-        catalog_.renameTable(tableName.toThrift(), newTableName.toThrift()));
+    Table newTable = catalog_.renameTable(tableName.toThrift(), newTableName.toThrift());
+    if (newTable == null) {
+      // The rename succeeded in the HMS but failed in the catalog cache. The cache is in
+      // an inconsistent state, but can likely be fixed by running "invalidate metadata".
+      throw new ImpalaRuntimeException(String.format(
+          "Table/view rename succeeded in the Hive Metastore, but failed in Impala's " +
+          "Catalog Server. Running 'invalidate metadata <tbl>' on the old table name " +
+          "'%s' and the new table name '%s' may fix the problem." , tableName.toString(),
+          newTableName.toString()));
+    }
+
+    TCatalogObject addedObject = newTable.toTCatalogObject();
     TCatalogObject removedObject = new TCatalogObject();
     removedObject.setType(TCatalogObjectType.TABLE);
-    removedObject.setTable(new TTable());
-    removedObject.getTable().setTbl_name(tableName.getTbl());
-    removedObject.getTable().setDb_name(tableName.getDb());
-    removedObject.setCatalog_version(newTable.getCatalog_version());
+    removedObject.setTable(new TTable(tableName.getDb(), tableName.getTbl()));
+    removedObject.setCatalog_version(addedObject.getCatalog_version());
     response.result.setRemoved_catalog_object_DEPRECATED(removedObject);
-    response.result.setUpdated_catalog_object_DEPRECATED(newTable);
-    response.result.setVersion(newTable.getCatalog_version());
+    response.result.setUpdated_catalog_object_DEPRECATED(addedObject);
+    response.result.setVersion(addedObject.getCatalog_version());
   }
 
   /**
@@ -2655,8 +2662,9 @@ public class CatalogOpExecutor {
       role = catalog_.getSentryProxy().dropRole(requestingUser,
           createDropRoleParams.getRole_name());
       if (role == null) {
-        role = new Role(createDropRoleParams.getRole_name(), Sets.<String>newHashSet());
-        role.setCatalogVersion(catalog_.getCatalogVersion());
+        // Nothing was removed from the catalogd's cache.
+        resp.result.setVersion(catalog_.getCatalogVersion());
+        return;
       }
     } else {
       role = catalog_.getSentryProxy().createRole(requestingUser,
@@ -2839,12 +2847,6 @@ public class CatalogOpExecutor {
     return fsList;
   }
 
-  private static TCatalogObject TableToTCatalogObject(Table table) {
-    if (table != null) return table.toTCatalogObject();
-    return new TCatalogObject(TCatalogObjectType.TABLE,
-        Catalog.INITIAL_CATALOG_VERSION);
-  }
-
    /**
    * Sets the table parameter 'transient_lastDdlTime' to System.currentTimeMillis()/1000
    * in the given msTbl. 'transient_lastDdlTime' is guaranteed to be changed.
@@ -2926,20 +2928,19 @@ public class CatalogOpExecutor {
       }
 
       if (modifiedObjects.first == null) {
-        TCatalogObject thriftTable = TableToTCatalogObject(modifiedObjects.second);
-        if (modifiedObjects.second != null) {
-          // Return the TCatalogObject in the result to indicate this request can be
-          // processed as a direct DDL operation.
-          if (wasRemoved) {
-            resp.getResult().setRemoved_catalog_object_DEPRECATED(thriftTable);
-          } else {
-            resp.getResult().setUpdated_catalog_object_DEPRECATED(thriftTable);
-          }
-        } else {
+        if (modifiedObjects.second == null) {
           // Table does not exist in the meta store and Impala catalog, throw error.
           throw new TableNotFoundException("Table not found: " +
-              req.getTable_name().getDb_name() + "."
-              + req.getTable_name().getTable_name());
+              req.getTable_name().getDb_name() + "." +
+              req.getTable_name().getTable_name());
+        }
+        TCatalogObject thriftTable = modifiedObjects.second.toTCatalogObject();
+        // Return the TCatalogObject in the result to indicate this request can be
+        // processed as a direct DDL operation.
+        if (wasRemoved) {
+          resp.getResult().setRemoved_catalog_object_DEPRECATED(thriftTable);
+        } else {
+          resp.getResult().setUpdated_catalog_object_DEPRECATED(thriftTable);
         }
         resp.getResult().setVersion(thriftTable.getCatalog_version());
       } else {
@@ -2965,8 +2966,7 @@ public class CatalogOpExecutor {
       catalog_.reset();
       resp.result.setVersion(catalog_.getCatalogVersion());
     }
-    resp.getResult().setStatus(
-        new TStatus(TErrorCode.OK, new ArrayList<String>()));
+    resp.getResult().setStatus(new TStatus(TErrorCode.OK, new ArrayList<String>()));
     return resp;
   }
 
