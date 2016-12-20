@@ -55,18 +55,22 @@ namespace impala {
 /// Each WriteHandle is backed by a range of data in a scratch file. The first call to
 /// Write() will create files for the FileGroup with unique filenames on the configured
 /// temporary devices. At most one directory per device is used (unless overridden for
-/// testing). Free space is managed within a FileGroup: once a WriteHandle is destroyed,
-/// the file range backing it can be recycled for a different WriteHandle. The file range
-/// of a WriteHandle can be replaced with a different one if a write error is encountered
-/// and the data instead needs to be written to a different disk.
+/// testing). The file range of a WriteHandle can be replaced with a different one if
+/// a write error is encountered and the data instead needs to be written to a different
+/// disk.
+///
+/// Free Space Management:
+/// Free space is managed within a FileGroup: once a WriteHandle is destroyed, the file
+/// range backing it can be recycled for a different WriteHandle. Scratch file ranges
+/// are grouped into size classes, each for a power-of-two number of bytes. Free file
+/// ranges of each size class are managed separately (i.e. there is no splitting or
+/// coalescing of ranges).
 ///
 /// Resource Management:
 /// TmpFileMgr provides some basic support for managing local disk space consumption.
 /// A FileGroup can be created with a limit on the total number of bytes allocated across
 /// all files. Writes that would exceed the limit fail with an error status.
 ///
-/// TODO: each FileGroup can manage only fixed length scratch file ranges of 'block_size',
-/// to simplify the recycling logic. BufferPool will require variable length ranges.
 /// TODO: IMPALA-4683: we could implement smarter handling of failures, e.g. to
 /// temporarily blacklist devices that show I/O errors.
 class TmpFileMgr {
@@ -94,10 +98,9 @@ class TmpFileMgr {
     /// and perform I/O using 'io_mgr'. Adds counters to 'profile' to track scratch
     /// space used. 'unique_id' is a unique ID that is used to prefix any scratch file
     /// names. It is an error to create multiple FileGroups with the same 'unique_id'.
-    /// 'block_size' is the size of blocks in bytes that space will be allocated in.
     /// 'bytes_limit' is the limit on the total file space to allocate.
     FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr, RuntimeProfile* profile,
-        const TUniqueId& unique_id, int64_t block_size, int64_t bytes_limit = -1);
+        const TUniqueId& unique_id, int64_t bytes_limit = -1);
 
     ~FileGroup();
 
@@ -108,9 +111,6 @@ class TmpFileMgr {
     /// may rewrite the data in 'buffer' in-place (e.g. to do in-place encryption or
     /// compression). The caller should not modify the data in 'buffer' until the write
     /// completes or is cancelled, otherwise invalid data may be written to disk.
-    ///
-    /// TODO: buffer->len must be <= 'block_size' until FileGroup supports allocating
-    /// variable-length scratch files ranges.
     ///
     /// Returns an error if the scratch space cannot be allocated or the write cannot
     /// be started. Otherwise 'handle' is set and 'cb' will be called asynchronously from
@@ -160,8 +160,9 @@ class TmpFileMgr {
     /// limit is exceeded. Must be called without 'lock_' held.
     Status AllocateSpace(int64_t num_bytes, File** tmp_file, int64_t* file_offset);
 
-    /// Add a free scratch range to 'free_ranges_'. Must be called without 'lock_' held.
-    void AddFreeRange(File* file, int64_t offset);
+    /// Add the scratch range from 'handle' to 'free_ranges_' and destroy handle. Must be
+    /// called without 'lock_' held.
+    void RecycleFileRange(std::unique_ptr<WriteHandle> handle);
 
     /// Called when the DiskIoMgr write completes for 'handle'. On error, will attempt
     /// to retry the write. On success or if the write can't be retried, calls
@@ -192,10 +193,6 @@ class TmpFileMgr {
 
     /// Unique across all FileGroups. Used to prefix file names.
     const TUniqueId unique_id_;
-
-    /// Size of the blocks in bytes that scratch space is managed in.
-    /// TODO: support variable-length scratch file ranges.
-    const int64_t block_size_;
 
     /// Max write space allowed (-1 means no limit).
     const int64_t bytes_limit_;
@@ -235,8 +232,10 @@ class TmpFileMgr {
     /// files.
     int next_allocation_index_;
 
-    /// List of File/offset pairs for free scratch ranges of size 'block_size_' bytes.
-    std::vector<std::pair<File*, int64_t>> free_ranges_;
+    /// Each vector in free_ranges_[i] is a vector of File/offset pairs for free scratch
+    /// ranges of length 2^i bytes. Has 64 entries so that every int64_t length has a
+    /// valid list associated with it.
+    std::vector<std::vector<std::pair<File*, int64_t>>> free_ranges_;
 
     /// Errors encountered when creating/writing scratch files. We store the history so
     /// that we can report the original cause of the scratch errors if we run out of

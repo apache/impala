@@ -26,8 +26,10 @@
 #include <gutil/strings/join.h>
 #include <gutil/strings/substitute.h>
 
+#include "gutil/bits.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tmp-file-mgr-internal.h"
+#include "util/bit-util.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
@@ -222,13 +224,11 @@ string TmpFileMgr::File::DebugString() {
 }
 
 TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
-    RuntimeProfile* profile, const TUniqueId& unique_id, int64_t block_size,
-    int64_t bytes_limit)
+    RuntimeProfile* profile, const TUniqueId& unique_id, int64_t bytes_limit)
   : tmp_file_mgr_(tmp_file_mgr),
     io_mgr_(io_mgr),
     io_ctx_(nullptr),
     unique_id_(unique_id),
-    block_size_(block_size),
     bytes_limit_(bytes_limit),
     write_counter_(ADD_COUNTER(profile, "ScratchWrites", TUnit::UNIT)),
     bytes_written_counter_(ADD_COUNTER(profile, "ScratchBytesWritten", TUnit::BYTES)),
@@ -239,8 +239,8 @@ TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
     disk_read_timer_(ADD_TIMER(profile, "TotalReadBlockTime")),
     encryption_timer_(ADD_TIMER(profile, "TotalEncryptionTime")),
     current_bytes_allocated_(0),
-    next_allocation_index_(0) {
-  DCHECK_GT(block_size_, 0);
+    next_allocation_index_(0),
+    free_ranges_(64) {
   DCHECK(tmp_file_mgr != nullptr);
   io_mgr_->RegisterContext(&io_ctx_, nullptr);
 }
@@ -301,17 +301,18 @@ void TmpFileMgr::FileGroup::Close() {
 
 Status TmpFileMgr::FileGroup::AllocateSpace(
     int64_t num_bytes, File** tmp_file, int64_t* file_offset) {
-  DCHECK_LE(num_bytes, block_size_);
   lock_guard<SpinLock> lock(lock_);
-
-  if (!free_ranges_.empty()) {
-    *tmp_file = free_ranges_.back().first;
-    *file_offset = free_ranges_.back().second;
-    free_ranges_.pop_back();
+  int64_t scratch_range_bytes = max<int64_t>(1L, BitUtil::RoundUpToPowerOfTwo(num_bytes));
+  int free_ranges_idx = Bits::Log2Ceiling64(scratch_range_bytes);
+  if (!free_ranges_[free_ranges_idx].empty()) {
+    *tmp_file = free_ranges_[free_ranges_idx].back().first;
+    *file_offset = free_ranges_[free_ranges_idx].back().second;
+    free_ranges_[free_ranges_idx].pop_back();
     return Status::OK();
   }
 
-  if (bytes_limit_ != -1 && current_bytes_allocated_ + block_size_ > bytes_limit_) {
+  if (bytes_limit_ != -1
+      && current_bytes_allocated_ + scratch_range_bytes > bytes_limit_) {
     return Status(TErrorCode::SCRATCH_LIMIT_EXCEEDED, bytes_limit_);
   }
 
@@ -323,9 +324,9 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
     *tmp_file = tmp_files_[next_allocation_index_].get();
     next_allocation_index_ = (next_allocation_index_ + 1) % tmp_files_.size();
     if ((*tmp_file)->is_blacklisted()) continue;
-    Status status = (*tmp_file)->AllocateSpace(block_size_, file_offset);
+    Status status = (*tmp_file)->AllocateSpace(scratch_range_bytes, file_offset);
     if (status.ok()) {
-      scratch_space_bytes_used_counter_->Add(block_size_);
+      scratch_space_bytes_used_counter_->Add(scratch_range_bytes);
       current_bytes_allocated_ += num_bytes;
       return Status::OK();
     }
@@ -347,9 +348,13 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
   return err_status;
 }
 
-void TmpFileMgr::FileGroup::AddFreeRange(File* file, int64_t offset) {
+void TmpFileMgr::FileGroup::RecycleFileRange(unique_ptr<WriteHandle> handle) {
+  int64_t scratch_range_bytes =
+      max<int64_t>(1L, BitUtil::RoundUpToPowerOfTwo(handle->len()));
+  int free_ranges_idx = Bits::Log2Ceiling64(scratch_range_bytes);
   lock_guard<SpinLock> lock(lock_);
-  free_ranges_.emplace_back(file, offset);
+  free_ranges_[free_ranges_idx].emplace_back(
+      handle->file_, handle->write_range_->offset());
 }
 
 Status TmpFileMgr::FileGroup::Write(
@@ -421,16 +426,14 @@ Status TmpFileMgr::FileGroup::CancelWriteAndRestoreData(
     status = handle->CheckHashAndDecrypt(buffer);
   }
   handle->WaitForWrite();
-  AddFreeRange(handle->file_, handle->write_range_->offset());
-  handle.reset();
+  RecycleFileRange(move(handle));
   return status;
 }
 
 void TmpFileMgr::FileGroup::DestroyWriteHandle(unique_ptr<WriteHandle> handle) {
   handle->Cancel();
   handle->WaitForWrite();
-  AddFreeRange(handle->file_, handle->write_range_->offset());
-  handle.reset();
+  RecycleFileRange(move(handle));
 }
 
 void TmpFileMgr::FileGroup::WriteComplete(
@@ -477,17 +480,15 @@ Status TmpFileMgr::FileGroup::RecoverWriteError(
 string TmpFileMgr::FileGroup::DebugString() {
   lock_guard<SpinLock> lock(lock_);
   stringstream ss;
-  ss << "FileGroup " << this << " block size " << block_size_
-     << " bytes limit " << bytes_limit_
+  ss << "FileGroup " << this << " bytes limit " << bytes_limit_
      << " current bytes allocated " << current_bytes_allocated_
-     << " next allocation index " << next_allocation_index_
-     << " writes " << write_counter_->value()
-     << " bytes written " << bytes_written_counter_->value()
-     << " reads " << read_counter_->value()
-     << " bytes read " << bytes_read_counter_->value()
-     << " scratch bytes used " << scratch_space_bytes_used_counter_
-     << " dist read timer " << disk_read_timer_->value()
-     << " encryption timer " << encryption_timer_->value() << endl
+     << " next allocation index " << next_allocation_index_ << " writes "
+     << write_counter_->value() << " bytes written " << bytes_written_counter_->value()
+     << " reads " << read_counter_->value() << " bytes read "
+     << bytes_read_counter_->value() << " scratch bytes used "
+     << scratch_space_bytes_used_counter_ << " dist read timer "
+     << disk_read_timer_->value() << " encryption timer " << encryption_timer_->value()
+     << endl
      << "  " << tmp_files_.size() << " files:" << endl;
   for (unique_ptr<File>& file : tmp_files_) {
     ss << "    " << file->DebugString() << endl;

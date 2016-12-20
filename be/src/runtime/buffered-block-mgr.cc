@@ -1228,7 +1228,7 @@ void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, TmpFileMgr* tmp_file_mgr,
   parent_profile->AddChild(profile_.get());
 
   tmp_file_group_.reset(new TmpFileMgr::FileGroup(
-      tmp_file_mgr, io_mgr, profile_.get(), query_id_, max_block_size_, scratch_limit));
+      tmp_file_mgr, io_mgr, profile_.get(), query_id_, scratch_limit));
 
   mem_limit_counter_ = ADD_COUNTER(profile_.get(), "MemoryLimit", TUnit::BYTES);
   mem_limit_counter_->Set(mem_limit);

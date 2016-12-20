@@ -203,8 +203,7 @@ TEST_F(TmpFileMgrTest, TestOneDirPerDevice) {
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, true, metrics_.get());
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(
-      &tmp_file_mgr, io_mgr(), profile_, id, 1024 * 1024 * 8);
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
   // Only the first directory should be used.
   EXPECT_EQ(1, tmp_file_mgr.NumActiveTmpDevices());
@@ -228,8 +227,7 @@ TEST_F(TmpFileMgrTest, TestMultiDirsPerDevice) {
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(
-      &tmp_file_mgr, io_mgr(), profile_, id, 1024 * 1024 * 8);
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
   // Both directories should be used.
   EXPECT_EQ(2, tmp_file_mgr.NumActiveTmpDevices());
@@ -257,8 +255,7 @@ TEST_F(TmpFileMgrTest, TestReportError) {
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(
-      &tmp_file_mgr, io_mgr(), profile_, id, 1024 * 1024 * 8);
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
   // Both directories should be used.
   vector<TmpFileMgr::DeviceId> devices = tmp_file_mgr.ActiveTmpDevices();
@@ -307,8 +304,7 @@ TEST_F(TmpFileMgrTest, TestAllocateNonWritable) {
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(
-      &tmp_file_mgr, io_mgr(), profile_, id, 1024 * 1024 * 8);
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
   vector<TmpFileMgr::File*> allocated_files;
   ASSERT_OK(CreateFiles(&file_group, &allocated_files))
@@ -334,11 +330,11 @@ TEST_F(TmpFileMgrTest, TestScratchLimit) {
   TmpFileMgr tmp_file_mgr;
   tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get());
 
-  const int64_t LIMIT = 100;
-  const int64_t ALLOC_SIZE = 50;
+  const int64_t LIMIT = 128;
+  // A power-of-two so that FileGroup allocates exactly this amount of scratch space.
+  const int64_t ALLOC_SIZE = 64;
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(
-      &tmp_file_mgr, io_mgr(), profile_, id, ALLOC_SIZE, LIMIT);
+  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id, LIMIT);
 
   vector<TmpFileMgr::File*> files;
   ASSERT_OK(CreateFiles(&file_group, &files));
@@ -367,46 +363,49 @@ TEST_F(TmpFileMgrTest, TestScratchLimit) {
   file_group.Close();
 }
 
-// Test that scratch file ranges are recycled as expected.
+// Test that scratch file ranges of varying length are recycled as expected.
 TEST_F(TmpFileMgrTest, TestScratchRangeRecycling) {
-  const int64_t ALLOC_SIZE = 50;
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(
-      test_env_->tmp_file_mgr(), io_mgr(), profile_, id, ALLOC_SIZE);
-
-  // Generate some data.
-  const int BLOCKS = 5;
-  vector<vector<uint8_t>> data(BLOCKS);
-  for (int i = 0; i < BLOCKS; ++i) {
-    data[i].resize(ALLOC_SIZE);
-    std::iota(data[i].begin(), data[i].end(), i);
-  }
-
-  DiskIoMgr::WriteRange::WriteDoneCallback callback =
-      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
-  vector<unique_ptr<TmpFileMgr::WriteHandle>> handles(BLOCKS);
-  // Make sure free space doesn't grow over several iterations.
-  const int TEST_ITERS = 5;
-  for (int i = 0; i < TEST_ITERS; ++i) {
-    cb_counter_ = 0;
-    for (int j = 0; j < BLOCKS; ++j) {
-      ASSERT_OK(
-          file_group.Write(MemRange(data[j].data(), ALLOC_SIZE), callback, &handles[j]));
+  TmpFileMgr::FileGroup file_group(test_env_->tmp_file_mgr(), io_mgr(), profile_, id);
+  int64_t expected_scratch_bytes_allocated = 0;
+  // Test some different allocation sizes.
+  for (int alloc_size = 64; alloc_size <= 64 * 1024; alloc_size *= 2) {
+    // Generate some data.
+    const int BLOCKS = 5;
+    vector<vector<uint8_t>> data(BLOCKS);
+    for (int i = 0; i < BLOCKS; ++i) {
+      data[i].resize(alloc_size);
+      std::iota(data[i].begin(), data[i].end(), i);
     }
-    WaitForCallbacks(BLOCKS);
-    EXPECT_EQ(ALLOC_SIZE * BLOCKS, BytesAllocated(&file_group));
 
-    // Read back and validate.
-    for (int j = 0; j < BLOCKS; ++j) {
-      uint8_t tmp[ALLOC_SIZE];
-      ASSERT_OK(file_group.Read(handles[j].get(), MemRange(tmp, ALLOC_SIZE)));
-      EXPECT_EQ(0, memcmp(tmp, data[j].data(), ALLOC_SIZE));
-      file_group.DestroyWriteHandle(move(handles[j]));
+    DiskIoMgr::WriteRange::WriteDoneCallback callback =
+        bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+    vector<unique_ptr<TmpFileMgr::WriteHandle>> handles(BLOCKS);
+    // 'file_group' should allocate extra scratch bytes for this 'alloc_size'.
+    expected_scratch_bytes_allocated += alloc_size * BLOCKS;
+    const int TEST_ITERS = 5;
+    // Make sure free space doesn't grow over several iterations.
+    for (int i = 0; i < TEST_ITERS; ++i) {
+      cb_counter_ = 0;
+      for (int j = 0; j < BLOCKS; ++j) {
+        ASSERT_OK(file_group.Write(
+            MemRange(data[j].data(), alloc_size), callback, &handles[j]));
+      }
+      WaitForCallbacks(BLOCKS);
+      EXPECT_EQ(expected_scratch_bytes_allocated, BytesAllocated(&file_group));
+
+      // Read back and validate.
+      for (int j = 0; j < BLOCKS; ++j) {
+        vector<uint8_t> tmp(alloc_size);
+        ASSERT_OK(file_group.Read(handles[j].get(), MemRange(tmp.data(), alloc_size)));
+        EXPECT_EQ(0, memcmp(tmp.data(), data[j].data(), alloc_size));
+        file_group.DestroyWriteHandle(move(handles[j]));
+      }
+      // Check that the space is still in use - it should be recycled by the next
+      // iteration.
+      EXPECT_EQ(expected_scratch_bytes_allocated, BytesAllocated(&file_group));
     }
-    // Check that the space is still in use - it should be recycled by the next iteration.
-    EXPECT_EQ(ALLOC_SIZE * BLOCKS, BytesAllocated(&file_group));
   }
-
   file_group.Close();
   test_env_->TearDownRuntimeStates();
 }
