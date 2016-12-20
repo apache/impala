@@ -96,21 +96,16 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   // Allow logging of at least one error, so we can detect and convert it into a
   // Java exception.
   query_ctx.client_request.query_options.max_errors = 1;
-  RuntimeState state(query_ctx);
+
+  // Track memory against a dummy "fe-eval-exprs" resource pool - we don't
+  // know what resource pool the query has been assigned to yet.
+  RuntimeState state(query_ctx, ExecEnv::GetInstance(), "fe-eval-exprs");
   // Make sure to close the runtime state no matter how this scope is exited.
   const auto close_runtime_state =
       MakeScopeExitTrigger([&state]() { state.ReleaseResources(); });
 
-  THROW_IF_ERROR_RET(jni_frame.push(env), env, JniUtil::internal_exc_class(),
-      result_bytes);
-  // Exprs can allocate memory so we need to set up the mem trackers before
-  // preparing/running the exprs.
-  int64_t mem_limit = -1;
-  if (query_ctx.client_request.query_options.__isset.mem_limit
-      && query_ctx.client_request.query_options.mem_limit > 0) {
-    mem_limit = query_ctx.client_request.query_options.mem_limit;
-  }
-  state.InitMemTrackers(NULL, mem_limit);
+  THROW_IF_ERROR_RET(
+      jni_frame.push(env), env, JniUtil::internal_exc_class(), result_bytes);
 
   // Prepare() the exprs. Always Close() the exprs even in case of errors.
   vector<ExprContext*> expr_ctxs;

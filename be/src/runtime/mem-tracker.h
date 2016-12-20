@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <map>
+#include <memory>
 #include <vector>
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
@@ -37,13 +38,20 @@
 
 namespace impala {
 
-class ReservationTrackerCounters;
+class ObjectPool;
 class MemTracker;
+class ReservationTrackerCounters;
+class TQueryOptions;
 
 /// A MemTracker tracks memory consumption; it contains an optional limit
 /// and can be arranged into a tree structure such that the consumption tracked
 /// by a MemTracker is also tracked by its ancestors.
-//
+///
+/// We use a five-level hierarchy of mem trackers: process, pool, query, fragment
+/// instance. Specific parts of the fragment (exec nodes, sinks, etc) will add a
+/// fifth level when they are initialized. This function also initializes a user
+/// function mem tracker (in the fifth level).
+///
 /// By default, memory consumption is tracked via calls to Consume()/Release(), either to
 /// the tracker itself or to one of its descendents. Alternatively, a consumption metric
 /// can specified, and then the metric's value is used as the consumption rather than the
@@ -87,26 +95,13 @@ class MemTracker {
   /// The counters should be owned by the fragment's RuntimeProfile.
   void EnableReservationReporting(const ReservationTrackerCounters& counters);
 
-  /// Returns a MemTracker object for query 'id'.  Calling this with the same id will
-  /// return the same MemTracker object.  An example of how this is used is to pass it
-  /// the same query id for all fragments of that query running on this machine.  This
-  /// way, we have per-query limits rather than per-fragment.
-  /// The first time this is called for an id, a new MemTracker object is created with
-  /// 'parent' as the parent tracker.
-  /// byte_limit and parent must be the same for all GetMemTracker() calls with the
-  /// same id.
-  static std::shared_ptr<MemTracker> GetQueryMemTracker(
-      const TUniqueId& id, int64_t byte_limit, MemTracker* parent);
-
-  /// Returns a MemTracker object for request pool 'pool_name'. Calling this with the same
-  /// 'pool_name' will return the same MemTracker object. This is used to track the local
-  /// memory usage of all requests executing in this pool. The first time this is called
-  /// for a pool, a new MemTracker object is created with the parent tracker if it is not
-  /// NULL. If the parent is NULL, no new tracker will be created and NULL is returned.
-  /// There is no explicit per-pool byte_limit set at any particular impalad, so newly
-  /// created trackers will always have a limit of -1.
-  static MemTracker* GetRequestPoolMemTracker(const std::string& pool_name,
-      MemTracker* parent);
+  /// Construct a MemTracker object for query 'id'. The query limits are determined based
+  /// on 'query_options'. The MemTracker is a child of the request pool MemTracker for
+  /// 'pool_name', which is created if needed. The returned MemTracker is owned by
+  /// 'obj_pool'.
+  static MemTracker* CreateQueryMemTracker(const TUniqueId& id,
+      const TQueryOptions& query_options, const std::string& pool_name,
+      ObjectPool* obj_pool);
 
   /// Increases consumption of this tracker and its ancestors by 'bytes'.
   void Consume(int64_t bytes) {
@@ -324,9 +319,12 @@ class MemTracker {
   static const std::string COUNTER_NAME;
 
  private:
+  friend class PoolMemTrackerRegistry;
+
   bool CheckLimitExceeded() const { return limit_ >= 0 && limit_ < consumption(); }
 
-  /// If consumption is higher than max_consumption, attempts to free memory by calling any
+  /// If consumption is higher than max_consumption, attempts to free memory by calling
+  /// any
   /// added GC functions.  Returns true if max_consumption is still exceeded. Takes
   /// gc_lock. Updates metrics if initialized.
   bool GcMemory(int64_t max_consumption);
@@ -361,25 +359,7 @@ class MemTracker {
   /// Lock to protect GcMemory(). This prevents many GCs from occurring at once.
   boost::mutex gc_lock_;
 
-  /// Protects request_to_mem_trackers_ and pool_to_mem_trackers_.
-  /// IMPALA-3068: Use SpinLock instead of boost::mutex so that it won't automatically
-  /// destroy itself as part of process teardown, which could cause races.
-  static SpinLock static_mem_trackers_lock_;
-
-  /// All per-request MemTracker objects that are in use.  For memory management, this map
-  /// contains only weak ptrs.  MemTrackers that are handed out via GetQueryMemTracker()
-  /// are shared ptrs.  When all the shared ptrs are no longer referenced, the MemTracker
-  /// d'tor will be called at which point the weak ptr will be removed from the map.
-  typedef boost::unordered_map<TUniqueId, std::weak_ptr<MemTracker>>
-  RequestTrackersMap;
-  static RequestTrackersMap request_to_mem_trackers_;
-
-  /// All per-request pool MemTracker objects. It is assumed that request pools will live
-  /// for the entire duration of the process lifetime.
-  typedef boost::unordered_map<std::string, MemTracker*> PoolTrackersMap;
-  static PoolTrackersMap pool_to_mem_trackers_;
-
-  /// Only valid for MemTrackers returned from GetQueryMemTracker()
+  /// Only valid for MemTrackers returned from CreateQueryMemTracker()
   TUniqueId query_id_;
 
   /// Only valid for MemTrackers returned from GetRequestPoolMemTracker()
@@ -424,13 +404,6 @@ class MemTracker {
   /// Functions to call after the limit is reached to free memory.
   std::vector<GcFunction> gc_functions_;
 
-  /// If true, calls UnregisterFromParent() in the dtor. This is only used for
-  /// the query wide trackers to remove it from the process mem tracker. The
-  /// process tracker never gets deleted so it is safe to reference it in the dtor.
-  /// The query tracker has lifetime shared by multiple plan fragments so it's hard
-  /// to do cleanup another way.
-  bool auto_unregister_;
-
   /// If false, this tracker (and its children) will not be included in LogUsage() output
   /// if consumption is 0.
   bool log_usage_if_zero_;
@@ -451,6 +424,29 @@ class MemTracker {
   IntGauge* limit_metric_;
 };
 
+/// Global registry for query and pool MemTrackers. Owned by ExecEnv.
+class PoolMemTrackerRegistry {
+ public:
+  /// Returns a MemTracker object for request pool 'pool_name'. Calling this with the same
+  /// 'pool_name' will return the same MemTracker object. This is used to track the local
+  /// memory usage of all requests executing in this pool. If 'create_if_not_present' is
+  /// true, the first time this is called for a pool, a new MemTracker object is created
+  /// with the process tracker as its parent. There is no explicit per-pool byte_limit
+  /// set at any particular impalad, so newly created trackers will always have a limit
+  /// of -1.
+  MemTracker* GetRequestPoolMemTracker(
+      const std::string& pool_name, bool create_if_not_present);
+
+ private:
+  /// All per-request pool MemTracker objects. It is assumed that request pools will live
+  /// for the entire duration of the process lifetime so MemTrackers are never removed
+  /// from this map. Protected by 'pool_to_mem_trackers_lock_'
+  typedef boost::unordered_map<std::string, MemTracker*> PoolTrackersMap;
+  PoolTrackersMap pool_to_mem_trackers_;
+  /// IMPALA-3068: Use SpinLock instead of boost::mutex so that the lock won't
+  /// automatically destroy itself as part of process teardown, which could cause races.
+  SpinLock pool_to_mem_trackers_lock_;
+};
 }
 
 #endif

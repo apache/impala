@@ -53,14 +53,13 @@
 #include "runtime/data-stream-mgr.h"
 #include "runtime/data-stream-sender.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-instance-state.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/parallel-executor.h"
 #include "runtime/plan-fragment-executor.h"
-#include "runtime/row-batch.h"
 #include "runtime/query-exec-mgr.h"
-#include "runtime/query-state.h"
-#include "runtime/fragment-instance-state.h"
+#include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 #include "scheduling/scheduler.h"
 #include "util/bloom-filter.h"
@@ -365,7 +364,7 @@ Coordinator::Coordinator(const QuerySchedule& schedule, ExecEnv* exec_env,
     exec_env_(exec_env),
     has_called_wait_(false),
     returned_all_results_(false),
-    query_mem_tracker_(), // Set in Exec()
+    query_state_(nullptr),
     num_remaining_fragment_instances_(0),
     obj_pool_(new ObjectPool()),
     query_events_(events),
@@ -375,13 +374,6 @@ Coordinator::Coordinator(const QuerySchedule& schedule, ExecEnv* exec_env,
 
 Coordinator::~Coordinator() {
   DCHECK(torn_down_) << "TearDown() must be called before Coordinator is destroyed";
-
-  // This may be NULL while executing UDFs.
-  if (filter_mem_tracker_.get() != nullptr) {
-    filter_mem_tracker_->UnregisterFromParent();
-  }
-  filter_mem_tracker_.reset();
-  query_mem_tracker_.reset();
 }
 
 PlanFragmentExecutor* Coordinator::executor() {
@@ -471,20 +463,10 @@ Status Coordinator::Exec() {
   // execution at Impala daemons where it hasn't even started
   lock_guard<mutex> l(lock_);
 
-  // The coordinator may require a query mem tracker for result-caching, which tracks
-  // memory via the query mem tracker.
-  int64_t query_limit = -1;
-  if (query_ctx_.client_request.query_options.__isset.mem_limit
-      && query_ctx_.client_request.query_options.mem_limit > 0) {
-    query_limit = query_ctx_.client_request.query_options.mem_limit;
-  }
-  MemTracker* pool_tracker = MemTracker::GetRequestPoolMemTracker(
-      schedule_.request_pool(), exec_env_->process_mem_tracker());
-  query_mem_tracker_ =
-      MemTracker::GetQueryMemTracker(query_id_, query_limit, pool_tracker);
-  DCHECK(query_mem_tracker() != nullptr);
-  filter_mem_tracker_.reset(
-      new MemTracker(-1, "Runtime Filter (Coordinator)", query_mem_tracker(), false));
+  query_state_ = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(
+      query_ctx_, schedule_.request_pool());
+  filter_mem_tracker_.reset(new MemTracker(
+      -1, "Runtime Filter (Coordinator)", query_state_->query_mem_tracker(), false));
 
   InitExecProfiles();
   InitExecSummary();
@@ -499,15 +481,10 @@ Status Coordinator::Exec() {
   // be set up. Must do this here in order to get a reference to coord_instance_
   // so that coord_sink_ remains valid throughout query lifetime.
   if (schedule_.GetCoordFragment() != nullptr) {
-    QueryState* qs = ExecEnv::GetInstance()->query_exec_mgr()->GetQueryState(query_id_);
-    if (qs != nullptr) coord_instance_ = qs->GetFInstanceState(query_id_);
+    coord_instance_ = query_state_->GetFInstanceState(query_id_);
     if (coord_instance_ == nullptr) {
       // Coordinator instance might have failed and unregistered itself even
       // though it was successfully started (e.g. Prepare() might have failed).
-      if (qs != nullptr) {
-        ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(qs);
-        qs = nullptr;
-      }
       InstanceState* coord_state = fragment_instance_states_[0];
       DCHECK(coord_state != nullptr);
       lock_guard<mutex> instance_state_lock(*coord_state->lock());
@@ -1580,10 +1557,6 @@ RuntimeState* Coordinator::runtime_state() {
   return executor() == NULL ? NULL : executor()->runtime_state();
 }
 
-MemTracker* Coordinator::query_mem_tracker() {
-  return query_mem_tracker_.get();
-}
-
 bool Coordinator::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update) {
   // Assume we are called only after all fragments have completed
   DCHECK(has_called_wait_);
@@ -1919,16 +1892,22 @@ void Coordinator::TearDown() {
       state->Disable(filter_mem_tracker_.get());
     }
   }
-
+  // This may be NULL while executing UDFs.
+  if (filter_mem_tracker_.get() != nullptr) {
+    filter_mem_tracker_->UnregisterFromParent();
+    filter_mem_tracker_.reset();
+  }
   // Need to protect against failed Prepare(), where root_sink() would not be set.
   if (coord_sink_ != nullptr) {
     coord_sink_->CloseConsumer();
     coord_sink_ = nullptr;
   }
-  if (coord_instance_ != nullptr) {
-    ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(
-        coord_instance_->query_state());
-    coord_instance_ = nullptr;
+  coord_instance_ = nullptr;
+  if (query_state_ != nullptr) {
+    // Tear down the query state last - other members like 'filter_mem_tracker_'
+    // may reference objects with query lifetime, like the query MemTracker.
+    ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(query_state_);
+    query_state_ = nullptr;
   }
 }
 

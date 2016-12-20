@@ -56,32 +56,13 @@ Status QueryExecMgr::StartFInstance(const TExecPlanFragmentParams& params) {
     return process_mem_tracker->MemLimitExceeded(NULL, msg, 0);
   }
 
-  QueryState* qs = nullptr;
-  int refcnt;
-  {
-    lock_guard<mutex> l(qs_map_lock_);
-    TUniqueId query_id = params.query_ctx.query_id;
-    auto it = qs_map_.find(query_id);
-    if (it == qs_map_.end()) {
-      // register new QueryState
-      qs = new QueryState(params.query_ctx);
-      qs_map_.insert(make_pair(query_id, qs));
-      VLOG_QUERY << "new QueryState: query_id=" << query_id;
-    } else {
-      qs = it->second;
-    }
-    // decremented at the end of ExecFInstance()
-    refcnt = qs->refcnt_.Add(1);
-  }
-  DCHECK(qs != nullptr && qs->refcnt_.Load() > 0);
-  VLOG_QUERY << "QueryState: query_id=" << params.query_ctx.query_id
-             << " refcnt=" << refcnt;
-
+  bool dummy;
+  QueryState* qs = GetOrCreateQueryState(
+      params.query_ctx, params.fragment_instance_ctx.request_pool, &dummy);
   DCHECK(params.__isset.fragment_ctx);
   DCHECK(params.__isset.fragment_instance_ctx);
-  FragmentInstanceState* fis = qs->obj_pool()->Add(
-      new FragmentInstanceState(qs, params.fragment_ctx, params.fragment_instance_ctx,
-        params.query_ctx.desc_tbl));
+  FragmentInstanceState* fis = qs->obj_pool()->Add(new FragmentInstanceState(
+      qs, params.fragment_ctx, params.fragment_instance_ctx, params.query_ctx.desc_tbl));
   // register instance before returning so that async Cancel() calls can
   // find the instance
   qs->RegisterFInstance(fis);
@@ -94,6 +75,39 @@ Status QueryExecMgr::StartFInstance(const TExecPlanFragmentParams& params) {
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(1L);
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->Increment(1L);
   return Status::OK();
+}
+
+QueryState* QueryExecMgr::CreateQueryState(
+    const TQueryCtx& query_ctx, const string& request_pool) {
+  bool created;
+  QueryState* qs = GetOrCreateQueryState(query_ctx, request_pool, &created);
+  DCHECK(created);
+  return qs;
+}
+
+QueryState* QueryExecMgr::GetOrCreateQueryState(
+    const TQueryCtx& query_ctx, const string& request_pool, bool* created) {
+  QueryState* qs = nullptr;
+  int refcnt;
+  {
+    lock_guard<mutex> l(qs_map_lock_);
+    auto it = qs_map_.find(query_ctx.query_id);
+    if (it == qs_map_.end()) {
+      // register new QueryState
+      qs = new QueryState(query_ctx, request_pool);
+      qs_map_.insert(make_pair(query_ctx.query_id, qs));
+      VLOG_QUERY << "new QueryState: query_id=" << query_ctx.query_id;
+      *created = true;
+    } else {
+      qs = it->second;
+      *created = false;
+    }
+    // decremented at the end of ExecFInstance()
+    refcnt = qs->refcnt_.Add(1);
+  }
+  DCHECK(qs != nullptr && qs->refcnt_.Load() > 0);
+  VLOG_QUERY << "QueryState: query_id=" << query_ctx.query_id << " refcnt=" << refcnt;
+  return qs;
 }
 
 void QueryExecMgr::ExecFInstance(FragmentInstanceState* fis) {
@@ -158,6 +172,6 @@ void QueryExecMgr::ReleaseQueryState(QueryState* qs) {
     qs_map_.erase(it);
   }
   // TODO: send final status report during gc, but do this from a different thread
+  qs_from_map->ReleaseResources();
   delete qs_from_map;
 }
-

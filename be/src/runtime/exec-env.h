@@ -38,6 +38,7 @@ class HdfsFsCache;
 class ImpalaServer;
 class LibCache;
 class MemTracker;
+class PoolMemTrackerRegistry;
 class MetricGroup;
 class QueryResourceMgr;
 class RequestPoolService;
@@ -57,7 +58,7 @@ class ExecEnv {
   ExecEnv();
 
   ExecEnv(const std::string& hostname, int backend_port, int subscriber_port,
-          int webserver_port, const std::string& statestore_host, int statestore_port);
+      int webserver_port, const std::string& statestore_host, int statestore_port);
 
   /// Returns the first created exec env instance. In a normal impalad, this is
   /// the only instance. In test setups with multiple ExecEnv's per process,
@@ -97,6 +98,7 @@ class ExecEnv {
   RequestPoolService* request_pool_service() { return request_pool_service_.get(); }
   CallableThreadPool* rpc_pool() { return async_rpc_pool_.get(); }
   QueryExecMgr* query_exec_mgr() { return query_exec_mgr_.get(); }
+  PoolMemTrackerRegistry* pool_mem_trackers() { return pool_mem_trackers_.get(); }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
@@ -131,6 +133,7 @@ class ExecEnv {
   boost::scoped_ptr<DiskIoMgr> disk_io_mgr_;
   boost::scoped_ptr<Webserver> webserver_;
   boost::scoped_ptr<MemTracker> mem_tracker_;
+  boost::scoped_ptr<PoolMemTrackerRegistry> pool_mem_trackers_;
   boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
   boost::scoped_ptr<HdfsOpThreadPool> hdfs_op_thread_pool_;
   boost::scoped_ptr<TmpFileMgr> tmp_file_mgr_;

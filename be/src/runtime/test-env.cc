@@ -16,6 +16,8 @@
 // under the License.
 
 #include "runtime/test-env.h"
+
+#include "runtime/query-exec-mgr.h"
 #include "util/disk-info.h"
 #include "util/impalad-metrics.h"
 
@@ -61,16 +63,20 @@ void TestEnv::InitTmpFileMgr(const vector<string>& tmp_dirs, bool one_dir_per_de
 
 TestEnv::~TestEnv() {
   // Queries must be torn down first since they are dependent on global state.
-  TearDownRuntimeStates();
+  TearDownQueries();
   exec_env_.reset();
   io_mgr_tracker_.reset();
   tmp_file_mgr_.reset();
   metrics_.reset();
 }
 
-void TestEnv::TearDownRuntimeStates() {
-  for (auto& runtime_state : runtime_states_) runtime_state.second->ReleaseResources();
+void TestEnv::TearDownQueries() {
+  for (RuntimeState* runtime_state : runtime_states_) runtime_state->ReleaseResources();
   runtime_states_.clear();
+  for (QueryState* query_state : query_states_) {
+    exec_env_->query_exec_mgr()->ReleaseQueryState(query_state);
+  }
+  query_states_.clear();
 }
 
 int64_t TestEnv::CalculateMemLimit(int max_buffers, int block_size) {
@@ -81,34 +87,35 @@ int64_t TestEnv::CalculateMemLimit(int max_buffers, int block_size) {
 
 int64_t TestEnv::TotalQueryMemoryConsumption() {
   int64_t total = 0;
-  for (const auto& runtime_state : runtime_states_) {
-    total += runtime_state.second->query_mem_tracker()->consumption();
+  for (QueryState* query_state : query_states_) {
+    total += query_state->query_mem_tracker()->consumption();
   }
   return total;
 }
 
 Status TestEnv::CreateQueryState(int64_t query_id, int max_buffers, int block_size,
     const TQueryOptions* query_options, RuntimeState** runtime_state) {
-  // Enforce invariant that each query ID can be registered at most once.
-  if (runtime_states_.find(query_id) != runtime_states_.end()) {
-    return Status(Substitute("Duplicate query id found: $0", query_id));
-  }
-
   TQueryCtx query_ctx;
   if (query_options != nullptr) query_ctx.client_request.query_options = *query_options;
   query_ctx.query_id.hi = 0;
   query_ctx.query_id.lo = query_id;
-  *runtime_state = new RuntimeState(query_ctx, exec_env_.get());
-  (*runtime_state)->InitMemTrackers(nullptr, -1);
+
+  // CreateQueryState() enforces the invariant that 'query_id' must be unique.
+  QueryState* qs = exec_env_->query_exec_mgr()->CreateQueryState(query_ctx, "test-pool");
+  query_states_.push_back(qs);
+  FragmentInstanceState* fis = qs->obj_pool()->Add(new FragmentInstanceState(
+      qs, TPlanFragmentCtx(), TPlanFragmentInstanceCtx(), TDescriptorTable()));
+  RuntimeState* rs = qs->obj_pool()->Add(
+      new RuntimeState(qs, fis->fragment_ctx(), fis->instance_ctx(), exec_env_.get()));
+  runtime_states_.push_back(rs);
 
   shared_ptr<BufferedBlockMgr> mgr;
-  RETURN_IF_ERROR(BufferedBlockMgr::Create(*runtime_state,
-      (*runtime_state)->query_mem_tracker(), (*runtime_state)->runtime_profile(),
-      tmp_file_mgr_.get(), CalculateMemLimit(max_buffers, block_size), block_size, &mgr));
-  (*runtime_state)->set_block_mgr(mgr);
+  RETURN_IF_ERROR(BufferedBlockMgr::Create(rs, qs->query_mem_tracker(),
+      rs->runtime_profile(), tmp_file_mgr_.get(),
+      CalculateMemLimit(max_buffers, block_size), block_size, &mgr));
+  rs->set_block_mgr(mgr);
 
-  runtime_states_[query_id] = shared_ptr<RuntimeState>(*runtime_state);
+  if (runtime_state != nullptr) *runtime_state = rs;
   return Status::OK();
 }
-
 }

@@ -407,7 +407,7 @@ TEST_F(TmpFileMgrTest, TestScratchRangeRecycling) {
     }
   }
   file_group.Close();
-  test_env_->TearDownRuntimeStates();
+  test_env_->TearDownQueries();
 }
 }
 

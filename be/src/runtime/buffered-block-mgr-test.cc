@@ -31,6 +31,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "runtime/runtime-state.h"
 #include "runtime/test-env.h"
 #include "runtime/tmp-file-mgr.h"
@@ -188,7 +189,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
   void TearDownMgrs() {
     // Tear down the query states, which DCHECKs that the memory consumption of
     // the query's trackers is zero.
-    test_env_->TearDownRuntimeStates();
+    test_env_->TearDownQueries();
   }
 
   void AllocateBlocks(BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
@@ -557,16 +558,15 @@ class BufferedBlockMgrTest : public ::testing::Test {
     const int num_threads = 8;
     thread_group workers;
     // Create a shared RuntimeState with no BufferedBlockMgr.
-    RuntimeState* shared_state =
-        new RuntimeState(TQueryCtx(), test_env_->exec_env());
-    shared_state->InitMemTrackers(NULL, -1);
+    RuntimeState shared_state(TQueryCtx(), test_env_->exec_env(), "test-pool");
 
     for (int i = 0; i < num_threads; ++i) {
       thread* t = new thread(
-          bind(&BufferedBlockMgrTest::CreateDestroyThread, this, shared_state));
+          bind(&BufferedBlockMgrTest::CreateDestroyThread, this, &shared_state));
       workers.add_thread(t);
     }
     workers.join_all();
+    shared_state.ReleaseResources();
   }
 
   // Test that in-flight IO operations are correctly handled on tear down.
@@ -891,16 +891,13 @@ void BufferedBlockMgrTest::TestRuntimeStateTeardown(
   BufferedBlockMgr::Client* client;
   CreateMgrAndClient(0, max_num_buffers, block_size_, 0, false, &client, &state);
 
-  // Hold extra references to block mgr and query mem tracker so they can outlive runtime
-  // state.
+  // Hold extra references to block mgr and query state so they outlive RuntimeState.
   shared_ptr<BufferedBlockMgr> block_mgr;
-  shared_ptr<MemTracker> query_mem_tracker;
+  QueryState::ScopedRef qs(state->query_id());
   Status status = BufferedBlockMgr::Create(state, state->query_mem_tracker(),
       state->runtime_profile(), test_env_->tmp_file_mgr(), 0, block_size_, &block_mgr);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(block_mgr != NULL);
-  query_mem_tracker = MemTracker::GetQueryMemTracker(
-      state->query_id(), -1, test_env_->exec_env()->process_mem_tracker());
 
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr.get(), client, max_num_buffers, &blocks);
@@ -926,7 +923,7 @@ void BufferedBlockMgrTest::TestRuntimeStateTeardown(
   // scenario by holding onto a reference to the block mgr. This should be safe so
   // long as blocks are properly deleted before the runtime state is torn down.
   DeleteBlocks(blocks);
-  test_env_->TearDownRuntimeStates();
+  test_env_->TearDownQueries();
 
   // Optionally wait for writes to complete after cancellation.
   if (wait_for_writes) WaitForWrites(block_mgr.get());

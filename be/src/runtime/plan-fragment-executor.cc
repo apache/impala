@@ -147,7 +147,6 @@ Status PlanFragmentExecutor::PrepareInternal(
   }
 
   DCHECK(!instance_ctx.request_pool.empty());
-  runtime_state_->InitMemTrackers(&instance_ctx.request_pool, bytes_limit);
   RETURN_IF_ERROR(runtime_state_->CreateBlockMgr());
   runtime_state_->InitFilterBank();
 

@@ -24,8 +24,9 @@
 
 #include "catalog/catalog-util.h"
 #include "gen-cpp/beeswax_types.h"
-#include "runtime/mem-tracker.h"
 #include "runtime/exec-env.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "service/impala-server.h"
 #include "service/query-exec-state.h"
 #include "thrift/protocol/TDebugProtocol.h"
@@ -250,20 +251,11 @@ void ImpalaHttpHandler::QueryMemoryHandler(const Webserver::ArgumentMap& args,
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
-  shared_ptr<ImpalaServer::QueryExecState> exec_state =
-      server_->GetQueryExecState(unique_id, true);
+  QueryState::ScopedRef qs(unique_id);
   string mem_usage_text;
-  // Search the in-flight queries, since only in-flight queries have a MemTracker
-  if (exec_state != NULL) {
-    lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
-    // Only queries with coordinator have mem_tracker
-    if (exec_state->coord() == NULL) {
-      mem_usage_text =
-          "The query does not have memory tracking information available.";
-    } else {
-      MemTracker* query_mem_tracker = exec_state->coord()->query_mem_tracker();
-      mem_usage_text = query_mem_tracker->LogUsage();
-    }
+  // Only in-flight queries have a MemTracker to get usage from.
+  if (qs.get() != nullptr) {
+    mem_usage_text = qs->query_mem_tracker()->LogUsage();
   } else {
     mem_usage_text =
         "The query is finished, current memory consumption is not available.";

@@ -38,11 +38,12 @@
 #include "common/status.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
+#include "runtime/query-state.h"
+#include "runtime/runtime-state.h" // for PartitionStatusMap; TODO: disentangle
+#include "scheduling/query-schedule.h"
 #include "util/histogram-metric.h"
 #include "util/progress-updater.h"
 #include "util/runtime-profile.h"
-#include "scheduling/query-schedule.h"
-#include "runtime/runtime-state.h"  // for PartitionStatusMap; TODO: disentangle
 
 namespace impala {
 
@@ -150,6 +151,14 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// to CancelInternal().
   Status UpdateFragmentExecStatus(const TReportExecStatusParams& params);
 
+  /// Returns the query state.
+  /// Only valid to call after Exec() and before TearDown(). The returned
+  /// reference only remains valid until TearDown() is called.
+  QueryState* query_state() const {
+    DCHECK(!torn_down_);
+    return query_state_;
+  }
+
   /// Only valid *after* calling Exec(). Return nullptr if the running query does not
   /// produce any rows.
   ///
@@ -158,18 +167,14 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// class.
   RuntimeState* runtime_state();
 
-  /// Only valid after Exec(). Returns runtime_state()->query_mem_tracker() if there
-  /// is a coordinator fragment, or query_mem_tracker_ (initialized in Exec()) otherwise.
-  ///
-  /// TODO: Remove, see runtime_state().
-  MemTracker* query_mem_tracker();
-
   /// Get cumulative profile aggregated over all fragments of the query.
   /// This is a snapshot of the current state of execution and will change in
   /// the future if not all fragments have finished execution.
   RuntimeProfile* query_profile() const { return query_profile_.get(); }
 
   const TUniqueId& query_id() const { return query_id_; }
+
+  MemTracker* query_mem_tracker() const { return query_state()->query_mem_tracker(); }
 
   /// This is safe to call only after Wait()
   const PartitionStatusMap& per_partition_status() { return per_partition_status_; }
@@ -287,6 +292,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Once this is set to true, errors from remote fragments are ignored.
   bool returned_all_results_;
 
+  /// The QueryState for this coordinator. Set in Exec(). Released in TearDown().
+  QueryState* query_state_;
+
   /// Non-null if and only if the query produces results for the client; i.e. is of
   /// TStmtType::QUERY. Coordinator uses these to pull results from plan tree and return
   /// them to the client in GetNext(), and also to access the fragment instance's runtime
@@ -302,12 +310,6 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Not owned by this class. Set in Exec(). Reset to nullptr in TearDown() or when
   /// GetNext() hits eos.
   PlanRootSink* coord_sink_ = nullptr;
-
-  /// Query mem tracker for this coordinator initialized in Exec(). Only valid if there
-  /// is no coordinator fragment (i.e. executor_ == NULL). If executor_ is not NULL,
-  /// this->runtime_state()->query_mem_tracker() returns the query mem tracker.
-  /// (See this->query_mem_tracker())
-  std::shared_ptr<MemTracker> query_mem_tracker_;
 
   /// owned by plan root, which resides in runtime_state_'s pool
   const RowDescriptor* row_desc_;
@@ -433,7 +435,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   TRuntimeFilterMode::type filter_mode_;
 
   /// Tracks the memory consumed by runtime filters during aggregation. Child of
-  /// query_mem_tracker_.
+  /// the query mem tracker in 'query_state_'.
   std::unique_ptr<MemTracker> filter_mem_tracker_;
 
   /// True if and only if TearDown() has been called.

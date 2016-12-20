@@ -15,22 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_RUNTIME_QUERY_STATE_H
 #define IMPALA_RUNTIME_QUERY_STATE_H
 
-#include <boost/thread/mutex.hpp>
+#include <memory>
 #include <unordered_map>
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread/mutex.hpp>
 
+#include "common/atomic.h"
 #include "common/object-pool.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
 #include "util/uid-util.h"
-#include "common/atomic.h"
 
 namespace impala {
 
 class FragmentInstanceState;
+class MemTracker;
 
 /// Central class for all backend execution state (example: the FragmentInstanceStates
 /// of the individual fragment instances) created for a particular query.
@@ -61,6 +63,8 @@ class QueryState {
   /// }
   class ScopedRef {
    public:
+    /// Looks up the query state with GetQueryState(). The query state is non-NULL if
+    /// the query was already registered.
     ScopedRef(const TUniqueId& query_id);
     ~ScopedRef();
 
@@ -85,6 +89,12 @@ class QueryState {
 
   const TUniqueId& query_id() const { return query_ctx_.query_id; }
 
+  const TQueryOptions& query_options() const {
+    return query_ctx_.client_request.query_options;
+  }
+
+  MemTracker* query_mem_tracker() const { return query_mem_tracker_; }
+
   /// Registers a new FInstanceState.
   void RegisterFInstance(FragmentInstanceState* fis);
 
@@ -92,9 +102,14 @@ class QueryState {
   /// been registered. The returned FIS is valid for the duration of the QueryState.
   FragmentInstanceState* GetFInstanceState(const TUniqueId& instance_id);
 
+  /// Called once the query is complete to release any resources.
+  /// Must be called before destroying the QueryState.
+  void ReleaseResources();
+
+  ~QueryState();
+
  private:
   friend class QueryExecMgr;
-  friend class TestEnv;
 
   static const int DEFAULT_BATCH_SIZE = 1024;
 
@@ -103,15 +118,24 @@ class QueryState {
   ObjectPool obj_pool_;
   AtomicInt32 refcnt_;
 
-  boost::mutex fis_map_lock_;  // protects fis_map_
+  /// True if and only if ReleaseResources() has been called.
+  bool released_resources_;
+
+  boost::mutex fis_map_lock_; // protects fis_map_
 
   /// map from instance id to its state (owned by obj_pool_)
   std::unordered_map<TUniqueId, FragmentInstanceState*> fis_map_;
 
-  /// Create QueryState w/ copy of query_ctx and refcnt of 0.
-  QueryState(const TQueryCtx& query_ctx);
-};
+  /// The top-level MemTracker for this query (owned by obj_pool_).
+  MemTracker* query_mem_tracker_;
 
+  /// Create QueryState w/ copy of query_ctx and refcnt of 0.
+  /// The query is associated with the resource pool named 'pool'
+  QueryState(const TQueryCtx& query_ctx, const std::string& pool);
+
+  /// Called from constructor to initialize MemTrackers.
+  void InitMemTrackers(const std::string& pool);
+};
 }
 
 #endif

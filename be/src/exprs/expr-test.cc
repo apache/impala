@@ -1019,15 +1019,16 @@ void ExprTest::TestTimestampValue(const string& expr, const TimestampValue& expe
 // Tests whether the returned TimestampValue is valid.
 // We use this function for tests where the expected value is unknown, e.g., now().
 void ExprTest::TestValidTimestampValue(const string& expr) {
-  EXPECT_TRUE(ConvertValue<TimestampValue>(GetValue(expr, TYPE_TIMESTAMP))
-      .HasDateOrTime());
+  EXPECT_TRUE(
+      ConvertValue<TimestampValue>(GetValue(expr, TYPE_TIMESTAMP)).HasDateOrTime());
 }
 
-template <typename T> void TestSingleLiteralConstruction(
+template <typename T>
+void TestSingleLiteralConstruction(
     const ColumnType& type, const T& value, const string& string_val) {
   ObjectPool pool;
   RowDescriptor desc;
-  RuntimeState state{TQueryCtx()};
+  RuntimeState state{TQueryCtx(), ExecEnv::GetInstance(), "test-pool"};
   MemTracker tracker;
 
   Expr* expr = pool.Add(new Literal(type, value));
@@ -1037,18 +1038,20 @@ template <typename T> void TestSingleLiteralConstruction(
   EXPECT_EQ(0, RawValue::Compare(ctx.GetValue(NULL), &value, type))
       << "type: " << type << ", value: " << value;
   ctx.Close(&state);
+  state.ReleaseResources();
 }
 
 TEST_F(ExprTest, NullLiteral) {
   for (int type = TYPE_BOOLEAN; type != TYPE_DATE; ++type) {
     NullLiteral expr(static_cast<PrimitiveType>(type));
     ExprContext ctx(&expr);
-    RuntimeState state{TQueryCtx()};
+    RuntimeState state{TQueryCtx(), ExecEnv::GetInstance(), "test-pool"};
     MemTracker tracker;
     EXPECT_OK(ctx.Prepare(&state, RowDescriptor(), &tracker));
     EXPECT_OK(ctx.Open(&state));
     EXPECT_TRUE(ctx.GetValue(NULL) == NULL);
     ctx.Close(&state);
+    state.ReleaseResources();
   }
 }
 

@@ -137,6 +137,7 @@ ExecEnv::ExecEnv()
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver()),
     mem_tracker_(NULL),
+    pool_mem_trackers_(new PoolMemTrackerRegistry),
     thread_mgr_(new ThreadResourceMgr),
     hdfs_op_thread_pool_(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
@@ -191,6 +192,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver(webserver_port)),
     mem_tracker_(NULL),
+    pool_mem_trackers_(new PoolMemTrackerRegistry),
     thread_mgr_(new ThreadResourceMgr),
     hdfs_op_thread_pool_(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),

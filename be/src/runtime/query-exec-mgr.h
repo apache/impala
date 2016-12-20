@@ -31,6 +31,7 @@ namespace impala {
 class QueryState;
 class Thread;
 class TExecPlanFragmentParams;
+class TQueryCtx;
 class TUniqueId;
 class FragmentInstanceState;
 
@@ -55,6 +56,12 @@ class QueryExecMgr {
   /// return value of this function.
   Status StartFInstance(const TExecPlanFragmentParams& params);
 
+  /// Creates and the QueryState for the given query with the provided parameters. Only
+  /// valid to call if the QueryState does not already exist. The caller must call
+  /// ReleaseQueryState() with the returned QueryState to decrement the refcount.
+  QueryState* CreateQueryState(
+      const TQueryCtx& query_ctx, const std::string& request_pool);
+
   /// If a QueryState for the given query exists, increments that refcount and returns
   /// the QueryState, otherwise returns nullptr.
   QueryState* GetQueryState(const TUniqueId& query_id);
@@ -69,10 +76,14 @@ class QueryExecMgr {
   /// map from query id to QueryState (owned by us)
   std::unordered_map<TUniqueId, QueryState*> qs_map_;
 
+  /// Gets the existing QueryState or creates a new one if not present.
+  /// 'created' is set to true if it was created, false otherwise.
+  QueryState* GetOrCreateQueryState(
+      const TQueryCtx& query_ctx, const std::string& request_pool, bool* created);
+
   /// Execute instance.
   void ExecFInstance(FragmentInstanceState* fis);
 };
-
 }
 
 #endif

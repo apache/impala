@@ -113,16 +113,15 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
 
 class DataStreamTest : public testing::Test {
  protected:
-  DataStreamTest()
-    : runtime_state_(TQueryCtx(), &exec_env_),
-      next_val_(0) {
-    // Initialize Mem trackers for use by the data stream receiver.
+  DataStreamTest() : next_val_(0) {
+    // Initialize MemTrackers and RuntimeState for use by the data stream receiver.
     exec_env_.InitForFeTests();
-    runtime_state_.InitMemTrackers(NULL, -1);
+    runtime_state_.reset(new RuntimeState(TQueryCtx(), &exec_env_, "test-pool"));
 
     // Stop tests that rely on mismatched sender / receiver pairs timing out from failing.
     FLAGS_datastream_sender_timeout_ms = 250;
   }
+  ~DataStreamTest() { runtime_state_->ReleaseResources(); }
 
   virtual void SetUp() {
     CreateRowDesc();
@@ -191,7 +190,7 @@ class DataStreamTest : public testing::Test {
   const RowDescriptor* row_desc_;
   TupleRowComparator* less_than_;
   ExecEnv exec_env_;
-  RuntimeState runtime_state_;
+  scoped_ptr<RuntimeState> runtime_state_;
   TUniqueId next_instance_id_;
   string stmt_;
 
@@ -277,7 +276,7 @@ class DataStreamTest : public testing::Test {
     slot_desc.__set_slotIdx(0);
     thrift_desc_tbl.slotDescriptors.push_back(slot_desc);
     EXPECT_OK(DescriptorTbl::Create(&obj_pool_, thrift_desc_tbl, &desc_tbl_));
-    runtime_state_.set_desc_tbl(desc_tbl_);
+    runtime_state_->set_desc_tbl(desc_tbl_);
 
     vector<TTupleId> row_tids;
     row_tids.push_back(0);
@@ -337,10 +336,8 @@ class DataStreamTest : public testing::Test {
     GetNextInstanceId(&instance_id);
     receiver_info_.push_back(ReceiverInfo(stream_type, num_senders, receiver_num));
     ReceiverInfo& info = receiver_info_.back();
-    info.stream_recvr =
-        stream_mgr_->CreateRecvr(&runtime_state_,
-            *row_desc_, instance_id, DEST_NODE_ID, num_senders, buffer_size, profile,
-            is_merging);
+    info.stream_recvr = stream_mgr_->CreateRecvr(runtime_state_.get(), *row_desc_,
+        instance_id, DEST_NODE_ID, num_senders, buffer_size, profile, is_merging);
     if (!is_merging) {
       info.thread_handle = new thread(&DataStreamTest::ReadStream, this, &info);
     } else {
@@ -481,11 +478,10 @@ class DataStreamTest : public testing::Test {
     }
   }
 
-  void Sender(int sender_num, int channel_buffer_size,
-              TPartitionType::type partition_type) {
-    RuntimeState state(TQueryCtx(), &exec_env_);
+  void Sender(
+      int sender_num, int channel_buffer_size, TPartitionType::type partition_type) {
+    RuntimeState state(TQueryCtx(), &exec_env_, "test-pool");
     state.set_desc_tbl(desc_tbl_);
-    state.InitMemTrackers(NULL, -1);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataStreamSink& sink = GetSink(partition_type);
     DataStreamSender sender(
@@ -507,10 +503,11 @@ class DataStreamTest : public testing::Test {
     info.num_bytes_sent = sender.GetNumDataBytesSent();
 
     batch->Reset();
+    state.ReleaseResources();
   }
 
-  void TestStream(TPartitionType::type stream_type, int num_senders,
-                  int num_receivers, int buffer_size, bool is_merging) {
+  void TestStream(TPartitionType::type stream_type, int num_senders, int num_receivers,
+      int buffer_size, bool is_merging) {
     VLOG_QUERY << "Testing stream=" << stream_type << " #senders=" << num_senders
                << " #receivers=" << num_receivers << " buffer_size=" << buffer_size
                << " is_merging=" << is_merging;
@@ -596,9 +593,8 @@ TEST_F(DataStreamTest, BasicTest) {
 //
 // TODO: Make lifecycle requirements more explicit.
 TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
-  scoped_ptr<RuntimeState> runtime_state(new RuntimeState(TQueryCtx(), &exec_env_));
-  runtime_state->InitMemTrackers(NULL, -1);
-
+  scoped_ptr<RuntimeState> runtime_state(
+      new RuntimeState(TQueryCtx(), &exec_env_, "test-pool"));
   scoped_ptr<RuntimeProfile> profile(new RuntimeProfile(&obj_pool_, "TestReceiver"));
 
   // Start just one receiver.
@@ -612,6 +608,7 @@ TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
   stream_recvr->Close();
 
   // Force deletion of the parent memtracker by destroying it's owning runtime state.
+  runtime_state->ReleaseResources();
   runtime_state.reset();
 
   // Send an eos RPC to the receiver. Not required for tear-down, but confirms that the

@@ -71,53 +71,42 @@ static const int64_t BLOCK_MGR_MEM_MIN_REMAINING = 100 * 1024 * 1024;
 
 namespace impala {
 
-RuntimeState::RuntimeState(
-    QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
+RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
     const TPlanFragmentInstanceCtx& instance_ctx, ExecEnv* exec_env)
   : desc_tbl_(nullptr),
     obj_pool_(new ObjectPool()),
     query_state_(query_state),
     fragment_ctx_(&fragment_ctx),
     instance_ctx_(&instance_ctx),
-    now_(new TimestampValue(
-        query_state->query_ctx().now_string.c_str(),
+    now_(new TimestampValue(query_state->query_ctx().now_string.c_str(),
         query_state->query_ctx().now_string.size())),
     exec_env_(exec_env),
     profile_(obj_pool_.get(), "Fragment " + PrintId(instance_ctx.fragment_instance_id)),
+    query_mem_tracker_(query_state_->query_mem_tracker()),
     is_cancelled_(false),
     root_node_id_(-1) {
   Init();
 }
 
-RuntimeState::RuntimeState(const TQueryCtx& query_ctx, ExecEnv* exec_env)
+RuntimeState::RuntimeState(
+    const TQueryCtx& query_ctx, ExecEnv* exec_env, const std::string& request_pool)
   : obj_pool_(new ObjectPool()),
     query_state_(nullptr),
     fragment_ctx_(nullptr),
     instance_ctx_(nullptr),
     local_query_ctx_(query_ctx),
     now_(new TimestampValue(query_ctx.now_string.c_str(), query_ctx.now_string.size())),
-    exec_env_(exec_env == nullptr ? ExecEnv::GetInstance() : exec_env),
+    exec_env_(exec_env),
     profile_(obj_pool_.get(), "<unnamed>"),
+    query_mem_tracker_(MemTracker::CreateQueryMemTracker(
+        query_id(), query_options(), request_pool, obj_pool_.get())),
     is_cancelled_(false),
     root_node_id_(-1) {
   Init();
 }
 
 RuntimeState::~RuntimeState() {
-  block_mgr_.reset();
-
-  // Release codegen memory before tearing down trackers.
-  codegen_.reset();
-
-  // query_mem_tracker_ must be valid as long as instance_mem_tracker_ is so
-  // delete instance_mem_tracker_ first.
-  // LogUsage() walks the MemTracker tree top-down when the memory limit is exceeded.
-  // Break the link between the instance_mem_tracker and its parent (query_mem_tracker_)
-  // before the instance_mem_tracker_ and its children are destroyed.
-  // May be NULL if InitMemTrackers() is not called, for example from tests.
-  if (instance_mem_tracker_ != NULL) instance_mem_tracker_->UnregisterFromParent();
-  instance_mem_tracker_.reset();
-  query_mem_tracker_.reset();
+  DCHECK(instance_mem_tracker_ == nullptr) << "Must call ReleaseResources()";
 }
 
 void RuntimeState::Init() {
@@ -133,18 +122,9 @@ void RuntimeState::Init() {
   total_storage_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalStorageWaitTime");
   total_network_send_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkSendTime");
   total_network_receive_timer_ = ADD_TIMER(runtime_profile(), "TotalNetworkReceiveTime");
-}
 
-void RuntimeState::InitMemTrackers(const string* pool_name, int64_t query_bytes_limit) {
-  MemTracker* query_parent_tracker = exec_env_->process_mem_tracker();
-  if (pool_name != NULL) {
-    query_parent_tracker = MemTracker::GetRequestPoolMemTracker(*pool_name,
-        query_parent_tracker);
-  }
-  query_mem_tracker_ =
-      MemTracker::GetQueryMemTracker(query_id(), query_bytes_limit, query_parent_tracker);
   instance_mem_tracker_.reset(new MemTracker(
-      runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker_.get()));
+      runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker_));
 }
 
 void RuntimeState::InitFilterBank() {
@@ -236,10 +216,10 @@ Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
   return Status::OK();
 }
 
-void RuntimeState::LogMemLimitExceeded(const MemTracker* tracker,
-    int64_t failed_allocation_size) {
+void RuntimeState::LogMemLimitExceeded(
+    const MemTracker* tracker, int64_t failed_allocation_size) {
   DCHECK_GE(failed_allocation_size, 0);
-  DCHECK(query_mem_tracker_.get() != NULL);
+  DCHECK(query_mem_tracker_ != NULL);
   stringstream ss;
   ss << "Memory Limit Exceeded by fragment: " << fragment_instance_id() << endl;
   if (failed_allocation_size != 0) {
@@ -281,7 +261,10 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
 }
 
 Status RuntimeState::CheckQueryState() {
-  if (UNLIKELY(instance_mem_tracker_->AnyLimitExceeded())) return SetMemLimitExceeded();
+  if (instance_mem_tracker_ != nullptr
+      && UNLIKELY(instance_mem_tracker_->AnyLimitExceeded())) {
+    return SetMemLimitExceeded();
+  }
   return GetQueryStatus();
 }
 
@@ -305,6 +288,20 @@ void RuntimeState::ReleaseResources() {
   if (resource_pool_ != nullptr) {
     exec_env_->thread_mgr()->UnregisterPool(resource_pool_);
   }
+  block_mgr_.reset(); // Release any block mgr memory, if this is the last reference.
+  codegen_.reset(); // Release any memory associated with codegen.
+
+  // 'query_mem_tracker_' must be valid as long as 'instance_mem_tracker_' is so
+  // delete 'instance_mem_tracker_' first.
+  // LogUsage() walks the MemTracker tree top-down when the memory limit is exceeded, so
+  // break the link between 'instance_mem_tracker_' and its parent before
+  // 'instance_mem_tracker_' and its children are destroyed.
+  instance_mem_tracker_->UnregisterFromParent();
+  instance_mem_tracker_.reset();
+
+  // If this RuntimeState owns 'query_mem_tracker_' it must deregister it.
+  if (query_state_ == nullptr) query_mem_tracker_->UnregisterFromParent();
+  query_mem_tracker_ = nullptr;
 }
 
 const std::string& RuntimeState::GetEffectiveUser() const {

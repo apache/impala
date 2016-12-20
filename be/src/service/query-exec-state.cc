@@ -551,6 +551,10 @@ void ImpalaServer::QueryExecState::Done() {
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   query_events_->MarkEvent("Unregister query");
 
+  // Update result set cache metrics, and update mem limit accounting before tearing
+  // down the coordinator.
+  ClearResultCache();
+
   if (coord_.get() != NULL) {
     // Release any reserved resources.
     Status status = exec_env_->scheduler()->Release(schedule_.get());
@@ -560,9 +564,6 @@ void ImpalaServer::QueryExecState::Done() {
     }
     coord_->TearDown();
   }
-
-  // Update result set cache metrics, and update mem limit accounting.
-  ClearResultCache();
 }
 
 Status ImpalaServer::QueryExecState::Exec(const TMetadataOpRequest& exec_request) {
@@ -1056,5 +1057,4 @@ void ImpalaServer::QueryExecState::ClearResultCache() {
   }
   result_cache_.reset(NULL);
 }
-
 }

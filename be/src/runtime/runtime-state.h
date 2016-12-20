@@ -81,20 +81,13 @@ class RuntimeState {
       const TPlanFragmentInstanceCtx& instance_ctx, ExecEnv* exec_env);
 
   /// RuntimeState for executing expr in fe-support.
-  RuntimeState(const TQueryCtx& query_ctx, ExecEnv* exec_env = nullptr);
+  RuntimeState(
+      const TQueryCtx& query_ctx, ExecEnv* exec_env, const std::string& request_pool);
 
   /// Empty d'tor to avoid issues with scoped_ptr.
   ~RuntimeState();
 
-  /// Set up five-level hierarchy of mem trackers: process, pool, query, fragment
-  /// instance. The instance tracker is tied to our profile. Specific parts of the
-  /// fragment (i.e. exec nodes, sinks, data stream senders, etc) will add a fifth level
-  /// when they are initialized. This function also initializes a user function mem
-  /// tracker (in the fifth level). If 'request_pool' is null, no request pool mem
-  /// tracker is set up, i.e. query pools will have the process mem pool as the parent.
-  void InitMemTrackers(const std::string* request_pool, int64_t query_bytes_limit);
-
-  /// Initializes the runtime filter bank. Must be called after InitMemTrackers().
+  /// Initializes the runtime filter bank.
   void InitFilterBank();
 
   /// Gets/Creates the query wide block mgr.
@@ -133,7 +126,7 @@ class RuntimeState {
   CatalogServiceClientCache* catalogd_client_cache();
   DiskIoMgr* io_mgr();
   MemTracker* instance_mem_tracker() { return instance_mem_tracker_.get(); }
-  MemTracker* query_mem_tracker() { return query_mem_tracker_.get(); }
+  MemTracker* query_mem_tracker() { return query_mem_tracker_; }
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
@@ -299,7 +292,8 @@ class RuntimeState {
 
   /// Returns a non-OK status if query execution should stop (e.g., the query was
   /// cancelled or a mem limit was exceeded). Exec nodes should check this periodically so
-  /// execution doesn't continue if the query terminates abnormally.
+  /// execution doesn't continue if the query terminates abnormally. This can be called
+  /// after ReleaseResources().
   Status CheckQueryState();
 
   /// Create a codegen object accessible via codegen() if it doesn't exist already.
@@ -383,11 +377,11 @@ class RuntimeState {
   /// Total CPU utilization for all threads in this plan fragment.
   RuntimeProfile::ThreadCounters* total_thread_statistics_;
 
-  /// MemTracker that is shared by all fragment instances running on this host.
-  /// The query mem tracker must be released after the instance_mem_tracker_.
-  std::shared_ptr<MemTracker> query_mem_tracker_;
+  /// Reference to the query MemTracker, owned by 'query_state_' if that is non-NULL
+  /// or stored in 'obj_pool_' otherwise.
+  MemTracker* query_mem_tracker_;
 
-  /// Memory usage of this fragment instance
+  /// Memory usage of this fragment instance, a child of 'query_mem_tracker_'.
   boost::scoped_ptr<MemTracker> instance_mem_tracker_;
 
   /// if true, execution should stop with a CANCELLED status

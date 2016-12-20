@@ -38,9 +38,6 @@ using namespace strings;
 namespace impala {
 
 const string MemTracker::COUNTER_NAME = "PeakMemoryUsage";
-MemTracker::RequestTrackersMap MemTracker::request_to_mem_trackers_;
-MemTracker::PoolTrackersMap MemTracker::pool_to_mem_trackers_;
-SpinLock MemTracker::static_mem_trackers_lock_;
 
 AtomicInt64 MemTracker::released_memory_since_gc_;
 
@@ -55,7 +52,6 @@ MemTracker::MemTracker(
     consumption_(&local_counter_),
     local_counter_(TUnit::BYTES),
     consumption_metric_(NULL),
-    auto_unregister_(false),
     log_usage_if_zero_(log_usage_if_zero),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
@@ -73,7 +69,6 @@ MemTracker::MemTracker(RuntimeProfile* profile, int64_t byte_limit,
     consumption_(profile->AddHighWaterMarkCounter(COUNTER_NAME, TUnit::BYTES)),
     local_counter_(TUnit::BYTES),
     consumption_metric_(NULL),
-    auto_unregister_(false),
     log_usage_if_zero_(true),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
@@ -91,7 +86,6 @@ MemTracker::MemTracker(
     consumption_(&local_counter_),
     local_counter_(TUnit::BYTES),
     consumption_metric_(consumption_metric),
-    auto_unregister_(false),
     log_usage_if_zero_(true),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
@@ -133,7 +127,7 @@ void MemTracker::EnableReservationReporting(const ReservationTrackerCounters& co
 int64_t MemTracker::GetPoolMemReserved() const {
   // Pool trackers should have a pool_name_ and no limit.
   DCHECK(!pool_name_.empty());
-  DCHECK_EQ(limit_, -1);
+  DCHECK_EQ(limit_, -1) << LogUsage("");
 
   int64_t mem_reserved = 0L;
   lock_guard<mutex> l(child_trackers_lock_);
@@ -144,40 +138,42 @@ int64_t MemTracker::GetPoolMemReserved() const {
       // Make sure we don't overflow if the query limits are set to ridiculous values.
       mem_reserved += std::min(child_limit, MemInfo::physical_mem());
     } else {
-      DCHECK_EQ(child_limit, -1);
+      DCHECK_EQ(child_limit, -1) << (*it)->LogUsage("");
       mem_reserved += (*it)->consumption();
     }
   }
   return mem_reserved;
 }
 
-MemTracker* MemTracker::GetRequestPoolMemTracker(const string& pool_name,
-    MemTracker* parent) {
+MemTracker* PoolMemTrackerRegistry::GetRequestPoolMemTracker(
+    const string& pool_name, bool create_if_not_present) {
   DCHECK(!pool_name.empty());
-  lock_guard<SpinLock> l(static_mem_trackers_lock_);
+  lock_guard<SpinLock> l(pool_to_mem_trackers_lock_);
   PoolTrackersMap::iterator it = pool_to_mem_trackers_.find(pool_name);
   if (it != pool_to_mem_trackers_.end()) {
     MemTracker* tracker = it->second;
     DCHECK(pool_name == tracker->pool_name_);
     return tracker;
-  } else {
-    if (parent == NULL) return NULL;
-    // First time this pool_name registered, make a new object.
-    MemTracker* tracker = new MemTracker(
-        -1, Substitute(REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT, pool_name), parent);
-    tracker->auto_unregister_ = true;
-    tracker->pool_name_ = pool_name;
-    pool_to_mem_trackers_[pool_name] = tracker;
-    return tracker;
   }
+  if (!create_if_not_present) return nullptr;
+  // First time this pool_name registered, make a new object.
+  MemTracker* tracker =
+      new MemTracker(-1, Substitute(REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT, pool_name),
+          ExecEnv::GetInstance()->process_mem_tracker());
+  tracker->pool_name_ = pool_name;
+  pool_to_mem_trackers_[pool_name] = tracker;
+  return tracker;
 }
 
-shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
-    const TUniqueId& id, int64_t byte_limit, MemTracker* parent) {
+MemTracker* MemTracker::CreateQueryMemTracker(const TUniqueId& id,
+    const TQueryOptions& query_options, const string& pool_name, ObjectPool* obj_pool) {
+  int64_t byte_limit = -1;
+  if (query_options.__isset.mem_limit && query_options.mem_limit > 0) {
+    byte_limit = query_options.mem_limit;
+  }
   if (byte_limit != -1) {
     if (byte_limit > MemInfo::physical_mem()) {
-      LOG(WARNING) << "Memory limit "
-                   << PrettyPrinter::Print(byte_limit, TUnit::BYTES)
+      LOG(WARNING) << "Memory limit " << PrettyPrinter::Print(byte_limit, TUnit::BYTES)
                    << " exceeds physical memory of "
                    << PrettyPrinter::Print(MemInfo::physical_mem(), TUnit::BYTES);
     }
@@ -185,37 +181,19 @@ shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
                << PrettyPrinter::Print(byte_limit, TUnit::BYTES);
   }
 
-  lock_guard<SpinLock> l(static_mem_trackers_lock_);
-  RequestTrackersMap::iterator it = request_to_mem_trackers_.find(id);
-  if (it != request_to_mem_trackers_.end()) {
-    // Return the existing MemTracker object for this id, converting the weak ptr
-    // to a shared ptr.
-    shared_ptr<MemTracker> tracker = it->second.lock();
-    DCHECK_EQ(tracker->limit_, byte_limit);
-    DCHECK(id == tracker->query_id_);
-    DCHECK(parent == tracker->parent_);
-    return tracker;
-  } else {
-    // First time this id registered, make a new object.  Give a shared ptr to
-    // the caller and put a weak ptr in the map.
-    shared_ptr<MemTracker> tracker = make_shared<MemTracker>(
-        byte_limit, Substitute("Query($0)", lexical_cast<string>(id)), parent);
-    tracker->auto_unregister_ = true;
-    tracker->query_id_ = id;
-    request_to_mem_trackers_[id] = tracker;
-    return tracker;
-  }
+  MemTracker* pool_tracker =
+      ExecEnv::GetInstance()->pool_mem_trackers()->GetRequestPoolMemTracker(
+          pool_name, true);
+  MemTracker* tracker = obj_pool->Add(new MemTracker(
+      byte_limit, Substitute("Query($0)", lexical_cast<string>(id)), pool_tracker));
+  tracker->query_id_ = id;
+  return tracker;
 }
 
 MemTracker::~MemTracker() {
-  DCHECK_EQ(consumption_->current_value(), 0) << label_ << "\n" << GetStackTrace();
-  lock_guard<SpinLock> l(static_mem_trackers_lock_);
-  if (auto_unregister_) UnregisterFromParent();
-  // Erase the weak ptr reference from the map.
-  request_to_mem_trackers_.erase(query_id_);
-  // Per-pool trackers should live the entire lifetime of the impalad process, but
-  // remove the element from the map in case this changes in the future.
-  pool_to_mem_trackers_.erase(pool_name_);
+  DCHECK_EQ(consumption_->current_value(), 0) << label_ << "\n"
+                                              << GetStackTrace() << "\n"
+                                              << LogUsage("");
 }
 
 void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
