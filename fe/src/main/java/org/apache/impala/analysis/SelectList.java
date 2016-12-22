@@ -22,13 +22,14 @@ import java.util.List;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.rewrite.ExprRewriter;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
  * Select list items plus optional distinct clause and optional plan hints.
  */
 public class SelectList {
-  private List<String> planHints_;
+  private List<PlanHint> planHints_ = Lists.newArrayList();;
   private boolean isDistinct_;
 
   /////////////////////////////////////////
@@ -50,7 +51,7 @@ public class SelectList {
   }
 
   public SelectList(List<SelectListItem> items, boolean isDistinct,
-      List<String> planHints) {
+      List<PlanHint> planHints) {
     isDistinct_ = isDistinct;
     items_ = items;
     planHints_ = planHints;
@@ -60,8 +61,7 @@ public class SelectList {
    * C'tor for cloning.
    */
   public SelectList(SelectList other) {
-    planHints_ =
-        (other.planHints_ != null) ? Lists.newArrayList(other.planHints_) : null;
+    planHints_ = Lists.newArrayList(other.planHints_);
     items_ = Lists.newArrayList();
     for (SelectListItem item: other.items_) {
       items_.add(item.clone());
@@ -70,16 +70,20 @@ public class SelectList {
   }
 
   public List<SelectListItem> getItems() { return items_; }
-  public void setPlanHints(List<String> planHints) { planHints_ = planHints; }
-  public List<String> getPlanHints() { return planHints_; }
+
+  public void setPlanHints(List<PlanHint> planHints) {
+    Preconditions.checkNotNull(planHints);
+    planHints_ = planHints;
+  }
+
+  public List<PlanHint> getPlanHints() { return planHints_; }
   public boolean isDistinct() { return isDistinct_; }
   public void setIsDistinct(boolean value) { isDistinct_ = value; }
-  public boolean hasPlanHints() { return planHints_ != null; }
+  public boolean hasPlanHints() { return !planHints_.isEmpty(); }
 
   public void analyzePlanHints(Analyzer analyzer) {
-    if (planHints_ == null) return;
-    for (String hint: planHints_) {
-      if (!hint.equalsIgnoreCase("straight_join")) {
+    for (PlanHint hint: planHints_) {
+      if (!hint.is("straight_join")) {
         analyzer.addWarning("PLAN hint not recognized: " + hint);
       }
       analyzer.setIsStraightJoin();

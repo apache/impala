@@ -64,7 +64,7 @@ public class InsertStmt extends StatementBase {
   private final List<PartitionKeyValue> partitionKeyValues_;
 
   // User-supplied hints to control hash partitioning before the table sink in the plan.
-  private final List<String> planHints_;
+  private List<PlanHint> planHints_ = Lists.newArrayList();
 
   // False if the original insert statement had a query statement, true if we need to
   // auto-generate one (for insert into tbl()) during analysis.
@@ -124,6 +124,14 @@ public class InsertStmt extends StatementBase {
   // clustering step.
   private boolean hasClusteredHint_ = false;
 
+  // For every column of the target table that is referenced in the optional 'sortby()'
+  // hint, this list will contain the corresponding result expr from 'resultExprs_'.
+  // Before insertion, all rows will be sorted by these exprs. If the list is empty, no
+  // additional sorting by non-partitioning columns will be performed. For Hdfs tables,
+  // the 'sortby()' hint must not contain partition columns. For Kudu tables, it must not
+  // contain primary key columns.
+  private List<Expr> sortByExprs_ = Lists.newArrayList();
+
   // Output expressions that produce the final results to write to the target table. May
   // include casts. Set in prepareExpressions().
   // If this is an INSERT on a non-Kudu table, it will contain one Expr for all
@@ -153,19 +161,19 @@ public class InsertStmt extends StatementBase {
 
   public static InsertStmt createInsert(WithClause withClause, TableName targetTable,
       boolean overwrite, List<PartitionKeyValue> partitionKeyValues,
-      List<String> planHints, QueryStmt queryStmt, List<String> columnPermutation) {
+      List<PlanHint> planHints, QueryStmt queryStmt, List<String> columnPermutation) {
     return new InsertStmt(withClause, targetTable, overwrite, partitionKeyValues,
         planHints, queryStmt, columnPermutation, false);
   }
 
   public static InsertStmt createUpsert(WithClause withClause, TableName targetTable,
-      List<String> planHints, QueryStmt queryStmt, List<String> columnPermutation) {
+      List<PlanHint> planHints, QueryStmt queryStmt, List<String> columnPermutation) {
     return new InsertStmt(withClause, targetTable, false, null, planHints, queryStmt,
         columnPermutation, true);
   }
 
   protected InsertStmt(WithClause withClause, TableName targetTable, boolean overwrite,
-      List<PartitionKeyValue> partitionKeyValues, List<String> planHints,
+      List<PartitionKeyValue> partitionKeyValues, List<PlanHint> planHints,
       QueryStmt queryStmt, List<String> columnPermutation, boolean isUpsert) {
     Preconditions.checkState(!isUpsert || (!overwrite && partitionKeyValues == null));
     withClause_ = withClause;
@@ -173,7 +181,7 @@ public class InsertStmt extends StatementBase {
     originalTableName_ = targetTableName_;
     overwrite_ = overwrite;
     partitionKeyValues_ = partitionKeyValues;
-    planHints_ = planHints;
+    planHints_ = (planHints != null) ? planHints : new ArrayList<PlanHint>();
     queryStmt_ = queryStmt;
     needsGeneratedQueryStatement_ = (queryStmt == null);
     columnPermutation_ = columnPermutation;
@@ -210,6 +218,7 @@ public class InsertStmt extends StatementBase {
     hasShuffleHint_ = false;
     hasNoShuffleHint_ = false;
     hasClusteredHint_ = false;
+    sortByExprs_.clear();
     resultExprs_.clear();
     mentionedColumns_.clear();
     primaryKeyExprs_.clear();
@@ -729,24 +738,26 @@ public class InsertStmt extends StatementBase {
   }
 
   private void analyzePlanHints(Analyzer analyzer) throws AnalysisException {
-    if (planHints_ == null) return;
     if (!planHints_.isEmpty() && table_ instanceof HBaseTable) {
-      throw new AnalysisException("INSERT hints are only supported for inserting into " +
-          "Hdfs and Kudu tables.");
+      throw new AnalysisException(String.format("INSERT hints are only supported for " +
+          "inserting into Hdfs and Kudu tables: %s", getTargetTableName()));
     }
     boolean hasNoClusteredHint = false;
-    for (String hint: planHints_) {
-      if (hint.equalsIgnoreCase("SHUFFLE")) {
+    for (PlanHint hint: planHints_) {
+      if (hint.is("SHUFFLE")) {
         hasShuffleHint_ = true;
         analyzer.setHasPlanHints();
-      } else if (hint.equalsIgnoreCase("NOSHUFFLE")) {
+      } else if (hint.is("NOSHUFFLE")) {
         hasNoShuffleHint_ = true;
         analyzer.setHasPlanHints();
-      } else if (hint.equalsIgnoreCase("CLUSTERED")) {
+      } else if (hint.is("CLUSTERED")) {
         hasClusteredHint_ = true;
         analyzer.setHasPlanHints();
-      } else if (hint.equalsIgnoreCase("NOCLUSTERED")) {
+      } else if (hint.is("NOCLUSTERED")) {
         hasNoClusteredHint = true;
+        analyzer.setHasPlanHints();
+      } else if (hint.is("SORTBY")) {
+        analyzeSortByHint(hint);
         analyzer.setHasPlanHints();
       } else {
         analyzer.addWarning("INSERT hint not recognized: " + hint);
@@ -761,6 +772,51 @@ public class InsertStmt extends StatementBase {
     }
   }
 
+  private void analyzeSortByHint(PlanHint hint) throws AnalysisException {
+    // HBase tables don't support insert hints at all (must be enforced by the caller).
+    Preconditions.checkState(!(table_ instanceof HBaseTable));
+
+    if (isUpsert_) {
+      throw new AnalysisException("SORTBY hint is not supported in UPSERT statements.");
+    }
+
+    List<String> columnNames = hint.getArgs();
+    Preconditions.checkState(!columnNames.isEmpty());
+    for (String columnName: columnNames) {
+      // Make sure it's not a Kudu primary key column or Hdfs partition column.
+      if (table_ instanceof KuduTable) {
+        KuduTable kuduTable = (KuduTable) table_;
+        if (kuduTable.isPrimaryKeyColumn(columnName)) {
+          throw new AnalysisException(String.format("SORTBY hint column list must not " +
+              "contain Kudu primary key column: '%s'", columnName));
+        }
+      } else {
+        for (Column tableColumn: table_.getClusteringColumns()) {
+          if (tableColumn.getName().equals(columnName)) {
+            throw new AnalysisException(String.format("SORTBY hint column list must " +
+                "not contain Hdfs partition column: '%s'", columnName));
+          }
+        }
+      }
+
+      // Find the matching column in the target table's column list (by name) and store
+      // the corresponding result expr in sortByExprs_.
+      boolean foundColumn = false;
+      List<Column> columns = table_.getNonClusteringColumns();
+      for (int i = 0; i < columns.size(); ++i) {
+        if (columns.get(i).getName().equals(columnName)) {
+          sortByExprs_.add(resultExprs_.get(i));
+          foundColumn = true;
+          break;
+        }
+      }
+      if (!foundColumn) {
+        throw new AnalysisException(String.format("Could not find SORTBY hint column " +
+            "'%s' in table.", columnName));
+      }
+    }
+  }
+
   @Override
   public ArrayList<Expr> getResultExprs() { return resultExprs_; }
 
@@ -772,7 +828,7 @@ public class InsertStmt extends StatementBase {
 
   private String getOpName() { return isUpsert_ ? "UPSERT" : "INSERT"; }
 
-  public List<String> getPlanHints() { return planHints_; }
+  public List<PlanHint> getPlanHints() { return planHints_; }
   public TableName getTargetTableName() { return targetTableName_; }
   public Table getTargetTable() { return table_; }
   public void setTargetTable(Table table) { this.table_ = table; }
@@ -788,6 +844,7 @@ public class InsertStmt extends StatementBase {
   public boolean hasNoShuffleHint() { return hasNoShuffleHint_; }
   public boolean hasClusteredHint() { return hasClusteredHint_; }
   public ArrayList<Expr> getPrimaryKeyExprs() { return primaryKeyExprs_; }
+  public List<Expr> getSortByExprs() { return sortByExprs_; }
 
   public List<String> getMentionedColumns() {
     List<String> result = Lists.newArrayList();
@@ -812,6 +869,7 @@ public class InsertStmt extends StatementBase {
     resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
     partitionKeyExprs_ = Expr.substituteList(partitionKeyExprs_, smap, analyzer, true);
     primaryKeyExprs_ = Expr.substituteList(primaryKeyExprs_, smap, analyzer, true);
+    sortByExprs_ = Expr.substituteList(sortByExprs_, smap, analyzer, true);
   }
 
   @Override
@@ -840,8 +898,8 @@ public class InsertStmt extends StatementBase {
       }
       strBuilder.append(" PARTITION (" + Joiner.on(", ").join(values) + ")");
     }
-    if (planHints_ != null) {
-      strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(planHints_));
+    if (!planHints_.isEmpty()) {
+      strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(getPlanHints()));
     }
     if (!needsGeneratedQueryStatement_) {
       strBuilder.append(" " + queryStmt_.toSql());

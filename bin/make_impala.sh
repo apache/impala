@@ -170,7 +170,6 @@ if [ $CMAKE_ONLY -eq 1 ]; then
   exit 0
 fi
 
-MAKE_ARGS=-j${IMPALA_BUILD_THREADS:-4}
 if [ $BUILD_FE_ONLY -eq 1 ]; then
   ${MAKE_CMD} ${MAKE_ARGS} fe
 elif [ $BUILD_EVERYTHING -eq 1 ]; then

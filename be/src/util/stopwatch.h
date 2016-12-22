@@ -170,7 +170,7 @@ class MonotonicStopWatch {
     // Now() can be called frequently (IMPALA-2407).
     timespec ts;
     clock_gettime(OsInfo::fast_clock(), &ts);
-    return ts.tv_sec * 1e9 + ts.tv_nsec;
+    return ts.tv_sec * NANOS_PER_SEC + ts.tv_nsec;
 #endif
   }
 

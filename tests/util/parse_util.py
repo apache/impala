@@ -52,7 +52,7 @@ def parse_mem_to_mb(mem, units):
   mem = float(mem)
   if mem <= 0:
     return
-  units = units.strip().upper()
+  units = units.strip().upper() if units else ""
   if units.endswith("B"):
     units = units[:-1]
   if not units:

@@ -30,7 +30,7 @@ import time
 
 from contextlib import closing
 from kazoo.client import KazooClient
-from kazoo.exceptions import NoNodeError
+from kazoo.exceptions import NoNodeError, ConnectionLoss
 from kazoo.handlers.threading import KazooTimeoutError
 
 LOGGER = logging.getLogger('hbase_check')
@@ -43,6 +43,7 @@ HDFS_HOST = '127.0.0.1:5070'
 ZK_HOSTS = '127.0.0.1:2181'
 HBASE_NODES = ['/hbase/master', '/hbase/rs']
 ADMIN_USER = 'admin'
+MAX_ZOOKEEPER_CONNECTION_RETRIES = 3
 
 
 def parse_args():
@@ -128,12 +129,31 @@ def check_znodes_list_for_errors(nodes, zookeeper_hosts, timeout):
         timeout_seconds: Number of seconds to attempt to get node
 
     Returns:
-        0 success, or else the number of unresponsive nodes
+        0 success, or else the number of errors
     """
-    with closing(connect_to_zookeeper(zookeeper_hosts, timeout)) as zk_client:
-        errors = sum([check_znode(node, zk_client, timeout) for node in nodes])
-        zk_client.stop()
-    return errors
+    connection_retries = 0
+
+    while True:
+        with closing(connect_to_zookeeper(zookeeper_hosts, timeout)) as zk_client:
+            try:
+                return sum([check_znode(node, zk_client, timeout) for node in nodes])
+            except ConnectionLoss as e:
+                connection_retries += 1
+                if connection_retries > MAX_ZOOKEEPER_CONNECTION_RETRIES:
+                    LOGGER.error("Max connection retries exceeded: {0}".format(str(e)))
+                    raise
+                else:
+                    err_msg = ("Zookeeper connection loss: retrying connection "
+                               "({0} of {1} attempts)")
+                    LOGGER.warn(err_msg.format(connection_retries,
+                                               MAX_ZOOKEEPER_CONNECTION_RETRIES))
+                    time.sleep(1)
+            except Exception as e:
+                LOGGER.error("Unexpected error checking HBase node: {0}".format(str(e)))
+                raise
+            finally:
+                LOGGER.info("Stopping Zookeeper client")
+                zk_client.stop()
 
 
 def is_hdfs_running(host, admin_user):

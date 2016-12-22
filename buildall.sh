@@ -59,7 +59,8 @@ CODE_COVERAGE=0
 BUILD_ASAN=0
 BUILD_FE_ONLY=0
 BUILD_TIDY=0
-MAKE_CMD=make
+# Export MAKE_CMD so it is visible in scripts that invoke make, e.g. copy-udfs-udas.sh
+export MAKE_CMD=make
 LZO_CMAKE_ARGS=
 
 # Defaults that can be picked up from the environment, but are overridable through the

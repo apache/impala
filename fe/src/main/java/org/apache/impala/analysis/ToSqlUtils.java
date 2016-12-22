@@ -389,8 +389,9 @@ public class ToSqlUtils {
    * commented plan hint style such that hinted views created by Impala are readable by
    * Hive (parsed as a comment by Hive).
    */
-  public static String getPlanHintsSql(List<String> hints) {
-    if (hints == null || hints.isEmpty()) return "";
+  public static String getPlanHintsSql(List<PlanHint> hints) {
+    Preconditions.checkNotNull(hints);
+    if (hints.isEmpty()) return "";
     StringBuilder sb = new StringBuilder();
     sb.append("\n-- +");
     sb.append(Joiner.on(",").join(hints));

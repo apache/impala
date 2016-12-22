@@ -137,12 +137,11 @@ public class PartitionSet extends PartitionSpecBase {
     }
   }
 
-  // Transform <COL> = NULL into IsNull expr; <String COL> = '' into IsNull expr and
-  // <String COL> = 'String Value' into lower case.
+  // Transform <COL> = NULL into IsNull expr; <String COL> = '' into IsNull expr.
   // The reason is that COL = NULL is allowed for selecting the NULL
   // partition, but a COL = NULL predicate can never be true, so we
   // need to transform such predicates before feeding them into the
-  // partition pruner. Same logic goes to String transformation.
+  // partition pruner.
   private List<Expr> transformPartitionConjuncts(Analyzer analyzer, List<Expr> conjuncts)
       throws AnalysisException {
     List<Expr> transformedConjuncts = Lists.newArrayList();
@@ -162,9 +161,6 @@ public class PartitionSet extends PartitionSpecBase {
           } else if (leftChild != null && stringChild != null) {
             if (stringChild.getStringValue().isEmpty()) {
               result = new IsNullPredicate(leftChild, false);
-            } else {
-              stringChild = new StringLiteral(stringChild.getStringValue().toLowerCase());
-              result.setChild(1, stringChild);
             }
           }
         }

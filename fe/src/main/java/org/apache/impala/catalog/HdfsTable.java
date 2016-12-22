@@ -535,7 +535,7 @@ public class HdfsTable extends Table {
     for (FieldSchema fs: getMetaStoreTable().getPartitionKeys()) {
       for (TPartitionKeyValue kv: partitionSpec) {
         if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {
-          targetValues.add(kv.getValue().toLowerCase());
+          targetValues.add(kv.getValue());
           // Same key was specified twice
           if (!keys.add(kv.getName().toLowerCase())) {
             return null;
@@ -569,7 +569,7 @@ public class HdfsTable extends Table {
           // backwards compatibility with Hive, and is clearly broken.
           if (value.isEmpty()) value = getNullPartitionKeyValue();
         }
-        if (!targetValues.get(i).equals(value.toLowerCase())) {
+        if (!targetValues.get(i).equals(value)) {
           matchFound = false;
           break;
         }

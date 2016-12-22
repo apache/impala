@@ -424,7 +424,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.stringpartitionkey PARTITION " +
                "(string_col='partition1') set fileformat parquet");
     AnalyzesOk("alter table functional.stringpartitionkey PARTITION " +
-               "(string_col='PaRtiTion1') set location '/a/b/c'");
+               "(string_col='partition1') set location '/a/b/c'");
     AnalyzesOk("alter table functional.alltypes PARTITION (year=2010, month=11) " +
                "set tblproperties('a'='1')");
     AnalyzesOk("alter table functional.alltypes PARTITION (year<=2010, month=11) " +

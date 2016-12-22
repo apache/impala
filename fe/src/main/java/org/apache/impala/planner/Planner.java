@@ -144,7 +144,7 @@ public class Planner {
             rootFragment, insertStmt, ctx_.getRootAnalyzer(), fragments);
       }
       // Add optional sort node to the plan, based on clustered/noclustered plan hint.
-      createClusteringSort(insertStmt, rootFragment, ctx_.getRootAnalyzer());
+      createPreInsertSort(insertStmt, rootFragment, ctx_.getRootAnalyzer());
       // set up table sink for root fragment
       rootFragment.setSink(insertStmt.createDataSink());
       resultExprs = insertStmt.getResultExprs();
@@ -512,21 +512,26 @@ public class Planner {
   }
 
   /**
-   * Insert a sort node on top of the plan, depending on the clustered/noclustered plan
-   * hint. This will sort the data produced by 'inputFragment' by the clustering columns
-   * (key columns for Kudu tables), so that partitions can be written sequentially in the
-   * table sink.
+   * Insert a sort node on top of the plan, depending on the clustered/noclustered/sortby
+   * plan hint. If clustering is enabled in insertStmt, then the ordering columns will
+   * start with the clustering columns (key columns for Kudu tables), so that partitions
+   * can be written sequentially in the table sink. Any additional non-clustering columns
+   * specified by the sortby hint will be added to the ordering columns and after any
+   * clustering columns. If neither clustering nor a sortby hint are specified, then no
+   * sort node will be added to the plan.
    */
-  public void createClusteringSort(InsertStmt insertStmt, PlanFragment inputFragment,
+  public void createPreInsertSort(InsertStmt insertStmt, PlanFragment inputFragment,
        Analyzer analyzer) throws ImpalaException {
-    if (!insertStmt.hasClusteredHint()) return;
+    List<Expr> orderingExprs = Lists.newArrayList();
 
-    List<Expr> orderingExprs;
-    if (insertStmt.getTargetTable() instanceof KuduTable) {
-      orderingExprs = Lists.newArrayList(insertStmt.getPrimaryKeyExprs());
-    } else {
-      orderingExprs = Lists.newArrayList(insertStmt.getPartitionKeyExprs());
+    if (insertStmt.hasClusteredHint()) {
+      if (insertStmt.getTargetTable() instanceof KuduTable) {
+        orderingExprs.addAll(insertStmt.getPrimaryKeyExprs());
+      } else {
+        orderingExprs.addAll(insertStmt.getPartitionKeyExprs());
+      }
     }
+    orderingExprs.addAll(insertStmt.getSortByExprs());
     // Ignore constants for the sake of clustering.
     Expr.removeConstants(orderingExprs);
 
