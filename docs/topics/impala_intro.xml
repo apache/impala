@@ -73,7 +73,7 @@ under the License.
 
   <concept id="impala_cdh">
 
-    <title>How Impala Works with CDH</title>
+    <title>How Impala Works with <keyword keyref="hadoop_distro"/></title>
   <prolog>
     <metadata>
       <data name="Category" value="Concepts"/>
@@ -82,7 +82,7 @@ under the License.
 
     <conbody>
 
-      <p conref="../shared/impala_common.xml#common/impala_overview_diagram"/>
+      <p audience="Cloudera" conref="../shared/impala_common.xml#common/impala_overview_diagram"/>
 
       <p conref="../shared/impala_common.xml#common/component_list"/>
 
