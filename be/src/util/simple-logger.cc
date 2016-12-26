@@ -86,7 +86,7 @@ Status SimpleLogger::Init() {
 
 Status SimpleLogger::AppendEntry(const std::string& entry) {
   lock_guard<mutex> l(log_file_lock_);
-  if (num_log_file_entries_ > max_entries_per_file_) {
+  if (num_log_file_entries_ >= max_entries_per_file_) {
     num_log_file_entries_ = 0;
     GenerateLogFileName();
     RETURN_IF_ERROR(FlushInternal());
