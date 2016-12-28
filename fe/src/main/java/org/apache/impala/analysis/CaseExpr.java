@@ -35,7 +35,8 @@ import com.google.common.collect.Lists;
 
 /**
  * CASE and DECODE are represented using this class. The backend implementation is
- * always the "case" function.
+ * always the "case" function. CASE always returns the THEN corresponding to the leftmost
+ * WHEN that is TRUE, or the ELSE (or NULL if no ELSE is provided) if no WHEN is TRUE.
  *
  * The internal representation of
  *   CASE [expr] WHEN expr THEN expr [WHEN expr THEN expr ...] [ELSE expr] END

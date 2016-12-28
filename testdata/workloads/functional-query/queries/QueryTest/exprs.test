@@ -2665,3 +2665,30 @@ select decode(0, 1, 0, id, 1, 2) a from functional.alltypestiny order by a
 ---- TYPES
 TINYINT
 ====
+---- QUERY
+# Test expr rewrite behavior of IF with constant conditions.
+select if(true, id * 10, 0) from functional.alltypestiny where id = if(false, 0, 1)
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test expr rewrite behavior of CompoundPredicate with constant conditions.
+select id, null and id = 0 from functional.alltypestiny where id < 2 or false
+---- RESULTS
+0,NULL
+1,false
+---- TYPES
+INT,BOOLEAN
+====
+---- QUERY
+# Test expr rewrite behavior of CASE with constant conditions.
+select id, case id when null then null when 1 then 10 when true then 20 end
+from functional.alltypestiny
+where id = case when false then 0 when 1 = 1 then 1 else 2 end
+---- RESULTS
+1,10
+---- TYPES
+INT,TINYINT
+====

@@ -23,10 +23,12 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
 import org.apache.impala.rewrite.FoldConstantsRule;
+import org.apache.impala.rewrite.NormalizeExprsRule;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -39,15 +41,17 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
 
   public Expr RewritesOk(String expr, ExprRewriteRule rule, String expectedExpr)
       throws AnalysisException {
+    return RewritesOk(expr, Lists.newArrayList(rule), expectedExpr);
+  }
+
+  public Expr RewritesOk(String expr, List<ExprRewriteRule> rules, String expectedExpr)
+      throws AnalysisException {
     String stmtStr = "select " + expr + " from functional.alltypessmall";
     SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
     Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
     stmt.analyze(analyzer);
     Expr origExpr = stmt.getResultExprs().get(0);
     String origSql = origExpr.toSql();
-    // Create a rewriter with only a single rule.
-    List<ExprRewriteRule> rules = Lists.newArrayList();
-    rules.add(rule);
     ExprRewriter rewriter = new ExprRewriter(rules);
     Expr rewrittenExpr = rewriter.rewrite(origExpr, analyzer);
     String rewrittenSql = rewrittenExpr.toSql();
@@ -229,5 +233,108 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("uuid()", rule, null);
     // Tests that exprs that warn during their evaluation are not folded.
     RewritesOk("coalesce(1.8, cast(int_col as decimal(38,38)))", rule, null);
+  }
+
+  @Test
+  public void TestSimplifyConditionalsRule() throws AnalysisException {
+    ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
+
+    // IF
+    RewritesOk("if(true, id, id+1)", rule, "id");
+    RewritesOk("if(false, id, id+1)", rule, "id + 1");
+    RewritesOk("if(null, id, id+1)", rule, "id + 1");
+    RewritesOk("if(id = 0, true, false)", rule, null);
+
+    // CompoundPredicate
+    RewritesOk("false || id = 0", rule, "id = 0");
+    RewritesOk("true || id = 0", rule, "TRUE");
+    RewritesOk("false && id = 0", rule, "FALSE");
+    RewritesOk("true && id = 0", rule, "id = 0");
+    // NULL with a non-constant other child doesn't get rewritten.
+    RewritesOk("null && id = 0", rule, null);
+    RewritesOk("null || id = 0", rule, null);
+
+    List<ExprRewriteRule> rules = Lists.newArrayList();
+    rules.add(FoldConstantsRule.INSTANCE);
+    rules.add(rule);
+    // CASE with caseExpr
+    // Single TRUE case with no preceding non-constant cases.
+    RewritesOk("case 1 when 0 then id when 1 then id + 1 when 2 then id + 2 end", rules,
+        "id + 1");
+    // SINGLE TRUE case with preceding non-constant case.
+    RewritesOk("case 1 when id then id when 1 then id + 1 end", rules,
+        "CASE 1 WHEN id THEN id ELSE id + 1 END");
+    // Single FALSE case.
+    RewritesOk("case 0 when 1 then 1 when id then id + 1 end", rules,
+        "CASE 0 WHEN id THEN id + 1 END");
+    // All FALSE, return ELSE.
+    RewritesOk("case 2 when 0 then id when 1 then id * 2 else 0 end", rules, "0");
+    // All FALSE, return implicit NULL ELSE.
+    RewritesOk("case 3 when 0 then id when 1 then id + 1 end", rules, "NULL");
+    // Multiple TRUE, first one becomes ELSE.
+    RewritesOk("case 1 when id then id when 2 - 1 then id + 1 when 1 then id + 2 end",
+        rules, "CASE 1 WHEN id THEN id ELSE id + 1 END");
+    // When NULL.
+    RewritesOk("case 0 when null then 0 else 1 end", rules, "1");
+    // All non-constant, don't rewrite.
+    RewritesOk("case id when 1 then 1 when 2 then 2 else 3 end", rules, null);
+
+    // CASE without caseExpr
+    // Single TRUE case with no predecing non-constant case.
+    RewritesOk("case when FALSE then 0 when TRUE then 1 end", rules, "1");
+    // Single TRUE case with preceding non-constant case.
+    RewritesOk("case when id = 0 then 0 when true then 1 when id = 2 then 2 end", rules,
+        "CASE WHEN id = 0 THEN 0 ELSE 1 END");
+    // Single FALSE case.
+    RewritesOk("case when id = 0 then 0 when false then 1 when id = 2 then 2 end", rules,
+        "CASE WHEN id = 0 THEN 0 WHEN id = 2 THEN 2 END");
+    // All FALSE, return ELSE.
+    RewritesOk(
+        "case when false then 1 when false then 2 else id + 1 end", rules, "id + 1");
+    // All FALSE, return implicit NULL ELSE.
+    RewritesOk("case when false then 0 end", rules, "NULL");
+    // Multiple TRUE, first one becomes ELSE.
+    RewritesOk("case when id = 1 then 0 when 2 = 1 + 1 then 1 when true then 2 end",
+        rules, "CASE WHEN id = 1 THEN 0 ELSE 1 END");
+    // When NULL.
+    RewritesOk("case when id = 0 then 0 when null then 1 else 2 end", rules,
+        "CASE WHEN id = 0 THEN 0 ELSE 2 END");
+    // All non-constant, don't rewrite.
+    RewritesOk("case when id = 0 then 0 when id = 1 then 1 end", rules, null);
+
+    // DECODE
+    // SIngle TRUE case with no preceding non-constant case.
+    RewritesOk("decode(1, 0, id, 1, id + 1, 2, id + 2)", rules, "id + 1");
+    // Single TRUE case with predecing non-constant case.
+    RewritesOk("decode(1, id, id, 1, id + 1, 0)", rules,
+        "CASE WHEN 1 = id THEN id ELSE id + 1 END");
+    // Single FALSE case.
+    RewritesOk("decode(1, 0, id, tinyint_col, id + 1)", rules,
+        "CASE WHEN 1 = tinyint_col THEN id + 1 END");
+    // All FALSE, return ELSE.
+    RewritesOk("decode(1, 0, 0, 2, 2, 3)", rules, "3");
+    // All FALSE, return implicit NULL ELSE.
+    RewritesOk("decode(1, 1 + 1, 2, 1 + 2, 3)", rules, "NULL");
+    // Multiple TRUE, first one becomes ELSE.
+    RewritesOk("decode(1, id, id, 1 + 1, 0, 1 * 1, 1, 2 - 1, 2)", rules,
+        "CASE WHEN 1 = id THEN id ELSE 1 END");
+    // When NULL - DECODE allows the decodeExpr to equal NULL (see CaseExpr.java), so the
+    // NULL case is not treated as a constant FALSE and removed.
+    RewritesOk("decode(id, null, 0, 1)", rules, null);
+    // All non-constant, don't rewrite.
+    RewritesOk("decode(id, 1, 1, 2, 2)", rules, null);
+  }
+
+  @Test
+  public void TestNormalizeExprsRule() throws AnalysisException {
+    ExprRewriteRule rule = NormalizeExprsRule.INSTANCE;
+
+    // CompoundPredicate
+    RewritesOk("id = 0 OR false", rule, "FALSE OR id = 0");
+    RewritesOk("null AND true", rule, "TRUE AND NULL");
+    // The following already have a BoolLiteral left child and don't get rewritten.
+    RewritesOk("true and id = 0", rule, null);
+    RewritesOk("false or id = 1", rule, null);
+    RewritesOk("false or true", rule, null);
   }
 }

@@ -22,21 +22,17 @@ package org.apache.impala.analysis;
  * captures info of a single WHEN expr THEN expr clause.
  *
  */
-class CaseWhenClause {
+public class CaseWhenClause {
   private final Expr whenExpr_;
   private final Expr thenExpr_;
 
   public CaseWhenClause(Expr whenExpr, Expr thenExpr) {
     super();
-    this.whenExpr_ = whenExpr;
-    this.thenExpr_ = thenExpr;
+    whenExpr_ = whenExpr;
+    thenExpr_ = thenExpr;
   }
 
-  public Expr getWhenExpr() {
-    return whenExpr_;
-  }
+  public Expr getWhenExpr() { return whenExpr_; }
 
-  public Expr getThenExpr() {
-    return thenExpr_;
-  }
+  public Expr getThenExpr() { return thenExpr_; }
 }

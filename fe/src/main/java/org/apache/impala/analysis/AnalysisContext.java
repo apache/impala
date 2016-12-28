@@ -40,6 +40,8 @@ import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
 import org.apache.impala.rewrite.FoldConstantsRule;
+import org.apache.impala.rewrite.NormalizeExprsRule;
+import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TQueryCtx;
@@ -79,7 +81,10 @@ public class AnalysisContext {
     List<ExprRewriteRule> rules = Lists.newArrayList(BetweenToCompoundRule.INSTANCE);
     if (queryCtx.getClient_request().getQuery_options().enable_expr_rewrites) {
       rules.add(FoldConstantsRule.INSTANCE);
+      rules.add(NormalizeExprsRule.INSTANCE);
       rules.add(ExtractCommonConjunctRule.INSTANCE);
+      // Relies on FoldConstantsRule and NormalizeExprsRule.
+      rules.add(SimplifyConditionalsRule.INSTANCE);
     }
     rewriter_ = new ExprRewriter(rules);
   }
