@@ -95,7 +95,7 @@ function build(node, parent, edges, states, colour_idx, max_node_time) {
                 "max_time_val": node["max_time_val"],
                 "style": "fill: " + colours[colour_idx]});
   if (parent != null) {
-    var label_val = "" + node["output_card"];
+    var label_val = "" + node["output_card"].toLocaleString();
     edges.push({ start: node["label"], end: parent,
                  style: { label: label_val }});
   }
@@ -104,7 +104,7 @@ function build(node, parent, edges, states, colour_idx, max_node_time) {
   if (node["data_stream_target"]) {
     edges.push({ "start": node["label"],
                  "end": node["data_stream_target"],
-                 "style": { label: "" + node["output_card"],
+                 "style": { label: "" + node["output_card"].toLocaleString(),
                             style: "stroke: #f66; stroke-dasharray: 5, 5;"}});
   }
   max_node_time = Math.max(node["max_time_val"], max_node_time)
