@@ -949,7 +949,7 @@ server=server1-&gt;uri=hdfs://namenode:port/path/to/dir
         <note type="warning">
           <p>
             Because the NameNode host and port must be specified, Cloudera strongly recommends you use High
-            Availability (HA). This ensures that the URI will remain constant even if the namenode changes.
+            Availability (HA). This ensures that the URI will remain constant even if the NameNode changes.
           </p>
 <codeblock>data_read = server=server1-&gt;uri=file:///path/to/dir,\ server=server1-&gt;uri=hdfs://ha-nn-uri/path/to/dir
 </codeblock>
