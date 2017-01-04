@@ -95,6 +95,10 @@ struct NullIndicatorOffset {
       bit_mask(bit_offset == -1 ? 0 : 1 << bit_offset) {
   }
 
+  bool Equals(const NullIndicatorOffset& o) const {
+    return this->byte_offset == o.byte_offset && this->bit_mask == o.bit_mask;
+  }
+
   std::string DebugString() const;
 };
 
@@ -134,6 +138,10 @@ class SlotDescriptor {
   static bool ColPathLessThan(const SlotDescriptor* a, const SlotDescriptor* b);
 
   std::string DebugString() const;
+
+  /// Return true if the physical layout of this descriptor matches the physical layout
+  /// of other_desc, but not necessarily ids.
+  bool LayoutEquals(const SlotDescriptor& other_desc) const;
 
   /// Generate LLVM code at the insert position of 'builder' that returns a boolean value
   /// represented as a LLVM i1 indicating whether this slot is null in 'tuple'.
@@ -397,6 +405,10 @@ class TupleDescriptor {
   /// Returns true if this tuple or any nested collection item tuples have string slots.
   bool ContainsStringData() const;
 
+  /// Return true if the physical layout of this descriptor matches that of other_desc,
+  /// but not necessarily the id.
+  bool LayoutEquals(const TupleDescriptor& other_desc) const;
+
   /// Creates a typed struct description for llvm.  The layout of the struct is computed
   /// by the FE which includes the order of the fields in the resulting struct.
   /// Returns the struct type or NULL if the type could not be created.
@@ -540,6 +552,14 @@ class RowDescriptor {
 
   /// Return true if the tuple ids of this descriptor match tuple ids of other desc.
   bool Equals(const RowDescriptor& other_desc) const;
+
+  /// Return true if the tuples of this descriptor are a prefix of the tuples of
+  /// other_desc. Tuples are compared by their physical layout and not by ids.
+  bool LayoutIsPrefixOf(const RowDescriptor& other_desc) const;
+
+  /// Return true if the physical layout of this descriptor matches the physical layout
+  /// of other_desc, but not necessarily the ids.
+  bool LayoutEquals(const RowDescriptor& other_desc) const;
 
   std::string DebugString() const;
 

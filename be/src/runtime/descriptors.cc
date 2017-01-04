@@ -128,6 +128,15 @@ string SlotDescriptor::DebugString() const {
   return out.str();
 }
 
+bool SlotDescriptor::LayoutEquals(const SlotDescriptor& other_desc) const {
+  if (type() != other_desc.type()) return false;
+  if (is_nullable() != other_desc.is_nullable()) return false;
+  if (slot_size() != other_desc.slot_size()) return false;
+  if (tuple_offset() != other_desc.tuple_offset()) return false;
+  if (!null_indicator_offset().Equals(other_desc.null_indicator_offset())) return false;
+  return true;
+}
+
 ColumnDescriptor::ColumnDescriptor(const TColumnDescriptor& tdesc)
   : name_(tdesc.name),
     type_(ColumnType::FromThrift(tdesc.type)) {
@@ -333,6 +342,17 @@ string TupleDescriptor::DebugString() const {
   return out.str();
 }
 
+bool TupleDescriptor::LayoutEquals(const TupleDescriptor& other_desc) const {
+  const vector<SlotDescriptor*>& slots = this->slots();
+  const vector<SlotDescriptor*>& other_slots = other_desc.slots();
+  if (this->byte_size() != other_desc.byte_size()) return false;
+  if (slots.size() != other_slots.size()) return false;
+  for (int i = 0; i < slots.size(); ++i) {
+    if (!slots[i]->LayoutEquals(*other_slots[i])) return false;
+  }
+  return true;
+}
+
 RowDescriptor::RowDescriptor(const DescriptorTbl& desc_tbl,
                              const vector<TTupleId>& row_tuples,
                              const vector<bool>& nullable_tuples)
@@ -436,11 +456,20 @@ bool RowDescriptor::IsPrefixOf(const RowDescriptor& other_desc) const {
 
 bool RowDescriptor::Equals(const RowDescriptor& other_desc) const {
   if (tuple_desc_map_.size() != other_desc.tuple_desc_map_.size()) return false;
+  return IsPrefixOf(other_desc);
+}
+
+bool RowDescriptor::LayoutIsPrefixOf(const RowDescriptor& other_desc) const {
+  if (tuple_desc_map_.size() > other_desc.tuple_desc_map_.size()) return false;
   for (int i = 0; i < tuple_desc_map_.size(); ++i) {
-    // pointer comparison okay, descriptors are unique
-    if (tuple_desc_map_[i] != other_desc.tuple_desc_map_[i]) return false;
+    if (!tuple_desc_map_[i]->LayoutEquals(*other_desc.tuple_desc_map_[i])) return false;
   }
   return true;
+}
+
+bool RowDescriptor::LayoutEquals(const RowDescriptor& other_desc) const {
+  if (tuple_desc_map_.size() != other_desc.tuple_desc_map_.size()) return false;
+  return LayoutIsPrefixOf(other_desc);
 }
 
 string RowDescriptor::DebugString() const {

@@ -870,6 +870,7 @@ PLAN-ROOT SINK
 |  other predicates: id IS NULL, int_col = 17
 |
 |--01:UNION
+|  |  pass-through-operands: all
 |  |
 |  |--05:AGGREGATE [FINALIZE]
 |  |  |  group by: id, int_col
@@ -933,6 +934,7 @@ PLAN-ROOT SINK
 |     predicates: isnull(a.id, 0) = 0
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--04:AGGREGATE [FINALIZE]
 |  |  group by: id, int_col

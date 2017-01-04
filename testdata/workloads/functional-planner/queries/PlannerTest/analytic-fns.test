@@ -1138,53 +1138,7 @@ PLAN-ROOT SINK
 |  order by: min(id) OVER(...) DESC NULLS FIRST
 |
 08:UNION
-|
-|--07:AGGREGATE [FINALIZE]
-|  |  group by: min(id) OVER(...)
-|  |
-|  00:UNION
-|  |
-|  |--06:ANALYTIC
-|  |  |  functions: max(id)
-|  |  |  partition by: bool_col
-|  |  |
-|  |  05:SORT
-|  |  |  order by: bool_col ASC NULLS FIRST
-|  |  |
-|  |  04:SCAN HDFS [functional.alltypessmall]
-|  |     partitions=4/4 files=4 size=6.32KB
-|  |
-|  03:ANALYTIC
-|  |  functions: min(id)
-|  |  partition by: int_col
-|  |
-|  02:SORT
-|  |  order by: int_col ASC NULLS FIRST
-|  |
-|  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
-|
-11:ANALYTIC
-|  functions: sum(bigint_col)
-|  partition by: int_col
-|  order by: id ASC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|
-10:SORT
-|  order by: int_col ASC NULLS FIRST, id ASC
-|
-09:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 files=4 size=460B
----- DISTRIBUTEDPLAN
-PLAN-ROOT SINK
-|
-18:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: min(id) OVER(...) DESC NULLS FIRST
-|
-12:SORT
-|  order by: min(id) OVER(...) DESC NULLS FIRST
-|
-08:UNION
+|  pass-through-operands: 07
 |
 |--11:ANALYTIC
 |  |  functions: sum(bigint_col)
@@ -1195,15 +1149,63 @@ PLAN-ROOT SINK
 |  10:SORT
 |  |  order by: int_col ASC NULLS FIRST, id ASC
 |  |
-|  13:EXCHANGE [HASH(int_col)]
+|  09:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|
+07:AGGREGATE [FINALIZE]
+|  group by: min(id) OVER(...)
+|
+00:UNION
+|
+|--06:ANALYTIC
+|  |  functions: max(id)
+|  |  partition by: bool_col
+|  |
+|  05:SORT
+|  |  order by: bool_col ASC NULLS FIRST
+|  |
+|  04:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 files=4 size=6.32KB
+|
+03:ANALYTIC
+|  functions: min(id)
+|  partition by: int_col
+|
+02:SORT
+|  order by: int_col ASC NULLS FIRST
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+18:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: min(id) OVER(...) DESC NULLS FIRST
+|
+12:SORT
+|  order by: min(id) OVER(...) DESC NULLS FIRST
+|
+08:UNION
+|  pass-through-operands: 16
+|
+|--11:ANALYTIC
+|  |  functions: sum(bigint_col)
+|  |  partition by: int_col
+|  |  order by: id ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |
+|  10:SORT
+|  |  order by: int_col ASC NULLS FIRST, id ASC
+|  |
+|  17:EXCHANGE [HASH(int_col)]
 |  |
 |  09:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
 |
-17:AGGREGATE [FINALIZE]
+16:AGGREGATE [FINALIZE]
 |  group by: min(id) OVER(...)
 |
-16:EXCHANGE [HASH(min(id) OVER(...))]
+15:EXCHANGE [HASH(min(id) OVER(...))]
 |
 07:AGGREGATE [STREAMING]
 |  group by: min(id) OVER(...)
@@ -1217,7 +1219,7 @@ PLAN-ROOT SINK
 |  05:SORT
 |  |  order by: bool_col ASC NULLS FIRST
 |  |
-|  15:EXCHANGE [HASH(bool_col)]
+|  14:EXCHANGE [HASH(bool_col)]
 |  |
 |  04:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -1229,7 +1231,7 @@ PLAN-ROOT SINK
 02:SORT
 |  order by: int_col ASC NULLS FIRST
 |
-14:EXCHANGE [HASH(int_col)]
+13:EXCHANGE [HASH(int_col)]
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -1814,25 +1816,25 @@ PLAN-ROOT SINK
 |
 00:UNION
 |
-|--01:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 files=4 size=460B
-|     predicates: t1.id IS NULL, t1.tinyint_col != 5
+|--08:EXCHANGE [RANDOM]
+|  |
+|  04:ANALYTIC
+|  |  functions: dense_rank()
+|  |  order by: id ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |
+|  07:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: id ASC
+|  |
+|  03:SORT
+|  |  order by: id ASC
+|  |
+|  02:SCAN HDFS [functional.alltypes t1]
+|     partitions=24/24 files=24 size=478.45KB
 |
-08:EXCHANGE [RANDOM]
-|
-04:ANALYTIC
-|  functions: dense_rank()
-|  order by: id ASC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|
-07:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: id ASC
-|
-03:SORT
-|  order by: id ASC
-|
-02:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+01:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+   predicates: t1.id IS NULL, t1.tinyint_col != 5
 ====
 # Propagate a predicate on a partition key through an inline view that has an analytic
 # function. Predicates that are not compatible with analytic function's partition by

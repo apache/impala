@@ -984,6 +984,7 @@ PLAN-ROOT SINK
 |
 00:UNION
 |  constant-operands=1
+|  pass-through-operands: all
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -995,6 +996,7 @@ PLAN-ROOT SINK
 |
 00:UNION
 |  constant-operands=1
+|  pass-through-operands: all
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB

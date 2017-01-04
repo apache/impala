@@ -326,3 +326,33 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.alltypestiny]
    predicates: id IN (1, NULL), bigint_col IN (NULL), bool_col IN (NULL), double_col IN (NULL), float_col IN (NULL), smallint_col IN (NULL), string_col IN (NULL), tinyint_col IN (NULL)
 ====
+# IMPALA-3586: The operand with the Kudu scan cannot be passed through because id is
+# not-nullable (primary key).
+select id from functional_kudu.alltypes
+union all
+select id from functional.alltypes;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: 02
+|
+|--01:SCAN KUDU [functional_kudu.alltypes]
+|
+02:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-3586: When both operands are Kudu scans, they should both be passed through.
+select id from functional_kudu.alltypes
+union all
+select id from functional_kudu.alltypes;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|
+|--02:SCAN KUDU [functional_kudu.alltypes]
+|
+01:SCAN KUDU [functional_kudu.alltypes]
+====

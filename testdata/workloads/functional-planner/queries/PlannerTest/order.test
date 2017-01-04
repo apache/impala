@@ -218,6 +218,7 @@ PLAN-ROOT SINK
 |  order by: int_col DESC
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -235,6 +236,7 @@ PLAN-ROOT SINK
 |  order by: int_col DESC
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -258,6 +260,7 @@ PLAN-ROOT SINK
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -283,6 +286,7 @@ PLAN-ROOT SINK
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -546,6 +550,7 @@ PLAN-ROOT SINK
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--04:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 files=1 size=115B
@@ -576,6 +581,7 @@ PLAN-ROOT SINK
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--04:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 files=1 size=115B
@@ -604,11 +610,13 @@ PLAN-ROOT SINK
 |  order by: id ASC, bool_col ASC
 |
 04:UNION
+|  pass-through-operands: all
 |
 |--03:AGGREGATE [FINALIZE]
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  |
 |  00:UNION
+|  |  pass-through-operands: all
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
 |  |     partitions=1/4 files=1 size=115B
@@ -631,27 +639,29 @@ PLAN-ROOT SINK
 |  order by: id ASC, bool_col ASC
 |
 04:UNION
+|  pass-through-operands: all
+|
+|--09:AGGREGATE [FINALIZE]
+|  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  |
+|  08:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
+|  |
+|  03:AGGREGATE [STREAMING]
+|  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  |
+|  00:UNION
+|  |  pass-through-operands: all
+|  |
+|  |--02:SCAN HDFS [functional.alltypestiny]
+|  |     partitions=1/4 files=1 size=115B
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     partitions=1/4 files=1 size=115B
 |
 |--06:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 files=1 size=115B
 |
-|--05:SCAN HDFS [functional.alltypestiny]
-|     partitions=1/4 files=1 size=115B
-|
-09:AGGREGATE [FINALIZE]
-|  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|
-08:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
-|
-03:AGGREGATE [STREAMING]
-|  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|
-00:UNION
-|
-|--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=1/4 files=1 size=115B
-|
-01:SCAN HDFS [functional.alltypestiny]
+05:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 files=1 size=115B
 ====
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from functional.alltypestiny where year=2009 and month=1
@@ -681,16 +691,31 @@ PLAN-ROOT SINK
 |  order by: year ASC, month ASC, id ASC
 |
 09:UNION
+|  pass-through-operands: 10,11,08
+|
+|--15:TOP-N [LIMIT=3]
+|  |  order by: id ASC
+|  |
+|  12:UNION
+|  |  pass-through-operands: all
+|  |
+|  |--14:SCAN HDFS [functional.alltypestiny]
+|  |     partitions=0/4 files=0 size=0B
+|  |
+|  13:SCAN HDFS [functional.alltypestiny]
+|     partitions=1/4 files=1 size=115B
 |
 |--08:AGGREGATE [FINALIZE]
 |  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  |
 |  00:UNION
+|  |  pass-through-operands: 01,02,03
 |  |
 |  |--07:TOP-N [LIMIT=3]
 |  |  |  order by: id ASC
 |  |  |
 |  |  04:UNION
+|  |  |  pass-through-operands: all
 |  |  |
 |  |  |--06:SCAN HDFS [functional.alltypestiny]
 |  |  |     partitions=1/4 files=1 size=115B
@@ -705,17 +730,6 @@ PLAN-ROOT SINK
 |  |     partitions=1/4 files=1 size=115B
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
-|     partitions=1/4 files=1 size=115B
-|
-|--15:TOP-N [LIMIT=3]
-|  |  order by: id ASC
-|  |
-|  12:UNION
-|  |
-|  |--14:SCAN HDFS [functional.alltypestiny]
-|  |     partitions=0/4 files=0 size=0B
-|  |
-|  13:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 files=1 size=115B
 |
 |--11:SCAN HDFS [functional.alltypestiny]
@@ -733,16 +747,11 @@ PLAN-ROOT SINK
 |  order by: year ASC, month ASC, id ASC
 |
 09:UNION
-|
-|--11:SCAN HDFS [functional.alltypestiny]
-|     partitions=1/4 files=1 size=115B
-|
-|--10:SCAN HDFS [functional.alltypestiny]
-|     partitions=1/4 files=1 size=115B
+|  pass-through-operands: 10,11,20
 |
 |--22:EXCHANGE [RANDOM]
 |  |
-|  17:MERGING-EXCHANGE [UNPARTITIONED]
+|  21:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: id ASC
 |  |  limit: 3
 |  |
@@ -750,6 +759,7 @@ PLAN-ROOT SINK
 |  |  order by: id ASC
 |  |
 |  12:UNION
+|  |  pass-through-operands: all
 |  |
 |  |--14:SCAN HDFS [functional.alltypestiny]
 |  |     partitions=0/4 files=0 size=0B
@@ -757,40 +767,48 @@ PLAN-ROOT SINK
 |  13:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 files=1 size=115B
 |
-21:AGGREGATE [FINALIZE]
-|  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|
-20:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
-|
-08:AGGREGATE [STREAMING]
-|  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|
-00:UNION
-|
-|--03:SCAN HDFS [functional.alltypestiny]
+|--20:AGGREGATE [FINALIZE]
+|  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  |
+|  19:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
+|  |
+|  08:AGGREGATE [STREAMING]
+|  |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  |
+|  00:UNION
+|  |  pass-through-operands: 01,02,03
+|  |
+|  |--18:EXCHANGE [RANDOM]
+|  |  |
+|  |  17:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  |  order by: id ASC
+|  |  |  limit: 3
+|  |  |
+|  |  07:TOP-N [LIMIT=3]
+|  |  |  order by: id ASC
+|  |  |
+|  |  04:UNION
+|  |  |  pass-through-operands: all
+|  |  |
+|  |  |--06:SCAN HDFS [functional.alltypestiny]
+|  |  |     partitions=1/4 files=1 size=115B
+|  |  |
+|  |  05:SCAN HDFS [functional.alltypestiny]
+|  |     partitions=1/4 files=1 size=115B
+|  |
+|  |--03:SCAN HDFS [functional.alltypestiny]
+|  |     partitions=1/4 files=1 size=115B
+|  |
+|  |--02:SCAN HDFS [functional.alltypestiny]
+|  |     partitions=1/4 files=1 size=115B
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 files=1 size=115B
 |
-|--02:SCAN HDFS [functional.alltypestiny]
+|--11:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 files=1 size=115B
 |
-|--01:SCAN HDFS [functional.alltypestiny]
-|     partitions=1/4 files=1 size=115B
-|
-19:EXCHANGE [RANDOM]
-|
-18:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: id ASC
-|  limit: 3
-|
-07:TOP-N [LIMIT=3]
-|  order by: id ASC
-|
-04:UNION
-|
-|--06:SCAN HDFS [functional.alltypestiny]
-|     partitions=1/4 files=1 size=115B
-|
-05:SCAN HDFS [functional.alltypestiny]
+10:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 files=1 size=115B
 ====
 # Sort over top-n
@@ -839,6 +857,7 @@ PLAN-ROOT SINK
 |  order by: bigint_col ASC
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -859,6 +878,7 @@ PLAN-ROOT SINK
 |  order by: bigint_col ASC
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -946,6 +966,7 @@ select * from functional.alltypessmall order by bigint_col
 PLAN-ROOT SINK
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -958,6 +979,7 @@ PLAN-ROOT SINK
 03:EXCHANGE [UNPARTITIONED]
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -976,6 +998,7 @@ PLAN-ROOT SINK
 |  order by: bigint_col ASC
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -992,6 +1015,7 @@ PLAN-ROOT SINK
 |  order by: bigint_col ASC
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -1014,6 +1038,7 @@ PLAN-ROOT SINK
 |  group by: int_col
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--05:TOP-N [LIMIT=10 OFFSET=5]
 |  |  order by: int_col ASC
@@ -1048,9 +1073,7 @@ PLAN-ROOT SINK
 |  group by: int_col
 |
 00:UNION
-|
-|--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|  pass-through-operands: all
 |
 |--11:EXCHANGE [RANDOM]
 |  |
@@ -1065,16 +1088,19 @@ PLAN-ROOT SINK
 |  04:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
 |
-10:EXCHANGE [RANDOM]
+|--10:EXCHANGE [RANDOM]
+|  |
+|  08:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: int_col ASC
+|  |  limit: 10
+|  |
+|  03:TOP-N [LIMIT=10]
+|  |  order by: int_col ASC
+|  |
+|  02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
 |
-08:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: int_col ASC
-|  limit: 10
-|
-03:TOP-N [LIMIT=10]
-|  order by: int_col ASC
-|
-02:SCAN HDFS [functional.alltypes]
+01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
 # Test slot materialization
@@ -1200,6 +1226,7 @@ PLAN-ROOT SINK
 |  order by: bigint_col ASC
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypesagg]
 |     partitions=11/11 files=11 size=814.73KB
@@ -1217,6 +1244,7 @@ PLAN-ROOT SINK
 |  order by: bigint_col ASC
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypesagg]
 |     partitions=11/11 files=11 size=814.73KB

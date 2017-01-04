@@ -225,7 +225,7 @@ enum TImpalaQueryOptions {
   // those queries, the coordinator deletes all files in the final location before copying
   // the files there.
   // TODO: Find a way to get this working for INSERT OVERWRITEs too.
-  S3_SKIP_INSERT_STAGING
+  S3_SKIP_INSERT_STAGING,
 
   // Maximum runtime filter size, in bytes.
   RUNTIME_FILTER_MAX_SIZE,
@@ -265,7 +265,7 @@ enum TImpalaQueryOptions {
   // It is preserved as the default for compatibility.
   // TODO: Remove the TWO_LEVEL_THEN_THREE_LEVEL mode completely or at least make
   // it non-default in a compatibility breaking release.
-  PARQUET_ARRAY_RESOLUTION
+  PARQUET_ARRAY_RESOLUTION,
 }
 
 // The summary of a DML statement.

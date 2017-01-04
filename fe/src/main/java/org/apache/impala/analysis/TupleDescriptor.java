@@ -335,18 +335,6 @@ public class TupleDescriptor {
   }
 
   /**
-   * Returns true if tuples of type 'this' can be assigned to tuples of type 'desc'
-   * (checks that both have the same number of slots and that slots are of the same type)
-   */
-  public boolean isCompatible(TupleDescriptor desc) {
-    if (slots_.size() != desc.slots_.size()) return false;
-    for (int i = 0; i < slots_.size(); ++i) {
-      if (!slots_.get(i).getType().equals(desc.slots_.get(i).getType())) return false;
-    }
-    return true;
-  }
-
-  /**
    * Returns a list of slot ids that correspond to partition columns.
    */
   public List<SlotId> getPartitionSlots() {

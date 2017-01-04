@@ -1529,7 +1529,8 @@ public class SingleNodePlanner {
       Analyzer analyzer, UnionStmt unionStmt, List<UnionOperand> unionOperands,
       PlanNode unionDistinctPlan)
       throws ImpalaException {
-    UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), unionStmt.getTupleId());
+    UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), unionStmt.getTupleId(),
+        unionStmt.getUnionResultExprs(), ctx_.hasSubplan());
     for (UnionOperand op: unionOperands) {
       if (op.getAnalyzer().hasEmptyResultSet()) {
         unmarkCollectionSlots(op.getQueryStmt());

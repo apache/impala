@@ -576,3 +576,15 @@ where c_custkey = 1
 ---- TYPES
 BIGINT,BIGINT
 ====
+---- QUERY
+# IMPALA-3678: union in a subplan - passthrough should be disabled.
+select count(c.c_custkey), count(v.tot_price)
+from tpch_nested_parquet.customer c, (
+select sum(o_totalprice) tot_price from c.c_orders
+union
+select sum(o_totalprice) tot_price from c.c_orders) v;
+---- RESULTS
+150000,99996
+---- TYPES
+bigint,bigint
+====

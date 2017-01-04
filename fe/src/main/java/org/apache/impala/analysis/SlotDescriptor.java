@@ -220,6 +220,20 @@ public class SlotDescriptor {
     setType(expr.getType());
   }
 
+  /**
+   * Return true if the physical layout of this descriptor matches the physical layout
+   * of the other descriptor, but not necessarily ids.
+   */
+  public boolean LayoutEquals(SlotDescriptor other) {
+    if (!getType().equals(other.getType())) return false;
+    if (isNullable_ != other.isNullable_) return false;
+    if (getByteSize() != other.getByteSize()) return false;
+    if (getByteOffset() != other.getByteOffset()) return false;
+    if (getNullIndicatorByte() != other.getNullIndicatorByte()) return false;
+    if (getNullIndicatorBit() != other.getNullIndicatorBit()) return false;
+    return true;
+  }
+
   public TSlotDescriptor toThrift() {
     Preconditions.checkState(isMaterialized_);
     List<Integer> materializedPath = getMaterializedPath();

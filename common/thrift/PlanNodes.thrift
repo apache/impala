@@ -445,6 +445,8 @@ struct TUnionNode {
   2: required list<list<Exprs.TExpr>> result_expr_lists
   // Separate list of expr lists coming from a constant select stmts.
   3: required list<list<Exprs.TExpr>> const_expr_lists
+  // Index of the first child that needs to be materialized.
+  4: required i64 first_materialized_child_idx
 }
 
 struct TExchangeNode {

@@ -547,7 +547,7 @@ template <bool FILL_INDICES, bool HAS_NULLABLE_TUPLE>
 Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
     vector<RowIdx>* indices) {
   DCHECK(!closed_);
-  DCHECK(batch->row_desc().Equals(desc_));
+  DCHECK(batch->row_desc().LayoutEquals(desc_));
   *eos = (rows_returned_ == num_rows_);
   if (*eos) return Status::OK();
   DCHECK_GE(read_block_null_indicators_size_, 0);

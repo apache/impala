@@ -18,15 +18,14 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
-import org.apache.impala.common.Pair;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TPlanNode;
@@ -35,15 +34,25 @@ import org.apache.impala.thrift.TUnionNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
- * Node that merges the results of its child plans by materializing
- * the corresponding result exprs into a new tuple.
+ * Node that merges the results of its child plans, Normally, this is done by
+ * materializing the corresponding result exprs into a new tuple. However, if
+ * a child has an identical tuple layout as the output of the union node, and
+ * the child only has naked SlotRefs as result exprs, then the child is marked
+ * as 'passthrough'. The rows of passthrough children are directly returned by
+ * the union node, instead of materializing the child's result exprs into new
+ * tuples.
  */
 public class UnionNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(UnionNode.class);
+
+  // List of union result exprs of the originating UnionStmt. Used for
+  // determining passthrough-compatibility of children.
+  protected List<Expr> unionResultExprs_;
 
   // Expr lists corresponding to the input query stmts.
   // The ith resultExprList belongs to the ith child.
@@ -59,11 +68,27 @@ public class UnionNode extends PlanNode {
   protected List<List<Expr>> materializedResultExprLists_ = Lists.newArrayList();
   protected List<List<Expr>> materializedConstExprLists_ = Lists.newArrayList();
 
+  // Indicates if this UnionNode is inside a subplan.
+  protected boolean isInSubplan_;
+
+  // Index of the first non-passthrough child.
+  protected int firstMaterializedChildIdx_;
+
   protected final TupleId tupleId_;
 
   protected UnionNode(PlanNodeId id, TupleId tupleId) {
     super(id, tupleId.asList(), "UNION");
+    unionResultExprs_ = Lists.newArrayList();
     tupleId_ = tupleId;
+    isInSubplan_ = false;
+  }
+
+  protected UnionNode(PlanNodeId id, TupleId tupleId,
+        List<Expr> unionResultExprs, boolean isInSubplan) {
+    super(id, tupleId.asList(), "UNION");
+    unionResultExprs_ = unionResultExprs;
+    tupleId_ = tupleId;
+    isInSubplan_ = isInSubplan;
   }
 
   public void addConstExprList(List<Expr> exprs) { constExprLists_.add(exprs); }
@@ -103,51 +128,80 @@ public class UnionNode extends PlanNode {
   }
 
   /**
-   * Re-order the union's operands descending by their estimated per-host memory,
-   * such that parent nodes can gauge the peak memory consumption of this MergeNode after
-   * opening it during execution (a MergeNode opens its first operand in Open()).
-   * Scan nodes are always ordered last because they can dynamically scale down their
-   * memory usage, whereas many other nodes cannot (e.g., joins, aggregations).
-   * One goal is to decrease the likelihood of a SortNode parent claiming too much
-   * memory in its Open(), possibly causing the mem limit to be hit when subsequent
-   * union operands are executed.
-   * Can only be called on a fragmented plan because this function calls computeCosts()
-   * on this node's children.
-   * TODO: Come up with a good way of handing memory out to individual operators so that
-   * they don't trip each other up. Then remove this function.
+   * Returns true if rows from the child with 'childTupleIds' and 'childResultExprs' can
+   * be returned directly by the union node (without materialization into a new tuple).
    */
-  public void reorderOperands(Analyzer analyzer) {
-    Preconditions.checkNotNull(fragment_,
-        "Operands can only be reordered on the fragmented plan.");
+  private boolean isChildPassthrough(
+      Analyzer analyzer, PlanNode childNode, List<Expr> childExprList) {
+    List<TupleId> childTupleIds = childNode.getTupleIds();
+    // Check that if the child outputs a single tuple, then it's not nullable. Tuple
+    // nullability can be considered to be part of the physical row layout.
+    Preconditions.checkState(childTupleIds.size() != 1 ||
+        !childNode.getNullableTupleIds().contains(childTupleIds.get(0)));
+    // If the Union node is inside a subplan, passthrough should be disabled to avoid
+    // performance issues by forcing tiny batches.
+    // TODO: Remove this as part of IMPALA-4179.
+    if (isInSubplan_) return false;
+    // Pass through is only done for the simple case where the row has a single tuple. One
+    // of the motivations for this is that the output of a UnionNode is a row with a
+    // single tuple.
+    if (childTupleIds.size() != 1) return false;
+    Preconditions.checkState(!unionResultExprs_.isEmpty());
 
-    // List of estimated per-host memory consumption (first) by child index (second).
-    List<Pair<Long, Integer>> memByChildIdx = Lists.newArrayList();
-    for (int i = 0; i < children_.size(); ++i) {
-      PlanNode child = children_.get(i);
-      child.computeCosts(analyzer.getQueryCtx().client_request.getQuery_options());
-      memByChildIdx.add(new Pair<Long, Integer>(child.getPerHostMemCost(), i));
+    TupleDescriptor unionTupleDescriptor = analyzer.getDescTbl().getTupleDesc(tupleId_);
+    TupleDescriptor childTupleDescriptor =
+        analyzer.getDescTbl().getTupleDesc(childTupleIds.get(0));
+
+    // Verify that the union tuple descriptor has one slot for every expression.
+    Preconditions.checkState(
+        unionTupleDescriptor.getSlots().size() == unionResultExprs_.size());
+    // Verify that the union node has one slot for every child expression.
+    Preconditions.checkState(
+        unionTupleDescriptor.getSlots().size() == childExprList.size());
+
+    if (unionResultExprs_.size() != childTupleDescriptor.getSlots().size()) return false;
+    if (unionTupleDescriptor.getByteSize() != childTupleDescriptor.getByteSize()) {
+      return false;
     }
 
-    Collections.sort(memByChildIdx,
-        new Comparator<Pair<Long, Integer>>() {
-      public int compare(Pair<Long, Integer> a, Pair<Long, Integer> b) {
-        PlanNode aNode = children_.get(a.second);
-        PlanNode bNode = children_.get(b.second);
-        // Order scan nodes last because they can dynamically scale down their mem.
-        if (bNode instanceof ScanNode && !(aNode instanceof ScanNode)) return -1;
-        if (aNode instanceof ScanNode && !(bNode instanceof ScanNode)) return 1;
-        long diff = b.first - a.first;
-        return (diff < 0 ? -1 : (diff > 0 ? 1 : 0));
-      }
-    });
+    for (int i = 0; i < unionResultExprs_.size(); ++i) {
+      if (!unionTupleDescriptor.getSlots().get(i).isMaterialized()) continue;
+      SlotRef unionSlotRef = unionResultExprs_.get(i).unwrapSlotRef(false);
+      SlotRef childSlotRef = childExprList.get(i).unwrapSlotRef(false);
+      Preconditions.checkNotNull(unionSlotRef);
+      if (childSlotRef == null) return false;
+      if (!childSlotRef.getDesc().LayoutEquals(unionSlotRef.getDesc())) return false;
+    }
+    return true;
+  }
 
+  /**
+   * Compute which children are passthrough and reorder them such that the passthrough
+   * children come before the children that need to be materialized. Also reorder
+   * 'resultExprLists_'. The children are reordered to simplify the implementation in the
+   * BE.
+   */
+   void computePassthrough(Analyzer analyzer) {
     List<List<Expr>> newResultExprLists = Lists.newArrayList();
     ArrayList<PlanNode> newChildren = Lists.newArrayList();
-    for (Pair<Long, Integer> p: memByChildIdx) {
-      newResultExprLists.add(resultExprLists_.get(p.second));
-      newChildren.add(children_.get(p.second));
+    for (int i = 0; i < children_.size(); i++) {
+      if (isChildPassthrough(analyzer, children_.get(i), resultExprLists_.get(i))) {
+        newResultExprLists.add(resultExprLists_.get(i));
+        newChildren.add(children_.get(i));
+      }
     }
+    firstMaterializedChildIdx_ = newChildren.size();
+
+    for (int i = 0; i < children_.size(); i++) {
+      if (!isChildPassthrough(analyzer, children_.get(i), resultExprLists_.get(i))) {
+        newResultExprLists.add(resultExprLists_.get(i));
+        newChildren.add(children_.get(i));
+      }
+    }
+
+    Preconditions.checkState(resultExprLists_.size() == newResultExprLists.size());
     resultExprLists_ = newResultExprLists;
+    Preconditions.checkState(children_.size() == newChildren.size());
     children_ = newChildren;
   }
 
@@ -165,6 +219,7 @@ public class UnionNode extends PlanNode {
     Preconditions.checkState(conjuncts_.isEmpty());
     computeMemLayout(analyzer);
     computeStats(analyzer);
+    computePassthrough(analyzer);
 
     // drop resultExprs/constExprs that aren't getting materialized (= where the
     // corresponding output slot isn't being materialized)
@@ -206,7 +261,9 @@ public class UnionNode extends PlanNode {
     for (List<Expr> constTexprList: materializedConstExprLists_) {
       constTexprLists.add(Expr.treesToThrift(constTexprList));
     }
-    msg.union_node = new TUnionNode(tupleId_.asInt(), texprLists, constTexprLists);
+    Preconditions.checkState(firstMaterializedChildIdx_ <= children_.size());
+    msg.union_node = new TUnionNode(
+        tupleId_.asInt(), texprLists, constTexprLists, firstMaterializedChildIdx_);
     msg.node_type = TPlanNodeType.UNION_NODE;
   }
 
@@ -222,6 +279,20 @@ public class UnionNode extends PlanNode {
     }
     if (!constExprLists_.isEmpty()) {
       output.append(detailPrefix + "constant-operands=" + constExprLists_.size() + "\n");
+    }
+    if (detailLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
+      List<String> passThroughNodeIds = Lists.newArrayList();
+      for (int i = 0; i < firstMaterializedChildIdx_; ++i) {
+        passThroughNodeIds.add(children_.get(i).getId().toString());
+      }
+      if (!passThroughNodeIds.isEmpty()) {
+        String result = detailPrefix + "pass-through-operands: ";
+        if (passThroughNodeIds.size() == children_.size()) {
+          output.append(result + "all\n");
+        } else {
+          output.append(result + Joiner.on(",").join(passThroughNodeIds) + "\n");
+        }
+      }
     }
     return output.toString();
   }

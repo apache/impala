@@ -714,6 +714,7 @@ PLAN-ROOT SINK
 |     predicates: t3.bool_col = FALSE
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypestiny t2]
 |     partitions=4/4 files=4 size=460B
@@ -748,6 +749,7 @@ PLAN-ROOT SINK
 |     predicates: b.int_col = 1
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--03:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
@@ -789,6 +791,7 @@ PLAN-ROOT SINK
 |  group by: month, year
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--03:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB

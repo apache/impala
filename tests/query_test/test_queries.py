@@ -75,6 +75,19 @@ class TestQueries(ImpalaTestSuite):
 
   def test_union(self, vector):
     self.run_test_case('QueryTest/union', vector)
+    # IMPALA-3586: The passthrough and materialized children are interleaved. The batch
+    # size is small to test the transition between materialized and passthrough children.
+    query_string = ("select count(c) from ( "
+        "select bigint_col + 1 as c from functional.alltypes limit 15 "
+        "union all "
+        "select bigint_col as c from functional.alltypes limit 15 "
+        "union all "
+        "select bigint_col + 1 as c from functional.alltypes limit 15 "
+        "union all "
+        "(select bigint_col as c from functional.alltypes limit 15)) t")
+    vector.get_value('exec_option')['batch_size'] = 10
+    result = self.execute_query(query_string, vector.get_value('exec_option'))
+    assert result.data[0] == '60'
 
   def test_sort(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':

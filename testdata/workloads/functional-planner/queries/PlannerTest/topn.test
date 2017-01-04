@@ -289,6 +289,7 @@ PLAN-ROOT SINK
 |  order by: int_col DESC
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -307,6 +308,7 @@ PLAN-ROOT SINK
 |  order by: int_col DESC
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -330,6 +332,7 @@ PLAN-ROOT SINK
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -356,6 +359,7 @@ PLAN-ROOT SINK
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypessmall]
 |     partitions=4/4 files=4 size=6.32KB
@@ -401,6 +405,7 @@ PLAN-ROOT SINK
 |  order by: int_col ASC
 |
 00:UNION
+|  pass-through-operands: all
 |  limit: 10
 |
 |--02:SCAN HDFS [functional.alltypessmall]
@@ -418,6 +423,7 @@ PLAN-ROOT SINK
 |  limit: 10
 |
 00:UNION
+|  pass-through-operands: all
 |  limit: 10
 |
 |--02:SCAN HDFS [functional.alltypessmall]

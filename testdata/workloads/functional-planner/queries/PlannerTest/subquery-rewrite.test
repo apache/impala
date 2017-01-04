@@ -2064,6 +2064,7 @@ union all
 PLAN-ROOT SINK
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--05:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 files=1 size=115B
@@ -2095,6 +2096,7 @@ PLAN-ROOT SINK
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--05:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 files=1 size=115B

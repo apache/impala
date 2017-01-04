@@ -193,7 +193,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     *eos = (input_batch_ == NULL);
     if (*eos) return Status::OK();
     next_row_idx_ = 0;
-    DCHECK(input_batch_->row_desc().IsPrefixOf(output_batch->row_desc()));
+    DCHECK(input_batch_->row_desc().LayoutIsPrefixOf(output_batch->row_desc()));
   }
 }
 

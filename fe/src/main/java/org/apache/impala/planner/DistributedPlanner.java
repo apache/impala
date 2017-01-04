@@ -681,7 +681,6 @@ public class DistributedPlanner {
         childFragment.setOutputPartition(DataPartition.RANDOM);
       }
     }
-    unionNode.reorderOperands(ctx_.getRootAnalyzer());
     unionNode.init(ctx_.getRootAnalyzer());
     return unionFragment;
   }

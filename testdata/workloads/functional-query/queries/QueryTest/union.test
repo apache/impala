@@ -16,6 +16,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 ====
 ---- QUERY
 # Only UNION ALL, no nested unions
+# IMPALA-3586: In this test, all union nodes are passed through.
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
 union all
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
@@ -1042,11 +1043,81 @@ DOUBLE
 # there are unmaterialized slots.
 set optimize_partition_key_scans=1;
 select t1.int_col
-from functional.alltypestiny t1 inner join
+from alltypestiny t1 inner join
   (select count(t2.tinyint_col) = 1337 as boolean_col,
-          min(t2.year) as int_col from functional.alltypestiny t2) t3
+          min(t2.year) as int_col from alltypestiny t2) t3
 on (t1.int_col = t3.int_col)
 ---- RESULTS
 ---- TYPES
 INT
+=====
+---- QUERY
+# IMPALA-3586: Verify that limit is obeyed in the passthrough case. This test
+# is relevant if the execution is on a single node (if exec_single_node_rows_threshold
+# large enough) because there is no exchange node above the union node to impose the
+# limit.
+select bigint_col from alltypestiny where bigint_col > 0
+union all
+(select bigint_col from alltypestiny where bigint_col > 0)
+limit 1
+---- RESULTS
+10
+---- TYPES
+bigint
+=====
+---- QUERY
+# IMPALA-3586: Input tuples that have non-nullable slots. Both operands should be passed
+# through by the union node.
+select count(*) from alltypestiny
+union all
+select count(*) from alltypestiny
+---- RESULTS
+8
+8
+---- TYPES
+bigint
+=====
+---- QUERY
+# IMPALA-3586: Both operands are not passed through.
+select bigint_col + 1 from alltypestiny
+union distinct
+select bigint_col + 1 from alltypestiny
+---- RESULTS
+1
+11
+---- TYPES
+bigint
+=====
+---- QUERY
+# IMPALA-3586: One operand is passed through, the other is not.
+select bigint_col + 1 from alltypestiny
+union distinct
+select bigint_col from alltypestiny
+---- RESULTS
+11
+10
+0
+1
+---- TYPES
+bigint
+=====
+---- QUERY
+# IMPALA-3678: The union operands that contain a join should not be passed through,
+# because the resulting row contains 2 tuples, instead of one. However, a semi join
+# outputs a row with only 1 tuple, so it should be passed through.
+select bigint_col from alltypestiny
+union
+select t1.bigint_col from alltypestiny t1 left semi join
+  alltypes t2 on t1.bigint_col = t2.bigint_col
+union
+select t1.bigint_col from alltypestiny t1 left join
+  alltypes t2 on t1.bigint_col = t2.bigint_col
+union
+select t1.bigint_col from alltypestiny t1 inner join
+  alltypes t2 on t1.bigint_col = t2.bigint_col
+---- RESULTS
+10
+0
+---- TYPES
+bigint
 =====

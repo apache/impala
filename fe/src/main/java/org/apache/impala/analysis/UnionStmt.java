@@ -152,6 +152,10 @@ public class UnionStmt extends QueryStmt {
   // true if any of the operands_ references an AnalyticExpr
   private boolean hasAnalyticExprs_ = false;
 
+  // List of output expressions produced by the union without the ORDER BY portion
+  // (if any). Same as resultExprs_ if there is no ORDER BY.
+  private List<Expr> unionResultExprs_ = Lists.newArrayList();
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -183,6 +187,7 @@ public class UnionStmt extends QueryStmt {
     toSqlString_ = (other.toSqlString_ != null) ? new String(other.toSqlString_) : null;
     hasAnalyticExprs_ = other.hasAnalyticExprs_;
     withClause_ = (other.withClause_ != null) ? other.withClause_.clone() : null;
+    unionResultExprs_ = Expr.cloneList(other.unionResultExprs_);
   }
 
   public List<UnionOperand> getOperands() { return operands_; }
@@ -262,6 +267,7 @@ public class UnionStmt extends QueryStmt {
       }
     }
 
+    unionResultExprs_ = Expr.cloneList(resultExprs_);
     if (evaluateOrderBy_) createSortTupleInfo(analyzer);
     baseTblResultExprs_ = resultExprs_;
   }
@@ -503,6 +509,7 @@ public class UnionStmt extends QueryStmt {
         }
       }
 
+      boolean isNullable = false;
       // register single-directional value transfers from output slot
       // to operands' result exprs (if those happen to be slotrefs);
       // don't do that if the operand computes analytic exprs
@@ -510,11 +517,16 @@ public class UnionStmt extends QueryStmt {
       for (UnionOperand op: operands_) {
         Expr resultExpr = op.getQueryStmt().getResultExprs().get(i);
         slotDesc.addSourceExpr(resultExpr);
+        SlotRef slotRef = resultExpr.unwrapSlotRef(false);
+        if (slotRef == null || slotRef.getDesc().getIsNullable()) isNullable = true;
         if (op.hasAnalyticExprs()) continue;
-        SlotRef slotRef = resultExpr.unwrapSlotRef(true);
+        slotRef = resultExpr.unwrapSlotRef(true);
         if (slotRef == null) continue;
         analyzer.registerValueTransfer(outputSlotRef.getSlotId(), slotRef.getSlotId());
       }
+      // If all the child slots are not nullable, then the union output slot should not
+      // be nullable as well.
+      slotDesc.setIsNullable(isNullable);
     }
     baseTblResultExprs_ = resultExprs_;
   }
@@ -601,6 +613,8 @@ public class UnionStmt extends QueryStmt {
     return operands_.get(0).getQueryStmt().getColLabels();
   }
 
+  public List<Expr> getUnionResultExprs() { return unionResultExprs_; }
+
   @Override
   public UnionStmt clone() { return new UnionStmt(this); }
 
@@ -621,5 +635,6 @@ public class UnionStmt extends QueryStmt {
     tupleId_ = null;
     toSqlString_ = null;
     hasAnalyticExprs_ = false;
+    unionResultExprs_.clear();
   }
 }

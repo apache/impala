@@ -149,6 +149,7 @@ select * from functional_hbase.alltypes limit 2
 PLAN-ROOT SINK
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HBASE [functional_hbase.alltypes]
 |     limit: 2
@@ -159,6 +160,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HBASE [functional_hbase.alltypes]
 |     limit: 2
@@ -173,6 +175,7 @@ select * from functional_hbase.alltypes limit 5
 PLAN-ROOT SINK
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HBASE [functional_hbase.alltypes]
 |     limit: 5
@@ -183,6 +186,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--04:EXCHANGE [UNPARTITIONED]
 |  |  limit: 5
@@ -278,19 +282,20 @@ where year=2009 and month=2
 PLAN-ROOT SINK
 |
 04:UNION
+|  pass-through-operands: 03
 |
-|--03:AGGREGATE [FINALIZE]
-|  |  group by: id, bool_col
-|  |
-|  00:UNION
-|  |
-|  |--02:SCAN HDFS [functional.alltypestiny b]
-|  |     partitions=1/4 files=1 size=115B
-|  |
-|  01:SCAN HDFS [functional.alltypestiny a]
+|--05:SCAN HDFS [functional.alltypestiny c]
 |     partitions=1/4 files=1 size=115B
 |
-05:SCAN HDFS [functional.alltypestiny c]
+03:AGGREGATE [FINALIZE]
+|  group by: id, bool_col
+|
+00:UNION
+|
+|--02:SCAN HDFS [functional.alltypestiny b]
+|     partitions=1/4 files=1 size=115B
+|
+01:SCAN HDFS [functional.alltypestiny a]
    partitions=1/4 files=1 size=115B
 ====
 # IMPALA-2527: Tests that the small query optimization is disabled for colleciton types

@@ -110,6 +110,7 @@ select * from functional.alltypestiny
 PLAN-ROOT SINK
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
@@ -250,6 +251,7 @@ select * from functional.alltypestiny
 PLAN-ROOT SINK
 |
 00:UNION
+|  pass-through-operands: all
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
@@ -387,6 +389,7 @@ from functional.alltypes where false
 PLAN-ROOT SINK
 |
 02:UNION
+|  pass-through-operands: all
 |
 01:AGGREGATE [FINALIZE]
 |  group by: lead(-496, 81, NULL) OVER(...)
@@ -411,14 +414,15 @@ PLAN-ROOT SINK
 |
 02:UNION
 |  constant-operands=1
+|  pass-through-operands: 01
 |
-|--01:AGGREGATE [FINALIZE]
-|  |  group by: lead(-496, 81, NULL) OVER(...)
-|  |
-|  00:UNION
+|--03:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
 |
-03:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 files=4 size=460B
+01:AGGREGATE [FINALIZE]
+|  group by: lead(-496, 81, NULL) OVER(...)
+|
+00:UNION
 ====
 # IMPALA-2216: Make sure the final output exprs are substituted, even
 # if the resulting plan is an EmptySetNode.
