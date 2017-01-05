@@ -1185,6 +1185,6 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   </topicref>
   <!-- Release coordinator: don't remove this pre-release tag, it will
        probably remain in pre-release state for some time. -->
-  <topicref audience="pre-release" href="topics/impala_errata.xml"/>
-  <keydef href="topics/impala_errata.xml" keys="errata"/>
+  <topicref audience="Cloudera" href="topics/impala_errata.xml"/>
+  <keydef audience="Cloudera" href="topics/impala_errata.xml" keys="errata"/>
 </map>
