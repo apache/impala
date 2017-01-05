@@ -19,9 +19,7 @@ package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Set;
 
 import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.AnalysisContext;
@@ -30,12 +28,17 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.QueryStmt;
+import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 
 /**
@@ -785,20 +788,23 @@ public class DistributedPlanner {
 
     DataPartition parentPartition = null;
     if (hasGrouping) {
-      // the parent fragment is partitioned on the grouping exprs;
-      // substitute grouping exprs to reference the *output* of the agg, not the input
       List<Expr> partitionExprs = node.getAggInfo().getPartitionExprs();
       if (partitionExprs == null) partitionExprs = groupingExprs;
-      partitionExprs = Expr.substituteList(partitionExprs,
-          node.getAggInfo().getIntermediateSmap(), ctx_.getRootAnalyzer(), false);
       boolean childHasCompatPartition = ctx_.getRootAnalyzer().equivSets(partitionExprs,
             childFragment.getDataPartition().getPartitionExprs());
-      if (childHasCompatPartition) {
-        // The data is already partitioned on the required expressions, we can just do
-        // the aggregation in the child fragment without an extra merge step.
+      if (childHasCompatPartition && !childFragment.refsNullableTupleId(partitionExprs)) {
+        // The data is already partitioned on the required expressions. We can do the
+        // aggregation in the child fragment without an extra merge step.
+        // An exchange+merge step is required if the grouping exprs reference a tuple
+        // that is made nullable in 'childFragment' to bring NULLs from outer-join
+        // non-matches together.
         childFragment.addPlanRoot(node);
         return childFragment;
       }
+      // the parent fragment is partitioned on the grouping exprs;
+      // substitute grouping exprs to reference the *output* of the agg, not the input
+      partitionExprs = Expr.substituteList(partitionExprs,
+          node.getAggInfo().getIntermediateSmap(), ctx_.getRootAnalyzer(), false);
       parentPartition = DataPartition.hashPartitioned(partitionExprs);
     } else {
       // the parent fragment is unpartitioned
@@ -973,12 +979,16 @@ public class DistributedPlanner {
     Preconditions.checkState(sortNode.isAnalyticSort());
     PlanFragment analyticFragment = childFragment;
     if (sortNode.getInputPartition() != null) {
-      // make sure the childFragment's output is partitioned as required by the sortNode
       sortNode.getInputPartition().substitute(
           childFragment.getPlanRoot().getOutputSmap(), ctx_.getRootAnalyzer());
-      if (!childFragment.getDataPartition().equals(sortNode.getInputPartition())) {
-        analyticFragment =
-            createParentFragment(childFragment, sortNode.getInputPartition());
+      // Make sure the childFragment's output is partitioned as required by the sortNode.
+      // Even if the fragment and the sort partition exprs are equal, an exchange is
+      // required if the sort partition exprs reference a tuple that is made nullable in
+      // 'childFragment' to bring NULLs from outer-join non-matches together.
+      DataPartition sortPartition = sortNode.getInputPartition();
+      if (!childFragment.getDataPartition().equals(sortPartition)
+          || childFragment.refsNullableTupleId(sortPartition.getPartitionExprs())) {
+        analyticFragment = createParentFragment(childFragment, sortPartition);
       }
     }
     analyticFragment.addPlanRoot(sortNode);

@@ -1167,3 +1167,109 @@ PLAN-ROOT SINK
    partitions=1/1 files=3 size=193.61MB
    runtime filters: RF002 -> l_orderkey, RF003 -> l_returnflag
 ====
+# IMPALA-4263: Grouping agg needs a merge step because the grouping exprs reference a
+# tuple that is made nullable in the join fragment.
+select /* +straight_join */ t2.id, count(*)
+from functional.alltypes t1
+left outer join /* +shuffle */ functional.alltypessmall t2
+  on t1.id = t2.id
+group by t2.id
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: t2.id
+|
+06:EXCHANGE [HASH(t2.id)]
+|
+03:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: t2.id
+|
+02:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: t1.id = t2.id
+|
+|--05:EXCHANGE [HASH(t2.id)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 files=4 size=6.32KB
+|
+04:EXCHANGE [HASH(t1.id)]
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-4263: Grouping agg is placed in the join fragment and has no merge step.
+select /* +straight_join */ t1.id, count(*)
+from functional.alltypes t1
+left outer join /* +shuffle */ functional.alltypessmall t2
+  on t1.id = t2.id
+group by t1.id
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: t1.id
+|
+02:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: t1.id = t2.id
+|
+|--05:EXCHANGE [HASH(t2.id)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 files=4 size=6.32KB
+|
+04:EXCHANGE [HASH(t1.id)]
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-4263: Grouping agg is placed in the second join fragment and has no merge step.
+# The grouping exprs reference a nullable tuple (t2), but that tuple is made nullable in
+# the first join fragment, so it's correct to place the the aggregation in the second
+# join fragment without a merge step.
+select /* +straight_join */ t2.id, count(*)
+from functional.alltypes t1
+left outer join /* +shuffle */ functional.alltypessmall t2
+  on t1.int_col = t2.int_col
+left outer join /* +shuffle */ functional.alltypestiny t3
+  on t2.id = t3.id
+group by t2.id
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+10:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: t2.id
+|
+04:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: t2.id = t3.id
+|
+|--09:EXCHANGE [HASH(t3.id)]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 files=4 size=460B
+|
+08:EXCHANGE [HASH(t2.id)]
+|
+03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: t1.int_col = t2.int_col
+|
+|--07:EXCHANGE [HASH(t2.int_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 files=4 size=6.32KB
+|
+06:EXCHANGE [HASH(t1.int_col)]
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====

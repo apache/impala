@@ -2327,3 +2327,38 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-4263: Analytic function needs a hash exchange because the partition exprs
+# reference a tuple that is made nullable in the join fragment.
+select /* +straight_join */ count(*) over (partition by t1.id)
+from functional.alltypes t1
+right outer join /* +shuffle */ functional.alltypessmall t2
+  on t1.id = t2.id
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+04:ANALYTIC
+|  functions: count(*)
+|  partition by: t1.id
+|
+03:SORT
+|  order by: id ASC NULLS FIRST
+|
+07:EXCHANGE [HASH(t1.id)]
+|
+02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|
+|--06:EXCHANGE [HASH(t2.id)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 files=4 size=6.32KB
+|
+05:EXCHANGE [HASH(t1.id)]
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
+====

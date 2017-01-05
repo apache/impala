@@ -18,30 +18,26 @@
 package org.apache.impala.planner;
 
 import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Set;
 
 import org.apache.impala.analysis.Analyzer;
-import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.JoinOperator;
-import org.apache.impala.analysis.SlotRef;
-import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.TreeNode;
-import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPartitionType;
-import org.apache.impala.thrift.TPlan;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TPlanFragmentTree;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * PlanFragments form a tree structure via their ExchangeNodes. A tree of fragments
@@ -384,5 +380,24 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     Preconditions.checkState(getChildren().containsAll(childFragments));
 
     for (PlanFragment child: getChildren()) child.verifyTree();
+  }
+
+  /**
+   * Returns true if 'exprs' reference a tuple that is made nullable in this fragment,
+   * but not in any of its input fragments.
+   */
+  public boolean refsNullableTupleId(List<Expr> exprs) {
+    Preconditions.checkNotNull(planRoot_);
+    List<TupleId> tids = Lists.newArrayList();
+    for (Expr e: exprs) e.getIds(tids, null);
+    Set<TupleId> nullableTids = Sets.newHashSet(planRoot_.getNullableTupleIds());
+    // Remove all tuple ids that were made nullable in an input fragment.
+    List<ExchangeNode> exchNodes = Lists.newArrayList();
+    planRoot_.collect(ExchangeNode.class, exchNodes);
+    for (ExchangeNode exchNode: exchNodes) {
+      nullableTids.removeAll(exchNode.getNullableTupleIds());
+    }
+    for (TupleId tid: tids) if (nullableTids.contains(tid)) return true;
+    return false;
   }
 }
