@@ -52,7 +52,10 @@ under the License.
       <note>
         Impala was accepted into the Apache incubator on December 2, 2015.
         In places where the documentation formerly referred to <q>Cloudera Impala</q>,
-        now the official name is <q>Apache Impala (incubating)</q>.
+        now the official name is <q>Apache Impala (incubating)</q>. As of January 2016,
+        the Impala community is working on excising the Cloudera-specific documentation
+        from this manual. While that is ongoing, there are still some outdated or
+        off-topic parts of this manual.
       </note>
 
   </conbody>
