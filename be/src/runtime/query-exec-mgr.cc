@@ -132,34 +132,32 @@ QueryState* QueryExecMgr::GetQueryState(const TUniqueId& query_id) {
 
 void QueryExecMgr::ReleaseQueryState(QueryState* qs) {
   DCHECK(qs != nullptr);
-  TUniqueId query_id;
-  {
-    int32_t cnt = qs->refcnt_.Add(-1);
-    VLOG_QUERY << "ReleaseQueryState(): query_id=" << PrintId(qs->query_id())
-               << " refcnt=" << cnt + 1;
-    DCHECK_GE(cnt, 0);
-    if (cnt > 0) return;
-    // don't reference anything from 'qs' beyond this point, 'qs' might get
-    // gc'd out from under us
-    query_id = qs->query_id();
-  }
+  TUniqueId query_id = qs->query_id();
+  int32_t cnt = qs->refcnt_.Add(-1);
+  // don't reference anything from 'qs' beyond this point, 'qs' might get
+  // gc'd out from under us
+  qs = nullptr;
+  VLOG_QUERY << "ReleaseQueryState(): query_id=" << PrintId(query_id)
+             << " refcnt=" << cnt + 1;
+  DCHECK_GE(cnt, 0);
+  if (cnt > 0) return;
 
+  QueryState* qs_from_map = nullptr;
   {
     // for now, gc right away
     lock_guard<mutex> l(qs_map_lock_);
     auto it = qs_map_.find(query_id);
     // someone else might have gc'd the entry
     if (it == qs_map_.end()) return;
-    qs = it->second;
-    DCHECK_EQ(qs->query_ctx().query_id, query_id);
-    int32_t cnt = qs->refcnt_.Load();
+    qs_from_map = it->second;
+    DCHECK_EQ(qs_from_map->query_ctx().query_id, query_id);
+    int32_t cnt = qs_from_map->refcnt_.Load();
     DCHECK_GE(cnt, 0);
     // someone else might have increased the refcnt in the meantime
     if (cnt > 0) return;
-    size_t num_erased = qs_map_.erase(qs->query_ctx().query_id);
-    DCHECK_EQ(num_erased, 1);
+    qs_map_.erase(it);
   }
   // TODO: send final status report during gc, but do this from a different thread
-  delete qs;
+  delete qs_from_map;
 }
 
