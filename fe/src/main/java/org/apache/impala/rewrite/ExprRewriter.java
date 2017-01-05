@@ -22,7 +22,7 @@ import java.util.List;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.common.AnalysisException;
-import org.apache.kudu.client.shaded.com.google.common.collect.Lists;
+import com.google.common.collect.Lists;
 
 /**
  * Helper class that drives the transformation of Exprs according to a given list of
