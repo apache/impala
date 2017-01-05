@@ -2109,7 +2109,7 @@ The <codeph>SHOW CREATE TABLE</codeph> statement gives us the starting point.
 |   late_aircraft_delay INT COMMENT 'inferred from: optional int32 late_aircraft_delay'
 | )
 | STORED AS PARQUET
-| LOCATION 'hdfs://a1730.halxg.cloudera.com:8020/user/impala/staging/airlines'
+| LOCATION 'hdfs://a1730.example.com:8020/user/impala/staging/airlines'
 | TBLPROPERTIES ('numFiles'='0', 'COLUMN_STATS_ACCURATE'='false',
 |   'transient_lastDdlTime'='1439425228', 'numRows'='-1', 'totalSize'='0',
 |   'rawDataSize'='-1')
@@ -2169,7 +2169,7 @@ Copyright (c) 2012 Cloudera, Inc. All rights reserved.
   late_aircraft_delay INT COMMENT 'inferred from: optional int32 late_aircraft_delay'
 )
 STORED AS PARQUET
-LOCATION 'hdfs://a1730.halxg.cloudera.com:8020/user/impala/staging/airlines'
+LOCATION 'hdfs://a1730.example.com:8020/user/impala/staging/airlines'
 TBLPROPERTIES ('numFiles'='0', 'COLUMN_STATS_ACCURATE'='false',
   'transient_lastDdlTime'='1439425228', 'numRows'='-1', 'totalSize'='0',
   'rawDataSize'='-1')"

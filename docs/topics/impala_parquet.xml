@@ -776,10 +776,9 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
         syntax.
       </p>
 
-<!-- Sample commands/output for when the 'distcp' business is expanded into a tutorial later. Part of
-     a1730.halxg.cloudera.com:/home/jrussell/jdr/mixed_format_partitions.log.
+<!-- Sample commands/output for when the 'distcp' business is expanded into a tutorial later.
 <codeblock>$ hdfs fsck -blocks /user/impala/warehouse/parquet_compression.db/parquet_everything
-Connecting to namenode via http://a1730.halxg.cloudera.com:50070
+Connecting to namenode via http://a1730.example.com:50070
 FSCK started by jrussell (auth:SIMPLE) from /10.20.198.130 for path /user/impala/warehouse/parquet_compression.db/parquet_everything at Fri Aug 23 11:35:37 PDT 2013
 ............................................................................Status: HEALTHY
  Total size:    74504481213 B
