@@ -29,6 +29,10 @@ using namespace impala;
 const int MAX_QUEUE_CAPACITY = 128;
 const int MIN_QUEUE_CAPACITY = 2;
 
+DEFINE_bool(use_hdfs_pread, false, "Enables using hdfsPread() instead of hdfsRead() "
+    "when performing HDFS read operations. This is necessary to use HDFS hedged reads "
+    "(assuming the HDFS client is configured to do so).");
+
 // Implementation of the ScanRange functionality. Each ScanRange contains a queue
 // of ready buffers. For each ScanRange, there is only a single producer and
 // consumer thread, i.e. only one disk thread will push to a scan range at
@@ -397,7 +401,15 @@ Status DiskIoMgr::ScanRange::Read(
       DCHECK_GE(chunk_size, 0);
       // The hdfsRead() length argument is an int.
       DCHECK_LE(chunk_size, numeric_limits<int>::max());
-      int last_read = hdfsRead(fs_, hdfs_file_->file(), buffer + *bytes_read, chunk_size);
+      int last_read = -1;
+      if (FLAGS_use_hdfs_pread) {
+        // bytes_read_ is only updated after the while loop
+        int64_t position_in_file = offset_ + bytes_read_ + *bytes_read;
+        last_read = hdfsPread(fs_, hdfs_file_->file(), position_in_file,
+            buffer + *bytes_read, chunk_size);
+      } else {
+        last_read = hdfsRead(fs_, hdfs_file_->file(), buffer + *bytes_read, chunk_size);
+      }
       if (last_read == -1) {
         return Status(GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
       } else if (last_read == 0) {
