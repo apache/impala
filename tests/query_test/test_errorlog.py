@@ -33,9 +33,9 @@ class TestErrorLogs(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestErrorLogs, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text')
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
 
   def test_errorlog(self, vector):

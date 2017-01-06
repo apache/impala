@@ -39,7 +39,7 @@ class TestHdfsFdCaching(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsFdCaching, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(cls.file_format_constraint)
+    cls.ImpalaTestMatrix.add_constraint(cls.file_format_constraint)
 
   @classmethod
   def get_workload(cls):

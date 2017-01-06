@@ -39,11 +39,12 @@ class TestHiddenFiles(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHiddenFiles, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
     # Only run in exhaustive mode on hdfs since this test takes a long time.
     if cls.exploration_strategy() != 'exhaustive' and not IS_S3:
-      cls.TestMatrix.clear()
+      cls.ImpalaTestMatrix.clear()
 
   def __prepare_test_table(self, db_name, tbl_name):
     """Creates a test table with two partitions, and copies files into the HDFS

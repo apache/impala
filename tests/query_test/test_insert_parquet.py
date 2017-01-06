@@ -29,7 +29,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
 
 # TODO: Add Gzip back.  IMPALA-424
@@ -52,16 +52,18 @@ class TestInsertParquetQueries(ImpalaTestSuite):
     # into the same table at the same time for the same file format).
     # TODO: When we do decide to run these tests in parallel we could create unique temp
     # tables for each test case to resolve the concurrency problems.
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
         sync_ddl=[1]))
 
-    cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
-    cls.TestMatrix.add_dimension(TestDimension("file_size", *PARQUET_FILE_SIZES));
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension("compression_codec", *PARQUET_CODECS));
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension("file_size", *PARQUET_FILE_SIZES));
 
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'parquet')
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
 
   @SkipIfLocal.multiple_impalad
@@ -82,13 +84,14 @@ class TestInsertParquetInvalidCodec(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestInsertParquetInvalidCodec, cls).add_test_dimensions()
     # Fix the exec_option vector to have a single value.
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
         sync_ddl=[1]))
-    cls.TestMatrix.add_dimension(TestDimension("compression_codec", 'bzip2'));
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension("compression_codec", 'bzip2'));
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'parquet')
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
 
   @SkipIfLocal.multiple_impalad
@@ -108,14 +111,15 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestInsertParquetVerifySize, cls).add_test_dimensions()
     # Fix the exec_option vector to have a single value.
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
         sync_ddl=[1]))
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'parquet')
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
-    cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension("compression_codec", *PARQUET_CODECS));
 
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.hdfs_client
@@ -156,7 +160,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsParquetTableWriter, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def test_def_level_encoding(self, vector, unique_database):

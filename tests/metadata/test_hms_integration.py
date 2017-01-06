@@ -52,8 +52,8 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestHmsIntegrationSanity, cls).add_test_dimensions()
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
   @pytest.mark.execute_serially
@@ -103,8 +103,8 @@ class TestHmsIntegration(ImpalaTestSuite):
       pytest.skip("Should only run in exhaustive due to long execution time.")
 
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
   class ImpalaDbWrapper(object):

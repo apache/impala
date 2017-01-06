@@ -157,7 +157,7 @@ def pytest_generate_tests(metafunc):
   """
   if 'vector' in metafunc.fixturenames:
     metafunc.cls.add_test_dimensions()
-    vectors = metafunc.cls.TestMatrix.generate_test_vectors(
+    vectors = metafunc.cls.ImpalaTestMatrix.generate_test_vectors(
         metafunc.config.option.exploration_strategy)
     if len(vectors) == 0:
       LOG.warning('No test vectors generated. Check constraints and input vectors')

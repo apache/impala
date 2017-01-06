@@ -408,7 +408,7 @@ class TestLibCache(TestDdlBase):
   @classmethod
   def add_test_dimensions(cls):
     super(TestLibCache, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
   def test_create_drop_function(self, vector, unique_database):
     """This will create, run, and drop the same function repeatedly, exercising the

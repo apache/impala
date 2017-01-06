@@ -29,13 +29,13 @@ class TestTpchQuery(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTpchQuery, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
     # The tpch tests take a long time to execute so restrict the combinations they
     # execute over.
     # TODO: the planner tests are based on text and need this.
     if cls.exploration_strategy() == 'core':
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format in ['text', 'parquet', 'kudu'])
 
   def get_test_file_prefix(self, vector):

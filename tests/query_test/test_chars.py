@@ -71,9 +71,9 @@ class TestStringQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestStringQueries, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(
       create_exec_option_dimension(disable_codegen_options=[False, True]))
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['text'] and
         v.get_value('table_format').compression_codec in ['none'])
 
@@ -117,9 +117,9 @@ class TestCharFormats(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestCharFormats, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(
       create_exec_option_dimension(disable_codegen_options=[False, True]))
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         (v.get_value('table_format').file_format in ['avro'] and
         v.get_value('table_format').compression_codec in ['snap']) or
         v.get_value('table_format').file_format in ['parquet'] or

@@ -44,9 +44,9 @@ class TestRewrittenFile(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestRewrittenFile, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # TODO: add more file formats
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def __overwrite_file_and_query(self, db_name, table_name, old_file, new_file,

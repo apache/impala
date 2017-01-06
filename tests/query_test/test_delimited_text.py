@@ -37,9 +37,10 @@ class TestDelimitedText(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestDelimitedText, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # Only run on delimited text with no compression.
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_delimited_text(self, vector, unique_database):
     self.run_test_case('QueryTest/delimited-text', vector, unique_database)

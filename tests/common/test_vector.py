@@ -15,41 +15,43 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# A TextMatrix is used to generate a set of TestVectors. The vectors that are generated
-# are based on one or more TestDimensions inputs. These lists define the set of
-# values that are interesting to a test. For example, for file_format these might be
-# 'seq', 'text', etc
+# A TextMatrix is used to generate a set of ImpalaTestVectors. The vectors that are
+# generated are based on one or more ImpalaTestDimensions inputs. These lists define
+# the set of values that are interesting to a test. For example, for file_format
+# these might be 'seq', 'text', etc
 #
-# The TestMatrix is then used to generate a set of TestVectors. Each TestVector contains a
-# single value from each of the input TestDimensions. An example:
+# The ImpalaTestMatrix is then used to generate a set of ImpalaTestVectors. Each
+# ImpalaTestVector contains a single value from each of the input ImpalaTestDimensions.
+# An example:
 #
-# TestMatrix.add_dimension('file_format', 'seq', 'text')
-# TestMatrix.add_dimension('agg_func', 'min', 'max', 'sum')
-# TestMatrix.add_dimension('col_type', 'int', 'bool')
-# test_vectors = TestMatrix.generate_test_vectors(...)
+# ImpalaTestMatrix.add_dimension('file_format', 'seq', 'text')
+# ImpalaTestMatrix.add_dimension('agg_func', 'min', 'max', 'sum')
+# ImpalaTestMatrix.add_dimension('col_type', 'int', 'bool')
+# test_vectors = ImpalaTestMatrix.generate_test_vectors(...)
 #
-# Would return a collection of TestVectors, with each one containing a combination of
-# file_format, agg_func, and col_type:
+# Would return a collection of ImpalaTestVectors, with each one containing a
+# combination of file_format, agg_func, and col_type:
 # seq, min, int
 # text, max, bool
 # ...
 #
-# A TestVector is an object itself, and the 'get_value' function is used to extract the
-# actual value from the TestVector for this particular combination:
+# A ImpalaTestVector is an object itself, and the 'get_value' function is used to
+# extract the actual value from the ImpalaTestVector for this particular combination:
 # test_vector = test_vectors[0]
 # print test_vector.get_value('file_format')
 #
-# The combinations of TestVectors generated can be done in two ways: pairwise and
-# exhaustive. Pairwise provides a way to get good coverage and reduce the total number
-# of combinations generated where exhaustive will generate all valid combinations.
+# The combinations of ImpalaTestVectors generated can be done in two ways: pairwise
+# and exhaustive. Pairwise provides a way to get good coverage and reduce the total
+# number of combinations generated where exhaustive will generate all valid
+# combinations.
 #
-# Finally, the TestMatrix also provides a way to add constraints to the vectors that
-# are generated. This is useful to filter out invalid combinations. These can be added
-# before calling 'generate_test_vectors'. The constraint is a function that
-# accepts a TestVector object and returns true if the vector is valid, false otherwise.
-# For example, if we want to make sure 'bool' columns are not used with 'sum':
+# Finally, the ImpalaTestMatrix also provides a way to add constraints to the vectors
+# that are generated. This is useful to filter out invalid combinations. These can
+# be added before calling 'generate_test_vectors'. The constraint is a function that
+# accepts a ImpalaTestVector object and returns true if the vector is valid, false
+# otherwise. For example, if we want to make sure 'bool' columns are not used with 'sum':
 #
-# TestMatrix.add_constraint(lambda v:\
+# ImpalaTestMatrix.add_constraint(lambda v:\
 #    not (v.get_value('col_type') == 'bool and v.get_value('agg_func') == 'sum'))
 #
 # Additional examples of usage can be found within the test suites.
@@ -57,15 +59,15 @@
 from itertools import product
 
 # A list of test dimension values.
-class TestDimension(list):
+class ImpalaTestDimension(list):
   def __init__(self, name, *args):
     self.name = name
-    self.extend([TestVector.Value(name, arg) for arg in args])
+    self.extend([ImpalaTestVector.Value(name, arg) for arg in args])
 
 
-# A test vector that passed to test method. The TestVector can be used to extract values
-# for the specified dimension(s)
-class TestVector(object):
+# A test vector that passed to test method. The ImpalaTestVector can be used to
+# extract values for the specified dimension(s)
+class ImpalaTestVector(object):
   def __init__(self, vector_values):
     self.vector_values = vector_values
 
@@ -89,7 +91,7 @@ class TestVector(object):
 
 # Matrix -> Collection of vectors
 # Vector -> Call to get specific values
-class TestMatrix(object):
+class ImpalaTestMatrix(object):
   def __init__(self, *args):
     self.dimensions = dict((arg.name, arg) for arg in args)
     self.constraint_list = list()
@@ -118,8 +120,8 @@ class TestMatrix(object):
       raise ValueError, 'Unknown exploration strategy: %s' % exploration_strategy
 
   def __generate_exhaustive_combinations(self):
-    return [TestVector(vec) for vec in product(*self.__extract_vector_values()) if\
-                                               self.is_valid(vec)]
+    return [ImpalaTestVector(vec) for vec in product(*self.__extract_vector_values())
+              if self.is_valid(vec)]
 
   def __generate_pairwise_combinations(self):
     import metacomm.combinatorics.all_pairs2
@@ -129,7 +131,7 @@ class TestMatrix(object):
     # results will be the same.
     if len(self.dimensions) == 1:
       return self.__generate_exhaustive_combinations()
-    return [TestVector(vec) for vec in all_pairs(self.__extract_vector_values(),
+    return [ImpalaTestVector(vec) for vec in all_pairs(self.__extract_vector_values(),
                                                  filter_func = self.is_valid)]
 
   def add_constraint(self, constraint_func):
@@ -139,15 +141,15 @@ class TestMatrix(object):
     self.constraint_list = list()
 
   def __extract_vector_values(self):
-    # The data is stored as a tuple of (name, [val1, val2, val3]). So extract the actual
-    # values from this
+    # The data is stored as a tuple of (name, [val1, val2, val3]). So extract the
+    # actual values from this
     return [v[1] for v in self.dimensions.items()]
 
   def is_valid(self, vector):
     for constraint in self.constraint_list:
       if (isinstance(vector, list) or isinstance(vector, tuple)) and\
           len(vector) == len(self.dimensions):
-        valid = constraint(TestVector(vector))
+        valid = constraint(ImpalaTestVector(vector))
         if valid:
           continue
         return False

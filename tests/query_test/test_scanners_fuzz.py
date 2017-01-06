@@ -53,13 +53,13 @@ class TestScannersFuzzing(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestScannersFuzzing, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({
           'abort_on_error' : cls.ABORT_ON_ERROR_VALUES,
           'num_nodes' : cls.NUM_NODES_VALUES,
           'mem_limit' : cls.MEM_LIMITS}))
     # TODO: enable for more table formats once they consistently pass the fuzz test.
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ('avro', 'parquet') or
         (v.get_value('table_format').file_format == 'text' and
           v.get_value('table_format').compression_codec in ('none', 'lzo')))

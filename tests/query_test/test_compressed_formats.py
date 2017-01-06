@@ -25,7 +25,7 @@ from subprocess import call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path
 
 # (file extension, table suffix) pairs
@@ -55,15 +55,15 @@ class TestCompressedFormats(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestCompressedFormats, cls).add_test_dimensions()
-    cls.TestMatrix.clear()
-    cls.TestMatrix.add_dimension(\
-        TestDimension('file_format', *['rc', 'seq', 'text']))
-    cls.TestMatrix.add_dimension(\
-        TestDimension('compression_format', *compression_formats))
+    cls.ImpalaTestMatrix.clear()
+    cls.ImpalaTestMatrix.add_dimension(\
+        ImpalaTestDimension('file_format', *['rc', 'seq', 'text']))
+    cls.ImpalaTestMatrix.add_dimension(\
+        ImpalaTestDimension('compression_format', *compression_formats))
     if cls.exploration_strategy() == 'core':
       # Don't run on core.  This test is very slow and we are unlikely
       # to regress here.
-      cls.TestMatrix.add_constraint(lambda v: False);
+      cls.ImpalaTestMatrix.add_constraint(lambda v: False);
 
   @pytest.mark.execute_serially
   def test_compressed_formats(self, vector):
@@ -136,11 +136,11 @@ class TestTableWriters(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTableWriters, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # This class tests many formats, but doesn't use the contraints
     # Each format is tested within one test file, we constrain to text/none
     # as each test file only needs to be run once.
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         (v.get_value('table_format').file_format =='text' and
         v.get_value('table_format').compression_codec == 'none'))
 
@@ -189,7 +189,7 @@ class TestLargeCompressedFile(ImpalaTestSuite):
 
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip("skipping if it's not exhaustive test.")
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         (v.get_value('table_format').file_format =='text' and
         v.get_value('table_format').compression_codec == 'snap'))
 
@@ -267,9 +267,9 @@ class TestBzip2Streaming(ImpalaTestSuite):
 
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip("skipping if it's not exhaustive test.")
-    cls.TestMatrix.add_dimension(
-        TestDimension('max_scan_range_length', *cls.MAX_SCAN_RANGE_LENGTHS))
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('max_scan_range_length', *cls.MAX_SCAN_RANGE_LENGTHS))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'bzip')
 

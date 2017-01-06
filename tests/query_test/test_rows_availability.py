@@ -18,7 +18,7 @@
 import pytest
 import re
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 
 class TestRowsAvailability(ImpalaTestSuite):
   """Tests that the 'Rows available' timeline event is marked only after rows are
@@ -49,8 +49,8 @@ class TestRowsAvailability(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestRowsAvailability, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(TestDimension('query', *cls.QUERIES))
-    cls.TestMatrix.add_constraint(lambda v: cls.__is_valid_test_vector(v))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('query', *cls.QUERIES))
+    cls.ImpalaTestMatrix.add_constraint(lambda v: cls.__is_valid_test_vector(v))
 
   @classmethod
   def __is_valid_test_vector(cls, vector):

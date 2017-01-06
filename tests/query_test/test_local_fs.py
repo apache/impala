@@ -28,9 +28,9 @@ class TestLocalFileSystem(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestLocalFileSystem, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and \
         v.get_value('table_format').compression_codec == 'none')
 

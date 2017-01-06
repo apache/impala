@@ -47,7 +47,7 @@ from tests.common.test_result_verifier import (
     apply_error_match_filter,
     verify_raw_results,
     verify_runtime_profile)
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 from tests.performance.query import Query
 from tests.performance.query_exec_functions import execute_using_jdbc
 from tests.performance.query_executor import JdbcQueryExecConfig
@@ -96,9 +96,9 @@ class ImpalaTestSuite(BaseTestSuite):
     add more dimensions or different dimensions they can override this function.
     """
     super(ImpalaTestSuite, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(
         cls.create_table_info_dimension(cls.exploration_strategy()))
-    cls.TestMatrix.add_dimension(cls.__create_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(cls.__create_exec_option_dimension())
 
   @classmethod
   def setup_class(cls):
@@ -583,7 +583,7 @@ class ImpalaTestSuite(BaseTestSuite):
       for tf in pytest.config.option.table_formats.split(','):
         dataset = get_dataset_from_workload(cls.get_workload())
         table_formats.append(TableFormatInfo.create_from_string(dataset, tf))
-      tf_dimensions = TestDimension('table_format', *table_formats)
+      tf_dimensions = ImpalaTestDimension('table_format', *table_formats)
     else:
       tf_dimensions = load_table_info_dimension(cls.get_workload(), exploration_strategy)
     # If 'skip_hbase' is specified or the filesystem is isilon, s3 or local, we don't

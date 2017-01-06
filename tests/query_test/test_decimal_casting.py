@@ -23,7 +23,7 @@ from metacomm.combinatorics.all_pairs2 import all_pairs2 as all_pairs
 from random import randint
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_vector import TestDimension, TestMatrix
+from tests.common.test_vector import ImpalaTestDimension, ImpalaTestMatrix
 
 class TestDecimalCasting(ImpalaTestSuite):
   """Test Suite to verify that casting to Decimal works.
@@ -55,11 +55,11 @@ class TestDecimalCasting(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    cls.TestMatrix = TestMatrix()
-    cls.TestMatrix.add_dimension(TestDimension('decimal_type',
+    cls.ImpalaTestMatrix = ImpalaTestMatrix()
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('decimal_type',
         *TestDecimalCasting.DECIMAL_TYPES_MAP[cls.exploration_strategy()]))
-    cls.TestMatrix.add_dimension(
-        TestDimension('cast_from', *TestDecimalCasting.CAST_FROM))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('cast_from', *TestDecimalCasting.CAST_FROM))
     cls.iterations = 1
 
   def setup_method(self, method):

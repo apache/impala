@@ -45,7 +45,8 @@ class TestUdfPersistence(CustomClusterTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestUdfPersistence, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
     super(TestUdfPersistence, self).setup_method(method)

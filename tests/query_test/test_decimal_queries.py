@@ -20,7 +20,7 @@
 from copy import copy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 
 class TestDecimalQueries(ImpalaTestSuite):
   BATCH_SIZES = [0, 1]
@@ -32,13 +32,13 @@ class TestDecimalQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestDecimalQueries, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
-        TestDimension('batch_size', *TestDecimalQueries.BATCH_SIZES))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('batch_size', *TestDecimalQueries.BATCH_SIZES))
 
     # Hive < 0.11 does not support decimal so we can't run these tests against the other
     # file formats.
     # TODO: Enable them on Hive >= 0.11.
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         (v.get_value('table_format').file_format == 'text' and
          v.get_value('table_format').compression_codec == 'none') or
          v.get_value('table_format').file_format == 'parquet')
@@ -58,7 +58,7 @@ class TestAvroDecimalQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestAvroDecimalQueries, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         (v.get_value('table_format').file_format == 'avro' and
          v.get_value('table_format').compression_codec == 'snap'))
 

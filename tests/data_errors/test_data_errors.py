@@ -33,7 +33,7 @@ class TestDataErrors(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestDataErrors, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension(batch_sizes=cls.BATCH_SIZES))
 
 
@@ -48,7 +48,7 @@ class TestHdfsScanNodeErrors(TestDataErrors):
   def add_test_dimensions(cls):
     super(TestHdfsScanNodeErrors, cls).add_test_dimensions()
     # Only run on delimited text with no compression.
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format != 'hbase' and
         v.get_value('table_format').file_format != 'parquet')
 
@@ -66,7 +66,7 @@ class TestHdfsSeqScanNodeErrors(TestHdfsScanNodeErrors):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsSeqScanNodeErrors, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'seq')
 
   def test_hdfs_seq_scan_node_errors(self, vector):
@@ -79,7 +79,7 @@ class TestHdfsRcFileScanNodeErrors(TestHdfsScanNodeErrors):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsRcFileScanNodeErrors, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'rc')
 
   def test_hdfs_rcfile_scan_node_errors(self, vector):
@@ -91,7 +91,7 @@ class TestAvroErrors(TestDataErrors):
   @classmethod
   def add_test_dimensions(cls):
     super(TestAvroErrors, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'avro' and
         v.get_value('table_format').compression_codec == 'snap')
 
@@ -105,7 +105,7 @@ class TestHBaseDataErrors(TestDataErrors):
     super(TestHBaseDataErrors, cls).add_test_dimensions()
 
     # Only run on hbase.
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'hbase' and\
         v.get_value('table_format').compression_codec == 'none')
 
@@ -133,7 +133,7 @@ class TestTimestampErrors(TestDataErrors):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTimestampErrors, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text')
 
   def _setup_test_table(self, fq_tbl_name):

@@ -38,9 +38,9 @@ class TestMultipleFilesystems(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMultipleFilesystems, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and \
         v.get_value('table_format').compression_codec == 'none')
 

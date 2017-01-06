@@ -19,7 +19,7 @@ import pytest
 import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 
 class TestHashJoinTimer(ImpalaTestSuite):
   """Tests that the local time in hash join is correct in the ExecSummary, average
@@ -74,8 +74,9 @@ class TestHashJoinTimer(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHashJoinTimer, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(TestDimension('test cases', *cls.TEST_CASES))
-    cls.TestMatrix.add_constraint(lambda v: cls.__is_valid_test_vector(v))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('test cases', *cls.TEST_CASES))
+    cls.ImpalaTestMatrix.add_constraint(lambda v: cls.__is_valid_test_vector(v))
 
   @classmethod
   def __is_valid_test_vector(cls, vector):

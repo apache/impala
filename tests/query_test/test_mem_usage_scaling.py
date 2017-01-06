@@ -22,7 +22,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 
 class TestQueryMemLimitScaling(ImpalaTestSuite):
   """Test class to do functional validation of per query memory limits. """
@@ -41,10 +41,11 @@ class TestQueryMemLimitScaling(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestQueryMemLimitScaling, cls).add_test_dimensions()
     # add mem_limit as a test dimension.
-    new_dimension = TestDimension('mem_limit', *TestQueryMemLimitScaling.MEM_LIMITS)
-    cls.TestMatrix.add_dimension(new_dimension)
+    new_dimension = ImpalaTestDimension('mem_limit',
+                                        *TestQueryMemLimitScaling.MEM_LIMITS)
+    cls.ImpalaTestMatrix.add_dimension(new_dimension)
     if cls.exploration_strategy() != 'exhaustive':
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format in ['parquet'])
 
   # Test running with different mem limits to exercise the dynamic memory
@@ -65,9 +66,9 @@ class TestExprMemUsage(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestExprMemUsage, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     if cls.exploration_strategy() != 'exhaustive':
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format in ['parquet'])
 
   def test_scanner_mem_usage(self, vector):
@@ -123,10 +124,10 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
   def add_test_dimensions(cls):
     super(TestTpchMemLimitError, cls).add_test_dimensions()
 
-    cls.TestMatrix.add_dimension(
-      TestDimension('mem_limit', *TestTpchMemLimitError.MEM_IN_MB))
+    cls.ImpalaTestMatrix.add_dimension(
+      ImpalaTestDimension('mem_limit', *TestTpchMemLimitError.MEM_IN_MB))
 
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_low_mem_limit_q1(self, vector):
@@ -215,10 +216,10 @@ class TestTpcdsMemLimitError(TestLowMemoryLimits):
   def add_test_dimensions(cls):
     super(TestTpcdsMemLimitError, cls).add_test_dimensions()
 
-    cls.TestMatrix.add_dimension(
-      TestDimension('mem_limit', *TestTpcdsMemLimitError.MEM_IN_MB))
+    cls.ImpalaTestMatrix.add_dimension(
+      ImpalaTestDimension('mem_limit', *TestTpcdsMemLimitError.MEM_IN_MB))
 
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_low_mem_limit_q53(self, vector):

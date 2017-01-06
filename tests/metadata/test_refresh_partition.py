@@ -39,8 +39,8 @@ class TestRefreshPartition(ImpalaTestSuite):
     super(TestRefreshPartition, cls).add_test_dimensions()
 
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
   def impala_partition_names(self, table_name):

@@ -20,7 +20,7 @@
 import os
 from itertools import product
 
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 
@@ -87,12 +87,12 @@ class TableFormatInfo(object):
 
 def create_uncompressed_text_dimension(workload):
   dataset = get_dataset_from_workload(workload)
-  return TestDimension('table_format',
+  return ImpalaTestDimension('table_format',
       TableFormatInfo.create_from_string(dataset, 'text/none'))
 
 def create_parquet_dimension(workload):
   dataset = get_dataset_from_workload(workload)
-  return TestDimension('table_format',
+  return ImpalaTestDimension('table_format',
       TableFormatInfo.create_from_string(dataset, 'parquet/none'))
 
 # Available Exec Options:
@@ -159,7 +159,7 @@ def create_exec_option_dimension_from_dict(exec_option_dimensions):
   exec_option_dimension_values = [dict(zip(keys, prod)) for prod in combinations]
 
   # Build a test vector out of it
-  return TestDimension('exec_option', *exec_option_dimension_values)
+  return ImpalaTestDimension('exec_option', *exec_option_dimension_values)
 
 def get_dataset_from_workload(workload):
   # TODO: We need a better way to define the workload -> dataset mapping so we can
@@ -198,7 +198,7 @@ def load_table_info_dimension(workload_name, exploration_strategy, file_formats=
         continue
       vector_values.append(TableFormatInfo(**vals))
 
-  return TestDimension('table_format', *vector_values)
+  return ImpalaTestDimension('table_format', *vector_values)
 
 def is_supported_insert_format(table_format):
   # Returns true if the given table_format is a supported Impala INSERT format

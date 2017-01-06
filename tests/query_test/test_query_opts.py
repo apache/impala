@@ -34,9 +34,9 @@ class TestQueryOptions(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueryOptions, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text')
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
 
   def test_set_invalid_query_option(self, vector):
@@ -47,9 +47,9 @@ class TestQueryOptionsHS2(HS2TestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueryOptions, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text')
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
 
   @needs_session()

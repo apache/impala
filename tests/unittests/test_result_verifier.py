@@ -28,7 +28,8 @@ class TestResultVerifier(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestResultVerifier, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_result_row_indexing(self, vector):
     res = create_query_result(self.client.execute("select 1 as int_col, 'A' as str_col"))

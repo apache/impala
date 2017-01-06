@@ -20,7 +20,7 @@ import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 from tests.util.test_file_parser import QueryTestSectionReader
 
 class TestExprs(ImpalaTestSuite):
@@ -33,10 +33,11 @@ class TestExprs(ImpalaTestSuite):
     super(TestExprs, cls).add_test_dimensions()
     # Test with and without expr rewrites to cover regular expr evaluations
     # as well as constant folding, in particular, timestamp literals.
-    cls.TestMatrix.add_dimension(TestDimension('enable_expr_rewrites', *[0,1]))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('enable_expr_rewrites', *[0,1]))
     if cls.exploration_strategy() == 'core':
       # Test with file format that supports codegen
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format == 'text' and\
           v.get_value('table_format').compression_codec == 'none')
 
@@ -81,12 +82,13 @@ class TestExprLimits(ImpalaTestSuite):
     if cls.exploration_strategy() != 'exhaustive':
       # Ensure the test runs with codegen enabled and disabled, even when the
       # exploration strategy is not exhaustive.
-      cls.TestMatrix.clear_dimension('exec_option')
-      cls.TestMatrix.add_dimension(create_exec_option_dimension(
+      cls.ImpalaTestMatrix.clear_dimension('exec_option')
+      cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
           cluster_sizes=[0], disable_codegen_options=[False, True], batch_sizes=[0]))
 
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_expr_child_limit(self, vector):
     # IN predicate

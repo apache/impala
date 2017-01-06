@@ -32,14 +32,14 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestLastDdlTimeUpdate, cls).add_test_dimensions()
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
     if cls.exploration_strategy() == 'core' and not IS_S3:
       # Don't run on core.  This test is very slow and we are unlikely
       # to regress here.
-      cls.TestMatrix.add_constraint(lambda v: False)
+      cls.ImpalaTestMatrix.add_constraint(lambda v: False)
 
   def test_alter(self, vector, unique_database):
     TBL_NAME = "alter_test_tbl"

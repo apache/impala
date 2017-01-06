@@ -27,7 +27,7 @@ from tests.common.skip import (
     SkipIfLocal,
     SkipIfOldAggsJoins,
     SkipIfS3)
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 
 class TestJoinQueries(ImpalaTestSuite):
   BATCH_SIZES = [0, 1]
@@ -39,16 +39,16 @@ class TestJoinQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestJoinQueries, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
-        TestDimension('batch_size', *TestJoinQueries.BATCH_SIZES))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('batch_size', *TestJoinQueries.BATCH_SIZES))
     # TODO: Look into splitting up join tests to accomodate hbase.
     # Joins with hbase tables produce drastically different results.
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['parquet'])
 
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on execution time when not running in exhaustive mode.
-      cls.TestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
+      cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
 
   def test_basic_joins(self, vector):
     new_vector = copy(vector)
@@ -102,14 +102,14 @@ class TestTPCHJoinQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTPCHJoinQueries, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
-        TestDimension('batch_size', *TestJoinQueries.BATCH_SIZES))
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('batch_size', *TestJoinQueries.BATCH_SIZES))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['parquet'])
 
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on execution time when not running in exhaustive mode.
-      cls.TestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
+      cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
 
   @classmethod
   def teardown_class(cls):
@@ -129,15 +129,15 @@ class TestSemiJoinQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestSemiJoinQueries, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
-        TestDimension('batch_size', *TestJoinQueries.BATCH_SIZES))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('batch_size', *TestJoinQueries.BATCH_SIZES))
     # Joins with hbase tables produce drastically different results.
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['parquet'])
 
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on execution time when not running in exhaustive mode.
-      cls.TestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
+      cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
 
   def __load_semi_join_tables(self, db_name):
     # Create and load fresh test tables for semi/anti-join tests

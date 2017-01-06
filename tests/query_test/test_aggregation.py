@@ -32,7 +32,7 @@ from tests.common.test_result_verifier import (
     parse_column_labels,
     QueryTestResult,
     parse_result_rows)
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 
 # Test dimensions for TestAggregation.
 AGG_FUNCTIONS = ['sum', 'count', 'min', 'max', 'avg', 'ndv']
@@ -95,9 +95,9 @@ class TestAggregation(ImpalaTestSuite):
     super(TestAggregation, cls).add_test_dimensions()
 
     # Add two more dimensions
-    cls.TestMatrix.add_dimension(TestDimension('agg_func', *AGG_FUNCTIONS))
-    cls.TestMatrix.add_dimension(TestDimension('data_type', *DATA_TYPES))
-    cls.TestMatrix.add_constraint(lambda v: cls.is_valid_vector(v))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('agg_func', *AGG_FUNCTIONS))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('data_type', *DATA_TYPES))
+    cls.ImpalaTestMatrix.add_constraint(lambda v: cls.is_valid_vector(v))
 
   @classmethod
   def is_valid_vector(cls, vector):
@@ -180,11 +180,12 @@ class TestAggregationQueries(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestAggregationQueries, cls).add_test_dimensions()
 
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(
       create_exec_option_dimension(disable_codegen_options=[False, True]))
 
     if cls.exploration_strategy() == 'core':
-      cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+      cls.ImpalaTestMatrix.add_dimension(
+          create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_non_codegen_tinyint_grouping(self, vector, unique_database):
     # Regression for IMPALA-901. The test includes an INSERT statement, so can only be run
@@ -280,11 +281,11 @@ class TestWideAggregationQueries(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestWideAggregationQueries, cls).add_test_dimensions()
 
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(
       create_exec_option_dimension(disable_codegen_options=[False, True]))
 
     # File format doesn't matter for this test.
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def test_many_grouping_columns(self, vector):
@@ -317,7 +318,7 @@ class TestTPCHAggregationQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTPCHAggregationQueries, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_tpch_aggregations(self, vector):

@@ -34,7 +34,7 @@ class TestNestedTypes(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestNestedTypes, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
   def test_scanner_basic(self, vector):
@@ -87,7 +87,7 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestParquetArrayEncodings, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
   # $ parquet-tools schema SingleFieldGroupInList.parquet
@@ -450,7 +450,7 @@ class TestMaxNestingDepth(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMaxNestingDepth, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
   def test_max_nesting_depth(self, vector, unique_database):

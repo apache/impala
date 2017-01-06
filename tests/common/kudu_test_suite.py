@@ -58,7 +58,8 @@ class KuduTestSuite(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(KuduTestSuite, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   @classmethod
   def auto_create_db(cls):

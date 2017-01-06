@@ -42,8 +42,9 @@ class TestLoadData(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestLoadData, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def _clean_test_tables(self):
     self.client.execute("drop table if exists functional.{0}".format(TEST_TBL_NOPART))

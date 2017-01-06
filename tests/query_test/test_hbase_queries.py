@@ -29,7 +29,7 @@ class TestHBaseQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHBaseQueries, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(\
+    cls.ImpalaTestMatrix.add_constraint(\
         lambda v: v.get_value('table_format').file_format == 'hbase')
 
   def test_hbase_scan_node(self, vector):

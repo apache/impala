@@ -28,7 +28,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import SkipIf, SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 
 FAILPOINT_ACTION = ['FAIL', 'CANCEL', 'MEM_LIMIT_EXCEEDED']
 FAILPOINT_LOCATION = ['PREPARE', 'PREPARE_SCANNER', 'OPEN', 'GETNEXT', 'CLOSE']
@@ -89,15 +89,20 @@ class TestFailpoints(ImpalaTestSuite):
     if os.getenv("TARGET_FILESYSTEM") in ["s3", "isilon", "local"]: return
     node_id_map = TestFailpoints.parse_plan_nodes_from_explain_output(QUERY, "functional")
     assert node_id_map
-    cls.TestMatrix.add_dimension(TestDimension('location', *FAILPOINT_LOCATION))
-    cls.TestMatrix.add_dimension(TestDimension('target_node', *(node_id_map.items())))
-    cls.TestMatrix.add_dimension(TestDimension('action', *FAILPOINT_ACTION))
-    cls.TestMatrix.add_dimension(TestDimension('query_type', *QUERY_TYPE))
-    cls.TestMatrix.add_dimension(create_exec_option_dimension([0], [False], [0]))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('location', *FAILPOINT_LOCATION))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('target_node', *(node_id_map.items())))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('action', *FAILPOINT_ACTION))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('query_type', *QUERY_TYPE))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension([0], [False], [0]))
 
     # These are invalid test cases.
     # For more info see IMPALA-55 and IMPALA-56.
-    cls.TestMatrix.add_constraint(lambda v: not (
+    cls.ImpalaTestMatrix.add_constraint(lambda v: not (
         v.get_value('action') == 'FAIL' and
         v.get_value('location') in ['CLOSE'] and
         v.get_value('target_node')[0] in ['AGGREGATE', 'HASH JOIN']) and
@@ -106,12 +111,12 @@ class TestFailpoints(ImpalaTestSuite):
 
     # Don't create CLOSE:WAIT debug actions to avoid leaking plan fragments (there's no
     # way to cancel a plan fragment once Close() has been called)
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_constraint(
         lambda v: not (v.get_value('action') == 'CANCEL'
                      and v.get_value('location') == 'CLOSE'))
 
     # No need to test error in scanner preparation for non-scan nodes.
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_constraint(
         lambda v: (v.get_value('location') != 'PREPARE_SCANNER' or
             v.get_value('target_node')[0] == 'SCAN HDFS'))
 

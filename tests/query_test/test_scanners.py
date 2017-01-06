@@ -39,7 +39,7 @@ from tests.common.test_result_verifier import (
     parse_column_labels,
     QueryTestResult,
     parse_result_rows)
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
 from tests.util.get_parquet_metadata import get_parquet_metadata
 from tests.util.test_file_parser import QueryTestSectionReader
@@ -58,9 +58,9 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
     if cls.exploration_strategy() == 'core':
       # The purpose of this test is to get some base coverage of all the file formats.
       # Even in 'core', we'll test each format by using the pairwise strategy.
-      cls.TestMatrix.add_dimension(cls.create_table_info_dimension('pairwise'))
-    cls.TestMatrix.add_dimension(
-        TestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
+      cls.ImpalaTestMatrix.add_dimension(cls.create_table_info_dimension('pairwise'))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
 
   def test_scanners(self, vector):
     new_vector = deepcopy(vector)
@@ -111,10 +111,10 @@ class TestUnmatchedSchema(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestUnmatchedSchema, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # Avro has a more advanced schema evolution process which is covered in more depth
     # in the test_avro_schema_evolution test suite.
-    cls.TestMatrix.add_constraint(\
+    cls.ImpalaTestMatrix.add_constraint(\
         lambda v: v.get_value('table_format').file_format != 'avro')
 
   def _create_test_table(self, vector):
@@ -160,7 +160,7 @@ class TestWideRow(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestWideRow, cls).add_test_dimensions()
     # I can't figure out how to load a huge row into hbase
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format != 'hbase')
 
   def test_wide_row(self, vector):
@@ -190,10 +190,10 @@ class TestWideTable(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestWideTable, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(TestDimension("num_cols", *cls.NUM_COLS))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension("num_cols", *cls.NUM_COLS))
     # To cut down on test execution time, only run in exhaustive.
     if cls.exploration_strategy() != 'exhaustive':
-      cls.TestMatrix.add_constraint(lambda v: False)
+      cls.ImpalaTestMatrix.add_constraint(lambda v: False)
 
   def test_wide_table(self, vector):
     if vector.get_value('table_format').file_format == 'kudu':
@@ -232,7 +232,7 @@ class TestParquet(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestParquet, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def test_parquet(self, vector):
@@ -471,8 +471,8 @@ class TestScanRangeLengths(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestScanRangeLengths, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
-        TestDimension('max_scan_range_length', *MAX_SCAN_RANGE_LENGTHS))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('max_scan_range_length', *MAX_SCAN_RANGE_LENGTHS))
 
   def test_scan_ranges(self, vector):
     vector.get_value('exec_option')['max_scan_range_length'] =\
@@ -494,9 +494,9 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTextScanRangeLengths, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
-        TestDimension('max_scan_range_length', *MAX_SCAN_RANGE_LENGTHS))
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('max_scan_range_length', *MAX_SCAN_RANGE_LENGTHS))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
@@ -527,7 +527,7 @@ class TestTextSplitDelimiters(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTextSplitDelimiters, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
@@ -604,7 +604,7 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTextScanRangeLengths, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'text')
 
   def test_text_scanner_with_header(self, vector, unique_database):
@@ -623,18 +623,18 @@ class TestScanTruncatedFiles(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestScanTruncatedFiles, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
     # This test takes about a minute to complete due to the Hive commands that are
     # executed. To cut down on runtime, limit the test to exhaustive exploration
     # strategy.
     # TODO: Test other file formats
     if cls.exploration_strategy() == 'exhaustive':
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format == 'text' and\
           v.get_value('table_format').compression_codec == 'none')
     else:
-      cls.TestMatrix.add_constraint(lambda v: False)
+      cls.ImpalaTestMatrix.add_constraint(lambda v: False)
 
   def test_scan_truncated_file_empty(self, vector, unique_database):
     self.scan_truncated_file(0, unique_database)

@@ -42,7 +42,7 @@ class TestParquetMaxPageHeader(CustomClusterTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(CustomClusterTestSuite, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet' and
         v.get_value('table_format').compression_codec == 'none')
 

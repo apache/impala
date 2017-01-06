@@ -38,8 +38,8 @@ class TestScratchLimit(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestScratchLimit, cls).add_test_dimensions()
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_with_high_scratch_limit(self, vector):

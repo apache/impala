@@ -23,7 +23,7 @@ import threading
 from random import choice
 from time import sleep
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.verifiers.metric_verifier import MetricVerifier
 
@@ -63,28 +63,37 @@ class TestCancellation(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestCancellation, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(TestDimension('query', *QUERIES.keys()))
-    cls.TestMatrix.add_dimension(TestDimension('query_type', *QUERY_TYPE))
-    cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *CANCEL_DELAY_IN_SECONDS))
-    cls.TestMatrix.add_dimension(TestDimension('action', *DEBUG_ACTIONS))
-    cls.TestMatrix.add_dimension(TestDimension('max_block_mgr_memory', 0))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('query', *QUERIES.keys()))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('query_type', *QUERY_TYPE))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('cancel_delay', *CANCEL_DELAY_IN_SECONDS))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('action', *DEBUG_ACTIONS))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('max_block_mgr_memory', 0))
 
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('query_type') != 'CTAS' or (\
-        v.get_value('table_format').file_format in ['text', 'parquet', 'kudu'] and\
-        v.get_value('table_format').compression_codec == 'none'))
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('query_type') != 'CTAS' or (\
+            v.get_value('table_format').file_format in ['text', 'parquet', 'kudu'] and\
+            v.get_value('table_format').compression_codec == 'none'))
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('exec_option')['batch_size'] == 0)
     # Ignore 'compute stats' queries for the CTAS query type.
-    cls.TestMatrix.add_constraint(lambda v: not (v.get_value('query_type') == 'CTAS' and
-         v.get_value('query').startswith('compute stats')))
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: not (v.get_value('query_type') == 'CTAS' and
+            v.get_value('query').startswith('compute stats')))
 
     # Ignore CTAS on Kudu if there is no PRIMARY KEY specified.
-    cls.TestMatrix.add_constraint(lambda v: not (v.get_value('query_type') == 'CTAS' and
-         v.get_value('table_format').file_format == 'kudu' and
-         QUERIES[v.get_value('query')] is None))
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: not (v.get_value('query_type') == 'CTAS' and
+            v.get_value('table_format').file_format == 'kudu' and
+            QUERIES[v.get_value('query')] is None))
 
     # tpch tables are not generated for hbase as the data loading takes a very long time.
     # TODO: Add cancellation tests for hbase.
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format != 'hbase')
     if cls.exploration_strategy() != 'core':
       NUM_CANCELATION_ITERATIONS = 3
@@ -170,7 +179,7 @@ class TestCancellationParallel(TestCancellation):
   @classmethod
   def add_test_dimensions(cls):
     super(TestCancellationParallel, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('query_type') != 'CTAS')
+    cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('query_type') != 'CTAS')
 
   def test_cancel_select(self, vector):
     self.execute_cancel_test(vector)
@@ -179,14 +188,14 @@ class TestCancellationSerial(TestCancellation):
   @classmethod
   def add_test_dimensions(cls):
     super(TestCancellationSerial, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('query_type') == 'CTAS' or
+    cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('query_type') == 'CTAS' or
         v.get_value('query').startswith('compute stats'))
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') != 0)
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('action') is None)
+    cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') != 0)
+    cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('action') is None)
     # Don't run across all cancel delay options unless running in exhaustive mode
     if cls.exploration_strategy() != 'exhaustive':
-      cls.TestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') in [3])
-      cls.TestMatrix.add_constraint(lambda v: v.get_value('query') ==\
+      cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') in [3])
+      cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('query') ==\
           choice(QUERIES.keys()))
 
   @pytest.mark.execute_serially
@@ -203,13 +212,16 @@ class TestCancellationFullSort(TestCancellation):
   def add_test_dimensions(cls):
     super(TestCancellation, cls).add_test_dimensions()
     # Override dimensions to only execute the order-by without limit query.
-    cls.TestMatrix.add_dimension(TestDimension('query', SORT_QUERY))
-    cls.TestMatrix.add_dimension(TestDimension('query_type', 'SELECT'))
-    cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *SORT_CANCEL_DELAY))
-    cls.TestMatrix.add_dimension(TestDimension('max_block_mgr_memory',\
-        *SORT_BLOCK_MGR_LIMIT))
-    cls.TestMatrix.add_dimension(TestDimension('action', None))
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('query', SORT_QUERY))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('query_type', 'SELECT'))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('cancel_delay', *SORT_CANCEL_DELAY))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('max_block_mgr_memory', *SORT_BLOCK_MGR_LIMIT))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('action', None))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
        v.get_value('table_format').file_format =='parquet' and\
        v.get_value('table_format').compression_codec == 'none')
 

@@ -39,7 +39,7 @@ class TestExplain(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestExplain, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none' and\
         v.get_value('exec_option')['batch_size'] == 0 and\

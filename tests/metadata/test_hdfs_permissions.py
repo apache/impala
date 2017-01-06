@@ -36,8 +36,9 @@ class TestHdfsPermissions(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsPermissions, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
     self._cleanup()

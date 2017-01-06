@@ -34,10 +34,11 @@ class TestComputeStats(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestComputeStats, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # Do not run these tests using all dimensions because the expected results
     # are different for different file formats.
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   @SkipIfLocal.hdfs_blocks
   def test_compute_stats(self, vector, unique_database):
@@ -127,8 +128,8 @@ class TestHbaseComputeStats(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHbaseComputeStats, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'hbase')
 
   @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
@@ -153,9 +154,10 @@ class TestCorruptTableStats(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestCorruptTableStats, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
       disable_codegen_options=[False], exec_single_node_option=[100]))
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_corrupt_stats(self, vector, unique_database):
     """IMPALA-1983/IMPALA-1657: Test that in the presence of corrupt table statistics a
@@ -173,8 +175,9 @@ class TestIncompatibleColStats(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestIncompatibleColStats, cls).add_test_dimensions()
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_incompatible_col_stats(self, vector, unique_database):
     """Tests Impala is able to use tables when the column stats data is not compatible

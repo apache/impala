@@ -25,7 +25,7 @@ from copy import copy
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
-    TestDimension,
+    ImpalaTestDimension,
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
 
@@ -68,21 +68,24 @@ class TestQueryMemLimit(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestQueryMemLimit, cls).add_test_dimensions()
     # Only run the query for text
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
     # add mem_limit as a test dimension.
     if cls.exploration_strategy() == 'core':
-      cls.TestMatrix.add_dimension(\
-          TestDimension('mem_limit', *TestQueryMemLimit.MEM_LIMITS_CORE))
+      cls.ImpalaTestMatrix.add_dimension(\
+          ImpalaTestDimension('mem_limit', *TestQueryMemLimit.MEM_LIMITS_CORE))
     else:
-      cls.TestMatrix.add_dimension(\
-          TestDimension('mem_limit', *TestQueryMemLimit.MEM_LIMITS))
+      cls.ImpalaTestMatrix.add_dimension(\
+          ImpalaTestDimension('mem_limit', *TestQueryMemLimit.MEM_LIMITS))
 
     # Make query a test dimension so we can support more queries.
-    cls.TestMatrix.add_dimension(TestDimension('query', *TestQueryMemLimit.QUERIES))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('query', *TestQueryMemLimit.QUERIES))
     # This query takes a very long time to finish with a bound on the batch_size.
     # Remove the bound on the batch size.
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('exec_option')['batch_size'] == 0)
 
   @pytest.mark.execute_serially
   def test_mem_limit(self, vector):
@@ -115,9 +118,9 @@ class TestCodegenMemLimit(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestCodegenMemLimit, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # Only run the query for parquet
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def test_codegen_mem_limit(self, vector):

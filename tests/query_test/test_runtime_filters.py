@@ -32,7 +32,7 @@ class TestRuntimeFilters(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestRuntimeFilters, cls).add_test_dimensions()
     # Runtime filters are disabled on HBase, Kudu
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format not in ['hbase', 'kudu'])
 
   def test_basic_filters(self, vector):
@@ -57,7 +57,7 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestRuntimeRowFilters, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_row_filters(self, vector):

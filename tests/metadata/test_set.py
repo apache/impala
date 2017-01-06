@@ -31,8 +31,9 @@ class TestSet(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestSet, cls).add_test_dimensions()
     # This test only needs to be run once.
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_set(self, vector):
     # Please note that query options modified during the test will be reset

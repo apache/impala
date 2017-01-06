@@ -28,9 +28,10 @@ class TestTargetedPerf(ImpalaTestSuite):
     return 'targeted-perf'
 
   @classmethod
-  def add_test_dimension(cls):
+  def add_test_dimensions(cls):
     super(TestTargetedPerf, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('exec_option')['batch_size'] == 0)
 
   def test_perf_aggregation(self, vector):
     self.run_test_case('aggregation', vector)

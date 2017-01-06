@@ -25,7 +25,7 @@ class TestInvalidTestHeader(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestInvalidTestHeader, cls).add_test_dimensions()
     # It's sufficient to run this test once.
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 

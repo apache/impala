@@ -20,7 +20,7 @@ import uuid
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 
 # Number of tables to create per thread
 NUM_TBLS_PER_THREAD = 10
@@ -42,10 +42,11 @@ class TestDdlStress(ImpalaTestSuite):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip("Should only run in exhaustive due to long execution time.")
 
-    cls.TestMatrix.add_dimension(TestDimension('test_id', *TEST_IDS))
-    cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('test_id', *TEST_IDS))
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('exec_option')['batch_size'] == 0)
 
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 

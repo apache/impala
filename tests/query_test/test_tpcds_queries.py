@@ -32,7 +32,7 @@ class TestTpcdsQuery(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTpcdsQuery, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and\
         v.get_value('table_format').compression_codec in ['none', 'snap'] and\
         v.get_value('table_format').compression_type != 'record')
@@ -40,10 +40,10 @@ class TestTpcdsQuery(ImpalaTestSuite):
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on the execution time for these tests in core by running only
       # against parquet.
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format in ['parquet'])
 
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('exec_option')['batch_size'] == 0)
 
   @pytest.mark.execute_serially
@@ -135,14 +135,14 @@ class TestTpcdsInsert(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTpcdsInsert, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         is_supported_insert_format(v.get_value('table_format')))
     if cls.exploration_strategy() == 'core' and not pytest.config.option.table_formats:
       # Don't run on core, unless the user explicitly wants to validate a specific table
       # format. Each test vector takes > 30s to complete and it doesn't add much
       # additional coverage on top of what's in the functional insert test suite
-      cls.TestMatrix.add_constraint(lambda v: False);
+      cls.ImpalaTestMatrix.add_constraint(lambda v: False);
 
   def test_tpcds_partitioned_insert(self, vector):
     self.run_test_case('partitioned-insert', vector)

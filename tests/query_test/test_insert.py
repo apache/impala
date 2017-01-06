@@ -30,7 +30,7 @@ from tests.common.test_result_verifier import (
     parse_column_labels,
     QueryTestResult,
     parse_result_rows)
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 
 # TODO: Add Gzip back.  IMPALA-424
 PARQUET_CODECS = ['none', 'snappy']
@@ -49,28 +49,30 @@ class TestInsertQueries(ImpalaTestSuite):
     # TODO: When we do decide to run these tests in parallel we could create unique temp
     # tables for each test case to resolve the concurrency problems.
     if cls.exploration_strategy() == 'core':
-      cls.TestMatrix.add_dimension(create_exec_option_dimension(
+      cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
           cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
           sync_ddl=[0]))
-      cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+      cls.ImpalaTestMatrix.add_dimension(
+          create_uncompressed_text_dimension(cls.get_workload()))
     else:
-      cls.TestMatrix.add_dimension(create_exec_option_dimension(
+      cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
           cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0, 1, 16],
           sync_ddl=[0, 1]))
-      cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
+      cls.ImpalaTestMatrix.add_dimension(
+          ImpalaTestDimension("compression_codec", *PARQUET_CODECS));
       # Insert is currently only supported for text and parquet
       # For parquet, we want to iterate through all the compression codecs
       # TODO: each column in parquet can have a different codec.  We could
       # test all the codecs in one table/file with some additional flags.
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format == 'parquet' or \
             (v.get_value('table_format').file_format == 'text' and \
             v.get_value('compression_codec') == 'none'))
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').compression_codec == 'none')
       # Only test other batch sizes for uncompressed parquet to keep the execution time
       # within reasonable bounds.
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('exec_option')['batch_size'] == 0 or \
             (v.get_value('table_format').file_format == 'parquet' and \
             v.get_value('compression_codec') == 'none'))
@@ -131,21 +133,21 @@ class TestInsertWideTable(ImpalaTestSuite):
     super(TestInsertWideTable, cls).add_test_dimensions()
 
     # Only vary codegen
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[True, False], batch_sizes=[0]))
 
     # Inserts only supported on text and parquet
     # TODO: Enable 'text'/codec once the compressed text writers are in.
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'parquet' or \
         v.get_value('table_format').file_format == 'text')
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
 
     # Don't run on core. This test is very slow (IMPALA-864) and we are unlikely to
     # regress here.
     if cls.exploration_strategy() == 'core':
-      cls.TestMatrix.add_constraint(lambda v: False);
+      cls.ImpalaTestMatrix.add_constraint(lambda v: False);
 
   @SkipIfLocal.parquet_file_size
   def test_insert_wide_table(self, vector, unique_database):
@@ -189,13 +191,13 @@ class TestInsertPartKey(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestInsertPartKey, cls).add_test_dimensions()
     # Only run for a single table type
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
         sync_ddl=[1]))
 
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         (v.get_value('table_format').file_format == 'text'))
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
 
   @pytest.mark.execute_serially
@@ -217,12 +219,12 @@ class TestInsertNullQueries(ImpalaTestSuite):
     # into the same table at the same time for the same file format).
     # TODO: When we do decide to run these tests in parallel we could create unique temp
     # tables for each test case to resolve the concurrency problems.
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
 
     # These tests only make sense for inserting into a text table with special
     # logic to handle all the possible ways NULL needs to be written as ascii
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
           (v.get_value('table_format').file_format == 'text' and \
            v.get_value('table_format').compression_codec == 'none'))
 

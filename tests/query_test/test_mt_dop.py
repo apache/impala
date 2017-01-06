@@ -22,8 +22,8 @@ import pytest
 from copy import deepcopy
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfOldAggsJoins
-from tests.common.test_vector import TestDimension
-from tests.common.test_vector import TestVector
+from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_vector import ImpalaTestVector
 
 # COMPUTE STATS on Parquet tables automatically sets MT_DOP=4, so include
 # the value 0 to cover the non-MT path as well.
@@ -33,7 +33,7 @@ class TestMtDop(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMtDop, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(TestDimension('mt_dop', *MT_DOP_VALUES))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
 
   @classmethod
   def get_workload(cls):
@@ -84,8 +84,8 @@ class TestMtDopParquet(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestMtDopParquet, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(TestDimension('mt_dop', *MT_DOP_VALUES))
-    cls.TestMatrix.add_constraint(
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
+    cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def test_parquet(self, vector):

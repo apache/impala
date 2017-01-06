@@ -40,9 +40,10 @@ class TestInsertQueriesWithPermutation(ImpalaTestSuite):
     # tables for each test case to resolve the concurrency problems.
     # TODO: do we need to run with multiple file formats? This seems to be really
     # targeting FE behavior.
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_insert_permutation(self, vector):
     map(self.cleanup_db, ["insert_permutation_test"])

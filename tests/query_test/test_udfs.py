@@ -239,12 +239,13 @@ class TestUdfExecution(TestUdfBase):
   @classmethod
   def add_test_dimensions(cls):
     super(TestUdfExecution, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(
+    cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({"disable_codegen" : [False, True],
           "exec_single_node_rows_threshold" : [0,100],
           "enable_expr_rewrites" : [False, True]}))
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_native_functions(self, vector, unique_database):
     enable_expr_rewrites = vector.get_value('exec_option')['enable_expr_rewrites']
@@ -363,7 +364,8 @@ class TestUdfTargeted(TestUdfBase):
   def add_test_dimensions(cls):
     super(TestUdfTargeted, cls).add_test_dimensions()
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_udf_invalid_symbol(self, vector, unique_database):
     """ IMPALA-1642: Impala crashes if the symbol for a Hive UDF doesn't exist

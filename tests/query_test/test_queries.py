@@ -22,14 +22,14 @@ import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.test_vector import TestVector
+from tests.common.test_vector import ImpalaTestVector
 
 class TestQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueries, cls).add_test_dimensions()
     if cls.exploration_strategy() == 'core':
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format == 'parquet')
 
     # Manually adding a test dimension here to test the small query opt
@@ -37,13 +37,13 @@ class TestQueries(ImpalaTestSuite):
     # TODO Cleanup required, allow adding values to dimensions without having to
     # manually explode them
     if cls.exploration_strategy() == 'exhaustive':
-      dim = cls.TestMatrix.dimensions["exec_option"]
+      dim = cls.ImpalaTestMatrix.dimensions["exec_option"]
       new_value = []
       for v in dim:
-        new_value.append(TestVector.Value(v.name, copy.copy(v.value)))
+        new_value.append(ImpalaTestVector.Value(v.name, copy.copy(v.value)))
         new_value[-1].value["exec_single_node_rows_threshold"] = 100
       dim.extend(new_value)
-      cls.TestMatrix.add_dimension(dim)
+      cls.ImpalaTestMatrix.add_dimension(dim)
 
   @classmethod
   def get_workload(cls):
@@ -134,7 +134,8 @@ class TestQueriesTextTables(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueriesTextTables, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   @classmethod
   def get_workload(cls):
@@ -172,7 +173,7 @@ class TestQueriesParquetTables(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueriesParquetTables, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'parquet')
 
   @classmethod
@@ -201,7 +202,7 @@ class TestHdfsQueries(TestQueries):
   def add_test_dimensions(cls):
     super(TestHdfsQueries, cls).add_test_dimensions()
     # Kudu doesn't support AllTypesAggMultiFilesNoPart (KUDU-1271, KUDU-1570).
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format != 'kudu')
 
   def test_hdfs_scan_node(self, vector):

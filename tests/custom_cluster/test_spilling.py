@@ -19,7 +19,7 @@ import pytest
 from copy import deepcopy
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.test_dimensions import (TestDimension,
+from tests.common.test_dimensions import (ImpalaTestDimension,
     create_single_exec_option_dimension,
     create_parquet_dimension)
 
@@ -53,15 +53,16 @@ class TestSpillStress(CustomClusterTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestSpillStress, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text')
     # Each client will get a different test id.
     # TODO: this test takes extremely long so only run on exhaustive. It would
     # be good to configure it so we can run some version on core.
     TEST_IDS = xrange(0, 3)
     NUM_ITERATIONS = [1]
-    cls.TestMatrix.add_dimension(TestDimension('test_id', *TEST_IDS))
-    cls.TestMatrix.add_dimension(TestDimension('iterations', *NUM_ITERATIONS))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('test_id', *TEST_IDS))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('iterations', *NUM_ITERATIONS))
 
   @pytest.mark.stress
   def test_spill_stress(self, vector):
@@ -77,9 +78,9 @@ class TestSpilling(CustomClusterTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestSpilling, cls).add_test_dimensions()
-    cls.TestMatrix.clear_constraints()
-    cls.TestMatrix.add_dimension(create_parquet_dimension('tpch'))
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.clear_constraints()
+    cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension('tpch'))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
   # Reduce the IO read size. This reduces the memory required to trigger spilling.
   @pytest.mark.execute_serially

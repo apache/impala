@@ -64,9 +64,10 @@ class TestViewCompatibility(ImpalaTestSuite):
       pytest.skip("Should only run in exhaustive due to long execution time.")
 
     # don't use any exec options, running exactly once is fine
-    cls.TestMatrix.clear_dimension('exec_option')
+    cls.ImpalaTestMatrix.clear_dimension('exec_option')
     # There is no reason to run these tests using all dimensions.
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_view_compatibility(self, vector, unique_database):
     self._run_view_compat_test_case('QueryTest/views-compatibility', vector,

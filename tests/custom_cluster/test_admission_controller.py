@@ -33,7 +33,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 from ImpalaService import ImpalaHiveServer2Service
 from TCLIService import TCLIService
@@ -129,9 +129,10 @@ class TestAdmissionControllerBase(CustomClusterTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestAdmissionControllerBase, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # There's no reason to test this on other file formats/compression codecs right now
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+      create_uncompressed_text_dimension(cls.get_workload()))
 
 class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def __check_pool_rejected(self, client, pool, expected_error_re):
@@ -343,11 +344,12 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
   @classmethod
   def add_test_dimensions(cls):
     super(TestAdmissionControllerStress, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(TestDimension('num_queries', *NUM_QUERIES))
-    cls.TestMatrix.add_dimension(
-        TestDimension('round_robin_submission', *ROUND_ROBIN_SUBMISSION))
-    cls.TestMatrix.add_dimension(
-        TestDimension('submission_delay_ms', *SUBMISSION_DELAY_MS))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('num_queries', *NUM_QUERIES))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('round_robin_submission', *ROUND_ROBIN_SUBMISSION))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('submission_delay_ms', *SUBMISSION_DELAY_MS))
 
     # Additional constraints for code coverage jobs and core.
     num_queries = None
@@ -356,12 +358,14 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       num_queries = 15
     elif cls.exploration_strategy() == 'core':
       num_queries = 30
-      cls.TestMatrix.add_constraint(lambda v: v.get_value('submission_delay_ms') == 0)
-      cls.TestMatrix.add_constraint(\
+      cls.ImpalaTestMatrix.add_constraint(
+          lambda v: v.get_value('submission_delay_ms') == 0)
+      cls.ImpalaTestMatrix.add_constraint(\
           lambda v: v.get_value('round_robin_submission') == True)
 
     if num_queries is not None:
-      cls.TestMatrix.add_constraint(lambda v: v.get_value('num_queries') == num_queries)
+      cls.ImpalaTestMatrix.add_constraint(
+          lambda v: v.get_value('num_queries') == num_queries)
 
   def setup(self):
     # All threads are stored in this list and it's used just to make sure we clean up

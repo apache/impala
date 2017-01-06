@@ -32,7 +32,8 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestGrantRevoke, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   @classmethod
   def get_workload(cls):

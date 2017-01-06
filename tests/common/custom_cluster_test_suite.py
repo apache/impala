@@ -47,10 +47,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(CustomClusterTestSuite, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'text' and
         v.get_value('table_format').compression_codec == 'none')
-    cls.TestMatrix.add_constraint(lambda v:
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('exec_option')['batch_size'] == 0 and
         v.get_value('exec_option')['disable_codegen'] == False and
         v.get_value('exec_option')['num_nodes'] == 0)

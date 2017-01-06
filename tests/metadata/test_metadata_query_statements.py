@@ -51,12 +51,13 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
       # Cut down on test runtime by only running with SYNC_DDL=0
       sync_ddl_opts = [0]
 
-    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         cluster_sizes=ALL_NODES_ONLY,
         disable_codegen_options=[False],
         batch_sizes=[0],
         sync_ddl=sync_ddl_opts))
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_use(self, vector):
     self.run_test_case('QueryTest/use', vector)

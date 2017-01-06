@@ -23,7 +23,7 @@ from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
-from tests.common.test_vector import TestDimension
+from tests.common.test_vector import ImpalaTestDimension
 from tests.util.shell_util import exec_process
 
 TEST_DB = 'test_encryption_db'
@@ -52,8 +52,9 @@ class TestHdfsEncryption(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsEncryption, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
     PARTITIONED = [True, False]
     # For 'core', just test loading from a directory that is encrypted.
@@ -64,10 +65,13 @@ class TestHdfsEncryption(ImpalaTestSuite):
       KEY_LOAD_DIR = [None, "testkey1", "testkey2"]
       KEY_TBL_DIR = [None, "testkey1", "testkey2"]
 
-    cls.TestMatrix.add_dimension(TestDimension('partitioned', *PARTITIONED))
-    cls.TestMatrix.add_dimension(TestDimension('key_load_dir', *KEY_LOAD_DIR))
-    cls.TestMatrix.add_dimension(TestDimension('key_tbl_dir', *KEY_TBL_DIR))
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('partitioned', *PARTITIONED))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('key_load_dir', *KEY_LOAD_DIR))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('key_tbl_dir', *KEY_TBL_DIR))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('key_load_dir') is not None or\
         v.get_value('key_tbl_dir') is not None)
 

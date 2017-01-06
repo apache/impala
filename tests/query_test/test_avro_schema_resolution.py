@@ -27,7 +27,7 @@ class TestAvroSchemaResolution(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestAvroSchemaResolution, cls).add_test_dimensions()
     # avro/snap is the only table format with a schema_resolution_test table
-    cls.TestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'avro' and\
         v.get_value('table_format').compression_codec == 'snap')
 

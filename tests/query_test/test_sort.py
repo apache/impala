@@ -35,7 +35,7 @@ class TestQueryFullSort(ImpalaTestSuite):
     super(TestQueryFullSort, cls).add_test_dimensions()
 
     if cls.exploration_strategy() == 'core':
-      cls.TestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format == 'parquet')
 
   def test_multiple_mem_limits(self, vector):
