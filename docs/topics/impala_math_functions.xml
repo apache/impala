@@ -1041,16 +1041,19 @@ select pmod(5,-2);
       <dlentry id="quotient">
 
         <dt>
-          <codeph>quotient(int numerator, int denominator)</codeph>
+          <codeph>quotient(bigint numerator, bigint denominator)</codeph>,
+          <codeph>quotient(double numerator, double denominator)</codeph>
         </dt>
 
         <dd>
           <indexterm audience="hidden">quotient() function</indexterm>
           <b>Purpose:</b> Returns the first argument divided by the second argument, discarding any fractional
-          part. Avoids promoting arguments to <codeph>DOUBLE</codeph> as happens with the <codeph>/</codeph> SQL
-          operator.
+          part. Avoids promoting integer arguments to <codeph>DOUBLE</codeph> as happens with the <codeph>/</codeph> SQL
+          operator. <ph rev="IMPALA-278">Also includes an overload that accepts <codeph>DOUBLE</codeph> arguments,
+          discards the fractional part of each argument value before dividing, and again returns <codeph>BIGINT</codeph>.
+          With integer arguments, this function works the same as the <codeph>DIV</codeph> operator.</ph>
           <p>
-            <b>Return type:</b> <codeph>int</codeph>
+            <b>Return type:</b> <codeph>bigint</codeph>
           </p>
         </dd>
 

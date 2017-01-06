@@ -108,6 +108,14 @@ under the License.
           </p>
         </li>
 
+        <li id="div" rev="IMPALA-278">
+          <p>
+            <codeph>DIV</codeph>: Integer division. Arguments are not promoted to a floating-point type, and any fractional result
+            is discarded. For example, <codeph>13 DIV 7</codeph> returns 1, <codeph>14 DIV 7</codeph> returns 2, and
+            <codeph>15 DIV 7</codeph> returns 2. This operator is the same as the <codeph>QUOTIENT()</codeph> function.
+          </p>
+        </li>
+
         <li>
           <p>
             <codeph>%</codeph>: Modulo operator. Returns the remainder of the left-hand argument divided by the right-hand argument. Both
