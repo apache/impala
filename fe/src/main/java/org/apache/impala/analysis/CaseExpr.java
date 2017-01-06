@@ -127,16 +127,17 @@ public class CaseExpr extends Expr {
         if (candidate.isNullLiteral()) {
           // An example case is DECODE(foo, NULL, bar), since NULLs are considered
           // equal, this becomes CASE WHEN foo IS NULL THEN bar END.
-          children_.add(encodedIsNull);
+          children_.add(encodedIsNull.clone());
         } else {
           children_.add(new BinaryPredicate(
-              BinaryPredicate.Operator.EQ, encoded, candidate));
+              BinaryPredicate.Operator.EQ, encoded.clone(), candidate));
         }
       } else {
         children_.add(new CompoundPredicate(CompoundPredicate.Operator.OR,
             new CompoundPredicate(CompoundPredicate.Operator.AND,
-                encodedIsNull, new IsNullPredicate(candidate, false)),
-            new BinaryPredicate(BinaryPredicate.Operator.EQ, encoded, candidate)));
+                encodedIsNull.clone(), new IsNullPredicate(candidate, false)),
+            new BinaryPredicate(BinaryPredicate.Operator.EQ, encoded.clone(),
+                candidate)));
       }
 
       // Add the value
@@ -148,6 +149,11 @@ public class CaseExpr extends Expr {
       hasElseExpr_ = true;
       children_.add(decodeExpr.getChild(childIdx));
     }
+
+    // Check that these exprs were cloned above, as reusing the same Expr object in
+    // different places can lead to bugs, eg. if the Expr has multiple parents, they may
+    // try to cast it to different types.
+    Preconditions.checkState(!contains(encoded) && !contains(encodedIsNull));
   }
 
   /**

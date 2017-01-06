@@ -158,6 +158,15 @@ public abstract class TreeNode<NodeType extends TreeNode<NodeType>> {
   }
 
   /**
+   * Returns true if this node or any of its children is 'node'.
+   */
+  public boolean contains(NodeType node) {
+    if (this == node) return true;
+    for (NodeType child: children_) if (child.contains(node)) return true;
+    return false;
+  }
+
+  /**
    * For each node in nodeList, return true if any subexpression satisfies
    * contains('predicate').
    */

@@ -2649,3 +2649,19 @@ select count(*) from functional.alltypestiny group by concat(uuid(), "_test")
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-4716: Tests that decode with 'when' values of different types is analyzed
+# correctly when expr rewrites are enabled.
+select decode(0, 1, 0, id, 1, 2) a from functional.alltypestiny order by a
+---- RESULTS
+1
+2
+2
+2
+2
+2
+2
+2
+---- TYPES
+TINYINT
+====
