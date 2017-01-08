@@ -157,7 +157,7 @@ def print_metrics(substring):
   for impalad in ImpalaCluster().impalads:
     print ">" * 80
     port = impalad._get_webserver_port()
-    print "connections metrics for impalad at port {}:".format(port)
+    print "connections metrics for impalad at port {0}:".format(port)
     debug_info = json.loads(ImpaladService(
             impalad.hostname,
             webserver_port=port)
