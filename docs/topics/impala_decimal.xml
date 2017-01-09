@@ -822,6 +822,9 @@ SELECT CAST(1000.5 AS DECIMAL);
 
     <p conref="../shared/impala_common.xml#common/column_stats_constant"/>
 
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p conref="../shared/impala_common.xml#common/kudu_unsupported_data_type"/>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>

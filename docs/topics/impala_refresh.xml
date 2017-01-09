@@ -333,6 +333,11 @@ ERROR: AnalysisException: Items in partition spec must exactly match the partiti
     <p conref="../shared/impala_common.xml#common/s3_metadata"/>
 
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p rev="kudu" conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p conref="../shared/impala_common.xml#common/kudu_metadata_intro"/>
+    <p conref="../shared/impala_common.xml#common/kudu_metadata_details"/>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
     <p>
       <xref href="impala_hadoop.xml#intro_metastore"/>,

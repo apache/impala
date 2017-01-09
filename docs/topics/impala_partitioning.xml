@@ -575,7 +575,7 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
 
   </concept>
 
-  <concept rev="kudu" id="partition_kudu" audience="hidden">
+  <concept rev="kudu 2.8.0" id="partition_kudu">
 
     <title>Using Partitioning with Kudu Tables</title>
 
@@ -591,6 +591,12 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
         Kudu tables use a more fine-grained partitioning scheme than tables containing HDFS data files. You specify a <codeph>PARTITION
         BY</codeph> clause with the <codeph>CREATE TABLE</codeph> statement to identify how to divide the values from the partition key
         columns.
+      </p>
+
+      <p>
+        See <xref href="impala_kudu.xml#kudu_partitioning"/> for
+        details and examples of the partitioning techniques
+        for Kudu tables.
       </p>
 
     </conbody>

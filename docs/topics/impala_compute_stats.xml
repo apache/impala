@@ -52,8 +52,7 @@ under the License.
 <codeblock rev="2.1.0">COMPUTE STATS [<varname>db_name</varname>.]<varname>table_name</varname>
 COMPUTE INCREMENTAL STATS [<varname>db_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>partition_spec</varname>)]
 
-<!-- Is kudu_partition_spec applicable here? -->
-<varname>partition_spec</varname> ::= <varname>simple_partition_spec</varname> | <ph rev="IMPALA-1654"><varname>complex_partition_spec</varname></ph> | <ph rev="kudu"><varname>kudu_partition_spec</varname></ph>
+<varname>partition_spec</varname> ::= <varname>simple_partition_spec</varname> | <ph rev="IMPALA-1654"><varname>complex_partition_spec</varname></ph>
 
 <varname>simple_partition_spec</varname> ::= <varname>partition_col</varname>=<varname>constant_value</varname>
 
@@ -521,6 +520,17 @@ show table stats item_partitioned;
       (Essentially, <codeph>COMPUTE STATS</codeph> requires the
       same permissions as the underlying <codeph>SELECT</codeph> queries it runs
       against the table.)
+    </p>
+
+    <p rev="kudu" conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
+    <p rev="IMPALA-2830">
+      The <codeph>COMPUTE STATS</codeph> statement applies to Kudu tables.
+      Impala does not compute the number of rows for each partition for
+      Kudu tables. Therefore, you do not need to re-run the operation when
+      you see -1 in the <codeph># Rows</codeph> column of the output from
+      <codeph>SHOW TABLE STATS</codeph>. That column always shows -1 for
+      all Kudu tables. 
     </p>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>

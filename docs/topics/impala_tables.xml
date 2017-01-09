@@ -73,13 +73,15 @@ under the License.
     </ul>
 
     <p rev="2.2.0">
-      Impala tables can also represent data that is stored in HBase, or in the Amazon S3 filesystem (CDH 5.4.0 or higher),
-      or on Isilon storage devices (CDH 5.4.3 or higher).  See <xref href="impala_hbase.xml#impala_hbase"/>,
+      Impala tables can also represent data that is stored in HBase, or in the Amazon S3 filesystem (<keyword keyref="impala22_full"/> or higher),
+      or on Isilon storage devices (<keyword keyref="impala223_full"/> or higher).  See <xref href="impala_hbase.xml#impala_hbase"/>,
       <xref href="impala_s3.xml#s3"/>, and <xref href="impala_isilon.xml#impala_isilon"/>
       for details about those special kinds of tables.
     </p>
 
     <p conref="../shared/impala_common.xml#common/ignore_file_extensions"/>
+
+    <p outputclass="toc inpage"/>
 
     <p>
       <b>Related statements:</b> <xref href="impala_create_table.xml#create_table"/>,
@@ -241,6 +243,7 @@ under the License.
 
   <concept id="table_file_formats">
     <title>File Formats</title>
+
     <conbody>
       <p>
         Each table has an associated file format, which determines how Impala interprets the
@@ -270,6 +273,144 @@ under the License.
         Based on your existing ETL workflow, you might use other file formats such as Avro, possibly doing a final
         conversion step to Parquet to take advantage of its performance for analytic queries.
       </p>
+    </conbody>
+  </concept>
+
+  <concept rev="kudu" id="kudu_tables">
+    <title>Kudu Tables</title>
+    <prolog>
+      <metadata>
+        <data name="Category" value="Kudu"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+      <p>
+        Tables stored in Apache Kudu are treated specially, because Kudu manages its data independently of HDFS files.
+        Some information about the table is stored in the metastore database for use by Impala. Other table metadata is
+        managed internally by Kudu.
+      </p>
+
+      <p>
+        When you create a Kudu table through Impala, it is assigned an internal Kudu table name of the form
+        <codeph>impala::<varname>db_name</varname>.<varname>table_name</varname></codeph>. You can see the Kudu-assigned name
+        in the output of <codeph>DESCRIBE FORMATTED</codeph>, in the <codeph>kudu.table_name</codeph> field of the table properties.
+        The Kudu-assigned name remains the same even if you use <codeph>ALTER TABLE</codeph> to rename the Impala table
+        or move it to a different Impala database. If you issue the statement
+        <codeph>ALTER TABLE <varname>impala_name</varname> SET TBLPROPERTIES('kudu.table_name' = '<varname>different_kudu_table_name</varname>')</codeph>,
+        the effect is different depending on whether the Impala table was created with a regular <codeph>CREATE TABLE</codeph>
+        statement (that is, if it is an internal or managed table), or if it was created with a
+        <codeph>CREATE EXTERNAL TABLE</codeph> statement (and therefore is an external table). Changing the <codeph>kudu.table_name</codeph>
+        property of an internal table physically renames the underlying Kudu table to match the new name.
+        Changing the <codeph>kudu.table_name</codeph> property of an external table switches which underlying Kudu table
+        the Impala table refers to; the underlying Kudu table must already exist.
+      </p>
+
+      <p>
+        The following example shows what happens with both internal and external Kudu tables as the <codeph>kudu.table_name</codeph>
+        property is changed. In practice, external tables are typically used to access underlying Kudu tables that were created
+        outside of Impala, that is, through the Kudu API.
+      </p>
+
+<codeblock>
+-- This is an internal table that we will create and then rename.
+create table old_name (id bigint primary key, s string)
+  partition by hash(id) partitions 2 stored as kudu;
+
+-- Initially, the name OLD_NAME is the same on the Impala and Kudu sides.
+describe formatted old_name;
+...
+| Location:          | hdfs://host.example.com:8020/path/user.db/old_name
+| Table Type:        | MANAGED_TABLE         | NULL
+| Table Parameters:  | NULL                  | NULL
+|                    | DO_NOT_UPDATE_STATS   | true
+|                    | kudu.master_addresses | vd0342.halxg.cloudera.com
+|                    | kudu.table_name       | impala::user.old_name
+
+-- ALTER TABLE RENAME TO changes the Impala name but not the underlying Kudu name.
+alter table old_name rename to new_name;
+
+describe formatted new_name;
+| Location:          | hdfs://host.example.com:8020/path/user.db/new_name
+| Table Type:        | MANAGED_TABLE         | NULL
+| Table Parameters:  | NULL                  | NULL
+|                    | DO_NOT_UPDATE_STATS   | true
+|                    | kudu.master_addresses | vd0342.halxg.cloudera.com
+|                    | kudu.table_name       | impala::user.old_name
+
+-- Setting TBLPROPERTIES changes the underlying Kudu name.
+alter table new_name
+  set tblproperties('kudu.table_name' = 'impala::user.new_name');
+
+describe formatted new_name;
+| Location:          | hdfs://host.example.com:8020/path/user.db/new_name
+| Table Type:        | MANAGED_TABLE         | NULL
+| Table Parameters:  | NULL                  | NULL
+|                    | DO_NOT_UPDATE_STATS   | true
+|                    | kudu.master_addresses | vd0342.halxg.cloudera.com
+|                    | kudu.table_name       | impala::user.new_name
+
+-- Put some data in the table to demonstrate how external tables can map to
+-- different underlying Kudu tables.
+insert into new_name values (0, 'zero'), (1, 'one'), (2, 'two');
+
+-- This external table points to the same underlying Kudu table, NEW_NAME,
+-- as we created above. No need to declare columns or other table aspects.
+create external table kudu_table_alias stored as kudu
+  tblproperties('kudu.table_name' = 'impala::user.new_name');
+
+-- The external table can fetch data from the NEW_NAME table that already
+-- existed and already had data.
+select * from kudu_table_alias limit 100;
++----+------+
+| id | s    |
++----+------+
+| 1  | one  |
+| 0  | zero |
+| 2  | two  |
++----+------+
+
+-- We cannot re-point the external table at a different underlying Kudu table
+-- unless that other underlying Kudu table already exists.
+alter table kudu_table_alias
+  set tblproperties('kudu.table_name' = 'impala::user.yet_another_name');
+ERROR:
+TableLoadingException: Error opening Kudu table 'impala::user.yet_another_name',
+  Kudu error: The table does not exist: table_name: "impala::user.yet_another_name"
+
+-- Once the underlying Kudu table exists, we can re-point the external table to it.
+create table yet_another_name (id bigint primary key, x int, y int, s string)
+  partition by hash(id) partitions 2 stored as kudu;
+
+alter table kudu_table_alias
+  set tblproperties('kudu.table_name' = 'impala::user.yet_another_name');
+
+-- Now no data is returned because this other table is empty.
+select * from kudu_table_alias limit 100;
+
+-- The Impala table automatically recognizes the table schema of the new table,
+-- for example the extra X and Y columns not present in the original table.
+describe kudu_table_alias;
++------+--------+---------+-------------+----------+...
+| name | type   | comment | primary_key | nullable |...
++------+--------+---------+-------------+----------+...
+| id   | bigint |         | true        | false    |...
+| x    | int    |         | false       | true     |...
+| y    | int    |         | false       | true     |...
+| s    | string |         | false       | true     |...
++------+--------+---------+-------------+----------+...
+</codeblock>
+
+      <p>
+        The <codeph>SHOW TABLE STATS</codeph> output for a Kudu table shows Kudu-specific details about the layout of the table.
+        Instead of information about the number and sizes of files, the information is divided by the Kudu tablets.
+        For each tablet, the output includes the fields
+        <codeph># Rows</codeph> (although this number is not currently computed), <codeph>Start Key</codeph>, <codeph>Stop Key</codeph>, <codeph>Leader Replica</codeph>, and <codeph># Replicas</codeph>.
+        The output of <codeph>SHOW COLUMN STATS</codeph>, illustrating the distribution of values within each column, is the same for Kudu tables
+        as for HDFS-backed tables.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/kudu_internal_external_tables"/>
     </conbody>
   </concept>
 

@@ -697,6 +697,91 @@ Returned 27 row(s) in 0.17s</codeblock>
       in an arbitrary HDFS directory based on its <codeph>LOCATION</codeph> attribute.)
     </p>
 
+    <p rev="kudu" conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
+    <p rev="kudu">
+      The information displayed for Kudu tables includes the additional attributes
+      that are only applicable for Kudu tables:
+    </p>
+    <ul rev="kudu">
+      <li>
+        Whether or not the column is part of the primary key. Every Kudu table
+        has a <codeph>true</codeph> value here for at least one column. There
+        could be multiple <codeph>true</codeph> values, for tables with
+        composite primary keys.
+      </li>
+      <li>
+        Whether or not the column is nullable. Specified by the <codeph>NULL</codeph>
+        or <codeph>NOT NULL</codeph> attributes on the <codeph>CREATE TABLE</codeph> statement.
+        Columns that are part of the primary key are automatically non-nullable.
+      </li>
+      <li>
+        The default value, if any, for the column. Specified by the <codeph>DEFAULT</codeph>
+        attribute on the <codeph>CREATE TABLE</codeph> statement. If the default value is
+        <codeph>NULL</codeph>, that is not indicated in this column. It is implied by
+        <codeph>nullable</codeph> being true and no other default value specified.
+      </li>
+      <li>
+        The encoding used for values in the column. Specified by the <codeph>ENCODING</codeph>
+        attribute on the <codeph>CREATE TABLE</codeph> statement.
+      </li>
+      <li>
+        The compression used for values in the column. Specified by the <codeph>COMPRESSION</codeph>
+        attribute on the <codeph>CREATE TABLE</codeph> statement.
+      </li>
+      <li>
+        The block size (in bytes) used for the underlying Kudu storage layer for the column.
+        Specified by the <codeph>BLOCK_SIZE</codeph> attribute on the <codeph>CREATE TABLE</codeph>
+        statement.
+      </li>
+    </ul>
+
+    <p rev="kudu">
+      The following example shows <codeph>DESCRIBE</codeph> output for a simple Kudu table, with 
+      a single-column primary key and all column attributes left with their default values:
+    </p>
+
+<codeblock rev="kudu">
+describe million_rows;
++------+--------+---------+-------------+----------+---------------+---------------+---------------------+------------+
+| name | type   | comment | primary_key | nullable | default_value | encoding      | compression         | block_size |
++------+--------+---------+-------------+----------+---------------+---------------+---------------------+------------+
+| id   | string |         | true        | false    |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+| s    | string |         | false       | false    |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
++------+--------+---------+-------------+----------+---------------+---------------+---------------------+------------+
+</codeblock>
+
+    <p rev="kudu">
+      The following example shows <codeph>DESCRIBE</codeph> output for a Kudu table with a
+      two-column primary key, and Kudu-specific attributes applied to some columns:
+    </p>
+
+<codeblock rev="kudu">
+create table kudu_describe_example
+(
+  c1 int, c2 int,
+  c3 string, c4 string not null, c5 string default 'n/a', c6 string default '',
+  c7 bigint not null, c8 bigint null default null, c9 bigint default -1 encoding bit_shuffle,
+  primary key(c1,c2)
+)
+partition by hash (c1, c2) partitions 10 stored as kudu;
+
+describe kudu_describe_example;
++------+--------+---------+-------------+----------+---------------+---------------+---------------------+------------+
+| name | type   | comment | primary_key | nullable | default_value | encoding      | compression         | block_size |
++------+--------+---------+-------------+----------+---------------+---------------+---------------------+------------+
+| c1   | int    |         | true        | false    |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+| c2   | int    |         | true        | false    |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+| c3   | string |         | false       | true     |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+| c4   | string |         | false       | false    |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+| c5   | string |         | false       | true     | n/a           | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+| c6   | string |         | false       | true     |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+| c7   | bigint |         | false       | false    |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+| c8   | bigint |         | false       | true     |               | AUTO_ENCODING | DEFAULT_COMPRESSION | 0          |
+| c9   | bigint |         | false       | true     | -1            | BIT_SHUFFLE   | DEFAULT_COMPRESSION | 0          |
++------+--------+---------+-------------+----------+---------------+---------------+---------------------+------------+
+</codeblock>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>

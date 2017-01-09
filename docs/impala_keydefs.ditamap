@@ -10285,6 +10285,7 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef keys="impala25"><topicmeta><keywords><keyword>Impala 2.5</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala24"><topicmeta><keywords><keyword>Impala 2.4</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala23"><topicmeta><keywords><keyword>Impala 2.3</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala223"><topicmeta><keywords><keyword>Impala 2.2.3</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala22"><topicmeta><keywords><keyword>Impala 2.2</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala21"><topicmeta><keywords><keyword>Impala 2.1</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala20"><topicmeta><keywords><keyword>Impala 2.0</keyword></keywords></topicmeta></keydef>
@@ -10298,6 +10299,7 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef keys="impala25_full"><topicmeta><keywords><keyword>Impala 2.5</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala24_full"><topicmeta><keywords><keyword>Impala 2.4</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala23_full"><topicmeta><keywords><keyword>Impala 2.3</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala223_full"><topicmeta><keywords><keyword>Impala 2.2.3</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala22_full"><topicmeta><keywords><keyword>Impala 2.2</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala21_full"><topicmeta><keywords><keyword>Impala 2.1</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala20_full"><topicmeta><keywords><keyword>Impala 2.0</keyword></keywords></topicmeta></keydef>

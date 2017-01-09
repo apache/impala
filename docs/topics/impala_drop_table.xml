@@ -155,6 +155,15 @@ drop table temporary.trivial;</codeblock>
       no particular permissions are needed for the associated HDFS files or directories.
     </p>
 
+    <p rev="kudu" conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p rev="kudu">
+      Kudu tables can be managed or external, the same as with HDFS-based
+      tables. For a managed table, the underlying Kudu table and its data
+      are removed by <codeph>DROP TABLE</codeph>. For an external table,
+      the underlying Kudu table and its data remain after a
+      <codeph>DROP TABLE</codeph>.
+    </p>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>

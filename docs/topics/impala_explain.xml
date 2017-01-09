@@ -234,6 +234,42 @@ EXPLAIN_LEVEL set to extended
       if the source table is partitioned.)
     </p>
 
+    <p rev="kudu" conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p>
+      The <codeph>EXPLAIN</codeph> statement displays equivalent plan
+      information for queries against Kudu tables as for queries
+      against HDFS-based tables.
+    </p>
+
+    <p>
+      To see which predicates Impala can <q>push down</q> to Kudu for
+      efficient evaluation, without transmitting unnecessary rows back
+      to Impala, look for the <codeph>kudu predicates</codeph> item in
+      the scan phase of the query. The label <codeph>kudu predicates</codeph>
+      indicates a condition that can be evaluated efficiently on the Kudu
+      side. The label <codeph>predicates</codeph> in a <codeph>SCAN KUDU</codeph>
+      node indicates a condition that is evaluated by Impala.
+      For example, in a table with primary key column <codeph>X</codeph>
+      and non-primary key column <codeph>Y</codeph>, you can see that
+      some operators in the <codeph>WHERE</codeph> clause are evaluated
+      immediately by Kudu and others are evaluated later by Impala:
+<codeblock>
+EXPLAIN SELECT x,y from kudu_table WHERE
+  x = 1 AND x NOT IN (2,3) AND y = 1
+  AND x IS NOT NULL AND x > 0;
++----------------
+| Explain String
++----------------
+...
+| 00:SCAN KUDU [jrussell.hash_only]
+|    predicates: x IS NOT NULL, x NOT IN (2, 3)
+|    kudu predicates: x = 1, x > 0, y = 1
+</codeblock>
+      Only binary predicates and <codeph>IN</codeph> predicates containing
+      literal values that exactly match the types in the Kudu table, and do not
+      require any casting, can be pushed to Kudu.
+    </p>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
     <p>
       <xref href="impala_select.xml#select"/>,

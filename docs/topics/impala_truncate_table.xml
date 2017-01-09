@@ -102,6 +102,9 @@ under the License.
       permission for all the files and directories that make up the table.
     </p>
 
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p conref="../shared/impala_common.xml#common/kudu_no_truncate_table"/>
+
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
     <p>

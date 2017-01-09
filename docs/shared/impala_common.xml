@@ -3730,6 +3730,58 @@ sudo pip-python install ssl</codeblock>
         NULL</codeph> attribute to that column.
       </p>
 
+      <p id="kudu_metadata_intro" rev="kudu">
+        Much of the metadata for Kudu tables is handled by the underlying
+        storage layer. Kudu tables have less reliance on the metastore
+        database, and require less metadata caching on the Impala side.
+        For example, information about partitions in Kudu tables is managed
+        by Kudu, and Impala does not cache any block locality metadata
+        for Kudu tables.
+      </p>
+
+      <p id="kudu_metadata_details" rev="kudu">
+        The <codeph>REFRESH</codeph> and <codeph>INVALIDATE METADATA</codeph>
+        statements are needed less frequently for Kudu tables than for
+        HDFS-backed tables. Neither statement is needed when data is
+        added to, removed, or updated in a Kudu table, even if the changes
+        are made directly to Kudu through a client program using the Kudu API.
+        Run <codeph>REFRESH <varname>table_name</varname></codeph> or
+        <codeph>INVALIDATE METADATA <varname>table_name</varname></codeph>
+        for a Kudu table only after making a change to the Kudu table schema,
+        such as adding or dropping a column, by a mechanism other than
+        Impala.
+      </p>
+ 
+      <p id="kudu_internal_external_tables">
+        The distinction between internal and external tables has some special
+        details for Kudu tables. Tables created entirely through Impala are
+        internal tables. The table name as represented within Kudu includes
+        notation such as an <codeph>impala::</codeph> prefix and the Impala
+        database name. External Kudu tables are those created by a non-Impala
+        mechanism, such as a user application calling the Kudu APIs. For
+        these tables, the <codeph>CREATE EXTERNAL TABLE</codeph> syntax lets
+        you establish a mapping from Impala to the existing Kudu table:
+<codeblock>
+CREATE EXTERNAL TABLE impala_name STORED AS KUDU
+  TBLPROPERTIES('kudu.table_name' = 'original_kudu_name');
+</codeblock>
+        External Kudu tables differ in one important way from other external
+        tables: adding or dropping a column or range partition changes the
+        data in the underlying Kudu table, in contrast to an HDFS-backed
+        external table where existing data files are left untouched.
+      </p>
+
+      <p id="kudu_sentry_limitations" rev="IMPALA-4000">
+        Access to Kudu tables must be granted to and revoked from roles as usual.
+        Only users with <codeph>ALL</codeph> privileges on <codeph>SERVER</codeph> can create external Kudu tables.
+        Currently, access to a Kudu table is <q>all or nothing</q>:
+        enforced at the table level rather than the column level, and applying to all
+        SQL operations rather than individual statements such as <codeph>INSERT</codeph>.
+        Because non-SQL APIs can access Kudu data without going through Sentry
+        authorization, currently the Sentry support is considered preliminary
+        and subject to change.
+      </p>
+
     </section>
 
   </conbody>

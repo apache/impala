@@ -397,6 +397,24 @@ insert into t1 partition(x=NULL, y) select c1, c3  from some_other_table;</codeb
         <codeph>nullifzero()</codeph>, and <codeph>zeroifnull()</codeph>. See
         <xref href="impala_conditional_functions.xml#conditional_functions"/> for details.
       </p>
+
+      <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+      <p rev="kudu">
+        Columns in Kudu tables have an attribute that specifies whether or not they can contain
+        <codeph>NULL</codeph> values. A column with a <codeph>NULL</codeph> attribute can contain
+        nulls. A column with a <codeph>NOT NULL</codeph> attribute cannot contain any nulls, and
+        an <codeph>INSERT</codeph>, <codeph>UPDATE</codeph>, or <codeph>UPSERT</codeph> statement
+        will skip any row that attempts to store a null in a column designated as <codeph>NOT NULL</codeph>.
+        Kudu tables default to the <codeph>NULL</codeph> setting for each column, except columns that
+        are part of the primary key.
+      </p>
+      <p rev="kudu">
+        In addition to columns with the <codeph>NOT NULL</codeph> attribute, Kudu tables also have
+        restrictions on <codeph>NULL</codeph> values in columns that are part of the primary key for
+        a table. No column that is part of the primary key in a Kudu table can contain any
+        <codeph>NULL</codeph> values.
+      </p>
+
     </conbody>
   </concept>
 </concept>

@@ -436,6 +436,9 @@ insert into dates_and_times values
 
     <p conref="../shared/impala_common.xml#common/avro_no_timestamp"/>
 
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p conref="../shared/impala_common.xml#common/kudu_unsupported_data_type"/>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <ul>

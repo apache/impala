@@ -34,6 +34,7 @@ under the License.
       <data name="Category" value="S3"/>
       <data name="Category" value="Developers"/>
       <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Kudu"/>
     </metadata>
   </prolog>
 
@@ -63,9 +64,11 @@ ALTER TABLE <varname>name</varname> REPLACE COLUMNS (<varname>col_spec</varname>
 ALTER TABLE <varname>name</varname> ADD [IF NOT EXISTS] PARTITION (<varname>partition_spec</varname>)
   <ph rev="IMPALA-4390">[<varname>location_spec</varname>]</ph>
   <ph rev="IMPALA-4390">[<varname>cache_spec</varname>]</ph>
+<ph rev="kudu">ALTER TABLE <varname>name</varname> ADD [IF NOT EXISTS] RANGE PARTITION (<varname>kudu_partition_spec</varname>)</ph>
 
 ALTER TABLE <varname>name</varname> DROP [IF EXISTS] PARTITION (<varname>partition_spec</varname>)
   <ph rev="2.3.0">[PURGE]</ph>
+<ph rev="kudu">ALTER TABLE <varname>name</varname> DROP [IF EXISTS] RANGE PARTITION <varname>kudu_partition_spec</varname></ph>
 
 <ph rev="2.3.0 IMPALA-1568 CDH-36799">ALTER TABLE <varname>name</varname> RECOVER PARTITIONS</ph>
 
@@ -86,11 +89,17 @@ statsKey ::= numDVs | numNulls | avgSize | maxSize</ph>
 
 <varname>col_spec</varname> ::= <varname>col_name</varname> <varname>type_name</varname>
 
-<varname>partition_spec</varname> ::= <varname>simple_partition_spec</varname> | <ph rev="IMPALA-1654"><varname>complex_partition_spec</varname></ph> | <ph rev="kudu"><varname>kudu_partition_spec</varname></ph>
+<varname>partition_spec</varname> ::= <varname>simple_partition_spec</varname> | <ph rev="IMPALA-1654"><varname>complex_partition_spec</varname></ph>
 
 <varname>simple_partition_spec</varname> ::= <varname>partition_col</varname>=<varname>constant_value</varname>
 
 <ph rev="IMPALA-1654"><varname>complex_partition_spec</varname> ::= <varname>comparison_expression_on_partition_col</varname></ph>
+
+<ph rev="kudu"><varname>kudu_partition_spec</varname> ::= <varname>constant</varname> <varname>range_operator</varname> VALUES <varname>range_operator</varname> <varname>constant</varname> | VALUE = <varname>constant</varname></ph>
+
+<ph rev="IMPALA-4390">cache_spec ::= CACHED IN '<varname>pool_name</varname>' [WITH REPLICATION = <varname>integer</varname>] | UNCACHED</ph>
+
+<ph rev="IMPALA-4390">location_spec ::= LOCATION '<varname>hdfs_path_of_directory</varname>'</ph>
 
 <varname>table_properties</varname> ::= '<varname>name</varname>'='<varname>value</varname>'[, '<varname>name</varname>'='<varname>value</varname>' ...]
 
@@ -894,6 +903,75 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
       and read and write permission for the data files within the table.
       The <codeph>ADD PARTITION</codeph> and <codeph>DROP PARTITION</codeph> clauses
       require write and execute permissions for the associated partition directory.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
+    <p rev="kudu IMPALA-2890">
+      Because of the extra constraints and features of Kudu tables, such as the <codeph>NOT NULL</codeph>
+      and <codeph>DEFAULT</codeph> attributes for columns, <codeph>ALTER TABLE</codeph> has specific
+      requirements related to Kudu tables:
+      <ul>
+        <li>
+          <p>
+            In an <codeph>ADD COLUMNS</codeph> operation, you can specify the <codeph>NULL</codeph>,
+            <codeph>NOT NULL</codeph>, and <codeph>DEFAULT <varname>default_value</varname></codeph>
+            column attributes.
+          </p>
+        </li>
+        <li>
+          <p>
+            If you add a column with a <codeph>NOT NULL</codeph> attribute, it must also have a
+            <codeph>DEFAULT</codeph> attribute, so the default value can be assigned to that
+            column for all existing rows.
+          </p>
+        </li>
+        <li>
+          <p>
+            The <codeph>DROP COLUMN</codeph> clause works the same for a Kudu table as for other
+            kinds of tables.
+          </p>
+        </li>
+        <li>
+          <p>
+            Although you can change the name of a column with the <codeph>CHANGE</codeph> clause,
+            you cannot change the type of a column in a Kudu table.
+          </p>
+        </li>
+        <li>
+          <p>
+            You cannot assign the <codeph>ENCODING</codeph>, <codeph>COMPRESSION</codeph>,
+            or <codeph>BLOCK_SIZE</codeph> attributes when adding a column.
+          </p>
+        </li>
+        <li>
+          <p>
+            You cannot change the default value, nullability, encoding, compression, or block size
+            of existing columns in a Kudu table.
+          </p>
+        </li>
+        <li>
+          <p>
+            You cannot use the <codeph>REPLACE COLUMNS</codeph> clause with a Kudu table.
+          </p>
+        </li>
+        <li>
+          <p>
+            The <codeph>RENAME TO</codeph> clause for a Kudu table only affects the name stored in the
+            metastore database that Impala uses to refer to the table. To change which underlying Kudu
+            table is associated with an Impala table name, you must change the <codeph>TBLPROPERTIES</codeph>
+            property of the table: <codeph>SET TBLPROPERTIES('kudu.table_name'='<varname>kudu_tbl_name</varname>)</codeph>.
+            Doing so causes Kudu to change the name of the underlying Kudu table.
+          </p>
+        </li>
+      </ul>
+    </p>
+
+    <p rev="kudu">
+      Kudu tables all use an underlying partitioning mechanism. The partition syntax is different than for non-Kudu
+      tables. You can use the <codeph>ALTER TABLE</codeph> statement to add and drop <term>range partitions</term>
+      from a Kudu table. Any new range must not overlap with any existing ranges. Dropping a range removes all the associated
+      rows from the table. See <xref href="impala_kudu.xml#kudu_partitioning"/> for details.
     </p>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>

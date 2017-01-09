@@ -28,6 +28,7 @@ under the License.
       <data name="Category" value="Developers"/>
       <data name="Category" value="Data Analysts"/>
       <data name="Category" value="Reports"/>
+      <data name="Category" value="Kudu"/>
     </metadata>
   </prolog>
 
@@ -49,7 +50,8 @@ SHOW TABLES [IN <varname>database_name</varname>] [[LIKE] '<varname>pattern</var
 <ph rev="1.2.1">SHOW TABLE STATS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
 <ph rev="1.2.1">SHOW COLUMN STATS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
 <ph rev="1.4.0">SHOW PARTITIONS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
-SHOW FILES IN [<varname>database_name</varname>.]<varname>table_name</varname> <ph  rev="IMPALA-1654">[PARTITION (<varname>key_col_expression</varname> [, <varname>key_col_expression</varname>]</ph>]
+<ph rev="1.4.0">SHOW <ph rev="kudu">[RANGE]</ph> PARTITIONS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
+SHOW FILES IN [<varname>database_name</varname>.]<varname>table_name</varname> <ph rev="IMPALA-1654">[PARTITION (<varname>key_col_expression</varname> [, <varname>key_col_expression</varname>]</ph>]
 
 <ph rev="2.0.0">SHOW ROLES
 SHOW CURRENT ROLES
@@ -129,7 +131,8 @@ show files in sample_table partition (month like 'J%');
       <note>
         This statement applies to tables and partitions stored on HDFS, or in the Amazon Simple Storage System (S3).
         It does not apply to views.
-        It does not apply to tables mapped onto HBase, because HBase does not use the same file-based storage layout.
+        It does not apply to tables mapped onto HBase <ph rev="kudu">or Kudu</ph>,
+        because those data management systems do not use the same file-based storage layout.
       </note>
 
       <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
@@ -742,6 +745,61 @@ show tables like '*dim*|t*';
 
       <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
 
+      <p rev="kudu">
+        For Kudu tables:
+      </p>
+
+      <ul rev="kudu">
+        <li>
+          <p>
+            The column specifications include attributes such as <codeph>NULL</codeph>,
+            <codeph>NOT NULL</codeph>, <codeph>ENCODING</codeph>, and <codeph>COMPRESSION</codeph>.
+            If you do not specify those attributes in the original <codeph>CREATE TABLE</codeph> statement,
+            the <codeph>SHOW CREATE TABLE</codeph> output displays the defaults that were used.
+          </p>
+        </li>
+        <li>
+          <p>
+            The specifications of any <codeph>RANGE</codeph> clauses are not displayed in full.
+            To see the definition of the range clauses for a Kudu table, use the <codeph>SHOW RANGE PARTITIONS</codeph> statement.
+          </p>
+        </li>
+        <li>
+          <p>
+            The <codeph>TBLPROPERTIES</codeph> output reflects the Kudu master address
+            and the internal Kudu name associated with the Impala table.
+          </p>
+        </li>
+      </ul>
+
+<codeblock rev="kudu">
+show CREATE TABLE numeric_grades_default_letter;
++------------------------------------------------------------------------------------------------+
+| result                                                                                         |
++------------------------------------------------------------------------------------------------+
+| CREATE TABLE user.numeric_grades_default_letter (                                              |
+|   score TINYINT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,               |
+|   letter_grade STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION DEFAULT '-', |
+|   student STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,                  |
+|   PRIMARY KEY (score)                                                                          |
+| )                                                                                              |
+| PARTITION BY <b>RANGE (score) (...)</b>                                                               |
+| STORED AS KUDU                                                                                 |
+| TBLPROPERTIES ('kudu.master_addresses'='vd0342.example.com:7051',                              |
+|   'kudu.table_name'='impala::USER.numeric_grades_default_letter')                              |
++------------------------------------------------------------------------------------------------+
+
+show range partitions numeric_grades_default_letter;
++--------------------+
+| RANGE (score)      |
++--------------------+
+| 0 &lt;= VALUES &lt; 50   |
+| 50 &lt;= VALUES &lt; 65  |
+| 65 &lt;= VALUES &lt; 80  |
+| 80 &lt;= VALUES &lt; 100 |
++--------------------+
+</codeblock>
+
       <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
       <p>
@@ -855,6 +913,39 @@ show create table show_create_table_demo;
 
       <p conref="../shared/impala_common.xml#common/show_security"/>
 
+      <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
+      <p rev="kudu IMPALA-2830">
+        Because Kudu tables do not have characteristics derived from HDFS, such
+        as number of files, file format, and HDFS cache status, the output of
+        <codeph>SHOW TABLE STATS</codeph> reflects different characteristics
+        that apply to Kudu tables. If the Kudu table is created with the
+        clause <codeph>PARTITIONS 20</codeph>, then the result set of
+        <codeph>SHOW TABLE STATS</codeph> consists of 20 rows, each representing
+        one of the numbered partitions. For example:
+      </p>
+
+<codeblock rev="kudu IMPALA-2830">
+show table stats kudu_table;
++--------+-----------+----------+-----------------------+------------+
+| # Rows | Start Key | Stop Key | Leader Replica        | # Replicas |
++--------+-----------+----------+-----------------------+------------+
+| -1     |           | 00000001 | host.example.com:7050 | 3          |
+| -1     | 00000001  | 00000002 | host.example.com:7050 | 3          |
+| -1     | 00000002  | 00000003 | host.example.com:7050 | 3          |
+| -1     | 00000003  | 00000004 | host.example.com:7050 | 3          |
+| -1     | 00000004  | 00000005 | host.example.com:7050 | 3          |
+...
+</codeblock>
+
+      <p rev="IMPALA-2830">
+        Impala does not compute the number of rows for each partition for
+        Kudu tables. Therefore, you do not need to re-run <codeph>COMPUTE STATS</codeph>
+        when you see -1 in the <codeph># Rows</codeph> column of the output from
+        <codeph>SHOW TABLE STATS</codeph>. That column always shows -1 for
+        all Kudu tables. 
+      </p>
+
       <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
       <p>
@@ -958,6 +1049,14 @@ show table stats store_sales;
       <p conref="../shared/impala_common.xml#common/security_blurb"/>
 
       <p conref="../shared/impala_common.xml#common/show_security"/>
+
+      <p rev="kudu IMPALA-2830">
+        The output for <codeph>SHOW COLUMN STATS</codeph> includes
+        the relevant information for Kudu tables.
+        The information for column statistics that originates in the
+        underlying Kudu storage layer is also represented in the
+        metastore database that Impala uses.
+      </p>
 
       <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
@@ -1145,7 +1244,30 @@ show column stats store_sales;
 
       <p conref="../shared/impala_common.xml#common/show_security"/>
 
+      <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
+      <p rev="kudu IMPALA-4403">
+        The optional <codeph>RANGE</codeph> clause only applies to Kudu tables. It displays only the partitions
+        defined by the <codeph>RANGE</codeph> clause of <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph>.
+      </p>
+
+      <p rev="kudu IMPALA-4403">
+        Although you can specify <codeph>&lt;</codeph> or
+        <codeph>&lt;=</codeph> comparison operators when defining
+        range partitions for Kudu tables, Kudu rewrites them if necessary
+        to represent each range as
+        <codeph><varname>low_bound</varname> &lt;= VALUES &lt; <varname>high_bound</varname></codeph>.
+        This rewriting might involve incrementing one of the boundary values
+        or appending a <codeph>\0</codeph> for string values, so that the
+        partition covers the same range as originally specified.
+      </p>
+
       <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+      <p>
+        The following example shows the output for a Parquet, text, or other
+        HDFS-backed table partitioned on the <codeph>YEAR</codeph> column:
+      </p>
 
 <codeblock rev="1.4.0">[localhost:21000] &gt; show partitions census;
 +-------+-------+--------+------+---------+
@@ -1160,6 +1282,53 @@ show column stats store_sales;
 | 2013  | 1     | 1      | 231B | PARQUET |
 | Total | 9     | 3      | 275B |         |
 +-------+-------+--------+------+---------+
+</codeblock>
+
+      <p rev="kudu IMPALA-4403">
+        The following example shows the output for a Kudu table
+        using the hash partitioning mechanism. The number of
+        rows in the result set corresponds to the values used
+        in the <codeph>PARTITIONS <varname>N</varname></codeph>
+        clause of <codeph>CREATE TABLE</codeph>.
+      </p>
+
+<codeblock rev="kudu IMPALA-4403"><![CDATA[
+show partitions million_rows_hash;
+
++--------+-----------+----------+-----------------------+--
+| # Rows | Start Key | Stop Key | Leader Replica        | # Replicas
++--------+-----------+----------+-----------------------+--
+| -1     |           | 00000001 | n236.example.com:7050 | 3
+| -1     | 00000001  | 00000002 | n236.example.com:7050 | 3
+| -1     | 00000002  | 00000003 | n336.example.com:7050 | 3
+| -1     | 00000003  | 00000004 | n238.example.com:7050 | 3
+| -1     | 00000004  | 00000005 | n338.example.com:7050 | 3
+....
+| -1     | 0000002E  | 0000002F | n240.example.com:7050 | 3
+| -1     | 0000002F  | 00000030 | n336.example.com:7050 | 3
+| -1     | 00000030  | 00000031 | n240.example.com:7050 | 3
+| -1     | 00000031  |          | n334.example.com:7050 | 3
++--------+-----------+----------+-----------------------+--
+Fetched 50 row(s) in 0.05s
+]]>
+</codeblock>
+
+      <p rev="kudu IMPALA-4403">
+        The following example shows the output for a Kudu table
+        using the range partitioning mechanism:
+      </p>
+
+<codeblock rev="kudu IMPALA-4403"><![CDATA[
+show range partitions million_rows_range;
++-----------------------+
+| RANGE (id)            |
++-----------------------+
+| VALUES < "A"          |
+| "A" <= VALUES < "["   |
+| "a" <= VALUES < "{"   |
+| "{" <= VALUES < "~\0" |
++-----------------------+
+]]>
 </codeblock>
 
       <p conref="../shared/impala_common.xml#common/permissions_blurb"/>

@@ -128,6 +128,9 @@ prefer to use an integer data type with sufficient range (<codeph>INT</codeph>,
 
     <p conref="../shared/impala_common.xml#common/column_stats_variable"/>
 
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p conref="../shared/impala_common.xml#common/kudu_unsupported_data_type"/>
+
     <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
 
     <p conref="../shared/impala_common.xml#common/blobs_are_strings"/>

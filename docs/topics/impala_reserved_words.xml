@@ -82,7 +82,9 @@ avro
 between
 bigint
 <ph rev="1.4.0">binary</ph>
+<ph rev="kudu">blocksize</ph>
 boolean
+<!-- <ph rev="kudu">buckets</ph> -->
 by
 <ph rev="1.4.0">cached</ph>
 <ph rev="2.3.0">cascade</ph>
@@ -95,6 +97,7 @@ change
 column
 columns
 comment
+<ph rev="kudu">compression</ph>
 compute
 create
 cross
@@ -105,15 +108,18 @@ databases
 date
 datetime
 decimal
-<ph rev="2.6.0">delete</ph>
+<ph rev="kudu">default</ph>
+<ph rev="kudu">delete</ph>
 delimited
 desc
 describe
 distinct
+<!-- <ph rev="kudu">distribute</ph> -->
 div
 double
 drop
 else
+<ph rev="kudu">encoding</ph>
 end
 escaped
 exists
@@ -136,10 +142,10 @@ function
 functions
 <ph rev="2.1.0">grant</ph>
 group
-<ph rev="2.6.0">hash</ph>
+<ph rev="kudu">hash</ph>
 having
 if
-<ph rev="2.6.0">ignore</ph>
+<!-- <ph rev="kudu">ignore</ph> -->
 <ph rev="2.5.0">ilike</ph>
 in
 <ph rev="2.1.0">incremental</ph>
@@ -210,6 +216,7 @@ serdeproperties
 set
 show
 smallint
+<!-- <ph rev="kudu">split</ph> -->
 stats
 stored
 straight_join
@@ -229,8 +236,9 @@ true
 <ph rev="2.0.0">unbounded</ph>
 <ph rev="1.4.0">uncached</ph>
 union
-<ph rev="2.6.0">update</ph>
+<ph rev="kudu">update</ph>
 <ph rev="1.2.1">update_fn</ph>
+<ph rev="kudu">upsert</ph>
 use
 using
 values

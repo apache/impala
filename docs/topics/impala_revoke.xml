@@ -108,6 +108,9 @@ object_type ::= TABLE | DATABASE | SERVER | URI
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
 
+    <p rev="2.8.0" conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p conref="../shared/impala_common.xml#common/kudu_sentry_limitations"/>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>

@@ -243,6 +243,9 @@ select concat('[',a,']') as a, concat('[',b,']') as b, concat('[',c,']') as c fr
 +------------------------+----------------------------------+--------------------------------------------+
 </codeblock>
 
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p conref="../shared/impala_common.xml#common/kudu_unsupported_data_type"/>
+
     <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
 
     <p>

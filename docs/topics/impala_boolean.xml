@@ -161,6 +161,9 @@ SELECT claim FROM assertions WHERE really = TRUE;
 
 <!-- <p conref="../shared/impala_common.xml#common/restrictions_blurb"/> -->
 
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p conref="../shared/impala_common.xml#common/kudu_non_pk_data_type"/>
+
 <!-- <p conref="../shared/impala_common.xml#common/related_info"/> -->
 
     <p>

@@ -102,6 +102,9 @@ SELECT CAST(1000.5 AS FLOAT);
 
     <p conref="../shared/impala_common.xml#common/float_double_decimal_caveat"/>
 
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p conref="../shared/impala_common.xml#common/kudu_non_pk_data_type"/>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
