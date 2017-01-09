@@ -296,9 +296,11 @@ public class ToSqlTest extends FrontendTestBase {
 
   @Test
   public void TestCreateTable() throws AnalysisException {
-    testToSql("create table p (a int)",
+    testToSql("create table p (a int) partitioned by (day string) " +
+        "comment 'This is a test'",
         "default",
-        "CREATE TABLE default.p ( a INT ) STORED AS TEXTFILE", true);
+        "CREATE TABLE default.p ( a INT ) PARTITIONED BY ( day STRING ) " +
+        "COMMENT 'This is a test' STORED AS TEXTFILE", true);
   }
 
   @Test

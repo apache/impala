@@ -264,7 +264,6 @@ public class ToSqlUtils {
       sb.append("\n)");
     }
     sb.append("\n");
-    if (tableComment != null) sb.append(" COMMENT '" + tableComment + "'\n");
 
     if (partitionColumnsSql != null && partitionColumnsSql.size() > 0) {
       sb.append(String.format("PARTITIONED BY (\n  %s\n)\n",
@@ -274,6 +273,8 @@ public class ToSqlUtils {
     if (kuduPartitionByParams != null) {
       sb.append("PARTITION BY " + kuduPartitionByParams + "\n");
     }
+
+    if (tableComment != null) sb.append(" COMMENT '" + tableComment + "'\n");
 
     if (rowFormat != null && !rowFormat.isDefault()) {
       sb.append("ROW FORMAT DELIMITED");

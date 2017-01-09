@@ -71,6 +71,7 @@ PARTITIONED BY (
   y INT,
   a BOOLEAN
 )
+COMMENT 'This is a test'
 STORED AS TEXTFILE
 ---- RESULTS
 CREATE TABLE show_create_table_test_db.test3 (
@@ -93,6 +94,7 @@ PARTITIONED BY (
   y INT,
   a BOOLEAN
 )
+COMMENT 'This is a test'
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
 ====
