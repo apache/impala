@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept id="upsert">
+<concept id="upsert" rev="kudu IMPALA-3725">
 
   <title>UPSERT Statement (<keyword keyref="impala28"/> or higher only)</title>
   <titlealts audience="PDF"><navtitle>UPSERT</navtitle></titlealts>
@@ -62,28 +62,54 @@ under the License.
     </p>
 
     <p>
-      Although inserting or updating a single row or a small set of rows would be inefficient for tables using HDFS
-      data files, Kudu is able to perform this operation efficiently.
-      Therefore, this statement only works for Impala tables that use the
-      Kudu storage engine.
+      This statement only works for Impala tables that use the Kudu storage engine.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
 <codeblock>
+UPSERT INTO [TABLE] [<varname>db_name</varname>.]<varname>table_name</varname>
+  [(<varname>column_list</varname>)]
+{
+    [<varname>hint_clause</varname>] <varname>select_statement</varname>
+  | VALUES (<varname>value</varname> [, <varname>value</varname> ...]) [, (<varname>value</varname> [, <varname>value</varname> ...]) ...]
+}
+
+hint_clause ::= [SHUFFLE] | [NOSHUFFLE]
+  (Note: the square brackets are part of the syntax.)
 </codeblock>
 
-    <p conref="../shared/impala_common.xml#common/dml_blurb"/>
+    <p>
+      The <varname>select_statement</varname> clause can use the full syntax, such as
+      <codeph>WHERE</codeph> and join clauses, as <xref href="impala_select.xml#select"/>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/dml_blurb_kudu"/>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
-    <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
+    <p>
+      If you specify a column list, any omitted columns in the inserted or updated rows are
+      set to their default value (if the column has one) or <codeph>NULL</codeph> (if the
+      column does not have a default value). Therefore, if a column is not nullable and
+      has no default value, it must be included in the column list for any <codeph>UPSERT</codeph>
+      statement. Because all primary key columns meet these conditions, all the primary key
+      columns must be specified in every <codeph>UPSERT</codeph> statement.
+    </p>
+
+    <p>
+      Because Kudu tables can efficiently handle small incremental changes, the <codeph>VALUES</codeph>
+      clause is more practical to use with Kudu tables than with HDFS-based tables.
+    </p>
 
     <note conref="../shared/impala_common.xml#common/compute_stats_next"/>
 
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>
 
+<codeblock>
+UPSERT INTO kudu_table (pk, c1, c2, c3) VALUES (0, 'hello', 50, true), (1, 'world', -1, false);
+UPSERT INTO production_table SELECT * FROM staging_table;
+UPSERT INTO production_table SELECT * FROM staging_table WHERE c1 IS NOT NULL AND c2 > 0;
 </codeblock>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>

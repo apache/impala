@@ -33,7 +33,7 @@ under the License.
       <data name="Category" value="Developers"/>
       <data name="Category" value="Tables"/>
       <data name="Category" value="S3"/>
-      <!-- <data name="Category" value="Kudu"/> -->
+      <data name="Category" value="Kudu"/>
       <!-- This is such an important statement, think if there are more applicable categories. -->
     </metadata>
   </prolog>
@@ -90,16 +90,39 @@ hint_clause ::= [SHUFFLE] | [NOSHUFFLE]    (Note: the square brackets are part o
       See <xref href="impala_complex_types.xml#complex_types"/> for details about working with complex types.
     </p>
 
-    <p rev="kudu">
-      <b>Ignoring duplicate partition keys for Kudu tables (IGNORE clause)</b>
-    </p>
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/kudu_no_insert_overwrite"/>
 
     <p rev="kudu">
-      Normally, an <codeph>INSERT</codeph> operation into a Kudu table fails if
-      it would result in duplicate partition key columns for any rows.
-      Specify <codeph>INSERT IGNORE <varname>rest_of_statement</varname></codeph> to
-      make the <codeph>INSERT</codeph> continue in this case. The rows that would
-      have duplicate partition key columns are not inserted.
+      Kudu tables require a unique primary key for each row. If an <codeph>INSERT</codeph>
+      statement attempts to insert a row with the same values for the primary key columns
+      as an existing row, that row is discarded and the insert operation continues.
+      When rows are discarded due to duplicate primary keys, the statement finishes
+      with a warning, not an error. (This is a change from early releases of Kudu
+      where the default was to return in error in such cases, and the syntax
+      <codeph>INSERT IGNORE</codeph> was required to make the statement succeed.
+      The <codeph>IGNORE</codeph> clause is no longer part of the <codeph>INSERT</codeph>
+      syntax.)
+    </p>
+
+    <p>
+      For situations where you prefer to replace rows with duplicate primary key values,
+      rather than discarding the new data, you can use the <codeph>UPSERT</codeph>
+      statement instead of <codeph>INSERT</codeph>. <codeph>UPSERT</codeph> inserts
+      rows that are entirely new, and for rows that match an existing primary key in the
+      table, the non-primary-key columns are updated to reflect the values in the
+      <q>upserted</q> data.
+    </p>
+
+    <p>
+      If you really want to store new rows, not replace existing ones, but cannot do so
+      because of the primary key uniqueness constraint, consider recreating the table
+      with additional columns included in the primary key.
+    </p>
+
+    <p>
+      See <xref href="impala_kudu.xml#impala_kudu"/> for more details about using Impala with Kudu.
     </p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>

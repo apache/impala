@@ -2720,6 +2720,10 @@ select max(height), avg(height) from census_data where age &gt; 20;
         <xref href="../topics/impala_sync_ddl.xml#sync_ddl">SYNC_DDL</xref> query option)
       </p>
 
+      <p id="dml_blurb_kudu" rev="kudu">
+        <b>Statement type:</b> DML
+      </p>
+
       <p rev="1.2" id="sync_ddl_blurb">
         If you connect to different Impala nodes within an <cmdname>impala-shell</cmdname> session for
         load-balancing purposes, you can enable the <codeph>SYNC_DDL</codeph> query option to make each DDL
@@ -3691,12 +3695,36 @@ sudo pip-python install ssl</codeblock>
         around sharing content between the Impala documentation and the Kudu documentation.
       </p>
 
-      <p id="kudu_blurb">
+      <p id="kudu_blurb" rev="kudu 2.8.0">
         <b>Kudu considerations:</b>
       </p>
 
-      <p id="kudu_no_load_data">
+      <p id="kudu_no_load_data" rev="kudu">
         The <codeph>LOAD DATA</codeph> statement cannot be used with Kudu tables.
+      </p>
+
+      <p id="kudu_no_truncate_table" rev="kudu">
+        Currently, the <codeph>TRUNCATE TABLE</codeph> statement cannot be used with Kudu tables.
+      </p>
+
+      <p id="kudu_no_insert_overwrite" rev="kudu">
+        Currently, the <codeph>INSERT OVERWRITE</codeph> syntax cannot be used with Kudu tables.
+      </p>
+
+      <p id="kudu_unsupported_data_type" rev="kudu">
+        Currently, the data types <codeph>DECIMAL</codeph>, <codeph>TIMESTAMP</codeph>, <codeph>CHAR</codeph>, <codeph>VARCHAR</codeph>,
+        <codeph>ARRAY</codeph>, <codeph>MAP</codeph>, and <codeph>STRUCT</codeph> cannot be used with Kudu tables.
+      </p>
+
+      <p id="kudu_non_pk_data_type" rev="kudu">
+        Currently, the data types <codeph>BOOLEAN</codeph>, <codeph>FLOAT</codeph>,
+        and <codeph>DOUBLE</codeph> cannot be used for primary key columns in Kudu tables.
+      </p>
+
+      <p id="pk_implies_not_null" rev="kudu">
+        Because all of the primary key columns must have non-null values, specifying a column
+        in the <codeph>PRIMARY KEY</codeph> clause implicitly adds the <codeph>NOT
+        NULL</codeph> attribute to that column.
       </p>
 
     </section>

@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept id="delete">
+<concept id="delete" rev="kudu">
 
   <title>DELETE Statement (<keyword keyref="impala28"/> or higher only)</title>
   <titlealts audience="PDF"><navtitle>DELETE</navtitle></titlealts>
@@ -39,43 +39,149 @@ under the License.
 
     <p>
       <indexterm audience="hidden">DELETE statement</indexterm>
-      Deletes one or more rows from a Kudu table.
-      Although deleting a single row or a range of rows would be inefficient for tables using HDFS
-      data files, Kudu is able to perform this operation efficiently. Therefore, this statement
-      only works for Impala tables that use the Kudu storage engine.
+      Deletes an arbitrary number of rows from a Kudu table.
+      This statement only works for Impala tables that use the Kudu storage engine.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
 <codeblock>
+DELETE [FROM] [<varname>database_name</varname>.]<varname>table_name</varname> [ WHERE <varname>where_conditions</varname> ]
+
+DELETE <varname>table_ref</varname> FROM [<varname>joined_table_refs</varname>] [ WHERE <varname>where_conditions</varname> ]
 </codeblock>
 
-    <p rev="kudu">
-      Normally, a <codeph>DELETE</codeph> operation for a Kudu table fails if
-      some partition key columns are not found, due to their being deleted or changed
-      by a concurrent <codeph>UPDATE</codeph> or <codeph>DELETE</codeph> operation.
-      Specify <codeph>DELETE IGNORE <varname>rest_of_statement</varname></codeph> to
-      make the <codeph>DELETE</codeph> continue in this case. The rows with the nonexistent
-      duplicate partition key column values are not removed.
+    <p>
+      The first form evaluates rows from one table against an optional
+      <codeph>WHERE</codeph> clause, and deletes all the rows that
+      match the <codeph>WHERE</codeph> conditions, or all rows if
+      <codeph>WHERE</codeph> is omitted.
     </p>
 
-    <p conref="../shared/impala_common.xml#common/dml_blurb"/>
+    <p>
+      The second form evaluates one or more join clauses, and deletes
+      all matching rows from one of the tables. The join clauses can
+      include non-Kudu tables, but the table from which the rows
+      are deleted must be a Kudu table. The <codeph>FROM</codeph>
+      keyword is required in this case, to separate the name of
+      the table whose rows are being deleted from the table names
+      of the join clauses.
+    </p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
-    <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
+    <p>
+      The conditions in the <codeph>WHERE</codeph> clause are the same ones allowed
+      for the <codeph>SELECT</codeph> statement. See <xref href="impala_select.xml#select"/>
+      for details.
+    </p>
+
+    <p>
+      The conditions in the <codeph>WHERE</codeph> clause can refer to
+      any combination of primary key columns or other columns. Referring to
+      primary key columns in the <codeph>WHERE</codeph> clause is more efficient
+      than referring to non-primary key columns.
+    </p>
+
+    <p>
+      If the <codeph>WHERE</codeph> clause is omitted, all rows are removed from the table.
+    </p>
+
+    <p>
+      Because Kudu currently does not enforce strong consistency during concurrent DML operations,
+      be aware that the results after this statement finishes might be different than you
+      intuitively expect:
+    </p>
+    <ul>
+      <li>
+        <p>
+          If some rows cannot be deleted because their
+          some primary key columns are not found, due to their being deleted
+          by a concurrent <codeph>DELETE</codeph> operation,
+          the statement succeeds but returns a warning.
+        </p>
+      </li>
+      <li>
+        <p>
+          A <codeph>DELETE</codeph> statement might also overlap with
+          <codeph>INSERT</codeph>, <codeph>UPDATE</codeph>,
+          or <codeph>UPSERT</codeph> statements running concurrently on the same table.
+          After the statement finishes, there might be more or fewer rows than expected in the table
+          because it is undefined whether the <codeph>DELETE</codeph> applies to rows that are
+          inserted or updated while the <codeph>DELETE</codeph> is in progress.
+        </p>
+      </li>
+    </ul>
+
+    <p>
+      The number of affected rows is reported in an <cmdname>impala-shell</cmdname> message
+      and in the query profile.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/dml_blurb_kudu"/>
 
     <note conref="../shared/impala_common.xml#common/compute_stats_next"/>
 
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>
 
+    <p>
+      The following examples show how to delete rows from a specified
+      table, either all rows or rows that match a <codeph>WHERE</codeph>
+      clause:
+    </p>
+
+<codeblock>
+-- Deletes all rows. The FROM keyword is optional.
+DELETE FROM kudu_table;
+DELETE kudu_table;
+
+-- Deletes 0, 1, or more rows.
+-- (If c1 is a single-column primary key, the statement could only
+-- delete 0 or 1 rows.)
+DELETE FROM kudu_table WHERE c1 = 100;
+
+-- Deletes all rows that match all the WHERE conditions.
+DELETE FROM kudu_table WHERE
+  (c1 > c2 OR c3 IN ('hello','world')) AND c4 IS NOT NULL;
+DELETE FROM t1 WHERE
+  (c1 IN (1,2,3) AND c2 > c3) OR c4 IS NOT NULL;
+DELETE FROM time_series WHERE
+  year = 2016 AND month IN (11,12) AND day > 15;
+
+-- WHERE condition with a subquery.
+DELETE FROM t1 WHERE
+  c5 IN (SELECT DISTINCT other_col FROM other_table);
+
+-- Does not delete any rows, because the WHERE condition is always false.
+DELETE FROM kudu_table WHERE 1 = 0;
+</codeblock>
+
+    <p>
+      The following examples show how to delete rows that are part
+      of the result set from a join:
+    </p>
+
+<codeblock>
+-- Remove _all_ rows from t1 that have a matching X value in t2.
+DELETE t1 FROM t1 JOIN t2 ON t1.x = t2.x;
+
+-- Remove _some_ rows from t1 that have a matching X value in t2.
+DELETE t1 FROM t1 JOIN t2 ON t1.x = t2.x
+  WHERE t1.y = FALSE and t2.z > 100;
+
+-- Delete from a Kudu table based on a join with a non-Kudu table.
+DELETE t1 FROM kudu_table t1 JOIN non_kudu_table t2 ON t1.x = t2.x;
+
+-- The tables can be joined in any order as long as the Kudu table
+-- is specified as the deletion target.
+DELETE t2 FROM non_kudu_table t1 JOIN kudu_table t2 ON t1.x = t2.x;
 </codeblock>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
-      <xref href="impala_kudu.xml#impala_kudu"/>
+      <xref href="impala_kudu.xml#impala_kudu"/>, <xref href="impala_insert.xml#insert"/>,
+      <xref href="impala_update.xml#update"/>, <xref href="impala_upsert.xml#upsert"/>
     </p>
 
   </conbody>

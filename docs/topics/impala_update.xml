@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept id="update">
+<concept id="update" rev="kudu">
 
   <title>UPDATE Statement (<keyword keyref="impala28"/> or higher only)</title>
   <titlealts audience="PDF"><navtitle>UPDATE</navtitle></titlealts>
@@ -39,43 +39,141 @@ under the License.
 
     <p>
       <indexterm audience="hidden">UPDATE statement</indexterm>
-      Updates one or more rows from a Kudu table.
-      Although updating a single row or a range of rows would be inefficient for tables using HDFS
-      data files, Kudu is able to perform this operation efficiently. Therefore, this statement
-      only works for Impala tables that use the Kudu storage engine.
+      Updates an arbitrary number of rows in a Kudu table.
+      This statement only works for Impala tables that use the Kudu storage engine.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
 <codeblock>
+UPDATE [<varname>database_name</varname>.]<varname>table_name</varname> SET <varname>col</varname> = <varname>val</varname> [, <varname>col</varname> = <varname>val</varname> ... ]
+  [ FROM <varname>joined_table_refs</varname> ]
+  [ WHERE <varname>where_conditions</varname> ]
 </codeblock>
-
-    <p rev="kudu">
-      Normally, an <codeph>UPDATE</codeph> operation for a Kudu table fails if
-      some partition key columns are not found, due to their being deleted or changed
-      by a concurrent <codeph>UPDATE</codeph> or <codeph>DELETE</codeph> operation.
-      Specify <codeph>UPDATE IGNORE <varname>rest_of_statement</varname></codeph> to
-      make the <codeph>UPDATE</codeph> continue in this case. The rows with the nonexistent
-      duplicate partition key column values are not changed.
-    </p>
-
-    <p conref="../shared/impala_common.xml#common/dml_blurb"/>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
-    <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
+    <p>
+      None of the columns that make up the primary key can be updated by the
+      <codeph>SET</codeph> clause.
+    </p>
+
+    <p>
+      The conditions in the <codeph>WHERE</codeph> clause are the same ones allowed
+      for the <codeph>SELECT</codeph> statement. See <xref href="impala_select.xml#select"/>
+      for details.
+    </p>
+
+    <p>
+      If the <codeph>WHERE</codeph> clause is omitted, all rows in the table are updated.
+    </p>
+
+    <p>
+      The conditions in the <codeph>WHERE</codeph> clause can refer to
+      any combination of primary key columns or other columns. Referring to
+      primary key columns in the <codeph>WHERE</codeph> clause is more efficient
+      than referring to non-primary key columns.
+    </p>
+
+    <p>
+      Because Kudu currently does not enforce strong consistency during concurrent DML operations,
+      be aware that the results after this statement finishes might be different than you
+      intuitively expect:
+    </p>
+    <ul>
+      <li>
+        <p>
+          If some rows cannot be updated because their
+          some primary key columns are not found, due to their being deleted
+          by a concurrent <codeph>DELETE</codeph> operation,
+          the statement succeeds but returns a warning.
+        </p>
+      </li>
+      <li>
+        <p>
+          An <codeph>UPDATE</codeph> statement might also overlap with
+          <codeph>INSERT</codeph>, <codeph>UPDATE</codeph>,
+          or <codeph>UPSERT</codeph> statements running concurrently on the same table.
+          After the statement finishes, there might be more or fewer matching rows than expected
+          in the table because it is undefined whether the <codeph>UPDATE</codeph> applies to rows
+          that are inserted or updated while the <codeph>UPDATE</codeph> is in progress.
+        </p>
+      </li>
+    </ul>
+
+    <p>
+      The number of affected rows is reported in an <cmdname>impala-shell</cmdname> message
+      and in the query profile.
+    </p>
+
+    <p>
+      The optional <codeph>FROM</codeph> clause lets you restrict the
+      updates to only the rows in the specified table that are part
+      of the result set for a join query. The join clauses can include
+      non-Kudu tables, but the table from which the rows are deleted
+      must be a Kudu table.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/dml_blurb_kudu"/>
 
     <note conref="../shared/impala_common.xml#common/compute_stats_next"/>
 
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>
 
+    <p>
+      The following examples show how to perform a simple update
+      on a table, with or without a <codeph>WHERE</codeph> clause:
+    </p>
+
+<codeblock>
+-- Set all rows to the same value for column c3.
+-- In this case, c1 and c2 are primary key columns
+-- and so cannot be updated.
+UPDATE kudu_table SET c3 = 'not applicable';
+
+-- Update only the rows that match the condition.
+UPDATE kudu_table SET c3 = NULL WHERE c1 > 100 AND c3 IS NULL;
+
+-- Does not update any rows, because the WHERE condition is always false.
+UPDATE kudu_table SET c3 = 'impossible' WHERE 1 = 0;
+
+-- Change the values of multiple columns in a single UPDATE statement.
+UPDATE kudu_table SET c3 = upper(c3), c4 = FALSE, c5 = 0 WHERE c6 = TRUE;
+</codeblock>
+
+    <p>
+      The following examples show how to perform an update using the
+      <codeph>FROM</codeph> keyword with a join clause:
+    </p>
+
+<codeblock>
+-- Uppercase a column value, only for rows that have
+-- an ID that matches the value from another table.
+UPDATE kudu_table SET c3 = upper(c3)
+  FROM kudu_table JOIN non_kudu_table
+  ON kudu_table.id = non_kudu_table.id;
+
+-- Same effect as previous statement.
+-- Assign table aliases in FROM clause, then refer to
+-- short names elsewhere in the statement.
+UPDATE t1 SET c3 = upper(c3)
+  FROM kudu_table t1 JOIN non_kudu_table t2
+  ON t1.id = t2.id;
+
+-- Same effect as previous statements, but more efficient.
+-- Use WHERE clause to skip updating values that are
+-- already uppercase.
+UPDATE t1 SET c3 = upper(c3)
+  FROM kudu_table t1 JOIN non_kudu_table t2
+  ON t1.id = t2.id
+  WHERE c3 != upper(c3);
 </codeblock>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
-      <xref href="impala_kudu.xml#impala_kudu"/>
+      <xref href="impala_kudu.xml#impala_kudu"/>, <xref href="impala_insert.xml#insert"/>,
+      <xref href="impala_delete.xml#delete"/>, <xref href="impala_upsert.xml#upsert"/>
     </p>
 
   </conbody>
