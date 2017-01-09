@@ -38,20 +38,5 @@ under the License.
 
     <note conref="../shared/impala_common.xml#common/llama_query_options_obsolete"/>
 
-    <p>
-      <indexterm audience="hidden">V_CPU_CORES query option</indexterm>
-      The number of per-host virtual CPU cores to request from YARN. If set, the query option overrides the
-      automatic estimate from Impala.
-      Used in conjunction with the Impala resource management feature in Impala 1.2 and higher and CDH 5.
-    </p>
-
-    <p>
-      <b>Type:</b> numeric
-    </p>
-
-    <p>
-      <b>Default:</b> 0 (use automatic estimates)
-    </p>
-
   </conbody>
 </concept>

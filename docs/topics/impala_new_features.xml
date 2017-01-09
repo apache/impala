@@ -46,11 +46,390 @@ under the License.
 
   </conbody>
 
+<!-- All 2.8.x new features go under here -->
+
+  <concept rev="2.8.0" id="new_features_280">
+
+    <title>New Features in <keyword keyref="impala28_full"/></title>
+
+    <conbody>
+
+      <ul id="feature_list">
+        <li>
+          <p>
+            Performance and scalability improvements:
+          </p>
+          <ul>
+            <li>
+              <p rev="IMPALA-4572">
+                The <codeph>COMPUTE STATS</codeph> statement can
+                take advantage of multithreading.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4135">
+                Improved scalability for highly concurrent loads by reducing the possibility of TCP/IP timeouts.
+                A configuration setting, <codeph>accepted_cnxn_queue_depth</codeph>, can be adjusted upwards to
+                avoid this type of timeout on large clusters.
+              </p>
+            </li>
+            <li>
+              <p>
+                Several performance improvements were made to the mechanism for generating native code:
+              </p>
+              <ul>
+                <li>
+                  <p rev="IMPALA-3638">
+                    Some queries involving analytic functions can take better advantage of native code generation.
+                  </p>
+                </li>
+                <li>
+                  <p rev="IMPALA-4008">
+                    Modules produced during intermediate code generation are organized
+                    to be easier to cache and reuse during the lifetime of a long-running or complicated query.
+                  </p>
+                </li>
+                <li>
+                  <p rev="IMPALA-4397 IMPALA-1430">
+                    The <codeph>COMPUTE STATS</codeph> statement is more efficient
+                    (less time for the codegen phase) for tables with a large number
+                    of columns, especially for tables containing <codeph>TIMESTAMP</codeph>
+                    columns.
+                  </p>
+                </li>
+                <li>
+                  <p rev="IMPALA-3838 IMPALA-4495">
+                    The logic for determining whether or not to use a runtime filter is more reliable, and the
+                    evaluation process itself is faster because of native code generation.
+                  </p>
+                </li>
+              </ul>
+            </li>
+            <li>
+              <p rev="IMPALA-3902">
+                The <codeph>MT_DOP</codeph> query option enables
+                multithreading for a number of Impala operations.
+                <codeph>COMPUTE STATS</codeph> statements for Parquet tables
+                use a default of <codeph>MT_DOP=4</codeph> to improve the
+                intra-node parallelism and CPU efficiency of this data-intensive
+                operation.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4397">
+                The <codeph>COMPUTE STATS</codeph> statement is more efficient
+                (less time for the codegen phase) for tables with a large number
+                of columns.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-2521">
+                A new hint, <codeph>CLUSTERED</codeph>,
+                allows Impala <codeph>INSERT</codeph> operations on a Parquet table
+                that use dynamic partitioning to process a high number of
+                partitions in a single statement. The data is ordered based on the
+                partition key columns, and each partition is only written
+                by a single host, reducing the amount of memory needed to buffer
+                Parquet data while the data blocks are being constructed.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4163">
+                A new hint, <codeph>SORTBY(<varname>cols</varname>)</codeph>,
+                allows Impala <codeph>INSERT</codeph> operations on a Parquet table
+                to produce optimized output files with better compressibility
+                and a more compact range of min/max values within each data file.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-3552">
+                The new configuration setting <codeph>inc_stats_size_limit_bytes</codeph>
+                lets you reduce the load on the catalog server when running the
+                <codeph>COMPUTE INCREMENTAL STATS</codeph> statement for very large tables.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-1788">
+                Impala folds many constant expressions within query statements,
+                rather than evaluating them for each row. This optimization
+                is especially useful when using functions to manipulate and
+                format <codeph>TIMESTAMP</codeph> values, such as the result
+                of an expression such as <codeph>to_date(now() - interval 1 day)</codeph>.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4529">
+                Parsing of complicated expressions is faster. This speedup is
+                especially useful for queries containing large <codeph>CASE</codeph>
+                expressions.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4302">
+                Evaluation is faster for <codeph>IN</codeph> operators with many constant
+                arguments. The same performance improvement applies to other functions
+                with many constant arguments.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-1286">
+                Impala optimizes identical comparison operators within multiple <codeph>OR</codeph>
+                blocks.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4193 IMPALA-3342">
+                The reporting for wall-clock times and total CPU time in profile output is more accurate.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-3671">
+                A new query option, <codeph>SCRATCH_LIMIT</codeph>, lets you restrict the amount of
+                space used when a query exceeds the memory limit and activates the <q>spill to disk</q> mechanism.
+                This option helps to avoid runaway queries or make queries <q>fail fast</q> if they require more
+                memory than anticipated. You can prevent runaway queries from using excessive amounts of spill space,
+                without restarting the cluster to turn the spilling feature off entirely.
+                See <xref href="impala_scratch_limit.xml#scratch_limit"/> for details.
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            Integration with Apache Kudu:
+          </p>
+          <ul>
+            <li>
+              <p rev="">
+                The experimental Impala support for the Kudu storage layer has been folded
+                into the main Impala development branch. Impala can now directly access Kudu tables,
+                opening up new capabilities such as enhanced DML operations and continuous ingestion.
+              </p>
+            </li>
+            <li>
+              <p rev="">
+                The <codeph>DELETE</codeph> statement is a flexible way to remove data from a Kudu table. Previously,
+                removing data from an Impala table involved removing or rewriting the underlying data files, dropping entire partitions,
+                or rewriting the entire table. This Impala statement only works for Kudu tables.
+              </p>
+            </li>
+            <li>
+              <p rev="">
+                The <codeph>UPDATE</codeph> statement is a flexible way to modify data within a Kudu table. Previously,
+                updating data in an Impala table involved replacing the underlying data files, dropping entire partitions,
+                or rewriting the entire table. This Impala statement only works for Kudu tables.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-3725">
+                The <codeph>UPSERT</codeph> statement is a flexible way to ingest, modify, or both data within a Kudu table. Previously,
+                ingesting data that might contain duplicates involved an inefficient multi-stage operation, and there was no
+                built-in protection against duplicate data. The <codeph>UPSERT</codeph> statement, in combination with
+                the primary key designation for Kudu tables, lets you add or replace rows in a single operation, and
+                automatically avoids creating any duplicate data.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-3719 IMPALA-3726">
+                The <codeph>CREATE TABLE</codeph> statement gains some new clauses that are specific to Kudu tables:
+                <codeph>PARTITION BY</codeph>, <codeph>PARTITIONS</codeph>, <codeph>STORED AS KUDU</codeph>, and column
+                attributes <codeph>PRIMARY KEY</codeph>, <codeph>NULL</codeph> and <codeph>NOT NULL</codeph>,
+                <codeph>ENCODING</codeph>, <codeph>COMPRESSION</codeph>, <codeph>DEFAULT</codeph>, and <codeph>BLOCK_SIZE</codeph>.
+                These clauses replace the explicit <codeph>TBLPROPERTIES</codeph> settings that were required in the
+                early experimental phases of integration between Impala and Kudu.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-2890">
+                The <codeph>ALTER TABLE</codeph> statement can change certain attributes of Kudu tables.
+                You can add, drop, or rename columns.
+                You can add or drop range partitions.
+                You can change the <codeph>TBLPROPERTIES</codeph> value to rename or point to a different underlying Kudu table,
+                independently from the Impala table name in the metastore database.
+                You cannot change the data type of an existing column in a Kudu table.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4403">
+                The <codeph>SHOW PARTITIONS</codeph> statement displays information about the distribution of data
+                between partitions in Kudu tables. A new variation, <codeph>SHOW RANGE PARTITIONS</codeph>,
+                displays information about the Kudu-specific partitions that apply across ranges of key values.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4379">
+                Not all Impala data types are supported in Kudu tables. In particular, currently the Impala
+                <codeph>TIMESTAMP</codeph> type is not allowed in a Kudu table. Impala does not recognize the
+                <codeph>UNIXTIME_MICROS</codeph> Kudu type when it is present in a Kudu table. (These two
+                representations of date/time data use different units and are not directly compatible.)
+                You cannot create columns of type <codeph>TIMESTAMP</codeph>, <codeph>DECIMAL</codeph>,
+                <codeph>VARCHAR</codeph>, or <codeph>CHAR</codeph> within a Kudu table. Within a query, you can
+                cast values in a result set to these types. Certain types, such as <codeph>BOOLEAN</codeph>,
+                cannot be used as primary key columns.
+              </p>
+            </li>
+            <li>
+              <p rev="">
+                Currently, Kudu tables are not interchangeable between Impala and Hive the way other kinds of Impala tables are.
+                Although the metadata for Kudu tables is stored in the metastore database, currently Hive cannot access Kudu tables.
+              </p>
+            </li>
+            <li>
+              <p rev="">
+                The <codeph>INSERT</codeph> statement works for Kudu tables. The organization
+                of the Kudu data makes it more efficient than with HDFS-backed tables to insert
+                data in small batches, such as with the <codeph>INSERT ... VALUES</codeph> syntax.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4283">
+                Some audit data is recorded for data governance purposes.
+                All <codeph>UPDATE</codeph>, <codeph>DELETE</codeph>, and <codeph>UPSERT</codeph> statements are characterized
+                as <codeph>INSERT</codeph> operations in the audit log. Currently, lineage metadata is not generated for
+                <codeph>UPDATE</codeph> and <codeph>DELETE</codeph> operations on Kudu tables.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4000">
+                Currently, Kudu tables have limited support for Sentry:
+                <ul>
+                  <li>
+                    <p>
+                      Access to Kudu tables must be granted to roles as usual.
+                    </p>
+                  </li>
+                  <li>
+                    <p>
+                      Currently, access to a Kudu table through Sentry is <q>all or nothing</q>.
+                      You cannot enforce finer-grained permissions such as at the column level,
+                      or permissions on certain operations such as <codeph>INSERT</codeph>.
+                    </p>
+                  </li>
+                  <li>
+                    <p>
+                      Only users with <codeph>ALL</codeph> privileges on <codeph>SERVER</codeph> can create external Kudu tables.
+                    </p>
+                  </li>
+                </ul>
+                Because non-SQL APIs can access Kudu data without going through Sentry
+                authorization, currently the Sentry support is considered preliminary.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4571">
+                Equality and <codeph>IN</codeph> predicates in Impala queries are pushed to
+                Kudu and evaluated efficiently by the Kudu storage layer.
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p rev="">
+            <b>Security:</b>
+          </p>
+          <ul>
+            <li>
+              <p>
+                Impala can take advantage of the S3 encrypted credential
+                store, to avoid exposing the secret key when accessing
+                data stored on S3.
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p rev="">
+            The <codeph>REFRESH</codeph> statement now updates information about HDFS block locations.
+            Therefore, you can perform a fast and efficient <codeph>REFRESH</codeph> after doing an HDFS
+            rebalancing operation instead of the more expensive <codeph>INVALIDATE METADATA</codeph> statement.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1654">
+            [<xref keyref="IMPALA-1654">IMPALA-1654</xref>]
+            Several kinds of DDL operations
+            can now work on a range of partitions. The partitions can be specified
+            using operators such as <codeph>&lt;</codeph>, <codeph>&gt;=</codeph>, and
+            <codeph>!=</codeph> rather than just an equality predicate applying to a single
+            partition.
+            This new feature extends the syntax of several clauses
+            of the <codeph>ALTER TABLE</codeph> statement
+            (<codeph>DROP PARTITION</codeph>, <codeph>SET [UN]CACHED</codeph>,
+            <codeph>SET FILEFORMAT | SERDEPROPERTIES | TBLPROPERTIES</codeph>),
+            the <codeph>SHOW FILES</codeph> statement, and the
+            <codeph>COMPUTE INCREMENTAL STATS</codeph> statement.
+            It does not apply to statements that are defined to only apply to a single
+            partition, such as <codeph>LOAD DATA</codeph>, <codeph>ALTER TABLE ... ADD PARTITION</codeph>,
+            <codeph>SET LOCATION</codeph>, and <codeph>INSERT</codeph> with a static
+            partitioning clause.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3973">
+            The <codeph>instr()</codeph> function has optional second and third arguments, representing
+            the character to position to begin searching for the substring, and the Nth occurrence
+            of the substring to find.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3441 IMPALA-4387">
+            Improved error handling for malformed Avro data. In particular, incorrect
+            precision or scale for <codeph>DECIMAL</codeph> types is now handled.
+          </p>
+        </li>
+        <li>
+          <p>
+            Impala debug web UI:
+          </p>
+          <ul>
+            <li>
+              <p rev="IMPALA-1169">
+                In addition to <q>inflight</q> and <q>finished</q> queries, the web UI
+                now also includes a section for <q>queued</q> queries.
+              </p>
+            </li>
+            <li>
+              <p rev="IMPALA-4048">
+                The <uicontrol>/sessions</uicontrol> tab now clarifies how many of the displayed
+                sections are active, and lets you sort by <uicontrol>Expired</uicontrol> status
+                to distinguish active sessions from expired ones.
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p rev="IMPALA-4020">
+            Improved stability when DDL operations such as <codeph>CREATE DATABASE</codeph>
+            or <codeph>DROP DATABASE</codeph> are run in Hive at the same time as an Impala
+            <codeph>INVALIDATE METADATA</codeph> statement.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-1616">
+            The <q>out of memory</q> error report was made more user-friendly, with additional
+            diagnostic information to help identify the spot where the memory limit was exceeded.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-3983 IMPALA-3974">
+            Improved disk space usage for Java-based UDFs. Temporary copies of the associated JAR
+            files are removed when no longer needed, so that they do not accumulate across restarts
+            of the <cmdname>catalogd</cmdname> daemon and potentially cause an out-of-space condition.
+            These temporary files are also created in the directory specified by the <codeph>local_library_dir</codeph>
+            configuration setting, so that the storage for these temporary files can be independent
+            from any capacity limits on the <filepath>/tmp</filepath> filesystem.
+          </p>
+        </li>
+      </ul>
+
+    </conbody>
+  </concept>
+
 <!-- All 2.7.x new features go under here -->
 
   <concept rev="2.7.0" id="new_features_270">
 
-    <title>New Features in Impala 2.7.x / CDH 5.9.x</title>
+    <title>New Features in <keyword keyref="impala27_full"/></title>
 
     <conbody>
 
@@ -171,27 +550,6 @@ under the License.
             column definitions in Avro tables.
           </p>
         </li>
-        <li audience="hidden"><!-- Patch didn't make it into in <keyword keyref="impala27_full"/> -->
-          <p rev="IMPALA-1654 CDH-43747">
-            [<xref href="https://issues.cloudera.org/browse/IMPALA-1654" scope="external" format="html">IMPALA-1654</xref>]
-            Several kinds of DDL operations
-            can now work on a range of partitions. The partitions can be specified
-            using operators such as <codeph>&lt;</codeph>, <codeph>&gt;=</codeph>, and
-            <codeph>!=</codeph> rather than just an equality predicate applying to a single
-            partition.
-            This new feature extends the syntax of
-            several clauses
-            of the <codeph>ALTER TABLE</codeph> statement
-            (<codeph>DROP PARTITION</codeph>, <codeph>SET [UN]CACHED</codeph>,
-            <codeph>SET FILEFORMAT | SERDEPROPERTIES | TBLPROPERTIES</codeph>),
-            the <codeph>SHOW FILES</codeph> statement, and the
-            <codeph>COMPUTE INCREMENTAL STATS</codeph> statement.
-            It does not apply to statements that are defined to only apply to a single
-            partition, such as <codeph>LOAD DATA</codeph>, <codeph>ALTER TABLE ... ADD PARTITION</codeph>,
-            <codeph>SET LOCATION</codeph>, and <codeph>INSERT</codeph> with a static
-            partitioning clause.
-          </p>
-        </li>
         <li>
           <p rev="IMPALA-3575 CDH-43742"> [<xref
               href="https://issues.cloudera.org/browse/IMPALA-3575"
@@ -210,7 +568,7 @@ under the License.
 
   <concept rev="2.6.0" id="new_features_260">
 
-    <title>New Features in Impala 2.6.x / CDH 5.8.x</title>
+    <title>New Features in <keyword keyref="impala26_full"/></title>
 
     <conbody>
 
@@ -249,7 +607,7 @@ under the License.
           <ul>
             <li>
               <p rev="CDH-41184 IMPALA-3333">
-                The default for the <codeph>RUNTIME_FILTER_MODE</codeph> 
+                The default for the <codeph>RUNTIME_FILTER_MODE</codeph>
                 query option is changed to <codeph>GLOBAL</codeph> (the highest setting).
                 See <xref href="impala_runtime_filter_mode.xml#runtime_filter_mode"/> for
                 details about this option.
@@ -287,7 +645,7 @@ under the License.
             </li>
             <li rev="CDH-41184 IMPALA-3077">
               <p>
-                Runtime filters can now be produced during join queries even 
+                Runtime filters can now be produced during join queries even
                 when the join processing activates the spill-to-disk mechanism.
               </p>
             </li>
@@ -390,8 +748,8 @@ under the License.
               <p rev="IMPALA-3554">
                 For Kerberized clusters, the Catalog service now uses
                 the Kerberos principal instead of the operating sytem user that runs
-                the <cmdname>catalogd</cmdname> daemon. 
-                This eliminates the requirement to configure a <codeph>hadoop.user.group.static.mapping.overrides</codeph> 
+                the <cmdname>catalogd</cmdname> daemon.
+                This eliminates the requirement to configure a <codeph>hadoop.user.group.static.mapping.overrides</codeph>
                 setting to put the OS user into the Sentry administrative group, on clusters where the principal
                 and the OS user name for this user are different.
               </p>
@@ -543,7 +901,7 @@ under the License.
 
   <concept rev="2.5.0" id="new_features_250">
 
-    <title>New Features in Impala 2.5.x / CDH 5.7.x</title>
+    <title>New Features in <keyword keyref="impala25_full"/></title>
 
     <conbody>
 
@@ -899,7 +1257,7 @@ under the License.
             UDFs using new <codeph>CREATE FUNCTION</codeph> syntax, without a signature for arguments
             or the return value. Afterwards, you no longer have to run the <codeph>CREATE FUNCTION</codeph>
             statements again after a restart.
-            Although Impala does not have visibility into the UDFs that implement the 
+            Although Impala does not have visibility into the UDFs that implement the
             Hive built-in functions, user-created Hive UDFs are now automatically available
             for calling through Impala.
             <ph audience="PDF">See <xref href="impala_create_function.xml#create_function"/> for details.</ph>
@@ -978,7 +1336,7 @@ under the License.
 
   <concept rev="2.4.0" id="new_features_240">
 
-    <title>New Features in Impala 2.4.x / CDH 5.6.x</title>
+    <title>New Features in <keyword keyref="impala24_full"/></title>
 
     <conbody>
 
@@ -1004,7 +1362,7 @@ under the License.
 
   <concept rev="2.3.0" id="new_features_230">
 
-    <title>New Features in Impala 2.3.x / CDH 5.5.x</title>
+    <title>New Features in <keyword keyref="impala23_full"/></title>
 
     <conbody>
 
@@ -1377,106 +1735,6 @@ under the License.
 
 <!-- All 2.2.x subsections go under here -->
 
-<!-- Removing all the 5.4.x release subtopics for which there wasn't anything to say.
-     Same convention as used in 5.5.x, 5.6.x, 5.7.x, 5.8.x. Only have one subtopic for
-     the .0.
-  <concept rev="5.4.10" id="new_features_2210">
-
-    <title>New Features in Impala 2.2.10 / CDH 5.4.10</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="5.4.9" id="new_features_229">
-
-    <title>New Features in Impala 2.2.9 / CDH 5.4.9</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="5.4.8" id="new_features_228">
-
-    <title>New Features in Impala 2.2.8 / CDH 5.4.8</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="5.4.7" id="new_features_227">
-
-    <title>New Features in Impala 2.2.7 / CDH 5.4.7</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
-
-    </conbody>
-
-  </concept>
-
-  <concept audience="hidden" rev="5.4.6" id="new_features_226">
-
-    <title>New Features in Impala 2.2.6 / CDH 5.4.6</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="5.4.5" id="new_features_225">
-
-    <title>New Features in Impala 2.2.x for CDH 5.4.5</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
-
-    </conbody>
-
-  </concept>
--->
-
   <concept rev="5.4.3" id="new_features_223">
 
     <title>New Features in Impala 2.2.x for CDH 5.4.3 and 5.4.4</title>
@@ -1498,54 +1756,17 @@ under the License.
 
   </concept>
 
-<!-- I let the 5.4.3/5.4.3 subtopic above remain in existence, but now back to hiding specific 5.4.x subtopics
-     after the .0 one that has the actual new features.
-  <concept audience="hidden" rev="5.4.2" id="new_features_222">
-
-    <title>New Features in Impala 2.2.x for CDH 5.4.2</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="5.4.x" id="new_features_54x">
-
-    <title>New Features in Impala for CDH 5.4.x</title>
-
-    <conbody>
-
-      <p>
-        See <xref href="impala_new_features.xml#new_features_220"/> for the most recent set of new Impala features.
-        CDH maintenance releases such as 5.4.1, 5.4.2, and so on are exclusively bug fix releases,
-        therefore there are no new features for the 5.4.x series after 5.4.0.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
-
-    </conbody>
-
-  </concept>
--->
-
   <concept rev="2.2.0" id="new_features_220">
 
-    <title>New Features in Impala 2.2.x / CDH 5.4.x</title>
+    <title>New Features in <keyword keyref="impala28_full"/></title>
 
     <conbody>
 
       <note conref="../shared/impala_common.xml#common/only_cdh5_220" />
 
       <p>
-        The following are the major new features in Impala 2.2.x. This release, available as part of CDH
-        5.4.x, contains improvements to performance, manageability, security, and SQL syntax.
+        The following are the major new features in <keyword keyref="impala22_full"/>. This release
+        contains improvements to performance, manageability, security, and SQL syntax.
       </p>
 
       <ul>
@@ -1771,136 +1992,9 @@ under the License.
 
 <!-- All 2.1.x subsections go under here -->
 
-  <concept rev="2.1.8" id="new_features_218">
-
-    <title>New Features in Impala 2.1.8 / CDH 5.3.10</title>
-
-    <conbody>
-
-      <p>
-        This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.1.7" id="new_features_217">
-
-    <title>New Features in Impala 2.1.7 / CDH 5.3.9</title>
-
-    <conbody>
-
-      <p>
-        This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.1.6" id="new_features_216">
-
-    <title>New Features in Impala 2.1.6 / CDH 5.3.8</title>
-
-    <conbody>
-
-      <p>
-        This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.1.5" id="new_features_215">
-
-    <title>New Features in Impala 2.1.5 / CDH 5.3.6</title>
-
-    <conbody>
-
-      <p>
-        This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.1.4" id="new_features_214">
-
-    <title>New Features in Impala 2.1.4 / CDH 5.3.4</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-        <ph conref="../shared/impala_common.xml#common/impala_214_redux"/>
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.1.3" id="new_features_213">
-
-    <title>New Features in Impala 2.1.3 / CDH 5.3.3</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_213" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.1.2" id="new_features_212">
-
-    <title>New Features in Impala 2.1.2 / CDH 5.3.2</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_212" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.1.1" id="new_features_211">
-
-    <title>New Features in Impala 2.1.1 / CDH 5.3.1</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-    </conbody>
-
-  </concept>
-
   <concept rev="2.1.0" id="new_features_210">
 
-    <title>New Features in Impala 2.1.0 / CDH 5.3.0</title>
+    <title>New Features in <keyword keyref="impala21_full"/></title>
 
     <conbody>
 
@@ -1954,93 +2048,15 @@ under the License.
 
 <!-- All 2.0.x subsections go under here -->
 
-  <concept rev="2.0.5" id="new_features_205">
-
-    <title>New Features in Impala 2.0.5 / CDH 5.2.6</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_205"/>
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.0.4" id="new_features_204">
-
-    <title>New Features in Impala 2.0.4 / CDH 5.2.5</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_204" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.0.3" id="new_features_203">
-
-    <title>New Features in Impala 2.0.3 / CDH 5.2.4</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_203" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.0.2" id="new_features_202">
-
-    <title>New Features in Impala 2.0.2 / CDH 5.2.3</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_202" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="2.0.1" id="new_features_201">
-
-    <title>New Features in Impala 2.0.1 / CDH 5.2.1</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-    </conbody>
-
-  </concept>
-
   <concept rev="2.0.0" id="new_features_200">
 
-    <title>New Features in Impala 2.0.0 / CDH 5.2.0</title>
+    <title>New Features in <keyword keyref="impala20_full"/></title>
 
     <conbody>
 
       <p>
-        The following are the major new features in Impala 2.0. This major release, available both with CDH 5.2 and
-        for CDH 4, contains improvements to performance, scalability, security, and SQL syntax.
+        The following are the major new features in <keyword keyref="impala20_full"/>. This major release
+        contains improvements to performance, scalability, security, and SQL syntax.
       </p>
 
       <ul>
@@ -2364,75 +2380,14 @@ under the License.
 
   </concept>
 
-  <concept rev="1.4.4" id="new_features_144">
-    <title>New Features in Impala 1.4.4 / CDH 5.1.5</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_144" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="1.4.3" id="new_features_143">
-
-    <title>New Features in Impala 1.4.3 / CDH 5.1.4</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release for an SSL security issue.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_143" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="1.4.2" id="new_features_142">
-
-    <title>New Features in Impala 1.4.2 / CDH 5.1.3</title>
-
-    <conbody>
-
-      <p>
-        Impala 1.4.2 is purely a bug-fix release. It does not include any new features.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_142" />
-
-    </conbody>
-
-  </concept>
-
-  <concept rev="1.4.1" id="new_features_141">
-
-    <title>New Features in Impala 1.4.1 / CDH 5.1.2</title>
-
-    <conbody>
-
-      <p>
-        Impala 1.4.1 is purely a bug-fix release. It does not include any new features.
-      </p>
-
-    </conbody>
-
-  </concept>
-
   <concept rev="1.4.0" id="new_features_140">
 
-    <title>New Features in Impala 1.4.0 / CDH 5.1.0</title>
+    <title>New Features in <keyword keyref="impala14_full"/></title>
 
     <conbody>
 
       <p>
-        The following are the major new features in Impala 1.4.
+        The following are the major new features in <keyword keyref="impala14_full"/>:
       </p>
 
       <ul>
@@ -2685,22 +2640,6 @@ under the License.
 
   </concept>
 
-  <concept rev="1.3.3" id="new_features_133">
-
-    <title>New Features in Impala 1.3.3 / CDH 5.0.5</title>
-
-    <conbody>
-
-      <p>
-        No new features. This point release is exclusively a bug fix release for an SSL security issue.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_133" />
-
-    </conbody>
-
-  </concept>
-
   <concept rev="1.3.2" id="new_features_132">
 
     <title>New Features in Impala 1.3.2 / CDH 5.0.4</title>
@@ -2720,18 +2659,13 @@ under the License.
 
   <concept rev="1.3.1" id="new_features_131">
 
-    <title>New Features in Impala 1.3.1 / CDH 5.0.3</title>
+    <title>New Features in Impala 1.3.1</title>
 
     <conbody>
 
       <p>
         This point release is primarily a vehicle to deliver bug fixes. Any new features are minor changes
         resulting from fixes for performance, reliability, or usability issues.
-      </p>
-
-      <p>
-        Because 1.3.1 is the first 1.3.x release for CDH 4, if you are on CDH 4, also consult
-        <xref href="impala_new_features.xml#new_features_130"/> for more features that are new to you.
       </p>
 
       <note conref="../shared/impala_common.xml#common/impala13_cdh" />
@@ -2773,7 +2707,7 @@ under the License.
 
   <concept rev="1.3.0" id="new_features_130">
 
-    <title>New Features in Impala 1.3.0 / CDH 5.0.0</title>
+    <title>New Features in <keyword keyref="impala13_full"/></title>
 
     <conbody>
 
@@ -2904,7 +2838,7 @@ under the License.
     <conbody>
 
       <note>
-        Impala 1.2.4 works with CDH 4. It is primarily a bug fix release for Impala 1.2.3, plus some performance
+        Impala 1.2.4 is primarily a bug fix release for Impala 1.2.3, plus some performance
         enhancements for the catalog server to minimize startup and DDL wait times for Impala deployments with
         large numbers of databases, tables, and partitions.
       </note>
@@ -2977,10 +2911,6 @@ under the License.
 
     <conbody>
 
-      <note>
-        Impala 1.2.3 works with CDH 4 and with CDH 5 beta 2. The resource management feature requires CDH 5 beta.
-      </note>
-
       <p>
         Impala 1.2.3 contains exactly the same feature set as Impala 1.2.2. Its only difference is one additional
         fix for compatibility with Parquet files generated outside of Impala by components such as Hive, Pig, or
@@ -2997,11 +2927,6 @@ under the License.
     <title>New Features in Impala 1.2.2</title>
 
     <conbody>
-
-      <note>
-        Impala 1.2.2 works with CDH 4. Its feature set is a superset of features in the Impala 1.2.0 beta, with the
-        exception of resource management, which relies on CDH 5.
-      </note>
 
       <p>
         Impala 1.2.2 includes new features for performance, security, and flexibility. The major enhancements over

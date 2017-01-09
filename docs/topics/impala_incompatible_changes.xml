@@ -53,9 +53,90 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
+  <concept rev="2.8.0" id="incompatible_changes_28x">
+
+    <title>Incompatible Changes Introduced in Impala 2.8.x</title>
+
+    <conbody>
+      <ul>
+        <li>
+          <p rev="IMPALA-4160">
+            Llama support is removed completely from Impala. Related flags (<codeph>--enable_rm</codeph>)
+            and query options (such as <codeph>V_CPU_CORES</codeph>) remain but do not have any effect.
+          </p>
+          <p rev="IMPALA-4160">
+            If <codeph>--enable_rm</codeph> is passed to Impala, a warning is printed to the log on startup.
+          </p>
+        </li>
+        <li>
+          <p rev="kudu">
+            The syntax related to Kudu tables includes a number of new reserved words,
+            such as <codeph>COMPRESSION</codeph>, <codeph>DEFAULT</codeph>, and <codeph>ENCODING</codeph>, that
+            might conflict with names of existing tables, columns, or other identifiers from older Impala versions.
+            See <xref href="impala_reserved_words.xml#reserved_words"/> for the full list of reserved words.
+          </p>
+        </li>
+        <li>
+          <p rev="kudu">
+            The DDL syntax for Kudu tables, particularly in the <codeph>CREATE TABLE</codeph> statement, is different
+            from the special <codeph>impala_next</codeph> fork that was previously used for accessing Kudu tables
+            from Impala:
+          </p>
+          <ul rev="kudu">
+            <li>
+              <p>
+                The <codeph>DISTRIBUTE BY</codeph> clause is now <codeph>PARTITIONED BY</codeph>.
+              </p>
+            </li>
+            <li>
+              <p>
+                The <codeph>INTO <varname>N</varname> BUCKETS</codeph>
+                clause is now <codeph>PARTITIONS <varname>N</varname></codeph>.
+              </p>
+            </li>
+            <li>
+              <p>
+                The <codeph>SPLIT ROWS</codeph> clause is replaced by different syntax for specifying
+                the ranges covered by each partition.
+              </p>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            The <codeph>DESCRIBE</codeph> output for Kudu tables includes several extra columns.
+          </p>
+        </li>
+        <li>
+          <p rev="kudu IMPALA-4527">
+            Non-primary-key columns can contain <codeph>NULL</codeph> values by default. The
+            <codeph>SHOW CREATE TABLE</codeph> output for these columns displays the <codeph>NULL</codeph>
+            attribute. There was a period during early experimental versions of Impala + Kudu where
+            non-primary-key columns had the <codeph>NOT NULL</codeph> attribute by default.
+          </p>
+        </li>
+        <li>
+          <p rev="kudu IMPALA-3710">
+            The <codeph>IGNORE</codeph> keyword that was present in early experimental versions of Impala + Kudu
+            is no longer present. The behavior of the <codeph>IGNORE</codeph> keyword is now the default:
+            DML statements continue with warnings, instead of failing with errors, if they encounter conditions
+            such as <q>primary key already exists</q> for an <codeph>INSERT</codeph> statement or
+            <q>primary key already deleted</q> for a <codeph>DELETE</codeph> statement.
+          </p>
+        </li>
+        <li>
+          <p rev="IMPALA-4589">
+            The replication factor for Kudu tables must be an odd number.
+          </p>
+        </li>
+      </ul>
+    </conbody>
+
+  </concept>
+
   <concept rev="2.7.0" id="incompatible_changes_27x">
 
-    <title>Incompatible Changes Introduced in Impala for CDH 5.9.x / Impala 2.7.x</title>
+    <title>Incompatible Changes Introduced in Impala 2.7.x</title>
 
     <conbody>
       <ul>
@@ -72,13 +153,6 @@ under the License.
             are now interpreted as <codeph>NULL</codeph> rather than being converted to valid floating-point values.
           </p>
         </li>
-        <li>
-          <p rev="IMPALA-4372">
-            The column types shown in the <codeph>DESCRIBE FORMATTED</codeph> output are in uppercase, where formerly they
-            were in lowercase. This is not an intended change and could be reverted in the future, when IMPALA-4372
-            is resolved.
-          </p>
-        </li>
       </ul>
     </conbody>
 
@@ -86,13 +160,13 @@ under the License.
 
   <concept rev="2.6.0" id="incompatible_changes_26x">
 
-    <title>Incompatible Changes Introduced in Impala for CDH 5.8.x / Impala 2.6.x</title>
+    <title>Incompatible Changes Introduced in Impala 2.6.x</title>
 
     <conbody>
       <ul>
         <li>
           <p rev="CDH-41184">
-            The default for the <codeph>RUNTIME_FILTER_MODE</codeph> 
+            The default for the <codeph>RUNTIME_FILTER_MODE</codeph>
             query option is changed to <codeph>GLOBAL</codeph> (the highest setting).
           </p>
         </li>
@@ -123,8 +197,8 @@ under the License.
           <p rev="IMPALA-3554">
             For Kerberized clusters, the Catalog service now uses
             the Kerberos principal instead of the operating sytem user that runs
-            the <cmdname>catalogd</cmdname> daemon. 
-            This eliminates the requirement to configure a <codeph>hadoop.user.group.static.mapping.overrides</codeph> 
+            the <cmdname>catalogd</cmdname> daemon.
+            This eliminates the requirement to configure a <codeph>hadoop.user.group.static.mapping.overrides</codeph>
             setting to put the OS user into the Sentry administrative group, on clusters where the principal
             and the OS user name for this user are different.
           </p>
@@ -218,7 +292,7 @@ under the License.
 
   <concept rev="2.5.x" id="incompatible_changes_25x">
 
-    <title>Incompatible Changes Introduced in Impala for CDH 5.7.x / Impala 2.5.x</title>
+    <title>Incompatible Changes Introduced in Impala 2.5.x</title>
 
     <conbody>
       <ul>
@@ -306,7 +380,7 @@ under the License.
 
   <concept rev="2.4.x" id="incompatible_changes_24x">
 
-    <title>Incompatible Changes Introduced in Impala for CDH 5.6.x / Impala 2.4.x</title>
+    <title>Incompatible Changes Introduced in Impala 2.4.x</title>
 
     <conbody>
       <p>
@@ -319,13 +393,13 @@ under the License.
 
 <!-- All 2.3.x subsections go under here -->
 
-<!-- Actually for 2.3 / 5.5, let's get away from doing a separate subhead for each maintenance release,
-     because in the normal course of events there will be nothing to add here until 5.6. If something new
-     needs to get noted, just add a new bullet with wording to indicate which 5.5.x release it applies to. -->
+<!-- Actually for 2.3 and higher, let's get away from doing a separate subhead for each maintenance release,
+     because in the normal course of events there will be nothing to add here until the next full release. If something new
+     needs to get noted, just add a new bullet with wording to indicate which x.y.z release it applies to. -->
 
   <concept rev="2.3.x" id="incompatible_changes_23x">
 
-    <title>Incompatible Changes Introduced in Impala for CDH 5.5.x / Impala 2.3.x</title>
+    <title>Incompatible Changes Introduced in Impala 2.3.x</title>
 
     <conbody>
 
@@ -388,28 +462,9 @@ under the License.
 
   <concept rev="2.2.x" id="incompatible_changes_22x">
 
-    <title>Incompatible Changes Introduced in Impala for CDH 5.4.x</title>
+    <title>Incompatible Changes Introduced in Impala 2.2.x</title>
 
     <conbody>
-
-<!--
-      <p>
-        No incompatible changes. CDH maintenance releases such as 5.4.1, 5.4.2, and so on are exclusively bug fix releases.
-        See <xref href="impala_incompatible_changes.xml#incompatible_changes_220"/> for the initial Impala feature release,
-        which are the releases that typically include incompatible changes.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x"/>
-
-    </conbody>
-  </concept>
-
-  <concept rev="2.2.0" id="incompatible_changes_220">
-
-    <title>Incompatible Changes Introduced in Impala 2.2.0 / CDH 5.4.0</title>
-
-    <conbody>
--->
 
       <note conref="../shared/impala_common.xml#common/only_cdh5_220"/>
 
@@ -430,7 +485,6 @@ under the License.
         </p>
       </section>
 
-
       <section id="prereqs_210">
       <title>
         Changes to Prerequisites
@@ -445,113 +499,9 @@ under the License.
 
   <concept rev="2.1.x" id="incompatible_changes_21x">
 
-    <title>Incompatible Changes Introduced in Impala for CDH 5.3.x</title>
+    <title>Incompatible Changes Introduced in Impala 2.1.x</title>
 
     <conbody>
-
-<!--
-      <p>
-        No incompatible changes. CDH maintenance releases such as 5.3.1, 5.3.2, and so on are exclusively bug fix releases.
-        See <xref href="impala_incompatible_changes.xml#incompatible_changes_210"/> for the initial Impala feature release,
-        which are the releases that typically include incompatible changes.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-    </conbody>
-  </concept>
-
-  <concept rev="2.1.7" id="incompatible_changes_217">
-    <title>Incompatible Changes Introduced in Cloudera Impala 2.1.7 / CDH 5.3.9</title>
-    <conbody>
-      <p>
-        No incompatible changes.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-    </conbody>
-  </concept>
-
-  <concept rev="2.1.6" id="incompatible_changes_216">
-    <title>Incompatible Changes Introduced in Impala 2.1.6 / CDH 5.3.8</title>
-    <conbody>
-      <p>
-        No incompatible changes.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-    </conbody>
-  </concept>
-
-  <concept rev="2.1.5" id="incompatible_changes_215">
-    <title>Incompatible Changes Introduced in Impala 2.1.5 / CDH 5.3.6</title>
-    <conbody>
-      <p>
-        No incompatible changes.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-    </conbody>
-  </concept>
-
-  <concept rev="2.1.4" id="incompatible_changes_214">
-    <title>Incompatible Changes Introduced in Impala 2.1.4 / CDH 5.3.4</title>
-    <conbody>
-      <p>
-        No incompatible changes.
-        <ph conref="../shared/impala_common.xml#common/impala_214_redux"/>
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-    </conbody>
-  </concept>
-
-  <concept rev="2.1.3" id="incompatible_changes_213">
-    <title>Incompatible Changes Introduced in Impala 2.1.3 / CDH 5.3.3</title>
-    <conbody>
-      <p>
-        No incompatible changes.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_213"/>
-
-    </conbody>
-  </concept>
-
-  <concept rev="2.1.2" id="incompatible_changes_212">
-    <title>Incompatible Changes Introduced in Impala 2.1.2 / CDH 5.3.2</title>
-    <conbody>
-      <p>
-        No incompatible changes.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_212"/>
-
-    </conbody>
-  </concept>
-
-  <concept rev="2.1.1" id="incompatible_changes_211">
-
-    <title>Incompatible Changes Introduced in Impala 2.1.1 / CDH 5.3.1</title>
-
-    <conbody>
-
-      <p>
-        No incompatible changes.
-      </p>
-    </conbody>
-  </concept>
-
-  <concept rev="2.1.0" id="incompatible_changes_210">
-
-    <title>Incompatible Changes Introduced in Impala 2.1.0 / CDH 5.3.0</title>
-
-    <conbody>
--->
 
       <section id="prereqs_210">
       <title>
@@ -594,7 +544,7 @@ under the License.
 
   <concept rev="2.0.5" id="incompatible_changes_205">
 
-    <title>Incompatible Changes Introduced in Impala 2.0.5 / CDH 5.2.6</title>
+    <title>Incompatible Changes Introduced in Impala 2.0.5</title>
 
     <conbody>
 
@@ -609,7 +559,7 @@ under the License.
 
   <concept rev="2.0.4" id="incompatible_changes_204">
 
-    <title>Incompatible Changes Introduced in Impala 2.0.4 / CDH 5.2.5</title>
+    <title>Incompatible Changes Introduced in Impala 2.0.4</title>
 
     <conbody>
 
@@ -624,7 +574,7 @@ under the License.
 
   <concept rev="2.0.3" id="incompatible_changes_203">
 
-    <title>Incompatible Changes Introduced in Impala 2.0.3 / CDH 5.2.4</title>
+    <title>Incompatible Changes Introduced in Impala 2.0.3</title>
 
     <conbody>
 
@@ -635,7 +585,7 @@ under the License.
 
   <concept rev="2.0.2" id="incompatible_changes_202">
 
-    <title>Incompatible Changes Introduced in Impala 2.0.2 / CDH 5.2.3</title>
+    <title>Incompatible Changes Introduced in Impala 2.0.2</title>
 
     <conbody>
 
@@ -650,7 +600,7 @@ under the License.
 
   <concept rev="2.0.1" id="incompatible_changes_201">
 
-    <title>Incompatible Changes Introduced in Impala 2.0.1 / CDH 5.2.1</title>
+    <title>Incompatible Changes Introduced in Impala 2.0.1</title>
 
     <conbody>
 
@@ -681,7 +631,7 @@ under the License.
 
   <concept rev="2.0.0" id="incompatible_changes_200">
 
-    <title>Incompatible Changes Introduced in Impala 2.0.0 / CDH 5.2.0</title>
+    <title>Incompatible Changes Introduced in Impala 2.0.0</title>
 
     <conbody>
 
@@ -873,7 +823,7 @@ under the License.
   </concept>
 
   <concept rev="1.4.4" id="incompatible_changes_144">
-    <title>Incompatible Changes Introduced in Impala 1.4.4 / CDH 5.1.5</title>
+    <title>Incompatible Changes Introduced in Impala 1.4.4 /</title>
     <conbody>
       <p>
         No incompatible changes.
@@ -886,7 +836,7 @@ under the License.
 
   <concept rev="1.4.3" id="incompatible_changes_143">
 
-    <title>Incompatible Changes Introduced in Impala 1.4.3 / CDH 5.1.4</title>
+    <title>Incompatible Changes Introduced in Impala 1.4.3</title>
 
     <conbody>
 
@@ -902,7 +852,7 @@ under the License.
 
   <concept rev="1.4.2" id="incompatible_changes_142">
 
-    <title>Incompatible Changes Introduced in Impala 1.4.2 / CDH 5.1.3</title>
+    <title>Incompatible Changes Introduced in Impala 1.4.2</title>
 
     <conbody>
 
@@ -917,7 +867,7 @@ under the License.
 
   <concept rev="1.4.1" id="incompatible_changes_141">
 
-    <title>Incompatible Changes Introduced in Impala 1.4.1 / CDH 5.1.2</title>
+    <title>Incompatible Changes Introduced in Impala 1.4.1</title>
 
     <conbody>
 
@@ -929,7 +879,7 @@ under the License.
 
   <concept rev="1.4.0" id="incompatible_changes_140">
 
-    <title>Incompatible Changes Introduced in Impala 1.4.0 / CDH 5.1.0</title>
+    <title>Incompatible Changes Introduced in Impala 1.4.0</title>
   <prolog>
     <metadata>
       <data name="Category" value="Deprecated Features"/>
@@ -1037,7 +987,7 @@ under the License.
 
   <concept rev="1.3.3" id="incompatible_changes_133">
 
-    <title>Incompatible Changes Introduced in Impala 1.3.3 / CDH 5.0.5</title>
+    <title>Incompatible Changes Introduced in Impala 1.3.3</title>
 
     <conbody>
 
@@ -1053,7 +1003,7 @@ under the License.
 
   <concept rev="1.3.2" id="incompatible_changes_132">
 
-    <title>Incompatible Changes Introduced in Impala 1.3.2 / CDH 5.0.4</title>
+    <title>Incompatible Changes Introduced in Impala 1.3.2</title>
 
     <conbody>
 
@@ -1068,7 +1018,7 @@ under the License.
 
   <concept rev="1.3.1" id="incompatible_changes_131">
 
-    <title>Incompatible Changes Introduced in Impala 1.3.1 / CDH 5.0.3</title>
+    <title>Incompatible Changes Introduced in Impala 1.3.1</title>
 
     <conbody>
 
@@ -1090,7 +1040,7 @@ under the License.
 
   <concept rev="1.3.0" id="incompatible_changes_130">
 
-    <title>Incompatible Changes Introduced in Impala 1.3.0 / CDH 5.0.0</title>
+    <title>Incompatible Changes Introduced in Impala 1.3.0</title>
 
     <conbody>
 
@@ -1467,7 +1417,7 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
     </conbody>
   </concept>
 
-  <concept id="incompatible_changes_07">
+  <concept id="incompatible_changes_07" audience="hidden">
 
     <title>Incompatible Change Introduced in Version 0.7 of the Impala Beta Release</title>
 
@@ -1484,7 +1434,7 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
     </conbody>
   </concept>
 
-  <concept id="incompatible_changes_06">
+  <concept id="incompatible_changes_06" audience="hidden">
 
     <title>Incompatible Change Introduced in Version 0.6 of the Impala Beta Release</title>
 
@@ -1501,7 +1451,7 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
     </conbody>
   </concept>
 
-  <concept id="incompatible_changes_04">
+  <concept id="incompatible_changes_04" audience="hidden">
 
     <title>Incompatible Change Introduced in Version 0.4 of the Impala Beta Release</title>
 
@@ -1518,7 +1468,7 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
     </conbody>
   </concept>
 
-  <concept id="incompatible_changes_03">
+  <concept id="incompatible_changes_03" audience="hidden">
 
     <title>Incompatible Change Introduced in Version 0.3 of the Impala Beta Release</title>
 

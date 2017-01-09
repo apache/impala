@@ -3290,19 +3290,18 @@ sudo pip-python install ssl</codeblock>
 
       <note id="llama_query_options_obsolete">
         <p>
-          This query option is no longer supported, because it affects interaction
-          between Impala and Llama.
-          The use of the Llama component for integrated
-          resource management within YARN is no longer supported with CDH 5.5 /
-          Impala 2.3 and higher.
+          This query option no longer has any effect.
+          The use of the Llama component for integrated resource management within YARN is no
+          longer supported with <keyword keyref="impala23_full"/> and higher, and the Llama
+          support code is removed entirely in <keyword keyref="impala28_full"/> and higher.
         </p>
       </note>
 
-      <note id="impala_llama_obsolete">
+      <note id="impala_llama_obsolete" rev="IMPALA-4160">
         <p>
-          The use of the Llama component for integrated
-          resource management within YARN is no longer supported with CDH 5.5 /
-          Impala 2.3 and higher.
+          The use of the Llama component for integrated resource management within YARN
+          is no longer supported with <keyword keyref="impala23_full"/> and higher.
+          The Llama support code is removed entirely in <keyword keyref="impala28_full"/> and higher.
         </p>
         <p>
           For clusters running Impala alongside
@@ -3318,7 +3317,6 @@ sudo pip-python install ssl</codeblock>
           <uicontrol>Max Memory</uicontrol> relies on the <uicontrol>Default
           Query Memory Limit</uicontrol> to produce a reliable estimate of
         overall memory consumption for a query. </note>
-
 
       <p id="admission_control_mem_limit_interaction">
         For example, consider the following scenario:

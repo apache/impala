@@ -44,113 +44,6 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
-  <concept audience="hidden" id="llama">
-  <!-- Hiding the whole concept now that Llama is desupported. -->
-
-    <title>The Llama Daemon</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Llama"/>
-    </metadata>
-  </prolog>
-
-    <conbody>
-
-<!-- Copied from http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_install_llama.html - turn into a conref in both places. -->
-
-      <p>
-        Llama is a system that mediates resource management between Impala and Hadoop YARN. Llama enables
-        Impala to reserve, use, and release resource allocations in a Hadoop cluster. Llama is only required if
-        resource management is enabled in Impala.
-      </p>
-
-      <p id="p_b2y_msl_jp">
-        By default, YARN allocates resources bit-by-bit as needed by MapReduce jobs. Impala needs all resources
-        available at the same time, so that intermediate results can be exchanged between cluster nodes, and
-        queries do not stall partway through waiting for new resources to be allocated. Llama is the intermediary
-        process that ensures all requested resources are available before each Impala query actually begins.
-      </p>
-
-<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_llama_installation.html -->
-
-<!-- Highly likely to be removed per https://jira.cloudera.com/browse/CDH-21352,
-     so commenting out for now. Feels like there should be some 'installing llama via CM' topic
-     even if it says not to worry.
-
-      <p>
-        For Llama installation instructions, see
-        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_llama_installation.html" scope="external" format="html">Llama
-        Installation</xref>.
-      </p>
--->
-
-<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CM5/latest/Cloudera-Manager-Managing-Clusters/cm_mc_impala_service.html -->
-
-      <p>
-        For management through Cloudera Manager, see
-        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/admin_llama.html" scope="external" format="html">The
-        Impala Llama ApplicationMaster</xref>.
-      </p>
-    </conbody>
-  </concept>
-
-<!-- Hiding more content per MJ feedback.
-  <concept id="rm_resource_estimates">
-
-    <title>Controlling Resource Estimation Behavior</title>
-
-    <conbody>
-
-      <p>
-        By default, Impala consults the table statistics and column statistics for each table in a query, and uses
-        those figures to construct estimates of needed resources for each query. See
-        <xref href="impala_compute_stats.xml#compute_stats"/> for the statement to collect table and column
-        statistics for a table.
-      </p>
-
-      <p>
-        In <keyword keyref="impala25_full"/> and higher, the preferred way to avoid overcommitting memory in a high-concurrency
-        or multitenant scenario is to use Impala admission control together with dynamic resource pools.
-        You can specify a <uicontrol>Default Query Memory Limit</uicontrol> setting, with a different value for each
-        pool, and Impala uses that value to calculate how many queries can safely run within a specified
-        cluster-wide aggregate memory size.
-        See <xref href="impala_admission.xml#admission_control"/> for details.
-      </p>
-
-      <p>
-        To avoid problems with inaccurate or missing statistics, which can lead to inaccurate estimates of resource
-        consumption, Impala allows you to set default estimates for CPU and memory resource consumption.
-        When the query is complete, those resources are returned to YARN as
-        normal. To enable this feature, use the command-line option <codeph>-rm_always_use_defaults</codeph> when
-        starting <cmdname>impalad</cmdname>, and optionally
-        <codeph>-rm_default_memory=<varname>size</varname></codeph> and <codeph>-rm_default_cpu_cores</codeph>.
-        See <xref href="impala_resource_management.xml#rm_options"/> for details about each option.
-      </p>
-    </conbody>
-  </concept>
-
-  <concept id="rm_checking">
-
-    <title>Checking Resource Estimates and Actual Usage</title>
-
-    <conbody>
-
-      <p>
-        To make resource usage easier to verify, the output of the <codeph>EXPLAIN</codeph> SQL statement now
-        includes information about estimated memory usage, whether table and column statistics are available for
-        each table, and the number of virtual cores that a query will use. You can get this information through the
-        <codeph>EXPLAIN</codeph> statement without actually running the query. The extra information requires
-        setting the query option <codeph>EXPLAIN_LEVEL=verbose</codeph>; see
-        <xref href="impala_explain.xml#explain"/> for details. The same extended information is shown at the start
-        of the output from the <codeph>PROFILE</codeph> statement in <cmdname>impala-shell</cmdname>. The detailed
-        profile information is only available after running the query. You can take appropriate actions (gathering
-        statistics, adjusting query options) if you find that queries fail or run with suboptimal performance when
-        resource management is enabled.
-      </p>
-    </conbody>
-  </concept>
--->
-
   <concept id="rm_enforcement">
 
     <title>How Resource Limits Are Enforced</title>
@@ -292,15 +185,6 @@ under the License.
             <xref href="impala_mem_limit.xml#mem_limit"/>
           </li>
 
-<!-- Not supported in CDH 5.5 / Impala 2.3 and up.
-          <li>
-            <xref href="impala_reservation_request_timeout.xml#reservation_request_timeout"/>
-          </li>
-
-          <li>
-            <xref href="impala_v_cpu_cores.xml#v_cpu_cores"/>
-          </li>
--->
         </ul>
       </conbody>
     </concept>
@@ -319,7 +203,7 @@ under the License.
      inside the list, so not practical to enclose the whole thing in XML comments. -->
 
       <p audience="hidden">
-        Currently, Impala in CDH 5 has the following limitations for resource management of Impala queries:
+        Currently, Impala has the following limitations for resource management of Impala queries:
       </p>
 
       <ul audience="hidden">
