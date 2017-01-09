@@ -112,7 +112,7 @@ class QueryResultComparator(object):
     if ref_exception:
       comparison_result.exception = ref_exception
       error_message = str(ref_exception)
-      if 'Year is out of valid range: 1400..10000' in error_message:
+      if 'Year is out of valid range: 1400..9999' in error_message:
         # This comes from Postgresql. Overflow errors will be ignored.
         comparison_result.exception = TypeOverflow(error_message)
       LOG.debug('%s encountered an error running query: %s',

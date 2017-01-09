@@ -597,18 +597,16 @@ TEST(TimestampTest, Basic) {
   TimestampValue too_early(-17987443201);
   EXPECT_FALSE(too_early.HasDate());
   EXPECT_FALSE(too_early.HasTime());
-  // Apparently 5 digit years don't parse (at least by default) but can be printed.
-  // Boost's documented says the max year supported is 9,999 but 10K seems to be
-  // the actual limit.
+  // Boost's max supported year is 9999.
   TimestampValue max_date =
-      TimestampValue(date(10000, Dec, 31), time_duration(23, 59, 59));
+      TimestampValue(date(9999, Dec, 31), time_duration(23, 59, 59));
   EXPECT_TRUE(max_date.HasDate());
   EXPECT_TRUE(max_date.HasTime());
   time_t tm_max;
   EXPECT_TRUE(max_date.ToUnixTime(&tm_max));
-  EXPECT_EQ(253433923199, tm_max);
-  EXPECT_EQ("10000-12-31 23:59:59", TimestampValue(253433923199).DebugString());
-  TimestampValue too_late(253433923200);
+  EXPECT_EQ(253402300799, tm_max);
+  EXPECT_EQ("9999-12-31 23:59:59", TimestampValue(253402300799).DebugString());
+  TimestampValue too_late(253402300800);
   EXPECT_FALSE(too_late.HasDate());
   EXPECT_FALSE(too_late.HasTime());
 

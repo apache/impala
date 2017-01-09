@@ -1453,6 +1453,10 @@ TEST_F(ExprTest, CastExprs) {
   TestIsNull("cast(cast(1180591620717411303425 as decimal(38, 0)) as timestamp)",
       TYPE_TIMESTAMP);
 
+  // Out of range String <--> Timestamp - invalid boundary cases.
+  TestIsNull("cast('1399-12-31 23:59:59' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('10000-01-01 00:00:00' as timestamp)", TYPE_TIMESTAMP);
+
   // Timestamp <--> Int
   TestIsNull("cast(cast('09:10:11.000000' as timestamp) as int)", TYPE_INT);
   TestValue("cast(cast('2000-01-01' as timestamp) as int)", TYPE_INT, 946684800);
@@ -1464,9 +1468,19 @@ TEST_F(ExprTest, CastExprs) {
       946717811);
   TestTimestampValue("cast(946717811 as timestamp)",
       TimestampValue("2000-01-01 09:10:11", 19));
-  TestValue("cast(cast('1400-01-01' as timestamp) as bigint)", TYPE_BIGINT, -17987443200);
-  TestTimestampValue("cast(-17987443200 as timestamp)", TimestampValue("1400-01-01", 10));
+
+  // Timestamp <--> Int conversions boundary cases
+  TestValue("cast(cast('1400-01-01 00:00:00' as timestamp) as bigint)",
+      TYPE_BIGINT, -17987443200);
+  TestTimestampValue("cast(-17987443200 as timestamp)",
+      TimestampValue("1400-01-01 00:00:00", 19));
   TestIsNull("cast(-17987443201 as timestamp)", TYPE_TIMESTAMP);
+  TestValue("cast(cast('9999-12-31 23:59:59' as timestamp) as bigint)",
+      TYPE_BIGINT, 253402300799);
+  TestTimestampValue("cast(253402300799 as timestamp)",
+      TimestampValue("9999-12-31 23:59:59", 19));
+  TestIsNull("cast(253402300800 as timestamp)", TYPE_TIMESTAMP);
+
   // Timestamp <--> Float
   TestIsNull("cast(cast('09:10:11.000000' as timestamp) as float)", TYPE_FLOAT);
   TestValue("cast(cast('2000-01-01' as timestamp) as double)", TYPE_DOUBLE, 946684800);
@@ -1478,10 +1492,7 @@ TEST_F(ExprTest, CastExprs) {
   TestValue("cast(cast('1400-01-01' as timestamp) as double)", TYPE_DOUBLE,
       -17987443200);
   TestIsNull("cast(cast(-17987443201.03 as double) as timestamp)", TYPE_TIMESTAMP);
-  // Use 4 digit years otherwise string parsing will fail.
-  TestValue("cast(cast('9999-12-31 23:59:59' as timestamp) + interval 1 year as bigint)",
-      TYPE_BIGINT, 253433923199);
-  TestTimestampValue("cast(253433923199 as timestamp) - interval 1 year",
+  TestTimestampValue("cast(253402300799 as timestamp)",
       TimestampValue("9999-12-31 23:59:59", 19));
   TestIsNull("cast(253433923200 as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast(cast(null as bigint) as timestamp)", TYPE_TIMESTAMP);
@@ -3594,7 +3605,7 @@ TEST_F(ExprTest, TimestampFunctions) {
       TYPE_TIMESTAMP);
   TestIsNull(
       "CAST('1400-01-01 00:12:00' AS TIMESTAMP) - INTERVAL 13 MINUTES", TYPE_TIMESTAMP);
-  TestIsNull("CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 100000000 SECONDS",
+  TestIsNull("CAST('9999-12-31 23:59:59' AS TIMESTAMP) + INTERVAL 1 SECONDS",
       TYPE_TIMESTAMP);
   TestIsNull(
       "CAST('1400-01-01 00:00:00' AS TIMESTAMP) - INTERVAL 1 SECONDS", TYPE_TIMESTAMP);
@@ -3804,7 +3815,7 @@ TEST_F(ExprTest, TimestampFunctions) {
     const string& lt_max_interval =
         lexical_cast<string>(static_cast<int64_t>(0.9 * it->second));
     // Test that pushing a value beyond the max/min values results in a NULL.
-    TestIsNull(unit + "_add(cast('9999-12-31 23:59:59' as timestamp) + interval 1 year, "
+    TestIsNull(unit + "_add(cast('9999-12-31 23:59:59' as timestamp), "
         + lt_max_interval + ")", TYPE_TIMESTAMP);
     TestIsNull(unit + "_sub(cast('1400-01-01 00:00:00' as timestamp), "
         + lt_max_interval + ")", TYPE_TIMESTAMP);
@@ -4109,11 +4120,9 @@ TEST_F(ExprTest, TimestampFunctions) {
       TYPE_TIMESTAMP);
   TestIsNull("from_utc_timestamp(CAST(\"1400-01-01 05:00:00\" as TIMESTAMP), \"PST\")",
       TYPE_TIMESTAMP);
-  // TODO: IMPALA-4549: these should return NULL, but validation doesn't catch year 10000.
-  // Just check that we don't crash.
-  GetValue("from_utc_timestamp(CAST(\"10000-12-31 21:00:00\" as TIMESTAMP), \"JST\")",
+  TestIsNull("from_utc_timestamp(CAST(\"9999-12-31 21:00:00\" as TIMESTAMP), \"JST\")",
       TYPE_TIMESTAMP);
-  GetValue("to_utc_timestamp(CAST(\"10000-12-31 21:00:00\" as TIMESTAMP), \"PST\")",
+  TestIsNull("to_utc_timestamp(CAST(\"9999-12-31 21:00:00\" as TIMESTAMP), \"PST\")",
       TYPE_TIMESTAMP);
 
   // With support of date strings this generates a date and 0 time.
