@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 import requests
 
@@ -28,3 +29,14 @@ class TestWebPage(ImpalaTestSuite):
     assert page.status_code == requests.codes.ok
     page = requests.get("http://localhost:25020/memz")
     assert page.status_code == requests.codes.ok
+
+  def test_query_profile_encoded_unknown_query_id(self):
+    """Test that /query_profile_encoded error message starts with the expected line in
+    case of missing query and does not contain any leading whitespace.
+    """
+    cluster = ImpalaCluster()
+    impalad = cluster.get_any_impalad()
+    result = impalad.service.read_debug_webpage("query_profile_encoded?query_id=123")
+    assert result.startswith("Could not obtain runtime profile: Query id")
+
+
