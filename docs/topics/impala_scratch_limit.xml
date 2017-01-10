@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="IMPALA-3671" id="scratch_limit">
+
+  <title>SCRATCH_LIMIT Query Option</title>
+  <titlealts audience="PDF"><navtitle>SCRATCH_LIMIT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Memory"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">SCRATCH_LIMIT query option</indexterm>
+      Specifies the maximum amount of disk storage, in bytes, that any Impala query can consume
+      on any host using the <q>spill to disk</q> mechanism that handles queries that exceed
+      the memory limit.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+    <p>
+      Specify the size in bytes, or with a trailing <codeph>m</codeph> or <codeph>g</codeph> character to indicate
+      megabytes or gigabytes. For example:
+    </p>
+
+<!-- Examples adapted from impala_parquet_file_size.xml.
+     To do: demonstrate with queries that succeed / fail
+     based on the query option setting, and interaction
+     with MEM_LIMIT. -->
+<codeblock>-- 128 megabytes.
+set SCRATCH_LIMIT=134217728
+
+-- 512 megabytes.
+set SCRATCH_LIMIT=512m;
+
+-- 1 gigabyte.
+set SCRATCH_LIMIT=1g;
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      A value of zero turns off the spill to disk feature for queries
+      in the current session, causing them to fail immediately if they
+      exceed the memory limit.
+    </p>
+
+    <p>
+      The amount of memory used per host for a query is limited by the
+      <codeph>MEM_LIMIT</codeph> query option.
+    </p>
+
+    <p>
+      The more Impala daemon hosts in the cluster, the less memory is used on each host,
+      and therefore also less scratch space is required for queries that
+      exceed the memory limit.
+    </p>
+
+    <p>
+      <b>Type:</b> numeric, with optional unit specifier
+    </p>
+
+    <p>
+      <b>Default:</b> -1 (amount of spill space is unlimited)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_scalability.xml#spill_to_disk"/>,
+      <xref href="impala_mem_limit.xml#mem_limit"/>
+    </p>
+
+  </conbody>
+</concept>

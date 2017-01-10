@@ -1027,6 +1027,7 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
           <topicref rev="2.6.0" href="topics/impala_s3_skip_insert_staging.xml"/>
           <keydef href="topics/impala_s3_skip_insert_staging.xml" keys="s3_skip_insert_staging"/>
           <topicref rev="2.5.0" href="topics/impala_scan_node_codegen_threshold.xml"/>
+          <topicref rev="2.8.0 IMPALA-3671" href="topics/impala_scratch_limit.xml"/>
           <keydef href="topics/impala_scan_node_codegen_threshold.xml" keys="scan_node_codegen_threshold"/>
           <!-- This option is for internal use only and might go away without ever being documented. -->
           <!-- <topicref href="topics/impala_seq_compression_mode.xml"/> -->
