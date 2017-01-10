@@ -721,7 +721,8 @@ Status Sorter::Run::UnpinAllBlocks() {
             reinterpret_cast<uint8_t*>(cur_sorted_var_len_block->buffer()), var_data_ptr);
       }
     }
-    RETURN_IF_ERROR(cur_fixed_block->Unpin());
+    status = cur_fixed_block->Unpin();
+    if (!status.ok()) goto cleanup_blocks;
   }
 
   if (HasVarLenBlocks()) {
