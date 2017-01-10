@@ -23,6 +23,7 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include "gutil/macros.h"
 #include "util/spinlock.h"
 
 namespace impala {
@@ -32,47 +33,36 @@ namespace impala {
 /// Thread-safe.
 class ObjectPool {
  public:
-  ObjectPool(): objects_() {}
-
+  ObjectPool() {}
   ~ObjectPool() { Clear(); }
 
   template <class T>
   T* Add(T* t) {
-    // Create the object to be pushed to the shared vector outside the critical section.
     // TODO: Consider using a lock-free structure.
-    SpecificElement<T>* obj = new SpecificElement<T>(t);
-    DCHECK(obj != NULL);
     boost::lock_guard<SpinLock> l(lock_);
-    objects_.push_back(obj);
+    objects_.emplace_back(
+        Element{t, [](void* obj) { delete reinterpret_cast<T*>(obj); }});
     return t;
   }
 
   void Clear() {
     boost::lock_guard<SpinLock> l(lock_);
-    for (ElementVector::iterator i = objects_.begin();
-         i != objects_.end(); ++i) {
-      delete *i;
-    }
+    for (Element& elem : objects_) elem.delete_fn(elem.obj);
     objects_.clear();
   }
 
  private:
-  struct GenericElement {
-    virtual ~GenericElement() {}
+  DISALLOW_COPY_AND_ASSIGN(ObjectPool);
+
+  /// A generic deletion function pointer. Deletes its first argument.
+  typedef void (*DeleteFn)(void*);
+
+  /// For each object, a pointer to the object and a function that deletes it.
+  struct Element {
+    void* obj;
+    DeleteFn delete_fn;
   };
-
-  template <class T>
-  struct SpecificElement : GenericElement {
-    SpecificElement(T* t): t(t) {}
-    ~SpecificElement() {
-      delete t;
-    }
-
-    T* t;
-  };
-
-  typedef std::vector<GenericElement*> ElementVector;
-  ElementVector objects_;
+  std::vector<Element> objects_;
   SpinLock lock_;
 };
 
