@@ -1,0 +1,62 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+{#  -*- coding: utf-8 -*- #}
+{% import 'post_helper.tmpl' as helper with context %}
+{% import 'comments_helper.tmpl' as comments with context %}
+
+{% macro html_title() %}
+{% if title and not post.meta('hidetitle') %}
+    <h3 class="p-name entry-title" itemprop="headline name"><a href="{{ post.permalink() }}" class="u-url">{{ post.title()|e }}</a></h3>
+{% endif %}
+{% endmacro %}
+
+{% macro html_sourcelink() %}
+    {% if show_sourcelink %}
+        <p class="sourceline"><a href="{{ post.source_link() }}" id="sourcelink">{{ messages("Source") }}</a></p>
+    {% endif %}
+{% endmacro %}
+
+{% macro html_post_header() %}
+    <header>
+        {{ html_title() }}
+        <div class="metadata">
+            <p class="byline author vcard">
+                <span class="byline-name fn">
+                    {% if author_pages_generated %}
+                        <a href="{{ _link('author', post.author()) }}">{{ post.author()|e }}</a>
+                    {% else %}
+                        {{ post.author()|e }}
+                    {% endif %}
+                </span>
+            </p>
+            <p class="dateline"><a href="{{ post.permalink() }}" rel="bookmark"><time class="published dt-published" datetime="{{ post.formatted_date('webiso') }}" itemprop="datePublished" title="{{ post.formatted_date(date_format)|e }}">{{ post.formatted_date(date_format)|e }}</time></a></p>
+            {% if not post.meta('nocomments') and site_has_comments %}
+                <p class="commentline">{{ comments.comment_link(post.permalink(), post._base_path) }}
+            {% endif %}
+            {{ html_sourcelink() }}
+            {% if post.meta('link') %}
+                    <p class="linkline"><a href="{{ post.meta('link') }}">{{ messages("Original site") }}</a></p>
+            {% endif %}
+            {% if post.description() %}
+                <meta name="description" itemprop="description" content="{{ post.description()|e }}">
+            {% endif %}
+        </div>
+    </header>
+{% endmacro %}

@@ -1,0 +1,81 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+{#  -*- coding: utf-8 -*- #}
+{% import 'base_helper.tmpl' as base with context %}
+
+{% macro html_header() %}
+    <header id="header">
+        {{ html_site_title() }}
+        {{ html_navigation_links() }}
+        {% if search_form %}
+            <div class="searchform" role="search">
+                {{ search_form }}
+            </div>
+        {% endif %}
+    </header>
+    {{ template_hooks['page_header']() }}
+{% endmacro %}
+
+{% macro html_site_title() %}
+    <h3 id="brand">
+        <a href="{{ abs_link(_link("root", None, lang)) }}" title="{{ blog_title|e }}" rel="home">
+        {% if logo_url %}
+            <img src="{{ logo_url }}" alt="{{ blog_title|e }}" id="logo">
+        {% endif %}
+
+        {% if show_blog_title %}
+            <span id="blog-title" class="muted" >{{ blog_title|e }}</span>
+        {% endif %}
+        </a>
+    </h3>
+{% endmacro %}
+
+{% macro html_navigation_links() %}
+    <nav id="menu">
+    <div class="navbar">
+        <div class="navbar-inner">
+            <div class="container">
+
+            <ul class="nav">
+                <li><a href="http://impala.apache.org/index.html">Home</a></li>
+                <li><a href="http://impala.apache.org/downloads.html">Downloads</a></li>
+                <li><a href="http://impala.apache.org/overview.html">Overview</a></li>
+                <li class="active"><a href="index.html">Blog</a></li>
+                <li><a href="https://cwiki.apache.org/confluence/display/IMPALA/Contributing+to+Impala">Contribute</a></li>
+                <li class="dropdown">
+                    <a href='#' class="dropdown-toggle" data-toggle="dropdown" role="button">
+                    Source code</a>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a href="https://git-wip-us.apache.org/repos/asf/incubator-impala.git">
+                            Official source</a>
+                        </li>
+                        <li><a href="https://github.com/apache/incubator-impala">GitHub mirror</a></li>
+                    </ul>
+                </li>
+                <li><a href="http://impala.apache.org/community.html">Community</a></li>
+                <li><a href="http://impala.apache.org/impala-docs.html">Documentation</a></li>
+            </ul>
+
+            </div><!-- container -->
+        </div><!-- navbar-inner -->
+    </div><!-- navbar -->
+    </nav>
+{% endmacro %}

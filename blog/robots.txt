@@ -1,0 +1,4 @@
+Sitemap: http://impala.apache.org/sitemapindex.xml
+
+User-Agent: *
+Host: impala.apache.org

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+    xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+    xmlns:xhtml="http://www.w3.org/1999/xhtml"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+                        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+ <url>
+  <loc>http://impala.apache.org/</loc>
+  <lastmod>2017-01-25T07:05:00Z</lastmod>
+ </url>
+ <url>
+  <loc>http://impala.apache.org/2017/</loc>
+  <lastmod>2017-01-24T21:49:00Z</lastmod>
+ </url>
+ <url>
+  <loc>http://impala.apache.org/archive.html</loc>
+  <lastmod>2017-01-24T21:49:00Z</lastmod>
+ </url>
+ <url>
+  <loc>http://impala.apache.org/categories/</loc>
+  <lastmod>2017-01-24T21:49:00Z</lastmod>
+ </url>
+ <url>
+  <loc>http://impala.apache.org/posts/impala-blog-coming-soon/</loc>
+  <lastmod>2017-01-24T22:50:00Z</lastmod>
+ </url>
+</urlset>

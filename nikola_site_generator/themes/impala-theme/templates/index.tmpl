@@ -1,0 +1,71 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+{#  -*- coding: utf-8 -*- #}
+{% import 'index_helper.tmpl' as helper with context %}
+{% import 'comments_helper.tmpl' as comments with context %}
+{% extends 'base.tmpl' %}
+
+{% block extra_head %}
+    {{ super() }}
+    {% if posts and (permalink == '/' or permalink == '/' + index_file) %}
+        <link rel="prefetch" href="{{ posts[0].permalink() }}" type="text/html">
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+{% block content_header %}{% endblock %}
+{% if 'main_index' in pagekind %}
+    {{ front_index_header }}
+{% endif %}
+<h3>All articles</h3>
+<div class="postindex">
+{% for post in posts %}
+    <hr />
+    <article class="h-entry post-{{ post.meta('type') }}">
+    <header>
+        <h3 class="p-name entry-title"><a href="{{ post.permalink() }}" class="u-url">{{ post.title()|e }}</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+            {% if author_pages_generated %}
+                <a href="{{ _link('author', post.author()) }}">{{ post.author()|e }}</a>
+            {% else %}
+                {{ post.author()|e }}
+            {% endif %}
+            </span></p>
+            <p class="dateline"><a href="{{ post.permalink() }}" rel="bookmark"><time class="published dt-published" datetime="{{ post.formatted_date('webiso') }}" title="{{ post.formatted_date(date_format)|e }}">{{ post.formatted_date(date_format)|e }}</time></a></p>
+            {% if not post.meta('nocomments') and site_has_comments %}
+                <p class="commentline">{{ comments.comment_link(post.permalink(), post._base_path) }}
+            {% endif %}
+        </div>
+    </header>
+    {% if index_teasers %}
+    <div class="p-summary entry-summary">
+    {{ post.text(teaser_only=True) }}
+    {% else %}
+    <div class="e-content entry-content">
+    {{ post.text(teaser_only=False) }}
+    {% endif %}
+    </div>
+    </article>
+{% endfor %}
+</div>
+{{ helper.html_pager() }}
+{{ comments.comment_link_script() }}
+{% endblock %}
