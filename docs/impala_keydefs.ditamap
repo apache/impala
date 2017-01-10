@@ -793,7 +793,7 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="topics/impala_max_scan_range_length.xml" keys="max_scan_range_length"/>
   <keydef href="topics/impala_max_num_runtime_filters.xml" keys="max_num_runtime_filters"/>
   <keydef href="topics/impala_mem_limit.xml" keys="mem_limit"/>
-  <!-- <keydef href="topics/impala_mt_dop.xml" keys="mt_dop"/> -->
+  <keydef href="topics/impala_mt_dop.xml" keys="mt_dop"/>
   <keydef href="topics/impala_num_nodes.xml" keys="num_nodes"/>
   <keydef href="topics/impala_num_scanner_threads.xml" keys="num_scanner_threads"/>
   <keydef href="topics/impala_optimize_partition_key_scans.xml" keys="optimize_partition_key_scans"/>

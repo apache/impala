@@ -194,6 +194,7 @@ under the License.
           <topicref href="topics/impala_max_scan_range_length.xml"/>
           <topicref rev="2.5.0" href="topics/impala_max_num_runtime_filters.xml"/>
           <topicref href="topics/impala_mem_limit.xml"/>
+          <topicref rev="2.8.0" href="topics/impala_mt_dop.xml"/>
           <topicref href="topics/impala_num_nodes.xml"/>
           <topicref href="topics/impala_num_scanner_threads.xml"/>
           <topicref rev="2.5.0" href="topics/impala_optimize_partition_key_scans.xml"/>

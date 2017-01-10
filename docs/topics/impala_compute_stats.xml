@@ -110,6 +110,15 @@ COMPUTE INCREMENTAL STATS [<varname>db_name</varname>.]<varname>table_name</varn
           The statistics help Impala to achieve high concurrency, full utilization of available memory, and avoid
           contention with workloads from other Hadoop components.
         </li>
+        <li rev="IMPALA-4572">
+          In <keyword keyref="impala28_full"/> and higher, when you run the
+          <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL STATS</codeph>
+          statement against a Parquet table, Impala automatically applies the query
+          option setting <codeph>MT_DOP=4</codeph> to increase the amount of intra-node
+          parallelism during this CPU-intensive operation. See <xref keyref="mt_dop"/>
+          for details about what this query option does and how to use it with
+          CPU-intensive <codeph>SELECT</codeph> statements.
+        </li>
       </ul>
     </note>
 

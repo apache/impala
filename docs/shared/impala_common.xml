@@ -1581,6 +1581,10 @@ explain select s from yy2 where year in (select year from yy where year between 
         <b>Default:</b> <codeph>false</codeph>
       </p>
 
+      <p id="default_0">
+        <b>Default:</b> <codeph>0</codeph>
+      </p>
+
       <p id="default_false_0">
         <b>Default:</b> <codeph>false</codeph> (shown as 0 in output of <codeph>SET</codeph> statement)
       </p>
