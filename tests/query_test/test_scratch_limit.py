@@ -59,9 +59,9 @@ class TestScratchLimit(ImpalaTestSuite):
     """
     exec_option = vector.get_value('exec_option')
     exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
-    exec_option['scratch_limit'] = '50m'
+    exec_option['scratch_limit'] = '24m'
     expected_error = 'Scratch space limit of %s bytes exceeded'
-    scratch_limit_in_bytes = 50 * 1024 * 1024
+    scratch_limit_in_bytes = 24 * 1024 * 1024
     try:
       self.execute_query(self.spill_query, exec_option)
       assert False, "Query was expected to fail"
