@@ -28,6 +28,8 @@ import org.apache.impala.common.AnalysisException;
 /**
  * Rewrites BetweenPredicates into an equivalent conjunctive/disjunctive
  * CompoundPredicate.
+ * It can be applied to pre-analysis expr trees and therefore does not reanalyze
+ * the transformation output itself.
  * Examples:
  * A BETWEEN X AND Y ==> A >= X AND A <= Y
  * A NOT BETWEEN X AND Y ==> A < X OR A > Y
@@ -55,7 +57,6 @@ public class BetweenToCompoundRule implements ExprRewriteRule {
           bp.getChild(0), bp.getChild(2));
       result = new CompoundPredicate(CompoundPredicate.Operator.AND, lower, upper);
     }
-    result.analyze(analyzer);
     return result;
   }
 

@@ -29,8 +29,8 @@ import org.apache.impala.common.AnalysisException;
  * TODO: Expressions fed into this rule are currently not required to be analyzed
  * in order to support constant folding in expressions that contain unresolved
  * references to select-list aliases (such expressions cannot be analyzed).
- * For sanity, we should restructure our analysis/rewriting to only allow analyzed exprs
- * to be rewritten.
+ * The cross-dependencies between rule transformations and analysis are vague at the
+ * moment and make rule application overly complicated.
  *
  * Examples:
  * 1 + 1 + 1 --> 3

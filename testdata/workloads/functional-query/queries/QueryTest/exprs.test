@@ -2547,7 +2547,7 @@ order by c, cast('2016-11-22 16:40:00.00' as timestamp)
 BIGINT, TIMESTAMP, TIMESTAMP
 ====
 ---- QUERY
-# Constant timestamp expresisons in a join condition / runtime filter as well
+# Constant timestamp expressions in a join condition / runtime filter as well
 # as a select node.
 select count(*) from (
   select a.timestamp_col from
@@ -2562,6 +2562,18 @@ where timestamp_col < cast('2013-02-18 20:46:00.01' as timestamp)
 8
 ---- TYPES
 BIGINT
+====
+---- QUERY
+# IMPALA-4739: rewrites in HAVING clause
+select tinyint_col, count(*) cnt
+from functional_parquet.alltypesagg
+group by 1
+having cnt > 1000 or cnt > 1000
+  and cnt between 1500 and 2500
+---- TYPES
+TINYINT, BIGINT
+---- RESULTS
+NULL,2000
 ====
 ---- QUERY
 # IMPALA-4550: Regression test for proper cast analysis after slot substitution within a

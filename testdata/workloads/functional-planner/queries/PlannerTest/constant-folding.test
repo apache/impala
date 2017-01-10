@@ -52,17 +52,19 @@ data source predicates: tinyint_col < 256, 2 > int_col
 predicates: float_col != 0
 ====
 # Test aggregation.
-select sum(1 + 1 + id)
+select sum(1 + 1 + id) sm
 from functional.alltypes
 group by timestamp_col = cast('2015-11-15' as timestamp) + interval 1 year
 having 1024 * 1024 * count(*) % 2 = 0
+  and (sm > 1 or sm > 1)
+  and (sm between 5 and 10)
 ---- PLAN
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(2 + id), count(*)
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
-|  having: 1048576 * count(*) % 2 = 0
+|  having: sum(2 + id) <= 10, sum(2 + id) > 1, sum(2 + id) >= 5, 1048576 * count(*) % 2 = 0
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB

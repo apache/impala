@@ -1060,6 +1060,9 @@ public class Analyzer {
           // analysis pass, so the conjunct may not have been rewritten yet.
           ExprRewriter rewriter = new ExprRewriter(BetweenToCompoundRule.INSTANCE);
           conjunct = rewriter.rewrite(conjunct, this);
+          // analyze this conjunct here: we know it can't contain references to select list
+          // aliases and having it analyzed is needed for the following EvalPredicate() call
+          conjunct.analyze(this);;
         }
         if (!FeSupport.EvalPredicate(conjunct, globalState_.queryCtx)) {
           if (fromHavingClause) {

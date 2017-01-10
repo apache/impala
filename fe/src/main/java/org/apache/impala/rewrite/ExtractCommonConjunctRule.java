@@ -30,6 +30,8 @@ import com.google.common.collect.Lists;
 /**
  * This rule extracts common conjuncts from multiple disjunctions when it is applied
  * recursively bottom-up to a tree of CompoundPredicates.
+ * It can be applied to pre-analysis expr trees and therefore does not reanalyze
+ * the transformation output itself.
  *
  * Examples:
  * (a AND b AND c) OR (b AND d) ==> b AND ((a AND c) OR (d))
@@ -80,7 +82,6 @@ public class ExtractCommonConjunctRule implements ExprRewriteRule {
     if (child0Conjuncts.isEmpty() || child1Conjuncts.isEmpty()) {
       Preconditions.checkState(!commonConjuncts.isEmpty());
       Expr result = CompoundPredicate.createConjunctivePredicate(commonConjuncts);
-      result.analyze(analyzer);
       return result;
     }
 
@@ -94,7 +95,6 @@ public class ExtractCommonConjunctRule implements ExprRewriteRule {
     newDisjunction.setPrintSqlInParens(true);
     Expr result = CompoundPredicate.createConjunction(newDisjunction,
         CompoundPredicate.createConjunctivePredicate(commonConjuncts));
-    result.analyze(analyzer);
     return result;
   }
 

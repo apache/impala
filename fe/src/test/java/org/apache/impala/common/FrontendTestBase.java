@@ -244,8 +244,8 @@ public class FrontendTestBase {
     try {
       AnalysisContext analysisCtx = new AnalysisContext(catalog_,
           TestUtils.createQueryContext(Catalog.DEFAULT_DB,
-              System.getProperty("user.name")),
-              AuthorizationConfig.createAuthDisabledConfig());
+            System.getProperty("user.name")),
+          AuthorizationConfig.createAuthDisabledConfig());
       analysisCtx.analyze(stmt, analyzer);
       AnalysisContext.AnalysisResult analysisResult = analysisCtx.getAnalysisResult();
       if (expectedWarning != null) {
