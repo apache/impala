@@ -59,8 +59,20 @@ INSERT { INTO | OVERWRITE } [TABLE] <varname>table_name</varname>
 
 partition_clause ::= <varname>col_name</varname> [= <varname>constant</varname>] [, <varname>col_name</varname> [= <varname>constant</varname>] ...]
 
-hint_clause ::= [SHUFFLE] | [NOSHUFFLE]    (Note: the square brackets are part of the syntax.)
+hint_clause ::=
+  <varname>hint_with_dashes</varname> |
+  <varname>hint_with_cstyle_delimiters</varname> |
+  <varname>hint_with_brackets</varname>
+
+hint_with_dashes ::= -- +SHUFFLE | -- +NOSHUFFLE <ph rev="IMPALA-2522 2.8.0">-- +CLUSTERED</ph>
+
+hint_with_cstyle_comments ::= /* +SHUFFLE */ | /* +NOSHUFFLE */ <ph rev="IMPALA-2522 2.8.0">| /* +CLUSTERED */</ph>
+
+hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
+  (With this hint format, the square brackets are part of the syntax.)
 </codeblock>
+
+    <note conref="../shared/impala_common.xml#common/square_bracket_hint_caveat"/>
 
     <p>
       <b>Appending or replacing (INTO and OVERWRITE clauses):</b>

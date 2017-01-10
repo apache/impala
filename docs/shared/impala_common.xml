@@ -919,6 +919,12 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
         combination with the setting <codeph>RUNTIME_FILTER_MODE=GLOBAL</codeph>.
       </p>
 
+      <note id="square_bracket_hint_caveat" rev="IMPALA-2522">
+        The square bracket style of hint is now deprecated and might be removed in
+        a future release. For that reason, any newly added hints are not available
+        with the square bracket syntax.
+      </note>
+
       <p rev="2.5.0" id="runtime_filtering_option_caveat">
         Because the runtime filtering feature applies mainly to resource-intensive
         and long-running queries, only adjust this query option when tuning long-running queries
@@ -2570,29 +2576,26 @@ select max(height), avg(height) from census_data where age &gt; 20;
         <xref href="../topics/impala_views.xml#views"/> for details.
       </p>
 
-      <p id="insert_hints" rev="1.2.2">
+      <p id="insert_hints">
         When inserting into partitioned tables, especially using the Parquet file format, you can include a hint in
         the <codeph>INSERT</codeph> statement to fine-tune the overall performance of the operation and its
         resource usage:
         <ul>
-          <li>
-            These hints are available in Impala 1.2.2 and higher.
-          </li>
 
           <li>
-            You would only use these hints if an <codeph>INSERT</codeph> into a partitioned Parquet table was
+            You would only use hints if an <codeph>INSERT</codeph> into a partitioned Parquet table was
             failing due to capacity limits, or if such an <codeph>INSERT</codeph> was succeeding but with
             less-than-optimal performance.
           </li>
 
           <li>
-            To use these hints, put the hint keyword <codeph>[SHUFFLE]</codeph> or <codeph>[NOSHUFFLE]</codeph>
+            To use a hint to influence the join order, put the hint keyword <codeph>/* +SHUFFLE */</codeph> or <codeph>/* +NOSHUFFLE */</codeph>
             (including the square brackets) after the <codeph>PARTITION</codeph> clause, immediately before the
             <codeph>SELECT</codeph> keyword.
           </li>
 
           <li>
-            <codeph>[SHUFFLE]</codeph> selects an execution plan that minimizes the number of files being written
+            <codeph>/* +SHUFFLE */</codeph> selects an execution plan that reduces the number of files being written
             simultaneously to HDFS, and the number of memory buffers holding data for individual partitions. Thus
             it reduces overall resource usage for the <codeph>INSERT</codeph> operation, allowing some
             <codeph>INSERT</codeph> operations to succeed that otherwise would fail. It does involve some data
@@ -2601,27 +2604,39 @@ select max(height), avg(height) from census_data where age &gt; 20;
           </li>
 
           <li>
-            <codeph>[NOSHUFFLE]</codeph> selects an execution plan that might be faster overall, but might also
+            <codeph>/* +NOSHUFFLE */</codeph> selects an execution plan that might be faster overall, but might also
             produce a larger number of small data files or exceed capacity limits, causing the
-            <codeph>INSERT</codeph> operation to fail. Use <codeph>[SHUFFLE]</codeph> in cases where an
+            <codeph>INSERT</codeph> operation to fail. Use <codeph>/* +SHUFFLE */</codeph> in cases where an
             <codeph>INSERT</codeph> statement fails or runs inefficiently due to all nodes attempting to construct
             data for all partitions.
           </li>
 
           <li>
-            Impala automatically uses the <codeph>[SHUFFLE]</codeph> method if any partition key column in the
+            Impala automatically uses the <codeph>/* +SHUFFLE */</codeph> method if any partition key column in the
             source table, mentioned in the <codeph>INSERT ... SELECT</codeph> query, does not have column
-            statistics. In this case, only the <codeph>[NOSHUFFLE]</codeph> hint would have any effect.
+            statistics. In this case, only the <codeph>/* +NOSHUFFLE */</codeph> hint would have any effect.
           </li>
 
           <li>
             If column statistics are available for all partition key columns in the source table mentioned in the
-            <codeph>INSERT ... SELECT</codeph> query, Impala chooses whether to use the <codeph>[SHUFFLE]</codeph>
-            or <codeph>[NOSHUFFLE]</codeph> technique based on the estimated number of distinct values in those
+            <codeph>INSERT ... SELECT</codeph> query, Impala chooses whether to use the <codeph>/* +SHUFFLE */</codeph>
+            or <codeph>/* +NOSHUFFLE */</codeph> technique based on the estimated number of distinct values in those
             columns and the number of nodes involved in the <codeph>INSERT</codeph> operation. In this case, you
-            might need the <codeph>[SHUFFLE]</codeph> or the <codeph>[NOSHUFFLE]</codeph> hint to override the
+            might need the <codeph>/* +SHUFFLE */</codeph> or the <codeph>/* +NOSHUFFLE */</codeph> hint to override the
             execution plan selected by Impala.
           </li>
+
+          <li rev="IMPALA-2522 2.8.0">
+            In <keyword keyref="impala28_full"/> or higher, you can make the
+            <codeph>INSERT</codeph> operation organize (<q>cluster</q>)
+            the data for each partition to avoid buffering data for multiple partitions
+            and reduce the risk of an out-of-memory condition. Specify the hint as
+            <codeph>/* +CLUSTERED */</codeph>. This technique is primarily
+            useful for inserts into Parquet tables, where the large block
+            size requires substantial memory to buffer data for multiple
+            output files at once.
+          </li>
+
         </ul>
       </p>
 

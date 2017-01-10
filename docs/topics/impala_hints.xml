@@ -62,18 +62,20 @@ under the License.
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
     <p>
-      You can represent the hints as keywords surrounded by <codeph>[]</codeph> square brackets; include the
-      brackets in the text of the SQL statement.
+      You can also represent the hints as keywords surrounded by <codeph>[]</codeph>
+      square brackets; include the brackets in the text of the SQL statement.
+      <note conref="../shared/impala_common.xml#common/square_bracket_hint_caveat"/>
     </p>
 
 <codeblock>SELECT STRAIGHT_JOIN <varname>select_list</varname> FROM
 <varname>join_left_hand_table</varname>
-  JOIN [{BROADCAST|SHUFFLE}]
+  JOIN [{ /* +BROADCAST */ | /* +SHUFFLE */ }]
 <varname>join_right_hand_table</varname>
 <varname>remainder_of_query</varname>;
 
 INSERT <varname>insert_clauses</varname>
-  [{SHUFFLE|NOSHUFFLE}]
+  [{ /* +SHUFFLE */ | /* +NOSHUFFLE */ }]
+  [<ph rev="IMPALA-2522 2.8.0">/* +CLUSTERED */</ph>]
   SELECT <varname>remainder_of_query</varname>;
 </codeblock>
 
@@ -82,6 +84,12 @@ INSERT <varname>insert_clauses</varname>
       either the <codeph>/* */</codeph> or <codeph>--</codeph> notation. Specify a <codeph>+</codeph> symbol
       immediately before the hint name. Recently added hints are only available using the <codeph>/* */</codeph>
       and <codeph>--</codeph> notation.
+      For clarity, the <codeph>/* */</codeph> and <codeph>--</codeph> styles
+      are used in the syntax and examples throughout this section.
+      With the <codeph>/* */</codeph> or <codeph>--</codeph> notation for
+      hints, specify a <codeph>+</codeph> symbol immediately before the first hint name.
+      Multiple hints can be specified separated by commas, for example
+      <codeph>/* +clustered,shuffle */</codeph>
     </p>
 
 <codeblock rev="2.0.0">SELECT STRAIGHT_JOIN <varname>select_list</varname> FROM
@@ -109,6 +117,14 @@ INSERT <varname>insert_clauses</varname>
   /* +{SCHEDULE_CACHE_LOCAL | SCHEDULE_DISK_LOCAL | SCHEDULE_REMOTE}
     [,RANDOM_REPLICA] */
 <varname>remainder_of_query</varname>;</ph>
+
+<ph rev="IMPALA-2522 2.8.0">INSERT <varname>insert_clauses</varname>
+  -- +CLUSTERED
+  SELECT <varname>remainder_of_query</varname>;
+
+INSERT <varname>insert_clauses</varname>
+  /* +CLUSTERED */
+  SELECT <varname>remainder_of_query</varname>;</ph>
 </codeblock>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
@@ -138,14 +154,14 @@ INSERT <varname>insert_clauses</varname>
     </p>
 
     <p>
-      The <codeph>[BROADCAST]</codeph> and <codeph>[SHUFFLE]</codeph> hints control the execution strategy for join
+      The <codeph>/* +BROADCAST */</codeph> and <codeph>/* +SHUFFLE */</codeph> hints control the execution strategy for join
       queries. Specify one of the following constructs immediately after the <codeph>JOIN</codeph> keyword in a
       query:
     </p>
 
     <ul>
       <li>
-        <codeph>[SHUFFLE]</codeph> - Makes that join operation use the <q>partitioned</q> technique, which divides
+        <codeph>/* +SHUFFLE */</codeph> - Makes that join operation use the <q>partitioned</q> technique, which divides
         up corresponding rows from both tables using a hashing algorithm, sending subsets of the rows to other
         nodes for processing. (The keyword <codeph>SHUFFLE</codeph> is used to indicate a <q>partitioned join</q>,
         because that type of join is not related to <q>partitioned tables</q>.) Since the alternative
@@ -155,7 +171,7 @@ INSERT <varname>insert_clauses</varname>
       </li>
 
       <li>
-        <codeph>[BROADCAST]</codeph> - Makes that join operation use the <q>broadcast</q> technique that sends the
+        <codeph>/* +BROADCAST */</codeph> - Makes that join operation use the <q>broadcast</q> technique that sends the
         entire contents of the right-hand table to all nodes involved in processing the join. This is the default
         mode of operation when table and index statistics are unavailable, so you would typically only need it if
         stale metadata caused Impala to mistakenly choose a partitioned join operation. Typically, broadcast joins
@@ -235,7 +251,7 @@ INSERT <varname>insert_clauses</varname>
     </p>
 
     <p>
-      In particular, the <codeph>[BROADCAST]</codeph> and <codeph>[SHUFFLE]</codeph> hints are expected to be
+      In particular, the <codeph>/* +BROADCAST */</codeph> and <codeph>/* +SHUFFLE */</codeph> hints are expected to be
       needed much less frequently in Impala 1.2.2 and higher, because the join order optimization feature in
       combination with the <codeph>COMPUTE STATS</codeph> statement now automatically choose join order and join
       mechanism without the need to rewrite the query and add hints. See
@@ -264,21 +280,21 @@ INSERT <varname>insert_clauses</varname>
     <p>
       For example, this query joins a large customer table with a small lookup table of less than 100 rows. The
       right-hand table can be broadcast efficiently to all nodes involved in the join. Thus, you would use the
-      <codeph>[broadcast]</codeph> hint to force a broadcast join strategy:
+      <codeph>/* +broadcast */</codeph> hint to force a broadcast join strategy:
     </p>
 
 <codeblock>select straight_join customer.address, state_lookup.state_name
-  from customer join <b>[broadcast]</b> state_lookup
+  from customer join <b>/* +broadcast */</b> state_lookup
   on customer.state_id = state_lookup.state_id;</codeblock>
 
     <p>
       This query joins two large tables of unpredictable size. You might benchmark the query with both kinds of
       hints and find that it is more efficient to transmit portions of each table to other nodes for processing.
-      Thus, you would use the <codeph>[shuffle]</codeph> hint to force a partitioned join strategy:
+      Thus, you would use the <codeph>/* +shuffle */</codeph> hint to force a partitioned join strategy:
     </p>
 
 <codeblock>select straight_join weather.wind_velocity, geospatial.altitude
-  from weather join <b>[shuffle]</b> geospatial
+  from weather join <b>/* +shuffle */</b> geospatial
   on weather.lat = geospatial.lat and weather.long = geospatial.long;</codeblock>
 
     <p>
@@ -290,7 +306,7 @@ INSERT <varname>insert_clauses</varname>
     </p>
 
 <codeblock>select straight_join t1.name, t2.id, t3.price
-  from t1 join <b>[shuffle]</b> t2 join <b>[broadcast]</b> t3
+  from t1 join <b>/* +shuffle */</b> t2 join <b>/* +broadcast */</b> t3
   on t1.id = t2.id and t2.id = t3.id;</codeblock>
 
     <!-- To do: This is a good place to add more sample output showing before and after EXPLAIN plans. -->
