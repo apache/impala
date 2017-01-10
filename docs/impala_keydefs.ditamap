@@ -22,8 +22,8 @@ under the License.
   <title>Apache Impala (incubating) Key Definitions</title>
 
 <!-- Definitions for substitution variables, particularly for upstream/downstream differences in terminology and versioning. -->
-  <keydef keys="hadoop_distro"><topicmeta><keywords><keyword>CDH</keyword></keywords></topicmeta></keydef>
-  <keydef keys="support_org"><topicmeta><keywords><keyword>Cloudera Support</keyword></keywords></topicmeta></keydef>
+  <keydef keys="hadoop_distro"><topicmeta><keywords><keyword>Apache Hadoop</keyword></keywords></topicmeta></keydef>
+  <keydef keys="support_org"><topicmeta><keywords><keyword>the appropriate support channel</keyword></keywords></topicmeta></keydef>
 
 <!-- URLs used in external links. Many, perhaps most, to be turned into keydefs to genericize and optionally re-point. -->
 

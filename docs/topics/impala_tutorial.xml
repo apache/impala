@@ -57,12 +57,12 @@ under the License.
 
     <ul>
       <li>
-        If you already have a CDH environment set up and just need to add Impala to it, follow the installation
-        process described in <xref href="impala_install.xml#install"/>. Make sure to also install the Hive
+        If you already have some <keyword keyref="hadoop_distro"/> environment set up and just need to add Impala to it,
+        follow the installation process described in <xref href="impala_install.xml#install"/>. Make sure to also install the Hive
         metastore service if you do not already have Hive configured.
       </li>
 
-      <li>
+      <li audience="hidden">
         To set up Impala and all its prerequisites at once, in a minimal configuration that you can use for
         small-scale experiments, set up the Cloudera QuickStart VM, which includes CDH and Impala on CentOS.
         Use this single-node VM to try out basic SQL functionality, not anything related to
@@ -127,7 +127,7 @@ under the License.
           on their names.
         </p>
 
-<codeblock>$ impala-shell -i localhost --quiet
+<codeblock rev="upstream">$ impala-shell -i localhost --quiet
 Starting Impala Shell without Kerberos authentication
 Welcome to the Impala shell. Press TAB twice to see a list of available commands.
 
@@ -517,20 +517,20 @@ Copyright (c) 2012 Cloudera, Inc. All rights reserved.
         <p>
           Populate HDFS with the data you want to query. To begin this process, create one or more new
           subdirectories underneath your user directory in HDFS. The data for each table resides in a separate
-          subdirectory. Substitute your own username for <codeph>cloudera</codeph> where appropriate. This example
+          subdirectory. Substitute your own username for <codeph>username</codeph> where appropriate. This example
           uses the <codeph>-p</codeph> option with the <codeph>mkdir</codeph> operation to create any necessary
           parent directories if they do not already exist.
         </p>
 
 <codeblock>$ whoami
-cloudera
+username
 $ hdfs dfs -ls /user
 Found 3 items
-drwxr-xr-x   - cloudera cloudera            0 2013-04-22 18:54 /user/cloudera
+drwxr-xr-x   - username username            0 2013-04-22 18:54 /user/username
 drwxrwx---   - mapred   mapred              0 2013-03-15 20:11 /user/history
 drwxr-xr-x   - hue      supergroup          0 2013-03-15 20:10 /user/hive
-<!-- $ hdfs dfs -mkdir -p /user/cloudera/sample_data/tab1 -->
-$ hdfs dfs -mkdir -p /user/cloudera/sample_data/tab1 /user/cloudera/sample_data/tab2</codeblock>
+<!-- $ hdfs dfs -mkdir -p /user/username/sample_data/tab1 -->
+$ hdfs dfs -mkdir -p /user/username/sample_data/tab1 /user/username/sample_data/tab2</codeblock>
 
         <p>
           Here is some sample data, for two tables named <codeph>TAB1</codeph> and <codeph>TAB2</codeph>.
@@ -571,16 +571,16 @@ $ hdfs dfs -mkdir -p /user/cloudera/sample_data/tab1 /user/cloudera/sample_data/
           which use paths available in the Impala Demo VM:
         </p>
 
-<codeblock><!-- $ hdfs dfs -mkdir /user/cloudera/tab1 -->$ hdfs dfs -put tab1.csv /user/cloudera/sample_data/tab1
-$ hdfs dfs -ls /user/cloudera/sample_data/tab1
+<codeblock><!-- $ hdfs dfs -mkdir /user/username/tab1 -->$ hdfs dfs -put tab1.csv /user/username/sample_data/tab1
+$ hdfs dfs -ls /user/username/sample_data/tab1
 Found 1 items
--rw-r--r--   1 cloudera cloudera        192 2013-04-02 20:08 /user/cloudera/sample_data/tab1/tab1.csv
+-rw-r--r--   1 username username        192 2013-04-02 20:08 /user/username/sample_data/tab1/tab1.csv
 
-<!-- $ hdfs dfs -mkdir /user/cloudera/tab2 -->
-$ hdfs dfs -put tab2.csv /user/cloudera/sample_data/tab2
-$ hdfs dfs -ls /user/cloudera/sample_data/tab2
+<!-- $ hdfs dfs -mkdir /user/username/tab2 -->
+$ hdfs dfs -put tab2.csv /user/username/sample_data/tab2
+$ hdfs dfs -ls /user/username/sample_data/tab2
 Found 1 items
--rw-r--r--   1 cloudera cloudera        158 2013-04-02 20:09 /user/cloudera/sample_data/tab2/tab2.csv
+-rw-r--r--   1 username username        158 2013-04-02 20:09 /user/username/sample_data/tab2/tab2.csv
 </codeblock>
 
         <p>
@@ -622,7 +622,7 @@ CREATE EXTERNAL TABLE tab1
    col_3 TIMESTAMP
 )
 ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
-LOCATION '/user/cloudera/sample_data/tab1';
+LOCATION '/user/username/sample_data/tab1';
 
 DROP TABLE IF EXISTS tab2;
 -- TAB2 is an external table, similar to TAB1.
@@ -633,7 +633,7 @@ CREATE EXTERNAL TABLE tab2
    col_2 DOUBLE
 )
 ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
-LOCATION '/user/cloudera/sample_data/tab2';
+LOCATION '/user/username/sample_data/tab2';
 
 DROP TABLE IF EXISTS tab3;
 -- Leaving out the EXTERNAL clause means the data will be managed
@@ -667,7 +667,7 @@ ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
               <codeph>impala</codeph> user should also be a member of the <codeph>hive</codeph> group.
             </li>
 
-            <li>
+            <li audience="hidden">
               If the value of <codeph>hive.metastore.warehouse.dir</codeph> is different in the Cloudera Manager
               dialogs and in the Hive shell, you might need to
               <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_managing_roles.html" scope="external" format="html">designate
@@ -695,20 +695,20 @@ ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
         </p>
 
         <p>
-          The following examples set up 2 tables, referencing the paths and sample data supplied with the Cloudera
-          QuickStart VM. For historical reasons, the data physically resides in an HDFS directory tree under
+          The following examples set up 2 tables, referencing the paths and sample data from the sample TPC-DS kit for Impala.
+          For historical reasons, the data physically resides in an HDFS directory tree under
           <filepath>/user/hive</filepath>, although this particular data is entirely managed by Impala rather than
           Hive. When we create an external table, we specify the directory containing one or more data files, and
           Impala queries the combined content of all the files inside that directory. Here is how we examine the
           directories and files within the HDFS filesystem:
         </p>
 
-<codeblock>$ cd ~/cloudera/datasets
+<codeblock>$ cd ~/username/datasets
 $ ./tpcds-setup.sh
 ... Downloads and unzips the kit, builds the data and loads it into HDFS ...
 $ hdfs dfs -ls /user/hive/tpcds/customer
 Found 1 items
--rw-r--r--   1 cloudera supergroup   13209372 2013-03-22 18:09 /user/hive/tpcds/customer/customer.dat
+-rw-r--r--   1 username supergroup   13209372 2013-03-22 18:09 /user/hive/tpcds/customer/customer.dat
 $ hdfs dfs -cat /user/hive/tpcds/customer/customer.dat | more
 1|AAAAAAAABAAAAAAA|980124|7135|32946|2452238|2452208|Mr.|Javier|Lewis|Y|9|12|1936|CHILE||Javie
 r.Lewis@VFAxlnZEvOx.org|2452508|
@@ -1703,7 +1703,7 @@ the <codeph>impala</codeph> user can read the files, which will be sufficient fo
 queries and perform some copy and transform operations into other tables.
 </p>
 
-<codeblock>$ impala-shell -i localhost
+<codeblock rev="upstream">$ impala-shell -i localhost
 Starting Impala Shell without Kerberos authentication
 Connected to localhost:21000
 Server version: impalad version 2.2.0-cdh5 RELEASE (build 2ffd73a4255cefd521362ffe1cfb37463f67f75c)
@@ -2125,7 +2125,7 @@ to start with, we restart the <cmdname>impala-shell</cmdname> command with the
 <codeph>-B</codeph> option, which turns off the box-drawing behavior.
 </p>
 
-<codeblock>[localhost:21000] > quit;
+<codeblock rev="upstream">[localhost:21000] > quit;
 Goodbye jrussell
 $ impala-shell -i localhost -B -d airline_data;
 Starting Impala Shell without Kerberos authentication
