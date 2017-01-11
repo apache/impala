@@ -21,6 +21,7 @@ under the License.
 <concept id="parquet_annotate_strings_utf8" rev="2.6.0 IMPALA-2069">
 
   <title>PARQUET_ANNOTATE_STRINGS_UTF8 Query Option (<keyword keyref="impala26"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>PARQUET_ANNOTATE_STRINGS_UTF8</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

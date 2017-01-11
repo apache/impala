@@ -21,7 +21,7 @@ under the License.
 <concept id="scan_node_codegen_threshold" rev="2.5.0 IMPALA-1755">
 
   <title>SCAN_NODE_CODEGEN_THRESHOLD Query Option (<keyword keyref="impala25"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle></navtitle></titlealts>
+  <titlealts audience="PDF"><navtitle>SCAN_NODE_CODEGEN_THRESHOLD</navtitle></titlealts>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
