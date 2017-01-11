@@ -68,7 +68,6 @@ import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.DisjointSet;
-import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TSessionStateUtil;
 import org.slf4j.Logger;
@@ -302,10 +301,6 @@ public class Analyzer {
     // Expr rewriter for foldinc constants.
     private final ExprRewriter constantFolder_ =
         new ExprRewriter(FoldConstantsRule.INSTANCE);
-
-    // Timeline of important events in the planning process, used for debugging /
-    // profiling
-    private final EventSequence timeline = new EventSequence("Planner Timeline");
 
     public GlobalState(ImpaladCatalog catalog, TQueryCtx queryCtx,
         AuthorizationConfig authzConfig) {
@@ -2542,8 +2537,6 @@ public class Analyzer {
     boolean res = globalState_.valueTransferGraph.validate(actual, expected);
     return res;
   }
-
-  public EventSequence getTimeline() { return globalState_.timeline; }
 
   /**
    * Assign all remaining unassigned slots to their own equivalence classes.

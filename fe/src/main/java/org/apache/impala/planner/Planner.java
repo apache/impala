@@ -85,7 +85,7 @@ public class Planner {
     SingleNodePlanner singleNodePlanner = new SingleNodePlanner(ctx_);
     DistributedPlanner distributedPlanner = new DistributedPlanner(ctx_);
     PlanNode singleNodePlan = singleNodePlanner.createSingleNodePlan();
-    ctx_.getRootAnalyzer().getTimeline().markEvent("Single node plan created");
+    ctx_.getAnalysisResult().getTimeline().markEvent("Single node plan created");
     ArrayList<PlanFragment> fragments = null;
 
     // Determine the maximum number of rows processed by any node in the plan tree
@@ -116,7 +116,7 @@ public class Planner {
       // Always compute filters, even if the BE won't always use all of them.
       RuntimeFilterGenerator.generateRuntimeFilters(ctx_.getRootAnalyzer(),
           singleNodePlan, ctx_.getQueryOptions().getMax_num_runtime_filters());
-      ctx_.getRootAnalyzer().getTimeline().markEvent(
+      ctx_.getAnalysisResult().getTimeline().markEvent(
           "Runtime filters computed");
     }
 
@@ -174,7 +174,7 @@ public class Planner {
     }
 
     Collections.reverse(fragments);
-    ctx_.getRootAnalyzer().getTimeline().markEvent("Distributed plan created");
+    ctx_.getAnalysisResult().getTimeline().markEvent("Distributed plan created");
 
     ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
@@ -217,7 +217,7 @@ public class Planner {
         graph.computeLineageGraph(resultExprs, ctx_.getRootAnalyzer());
       }
       if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
-      ctx_.getRootAnalyzer().getTimeline().markEvent("Lineage info computed");
+      ctx_.getAnalysisResult().getTimeline().markEvent("Lineage info computed");
     }
 
     return fragments;
@@ -236,7 +236,7 @@ public class Planner {
     // Only use one scanner thread per scan-node instance since intra-node
     // parallelism is achieved via multiple fragment instances.
     ctx_.getQueryOptions().setNum_scanner_threads(1);
-    ctx_.getRootAnalyzer().getTimeline().markEvent("Parallel plans created");
+    ctx_.getAnalysisResult().getTimeline().markEvent("Parallel plans created");
     return parallelPlans;
   }
 

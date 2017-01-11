@@ -904,12 +904,18 @@ public class Frontend {
           // Only re-throw the AnalysisException if there were no missing tables.
           if (missingTbls.isEmpty()) throw e;
 
+          // Record that analysis needs table metadata
+          analysisCtx.getTimeline().markEvent("Metadata load started");
+
           // Some tables/views were missing, request and wait for them to load.
           if (!requestTblLoadAndWait(missingTbls, MISSING_TBL_LOAD_WAIT_TIMEOUT_MS)) {
             if (LOG.isTraceEnabled()) {
               LOG.trace(String.format("Missing tables were not received in %dms. Load " +
                   "request will be retried.", MISSING_TBL_LOAD_WAIT_TIMEOUT_MS));
             }
+            analysisCtx.getTimeline().markEvent("Metadata load timeout");
+          } else {
+            analysisCtx.getTimeline().markEvent("Metadata load finished");
           }
         }
       }
@@ -1037,7 +1043,7 @@ public class Frontend {
       throws ImpalaException {
     // Analyze the statement
     AnalysisContext.AnalysisResult analysisResult = analyzeStmt(queryCtx);
-    EventSequence timeline = analysisResult.getAnalyzer().getTimeline();
+    EventSequence timeline = analysisResult.getTimeline();
     timeline.markEvent("Analysis finished");
     Preconditions.checkNotNull(analysisResult.getStmt());
     TExecRequest result = new TExecRequest();
@@ -1150,7 +1156,7 @@ public class Frontend {
     }
 
     timeline.markEvent("Planning finished");
-    result.setTimeline(analysisResult.getAnalyzer().getTimeline().toThrift());
+    result.setTimeline(analysisResult.getTimeline().toThrift());
     return result;
   }
 

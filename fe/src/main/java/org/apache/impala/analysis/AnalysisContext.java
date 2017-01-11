@@ -43,6 +43,7 @@ import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.util.EventSequence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +60,10 @@ public class AnalysisContext {
   private final TQueryCtx queryCtx_;
   private final AuthorizationConfig authzConfig_;
   private final ExprRewriter rewriter_;
+
+  // Timeline of important events in the planning process, used for debugging
+  // and profiling
+  private final EventSequence timeline_ = new EventSequence("Planner Timeline");
 
   // Set in analyze()
   private AnalysisResult analysisResult_;
@@ -93,6 +98,7 @@ public class AnalysisContext {
   static public class AnalysisResult {
     private StatementBase stmt_;
     private Analyzer analyzer_;
+    private EventSequence timeline_;
 
     public boolean isAlterTableStmt() { return stmt_ instanceof AlterTableStmt; }
     public boolean isAlterViewStmt() { return stmt_ instanceof AlterViewStmt; }
@@ -332,6 +338,7 @@ public class AnalysisContext {
 
     public StatementBase getStmt() { return stmt_; }
     public Analyzer getAnalyzer() { return analyzer_; }
+    public EventSequence getTimeline() { return timeline_; }
     public Set<TAccessEvent> getAccessEvents() { return analyzer_.getAccessEvents(); }
     public boolean requiresSubqueryRewrite() {
       return analyzer_.containsSubquery() && !(stmt_ instanceof CreateViewStmt)
@@ -375,6 +382,7 @@ public class AnalysisContext {
       if (analysisResult_.analyzer_ == null) {
         analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_, authzConfig_);
       }
+      analysisResult_.timeline_ = timeline_;
       analysisResult_.stmt_ = (StatementBase) parser.parse().value;
       if (analysisResult_.stmt_ == null) return;
 
@@ -583,4 +591,5 @@ public class AnalysisContext {
 
   public AnalysisResult getAnalysisResult() { return analysisResult_; }
   public Analyzer getAnalyzer() { return getAnalysisResult().getAnalyzer(); }
+  public EventSequence getTimeline() { return timeline_; }
 }

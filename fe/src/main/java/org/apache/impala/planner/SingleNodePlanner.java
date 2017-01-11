@@ -126,7 +126,7 @@ public class SingleNodePlanner {
     // to detect empty result sets.
     Analyzer analyzer = queryStmt.getAnalyzer();
     analyzer.computeEquivClasses();
-    analyzer.getTimeline().markEvent("Equivalence classes computed");
+    ctx_.getAnalysisResult().getTimeline().markEvent("Equivalence classes computed");
 
     // Mark slots referenced by output exprs as materialized, prior to generating the
     // plan tree.
