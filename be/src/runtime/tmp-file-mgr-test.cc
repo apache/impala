@@ -307,7 +307,7 @@ TEST_F(TmpFileMgrTest, TestAllocateNonWritable) {
   TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
   vector<TmpFileMgr::File*> allocated_files;
-  ASSERT_OK(CreateFiles(&file_group, &allocated_files))
+  ASSERT_OK(CreateFiles(&file_group, &allocated_files));
   int64_t offset;
   ASSERT_OK(FileAllocateSpace(allocated_files[0], 1, &offset));
 

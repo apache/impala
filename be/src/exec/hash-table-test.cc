@@ -71,7 +71,7 @@ class HashTableTest : public testing::Test {
     // internals so a simple build/probe expr is fine.
     Expr* expr = pool_.Add(new SlotRef(TYPE_INT, 1, true /* nullable */));
     build_expr_ctxs_.push_back(pool_.Add(new ExprContext(expr)));
-    ASSERT_OK(Expr::Prepare(build_expr_ctxs_, NULL, desc, &tracker_))
+    ASSERT_OK(Expr::Prepare(build_expr_ctxs_, NULL, desc, &tracker_));
     ASSERT_OK(Expr::Open(build_expr_ctxs_, NULL));
 
     expr = pool_.Add(new SlotRef(TYPE_INT, 1, true /* nullable */));

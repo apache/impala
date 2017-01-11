@@ -305,7 +305,7 @@ class SimpleTupleStreamTest : public testing::Test {
       batch = CreateBatch(*desc, offset, num_rows, gen_null);
       for (int j = 0; j < batch->num_rows(); ++j) {
         bool b = stream.AddRow(batch->GetRow(j), &status);
-        ASSERT_OK(status)
+        ASSERT_OK(status);
         if (!b) {
           ASSERT_TRUE(stream.using_small_buffers());
           bool got_buffer;

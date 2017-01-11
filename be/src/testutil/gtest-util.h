@@ -25,9 +25,23 @@
 namespace impala {
 
 // Macros for backend tests to be used when we expect the status to be OK.
-#define EXPECT_OK(status) EXPECT_TRUE(status.ok()) << "Error: " << status.GetDetail();
-#define ASSERT_OK(status) ASSERT_TRUE(status.ok()) << "Error: " << status.GetDetail();
-#define EXPECT_ERROR(status, err) EXPECT_EQ(status.code(), err);
+#define EXPECT_OK(status)                                            \
+  do {                                                               \
+    const Status& __status = (status);                               \
+    EXPECT_TRUE(__status.ok()) << "Error: " << __status.GetDetail(); \
+  } while (0)
+
+#define ASSERT_OK(status)                                            \
+  do {                                                               \
+    const Status& __status = (status);                               \
+    ASSERT_TRUE(__status.ok()) << "Error: " << __status.GetDetail(); \
+  } while (0)
+
+#define EXPECT_ERROR(status, err)                                         \
+  do {                                                                    \
+    const Status& __status = (status);                                    \
+    EXPECT_EQ(__status.code(), err) << "Error: " << __status.GetDetail(); \
+  } while (0)
 
 // Basic main() function to be used in gtest unit tests. Does not start a JVM and does
 // not initialize the FE.
