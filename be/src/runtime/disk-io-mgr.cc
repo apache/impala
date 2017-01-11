@@ -870,19 +870,16 @@ bool DiskIoMgr::GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
     // same reader here (the reader is removed from the queue).  There can be
     // other disk threads operating on this reader in other functions though.
 
-    // We just picked a reader, check the mem limits. We need to fail the request if
-    // the reader exceeded its memory limit, or if we're over a global memory limit.
+    // We just picked a reader. Before we may allocate a buffer on its behalf, check that
+    // it has not exceeded any memory limits (e.g. the query or process limit).
     // TODO: once IMPALA-3200 is fixed, we should be able to remove the free lists and
     // move these memory limit checks to GetFreeBuffer().
     // Note that calling AnyLimitExceeded() can result in a call to GcIoBuffers().
-    bool any_io_mgr_limit_exceeded = free_buffer_mem_tracker_->AnyLimitExceeded();
     // TODO: IMPALA-3209: we should not force a reader over its memory limit by
     // pushing more buffers to it. Most readers can make progress and operate within
     // a fixed memory limit.
-    bool reader_limit_exceeded = (*request_context)->mem_tracker_ != NULL
-        ? (*request_context)->mem_tracker_->AnyLimitExceeded() : false;
-
-    if (any_io_mgr_limit_exceeded || reader_limit_exceeded) {
+    if ((*request_context)->mem_tracker_ != NULL
+        && (*request_context)->mem_tracker_->AnyLimitExceeded()) {
       (*request_context)->Cancel(Status::MemLimitExceeded());
     }
 

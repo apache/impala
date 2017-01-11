@@ -516,21 +516,38 @@ Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, DiskIoRequestContext* i
 
   if (FLAGS_disk_spill_encryption) RETURN_IF_ERROR(EncryptAndHash(buffer));
 
+  // Set all member variables before calling AddWriteRange(): after it succeeds,
+  // WriteComplete() may be called concurrently with the remainder of this function.
   file_ = file;
-  write_in_flight_ = true;
   write_range_.reset(
       new DiskIoMgr::WriteRange(file->path(), offset, file->AssignDiskQueue(), callback));
   write_range_->SetData(buffer.data(), buffer.len());
-  return io_mgr->AddWriteRange(io_ctx, write_range_.get());
+  write_in_flight_ = true;
+  Status status = io_mgr->AddWriteRange(io_ctx, write_range_.get());
+  if (!status.ok()) {
+    // The write will not be in flight if we returned with an error.
+    write_in_flight_ = false;
+    // We won't return this WriteHandle to the client of FileGroup, so it won't be
+    // cancelled in the normal way. Mark the handle as cancelled so it can be
+    // cleanly destroyed.
+    is_cancelled_ = true;
+    return status;
+  }
+  return Status::OK();
 }
 
 Status TmpFileMgr::WriteHandle::RetryWrite(
     DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file, int64_t offset) {
   DCHECK(write_in_flight_);
   file_ = file;
-  write_in_flight_ = true;
   write_range_->SetRange(file->path(), offset, file->AssignDiskQueue());
-  return io_mgr->AddWriteRange(io_ctx, write_range_.get());
+  Status status = io_mgr->AddWriteRange(io_ctx, write_range_.get());
+  if (!status.ok()) {
+    // The write will not be in flight if we returned with an error.
+    write_in_flight_ = false;
+    return status;
+  }
+  return Status::OK();
 }
 
 void TmpFileMgr::WriteHandle::WriteComplete(const Status& write_status) {

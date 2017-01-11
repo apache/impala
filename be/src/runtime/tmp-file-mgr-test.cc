@@ -116,6 +116,11 @@ class TmpFileMgrTest : public ::testing::Test {
     group->next_allocation_index_ = value;
   }
 
+  /// Helper to cancel the FileGroup DiskIoRequestContext.
+  static void CancelIoContext(TmpFileMgr::FileGroup* group) {
+    group->io_mgr_->CancelContext(group->io_ctx_);
+  }
+
   /// Helper to get the # of bytes allocated by the group. Validates that the sum across
   /// all files equals this total.
   static int64_t BytesAllocated(TmpFileMgr::FileGroup* group) {
@@ -408,6 +413,28 @@ TEST_F(TmpFileMgrTest, TestScratchRangeRecycling) {
   }
   file_group.Close();
   test_env_->TearDownQueries();
+}
+
+// Regression test for IMPALA-4748, where hitting the process memory limit caused
+// internal invariants of TmpFileMgr to be broken on error path.
+TEST_F(TmpFileMgrTest, TestProcessMemLimitExceeded) {
+  TUniqueId id;
+  TmpFileMgr::FileGroup file_group(test_env_->tmp_file_mgr(), io_mgr(), profile_, id);
+
+  const int DATA_SIZE = 64;
+  vector<uint8_t> data(DATA_SIZE);
+
+  // Fake the asynchronous error from the process mem limit by cancelling the io context.
+  CancelIoContext(&file_group);
+
+  // After this error, writing via the file group should fail.
+  DiskIoMgr::WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+  unique_ptr<TmpFileMgr::WriteHandle> handle;
+  Status status = file_group.Write(MemRange(data.data(), DATA_SIZE), callback, &handle);
+  EXPECT_EQ(TErrorCode::CANCELLED, status.code());
+  file_group.Close();
+  test_env_->TearDownRuntimeStates();
 }
 }
 

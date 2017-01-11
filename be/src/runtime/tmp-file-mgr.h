@@ -260,7 +260,8 @@ class TmpFileMgr {
   /// Public methods of WriteHandle are safe to call concurrently from multiple threads.
   class WriteHandle {
    public:
-    // The write must be destroyed by FileGroup::DestroyWriteHandle().
+    /// The write must be destroyed by passing it to FileGroup - destroying it before
+    /// cancelling the write is an error.
     ~WriteHandle() {
       DCHECK(!write_in_flight_);
       DCHECK(is_cancelled_);
@@ -280,13 +281,16 @@ class TmpFileMgr {
 
     WriteHandle(RuntimeProfile::Counter* encryption_timer, WriteDoneCallback cb);
 
-    /// Starts a write of 'buffer' to 'offset' of 'file'.
+    /// Starts a write of 'buffer' to 'offset' of 'file'. 'write_in_flight_' must be false
+    /// before calling. After returning, 'write_in_flight_' is true on success or false on
+    /// failure and 'is_cancelled_' is set to true on failure.
     Status Write(DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file,
         int64_t offset, MemRange buffer,
         DiskIoMgr::WriteRange::WriteDoneCallback callback) WARN_UNUSED_RESULT;
 
     /// Retry the write after the initial write failed with an error, instead writing to
-    /// 'offset' of 'file'.
+    /// 'offset' of 'file'. 'write_in_flight_' must be true before calling.
+    /// After returning, 'write_in_flight_' is true on success or false on failure.
     Status RetryWrite(DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file,
         int64_t offset) WARN_UNUSED_RESULT;
 
@@ -333,10 +337,10 @@ class TmpFileMgr {
     /// acquiring other locks or invoking 'cb_'.
     boost::mutex write_state_lock_;
 
-    // True if the the write has been cancelled (but is not necessarily complete).
+    /// True if the the write has been cancelled (but is not necessarily complete).
     bool is_cancelled_;
 
-    // True if a write is in flight.
+    /// True if a write is in flight.
     bool write_in_flight_;
 
     /// Signalled when the write completes and 'write_in_flight_' becomes false, before
