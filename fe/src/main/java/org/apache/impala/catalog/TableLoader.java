@@ -55,7 +55,7 @@ public class TableLoader {
    */
   public Table load(Db db, String tblName) {
     String fullTblName = db.getName() + "." + tblName;
-    if (LOG.isTraceEnabled()) LOG.trace("Loading metadata for: " + fullTblName);
+    LOG.info("Loading metadata for: " + fullTblName);
     Table table;
     // turn all exceptions into TableLoadingException
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
@@ -88,12 +88,13 @@ public class TableLoader {
           "catalog.");
       table = IncompleteTable.createFailedMetadataLoadTable(
           db, tblName, tableDoesNotExist);
-    } catch (Exception e) {
+    } catch (Throwable e) {
       table = IncompleteTable.createFailedMetadataLoadTable(
           db, tblName, new TableLoadingException(
           "Failed to load metadata for table: " + fullTblName + ". Running " +
           "'invalidate metadata " + fullTblName + "' may resolve this problem.", e));
     }
+    LOG.info("Loaded metadata for: " + fullTblName);
     return table;
   }
 }

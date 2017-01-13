@@ -559,7 +559,7 @@ public class CatalogOpExecutor {
 
   /**
    * Loads the metadata of a table 'tbl' and assigns a new catalog version.
-   * reloadFileMetadata', 'reloadTableSchema', and 'partitionsToUpdate'
+   * 'reloadFileMetadata', 'reloadTableSchema', and 'partitionsToUpdate'
    * are used only for HdfsTables and control which metadata to reload.
    * Throws a CatalogException if there is an error loading table metadata.
    */

@@ -272,6 +272,7 @@ public class HdfsTable extends Table {
         synthesizeBlockMetadata(fs, dirPath, partsByPath);
         return;
       }
+
       int unknownDiskIdCount = 0;
       RemoteIterator<LocatedFileStatus> fileStatusIter = fs.listFiles(dirPath, true);
       while (fileStatusIter.hasNext()) {
@@ -728,7 +729,7 @@ public class HdfsTable extends Table {
         }
       }
     }
-    if (LOG.isTraceEnabled()) LOG.trace("partsByPath size: " + partsByPath.size());
+
     loadMetadataAndDiskIds(dirsToLoad, partsByPath);
   }
 
@@ -746,8 +747,13 @@ public class HdfsTable extends Table {
    */
   private void loadMetadataAndDiskIds(List<Path> locations,
       HashMap<Path, List<HdfsPartition>> partsByPath) {
+    LOG.info(String.format("Loading file and block metadata for %s partitions: %s",
+        partsByPath.size(), getFullName()));
     for (Path location: locations) { loadBlockMetadata(location, partsByPath); }
+    LOG.info(String.format("Loaded file and block metadata for %s partitions: %s",
+        partsByPath.size(), getFullName()));
   }
+
   /**
    * Gets the AccessLevel that is available for Impala for this table based on the
    * permissions Impala has on the given path. If the path does not exist, recurses up
@@ -1029,9 +1035,7 @@ public class HdfsTable extends Table {
       // Load partition and file metadata
       if (reuseMetadata) {
         // Incrementally update this table's partitions and file metadata
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("incremental update for table: " + db_.getName() + "." + name_);
-        }
+        LOG.info("Incrementally loading table metadata for: " + getFullName());
         Preconditions.checkState(partitionsToUpdate == null || loadFileMetadata);
         updateMdFromHmsTable(msTbl);
         if (msTbl.getPartitionKeysSize() == 0) {
@@ -1039,15 +1043,14 @@ public class HdfsTable extends Table {
         } else {
           updatePartitionsFromHms(client, partitionsToUpdate, loadFileMetadata);
         }
+        LOG.info("Incrementally loaded table metadata for: " + getFullName());
       } else {
         // Load all partitions from Hive Metastore, including file metadata.
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("load table from Hive Metastore: " + db_.getName() + "." + name_);
-        }
+        LOG.info("Fetching partition metadata from the Metastore: " + getFullName());
         List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
-            Lists.newArrayList();
-        msPartitions.addAll(MetaStoreUtil.fetchAllPartitions(
-            client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES));
+            MetaStoreUtil.fetchAllPartitions(
+                client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES);
+        LOG.info("Fetched partition metadata from the Metastore: " + getFullName());
         loadAllPartitions(msPartitions, msTbl);
       }
       if (loadTableSchema) setAvroSchema(client, msTbl);
@@ -1107,9 +1110,7 @@ public class HdfsTable extends Table {
    */
   private void updatePartitionsFromHms(IMetaStoreClient client,
       Set<String> partitionsToUpdate, boolean loadFileMetadata) throws Exception {
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("sync table partitions: " + name_);
-    }
+    if (LOG.isTraceEnabled()) LOG.trace("Sync table partitions: " + name_);
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
     Preconditions.checkState(msTbl.getPartitionKeysSize() != 0);

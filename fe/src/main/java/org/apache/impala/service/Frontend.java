@@ -887,7 +887,7 @@ public class Frontend {
 
     AnalysisContext analysisCtx = new AnalysisContext(impaladCatalog_, queryCtx,
         authzConfig_);
-    if (LOG.isTraceEnabled()) LOG.trace("analyze query " + queryCtx.client_request.stmt);
+    LOG.info("Compiling query: " + queryCtx.client_request.stmt);
 
     // Run analysis in a loop until it any of the following events occur:
     // 1) Analysis completes successfully.
@@ -909,8 +909,8 @@ public class Frontend {
 
           // Some tables/views were missing, request and wait for them to load.
           if (!requestTblLoadAndWait(missingTbls, MISSING_TBL_LOAD_WAIT_TIMEOUT_MS)) {
-            if (LOG.isTraceEnabled()) {
-              LOG.trace(String.format("Missing tables were not received in %dms. Load " +
+            if (LOG.isWarnEnabled()) {
+              LOG.warn(String.format("Missing tables were not received in %dms. Load " +
                   "request will be retried.", MISSING_TBL_LOAD_WAIT_TIMEOUT_MS));
             }
             analysisCtx.getTimeline().markEvent("Metadata load timeout");
@@ -924,6 +924,7 @@ public class Frontend {
       // AuthorizationExceptions must take precedence over any AnalysisException
       // that has been thrown, so perform the authorization first.
       analysisCtx.authorize(getAuthzChecker());
+      LOG.info("Compiled query.");
     }
   }
 
