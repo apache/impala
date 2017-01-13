@@ -37,15 +37,12 @@
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/thread.h"
 
-DEFINE_string(keytab_file, "",
-              "Path to the Kerberos Keytab file for this server. Specifying a "
-              "keytab file will cause the server to kinit, and enable Kerberos "
-              "to be used to authenticate RPC connections.");
+#include "common/config.h"
+
+DECLARE_string(keytab_file);
 TAG_FLAG(keytab_file, stable);
 
-DEFINE_string(principal, "kudu/_HOST",
-              "Kerberos principal that this daemon will log in as. The special token "
-              "_HOST will be replaced with the FQDN of the local host.");
+DECLARE_string(principal);
 TAG_FLAG(principal, experimental);
 // This is currently tagged as unsafe because there is no way for users to configure
 // clients to expect a non-default principal. As such, configuring a server to login
@@ -218,6 +215,37 @@ int32_t KinitContext::GetBackedOffRenewInterval(int32_t time_remaining, uint32_t
   return static_cast<int32_t>(base_time * dist(generator));
 }
 
+#ifndef HAVE_KRB5_IS_CONFIG_PRINCIPAL
+
+namespace {
+
+// Adapted from
+// https://github.com/krb5/krb5/blob/master/src/lib/krb5/ccache/ccfns.c#L248
+// available under MIT license.
+
+static const char conf_realm[] = "X-CACHECONF:";
+static const char conf_name[] = "krb5_ccache_conf_data";
+
+krb5_boolean krb5_is_config_principal(krb5_context context,
+    krb5_const_principal principal) {
+  const krb5_data *realm = &principal->realm;
+
+  if (realm->length != sizeof(conf_realm) - 1 ||
+      memcmp(realm->data, conf_realm, sizeof(conf_realm) - 1) != 0)
+    return FALSE;
+
+  if (principal->length == 0 ||
+      principal->data[0].length != (sizeof(conf_name) - 1) ||
+      memcmp(principal->data[0].data, conf_name, sizeof(conf_name) - 1) != 0)
+    return FALSE;
+
+  return TRUE;
+}
+
+}
+
+#endif
+
 Status KinitContext::DoRenewal() {
 
   krb5_cc_cursor cursor;
@@ -267,7 +295,7 @@ Status KinitContext::DoRenewal() {
                                                               nullptr /* TKT service name */,
                                                               opts_),
                                    "Reacquire error: unable to login from keytab");
-#ifdef __APPLE__
+#ifndef HAVE_KRB5_GET_INIT_CREDS_OPT_SET_OUT_CCACHE
         // Heimdal krb5 doesn't have the 'krb5_get_init_creds_opt_set_out_ccache' option,
         // so use this alternate route.
         KRB5_RETURN_NOT_OK_PREPEND(krb5_cc_initialize(g_krb5_ctx, ccache_, principal_),
@@ -320,7 +348,7 @@ Status KinitContext::Kinit(const string& keytab_path, const string& principal) {
   KRB5_RETURN_NOT_OK_PREPEND(krb5_get_init_creds_opt_alloc(g_krb5_ctx, &opts_),
                              "unable to allocate get_init_creds_opt struct");
 
-#ifndef __APPLE__
+#ifdef HAVE_KRB5_GET_INIT_CREDS_OPT_SET_OUT_CCACHE
   KRB5_RETURN_NOT_OK_PREPEND(krb5_get_init_creds_opt_set_out_ccache(g_krb5_ctx, opts_, ccache_),
                              "unable to set init_creds options");
 #endif
@@ -335,7 +363,7 @@ Status KinitContext::Kinit(const string& keytab_path, const string& principal) {
 
   ticket_end_timestamp_ = creds.times.endtime;
 
-#ifdef __APPLE__
+#ifndef HAVE_KRB5_GET_INIT_CREDS_OPT_SET_OUT_CCACHE
   // Heimdal krb5 doesn't have the 'krb5_get_init_creds_opt_set_out_ccache' option,
   // so use this alternate route.
   KRB5_RETURN_NOT_OK_PREPEND(krb5_cc_initialize(g_krb5_ctx, ccache_, principal_),

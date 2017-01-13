@@ -95,9 +95,6 @@ set_dep_root(RAPIDJSON)
 set_dep_root(SNAPPY)
 set_dep_root(THRIFT)
 set_dep_root(ZLIB)
-if (APPLE)
-  set_dep_root(OPENSSL)
-endif()
 
 # The boost-cmake project hasn't been maintained for years. Let's make sure we
 # don't accidentally use it if it can be found.
@@ -151,7 +148,23 @@ include_directories(${Boost_INCLUDE_DIRS})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost libraries: " ${Boost_LIBRARIES})
 
-find_package(OpenSSL REQUIRED)
+# If at all possible, try to link with system OpenSSL in an attempt to match what the
+# platform that this build might ultimately be deployed on. If no suitable OpenSSL is
+# found, use the toolchain version - but beware that Impala will then fail to start if
+# deployed on a system with a lower version.
+find_package(OpenSSL 1.0.0 QUIET)
+if (NOT ${OPENSSL_FOUND})
+  set_dep_root(OPENSSL)
+  set(OPENSSL_FOUND ON)
+  set(OPENSSL_INCLUDE_DIR ${OPENSSL_ROOT}/include)
+  set(OPENSSL_SSL_LIBRARY ${OPENSSL_ROOT}/lib/libssl.so)
+  set(OPENSSL_CRYPTO_LIBRARY ${OPENSSL_ROOT}/lib/libcrypto.so)
+  set(OPENSSL_VERSION $ENV{IMPALA_OPENSSL_VERSION})
+  message(STATUS "System OpenSSL not found. Defaulting to toolchain version in"
+    " ${OPENSSL_ROOT_DIR}")
+endif()
+
+# OpenSSL, being a security dependency, is always dynamically linked.
 IMPALA_ADD_THIRDPARTY_LIB(openssl_ssl ${OPENSSL_INCLUDE_DIR} "" ${OPENSSL_SSL_LIBRARY})
 IMPALA_ADD_THIRDPARTY_LIB(openssl_crypto "" "" ${OPENSSL_CRYPTO_LIBRARY})
 
@@ -280,6 +293,13 @@ IMPALA_ADD_THIRDPARTY_LIB(java_jvm "${JNI_INCLUDE_DIRS}" ${JAVA_JVM_LIBRARY} "")
 find_package(Breakpad REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(breakpad_client ${BREAKPAD_INCLUDE_DIR} ${BREAKPAD_STATIC_LIB}
   "")
+
+# Be careful with Kerberos: we do not statically link against it as it is a security
+# dependency.
+find_package(Kerberos REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(krb5 ${KERBEROS_INCLUDE_DIR} "" ${KERBEROS_LIBRARY})
+
+###################################################################
 
 # System dependencies
 if (NOT APPLE)

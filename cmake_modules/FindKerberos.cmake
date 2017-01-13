@@ -21,8 +21,13 @@
 #  KERBEROS_LIBRARY      - List of libraries when using krb5.
 #  KERBEROS_FOUND        - True if krb5 found.
 
-find_path(KERBEROS_INCLUDE_DIR krb5.h)
-find_library(KERBEROS_LIBRARY NAMES krb5)
+set(_KRB5_SEARCH_DIRS)
+if (KRB5_ROOT)
+  set(_KRB5_SEARCH_DIRS PATHS ${KRB5_ROOT} NO_DEFAULT_PATH)
+endif()
+
+find_path(KERBEROS_INCLUDE_DIR krb5.h ${_KRB5_SEARCH_DIRS} PATH_SUFFIXES include)
+find_library(KERBEROS_LIBRARY NAMES krb5 ${_KRB5_SEARCH_DIRS} PATH_SUFFIXES lib)
 
 # handle the QUIETLY and REQUIRED arguments and set KERBEROS_FOUND to TRUE if
 # all listed variables are TRUE

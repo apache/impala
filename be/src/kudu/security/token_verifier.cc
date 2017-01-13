@@ -157,8 +157,9 @@ const char* VerificationResultToString(VerificationResult r) {
     case security::VerificationResult::INCOMPATIBLE_FEATURE:
       return "authentication token uses incompatible feature";
   }
+  DCHECK(false);
+  return nullptr;
 }
 
 } // namespace security
 } // namespace kudu
-

@@ -309,6 +309,12 @@ CHECK_FUNCTION_EXISTS(preadv HAVE_PREADV)
 INCLUDE(CheckIncludeFiles)
 CHECK_INCLUDE_FILES(linux/magic.h HAVE_MAGIC_H)
 
+include(CheckLibraryExists)
+CHECK_LIBRARY_EXISTS("krb5" krb5_is_config_principal
+  ${KERBEROS_LIBRARY} HAVE_KRB5_IS_CONFIG_PRINCIPAL)
+CHECK_LIBRARY_EXISTS("krb5" krb5_get_init_creds_opt_set_out_ccache
+  ${KERBEROS_LIBRARY} HAVE_KRB5_GET_INIT_CREDS_OPT_SET_OUT_CCACHE)
+
 # This is a list of impala library dependencies. Individual libraries
 # must not specify library dependencies in their own CMakeLists.txt file.
 # Enclose the impala libraries in -Wl,--start-group and -Wl,--end-group
@@ -337,10 +343,12 @@ set (IMPALA_LINK_LIBS
   Rpc
   Runtime
   Scheduling
+  security
   Service
   Statestore
   TestUtil
   ThriftSaslTransport
+  token_proto
   Udf
   Util
   ${WL_END_GROUP}
@@ -358,6 +366,7 @@ if (BUILD_SHARED_LIBS)
     Exprs
     Rpc
     Service
+    security
     Statestore
     Scheduling
     Catalog
@@ -384,6 +393,7 @@ set (IMPALA_DEPENDENCIES
   gutil
   glog
   gflags
+  krb5
   pprof
   breakpad_client
   hdfs
@@ -490,6 +500,7 @@ add_subdirectory(src/codegen)
 add_subdirectory(src/common)
 add_subdirectory(src/exec)
 add_subdirectory(src/exprs)
+add_subdirectory(src/kudu/security)
 add_subdirectory(src/kudu/util)
 add_subdirectory(src/runtime)
 add_subdirectory(src/scheduling)
