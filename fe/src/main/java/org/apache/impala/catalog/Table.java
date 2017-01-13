@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -67,6 +68,8 @@ public abstract class Table implements CatalogObject {
   protected final String owner_;
   protected TTableDescriptor tableDesc_;
   protected TAccessLevel accessLevel_ = TAccessLevel.READ_WRITE;
+  // Lock protecting this table
+  private final ReentrantLock tableLock_ = new ReentrantLock(true);
 
   // Number of clustering columns.
   protected int numClusteringCols_;
@@ -101,6 +104,7 @@ public abstract class Table implements CatalogObject {
         CatalogServiceCatalog.getLastDdlTime(msTable_) : -1;
   }
 
+  public ReentrantLock getLock() { return tableLock_; }
   public abstract TTableDescriptor toThriftDescriptor(
       int tableId, Set<Long> referencedPartitions);
   public abstract TCatalogObjectType getCatalogObjectType();

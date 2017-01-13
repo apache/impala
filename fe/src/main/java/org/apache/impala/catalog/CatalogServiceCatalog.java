@@ -180,6 +180,42 @@ public class CatalogServiceCatalog extends Catalog {
     localLibraryPath_ = new String("file://" + localLibraryPath);
   }
 
+  // Timeout for acquiring a table lock
+  // TODO: Make this configurable
+  private static final long TBL_LOCK_TIMEOUT_MS = 7200000;
+  // Time to sleep before retrying to acquire a table lock
+  private static final int TBL_LOCK_RETRY_MS = 10;
+
+  /**
+   * Tries to acquire catalogLock_ and the lock of 'tbl' in that order. Returns true if it
+   * successfully acquires both within TBL_LOCK_TIMEOUT_MS millisecs; both locks are held
+   * when the function returns. Returns false otherwise and no lock is held in this case.
+   */
+  public boolean tryLockTable(Table tbl) {
+    long begin = System.currentTimeMillis();
+    long end;
+    do {
+      catalogLock_.writeLock().lock();
+      if (tbl.getLock().tryLock()) {
+        if (LOG.isTraceEnabled()) {
+          end = System.currentTimeMillis();
+          LOG.trace(String.format("Lock for table %s was acquired in %d msec",
+              tbl.getFullName(), end - begin));
+        }
+        return true;
+      }
+      catalogLock_.writeLock().unlock();
+      try {
+        // Sleep to avoid spinning and allow other operations to make progress.
+        Thread.sleep(TBL_LOCK_RETRY_MS);
+      } catch (InterruptedException e) {
+        // ignore
+      }
+      end = System.currentTimeMillis();
+    } while (end - begin < TBL_LOCK_TIMEOUT_MS);
+    return false;
+  }
+
   /**
    * Reads the current set of cache pools from HDFS and updates the catalog.
    * Called periodically by the cachePoolReader_.
@@ -290,7 +326,8 @@ public class CatalogServiceCatalog extends Catalog {
           }
 
           // Protect the table from concurrent modifications.
-          synchronized(tbl) {
+          tbl.getLock().lock();
+          try {
             // Only add the extended metadata if this table's version is >=
             // the fromVersion.
             if (tbl.getCatalogVersion() >= fromVersion) {
@@ -307,6 +344,8 @@ public class CatalogServiceCatalog extends Catalog {
             } else {
               catalogTbl.setTable(new TTable(db.getName(), tblName));
             }
+          } finally {
+            tbl.getLock().unlock();
           }
           resp.addToObjects(catalogTbl);
         }
@@ -919,8 +958,11 @@ public class CatalogServiceCatalog extends Catalog {
       }
     }
 
-    catalogLock_.writeLock().lock();
-    synchronized(tbl) {
+    if (!tryLockTable(tbl)) {
+      throw new CatalogException(String.format("Error refreshing metadata for table " +
+          "%s due to lock contention", tbl.getFullName()));
+    }
+    try {
       long newCatalogVersion = incrementAndGetCatalogVersion();
       catalogLock_.writeLock().unlock();
       try (MetaStoreClient msClient = getMetaStoreClient()) {
@@ -937,6 +979,9 @@ public class CatalogServiceCatalog extends Catalog {
       tbl.setCatalogVersion(newCatalogVersion);
       LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));
       return tbl;
+    } finally {
+      Preconditions.checkState(!catalogLock_.isWriteLockedByCurrentThread());
+      tbl.getLock().unlock();
     }
   }
 
@@ -958,7 +1003,7 @@ public class CatalogServiceCatalog extends Catalog {
       throws CatalogException {
     Preconditions.checkNotNull(tbl);
     Preconditions.checkNotNull(partitionSet);
-    Preconditions.checkState(Thread.holdsLock(tbl));
+    Preconditions.checkArgument(tbl.getLock().isHeldByCurrentThread());
     if (!(tbl instanceof HdfsTable)) {
       throw new CatalogException("Table " + tbl.getFullName() + " is not an Hdfs table");
     }
@@ -979,7 +1024,7 @@ public class CatalogServiceCatalog extends Catalog {
       throws CatalogException {
     Preconditions.checkNotNull(tbl);
     Preconditions.checkNotNull(partitionSpec);
-    Preconditions.checkState(Thread.holdsLock(tbl));
+    Preconditions.checkArgument(tbl.getLock().isHeldByCurrentThread());
     if (!(tbl instanceof HdfsTable)) {
       throw new CatalogException("Table " + tbl.getFullName() + " is not an Hdfs table");
     }
@@ -994,7 +1039,6 @@ public class CatalogServiceCatalog extends Catalog {
   public Table addPartition(HdfsPartition partition) throws CatalogException {
     Preconditions.checkNotNull(partition);
     HdfsTable hdfsTable = partition.getTable();
-    Db db = getDb(hdfsTable.getDb().getName());
     hdfsTable.addPartition(partition);
     return hdfsTable;
   }
@@ -1251,8 +1295,11 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public Table reloadPartition(Table tbl, List<TPartitionKeyValue> partitionSpec)
       throws CatalogException {
-    catalogLock_.writeLock().lock();
-    synchronized (tbl) {
+    if (!tryLockTable(tbl)) {
+      throw new CatalogException(String.format("Error reloading partition of table %s " +
+          "due to lock contention", tbl.getFullName()));
+    }
+    try {
       long newCatalogVersion = incrementAndGetCatalogVersion();
       catalogLock_.writeLock().unlock();
       HdfsTable hdfsTable = (HdfsTable) tbl;
@@ -1288,6 +1335,9 @@ public class CatalogServiceCatalog extends Catalog {
       LOG.info(String.format("Refreshed partition metadata: %s %s",
           hdfsTable.getFullName(), partitionName));
       return hdfsTable;
+    } finally {
+      Preconditions.checkState(!catalogLock_.isWriteLockedByCurrentThread());
+      tbl.getLock().unlock();
     }
   }
 }
