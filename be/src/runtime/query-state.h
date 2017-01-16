@@ -21,12 +21,12 @@
 #include <memory>
 #include <unordered_map>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
 
 #include "common/atomic.h"
 #include "common/object-pool.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
+#include "util/spinlock.h"
 #include "util/uid-util.h"
 
 namespace impala {
@@ -95,6 +95,11 @@ class QueryState {
 
   MemTracker* query_mem_tracker() const { return query_mem_tracker_; }
 
+  /// Sets up state required for fragment execution: memory reservations, etc. Fails
+  /// if resources could not be acquired. Safe to call concurrently and idempotent:
+  /// the first thread to call this does the setup work.
+  Status Prepare();
+
   /// Registers a new FInstanceState.
   void RegisterFInstance(FragmentInstanceState* fis);
 
@@ -118,10 +123,21 @@ class QueryState {
   ObjectPool obj_pool_;
   AtomicInt32 refcnt_;
 
+  /// Held for duration of Prepare(). Protects 'prepared_',
+  /// 'prepare_status_' and the members initialized in Prepare().
+  SpinLock prepare_lock_;
+
+  /// Non-OK if Prepare() failed the first time it was called.
+  /// All subsequent calls to Prepare() return this status.
+  Status prepare_status_;
+
+  /// True if Prepare() executed and finished successfully.
+  bool prepared_;
+
   /// True if and only if ReleaseResources() has been called.
   bool released_resources_;
 
-  boost::mutex fis_map_lock_; // protects fis_map_
+  SpinLock fis_map_lock_; // protects fis_map_
 
   /// map from instance id to its state (owned by obj_pool_)
   std::unordered_map<TUniqueId, FragmentInstanceState*> fis_map_;
@@ -133,7 +149,7 @@ class QueryState {
   /// The query is associated with the resource pool named 'pool'
   QueryState(const TQueryCtx& query_ctx, const std::string& pool);
 
-  /// Called from constructor to initialize MemTrackers.
+  /// Called from Prepare() to initialize MemTrackers.
   void InitMemTrackers(const std::string& pool);
 };
 }

@@ -56,8 +56,8 @@ class QueryExecMgr {
   /// return value of this function.
   Status StartFInstance(const TExecPlanFragmentParams& params);
 
-  /// Creates and the QueryState for the given query with the provided parameters. Only
-  /// valid to call if the QueryState does not already exist. The caller must call
+  /// Creates a QueryState for the given query with the provided parameters. Only valid
+  /// to call if the QueryState does not already exist. The caller must call
   /// ReleaseQueryState() with the returned QueryState to decrement the refcount.
   QueryState* CreateQueryState(
       const TQueryCtx& query_ctx, const std::string& request_pool);

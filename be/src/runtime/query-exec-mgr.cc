@@ -45,22 +45,17 @@ Status QueryExecMgr::StartFInstance(const TExecPlanFragmentParams& params) {
   VLOG_QUERY << "StartFInstance() instance_id=" << PrintId(instance_id)
              << " coord=" << params.query_ctx.coord_address;
 
-  // Starting a new fragment instance creates a thread and consumes a non-trivial
-  // amount of memory. If we are already starved for memory, cancel the instance as
-  // early as possible to avoid digging the hole deeper.
-  MemTracker* process_mem_tracker = ExecEnv::GetInstance()->process_mem_tracker();
-  if (process_mem_tracker->LimitExceeded()) {
-    string msg = Substitute("Instance $0 of plan fragment $1 could not "
-        "start because the backend Impala daemon is over its memory limit",
-        PrintId(instance_id), params.fragment_ctx.fragment.display_name);
-    return process_mem_tracker->MemLimitExceeded(NULL, msg, 0);
-  }
-
   bool dummy;
   QueryState* qs = GetOrCreateQueryState(
       params.query_ctx, params.fragment_instance_ctx.request_pool, &dummy);
   DCHECK(params.__isset.fragment_ctx);
   DCHECK(params.__isset.fragment_instance_ctx);
+  Status status = qs->Prepare();
+  if (!status.ok()) {
+    ReleaseQueryState(qs);
+    return status;
+  }
+
   FragmentInstanceState* fis = qs->obj_pool()->Add(new FragmentInstanceState(
       qs, params.fragment_ctx, params.fragment_instance_ctx, params.query_ctx.desc_tbl));
   // register instance before returning so that async Cancel() calls can

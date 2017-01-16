@@ -103,6 +103,7 @@ Status TestEnv::CreateQueryState(int64_t query_id, int max_buffers, int block_si
   // CreateQueryState() enforces the invariant that 'query_id' must be unique.
   QueryState* qs = exec_env_->query_exec_mgr()->CreateQueryState(query_ctx, "test-pool");
   query_states_.push_back(qs);
+  RETURN_IF_ERROR(qs->Prepare());
   FragmentInstanceState* fis = qs->obj_pool()->Add(new FragmentInstanceState(
       qs, TPlanFragmentCtx(), TPlanFragmentInstanceCtx(), TDescriptorTable()));
   RuntimeState* rs = qs->obj_pool()->Add(
