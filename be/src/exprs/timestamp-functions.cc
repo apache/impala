@@ -38,7 +38,23 @@ using boost::local_time::time_zone_ptr;
 using boost::posix_time::ptime;
 using boost::posix_time::to_iso_extended_string;
 
+typedef boost::gregorian::date Date;
+
 namespace impala {
+
+// Constant strings used for DayName function.
+const char* TimestampFunctions::SUNDAY = "Sunday";
+const char* TimestampFunctions::MONDAY = "Monday";
+const char* TimestampFunctions::TUESDAY = "Tuesday";
+const char* TimestampFunctions::WEDNESDAY = "Wednesday";
+const char* TimestampFunctions::THURSDAY = "Thursday";
+const char* TimestampFunctions::FRIDAY = "Friday";
+const char* TimestampFunctions::SATURDAY = "Saturday";
+
+const string TimestampFunctions::DAY_ARRAY[7] = {"Sun", "Mon", "Tue", "Wed", "Thu",
+    "Fri", "Sat"};
+const string TimestampFunctions::MONTH_ARRAY[12] = {"Jan", "Feb", "Mar", "Apr", "May",
+    "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 namespace {
 /// Uses Boost's internal checking to throw an exception if 'date' is out of the

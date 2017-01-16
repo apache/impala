@@ -33,6 +33,7 @@
 #include "common/names.h"
 
 using boost::gregorian::greg_month;
+using boost::gregorian::max_date_time;
 using boost::gregorian::min_date_time;
 using boost::posix_time::not_a_date_time;
 using boost::posix_time::ptime;
@@ -52,44 +53,6 @@ typedef boost::posix_time::nanoseconds Nanoseconds;
 typedef boost::posix_time::seconds Seconds;
 
 namespace impala {
-
-// Constant strings used for DayName function.
-const char* TimestampFunctions::SUNDAY = "Sunday";
-const char* TimestampFunctions::MONDAY = "Monday";
-const char* TimestampFunctions::TUESDAY = "Tuesday";
-const char* TimestampFunctions::WEDNESDAY = "Wednesday";
-const char* TimestampFunctions::THURSDAY = "Thursday";
-const char* TimestampFunctions::FRIDAY = "Friday";
-const char* TimestampFunctions::SATURDAY = "Saturday";
-
-// To workaround a boost bug (where adding very large intervals to ptimes causes the
-// value to wrap around instead or throwing an exception -- the root cause of
-// IMPALA-1675), max interval value are defined below. Some values below are less than
-// the minimum interval needed to trigger IMPALA-1675 but the values are greater or
-// equal to the interval that would definitely result in an out of bounds value. The
-// min and max year are also defined for manual error checking. Boost is inconsistent
-// with its defined max year. date(max_date_time).year() will give 9999 but testing shows
-// the actual max date is 1 year later.
-const int64_t TimestampFunctions::MAX_YEAR = 10000;
-const int64_t TimestampFunctions::MIN_YEAR = Date(min_date_time).year();
-const int64_t TimestampFunctions::MAX_YEAR_INTERVAL =
-    TimestampFunctions::MAX_YEAR - TimestampFunctions::MIN_YEAR;
-const int64_t TimestampFunctions::MAX_MONTH_INTERVAL =
-    TimestampFunctions::MAX_YEAR_INTERVAL * 12;
-const int64_t TimestampFunctions::MAX_WEEK_INTERVAL =
-    TimestampFunctions::MAX_YEAR_INTERVAL * 53;
-const int64_t TimestampFunctions::MAX_DAY_INTERVAL =
-    TimestampFunctions::MAX_YEAR_INTERVAL * 366;
-const int64_t TimestampFunctions::MAX_HOUR_INTERVAL =
-    TimestampFunctions::MAX_DAY_INTERVAL * 24;
-const int64_t TimestampFunctions::MAX_MINUTE_INTERVAL =
-    TimestampFunctions::MAX_DAY_INTERVAL * 60;
-const int64_t TimestampFunctions::MAX_SEC_INTERVAL =
-    TimestampFunctions::MAX_MINUTE_INTERVAL * 60;
-const int64_t TimestampFunctions::MAX_MILLI_INTERVAL =
-    TimestampFunctions::MAX_SEC_INTERVAL * 1000;
-const int64_t TimestampFunctions::MAX_MICRO_INTERVAL =
-    TimestampFunctions::MAX_MILLI_INTERVAL * 1000;
 
 StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
     const TimestampValue& tv, const StringVal& fmt) {
@@ -477,8 +440,6 @@ inline void AddInterval<Years>(FunctionContext* context, int64_t interval,
 string TimestampFunctions::ShortDayName(FunctionContext* context,
     const TimestampVal& ts) {
   if (ts.is_null) return NULL;
-  static const string DAY_ARRAY[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri",
-      "Sat"};
   IntVal dow = DayOfWeek(context, ts);
   DCHECK_GT(dow.val, 0);
   DCHECK_LT(dow.val, 8);
@@ -488,8 +449,6 @@ string TimestampFunctions::ShortDayName(FunctionContext* context,
 string TimestampFunctions::ShortMonthName(FunctionContext* context,
     const TimestampVal& ts) {
   if (ts.is_null) return NULL;
-  static const string MONTH_ARRAY[12] = {"Jan", "Feb", "Mar", "Apr", "May",
-      "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
   IntVal mth = Month(context, ts);
   DCHECK_GT(mth.val, 0);
   DCHECK_LT(mth.val, 13);
@@ -723,6 +682,8 @@ template <bool is_add, typename AnyIntVal, typename Interval,
     bool is_add_months_keep_last_day>
 TimestampVal TimestampFunctions::AddSub(FunctionContext* context,
     const TimestampVal& timestamp, const AnyIntVal& num_interval_units) {
+  DCHECK_EQ(Date(max_date_time).year(), MAX_YEAR);
+  DCHECK_EQ(Date(min_date_time).year(), MIN_YEAR);
   if (timestamp.is_null || num_interval_units.is_null) return TimestampVal::null();
   const TimestampValue& value = TimestampValue::FromTimestampVal(timestamp);
   if (!value.HasDate()) return TimestampVal::null();

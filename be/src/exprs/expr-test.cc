@@ -3966,7 +3966,7 @@ TEST_F(ExprTest, TimestampFunctions) {
       "to_date(cast('2011-12-22 09:10:11.12345678' as timestamp))", "2011-12-22");
 
   // Check that timeofday() does not crash or return incorrect results
-  GetValue("timeofday()", TYPE_STRING);
+  TestIsNotNull("timeofday()", TYPE_STRING);
 
   TestValue("timestamp_cmp('1964-05-04 15:33:45','1966-05-04 15:33:45')", TYPE_INT, -1);
   TestValue("timestamp_cmp('1966-09-04 15:33:45','1966-05-04 15:33:45')", TYPE_INT, 1);
@@ -4105,6 +4105,7 @@ TEST_F(ExprTest, TimestampFunctions) {
         TYPE_DOUBLE, 1.2938724610001E9);
     TestStringValue("cast(cast(1.3041352164485E9 as timestamp) as string)",
         "2011-04-29 20:46:56.448500000");
+
     // NULL arguments.
     TestIsNull("from_utc_timestamp(NULL, 'PST')", TYPE_TIMESTAMP);
     TestIsNull("from_utc_timestamp(cast('2011-01-01 01:01:01.1' as timestamp), NULL)",
@@ -4254,7 +4255,6 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   TestIsNull("unix_timestamp('1970-01', 'yyyy-MM-dd')", TYPE_BIGINT);
   TestIsNull("unix_timestamp('1970-20-01', 'yyyy-MM-dd')", TYPE_BIGINT);
-
 
   // regression test for IMPALA-1105
   TestIsNull("cast(trunc('2014-07-22 01:34:55 +0100', 'year') as STRING)", TYPE_STRING);
@@ -4665,8 +4665,6 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestNextDayFunction();
 }
 
-
-
 TEST_F(ExprTest, ConditionalFunctions) {
   // If first param evaluates to true, should return second parameter,
   // false or NULL should return the third.
@@ -5036,7 +5034,6 @@ TEST_F(ExprTest, ConditionalFunctionIsNotFalse) {
 //     exprs that have the same byte size can end up in a number of locations
 void ValidateLayout(const vector<Expr*>& exprs, int expected_byte_size,
     int expected_var_begin, const map<int, set<int>>& expected_offsets) {
-
   vector<int> offsets;
   set<int> offsets_found;
 
@@ -6160,7 +6157,7 @@ TEST_F(ExprTest, UuidTest) {
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
-  InitFeSupport();
+  InitFeSupport(false);
   impala::LlvmCodeGen::InitializeLlvm();
 
   // Disable llvm optimization passes if the env var is no set to true. Running without
@@ -6186,6 +6183,7 @@ int main(int argc, char **argv) {
 
   // Disable FE expr rewrites to make sure the Exprs get executed exactly as specified
   // in the tests here.
+  int ret;
   vector<string> options;
   options.push_back("ENABLE_EXPR_REWRITES=0");
   options.push_back("DISABLE_CODEGEN=1");
@@ -6193,12 +6191,13 @@ int main(int argc, char **argv) {
   enable_expr_rewrites_ = false;
   executor_->setExecOptions(options);
   cout << "Running without codegen" << endl;
-  int ret = RUN_ALL_TESTS();
+  ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;
 
   options.clear();
   options.push_back("ENABLE_EXPR_REWRITES=0");
   options.push_back("DISABLE_CODEGEN=0");
+  options.push_back("EXEC_SINGLE_NODE_ROWS_THRESHOLD=0");
   disable_codegen_ = false;
   enable_expr_rewrites_ = false;
   executor_->setExecOptions(options);

@@ -402,6 +402,13 @@ string
 'hello'
 ====
 ---- QUERY
+select to_upper("foobar")
+---- TYPES
+string
+---- RESULTS
+'FOOBAR'
+====
+---- QUERY
 select tinyint_col, int_col, var_sum_multiply(2, tinyint_col, int_col)
 from functional.alltypestiny
 ---- TYPES

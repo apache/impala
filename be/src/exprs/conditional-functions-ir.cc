@@ -155,3 +155,23 @@ COALESCE_COMPUTE_FUNCTION(DoubleVal);
 COALESCE_COMPUTE_FUNCTION(StringVal);
 COALESCE_COMPUTE_FUNCTION(TimestampVal);
 COALESCE_COMPUTE_FUNCTION(DecimalVal);
+
+BooleanVal ConditionalFunctions::IsFalse(FunctionContext* ctx, const BooleanVal& val) {
+  if (val.is_null) return BooleanVal(false);
+  return BooleanVal(!val.val);
+}
+
+BooleanVal ConditionalFunctions::IsNotFalse(FunctionContext* ctx, const BooleanVal& val) {
+  if (val.is_null) return BooleanVal(true);
+  return BooleanVal(val.val);
+}
+
+BooleanVal ConditionalFunctions::IsTrue(FunctionContext* ctx, const BooleanVal& val) {
+  if (val.is_null) return BooleanVal(false);
+  return BooleanVal(val.val);
+}
+
+BooleanVal ConditionalFunctions::IsNotTrue(FunctionContext* ctx, const BooleanVal& val) {
+  if (val.is_null) return BooleanVal(true);
+  return BooleanVal(!val.val);
+}

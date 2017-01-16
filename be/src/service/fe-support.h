@@ -29,7 +29,7 @@ namespace impala {
 /// native functions". See this link:
 ///     http://java.sun.com/docs/books/jni/html/other.html#29535
 /// for details.
-void InitFeSupport();
+void InitFeSupport(bool disable_codegen = true);
 
 }
 #endif

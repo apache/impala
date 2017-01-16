@@ -52,6 +52,8 @@
 using namespace impala;
 using namespace apache::thrift::server;
 
+static bool fe_support_disable_codegen = true;
+
 // Called from the FE when it explicitly loads libfesupport.so for tests.
 // This creates the minimal state necessary to service the other JNI calls.
 // This is not called when we first start up the BE.
@@ -91,8 +93,9 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch);
   DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx);
   vector<TExpr>& texprs = expr_batch.exprs;
-  // Disable codegen advisory to avoid unnecessary latency.
-  query_ctx.disable_codegen_hint = true;
+  // Disable codegen advisorily to avoid unnecessary latency. For testing purposes
+  // (expr-test.cc), fe_support_disable_codegen may be set to false.
+  query_ctx.disable_codegen_hint = fe_support_disable_codegen;
   // Allow logging of at least one error, so we can detect and convert it into a
   // Java exception.
   query_ctx.client_request.query_options.max_errors = 1;
@@ -368,7 +371,8 @@ static JNINativeMethod native_methods[] = {
   },
 };
 
-void InitFeSupport() {
+void InitFeSupport(bool disable_codegen) {
+  fe_support_disable_codegen = disable_codegen;
   JNIEnv* env = getJNIEnv();
   jclass native_backend_cl = env->FindClass("org/apache/impala/service/FeSupport");
   env->RegisterNatives(native_backend_cl, native_methods,

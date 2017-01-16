@@ -77,6 +77,12 @@ class ExprCodegenTest : public ::testing::Test {
     return expr->InlineConstants(codegen, fn);
   }
 
+  static Status CreateFromFile(
+      ObjectPool* pool, const string& filename, scoped_ptr<LlvmCodeGen>* codegen) {
+    RETURN_IF_ERROR(LlvmCodeGen::CreateFromFile(pool, NULL, filename, "test", codegen));
+    return (*codegen)->MaterializeModule();
+  }
+
   virtual void SetUp() {
     FunctionContext::TypeDesc return_type;
     return_type.type = FunctionContext::TYPE_INT;
@@ -251,8 +257,7 @@ TEST_F(ExprCodegenTest, TestInlineConstants) {
   stringstream test_udf_file;
   test_udf_file << getenv("IMPALA_HOME") << "/be/build/latest/exprs/expr-codegen-test.ll";
   scoped_ptr<LlvmCodeGen> codegen;
-  ASSERT_OK(
-      LlvmCodeGen::CreateFromFile(&pool, NULL, test_udf_file.str(), "test", &codegen));
+  ASSERT_OK(ExprCodegenTest::CreateFromFile(&pool, test_udf_file.str(), &codegen));
   Function* fn = codegen->GetFunction(TEST_GET_CONSTANT_SYMBOL, false);
   ASSERT_TRUE(fn != NULL);
 

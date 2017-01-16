@@ -35,19 +35,24 @@ class TupleRow;
 /// TODO: Reconsider whether this class needs to exist.
 class TimestampFunctions {
  public:
-  // To workaround IMPALA-1675 (boost doesn't throw an error for very large intervals),
-  // define the max intervals.
-  static const int64_t MAX_YEAR;
-  static const int64_t MIN_YEAR;
-  static const int64_t MAX_YEAR_INTERVAL;
-  static const int64_t MAX_MONTH_INTERVAL;
-  static const int64_t MAX_WEEK_INTERVAL;
-  static const int64_t MAX_DAY_INTERVAL;
-  static const int64_t MAX_HOUR_INTERVAL;
-  static const int64_t MAX_MINUTE_INTERVAL;
-  static const int64_t MAX_SEC_INTERVAL;
-  static const int64_t MAX_MILLI_INTERVAL;
-  static const int64_t MAX_MICRO_INTERVAL;
+  /// To workaround a boost bug (where adding very large intervals to ptimes causes the
+  /// value to wrap around instead or throwing an exception -- the root cause of
+  /// IMPALA-1675), max interval value are defined below. Some values below are less than
+  /// the minimum interval needed to trigger IMPALA-1675 but the values are greater or
+  /// equal to the interval that would definitely result in an out of bounds value. The
+  /// min and max year are also defined for manual error checking. The min / max years
+  /// are derived from date(min_date_time).year() / date(max_date_time).year().
+  static const int64_t MAX_YEAR = 9999;
+  static const int64_t MIN_YEAR = 1400;
+  static const int64_t MAX_YEAR_INTERVAL = MAX_YEAR - MIN_YEAR;
+  static const int64_t MAX_MONTH_INTERVAL = MAX_YEAR_INTERVAL * 12;
+  static const int64_t MAX_WEEK_INTERVAL = MAX_YEAR_INTERVAL * 53;
+  static const int64_t MAX_DAY_INTERVAL = MAX_YEAR_INTERVAL * 366;
+  static const int64_t MAX_HOUR_INTERVAL = MAX_DAY_INTERVAL * 24;
+  static const int64_t MAX_MINUTE_INTERVAL = MAX_HOUR_INTERVAL * 60;
+  static const int64_t MAX_SEC_INTERVAL = MAX_MINUTE_INTERVAL * 60;
+  static const int64_t MAX_MILLI_INTERVAL = MAX_SEC_INTERVAL * 1000;
+  static const int64_t MAX_MICRO_INTERVAL = MAX_MILLI_INTERVAL * 1000;
 
   /// Parse and initialize format string if it is a constant. Raise error if invalid.
   static void UnixAndFromUnixPrepare(FunctionContext* context,
@@ -193,6 +198,10 @@ class TimestampFunctions {
   static const char* FRIDAY;
   static const char* SATURDAY;
   static const char* SUNDAY;
+
+  /// Static result values for ShortDayName() and ShortMonthName() functions.
+  static const std::string DAY_ARRAY[7];
+  static const std::string MONTH_ARRAY[12];
 };
 
 } // namespace impala

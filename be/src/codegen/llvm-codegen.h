@@ -27,6 +27,7 @@
 #include <vector>
 #include <boost/scoped_ptr.hpp>
 
+#include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 
 #include <llvm/IR/DerivedTypes.h>
@@ -80,6 +81,9 @@ class TupleDescriptor;
 class LlvmBuilder : public llvm::IRBuilder<> {
   using llvm::IRBuilder<>::IRBuilder;
 };
+
+/// Map of functions' names to their callee functions' names.
+typedef boost::unordered_map<std::string, boost::unordered_set<std::string>> FnRefsMap;
 
 /// LLVM code generator.  This is the top level object to generate jitted code.
 //
@@ -138,12 +142,12 @@ class LlvmCodeGen {
   /// This function must be called once per process before any llvm API calls are
   /// made.  It is not valid to call it multiple times. LLVM needs to allocate data
   /// structures for multi-threading support and to enable dynamic linking of jitted code.
-  /// if 'load_backend', load the backend static object for llvm.  This is needed
-  /// when libbackend.so is loaded from java.  llvm will be default only look in
+  /// if 'load_backend', load the backend static object for llvm. This is needed
+  /// when libfesupport.so is loaded from java. llvm will by default only look in
   /// the current object and not be able to find the backend symbols
   /// TODO: this can probably be removed after impalad refactor where the java
   /// side is not loading the be explicitly anymore.
-  static void InitializeLlvm(bool load_backend = false);
+  static Status InitializeLlvm(bool load_backend = false);
 
   /// Creates a codegen instance for Impala initialized with the cross-compiled Impala IR.
   /// 'codegen' will contain the created object on success.
@@ -153,7 +157,9 @@ class LlvmCodeGen {
       const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   /// Creates a LlvmCodeGen instance initialized with the module bitcode from 'file'.
-  /// 'codegen' will contain the created object on success.
+  /// 'codegen' will contain the created object on success. The functions in the module
+  /// are materialized lazily. Getting a reference to a function via GetFunction() will
+  /// materialize the function and its callees recursively.
   static Status CreateFromFile(ObjectPool*, MemTracker* parent_mem_tracker,
       const std::string& file, const std::string& id,
       boost::scoped_ptr<LlvmCodeGen>* codegen);
@@ -500,19 +506,11 @@ class LlvmCodeGen {
   /// Returns true if the function 'fn' is defined in the Impalad native code.
   static bool IsDefinedInImpalad(const std::string& fn);
 
-  /// Parses the given global constant recursively and adds functions referenced in it
-  /// to the set 'ref_fns' if they are not defined in the Impalad native code. These
-  /// functions need to be materialized to avoid linking error.
-  static void ParseGlobalConstant(llvm::Value* global_const,
-      boost::unordered_set<string>* ref_fns);
+  /// Find all global variables and functions which reference the llvm::Value 'val'
+  /// and return them in 'users'.
+  static void FindGlobalUsers(llvm::User* val, std::vector<llvm::GlobalObject*>* users);
 
-  /// Parses all the global variables in 'module' and adds any functions referenced by
-  /// them to the set 'ref_fns' if they are not defined in the Impalad native code.
-  /// These functions need to be materialized to avoid linking error.
-  static void ParseGVForFunctions(
-      llvm::Module* module, boost::unordered_set<string>* ref_fns);
-
-  /// Top level codegen object.  'module_id' is used for debugging when outputting the IR.
+  /// Top level codegen object. 'module_id' is used for debugging when outputting the IR.
   LlvmCodeGen(
       ObjectPool* pool, MemTracker* parent_mem_tracker, const std::string& module_id);
 
@@ -520,23 +518,23 @@ class LlvmCodeGen {
   Status Init(std::unique_ptr<llvm::Module> module);
 
   /// Creates a LlvmCodeGen instance initialized with the module bitcode in memory.
-  /// 'codegen' will contain the created object on success. Note that the functions
-  /// are not materialized. Getting a reference to the function via GetFunction()
-  /// will materialize the function and its callees recursively.
+  /// 'codegen' will contain the created object on success. The functions in the module
+  /// are materialized lazily. Getting a reference to a function via GetFunction() will
+  /// materialize the function and its callees recursively.
   static Status CreateFromMemory(ObjectPool* pool, MemTracker* parent_mem_tracker,
       const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   /// Loads an LLVM module from 'file' which is the local path to the LLVM bitcode file.
-  /// The functions in the module are not materialized. Getting a reference to the
+  /// The functions in the module are materialized lazily. Getting a reference to the
   /// function via GetFunction() will materialize the function and its callees
   /// recursively. The caller is responsible for cleaning up the module.
   Status LoadModuleFromFile(const string& file, std::unique_ptr<llvm::Module>* module);
 
   /// Loads an LLVM module. 'module_ir_buf' is the memory buffer containing LLVM bitcode.
-  /// 'module_name' is the name of the module to use when reporting errors.
-  /// The caller is responsible for cleaning up 'module'. The functions in the module
-  /// aren't materialized. Getting a reference to the function via GetFunction() will
-  /// materialize the function and its callees recursively.
+  /// 'module_name' is the name of the module to use when reporting errors. The caller is
+  /// responsible for cleaning up 'module'. The functions in the module aren't
+  /// materialized. Getting a reference to the functiom via GetFunction() will materialize
+  /// the function and its callees recursively.
   Status LoadModuleFromMemory(std::unique_ptr<llvm::MemoryBuffer> module_ir_buf,
       std::string module_name, std::unique_ptr<llvm::Module>* module);
 
@@ -589,9 +587,9 @@ class LlvmCodeGen {
   /// to do the actual work. Return error status for any error.
   Status MaterializeFunction(llvm::Function* fn);
 
-  /// Materialize the given module by materializing all its unmaterialized functions
-  /// and deleting the module's materializer. Returns error status for any error.
-  Status MaterializeModule(llvm::Module* module);
+  /// Materialize the module owned by this codegen object. This will materialize all
+  /// functions and delete the module's materializer. Returns error status for any error.
+  Status MaterializeModule();
 
   /// With lazy materialization, functions which haven't been materialized when the module
   /// is finalized must be dead code or referenced only by global variables (e.g. boost
@@ -614,11 +612,15 @@ class LlvmCodeGen {
   static std::string cpu_name_;
   static std::vector<std::string> cpu_attrs_;
 
-  /// This set contains names of functions referenced by global variables which aren't
-  /// defined in the Impalad native code (they may have been inlined by gcc). These
-  /// functions are always materialized each time the module is loaded to ensure that
-  /// LLVM can resolve references to them.
-  static boost::unordered_set<std::string> gv_ref_ir_fns_;
+  /// A call graph for all IR functions in the main module. Used for determining
+  /// dependencies when materializing IR functions.
+  static FnRefsMap fn_refs_map_;
+
+  /// This set contains names of all functions which always need to be materialized.
+  /// They are referenced by global variables but NOT defined in the Impalad native
+  /// code (they may have been inlined by gcc). These functions are always materialized
+  /// when a module is loaded to ensure that LLVM can resolve references to them.
+  static boost::unordered_set<std::string> fns_to_always_materialize_;
 
   /// ID used for debugging (can be e.g. the fragment instance ID)
   std::string id_;

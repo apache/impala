@@ -161,6 +161,26 @@ StringVal ToLower(FunctionContext* context, const StringVal& str) {
           context, str);
 }
 
+// Call a function defined in Impalad proper to make sure linking works correctly.
+extern "C" StringVal
+    _ZN6impala15StringFunctions5UpperEPN10impala_udf15FunctionContextERKNS1_9StringValE(
+        FunctionContext* context, const StringVal& str);
+
+typedef StringVal (*ToUpperFn)(FunctionContext* context, const StringVal& str);
+
+StringVal ToUpperWork(FunctionContext* context, const StringVal& str, ToUpperFn fn) {
+  return fn(context, str);
+}
+
+StringVal ToUpper(FunctionContext* context, const StringVal& str) {
+  // StringVal::null() doesn't inline its callee when compiled without optimization.
+  // Useful for testing cases such as IMPALA-4595.
+  if (str.is_null) return StringVal::null();
+  // Test for IMPALA-4705: pass a function as argument and make sure it's materialized.
+  return ToUpperWork(context, str,
+      _ZN6impala15StringFunctions5UpperEPN10impala_udf15FunctionContextERKNS1_9StringValE);
+}
+
 typedef DoubleVal (*TestFn)(const DoubleVal& base, const DoubleVal& exp);
 
 // This function is dropped upon linking when tested as IR UDF as it has internal linkage

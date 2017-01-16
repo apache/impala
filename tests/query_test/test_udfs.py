@@ -178,6 +178,10 @@ create function {database}.to_lower(string) returns string
 location '{location}'
 symbol='_Z7ToLowerPN10impala_udf15FunctionContextERKNS_9StringValE';
 
+create function {database}.to_upper(string) returns string
+location '{location}'
+symbol='_Z7ToUpperPN10impala_udf15FunctionContextERKNS_9StringValE';
+
 create function {database}.constant_timestamp() returns timestamp
 location '{location}' symbol='ConstantTimestamp';
 

@@ -55,7 +55,8 @@ class LlvmCodeGenTest : public testing:: Test {
   // Wrapper to call private test-only methods on LlvmCodeGen object
   static Status CreateFromFile(
       ObjectPool* pool, const string& filename, scoped_ptr<LlvmCodeGen>* codegen) {
-    return LlvmCodeGen::CreateFromFile(pool, NULL, filename, "test", codegen);
+    RETURN_IF_ERROR(LlvmCodeGen::CreateFromFile(pool, NULL, filename, "test", codegen));
+    return (*codegen)->MaterializeModule();
   }
 
   static LlvmCodeGen* CreateCodegen(ObjectPool* pool) {

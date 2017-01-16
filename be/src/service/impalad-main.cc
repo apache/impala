@@ -59,7 +59,7 @@ DECLARE_bool(enable_rm);
 int ImpaladMain(int argc, char** argv) {
   InitCommonRuntime(argc, argv, true);
 
-  LlvmCodeGen::InitializeLlvm();
+  ABORT_IF_ERROR(LlvmCodeGen::InitializeLlvm());
   JniUtil::InitLibhdfs();
   ABORT_IF_ERROR(HBaseTableScanner::Init());
   ABORT_IF_ERROR(HBaseTable::InitJNI());

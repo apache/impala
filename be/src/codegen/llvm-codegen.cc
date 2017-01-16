@@ -101,7 +101,8 @@ bool LlvmCodeGen::llvm_initialized_ = false;
 
 string LlvmCodeGen::cpu_name_;
 vector<string> LlvmCodeGen::cpu_attrs_;
-unordered_set<string> LlvmCodeGen::gv_ref_ir_fns_;
+unordered_set<string> LlvmCodeGen::fns_to_always_materialize_;
+FnRefsMap LlvmCodeGen::fn_refs_map_;
 
 [[noreturn]] static void LlvmCodegenHandleError(
     void* user_data, const std::string& reason, bool gen_crash_diag) {
@@ -115,62 +116,29 @@ bool LlvmCodeGen::IsDefinedInImpalad(const string& fn_name) {
   return status.ok();
 }
 
-void LlvmCodeGen::ParseGlobalConstant(Value* val, unordered_set<string>* ref_fns) {
-  // Parse constants to find any referenced functions.
-  vector<string> fn_names;
-  if (isa<Function>(val)) {
-    fn_names.push_back(cast<Function>(val)->getName().str());
-  } else if (isa<BlockAddress>(val)) {
-    const BlockAddress *ba = cast<BlockAddress>(val);
-    fn_names.push_back(ba->getFunction()->getName().str());
-  } else if (isa<GlobalAlias>(val)) {
-    GlobalAlias* alias = cast<GlobalAlias>(val);
-    ParseGlobalConstant(alias->getAliasee(), ref_fns);
-  } else if (isa<ConstantExpr>(val)) {
-    const ConstantExpr* ce = cast<ConstantExpr>(val);
-    if (ce->isCast()) {
-      for (User::const_op_iterator oi=ce->op_begin(); oi != ce->op_end(); ++oi) {
-        Function* fn = dyn_cast<Function>(*oi);
-        if (fn != NULL) fn_names.push_back(fn->getName().str());
+void LlvmCodeGen::FindGlobalUsers(User* val, vector<GlobalObject*>* users) {
+  for (Use& u: val->uses()) {
+    User* user = u.getUser();
+    if (isa<Instruction>(user)) {
+      Instruction* inst = dyn_cast<Instruction>(u.getUser());
+      users->push_back(inst->getFunction());
+    } else if (isa<GlobalVariable>(user)) {
+      GlobalVariable* gv = cast<GlobalVariable>(user);
+      string val_name = gv->getName();
+      // We strip global ctors and dtors out of the modules as they are not run.
+      if (val_name.find("llvm.global_ctors") == string::npos &&
+          val_name.find("llvm.global_dtors") == string::npos) {
+        users->push_back(gv);;
       }
-    }
-  } else if (isa<ConstantStruct>(val) || isa<ConstantArray>(val) ||
-      isa<ConstantDataArray>(val)) {
-    const Constant* val_constant = cast<Constant>(val);
-    for (int i = 0; i < val_constant->getNumOperands(); ++i) {
-      ParseGlobalConstant(val_constant->getOperand(i), ref_fns);
-    }
-  } else if (isa<ConstantVector>(val) || isa<ConstantDataVector>(val)) {
-    const Constant* val_const = cast<Constant>(val);
-    for (int i = 0; i < val->getType()->getVectorNumElements(); ++i) {
-      ParseGlobalConstant(val_const->getAggregateElement(i), ref_fns);
-    }
-  } else {
-    // Ignore constants which cannot contain function pointers. Ignore other global
-    // variables referenced by this global variable as InitializeLlvm() will parse
-    // all global variables.
-    DCHECK(isa<UndefValue>(val) || isa<ConstantFP>(val) || isa<ConstantInt>(val) ||
-        isa<GlobalVariable>(val) || isa<ConstantTokenNone>(val) ||
-        isa<ConstantPointerNull>(val) || isa<ConstantAggregateZero>(val) ||
-        isa<ConstantDataSequential>(val));
-  }
-
-  // Adds all functions not defined in Impalad native binary.
-  for (const string& fn_name: fn_names) {
-    if (!IsDefinedInImpalad(fn_name)) ref_fns->insert(fn_name);
-  }
-}
-
-void LlvmCodeGen::ParseGVForFunctions(Module* module, unordered_set<string>* ref_fns) {
-  for (GlobalVariable& gv: module->globals()) {
-    if (gv.hasInitializer() && gv.isConstant()) {
-      Constant* val = gv.getInitializer();
-      if (val->getNumOperands() > 0) ParseGlobalConstant(val, ref_fns);
+    } else if (isa<Constant>(user)) {
+      FindGlobalUsers(user, users);
+    } else {
+      DCHECK(false) << "Unknown user's types for " << val->getName().str();
     }
   }
 }
 
-void LlvmCodeGen::InitializeLlvm(bool load_backend) {
+Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
   DCHECK(!llvm_initialized_);
   llvm::remove_fatal_error_handler();
   llvm::install_fatal_error_handler(LlvmCodegenHandleError);
@@ -201,17 +169,43 @@ void LlvmCodeGen::InitializeLlvm(bool load_backend) {
 
   ObjectPool init_pool;
   scoped_ptr<LlvmCodeGen> init_codegen;
-  Status status = LlvmCodeGen::CreateFromMemory(&init_pool, NULL, "init", &init_codegen);
-  ParseGVForFunctions(init_codegen->module_, &gv_ref_ir_fns_);
+  RETURN_IF_ERROR(LlvmCodeGen::CreateFromMemory(&init_pool, NULL, "init", &init_codegen));
+  // LLVM will construct "use" lists only when the entire module is materialized.
+  RETURN_IF_ERROR(init_codegen->MaterializeModule());
 
   // Validate the module by verifying that functions for all IRFunction::Type
   // can be found.
   for (int i = IRFunction::FN_START; i < IRFunction::FN_END; ++i) {
     DCHECK(FN_MAPPINGS[i].fn == i);
     const string& fn_name = FN_MAPPINGS[i].fn_name;
-    DCHECK(init_codegen->module_->getFunction(fn_name) != NULL)
-        << "Failed to find function " << fn_name;
+    if (init_codegen->module_->getFunction(fn_name) == nullptr) {
+      return Status(Substitute("Failed to find function $0", fn_name));
+    }
   }
+
+  // Create a mapping of functions to their referenced functions.
+  for (Function& fn: init_codegen->module_->functions()) {
+    if (fn.isIntrinsic() || fn.isDeclaration()) continue;
+    string fn_name = fn.getName();
+    vector<GlobalObject*> users;
+    FindGlobalUsers(&fn, &users);
+    for (GlobalValue* val: users) {
+      string key = val->getName();
+      DCHECK(isa<GlobalVariable>(val) || isa<Function>(val));
+      // 'fn_refs_map_' contains functions which need to be materialized when a certain
+      // IR Function is materialized. We choose to include functions referenced by
+      // another IR function in the map even if it's defined in Impalad binary so it
+      // can be inlined for further optimization. This is not applicable for functions
+      // referenced by global variables only.
+      if (isa<GlobalVariable>(val)) {
+        if (IsDefinedInImpalad(fn_name)) continue;
+        fns_to_always_materialize_.insert(fn_name);
+      } else {
+        fn_refs_map_[key].insert(fn_name);
+      }
+    }
+  }
+  return Status::OK();
 }
 
 LlvmCodeGen::LlvmCodeGen(
@@ -329,19 +323,17 @@ Status LlvmCodeGen::LinkModule(const string& file) {
   // The module data layout must match the one selected by the execution engine.
   new_module->setDataLayout(execution_engine_->getDataLayout());
 
-  // Record all IR functions in 'new_module' referenced by the module's global variables
-  // if they are not defined in the Impalad native code. They must be materialized to
-  // avoid linking error.
-  unordered_set<string> ref_fns;
-  ParseGVForFunctions(new_module.get(), &ref_fns);
-
-  // Record all the materializable functions in the new module before linking.
-  // Linking the new module to the main module (i.e. 'module_') may materialize
-  // functions in the new module. These materialized functions need to be parsed
-  // to materialize any functions they call in 'module_'.
-  unordered_set<string> materializable_fns;
+  // Parse all functions' names from the new module and find those which also exist in
+  // the main module. They are declarations in the new module or duplicated definitions
+  // of the same function in both modules. For the latter case, it's unclear which one
+  // the linker will choose. Materialize these functions in the main module in case they
+  // are chosen by the linker or referenced by functions in the new module. Note that
+  // linkModules() will materialize functions defined only in the new module.
   for (Function& fn: new_module->functions()) {
-    if (fn.isMaterializable()) materializable_fns.insert(fn.getName().str());
+    if (fn_refs_map_.find(fn.getName()) != fn_refs_map_.end()) {
+      Function* local_fn = module_->getFunction(fn.getName());
+      RETURN_IF_ERROR(MaterializeFunction(local_fn));
+    }
   }
 
   bool error = Linker::linkModules(*module_, std::move(new_module));
@@ -352,23 +344,6 @@ Status LlvmCodeGen::LinkModule(const string& file) {
   }
   linked_modules_.insert(file);
 
-  for (const string& fn_name: ref_fns) {
-    Function* fn = module_->getFunction(fn_name);
-    // The global variable from source module which references 'fn' can have private
-    // linkage and it may not be linked into 'module_'.
-    if (fn != NULL && fn->isMaterializable()) {
-      RETURN_IF_ERROR(MaterializeFunction(fn));
-      materializable_fns.erase(fn->getName().str());
-    }
-  }
-  // Parse functions in the source module materialized during linking and materialize
-  // their callees. Do it after linking so LLVM has "merged" functions defined in both
-  // modules. LLVM may not link in functions (and their callees) from source module if
-  // they're defined in destination module already.
-  for (const string& fn_name: materializable_fns) {
-    Function* fn = module_->getFunction(fn_name);
-    if (fn != NULL && !fn->isMaterializable()) RETURN_IF_ERROR(MaterializeCallees(fn));
-  }
   return Status::OK();
 }
 
@@ -403,11 +378,11 @@ Status LlvmCodeGen::CreateImpalaCodegen(ObjectPool* pool, MemTracker* parent_mem
     return Status("Could not create llvm struct type for StringVal");
   }
 
-  // Materialize functions implicitly referenced by the global variables.
-  for (const string& fn_name : gv_ref_ir_fns_) {
+  // Materialize functions referenced by the global variables.
+  for (const string& fn_name : fns_to_always_materialize_) {
     Function* fn = codegen->module_->getFunction(fn_name);
-    DCHECK(fn != NULL);
-    codegen->MaterializeFunction(fn);
+    DCHECK(fn != nullptr);
+    RETURN_IF_ERROR(codegen->MaterializeFunction(fn));
   }
   return Status::OK();
 }
@@ -642,22 +617,6 @@ void LlvmCodeGen::CreateIfElseBlocks(Function* fn, const string& if_name,
   *else_block = BasicBlock::Create(context(), else_name, fn, insert_before);
 }
 
-Status LlvmCodeGen::MaterializeCallees(Function* fn) {
-  for (inst_iterator iter = inst_begin(fn); iter != inst_end(fn); ++iter) {
-    Instruction* instr = &*iter;
-    Function* called_fn = NULL;
-    if (isa<CallInst>(instr)) {
-      CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
-      called_fn = call_instr->getCalledFunction();
-    } else if (isa<InvokeInst>(instr)) {
-      InvokeInst* invoke_instr = reinterpret_cast<InvokeInst*>(instr);
-      called_fn = invoke_instr->getCalledFunction();
-    }
-    if (called_fn != NULL) RETURN_IF_ERROR(MaterializeFunctionHelper(called_fn));
-  }
-  return Status::OK();
-}
-
 Status LlvmCodeGen::MaterializeFunctionHelper(Function *fn) {
   DCHECK(!is_compiled_);
   if (fn->isIntrinsic() || !fn->isMaterializable()) return Status::OK();
@@ -670,7 +629,12 @@ Status LlvmCodeGen::MaterializeFunctionHelper(Function *fn) {
 
   // Materialized functions are marked as not materializable by LLVM.
   DCHECK(!fn->isMaterializable());
-  RETURN_IF_ERROR(MaterializeCallees(fn));
+  const unordered_set<string>& callees = fn_refs_map_[fn->getName().str()];
+  for (const string& callee: callees) {
+    Function* callee_fn = module_->getFunction(callee);
+    DCHECK(callee_fn != nullptr);
+    RETURN_IF_ERROR(MaterializeFunctionHelper(callee_fn));
+  }
   return Status::OK();
 }
 
@@ -886,13 +850,11 @@ Function* LlvmCodeGen::FinalizeFunction(Function* function) {
   return function;
 }
 
-Status LlvmCodeGen::MaterializeModule(Module* module) {
-  std::error_code err = module->materializeAll();
+Status LlvmCodeGen::MaterializeModule() {
+  std::error_code err = module_->materializeAll();
   if (UNLIKELY(err)) {
-    stringstream err_msg;
-    err_msg << "Failed to complete materialization of module " << module->getName().str()
-        << ": " << err.message();
-    return Status(err_msg.str());
+    return Status(Substitute("Failed to materialize module $0: $1",
+        module_->getName().str(), err.message()));
   }
   return Status::OK();
 }
@@ -919,7 +881,7 @@ Status LlvmCodeGen::FinalizeLazyMaterialization() {
   // All unused functions are now not materializable so it should be quick to call
   // materializeAll(). We need to call this function in order to destroy the
   // materializer so that DCE will not assert fail.
-  return MaterializeModule(module_);
+  return MaterializeModule();
 }
 
 Status LlvmCodeGen::FinalizeModule() {
