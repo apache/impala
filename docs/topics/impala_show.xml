@@ -49,7 +49,7 @@ SHOW TABLES [IN <varname>database_name</varname>] [[LIKE] '<varname>pattern</var
 <ph rev="1.2.1">SHOW TABLE STATS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
 <ph rev="1.2.1">SHOW COLUMN STATS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
 <ph rev="1.4.0">SHOW PARTITIONS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
-<ph rev="2.2.0">SHOW FILES IN [<varname>database_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>key_col</varname>=<varname>value</varname> [, <varname>key_col</varname>=<varname>value</varname>]]</ph>
+SHOW FILES IN [<varname>database_name</varname>.]<varname>table_name</varname> <ph  rev="IMPALA-1654">[PARTITION (<varname>key_col_expression</varname> [, <varname>key_col_expression</varname>]</ph>]
 
 <ph rev="2.0.0">SHOW ROLES
 SHOW CURRENT ROLES
@@ -111,6 +111,19 @@ show tables '*dim*|*fact*';</codeblock>
         only. The output includes the names of the files, the size of each file, and the applicable partition
         for a partitioned table. The size includes a suffix of <codeph>B</codeph> for bytes,
         <codeph>MB</codeph> for megabytes, and <codeph>GB</codeph> for gigabytes.
+      </p>
+
+      <p rev="IMPALA-1654">
+        In <keyword keyref="impala28_full"/> and higher, you can use general
+        expressions with operators such as <codeph>&lt;</codeph>, <codeph>IN</codeph>,
+        <codeph>LIKE</codeph>, and <codeph>BETWEEN</codeph> in the <codeph>PARTITION</codeph>
+        clause, instead of only equality operators. For example:
+<codeblock><![CDATA[
+show files in sample_table partition (j < 5);
+show files in sample_table partition (k = 3, l between 1 and 10);
+show files in sample_table partition (month like 'J%');
+]]>
+</codeblock>
       </p>
 
       <note>

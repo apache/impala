@@ -52,7 +52,12 @@ under the License.
 <codeblock rev="2.1.0">COMPUTE STATS [<varname>db_name</varname>.]<varname>table_name</varname>
 COMPUTE INCREMENTAL STATS [<varname>db_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>partition_spec</varname>)]
 
-<varname>partition_spec</varname> ::= <varname>partition_col</varname>=<varname>constant_value</varname>
+<!-- Is kudu_partition_spec applicable here? -->
+<varname>partition_spec</varname> ::= <varname>simple_partition_spec</varname> | <ph rev="IMPALA-1654"><varname>complex_partition_spec</varname></ph> | <ph rev="kudu"><varname>kudu_partition_spec</varname></ph>
+
+<varname>simple_partition_spec</varname> ::= <varname>partition_col</varname>=<varname>constant_value</varname>
+
+<ph rev="IMPALA-1654"><varname>complex_partition_spec</varname> ::= <varname>comparison_expression_on_partition_col</varname></ph>
 </codeblock>
 
     <p conref="../shared/impala_common.xml#common/incremental_partition_spec"/>
@@ -107,6 +112,75 @@ COMPUTE INCREMENTAL STATS [<varname>db_name</varname>.]<varname>table_name</varn
         </li>
       </ul>
     </note>
+
+    <p rev="IMPALA-1654">
+      <b>Computing stats for groups of partitions:</b>
+    </p>
+
+    <p rev="IMPALA-1654">
+      In <keyword keyref="impala28_full"/> and higher, you can run <codeph>COMPUTE INCREMENTAL STATS</codeph>
+      on multiple partitions, instead of the entire table or one partition at a time. You include
+      comparison operators other than <codeph>=</codeph> in the <codeph>PARTITION</codeph> clause,
+      and the <codeph>COMPUTE INCREMENTAL STATS</codeph> statement applies to all partitions that
+      match the comparison expression.
+    </p>
+
+    <p rev="IMPALA-1654">
+      For example, the <codeph>INT_PARTITIONS</codeph> table contains 4 partitions.
+      The following <codeph>COMPUTE INCREMENTAL STATS</codeph> statements affect some but not all
+      partitions, as indicated by the <codeph>Updated <varname>n</varname> partition(s)</codeph>
+      messages. The partitions that are affected depend on values in the partition key column <codeph>X</codeph>
+      that match the comparison expression in the <codeph>PARTITION</codeph> clause.
+    </p>
+
+<codeblock rev="IMPALA-1654"><![CDATA[
+show partitions int_partitions;
++-------+-------+--------+------+--------------+-------------------+---------+...
+| x     | #Rows | #Files | Size | Bytes Cached | Cache Replication | Format  |...
++-------+-------+--------+------+--------------+-------------------+---------+...
+| 99    | -1    | 0      | 0B   | NOT CACHED   | NOT CACHED        | PARQUET |...
+| 120   | -1    | 0      | 0B   | NOT CACHED   | NOT CACHED        | TEXT    |...
+| 150   | -1    | 0      | 0B   | NOT CACHED   | NOT CACHED        | TEXT    |...
+| 200   | -1    | 0      | 0B   | NOT CACHED   | NOT CACHED        | TEXT    |...
+| Total | -1    | 0      | 0B   | 0B           |                   |         |...
++-------+-------+--------+------+--------------+-------------------+---------+...
+
+compute incremental stats int_partitions partition (x < 100);
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 1 column(s). |
++-----------------------------------------+
+
+compute incremental stats int_partitions partition (x in (100, 150, 200));
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 2 partition(s) and 1 column(s). |
++-----------------------------------------+
+
+compute incremental stats int_partitions partition (x between 100 and 175);
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 2 partition(s) and 1 column(s). |
++-----------------------------------------+
+
+compute incremental stats int_partitions partition (x in (100, 150, 200) or x < 100);
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 3 partition(s) and 1 column(s). |
++-----------------------------------------+
+
+compute incremental stats int_partitions partition (x != 150);
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 3 partition(s) and 1 column(s). |
++-----------------------------------------+
+]]>
+</codeblock>
 
     <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
 

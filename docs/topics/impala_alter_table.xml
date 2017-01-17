@@ -80,7 +80,11 @@ statsKey ::= numDVs | numNulls | avgSize | maxSize</ph>
 
 <varname>col_spec</varname> ::= <varname>col_name</varname> <varname>type_name</varname>
 
-<varname>partition_spec</varname> ::= <varname>partition_col</varname>=<varname>constant_value</varname>
+<varname>partition_spec</varname> ::= <varname>simple_partition_spec</varname> | <ph rev="IMPALA-1654"><varname>complex_partition_spec</varname></ph> | <ph rev="kudu"><varname>kudu_partition_spec</varname></ph>
+
+<varname>simple_partition_spec</varname> ::= <varname>partition_col</varname>=<varname>constant_value</varname>
+
+<ph rev="IMPALA-1654"><varname>complex_partition_spec</varname> ::= <varname>comparison_expression_on_partition_col</varname></ph>
 
 <varname>table_properties</varname> ::= '<varname>name</varname>'='<varname>value</varname>'[, '<varname>name</varname>'='<varname>value</varname>' ...]
 
@@ -123,6 +127,80 @@ statsKey ::= numDVs | numNulls | avgSize | maxSize</ph>
       for external tables (with data files located in arbitrary locations). The exception is renaming a table; for
       an external table, the underlying data directory is not renamed or moved.
     </p>
+
+    <p>
+      <b>Dropping or altering multiple partitions:</b>
+    </p>
+
+    <p rev="IMPALA-1654">
+      In <keyword keyref="impala28_full"/> and higher,
+      the expression for the partition clause with a <codeph>DROP</codeph> or <codeph>SET</codeph>
+      operation can include comparison operators such as <codeph>&lt;</codeph>, <codeph>IN</codeph>,
+      or <codeph>BETWEEN</codeph>, and Boolean operators such as <codeph>AND</codeph>
+      and <codeph>OR</codeph>.
+    </p>
+
+    <p rev="IMPALA-1654">
+      For example, you might drop a group of partitions corresponding to a particular date
+      range after the data <q>ages out</q>:
+    </p>
+
+<codeblock><![CDATA[
+alter table historical_data drop partition (year < 1995);
+alter table historical_data drop partition (year = 1996 and month between 1 and 6);
+]]>
+</codeblock>
+
+    <p rev="IMPALA-1654">
+      For tables with multiple partition keys columns, you can specify multiple
+      conditions separated by commas, and the operation only applies to the partitions
+      that match all the conditions (similar to using an <codeph>AND</codeph> clause):
+    </p>
+
+<codeblock><![CDATA[
+alter table historical_data drop partition (year < 1995, last_name like 'A%');
+]]>
+</codeblock>
+
+    <p rev="IMPALA-1654">
+      This technique can also be used to change the file format of groups of partitions,
+      as part of an ETL pipeline that periodically consolidates and rewrites the underlying
+      data files in a different file format:
+    </p>
+
+<codeblock><![CDATA[
+alter table fast_growing_data partition (year = 2016, month in (10,11,12)) set fileformat parquet;
+]]>
+</codeblock>
+
+    <note>
+      <p rev="IMPALA-1654">
+        The extended syntax involving comparison operators and multiple partitions
+        applies to the <codeph>SET FILEFORMAT</codeph>, <codeph>SET TBLPROPERTIES</codeph>,
+        <codeph>SET SERDEPROPERTIES</codeph>, and <codeph>SET [UN]CACHED</codeph> clauses.
+        You can also use this syntax with the <codeph>PARTITION</codeph> clause
+        in the <codeph>COMPUTE INCREMENTAL STATS</codeph> statement, and with the
+        <codeph>PARTITION</codeph> clause of the <codeph>SHOW FILES</codeph> statement.
+        Some forms of <codeph>ALTER TABLE</codeph> still only apply to one partition
+        at a time: the <codeph>SET LOCATION</codeph> and <codeph>ADD PARTITION</codeph>
+        clauses. The <codeph>PARTITION</codeph> clauses in the <codeph>LOAD DATA</codeph>
+        and <codeph>INSERT</codeph> statements also only apply to one partition at a time.
+      </p>
+      <p>
+        A DDL statement that applies to multiple partitions is considered successful
+        (resulting in no changes) even if no partitions match the conditions.
+        The results are the same as if the <codeph>IF EXISTS</codeph> clause was specified.
+      </p>
+      <p>
+        The performance and scalability of this technique is similar to
+        issuing a sequence of single-partition <codeph>ALTER TABLE</codeph>
+        statements in quick succession. To minimize bottlenecks due to
+        communication with the metastore database, or causing other
+        DDL operations on the same table to wait, test the effects of
+        performing <codeph>ALTER TABLE</codeph> statements that affect
+        large numbers of partitions.
+      </p>
+    </note>
 
     <p conref="../shared/impala_common.xml#common/s3_blurb"/>
 
