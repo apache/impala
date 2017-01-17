@@ -377,7 +377,8 @@ class QueryExecutor(object):
       query_thread = Thread(
           target=self._fetch_sql_results,
           args=[query, cursor, sql_writer, log_file],
-          name='Statement execution thread {0}'.format(current_thread().name))
+          name='{db_type}-exec-{id_}'.format(
+              db_type=cursor.db_type, id_=id(query)))
       query_thread.daemon = True
       query_thread.sql = ''
       query_thread.data_set = None
@@ -914,7 +915,8 @@ if __name__ == '__main__':
   # TODO: Seed the random query generator for repeatable queries?
 
   args = parser.parse_args()
-  cli_options.configure_logging(args.log_level, debug_log_file=args.debug_log_file)
+  cli_options.configure_logging(
+      args.log_level, debug_log_file=args.debug_log_file, log_thread_name=True)
   cluster = cli_options.create_cluster(args)
 
   ref_conn = cli_options.create_connection(args, args.ref_db_type, db_name=args.db_name)

@@ -1777,7 +1777,7 @@ def main():
   args = parser.parse_args()
 
   cli_options.configure_logging(
-      args.log_level, debug_log_file=args.debug_log_file, log_thread_id=True,
+      args.log_level, debug_log_file=args.debug_log_file, log_thread_name=True,
       log_process_id=True)
   LOG.debug("CLI args: %s" % (args, ))
 
