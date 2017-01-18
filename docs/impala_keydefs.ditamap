@@ -630,32 +630,30 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="https://issues.cloudera.org/browse/IMPALA-995" scope="external" format="html" keys="IMPALA-995"/>
 
 <!-- Short form of mapping from Impala release to vendor-specific releases, for use in headings. -->
-  <keydef keys="impala28"><topicmeta><keywords><keyword>CDH 5.10</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala27"><topicmeta><keywords><keyword>CDH 5.9</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala26"><topicmeta><keywords><keyword>CDH 5.8</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala25"><topicmeta><keywords><keyword>CDH 5.7</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala24"><topicmeta><keywords><keyword>CDH 5.6</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala23"><topicmeta><keywords><keyword>CDH 5.5</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala22"><topicmeta><keywords><keyword>CDH 5.4</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala21"><topicmeta><keywords><keyword>CDH 5.3</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala20"><topicmeta><keywords><keyword>CDH 5.2</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala14"><topicmeta><keywords><keyword>CDH 5.1</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala13"><topicmeta><keywords><keyword>CDH 5.0</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala12"><topicmeta><keywords><keyword>CDH 5.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala28"><topicmeta><keywords><keyword>Impala 2.8</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala27"><topicmeta><keywords><keyword>Impala 2.7</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala26"><topicmeta><keywords><keyword>Impala 2.6</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala25"><topicmeta><keywords><keyword>Impala 2.5</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala24"><topicmeta><keywords><keyword>Impala 2.4</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala23"><topicmeta><keywords><keyword>Impala 2.3</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala22"><topicmeta><keywords><keyword>Impala 2.2</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala21"><topicmeta><keywords><keyword>Impala 2.1</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala20"><topicmeta><keywords><keyword>Impala 2.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala14"><topicmeta><keywords><keyword>Impala 1.4</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala13"><topicmeta><keywords><keyword>Impala 1.3</keyword></keywords></topicmeta></keydef>
 
 <!-- Short form of mapping from Impala release to vendor-specific releases, for use in running text. -->
-  <keydef keys="impala28_full"><topicmeta><keywords><keyword>CDH 5.10 / Impala 2.8</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala27_full"><topicmeta><keywords><keyword>CDH 5.9 / Impala 2.7</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala26_full"><topicmeta><keywords><keyword>CDH 5.8 / Impala 2.6</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala25_full"><topicmeta><keywords><keyword>CDH 5.7 / Impala 2.5</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala24_full"><topicmeta><keywords><keyword>CDH 5.6 / Impala 2.4</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala23_full"><topicmeta><keywords><keyword>CDH 5.5 / Impala 2.3</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala22_full"><topicmeta><keywords><keyword>CDH 5.4 / Impala 2.2</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala21_full"><topicmeta><keywords><keyword>CDH 5.3 / Impala 2.1</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala20_full"><topicmeta><keywords><keyword>CDH 5.2 / Impala 2.0</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala14_full"><topicmeta><keywords><keyword>CDH 5.1 / Impala 1.4</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala13_full"><topicmeta><keywords><keyword>CDH 5.0 / Impala 1.3</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala12_full"><topicmeta><keywords><keyword>CDH 5.0 / Impala 1.2</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala28_full"><topicmeta><keywords><keyword>Impala 2.8</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala27_full"><topicmeta><keywords><keyword>Impala 2.7</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala26_full"><topicmeta><keywords><keyword>Impala 2.6</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala25_full"><topicmeta><keywords><keyword>Impala 2.5</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala24_full"><topicmeta><keywords><keyword>Impala 2.4</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala23_full"><topicmeta><keywords><keyword>Impala 2.3</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala22_full"><topicmeta><keywords><keyword>Impala 2.2</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala21_full"><topicmeta><keywords><keyword>Impala 2.1</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala20_full"><topicmeta><keywords><keyword>Impala 2.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala14_full"><topicmeta><keywords><keyword>Impala 1.4</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala13_full"><topicmeta><keywords><keyword>Impala 1.3</keyword></keywords></topicmeta></keydef>
 
 <!-- Indirect addresses for all the impala*.xml files. The key is the ID of the first topic within each file. -->
   <keydef href="topics/impala_concepts.xml" keys="concepts"/>
