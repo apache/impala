@@ -316,7 +316,7 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 drop stats alltypes
 ====
 ---- QUERY
-# test computing stats on an partitioned text table with all types
+# test computing stats on an unpartitioned text table with all types
 create table alltypesnopart like functional.alltypesnopart;
 insert into alltypesnopart
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
@@ -357,6 +357,19 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'timestamp_col','TIMESTAMP',101,-1,16,16
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+# IMPALA-4767: Test that ALTER TABLE commands preserve table stats.
+alter table alltypesnopart set tblproperties('test'='test');
+alter table alltypesnopart set column stats string_col ('numDVs'='10');
+alter table alltypesnopart add columns (new_col int);
+show table stats alltypesnopart;
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+100,3,'7.73KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # test computing stats on a partitioned parquet table with all types
@@ -425,6 +438,43 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'month','INT',12,0,4,4
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+# IMPALA-4767: Test that ALTER TABLE commands preserve table stats.
+alter table alltypes_parquet set tblproperties('test'='test');
+alter table alltypes_parquet set column stats string_col ('numDVs'='10');
+alter table alltypes_parquet add columns (new_col int);
+show table stats alltypes_parquet;
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'2009','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','7',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','8',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','9',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','10',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','11',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','12',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','1',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','2',280,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','3',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','4',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','5',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','6',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','7',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','8',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','9',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','10',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','11',300,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','12',310,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'Total','',7300,24,regex:.+KB,'0B','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # test computing stats on an empty table

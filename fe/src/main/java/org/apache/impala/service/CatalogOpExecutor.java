@@ -712,7 +712,7 @@ public class CatalogOpExecutor {
           msClient.getHiveClient().updateTableColumnStatistics(colStats);
         } catch (Exception e) {
           throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
-                  "updateTableColumnStatistics"), e);
+              "updateTableColumnStatistics"), e);
         }
       }
       // Update the table stats. Apply the table alteration last to ensure the
@@ -2622,6 +2622,10 @@ public class CatalogOpExecutor {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       lastDdlTime = calculateDdlTime(msTbl);
       msTbl.putToParameters("transient_lastDdlTime", Long.toString(lastDdlTime));
+      // TODO: Remove this workaround for HIVE-15653 to preserve table stats
+      // during table alterations.
+      msTbl.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
+          StatsSetupConst.TRUE);
       msClient.getHiveClient().alter_table(
           msTbl.getDbName(), msTbl.getTableName(), msTbl);
     } catch (TException e) {
