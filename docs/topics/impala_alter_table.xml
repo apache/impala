@@ -60,7 +60,13 @@ ALTER TABLE <varname>name</varname> DROP [COLUMN] <varname>column_name</varname>
 ALTER TABLE <varname>name</varname> CHANGE <varname>column_name</varname> <varname>new_name</varname> <varname>new_type</varname>
 ALTER TABLE <varname>name</varname> REPLACE COLUMNS (<varname>col_spec</varname>[, <varname>col_spec</varname> ...])
 
-ALTER TABLE <varname>name</varname> { ADD [IF NOT EXISTS] | DROP [IF EXISTS] } PARTITION (<varname>partition_spec</varname>) <ph rev="2.3.0">[PURGE]</ph>
+ALTER TABLE <varname>name</varname> ADD [IF NOT EXISTS] PARTITION (<varname>partition_spec</varname>)
+  <ph rev="IMPALA-4390">[<varname>location_spec</varname>]</ph>
+  <ph rev="IMPALA-4390">[<varname>cache_spec</varname>]</ph>
+
+ALTER TABLE <varname>name</varname> DROP [IF EXISTS] PARTITION (<varname>partition_spec</varname>)
+  <ph rev="2.3.0">[PURGE]</ph>
+
 <ph rev="2.3.0 IMPALA-1568 CDH-36799">ALTER TABLE <varname>name</varname> RECOVER PARTITIONS</ph>
 
 ALTER TABLE <varname>name</varname> [PARTITION (<varname>partition_spec</varname>)]
