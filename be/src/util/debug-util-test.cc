@@ -20,11 +20,22 @@
 #include <iostream>
 
 #include "testutil/gtest-util.h"
+#include "util/benchmark.h"
 #include "util/debug-util.h"
 
 #include "common/names.h"
 
 namespace impala {
+
+TEST(DebugUtil, UniqueID) {
+  TUniqueId unique_id;
+  unique_id.hi = 0xfeedbeeff00d7777ULL;
+  unique_id.lo = 0x2020202020202020ULL;
+  std::string str("feedbeeff00d7777:2020202020202020");
+  EXPECT_EQ(str, PrintId(unique_id));
+  unique_id.lo = 0x20ULL;
+  EXPECT_EQ("feedbeeff00d7777:20", PrintId(unique_id));
+}
 
 string RecursionStack(int level) {
   if (level == 0) return GetStackTrace();

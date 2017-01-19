@@ -180,7 +180,9 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size,
     bool fetch_first, TFetchResultsResp* fetch_results) {
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (exec_state == NULL) return Status("Invalid query handle");
+  if (UNLIKELY(exec_state == nullptr)) {
+    return Status(Substitute("Invalid query handle: $0", PrintId(query_id)));
+  }
 
   // FetchResults doesn't have an associated session handle, so we presume that this
   // request should keep alive the same session that orignated the query.
@@ -632,9 +634,10 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
   VLOG_ROW << "GetOperationStatus(): query_id=" << PrintId(query_id);
 
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (exec_state.get() == nullptr) {
+  if (UNLIKELY(exec_state.get() == nullptr)) {
     // No handle was found
-    HS2_RETURN_ERROR(return_val, "Invalid query handle", SQLSTATE_GENERAL_ERROR);
+    HS2_RETURN_ERROR(return_val,
+      Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
 
   ScopedSessionState session_handle(this);
@@ -667,9 +670,10 @@ void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,
   VLOG_QUERY << "CancelOperation(): query_id=" << PrintId(query_id);
 
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (exec_state.get() == NULL) {
+  if (UNLIKELY(exec_state.get() == nullptr)) {
     // No handle was found
-    HS2_RETURN_ERROR(return_val, "Invalid query handle", SQLSTATE_GENERAL_ERROR);
+    HS2_RETURN_ERROR(return_val,
+      Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = exec_state->session_id();
@@ -688,9 +692,10 @@ void ImpalaServer::CloseOperation(TCloseOperationResp& return_val,
   VLOG_QUERY << "CloseOperation(): query_id=" << PrintId(query_id);
 
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (exec_state.get() == NULL) {
+  if (UNLIKELY(exec_state.get() == nullptr)) {
     // No handle was found
-    HS2_RETURN_ERROR(return_val, "Invalid query handle", SQLSTATE_GENERAL_ERROR);
+    HS2_RETURN_ERROR(return_val,
+      Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = exec_state->session_id();
@@ -715,18 +720,22 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
   // Look up the session ID (which takes session_state_map_lock_) before taking the query
   // exec state lock.
   TUniqueId session_id;
-  if (!GetSessionIdForQuery(query_id, &session_id)) {
-    HS2_RETURN_ERROR(return_val, "Invalid query handle", SQLSTATE_GENERAL_ERROR);
+  if (UNLIKELY(!GetSessionIdForQuery(query_id, &session_id))) {
+    // No handle was found
+    HS2_RETURN_ERROR(return_val,
+      Substitute("Unable to find session ID for query handle: $0", PrintId(query_id)),
+      SQLSTATE_GENERAL_ERROR);
   }
   ScopedSessionState session_handle(this);
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
       SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
-  if (exec_state.get() == NULL) {
+  if (UNLIKELY(exec_state.get() == nullptr)) {
     VLOG_QUERY << "GetResultSetMetadata(): invalid query handle";
     // No handle was found
-    HS2_RETURN_ERROR(return_val, "Invalid query handle", SQLSTATE_GENERAL_ERROR);
+    HS2_RETURN_ERROR(return_val,
+      Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
   {
     // make sure we release the lock on exec_state if we see any error
@@ -798,9 +807,10 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (exec_state.get() == NULL) {
+  if (UNLIKELY(exec_state.get() == nullptr)) {
     // No handle was found
-    HS2_RETURN_ERROR(return_val, "Invalid query handle", SQLSTATE_GENERAL_ERROR);
+    HS2_RETURN_ERROR(return_val,
+      Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
 
   // GetLog doesn't have an associated session handle, so we presume that this request

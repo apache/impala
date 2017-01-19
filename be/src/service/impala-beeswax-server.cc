@@ -189,8 +189,9 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_QUERY << "get_results_metadata(): query_id=" << PrintId(query_id);
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
-  if (exec_state.get() == NULL) {
-    RaiseBeeswaxException("Invalid query handle", SQLSTATE_GENERAL_ERROR);
+  if (UNLIKELY(exec_state.get() == nullptr)) {
+    RaiseBeeswaxException(Substitute("Invalid query handle: $0", PrintId(query_id)),
+      SQLSTATE_GENERAL_ERROR);
   }
 
   {
@@ -249,7 +250,8 @@ beeswax::QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
     return entry->second->query_state();
   } else {
     VLOG_QUERY << "ImpalaServer::get_state invalid handle";
-    RaiseBeeswaxException("Invalid query handle", SQLSTATE_GENERAL_ERROR);
+    RaiseBeeswaxException(Substitute("Invalid query handle: $0", PrintId(query_id)),
+      SQLSTATE_GENERAL_ERROR);
   }
   // dummy to keep compiler happy
   return beeswax::QueryState::FINISHED;
@@ -454,7 +456,9 @@ inline void ImpalaServer::QueryHandleToTUniqueId(const QueryHandle& handle,
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
     const bool start_over, const int32_t fetch_size, beeswax::Results* query_results) {
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
-  if (exec_state == NULL) return Status("Invalid query handle");
+  if (UNLIKELY(exec_state == nullptr)) {
+    return Status(Substitute("Invalid query handle: $0", PrintId(query_id)));
+  }
 
   // Make sure QueryExecState::Wait() has completed before fetching rows. Wait() ensures
   // that rows are ready to be fetched (e.g., Wait() opens QueryExecState::output_exprs_,
@@ -512,7 +516,10 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
 Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
     TInsertResult* insert_result) {
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
-  if (exec_state == NULL) return Status("Invalid query handle");
+  if (UNLIKELY(exec_state == nullptr)) {
+    return Status(Substitute("Invalid query handle: $0", PrintId(query_id)));
+  }
+
   Status query_status;
   {
     lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());

@@ -227,6 +227,23 @@ class TestHS2(HS2TestSuite):
            len(operation_handle.operationId.secret))
     assert err_msg in get_operation_status_resp.status.errorMessage
 
+  @needs_session()
+  def test_invalid_query_handle(self):
+    operation_handle = TCLIService.TOperationHandle()
+    operation_handle.operationId = TCLIService.THandleIdentifier()
+    operation_handle.operationId.guid = "\x01\x23\x45\x67\x89\xab\xcd\xef76543210"
+    operation_handle.operationId.secret = "PasswordIsPencil"
+    operation_handle.operationType = TCLIService.TOperationType.EXECUTE_STATEMENT
+    operation_handle.hasResultSet = False
+
+    get_operation_status_resp = self.get_operation_status(operation_handle)
+    TestHS2.check_response(get_operation_status_resp, \
+        TCLIService.TStatusCode.ERROR_STATUS)
+
+    print get_operation_status_resp.status.errorMessage
+    err_msg = "Invalid query handle: efcdab8967452301:3031323334353637"
+    assert err_msg in get_operation_status_resp.status.errorMessage
+
   @pytest.mark.execute_serially
   def test_socket_close_forces_session_close(self):
     """Test that closing the underlying socket forces the associated session to close.

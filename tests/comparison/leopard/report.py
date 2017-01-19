@@ -55,7 +55,7 @@ class Report(object):
     ur'^Column \d+ in row \d+ does not match': 'mismatch',
     ur'^Could not connect': 'could_not_connect',
     ur'^IllegalStateException': 'IllegalStateException',
-    ur'^Invalid query handle': 'invalid_query_handle',
+    ur'^Invalid query handle: ': 'invalid_query_handle',
     ur'^Known issue:': 'known_issue',
     ur'^Operation is in ERROR_STATE': 'error_state',
     ur'^Query timed out after \d+ seconds': 'timeout',
