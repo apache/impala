@@ -246,6 +246,8 @@ public class HdfsTable extends Table {
    *   file under it recursively.
    * - For every valid data file, map it to a partition from 'partsByPath' (if one exists)
    *   and enumerate all its blocks and their corresponding hosts and disk IDs.
+   * Requires that 'dirPath' and all paths in 'partsByPath' have consistent qualification
+   * (either fully qualified or unqualified), for isDescendantPath().
    * TODO: Split this method into more logical methods for cleaner code.
    */
   private void loadBlockMetadata(Path dirPath,
@@ -257,15 +259,29 @@ public class HdfsTable extends Table {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Loading block md for " + name_ + " directory " + dirPath.toString());
       }
-      // Clear the state of partitions under dirPath since they are now updated based
-      // on the current snapshot of files in the directory.
-      for (Map.Entry<Path, List<HdfsPartition>> entry: partsByPath.entrySet()) {
-        Path partDir = entry.getKey();
-        if (!FileSystemUtil.isDescendantPath(partDir, dirPath)) continue;
-        for (HdfsPartition partition: entry.getValue()) {
+
+      // Clear the state of partitions under dirPath since they are going to be updated
+      // based on the current snapshot of files in the directory.
+      List<HdfsPartition> dirPathPartitions = partsByPath.get(dirPath);
+      if (dirPathPartitions != null) {
+        // The dirPath is a partition directory. This means the path is the root of an
+        // unpartitioned table, or the path of at least one partition.
+        for (HdfsPartition partition: dirPathPartitions) {
           partition.setFileDescriptors(new ArrayList<FileDescriptor>());
         }
+      } else {
+        // The dirPath is not a partition directory. We expect it to be an ancestor of
+        // partition paths (e.g., the table root). Clear all partitions whose paths are
+        // a descendant of dirPath.
+        for (Map.Entry<Path, List<HdfsPartition>> entry: partsByPath.entrySet()) {
+          Path partDir = entry.getKey();
+          if (!FileSystemUtil.isDescendantPath(partDir, dirPath)) continue;
+          for (HdfsPartition partition: entry.getValue()) {
+            partition.setFileDescriptors(new ArrayList<FileDescriptor>());
+          }
+        }
       }
+
       // For file systems that do not support BlockLocation API, we manually synthesize
       // block location metadata based on file formats.
       if (!FileSystemUtil.supportsStorageIds(fs)) {
@@ -671,7 +687,8 @@ public class HdfsTable extends Table {
     // using createPartition() calls. A single partition path can correspond to multiple
     // partitions.
     HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
-    Path tblLocation = getHdfsBaseDirPath();
+    // Qualify to ensure isDescendantPath() works correctly.
+    Path tblLocation = FileSystemUtil.createFullyQualifiedPath(getHdfsBaseDirPath());
     // List of directories that we scan for block locations. We optimize the block metadata
     // loading to reduce the number of RPCs to the NN by separately loading partitions
     // with default directory paths (under the base table directory) and non-default
@@ -681,7 +698,7 @@ public class HdfsTable extends Table {
     // TODO: We can still do some advanced optimization by grouping all the partition
     // directories under the same ancestor path up the tree.
     List<Path> dirsToLoad = Lists.newArrayList(tblLocation);
-    FileSystem fs = tblLocation.getFileSystem(CONF);
+
     if (msTbl.getPartitionKeysSize() == 0) {
       Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
       // This table has no partition key, which means it has no declared partitions.
@@ -692,6 +709,7 @@ public class HdfsTable extends Table {
       partsByPath.put(tblLocation, Lists.newArrayList(part));
       if (isMarkedCached_) part.markCached();
       addPartition(part);
+      FileSystem fs = tblLocation.getFileSystem(CONF);
       if (fs.exists(tblLocation)) {
         accessLevel_ = getAvailableAccessLevel(fs, tblLocation);
       }
@@ -714,13 +732,17 @@ public class HdfsTable extends Table {
           // WRITE_ONLY the table's access level should be NONE.
           accessLevel_ = TAccessLevel.READ_ONLY;
         }
-        Path partDir = new Path(msPartition.getSd().getLocation());
+
+        // Qualify to ensure isDescendantPath() works correctly.
+        Path partDir = FileSystemUtil.createFullyQualifiedPath(
+            new Path(msPartition.getSd().getLocation()));
         List<HdfsPartition> parts = partsByPath.get(partDir);
         if (parts == null) {
           partsByPath.put(partDir, Lists.newArrayList(partition));
         } else {
           parts.add(partition);
         }
+
         if (!dirsToLoad.contains(partDir) &&
             !FileSystemUtil.isDescendantPath(partDir, tblLocation)) {
           // This partition has a custom filesystem location. Load its file/block
@@ -734,10 +756,10 @@ public class HdfsTable extends Table {
   }
 
   private void loadMetadataAndDiskIds(HdfsPartition partition) throws CatalogException {
-      Path partDirPath = partition.getLocationPath();
-      HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
-      partsByPath.put(partDirPath, Lists.newArrayList(partition));
-      loadMetadataAndDiskIds(Lists.newArrayList(partDirPath), partsByPath);
+    Path partDirPath = partition.getLocationPath();
+    HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
+    partsByPath.put(partDirPath, Lists.newArrayList(partition));
+    loadMetadataAndDiskIds(Lists.newArrayList(partDirPath), partsByPath);
   }
 
   /**
@@ -747,11 +769,13 @@ public class HdfsTable extends Table {
    */
   private void loadMetadataAndDiskIds(List<Path> locations,
       HashMap<Path, List<HdfsPartition>> partsByPath) {
-    LOG.info(String.format("Loading file and block metadata for %s partitions: %s",
-        partsByPath.size(), getFullName()));
+    LOG.info(String.format(
+        "Loading file and block metadata for %s partitions from %s paths: %s",
+        partsByPath.size(), locations.size(), getFullName()));
     for (Path location: locations) { loadBlockMetadata(location, partsByPath); }
-    LOG.info(String.format("Loaded file and block metadata for %s partitions: %s",
-        partsByPath.size(), getFullName()));
+    LOG.info(String.format(
+        "Loaded file and block metadata for %s partitions from %s paths: %s",
+        partsByPath.size(), locations.size(), getFullName()));
   }
 
   /**
