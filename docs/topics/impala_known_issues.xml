@@ -141,6 +141,31 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
 
     </conbody>
 
+    <concept id="IMPALA-1972" rev="IMPALA-1972">
+
+      <title>Queries that take a long time to plan can cause webserver to block other queries</title>
+
+      <conbody>
+
+        <p>
+          Trying to get the details of a query through the debug web page
+          while the query is planning will block new queries that had not
+          started when the web page was requested. The web UI becomes
+          unresponsive until the planning phase is finished.
+        </p>
+
+        <p>
+          <b>Bug:</b> <xref keyref="IMPALA-1972">IMPALA-1972</xref>
+        </p>
+
+        <p>
+          <b>Severity:</b> High
+        </p>
+
+      </conbody>
+
+    </concept>
+
     <concept id="IMPALA-3069" rev="IMPALA-3069">
 
       <title>Setting BATCH_SIZE query option too large can cause a crash</title>
