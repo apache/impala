@@ -1615,7 +1615,7 @@ public class HdfsTable extends Table {
    * partition key column.
    */
   public List<List<String>> getPathsWithoutPartitions() throws CatalogException {
-    List<List<LiteralExpr>> existingPartitions = new ArrayList<List<LiteralExpr>>();
+    HashSet<List<LiteralExpr>> existingPartitions = new HashSet<List<LiteralExpr>>();
     // Get the list of partition values of existing partitions in Hive Metastore.
     for (HdfsPartition partition: partitionMap_.values()) {
       if (partition.isDefaultPartition()) continue;
@@ -1643,7 +1643,7 @@ public class HdfsTable extends Table {
    * type compatibility check. Also these partitions are not already part of the table.
    */
   private void getAllPartitionsNotInHms(Path path, List<String> partitionKeys,
-      List<List<LiteralExpr>> existingPartitions,
+      HashSet<List<LiteralExpr>> existingPartitions,
       List<List<String>> partitionsNotInHms) throws IOException {
     FileSystem fs = path.getFileSystem(CONF);
     // Check whether the base directory exists.
@@ -1671,7 +1671,7 @@ public class HdfsTable extends Table {
    */
   private void getAllPartitionsNotInHms(Path path, List<String> partitionKeys,
       int depth, FileSystem fs, List<String> partitionValues,
-      List<LiteralExpr> partitionExprs, List<List<LiteralExpr>> existingPartitions,
+      List<LiteralExpr> partitionExprs, HashSet<List<LiteralExpr>> existingPartitions,
       List<List<String>> partitionsNotInHms) throws IOException {
     if (depth == partitionKeys.size()) {
       if (existingPartitions.contains(partitionExprs)) {
