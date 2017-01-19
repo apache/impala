@@ -255,7 +255,7 @@ $ sudo apt-get install hadoop-lzo-cdh4 # Optional; if this package is already in
 
   <concept id="upgrade_noncm" rev="upstream">
 
-    <title>Upgrading Impala without Cloudera Manager</title>
+    <title>Upgrading Impala</title>
   <prolog>
     <metadata>
       <!-- Fill in relevant metatag(s) when we decide how to mark non-CM topics. -->

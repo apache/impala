@@ -20,7 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept id="noncm_installation">
 
-  <title>Installing Impala without Cloudera Manager</title>
+  <title>Installing Impala</title>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
