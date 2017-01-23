@@ -31,7 +31,7 @@ from tests.comparison.db_types import (
     Timestamp,
     TinyInt,
     VarChar)
-from tests.comparison.query import InsertStatement, Query
+from tests.comparison.query import InsertClause, Query
 from tests.comparison.query_flattener import QueryFlattener
 
 LOG = getLogger(__name__)
@@ -528,6 +528,20 @@ class ImpalaSqlWriter(SqlWriter):
       result = 'TRIM(%s)' % result
     return result
 
+  def _write_insert_clause(self, insert_clause):
+    sql = super(ImpalaSqlWriter, self)._write_insert_clause(insert_clause)
+    if insert_clause.conflict_action == InsertClause.CONFLICT_ACTION_UPDATE:
+      # The value of sql at this point would be something like:
+      #
+      # INSERT INTO <table name> [(column list)]
+      #
+      # If it happens that the table name or column list contains the text INSERT in an
+      # identifier, we want to ensure that the replace() call below does not alter their
+      # names but instead only modifiers the INSERT keyword to UPSERT.
+      return sql.replace('INSERT', 'UPSERT', 1)
+    else:
+      return sql
+
 
 class OracleSqlWriter(SqlWriter):
 
@@ -643,10 +657,19 @@ class PostgresqlSqlWriter(SqlWriter):
 
   def _write_insert_statement(self, insert_statement):
     sql = SqlWriter._write_insert_statement(self, insert_statement)
-    if insert_statement.conflict_action == InsertStatement.CONFLICT_ACTION_DEFAULT:
+    if insert_statement.conflict_action == InsertClause.CONFLICT_ACTION_DEFAULT:
       pass
-    elif insert_statement.conflict_action == InsertStatement.CONFLICT_ACTION_IGNORE:
+    elif insert_statement.conflict_action == InsertClause.CONFLICT_ACTION_IGNORE:
       sql += '\nON CONFLICT DO NOTHING'
+    elif insert_statement.conflict_action == InsertClause.CONFLICT_ACTION_UPDATE:
+      if insert_statement.updatable_column_names:
+        primary_keys = insert_statement.primary_key_string
+        columns = ',\n'.join('{name} = EXCLUDED.{name}'.format(name=name) for name in
+                             insert_statement.updatable_column_names)
+        sql += '\nON CONFLICT {primary_keys}\nDO UPDATE SET\n{columns}'.format(
+            primary_keys=primary_keys, columns=columns)
+      else:
+        sql += '\nON CONFLICT DO NOTHING'
     else:
       raise Exception('InsertStatement has unsupported conflict_action: {0}'.format(
           insert_statement.conflict_action))

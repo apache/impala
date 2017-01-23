@@ -27,6 +27,7 @@ from tests.comparison.db_types import (
     TYPES,
     Timestamp)
 from tests.comparison.query import (
+    InsertClause,
     InsertStatement,
     Query,
     StatementExecutionMode,
@@ -211,7 +212,10 @@ class DefaultProfile(object):
             'none': 1},
         'VALUES_ITEM_EXPR': {
             'constant': 1,
-            'function': 2}}
+            'function': 2},
+        'INSERT_UPSERT': {
+            InsertClause.CONFLICT_ACTION_IGNORE: 1,
+            InsertClause.CONFLICT_ACTION_UPDATE: 3}}
 
     # On/off switches
     self._flags = {
@@ -631,16 +635,16 @@ class DefaultProfile(object):
 
   def choose_insert_source_clause(self):
     """
-    Returns whether we generate an INSERT SELECT or an INSERT VALUES
+    Returns whether we generate an INSERT/UPSERT SELECT or an INSERT/UPSERT VALUES
     """
     return self._choose_from_weights('INSERT_SOURCE_CLAUSE')
 
   def choose_insert_column_list(self, table):
     """
-    Decide whether or not an INSERT will be in the form of:
-    INSERT INTO table SELECT|VALUES ...
+    Decide whether or not an INSERT/UPSERT will be in the form of:
+    INSERT/UPSERT INTO table SELECT|VALUES ...
     or
-    INSERT INTO table (col1, col2, ...) SELECT|VALUES ...
+    INSERT/UPSERT INTO table (col1, col2, ...) SELECT|VALUES ...
     If the second form, the column list is shuffled. The column list will always contain
     the primary key columns and between 0 and all additional columns.
     """
@@ -649,7 +653,8 @@ class DefaultProfile(object):
       min_additional_insert_cols = 0 if columns_to_insert else 1
       remaining_columns = [col for col in table.cols if not col.is_primary_key]
       shuffle(remaining_columns)
-      additional_column_count = randint(min_additional_insert_cols, len(remaining_columns))
+      additional_column_count = randint(min_additional_insert_cols,
+                                        len(remaining_columns))
       columns_to_insert.extend(remaining_columns[:additional_column_count])
       shuffle(columns_to_insert)
       return columns_to_insert
@@ -658,7 +663,7 @@ class DefaultProfile(object):
 
   def choose_insert_values_row_count(self):
     """
-    Choose the number of rows to insert in an INSERT VALUES
+    Choose the number of rows to insert in an INSERT/UPSERT VALUES
     """
     return self._choose_from_bounds('INSERT_VALUES_ROWS')
 
@@ -668,6 +673,12 @@ class DefaultProfile(object):
     constant or a function.
     """
     return self._choose_from_weights('VALUES_ITEM_EXPR')
+
+  def choose_insert_vs_upsert(self):
+    """
+    Choose whether a particular insertion-type statement will be INSERT or UPSERT.
+    """
+    return self._choose_from_weights('INSERT_UPSERT')
 
 
 class ImpalaNestedTypesProfile(DefaultProfile):

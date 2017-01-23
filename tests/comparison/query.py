@@ -702,19 +702,69 @@ class LimitClause(object):
 
 class InsertClause(object):
 
-  def __init__(self, table, column_list=None):
+  # This enum represents possibilities for different types of INSERTs. A user of this
+  # object, like StatementGenerator, is responsible for setting the conflict_action
+  # value appropriately. These values are valid for the conflict_action parameter.
+  # Because an InsertStatement is a single piece of data shared across multiple SQL
+  # dialects, this setting can alter the written SQL in multiple dialects.
+  #
+  # CONLICT_ACTION_DEFAULT
+  #
+  # For Impala, this is a statement like INSERT INTO hdfs_table SELECT * FROM foo
+  # For PostgreSQL, this is a statement like INSERT INTO hdfs_table SELECT * FROM foo
+  #
+  # Example uses cases: inserting into tables that do not have primary keys, or
+  # inserting into PostgreSQL tables where you want to error if there are attempts to
+  # insert duplicate primary keys
+  #
+  # CONFLICT_ACTION_IGNORE
+  #
+  # For Impala, this is a statement like INSERT INTO kudu_table SELECT * FROM foo
+  # For PostgreSQL, this is a statement like INSERT INTO kudu_table SELECT * FROM foo
+  #                                          ON CONFLICT DO NOTHING
+  #
+  # Example use case: inserting into Kudu tables, where attempts to insert duplicate
+  # primary key rows are ignored by Impala, so they must also be ignored by PostgreSQL.
+  # Note that the *syntax* for INSERT doesn't change with Impala, but because it's a
+  # Kudu table, the behavior differs.
+  #
+  # CONFLICT_ACTION_UPDATE
+  #
+  # For Impala, this is a statement like UPSERT INTO kudu_table SELECT * FROM foo
+  # For PostgreSQL, this is a statement like INSERT INTO kudu_table SELECT * FROM foo
+  #                                          ON CONFLICT DO UPDATE SET
+  #                                          (col1 = EXCLUDED.col1, ...)
+  #
+  # Example use case: upserting into Kudu tables, where attempts to insert duplicate
+  # primary key rows will either insert a single row, or update a single row already
+  # there, without error. In PostgreSQL, UPSERT is written via this "ON CONFLICT DO
+  # UPDATE" clause.
+  #
+  # More on PostgreSQL INSERT/UPSERT syntax here:
+  # https://www.postgresql.org/docs/9.5/static/sql-insert.html
+
+  (CONFLICT_ACTION_DEFAULT,
+   CONFLICT_ACTION_IGNORE,
+   CONFLICT_ACTION_UPDATE) = range(3)
+
+  def __init__(self, table, column_list=None, conflict_action=CONFLICT_ACTION_DEFAULT):
     """
-    Represent an INSERT clause, which is the first half of an INSERT statement. The
-    table is a Table object.
+    Represent an INSERT/UPSERT clause, which is the first half of an INSERT/UPSERT
+    statement. Note that UPSERTs are very similar to INSERTs, so this data structure can
+    easily deal with both.
+
+    The table is a Table object.
 
     column_list is an optional list, tuple, or other sequence of
-    tests.comparison.common.Column objects.
-
-    In an INSERT statement, it's a sequence of column names. See
+    tests.comparison.common.Column objects. In an Impala INSERT/UPSERT SQL statement,
+    it's a sequence of column names. See
     http://www.cloudera.com/documentation/enterprise/latest/topics/impala_insert.html
+
+    conflict_action takes in one of the CONFLICT_ACTION_* class attributes. See above.
     """
     self.table = table
     self.column_list = column_list
+    self.conflict_action = conflict_action
 
 
 class ValuesRow(object):
@@ -728,32 +778,22 @@ class ValuesRow(object):
 class ValuesClause(object):
   def __init__(self, values_rows):
     """
-    Represent the VALUES clause of an INSERT statement. The values_rows is a sequence of
-    ValuesRow objects.
+    Represent the VALUES clause of an INSERT/UPSERT statement. The values_rows is a
+    sequence of ValuesRow objects.
     """
     self.values_rows = values_rows
 
 
 class InsertStatement(AbstractStatement):
 
-  (CONFLICT_ACTION_DEFAULT,
-   CONFLICT_ACTION_IGNORE) = range(2)
-
   def __init__(self, with_clause=None, insert_clause=None, select_query=None,
-               values_clause=None, conflict_action=CONFLICT_ACTION_DEFAULT,
-               execution=None):
+               values_clause=None, execution=None):
     """
-    Represent an INSERT statement. The INSERT may have an optional WithClause, and then
-    either a SELECT query (Query) object from whose rows we INSERT, or a VALUES clause,
-    but not both.
+    Represent an INSERT/UPSERT statement. Note that UPSERTs are very similar to INSERTs,
+    so this data structure can easily deal with both.
 
-    conflict_action takes in one of the CONFLICT_ACTION_* class attributes. On INSERT if
-    the conflict_action is CONFLICT_ACTION_DEFAULT, we write standard INSERT queries.
-
-    If CONFLICT_ACTION_IGNORE is chosen instead, PostgreSQL INSERTs will use "ON
-    CONFLICT DO NOTHING". The syntax doesn't change for Impala, but the implied
-    semantics are needed: if we are INSERTing a Kudu table, conflict_action must be
-    CONFLICT_ACTION_IGNORE.
+    The INSERT/UPSERT may have an optional WithClause, and then either a SELECT query
+    (Query) object from whose rows we INSERT, or a VALUES clause, but not both.
 
     The execution attribute is used by the discrepancy_searcher to track whether this
     InsertStatement is some sort of setup operation or a true random statement test.
@@ -766,7 +806,6 @@ class InsertStatement(AbstractStatement):
     self.values_clause = values_clause
     self.with_clause = with_clause
     self.insert_clause = insert_clause
-    self.conflict_action = conflict_action
 
   @property
   def select_query(self):
@@ -777,7 +816,7 @@ class InsertStatement(AbstractStatement):
     if self.values_clause is None or select_query is None:
       self._select_query = select_query
     else:
-      raise Exception('An INSERT statement may not have both the select_query and '
+      raise Exception('An INSERT/UPSERT statement may not have both the select_query and '
                       'values_clause set: {select}; {values}'.format(
                           select=select_query, values=self.values_clause))
 
@@ -790,7 +829,7 @@ class InsertStatement(AbstractStatement):
     if self.select_query is None or values_clause is None:
       self._values_clause = values_clause
     else:
-      raise Exception('An INSERT statement may not have both the select_query and '
+      raise Exception('An INSERT/UPSERT statement may not have both the select_query and '
                       'values_clause set: {select}; {values}'.format(
                           select=self.select_query, values=values_clause))
 
@@ -815,3 +854,16 @@ class InsertStatement(AbstractStatement):
   @property
   def dml_table(self):
     return self.insert_clause.table
+
+  @property
+  def conflict_action(self):
+    return self.insert_clause.conflict_action
+
+  @property
+  def primary_key_string(self):
+    return '({primary_key_list})'.format(
+        primary_key_list=', '.join(self.insert_clause.table.primary_key_names))
+
+  @property
+  def updatable_column_names(self):
+    return self.insert_clause.table.updatable_column_names

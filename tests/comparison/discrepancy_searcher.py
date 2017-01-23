@@ -660,13 +660,13 @@ class QueryResultDiffSearcher(object):
     copy_select_query.from_clause = FromClause(src_table)
 
     if new_table.primary_keys:
-      conflict_action = InsertStatement.CONFLICT_ACTION_IGNORE
+      conflict_action = InsertClause.CONFLICT_ACTION_IGNORE
     else:
-      conflict_action = InsertStatement.CONFLICT_ACTION_DEFAULT
+      conflict_action = InsertClause.CONFLICT_ACTION_DEFAULT
 
     table_copy_statement = InsertStatement(
-        insert_clause=InsertClause(new_table), select_query=copy_select_query,
-        conflict_action=conflict_action, execution=StatementExecutionMode.DML_SETUP)
+        insert_clause=InsertClause(new_table, conflict_action=conflict_action),
+        select_query=copy_select_query, execution=StatementExecutionMode.DML_SETUP)
 
     result = self.query_result_comparator.compare_query_results(table_copy_statement)
     if result.error:
@@ -703,15 +703,15 @@ class QueryResultDiffSearcher(object):
       dml_table = None
       if issubclass(statement_type, (InsertStatement,)):
         dml_choice_src_table = self.query_profile.choose_table(self.common_tables)
-        # Copy the table we want to INSERT INTO. Do this for the following reasons:
+        # Copy the table we want to INSERT/UPSERT INTO. Do this for the following reasons:
         #
         # 1. If we don't copy, the tables will get larger and larger
         # 2. If we want to avoid tables getting larger and larger, we have to come up
         # with some threshold about when to cut and start over.
-        # 3. If we keep INSERTing into tables and finally find a crash, we have to
-        # replay all previous INSERTs again. Those INSERTs may not produce the same rows
-        # as before. To maximize the chance of bug reproduction, run every INSERT on a
-        # pristine table.
+        # 3. If we keep INSERT/UPSERTing into tables and finally find a crash, we have to
+        # replay all previous INSERT/UPSERTs again. Those INSERTs may not produce the
+        # same rows as before. To maximize the chance of bug reproduction, run every
+        # INSERT/UPSERT on a pristine table.
         dml_table = self._concurrently_copy_table(dml_choice_src_table)
       statement = statement_generator.generate_statement(
           self.common_tables, dml_table=dml_table)

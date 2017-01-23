@@ -87,6 +87,24 @@ KUDU_TABLE = FakeTable(
     ]
 )
 
+FOUR_COL_KUDU_TABLE = FakeTable(
+    'four_col_kudu_table',
+    [
+        FakeColumn('int_col1', Int, is_primary_key=True),
+        FakeColumn('char_col1', Char, is_primary_key=True),
+        FakeColumn('int_col2', Int),
+        FakeColumn('char_col2', Char),
+    ]
+)
+
+
+ONE_COL_KUDU_TABLE = FakeTable(
+    'one_col_kudu_table',
+    [
+        FakeColumn('int_col', Int, is_primary_key=True),
+    ]
+)
+
 # This can't be used inline because we need its table expressions later.
 SIMPLE_WITH_CLAUSE = WithClause(
     TableExprList([
@@ -388,12 +406,13 @@ INSERT_QUERY_TEST_CASES = [
     InsertStatementTest(
         testid='insert into table select cols ignore conflicts',
         query=InsertStatement(
-            insert_clause=InsertClause(KUDU_TABLE),
+            insert_clause=InsertClause(
+                KUDU_TABLE,
+                conflict_action=InsertClause.CONFLICT_ACTION_IGNORE),
             select_query=FakeQuery(
                 select_clause=FakeSelectClause(*SIMPLE_TABLE.cols),
                 from_clause=FromClause(SIMPLE_TABLE)
             ),
-            conflict_action=InsertStatement.CONFLICT_ACTION_IGNORE
         ),
         impala_query_string=(
             'INSERT INTO kudu_table\n'
@@ -414,12 +433,14 @@ INSERT_QUERY_TEST_CASES = [
     InsertStatementTest(
         testid='insert 2 value rows ignore conflicts',
         query=InsertStatement(
-            insert_clause=InsertClause(KUDU_TABLE),
+            insert_clause=InsertClause(
+                KUDU_TABLE,
+                conflict_action=InsertClause.CONFLICT_ACTION_IGNORE,
+            ),
             values_clause=ValuesClause((
                 ValuesRow((Int(1), Char('a'))),
                 ValuesRow((Int(2), Char('b'))),
             )),
-            conflict_action=InsertStatement.CONFLICT_ACTION_IGNORE
         ),
         impala_query_string=(
             'INSERT INTO kudu_table\n'
@@ -439,13 +460,15 @@ INSERT_QUERY_TEST_CASES = [
         testid='insert values seleted from with clause ignore conflicts',
         query=InsertStatement(
             with_clause=SIMPLE_WITH_CLAUSE,
-            insert_clause=InsertClause(KUDU_TABLE,
-                                       column_list=(KUDU_TABLE.cols[0],)),
+            insert_clause=InsertClause(
+                KUDU_TABLE,
+                column_list=(KUDU_TABLE.cols[0],),
+                conflict_action=InsertClause.CONFLICT_ACTION_IGNORE,
+            ),
             select_query=FakeQuery(
                 select_clause=FakeSelectClause(*SIMPLE_WITH_CLAUSE.table_exprs[0].cols),
                 from_clause=FromClause(SIMPLE_WITH_CLAUSE.table_exprs[0])
             ),
-            conflict_action=InsertStatement.CONFLICT_ACTION_IGNORE
         ),
         impala_query_string=(
             'WITH with_view AS (SELECT\n'
@@ -466,5 +489,121 @@ INSERT_QUERY_TEST_CASES = [
             'FROM with_view\n'
             'ON CONFLICT DO NOTHING'
         ),
-    )
+    ),
+    InsertStatementTest(
+        testid='upsert into table select cols',
+        query=InsertStatement(
+            insert_clause=InsertClause(
+                KUDU_TABLE,
+                conflict_action=InsertClause.CONFLICT_ACTION_UPDATE),
+            select_query=FakeQuery(
+                select_clause=FakeSelectClause(*SIMPLE_TABLE.cols),
+                from_clause=FromClause(SIMPLE_TABLE)
+            ),
+        ),
+        impala_query_string=(
+            'UPSERT INTO kudu_table\n'
+            'SELECT\n'
+            'fake_table.int_col,\n'
+            'TRIM(fake_table.char_col)\n'
+            'FROM fake_table'
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table\n'
+            'SELECT\n'
+            'fake_table.int_col,\n'
+            'fake_table.char_col\n'
+            'FROM fake_table\n'
+            'ON CONFLICT (int_col)\n'
+            'DO UPDATE SET\n'
+            'char_col = EXCLUDED.char_col'
+        ),
+    ),
+    InsertStatementTest(
+        testid='upsert 2 value rows',
+        query=InsertStatement(
+            insert_clause=InsertClause(
+                KUDU_TABLE,
+                conflict_action=InsertClause.CONFLICT_ACTION_UPDATE,
+            ),
+            values_clause=ValuesClause((
+                ValuesRow((Int(1), Char('a'))),
+                ValuesRow((Int(2), Char('b'))),
+            )),
+        ),
+        impala_query_string=(
+            'UPSERT INTO kudu_table\n'
+            'VALUES\n'
+            "(1, 'a'),\n"
+            "(2, 'b')"
+        ),
+        postgres_query_string=(
+            'INSERT INTO kudu_table\n'
+            'VALUES\n'
+            "(1, 'a' || ''),\n"
+            "(2, 'b' || '')\n"
+            'ON CONFLICT (int_col)\n'
+            'DO UPDATE SET\n'
+            'char_col = EXCLUDED.char_col'
+        ),
+    ),
+    InsertStatementTest(
+        testid='upsert select into table with multiple pk / updatable columns',
+        query=InsertStatement(
+            insert_clause=InsertClause(
+                FOUR_COL_KUDU_TABLE,
+                conflict_action=InsertClause.CONFLICT_ACTION_UPDATE),
+            select_query=FakeQuery(
+                select_clause=FakeSelectClause(*FOUR_COL_KUDU_TABLE.cols),
+                from_clause=FromClause(FOUR_COL_KUDU_TABLE)
+            ),
+        ),
+        impala_query_string=(
+            'UPSERT INTO four_col_kudu_table\n'
+            'SELECT\n'
+            'four_col_kudu_table.int_col1,\n'
+            'TRIM(four_col_kudu_table.char_col1),\n'
+            'four_col_kudu_table.int_col2,\n'
+            'TRIM(four_col_kudu_table.char_col2)\n'
+            'FROM four_col_kudu_table'
+        ),
+        postgres_query_string=(
+            'INSERT INTO four_col_kudu_table\n'
+            'SELECT\n'
+            'four_col_kudu_table.int_col1,\n'
+            'four_col_kudu_table.char_col1,\n'
+            'four_col_kudu_table.int_col2,\n'
+            'four_col_kudu_table.char_col2\n'
+            'FROM four_col_kudu_table\n'
+            'ON CONFLICT (int_col1, char_col1)\n'
+            'DO UPDATE SET\n'
+            'int_col2 = EXCLUDED.int_col2,\n'
+            'char_col2 = EXCLUDED.char_col2'
+        ),
+    ),
+    InsertStatementTest(
+        testid='upsert select into table with no updatable columns',
+        query=InsertStatement(
+            insert_clause=InsertClause(
+                ONE_COL_KUDU_TABLE,
+                conflict_action=InsertClause.CONFLICT_ACTION_UPDATE),
+            select_query=FakeQuery(
+                select_clause=FakeSelectClause(SIMPLE_TABLE.cols[0]),
+                from_clause=FromClause(SIMPLE_TABLE)
+            ),
+        ),
+        impala_query_string=(
+            'UPSERT INTO one_col_kudu_table\n'
+            'SELECT\n'
+            'fake_table.int_col\n'
+            'FROM fake_table'
+        ),
+        postgres_query_string=(
+            'INSERT INTO one_col_kudu_table\n'
+            'SELECT\n'
+            'fake_table.int_col\n'
+            'FROM fake_table\n'
+            'ON CONFLICT DO NOTHING'
+        ),
+    ),
 ]

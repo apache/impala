@@ -33,20 +33,21 @@ class InsertStatementGenerator(object):
   def __init__(self, profile):
     # QueryProfile-like object
     self.profile = profile
-    # used to generate SELECT queries for INSERT ... SELECT statements;
+    # used to generate SELECT queries for INSERT/UPSERT ... SELECT statements;
     # to ensure state is completely reset, this is created anew with each call to
     # generate_statement()
     self.select_stmt_generator = None
 
   def generate_statement(self, tables, dml_table):
     """
-    Return a randomly generated INSERT statement.
+    Return a randomly generated INSERT or UPSERT statement. Note that UPSERTs are very
+    similar to INSERTs, which is why this generator handles both.
 
     tables should be a list of Table objects. A typical source of such a list comes from
     db_connection.DbCursor.describe_common_tables(). This list describes the possible
-    "sources" of the INSERT's WITH and FROM/WHERE clauses.
+    "sources" of the INSERT/UPSERT's WITH and FROM/WHERE clauses.
 
-    dml_table is a required Table object. The INSERT will be into this table.
+    dml_table is a required Table object. The INSERT/UPSERT will be into this table.
     """
     if not (isinstance(tables, list) and len(tables) > 0 and
             all((isinstance(t, Table) for t in tables))):
@@ -57,23 +58,23 @@ class InsertStatementGenerator(object):
 
     self.select_stmt_generator = QueryGenerator(self.profile)
 
-    if dml_table.primary_keys:
-      insert_statement = InsertStatement(
-          conflict_action=InsertStatement.CONFLICT_ACTION_IGNORE)
-    else:
-      insert_statement = InsertStatement(
-          conflict_action=InsertStatement.CONFLICT_ACTION_DEFAULT)
-
-    insert_statement.execution = StatementExecutionMode.DML_TEST
+    insert_statement = InsertStatement(execution=StatementExecutionMode.DML_TEST)
 
     # Choose whether this is a
-    #   INSERT INTO table SELECT/VALUES
+    #   INSERT/UPSERT INTO table SELECT/VALUES
     # or
-    #   INSERT INTO table (col1, col2, ...) SELECT/VALUES
+    #   INSERT/UPSERT INTO table (col1, col2, ...) SELECT/VALUES
     # If the method returns None, it's the former.
     insert_column_list = self.profile.choose_insert_column_list(dml_table)
+
+    if dml_table.primary_keys:
+      # Having primary keys implies the table is a Kudu table, which makes it subject to
+      # both INSERTs (with automatic ignoring of primary key duplicates) and UPSERTs.
+      conflict_action = self.profile.choose_insert_vs_upsert()
+    else:
+      conflict_action = InsertClause.CONFLICT_ACTION_DEFAULT
     insert_statement.insert_clause = InsertClause(
-        dml_table, column_list=insert_column_list)
+        dml_table, column_list=insert_column_list, conflict_action=conflict_action)
     # We still need to internally track the columns we're inserting. Keep in mind None
     # means "all" without an explicit column list. Since we've already created the
     # InsertClause object though, we can fill this in for ourselves.
@@ -81,7 +82,7 @@ class InsertStatementGenerator(object):
       insert_column_list = dml_table.cols
     insert_item_data_types = [col.type for col in insert_column_list]
 
-    # Decide whether this is INSERT VALUES or INSERT SELECT
+    # Decide whether this is INSERT/UPSERT VALUES or INSERT/UPSERT SELECT
     insert_source_clause = self.profile.choose_insert_source_clause()
 
     if issubclass(insert_source_clause, Query):
@@ -99,7 +100,7 @@ class InsertStatementGenerator(object):
     elif issubclass(insert_source_clause, ValuesClause):
       insert_statement.values_clause = self._generate_values_clause(insert_column_list)
     else:
-      raise Exception('unsupported INSERT source clause: {0}'.format(
+      raise Exception('unsupported INSERT/UPSERT source clause: {0}'.format(
           insert_source_clause))
     return insert_statement
 
