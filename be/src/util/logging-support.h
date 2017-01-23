@@ -23,13 +23,21 @@
 
 namespace impala {
 
-/// InitLoggingSupport registers the native logging functions with JNI. This allows
-/// the Java log4j log messages to be forwarded to Glog.
+class Webserver;
+
+/// Registers the required native logging functions with JNI. This allows the Java log4j
+/// log messages to be forwarded to Glog. Also loads the JNI helper methods to dynamically
+/// change these Java log levels.
 void InitJvmLoggingSupport();
 
 /// Helper function to convert a command line logging flag value (input as an int) to the
 /// matching TLogLevel enum value.
 TLogLevel::type FlagToTLogLevel(int flag);
+
+/// Registers the call back methods for handling dynamic log level changes. Since every
+/// daemon need not include an embedded jvm, dynamic log4j configuration is supported only
+/// when register_log4j_handlers is true.
+void RegisterLogLevelCallbacks(Webserver* webserver, bool register_log4j_handlers);
 
 class LoggingSupport {
  public:

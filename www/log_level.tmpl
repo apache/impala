@@ -1,0 +1,97 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+{{>www/common-header.tmpl}}
+<style type="text/css">
+  .log-level{
+  width: 50%;
+  line-height: 15px
+  }
+</style>
+
+{{?include_log4j_handlers}}
+<h2>Change Java log level (log4j)</h2>
+<div class="log-level">
+<form action="get_java_loglevel">
+  <div class="form-group">
+    <input type="text" class="form-control" name="class" placeholder="e.g. org.apache.impala.analysis.Analyzer">
+  </div>
+  <button type="submit" class="btn btn-primary btn-sm">Get Java Log Level</button>
+  <label>{{get_java_loglevel_result}}</label>
+</form>
+<br>
+<form action="set_java_loglevel">
+  <div class="form-group" name="level">
+    <input type="text" class="form-control" name="class" placeholder="e.g. org.apache.impala.analysis.Analyzer">
+    <br>
+    <div class="col-xs-20">
+      <label>Log level:</label>
+      <select name="level" class="selectpicker" data-style="btn-primary btn-sm">
+        <option value="all">ALL</option>
+        <option value="debug">DEBUG</option>
+        <option value="error">ERROR</option>
+        <option value="fatal">FATAL</option>
+        <option value="info">INFO</option>
+        <option value="off">OFF</option>
+        <option value="trace">TRACE</option>
+        <option value="warn">WARN</option>
+      </select>
+      <button type="submit" class="btn btn-primary btn-sm">Set Java Log Level</button>
+      {{?set_java_loglevel_result}}
+      <strong> Effective log level: {{set_java_loglevel_result}}</strong>
+      {{/set_java_loglevel_result}}
+    </div>
+  </div>
+</form>
+<form action="reset_java_loglevel">
+  <div class="col-xs-20">
+    <button type="submit" class="btn btn-primary btn-sm">Reset Java Log Levels</button>
+    <strong>{{reset_java_loglevel_result}}</strong>
+  </div>
+</form>
+{{/include_log4j_handlers}}
+
+<h2>Change backend logging level (glog)</h2>
+<form action="set_glog_level">
+  <div class="form-group" name="level">
+    <div class="col-xs-20">
+      <label>Log level:</label>
+      <select name="glog" class="selectpicker" data-style="btn-primary btn-sm">
+        <option value="0">0</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+      </select>
+      <button type="submit" class="btn btn-primary btn-sm">Set Glog Level</button>
+      {{?set_glog_level_result}}
+      <strong>&nbsp &nbsp Glog level for --{{set_glog_level_result}}</strong>
+      <strong>&nbsp &nbsp Default glog level: {{default_glog_level}}</strong>
+      {{/set_glog_level_result}}
+    </div>
+  </div>
+</form>
+<form action="reset_glog_level">
+  <div class="col-xs-20">
+    <button type="submit" class="btn btn-primary btn-sm">Reset Glog Levels</button>
+    {{?reset_glog_level_result}}
+    <strong> &nbsp &nbsp Glog logging level for --{{reset_glog_level_result}}</strong>
+    {{/reset_glog_level_result}}
+  </div>
+</form>
+{{>www/common-footer.tmpl}}

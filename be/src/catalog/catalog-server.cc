@@ -23,6 +23,8 @@
 #include "catalog/catalog-util.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/debug-util.h"
+#include "util/logging-support.h"
+#include "util/webserver.h"
 #include "gen-cpp/CatalogInternalService_types.h"
 #include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/CatalogService_types.h"
@@ -202,6 +204,8 @@ void CatalogServer::RegisterWebpages(Webserver* webserver) {
       bind<void>(mem_fn(&CatalogServer::CatalogObjectsUrlCallback), this, _1, _2);
   webserver->RegisterUrlCallback(CATALOG_OBJECT_WEB_PAGE, CATALOG_OBJECT_TEMPLATE,
       catalog_objects_callback, false);
+
+  RegisterLogLevelCallbacks(webserver, true);
 }
 
 void CatalogServer::UpdateCatalogTopicCallback(

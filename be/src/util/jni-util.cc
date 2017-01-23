@@ -190,4 +190,12 @@ Status JniUtil::LoadJniMethod(JNIEnv* env, const jclass& jni_class,
   return Status::OK();
 }
 
+Status JniUtil::LoadStaticJniMethod(JNIEnv* env, const jclass& jni_class,
+    JniMethodDescriptor* descriptor) {
+  (*descriptor->method_id) = env->GetStaticMethodID(jni_class,
+      descriptor->name.c_str(), descriptor->signature.c_str());
+  RETURN_ERROR_IF_EXC(env);
+  return Status::OK();
+}
+
 }

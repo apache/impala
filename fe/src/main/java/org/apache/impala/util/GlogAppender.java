@@ -22,19 +22,30 @@ import java.util.Properties;
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.LogManager;
 import org.apache.log4j.PropertyConfigurator;
 import org.apache.log4j.spi.LoggingEvent;
 
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.JniUtil;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TGetJavaLogLevelParams;
+import org.apache.impala.thrift.TSetJavaLogLevelParams;
 import org.apache.impala.thrift.TLogLevel;
+import org.apache.thrift.protocol.TBinaryProtocol;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 /**
  * log4j appender which calls into C++ code to log messages at their correct severities
  * via glog.
  */
 public class GlogAppender extends AppenderSkeleton {
+  private final static TBinaryProtocol.Factory protocolFactory_ =
+      new TBinaryProtocol.Factory();
+
   // GLOG takes care of formatting, so we don't require a layout
   public boolean requiresLayout() { return false; }
 
@@ -123,7 +134,41 @@ public class GlogAppender extends AppenderSkeleton {
     properties.setProperty("log4j.logger.org.apache.impala",
         log4jLevelForTLogLevel(impalaLogLevel));
     PropertyConfigurator.configure(properties);
-    Logger.getLogger(GlogAppender.class).info(String.format("Logging initialized. " +
+    Logger.getLogger(GlogAppender.class).info(String.format("Logging (re)initialized. " +
         "Impala: %s, All other: %s", impalaLogLevel, otherLogLevel));
+  }
+
+  /**
+   * Get the log4j log level corresponding to a serialized TGetJavaLogLevelParams.
+   */
+  public static String getLogLevel(byte[] serializedParams) throws ImpalaException {
+    TGetJavaLogLevelParams thriftParams = new TGetJavaLogLevelParams();
+    JniUtil.deserializeThrift(protocolFactory_, thriftParams, serializedParams);
+    String className = thriftParams.getClass_name();
+    if (Strings.isNullOrEmpty(className)) return null;
+    return Logger.getLogger(className).getEffectiveLevel().toString();
+  }
+
+  /**
+   * Sets the logging level of a class as per serialized TSetJavaLogLevelParams.
+   */
+  public static String setLogLevel(byte[] serializedParams) throws ImpalaException {
+    TSetJavaLogLevelParams thriftParams = new TSetJavaLogLevelParams();
+    JniUtil.deserializeThrift(protocolFactory_, thriftParams, serializedParams);
+    String className = thriftParams.getClass_name();
+    String logLevel = thriftParams.getLog_level();
+    if (Strings.isNullOrEmpty(className) || Strings.isNullOrEmpty(logLevel)) return null;
+    // Level.toLevel() returns DEBUG for an incorrect logLevel input.
+    Logger.getLogger(className).setLevel(Level.toLevel(logLevel));
+    return Logger.getLogger(className).getEffectiveLevel().toString();
+  }
+
+  /**
+   * Re-initializes the Java log4j logging levels.
+   */
+  public static void resetLogLevels() throws ImpalaException {
+    LogManager.resetConfiguration();
+    Install(TLogLevel.values()[BackendConfig.INSTANCE.getImpalaLogLevel()],
+        TLogLevel.values()[BackendConfig.INSTANCE.getNonImpalaJavaVlogLevel()]);
   }
 };

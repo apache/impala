@@ -27,6 +27,7 @@
 #include "statestore/failure-detector.h"
 #include "rpc/thrift-util.h"
 #include "util/debug-util.h"
+#include "util/logging-support.h"
 #include "util/time.h"
 #include "util/uid-util.h"
 #include "util/webserver.h"
@@ -262,6 +263,8 @@ void Statestore::RegisterWebpages(Webserver* webserver) {
       bind<void>(&Statestore::SubscribersHandler, this, _1, _2);
   webserver->RegisterUrlCallback("/subscribers", "statestore_subscribers.tmpl",
       subscribers_callback);
+
+  RegisterLogLevelCallbacks(webserver, false);
 }
 
 void Statestore::TopicsHandler(const Webserver::ArgumentMap& args,
