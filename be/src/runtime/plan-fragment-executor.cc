@@ -499,13 +499,12 @@ void PlanFragmentExecutor::Close() {
   // Prepare should always have been called, and so runtime_state_ should be set
   DCHECK(prepared_promise_.IsSet());
   if (exec_tree_ != NULL) exec_tree_->Close(runtime_state_.get());
-  runtime_state_->ReleaseResources();
-
   if (mem_usage_sampled_counter_ != NULL) {
+    // This counter references runtime_state_->instance_mem_tracker() so must be
+    // stopped before calling ReleaseResources().
     PeriodicCounterUpdater::StopTimeSeriesCounter(mem_usage_sampled_counter_);
     mem_usage_sampled_counter_ = NULL;
   }
-  closed_ = true;
   // Sanity timer checks
 #ifndef NDEBUG
   int64_t total_time = profile()->total_time_counter()->value();
@@ -516,6 +515,9 @@ void PlanFragmentExecutor::Close() {
   }
   DCHECK_LE(other_time, total_time);
 #endif
+  runtime_state_->ReleaseResources();
+
+  closed_ = true;
 }
 
 }
