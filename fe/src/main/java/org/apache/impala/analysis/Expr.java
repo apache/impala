@@ -316,15 +316,17 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     if (isConstant()) {
       numDistinctValues_ = 1;
     } else {
-      // if this Expr contains slotrefs, we estimate the # of distinct values
-      // to be the maximum such number for any of the slotrefs;
-      // the subclass analyze() function may well want to override this, if it
-      // knows better
-      List<SlotRef> slotRefs = Lists.newArrayList();
-      this.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
       numDistinctValues_ = -1;
-      for (SlotRef slotRef: slotRefs) {
-        numDistinctValues_ = Math.max(numDistinctValues_, slotRef.numDistinctValues_);
+
+      // get the max number of distinct values over all children of this node
+      for (Expr child: children_) {
+        // A constant should not override a -1 from a SlotRef, so we only consider
+        // non-constant expressions. This is functionally similar to considering
+        // only the SlotRefs, except that it allows an Expr to override the values
+        // that come out of its children.
+        if (!child.isConstant()) {
+          numDistinctValues_ = Math.max(numDistinctValues_, child.getNumDistinctValues());
+        }
       }
     }
   }
