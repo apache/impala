@@ -3027,7 +3027,7 @@ public class ParserTest extends FrontendTestBase {
         "       ^\n" +
         "Encountered: FROM\n" +
         "Expected: ALL, CASE, CAST, DEFAULT, DISTINCT, EXISTS, " +
-        "FALSE, IF, INTERVAL, NOT, NULL, " +
+        "FALSE, IF, INTERVAL, NOT, NULL, REPLACE, " +
         "STRAIGHT_JOIN, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // missing from
@@ -3054,7 +3054,7 @@ public class ParserTest extends FrontendTestBase {
         "                           ^\n" +
         "Encountered: EOF\n" +
         "Expected: CASE, CAST, DEFAULT, EXISTS, FALSE, " +
-        "IF, INTERVAL, NOT, NULL, TRUNCATE, TRUE, IDENTIFIER\n");
+        "IF, INTERVAL, NOT, NULL, REPLACE, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -3063,7 +3063,7 @@ public class ParserTest extends FrontendTestBase {
         "                            ^\n" +
         "Encountered: GROUP\n" +
         "Expected: CASE, CAST, DEFAULT, EXISTS, FALSE, " +
-        "IF, INTERVAL, NOT, NULL, TRUNCATE, TRUE, IDENTIFIER\n");
+        "IF, INTERVAL, NOT, NULL, REPLACE, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
@@ -3124,7 +3124,7 @@ public class ParserTest extends FrontendTestBase {
         "                             ^\n" +
         "Encountered: COMMA\n" +
         "Expected: CASE, CAST, DEFAULT, EXISTS, FALSE, " +
-        "IF, INTERVAL, NOT, NULL, TRUNCATE, TRUE, IDENTIFIER\n");
+        "IF, INTERVAL, NOT, NULL, REPLACE, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // Parsing identifiers that have different names printed as EXPECTED
     ParserError("DROP DATA SRC foo",

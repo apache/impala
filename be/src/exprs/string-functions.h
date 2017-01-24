@@ -53,6 +53,10 @@ class StringFunctions {
   static StringVal Lower(FunctionContext*, const StringVal& str);
   static StringVal Upper(FunctionContext*, const StringVal& str);
   static StringVal InitCap(FunctionContext*, const StringVal& str);
+  static void ReplacePrepare(FunctionContext*, FunctionContext::FunctionStateScope);
+  static void ReplaceClose(FunctionContext*, FunctionContext::FunctionStateScope);
+  static StringVal Replace(FunctionContext*, const StringVal& str,
+      const StringVal& pattern, const StringVal& replace);
   static StringVal Reverse(FunctionContext*, const StringVal& str);
   static StringVal Translate(FunctionContext*, const StringVal& str, const StringVal& src,
       const StringVal& dst);

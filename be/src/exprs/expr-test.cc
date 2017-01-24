@@ -36,12 +36,14 @@
 #include "exprs/like-predicate.h"
 #include "exprs/literal.h"
 #include "exprs/null-literal.h"
+#include "exprs/string-functions.h"
 #include "exprs/timestamp-functions.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/hive_metastore_types.h"
 #include "rpc/thrift-client.h"
 #include "rpc/thrift-server.h"
 #include "runtime/runtime-state.h"
+#include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/string-value.h"
@@ -50,6 +52,7 @@
 #include "service/impala-server.h"
 #include "testutil/impalad-query-executor.h"
 #include "testutil/in-process-servers.h"
+#include "udf/udf-test-harness.h"
 #include "util/debug-util.h"
 #include "util/string-parser.h"
 #include "util/test-info.h"
@@ -2084,6 +2087,119 @@ TEST_F(ExprTest, StringFunctions) {
     TestValue(length_aliases[i] + "('abcdefg')", TYPE_INT, 7);
     TestIsNull(length_aliases[i] + "(NULL)", TYPE_INT);
   }
+
+  TestStringValue("replace('aaaaaa', 'a', 'b')", "bbbbbb");
+  TestStringValue("replace('aaaaaa', 'aa', 'b')", "bbb");
+  TestStringValue("replace('aaaaaaa', 'aa', 'b')", "bbba");
+  TestStringValue("replace('zzzaaaaaaqqq', 'a', 'b')", "zzzbbbbbbqqq");
+  TestStringValue("replace('zzzaaaaaaaqqq', 'aa', 'b')", "zzzbbbaqqq");
+  TestStringValue("replace('aaaaaaaaaaaaaaaaaaaa', 'a', 'b')", "bbbbbbbbbbbbbbbbbbbb");
+  TestStringValue("replace('bobobobobo', 'bobo', 'a')", "aabo");
+  TestStringValue("replace('abc', 'abcd', 'a')", "abc");
+  TestStringValue("replace('aaaaaa', '', 'b')", "aaaaaa");
+  TestStringValue("replace('abc', 'abc', '')", "");
+  TestStringValue("replace('abcdefg', 'z', '')", "abcdefg");
+  TestStringValue("replace('', 'zoltan', 'sultan')", "");
+  TestStringValue("replace('strstrstr', 'str', 'strstr')", "strstrstrstrstrstr");
+  TestStringValue("replace('aaaaaa', 'a', '')", "");
+  TestIsNull("replace(NULL, 'foo', 'bar')", TYPE_STRING);
+  TestIsNull("replace('zomg', 'foo', NULL)", TYPE_STRING);
+  TestIsNull("replace('abc', NULL, 'a')", TYPE_STRING);
+
+  // Do some tests with huge strings
+  const int huge_size = 500000;
+  std::string huge_str;
+  huge_str.reserve(huge_size);
+  huge_str.append(huge_size, 'A');
+
+  std::string huge_space;
+  huge_space.reserve(huge_size);
+  huge_space.append(huge_size, ' ');
+
+  std::string huger_str;
+  huger_str.reserve(3 * huge_size);
+  huger_str.append(3 * huge_size, 'A');
+
+  TestStringValue("replace('" + huge_str + "', 'A', ' ')", huge_space);
+  TestStringValue("replace('" + huge_str + "', 'A', '')", "");
+
+  TestStringValue("replace('" + huge_str + "', 'A', 'AAA')", huger_str);
+  TestStringValue("replace('" + huger_str + "', 'AAA', 'A')", huge_str);
+
+  auto* giga_buf = new std::array<uint8_t, StringVal::MAX_LENGTH>;
+  giga_buf->fill('A');
+  (*giga_buf)[0] = 'Z';
+  (*giga_buf)[10] = 'Z';
+  (*giga_buf)[100] = 'Z';
+  (*giga_buf)[1000] = 'Z';
+  (*giga_buf)[StringVal::MAX_LENGTH-1] = 'Z';
+
+  // Hack up a function context so we can call Replace functions directly.
+  MemTracker m;
+  MemPool pool(&m);
+  FunctionContext::TypeDesc str_desc;
+  str_desc.type = FunctionContext::Type::TYPE_STRING;
+  std::vector<FunctionContext::TypeDesc> v(3, str_desc);
+  auto context = UdfTestHarness::CreateTestContext(str_desc, v, nullptr, &pool);
+
+  StringVal giga(static_cast<uint8_t*>(giga_buf->data()), StringVal::MAX_LENGTH);
+  StringVal a("A");
+  StringVal z("Z");
+  StringVal aaa("aaa");
+
+  // Replace z's with a's on giga
+  auto r1 = StringFunctions::Replace(context, giga, z, a);
+  EXPECT_EQ(r1.ptr[0], 'A');
+  EXPECT_EQ(r1.ptr[10], 'A');
+  EXPECT_EQ(r1.ptr[100], 'A');
+  EXPECT_EQ(r1.ptr[1000], 'A');
+  EXPECT_EQ(r1.ptr[StringVal::MAX_LENGTH-1], 'A');
+
+  // Entire string match is legal
+  auto r2 = StringFunctions::Replace(context, giga, giga, a);
+  EXPECT_EQ(r2, a);
+
+  // So is replacing giga with itself
+  auto r3 = StringFunctions::Replace(context, giga, giga, giga);
+  EXPECT_EQ(r3.ptr[0], 'Z');
+  EXPECT_EQ(r3.ptr[10], 'Z');
+  EXPECT_EQ(r3.ptr[100], 'Z');
+  EXPECT_EQ(r3.ptr[1000], 'Z');
+  EXPECT_EQ(r3.ptr[StringVal::MAX_LENGTH-1], 'Z');
+
+  // Expect expansion to fail as soon as possible; test with unallocated string space
+  // This tests overflowing the first allocation.
+  auto* short_buf = new std::array<uint8_t, 4096>;
+  short_buf->fill('A');
+  (*short_buf)[1000] = 'Z';
+  StringVal bam(static_cast<uint8_t*>(short_buf->data()), StringVal::MAX_LENGTH);
+  auto r4 = StringFunctions::Replace(context, bam, z, aaa);
+  EXPECT_TRUE(r4.is_null);
+
+  // Similar test for second overflow.  This tests overflowing on re-allocation.
+  (*short_buf)[4095] = 'Z';
+  StringVal bam2(static_cast<uint8_t*>(short_buf->data()), StringVal::MAX_LENGTH-2);
+  auto r5 = StringFunctions::Replace(context, bam2, z, aaa);
+  EXPECT_TRUE(r5.is_null);
+
+  // Finally, test expanding to exactly MAX_LENGTH
+  // There are 4 Zs in giga4 (not including the trailing one, as we truncate that)
+  StringVal giga4(static_cast<uint8_t*>(giga_buf->data()), StringVal::MAX_LENGTH-8);
+  auto r6 = StringFunctions::Replace(context, giga4, z, aaa);
+  EXPECT_EQ(strncmp((char*)&r6.ptr[0], "aaaA", 4), 0);
+  EXPECT_EQ(r6.len, 1 << 30);
+
+  // Finally, an expansion in the last string position
+  (*giga_buf)[StringVal::MAX_LENGTH-11] = 'Z';
+  StringVal giga5(static_cast<uint8_t*>(giga_buf->data()), StringVal::MAX_LENGTH-10);
+  auto r7 = StringFunctions::Replace(context, giga5, z, aaa);
+  EXPECT_EQ(r7.len, 1 << 30);
+  EXPECT_EQ(strncmp((char*)&r7.ptr[StringVal::MAX_LENGTH-4], "Aaaa", 4), 0);
+
+  UdfTestHarness::CloseContext(context);
+  delete giga_buf;
+  delete short_buf;
+  pool.FreeAll();
 
   TestStringValue("reverse('abcdefg')", "gfedcba");
   TestStringValue("reverse('')", "");

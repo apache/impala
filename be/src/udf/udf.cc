@@ -17,6 +17,7 @@
 
 #include "udf/udf.h"
 
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <assert.h>
@@ -449,6 +450,29 @@ uint8_t* FunctionContextImpl::AllocateLocal(int64_t byte_size) noexcept {
   return buffer;
 }
 
+uint8_t* FunctionContextImpl::ReallocateLocal(uint8_t* ptr, int64_t byte_size) noexcept {
+  assert(!closed_);
+  uint8_t* new_ptr  = pool_->Reallocate(ptr, byte_size);
+  if (UNLIKELY(!CheckAllocResult("FunctionContextImpl::ReallocateLocal",
+      new_ptr, byte_size))) {
+    return NULL;
+  }
+  if (new_ptr != ptr) {
+    auto v = std::find(local_allocations_.rbegin(), local_allocations_.rend(), ptr);
+    assert(v != local_allocations_.rend());
+    // Avoid perf issue; move to end of local allocations on any reallocation and
+    // always start the search from there.
+    if (v != local_allocations_.rbegin()) {
+      *v = *local_allocations_.rbegin();
+    }
+    *local_allocations_.rbegin() = new_ptr;
+  }
+  VLOG_ROW << "Reallocate Local: FunctionContext=" << context_
+           << " ptr=" << reinterpret_cast<void*>(ptr) << " size=" << byte_size
+           << " result=" << reinterpret_cast<void*>(new_ptr);
+  return new_ptr;
+}
+
 void FunctionContextImpl::FreeLocalAllocations() noexcept {
   assert(!closed_);
   if (VLOG_ROW_IS_ON) {
@@ -479,7 +503,6 @@ void FunctionContextImpl::SetNonConstantArgs(
 // expr-ir.cc. This could probably use further investigation.
 StringVal::StringVal(FunctionContext* context, int len) noexcept : len(len), ptr(NULL) {
   if (UNLIKELY(len > StringVal::MAX_LENGTH)) {
-    std::cout << "MAX_LENGTH, Trying to allocate " << len;
     context->SetError("String length larger than allowed limit of "
                       "1 GB character data.");
     len = 0;
@@ -502,6 +525,22 @@ StringVal StringVal::CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t l
     memcpy(result.ptr, buf, len);
   }
   return result;
+}
+
+bool StringVal::Resize(FunctionContext* ctx, int new_len) noexcept {
+  if (UNLIKELY(new_len > StringVal::MAX_LENGTH)) {
+    ctx->SetError("String length larger than allowed limit of 1 GB character data.");
+    len = 0;
+    is_null = true;
+    return false;
+  }
+  auto* new_ptr = ctx->impl()->ReallocateLocal(ptr, new_len);
+  if (new_ptr != nullptr) {
+    ptr = new_ptr;
+    len = new_len;
+    return true;
+  }
+  return false;
 }
 
 // TODO: why doesn't libudasample.so build if this in udf-ir.cc?

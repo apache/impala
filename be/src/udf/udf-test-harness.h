@@ -28,6 +28,8 @@
 #include "udf/udf.h"
 #include "udf/udf-debug.h"
 
+namespace impala { class MemPool; }
+
 namespace impala_udf {
 
 /// Utility class to help test UDFs.
@@ -38,7 +40,7 @@ class UdfTestHarness {
   /// for calling delete on it. This context has additional debugging validation enabled.
   static FunctionContext* CreateTestContext(const FunctionContext::TypeDesc& return_type,
       const std::vector<FunctionContext::TypeDesc>& arg_types,
-      impala::RuntimeState* state = nullptr);
+      impala::RuntimeState* state = nullptr, impala::MemPool* pool = nullptr);
 
   /// Use with test contexts to test use of IsArgConstant() and GetConstantArg().
   /// constant_args should contain an AnyVal* for each argument of the UDF not including

@@ -1931,6 +1931,33 @@ CAUSED BY: InternalException: Could not compile regexp pattern: *
 Error: no argument for repetition operator: *
 ====
 ---- QUERY
+select sum(length(replace(y, x, 'bbbbbbbbbbb')))
+from (select cast(round(float_col) AS STRING) as x, string_col as y
+      from functional.alltypes) v;
+---- TYPES
+BIGINT
+---- RESULTS
+43800
+====
+---- QUERY
+select sum(length(replace(y, '0', x)))
+from (select cast(round(float_col) AS STRING) as x, string_col as y
+      from functional.alltypes) v;
+---- TYPES
+BIGINT
+---- RESULTS
+7300
+====
+---- QUERY
+select sum(length(concat(replace(y, '0', x), replace(y, '0', x))))
+from (select cast(round(float_col) AS STRING) as x, string_col as y
+      from functional.alltypes) v;
+---- TYPES
+BIGINT
+---- RESULTS
+14600
+====
+---- QUERY
 # Test for factorial operator
 select distinct int_col, int_col! from functional.alltypes order by 1
 ---- RESULTS

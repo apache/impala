@@ -23,10 +23,13 @@
 #include <re2/stringpiece.h>
 #include <bitset>
 
+#include <boost/static_assert.hpp>
+
 #include "exprs/anyval-util.h"
 #include "exprs/expr.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple-row.h"
+#include "util/bit-util.h"
 #include "util/coding-util.h"
 #include "util/url-parser.h"
 
@@ -201,6 +204,163 @@ StringVal StringFunctions::InitCap(FunctionContext* context, const StringVal& st
       word_start = false;
     }
   }
+  return result;
+}
+
+struct ReplaceContext {
+  ReplaceContext(StringVal *pattern_in) {
+    pattern = StringValue::FromStringVal(*pattern_in);
+    search = StringSearch(&pattern);
+  }
+  StringValue pattern;
+  StringSearch search;
+};
+
+void StringFunctions::ReplacePrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  if (!context->IsArgConstant(1)) return;
+  DCHECK_EQ(context->GetArgType(1)->type, FunctionContext::TYPE_STRING);
+  StringVal* pattern = reinterpret_cast<StringVal*>(context->GetConstantArg(1));
+  if (pattern->is_null || pattern->len == 0) return;
+
+  struct ReplaceContext* replace = context->Allocate<ReplaceContext>();
+  if (replace != nullptr) {
+    new(replace) ReplaceContext(pattern);
+    context->SetFunctionState(scope, replace);
+  }
+}
+
+void StringFunctions::ReplaceClose(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  ReplaceContext* rptr = reinterpret_cast<ReplaceContext*>
+      (context->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+  if (rptr != nullptr) context->Free(reinterpret_cast<uint8_t*>(rptr));
+}
+
+StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& str,
+    const StringVal& pattern, const StringVal& replace) {
+  DCHECK_LE(str.len, StringVal::MAX_LENGTH);
+  DCHECK_LE(pattern.len, StringVal::MAX_LENGTH);
+  DCHECK_LE(replace.len, StringVal::MAX_LENGTH);
+  if (str.is_null || pattern.is_null || replace.is_null) return StringVal::null();
+  if (pattern.len == 0 || pattern.len > str.len) return str;
+
+  // StringSearch keeps a pointer to the StringValue object, so it must remain
+  // in scope if used.
+  StringSearch search;
+  StringValue needle;
+  const StringSearch *search_ptr;
+  const ReplaceContext* rptr = reinterpret_cast<ReplaceContext*>
+      (context->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+  if (UNLIKELY(rptr == nullptr)) {
+    needle = StringValue::FromStringVal(pattern);
+    search = StringSearch(&needle);
+    search_ptr = &search;
+  } else {
+    search_ptr = &rptr->search;
+  }
+
+  const StringValue haystack = StringValue::FromStringVal(str);
+  int64_t match_pos = search_ptr->Search(&haystack);
+
+  // No match?  Skip everything.
+  if (match_pos < 0) return str;
+
+  DCHECK_GT(pattern.len, 0);
+  DCHECK_GE(haystack.len, pattern.len);
+  int buffer_space;
+  const int delta = replace.len - pattern.len;
+  // MAX_LENGTH is unsigned, so convert back to int to do correctly signed compare
+  DCHECK_LE(delta, static_cast<int>(StringVal::MAX_LENGTH) - 1);
+  if ((delta > 0 && delta < 128) && haystack.len <= 128) {
+    // Quick estimate for potential matches - this heuristic is needed to win
+    // over regexp_replace on expanding patterns.  128 is arbitrarily chosen so
+    // we can't massively over-estimate the buffer size.
+    int matches_possible = 0;
+    char c = pattern.ptr[0];
+    for (int i = 0; i <= haystack.len - pattern.len; ++i) {
+      if (haystack.ptr[i] == c) ++matches_possible;
+    }
+    buffer_space = haystack.len + matches_possible * delta;
+  } else {
+    // Note - cannot overflow because pattern.len is at least one
+    static_assert(StringVal::MAX_LENGTH - 1 + StringVal::MAX_LENGTH <=
+        std::numeric_limits<decltype(buffer_space)>::max(),
+        "Buffer space computation can overflow");
+    buffer_space = haystack.len + delta;
+  }
+
+  StringVal result(context, buffer_space);
+  // If the result went over MAX_LENGTH, we can get a null result back
+  if (UNLIKELY(result.is_null)) return result;
+
+  uint8_t* ptr = result.ptr;
+  int consumed = 0;
+  while (match_pos + pattern.len <= haystack.len) {
+    // Copy in original string
+    const int unmatched_bytes = match_pos - consumed;
+    memcpy(ptr, &haystack.ptr[consumed], unmatched_bytes);
+    DCHECK_LE(ptr - result.ptr + unmatched_bytes, buffer_space);
+    ptr += unmatched_bytes;
+
+    // Copy in replacement - always safe since we always leave room for one more replace
+    DCHECK_LE(ptr - result.ptr + replace.len, buffer_space);
+    memcpy(ptr, replace.ptr, replace.len);
+    ptr += replace.len;
+
+    // Don't want to re-match within already replaced pattern
+    match_pos += pattern.len;
+    consumed = match_pos;
+
+    StringValue haystack_substring = haystack.Substring(match_pos);
+    int match_pos_in_substring = search_ptr->Search(&haystack_substring);
+    if (match_pos_in_substring < 0) break;
+
+    match_pos += match_pos_in_substring;
+
+    // If we had an enlarging pattern, we may need more space
+    if (delta > 0) {
+      const int bytes_produced = ptr - result.ptr;
+      const int bytes_remaining = haystack.len - consumed;
+      DCHECK_LE(bytes_produced, StringVal::MAX_LENGTH);
+      DCHECK_LE(bytes_remaining, StringVal::MAX_LENGTH - 1);
+      // Note: by above, cannot overflow
+      const int min_output = bytes_produced + bytes_remaining;
+      DCHECK_LE(min_output, StringVal::MAX_LENGTH);
+      // Also no overflow: min_output <= MAX_LENGTH and delta <= MAX_LENGTH - 1
+      const int64_t space_needed = min_output + delta;
+      if (UNLIKELY(space_needed > buffer_space)) {
+        // Double at smaller sizes, but don't grow more than a megabyte a
+        // time at larger sizes.  Reasoning: let the allocator do its job
+        // and don't depend on policy here.
+        static_assert(StringVal::MAX_LENGTH % (1 << 20) == 0,
+            "Math requires StringVal::MAX_LENGTH to be a multiple of 1MB");
+        // Must compute next power of two using 64-bit math to avoid signed overflow
+        // The following DCHECK was supposed to be a static assertion, but C++11 is
+        // broken and doesn't declare std::min or std::max to be constexpr.  Fix this
+        // when eventually the minimum supported standard is raised to at least C++14
+        DCHECK_EQ(static_cast<int>(std::min<int64_t>(
+            BitUtil::RoundUpToPowerOfTwo(StringVal::MAX_LENGTH+1),
+            StringVal::MAX_LENGTH + (1 << 20))),
+            StringVal::MAX_LENGTH + (1 << 20));
+        buffer_space = static_cast<int>(std::min<int64_t>(
+            BitUtil::RoundUpToPowerOfTwo(space_needed),
+            space_needed + (1 << 20)));
+        if (UNLIKELY(!result.Resize(context, buffer_space))) return StringVal::null();
+        // Don't forget to move the pointer
+        ptr = result.ptr + bytes_produced;
+      }
+    }
+  }
+
+  // Copy in remainder and re-adjust size
+  const int bytes_remaining = haystack.len - consumed;
+  result.len = ptr - result.ptr + bytes_remaining;
+  DCHECK_LE(result.len, buffer_space);
+  memcpy(ptr, &haystack.ptr[consumed], bytes_remaining);
+
   return result;
 }
 

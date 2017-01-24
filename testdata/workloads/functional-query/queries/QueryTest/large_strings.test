@@ -164,6 +164,24 @@ select length(regexp_replace(s, '.', '++++++++')) from (
 String length larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
+select length(replace(s, ' ', '++++++++')) from (
+  select group_concat(l_comment, "!") s from (
+    select l_comment from tpch.lineitem union all
+    select l_comment from tpch.lineitem) t1
+  ) t2
+---- RESULTS
+625718301
+=====
+---- QUERY
+select replace(x, '+', '000') from (select (replace(s, ' ', '++++++++')) x from (
+  select group_concat(l_comment, "!") s from (
+    select l_comment from tpch.lineitem union all
+    select l_comment from tpch.lineitem) t1
+  ) t2) t3;
+---- CATCH
+String length larger than allowed limit of 1 GB character data
+=====
+---- QUERY
 select trunc(timestamp_col, space(1073741830)) from functional.alltypes
 ---- CATCH
 String length larger than allowed limit of 1 GB character data

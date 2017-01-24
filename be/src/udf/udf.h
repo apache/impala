@@ -582,7 +582,21 @@ struct StringVal : public AnyVal {
   /// If the memory allocation fails, e.g. because the intermediate value would be too
   /// large, the constructor will construct a NULL string and set an error on the function
   /// context.
+  ///
+  /// The memory backing this StringVal is a local allocation, and so doesn't need
+  /// to be explicitly freed.
   StringVal(FunctionContext* context, int len) noexcept;
+
+  /// Reallocate a StringVal that is backed by a local allocation so that it as
+  /// at least as large as len.  May shrink or / expand the string.  If the
+  /// string is expanded, the content of the new space is undefined.
+  ///
+  /// If the resize fails, the original StringVal remains in place.  Callers do not
+  /// otherwise need to be concerned with backing storage, which is allocated from a
+  /// local allocation.
+  ///
+  /// Returns true on success, false on failure.
+  bool Resize(FunctionContext* context, int len) noexcept;
 
   /// Will create a new StringVal with the given dimension and copy the data from the
   /// parameters. In case of an error will return a NULL string and set an error on the

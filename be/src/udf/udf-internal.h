@@ -92,6 +92,11 @@ class FunctionContextImpl {
   /// TODO: free them at the batch level and save some copies?
   uint8_t* AllocateLocal(int64_t byte_size) noexcept;
 
+  /// Resize a local allocation.
+  /// If the new allocation causes the memory limit to be exceeded, the error will be set
+  /// in this object causing the query to fail.
+  uint8_t* ReallocateLocal(uint8_t* ptr, int64_t byte_size) noexcept;
+
   /// Frees all allocations returned by AllocateLocal().
   void FreeLocalAllocations() noexcept;
 

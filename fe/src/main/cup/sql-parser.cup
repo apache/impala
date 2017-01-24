@@ -2633,9 +2633,11 @@ non_pred_expr ::=
   {: RESULT = e; :}
   | analytic_expr:e
   {: RESULT = e; :}
-  /* Since "IF", "TRUNCATE" are keywords, need to special case these functions */
+  /* Since "IF", "REPLACE", "TRUNCATE" are keywords, need to special case these functions */
   | KW_IF LPAREN expr_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr("if", exprs); :}
+  | KW_REPLACE LPAREN expr_list:exprs RPAREN
+  {: RESULT = new FunctionCallExpr("replace", exprs); :}
   | KW_TRUNCATE LPAREN expr_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr("truncate", exprs); :}
   | cast_expr:c
