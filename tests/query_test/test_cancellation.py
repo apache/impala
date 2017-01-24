@@ -20,7 +20,6 @@
 
 import pytest
 import threading
-from random import choice
 from time import sleep
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import ImpalaTestDimension
@@ -195,8 +194,6 @@ class TestCancellationSerial(TestCancellation):
     # Don't run across all cancel delay options unless running in exhaustive mode
     if cls.exploration_strategy() != 'exhaustive':
       cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') in [3])
-      cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('query') ==\
-          choice(QUERIES.keys()))
 
   @pytest.mark.execute_serially
   def test_cancel_insert(self, vector):
