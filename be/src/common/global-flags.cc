@@ -91,7 +91,7 @@ DEFINE_bool(load_auth_to_local_rules, false, "If true, load auth_to_local config
     "hadoop.security.auth_to_local and applies them to translate the Kerberos principal "
     "to its corresponding local user name for authorization.");
 
-// Stress option for testing failed memory allocation. Debug builds only.
+// Stress options that are only enabled in debug builds for testing.
 #ifndef NDEBUG
 DEFINE_int32(stress_free_pool_alloc, 0, "A stress option which causes memory allocations "
     "to fail once every n allocations where n is the value of this flag. Effective in "
@@ -106,6 +106,8 @@ DEFINE_int32(fault_injection_rpc_delay_ms, 0, "A fault injection option that cau
     "Effective in debug builds only.");
 DEFINE_int32(fault_injection_rpc_type, 0, "A fault injection option that specifies "
     "which rpc call will be injected with the delay. Effective in debug builds only.");
+DEFINE_int32(stress_scratch_write_delay_ms, 0, "A stress option which causes writes to "
+    "scratch files to be to be delayed to simulate slow writes.");
 #endif
 
 // Used for testing the path where the Kudu client is stubbed.

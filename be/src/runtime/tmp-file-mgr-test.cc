@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <cstdio>
 #include <cstdlib>
 
 #include <boost/filesystem.hpp>
@@ -38,6 +39,11 @@
 
 using boost::filesystem::path;
 
+DECLARE_bool(disk_spill_encryption);
+#ifndef NDEBUG
+DECLARE_int32(stress_scratch_write_delay_ms);
+#endif
+
 namespace impala {
 
 class TmpFileMgrTest : public ::testing::Test {
@@ -47,6 +53,12 @@ class TmpFileMgrTest : public ::testing::Test {
     profile_ = obj_pool_.Add(new RuntimeProfile(&obj_pool_, "tmp-file-mgr-test"));
     test_env_.reset(new TestEnv);
     cb_counter_ = 0;
+
+    // Reset query options that are modified by tests.
+    FLAGS_disk_spill_encryption = false;
+#ifndef NDEBUG
+    FLAGS_stress_scratch_write_delay_ms = 0;
+#endif
   }
 
   virtual void TearDown() {
@@ -433,6 +445,52 @@ TEST_F(TmpFileMgrTest, TestProcessMemLimitExceeded) {
   unique_ptr<TmpFileMgr::WriteHandle> handle;
   Status status = file_group.Write(MemRange(data.data(), DATA_SIZE), callback, &handle);
   EXPECT_EQ(TErrorCode::CANCELLED, status.code());
+  file_group.Close();
+  test_env_->TearDownQueries();
+}
+
+// Regression test for IMPALA-4820 - encrypted data can get written to disk.
+TEST_F(TmpFileMgrTest, TestEncryptionDuringCancellation) {
+  FLAGS_disk_spill_encryption = true;
+  // A delay is required for this to reproduce the issue, since writes are often buffered
+  // in memory by the OS. The test should succeed regardless of the delay.
+#ifndef NDEBUG
+  FLAGS_stress_scratch_write_delay_ms = 1000;
+#endif
+  TUniqueId id;
+  TmpFileMgr::FileGroup file_group(test_env_->tmp_file_mgr(), io_mgr(), profile_, id);
+
+  // Make the data fairly large so that we have a better chance of cancelling while the
+  // write is in flight
+  const int DATA_SIZE = 8 * 1024 * 1024;
+  string data(DATA_SIZE, ' ');
+  MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), DATA_SIZE);
+
+  // Write out a string repeatedly. We don't want to see this written unencypted to disk.
+  string plaintext("the quick brown fox jumped over the lazy dog");
+  for (int pos = 0; pos + plaintext.size() < DATA_SIZE; pos += plaintext.size()) {
+    memcpy(&data[pos], &plaintext[0], plaintext.size());
+  }
+
+  // Start a write in flight, which should encrypt the data and write it to disk.
+  unique_ptr<TmpFileMgr::WriteHandle> handle;
+  DiskIoMgr::WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+  ASSERT_OK(file_group.Write(data_mem_range, callback, &handle));
+  string file_path = handle->TmpFilePath();
+
+  // Cancel the write - prior to the IMPALA-4820 fix decryption could race with the write.
+  ASSERT_OK(file_group.CancelWriteAndRestoreData(move(handle), data_mem_range));
+  WaitForCallbacks(1);
+
+  // Read the data from the scratch file and check that the plaintext isn't present.
+  FILE* file = fopen(file_path.c_str(), "r");
+  ASSERT_EQ(DATA_SIZE, fread(&data[0], 1, DATA_SIZE, file));
+  for (int pos = 0; pos + plaintext.size() < DATA_SIZE; pos += plaintext.size()) {
+    ASSERT_NE(0, memcmp(&data[pos], &plaintext[0], plaintext.size()))
+        << file_path << "@" << pos;
+  }
+  fclose(file);
   file_group.Close();
   test_env_->TearDownQueries();
 }

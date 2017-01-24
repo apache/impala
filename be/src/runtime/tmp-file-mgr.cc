@@ -418,14 +418,13 @@ Status TmpFileMgr::FileGroup::CancelWriteAndRestoreData(
   DCHECK_EQ(handle->len(), buffer.len());
   handle->Cancel();
 
-  // Decrypt regardless of whether the write is still in flight or not. An in-flight
-  // write may write bogus data to disk but this lets us get some work done while the
-  // write is being cancelled.
+  handle->WaitForWrite();
+  // Decrypt after the write is finished, so that we don't accidentally write decrypted
+  // data to disk.
   Status status;
   if (FLAGS_disk_spill_encryption) {
     status = handle->CheckHashAndDecrypt(buffer);
   }
-  handle->WaitForWrite();
   RecycleFileRange(move(handle));
   return status;
 }

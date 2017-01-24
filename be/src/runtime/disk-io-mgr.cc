@@ -23,8 +23,12 @@
 #include "gutil/bits.h"
 #include "gutil/strings/substitute.h"
 #include "util/hdfs-util.h"
+#include "util/time.h"
 
 DECLARE_bool(disable_mem_pools);
+#ifndef NDEBUG
+DECLARE_int32(stress_scratch_write_delay_ms);
+#endif
 
 #include "common/names.h"
 
@@ -1197,6 +1201,11 @@ Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
         write_range->file_, write_range->offset(), errno, GetStrErrMsg())));
   }
 
+#ifndef NDEBUG
+  if (FLAGS_stress_scratch_write_delay_ms > 0) {
+    SleepForMs(FLAGS_stress_scratch_write_delay_ms);
+  }
+#endif
   int64_t bytes_written = fwrite(write_range->data_, 1, write_range->len_, file_handle);
   if (bytes_written < write_range->len_) {
     return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
