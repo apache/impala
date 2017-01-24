@@ -321,12 +321,35 @@ TimestampVal TimestampFunctions::Now(FunctionContext* context) {
   return return_val;
 }
 
+// Writes 'num' as ASCII into 'dst'. If necessary, adds leading zeros to make the ASCII
+// representation exactly 'len' characters. Both 'num' and 'len' must be >= 0.
+static inline void IntToChar(uint8_t* dst, int num, int len) {
+  DCHECK_GE(len, 0);
+  DCHECK_GE(num, 0);
+  for (int i = len - 1; i >= 0; --i) {
+    *(dst + i) = '0' + (num % 10);
+    num /= 10;
+  }
+}
+
 StringVal TimestampFunctions::ToDate(FunctionContext* context,
     const TimestampVal& ts_val) {
   if (ts_val.is_null) return StringVal::null();
   const TimestampValue ts_value = TimestampValue::FromTimestampVal(ts_val);
-  string result = ToIsoExtendedString(ts_value);
-  return AnyValUtil::FromString(context, result);
+  // Defensively, return NULL if the timestamp does not have a date portion. Some of
+  // our built-in functions might incorrectly return such a malformed timestamp.
+  if (!ts_value.HasDate()) return StringVal::null();
+  DCHECK(ts_value.IsValidDate());
+  StringVal result(context, 10);
+  result.len = 10;
+  // Fill in year, month, and day.
+  IntToChar(result.ptr, ts_value.date().year(), 4);
+  IntToChar(result.ptr + 5, ts_value.date().month(), 2);
+  IntToChar(result.ptr + 8, ts_value.date().day(), 2);
+  // Fill in dashes.
+  result.ptr[7] = '-';
+  result.ptr[4] = '-';
+  return result;
 }
 
 inline bool IsLeapYear(int year) {

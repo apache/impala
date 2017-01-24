@@ -185,8 +185,6 @@ class TimestampFunctions {
       const StringVal& format, bool is_error);
 
  private:
-  static std::string ToIsoExtendedString(const TimestampValue& ts_value);
-
   /// Static result values for DayName() function.
   static const char* MONDAY;
   static const char* TUESDAY;

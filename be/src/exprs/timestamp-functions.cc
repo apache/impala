@@ -40,14 +40,6 @@ using boost::posix_time::to_iso_extended_string;
 
 namespace impala {
 
-// This function is not cross-compiled to avoid including unnecessary boost library's
-// header files which bring in a bunch of unused code and global variables and increase
-// the codegen time. boost::posix_time::to_iso_extended_string() is large enough that
-// it won't benefit much from inlining.
-string TimestampFunctions::ToIsoExtendedString(const TimestampValue& ts_value) {
-  return to_iso_extended_string(ts_value.date());
-}
-
 namespace {
 /// Uses Boost's internal checking to throw an exception if 'date' is out of the
 /// supported range of boost::gregorian.
