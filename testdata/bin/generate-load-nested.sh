@@ -53,6 +53,10 @@ while getopts ":n:e:i:f" OPTION; do
   esac
 done
 
+if $FLATTEN; then
+  mvn -f "${IMPALA_HOME}/testdata/TableFlattener/pom.xml" package;
+fi
+
 RANDOM_SCHEMA_GENERATOR=${IMPALA_HOME}/testdata/bin/random_avro_schema.py;
 HDFS_DIR=/test-warehouse/random_nested_data
 

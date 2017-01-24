@@ -1,0 +1,22 @@
+This is a tool to convert a nested dataset to an unnested dataset. The source and/or
+destination can be the local file system or HDFS.
+
+Structs get converted to a column (with a long name). Arrays and Maps get converted to
+a table which can be joined with the parent table on id column.
+
+$ mvn exec:java \
+    -Dexec.mainClass=org.apache.impala.infra.tableflattener.Main \
+    -Dexec.arguments="file:///tmp/in.parquet,file:///tmp/out,-sfile:///tmp/in.avsc"
+
+$ mvn exec:java \
+    -Dexec.mainClass=org.apache.impala.infra.tableflattener.Main \
+    -Dexec.arguments="hdfs://localhost:20500/nested.avro,file://$PWD/unnested"
+
+There are various options to specify the type of input file but the output is always
+parquet/snappy.
+
+For additional help, use the following command:
+$ mvn exec:java \
+    -Dexec.mainClass=org.apache.impala.infra.tableflattener.Main -Dexec.arguments="--help"
+
+This is used by testdata/bin/generate-load-nested.sh.
