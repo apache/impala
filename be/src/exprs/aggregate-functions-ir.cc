@@ -1331,7 +1331,7 @@ DoubleVal AggregateFunctions::KnuthVarFinalize(
     FunctionContext* ctx, const StringVal& state_sv) {
   DCHECK(!state_sv.is_null);
   KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
-  if (state->count == 0) return DoubleVal::null();
+  if (state->count == 0 || state->count == 1) return DoubleVal::null();
   double variance = ComputeKnuthVariance(*state, false);
   return DoubleVal(variance);
 }
@@ -1350,7 +1350,7 @@ DoubleVal AggregateFunctions::KnuthStddevFinalize(FunctionContext* ctx,
   DCHECK(!state_sv.is_null);
   DCHECK_EQ(state_sv.len, sizeof(KnuthVarianceState));
   KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
-  if (state->count == 0) return DoubleVal::null();
+  if (state->count == 0 || state->count == 1) return DoubleVal::null();
   return sqrt(ComputeKnuthVariance(*state, false));
 }
 

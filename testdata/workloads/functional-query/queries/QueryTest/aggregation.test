@@ -22,14 +22,15 @@ NULL,NULL,NULL,NULL
 double, double, double, double
 ====
 ---- QUERY
-# exactly 1 tuple processed (variance & stddev are 0)
-SELECT variance(tinyint_col), stddev(smallint_col), variance_pop(int_col),
-stddev_pop(bigint_col)
+# exactly 1 tuple processed (variance_pop & stddev_pop are 0, stddev and variance
+# are NULL)
+SELECT variance(tinyint_col), variance_samp(smallint_col), variance_pop(int_col),
+stddev(smallint_col), stddev_samp(smallint_col), stddev_pop(bigint_col)
 from alltypesagg WHERE id = 1006
 ---- RESULTS
-0,0,0,0
+NULL,NULL,0,NULL,NULL,0
 ---- TYPES
-double, double, double, double
+double, double, double, double, double, double
 ====
 ---- QUERY
 # Includes one row which is null, and test the aliases for variance() as well
