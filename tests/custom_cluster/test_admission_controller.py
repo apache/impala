@@ -296,7 +296,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args=impalad_admission_ctrl_flags(1, 1, 1234, 1024 * 1024 * 1024),
+      impalad_args=impalad_admission_ctrl_flags(1, 1, 10 * 1024 * 1024,
+          1024 * 1024 * 1024),
       statestored_args=_STATESTORED_ARGS)
   def test_trivial_coord_query_limits(self):
     """Tests that trivial coordinator only queries have negligible resource requirements.
@@ -311,7 +312,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         "select * from functional.alltypestiny"]
     for query in non_trivial_queries:
       ex = self.execute_query_expect_failure(self.client, query)
-      assert "memory needed 4.00 GB is greater than pool max mem resources" in str(ex)
+      assert re.search("Rejected query from pool default-pool : request memory needed "
+          ".* is greater than pool max mem resources 10.00 MB", str(ex))
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions

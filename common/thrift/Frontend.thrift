@@ -387,12 +387,10 @@ struct TQueryExecRequest {
   7: required Types.TStmtType stmt_type
 
   // Estimated per-host peak memory consumption in bytes. Used for resource management.
-  8: optional i64 per_host_mem_req
+  8: optional i64 per_host_mem_estimate
 
-  // Estimated per-host CPU requirements in YARN virtual cores.
-  // Used for resource management.
-  // TODO: Remove this and associated code in Planner.
-  9: optional i16 per_host_vcores
+  // Minimum buffer reservation required per host in bytes.
+  9: optional i64 per_host_min_reservation;
 
   // List of replica hosts.  Used by the host_idx field of TScanRangeLocation.
   10: required list<Types.TNetworkAddress> host_list

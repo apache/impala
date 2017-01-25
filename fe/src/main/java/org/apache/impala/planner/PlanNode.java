@@ -65,6 +65,10 @@ import com.google.common.math.LongMath;
 abstract public class PlanNode extends TreeNode<PlanNode> {
   private final static Logger LOG = LoggerFactory.getLogger(PlanNode.class);
 
+  // The size of buffer used in spilling nodes. Used in computeResourceProfile().
+  // TODO: IMPALA-3200: get from query option
+  protected final static long SPILLABLE_BUFFER_BYTES = 8L * 1024L * 1024L;
+
   // String used for this node in getExplainString().
   protected String displayName_;
 
@@ -110,12 +114,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // set in computeStats(); invalid: -1
   protected int numNodes_;
 
+  // resource requirements and estimates for this plan node.
+  // set in computeResourceProfile().
+  protected ResourceProfile resourceProfile_ = null;
+
   // sum of tupleIds_' avgSerializedSizes; set in computeStats()
   protected float avgRowSize_;
-
-  // estimated per-host memory requirement for this node;
-  // set in computeCosts(); invalid: -1
-  protected long perHostMemCost_ = -1;
 
   // If true, disable codegen for this plan node.
   protected boolean disableCodegen_;
@@ -187,9 +191,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
   public long getLimit() { return limit_; }
   public boolean hasLimit() { return limit_ > -1; }
-  public long getPerHostMemCost() { return perHostMemCost_; }
   public long getCardinality() { return cardinality_; }
   public int getNumNodes() { return numNodes_; }
+  public ResourceProfile getResourceProfile() { return resourceProfile_; }
   public float getAvgRowSize() { return avgRowSize_; }
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
   public PlanFragment getFragment() { return fragment_; }
@@ -235,8 +239,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     conjuncts_.clear();
   }
 
-  public String getExplainString() {
-    return getExplainString("", "", TExplainLevel.VERBOSE);
+  public String getExplainString(TQueryOptions queryOptions) {
+    return getExplainString("", "", queryOptions, TExplainLevel.VERBOSE);
   }
 
   protected void setDisplayName(String s) { displayName_ = s; }
@@ -269,7 +273,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * output will be prefixed by prefix.
    */
   protected final String getExplainString(String rootPrefix, String prefix,
-      TExplainLevel detailLevel) {
+      TQueryOptions queryOptions, TExplainLevel detailLevel) {
     StringBuilder expBuilder = new StringBuilder();
     String detailPrefix = prefix;
     String filler;
@@ -302,11 +306,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     // Output cardinality, cost estimates and tuple Ids only when explain plan level
     // is extended or above.
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
-      // Print estimated output cardinality and memory cost.
-      expBuilder.append(PrintUtils.printHosts(detailPrefix, numNodes_));
-      expBuilder.append(PrintUtils.printMemCost(" ", perHostMemCost_) + "\n");
+      // Print resource profile.
+      expBuilder.append(detailPrefix);
+      expBuilder.append(resourceProfile_.getExplainString());
+      expBuilder.append("\n");
 
-      // Print tuple ids and row size.
+      // Print tuple ids, row size and cardinality.
       expBuilder.append(detailPrefix + "tuple-ids=");
       for (int i = 0; i < tupleIds_.size(); ++i) {
         TupleId tupleId = tupleIds_.get(i);
@@ -331,15 +336,23 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
           // we're crossing a fragment boundary
           expBuilder.append(
               child.fragment_.getExplainString(
-                childHeadlinePrefix, childDetailPrefix, detailLevel));
+                childHeadlinePrefix, childDetailPrefix, queryOptions, detailLevel));
         } else {
-          expBuilder.append(
-              child.getExplainString(childHeadlinePrefix, childDetailPrefix,
-                  detailLevel));
+          expBuilder.append(child.getExplainString(childHeadlinePrefix,
+              childDetailPrefix, queryOptions, detailLevel));
         }
         if (printFiller) expBuilder.append(filler + "\n");
       }
-      expBuilder.append(children_.get(0).getExplainString(prefix, prefix, detailLevel));
+      PlanFragment childFragment = children_.get(0).fragment_;
+      if (fragment_ != childFragment && detailLevel == TExplainLevel.EXTENDED) {
+        // we're crossing a fragment boundary - print the fragment header.
+        expBuilder.append(prefix);
+        expBuilder.append(
+            childFragment.getFragmentHeaderString(queryOptions.getMt_dop()));
+        expBuilder.append("\n");
+      }
+      expBuilder.append(
+          children_.get(0).getExplainString(prefix, prefix, queryOptions, detailLevel));
     }
     return expBuilder.toString();
   }
@@ -379,7 +392,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
     TExecStats estimatedStats = new TExecStats();
     estimatedStats.setCardinality(cardinality_);
-    estimatedStats.setMemory_used(perHostMemCost_);
+    estimatedStats.setMemory_used(resourceProfile_.getMemEstimateBytes());
     msg.setLabel(getDisplayLabel());
     msg.setLabel_detail(getDisplayLabelDetail());
     msg.setEstimated_stats(estimatedStats);
@@ -605,13 +618,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public boolean isBlockingNode() { return false; }
 
   /**
-   * Estimates the cost of executing this PlanNode. Currently only sets perHostMemCost_.
-   * May only be called after this PlanNode has been placed in a PlanFragment because
-   * the cost computation is dependent on the enclosing fragment's data partition.
+   * Compute resources consumed when executing this PlanNode, initializing
+   * 'resource_profile_'. May only be called after this PlanNode has been placed in a
+   * PlanFragment because the cost computation is dependent on the enclosing fragment's
+   * data partition.
    */
-  public void computeCosts(TQueryOptions queryOptions) {
-    perHostMemCost_ = 0;
-  }
+  public abstract void computeResourceProfile(TQueryOptions queryOptions);
 
   /**
    * The input cardinality is the sum of output cardinalities of its children.

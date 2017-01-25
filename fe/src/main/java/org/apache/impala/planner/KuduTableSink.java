@@ -23,11 +23,11 @@ import java.util.List;
 
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.common.PrintUtils;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TKuduTableSink;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTableSinkType;
 
@@ -51,17 +51,16 @@ public class KuduTableSink extends TableSink {
   }
 
   @Override
-  public String getExplainString(String prefix, String detailPrefix,
-      TExplainLevel explainLevel) {
-    StringBuilder output = new StringBuilder();
+  public void appendSinkExplainString(String prefix, String detailPrefix,
+      TQueryOptions queryOptions, TExplainLevel explainLevel, StringBuilder output) {
     output.append(prefix + sinkOp_.toExplainString());
     output.append(" KUDU [" + targetTable_.getFullName() + "]\n");
-    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
-      output.append(PrintUtils.printHosts(detailPrefix, fragment_.getNumNodes()));
-      output.append(PrintUtils.printMemCost(" ", perHostMemCost_));
-      output.append("\n");
-    }
-    return output.toString();
+  }
+
+  @Override
+  public void computeResourceProfile(TQueryOptions queryOptions) {
+    // TODO: add a memory estimate
+    resourceProfile_ = new ResourceProfile(0, 0);
   }
 
   @Override

@@ -43,6 +43,7 @@ import org.apache.impala.thrift.TKuduScanNode;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
@@ -272,6 +273,11 @@ public class KuduScanNode extends ScanNode {
     if (LOG.isTraceEnabled()) {
       LOG.trace("computeStats KuduScan: cardinality=" + Long.toString(cardinality_));
     }
+  }
+
+  @Override
+  public void computeResourceProfile(TQueryOptions queryOptions) {
+    resourceProfile_ = new ResourceProfile(0, 0);
   }
 
   @Override

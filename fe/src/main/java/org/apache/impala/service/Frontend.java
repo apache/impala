@@ -962,6 +962,9 @@ public class Frontend {
       }
     }
 
+    // Clear pre-existing lists to avoid adding duplicate entries in FE tests.
+    queryCtx.unsetTables_missing_stats();
+    queryCtx.unsetTables_with_corrupt_stats();
     for (TTableName tableName: tablesMissingStats) {
       queryCtx.addToTables_missing_stats(tableName);
     }
@@ -970,16 +973,6 @@ public class Frontend {
     }
     for (TTableName tableName: tablesWithMissingDiskIds) {
       queryCtx.addToTables_missing_diskids(tableName);
-    }
-
-    // Compute resource requirements after scan range locations because the cost
-    // estimates of scan nodes rely on them.
-    try {
-      planner.computeResourceReqs(fragments, true, queryExecRequest);
-    } catch (Exception e) {
-      // Turn exceptions into a warning to allow the query to execute.
-      LOG.error("Failed to compute resource requirements for query\n" +
-          queryCtx.client_request.getStmt(), e);
     }
 
     // The fragment at this point has all state set, serialize it to thrift.
@@ -1019,6 +1012,10 @@ public class Frontend {
       result.addToPlan_exec_info(
           createPlanExecInfo(planRoot, planner, queryCtx, result));
     }
+
+    // Compute resource requirements after scan range locations because the cost
+    // estimates of scan nodes rely on them.
+    planner.computeResourceReqs(planRoots, result);
 
     // Optionally disable spilling in the backend. Allow spilling if there are plan hints
     // or if all tables have stats.

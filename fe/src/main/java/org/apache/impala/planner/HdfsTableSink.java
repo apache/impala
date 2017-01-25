@@ -24,11 +24,11 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.common.PrintUtils;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.THdfsTableSink;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTableSinkType;
 import com.google.common.base.Preconditions;
@@ -39,7 +39,8 @@ import com.google.common.collect.Lists;
  *
  */
 public class HdfsTableSink extends TableSink {
-  // Default number of partitions used for computeCosts() in the absence of column stats.
+  // Default number of partitions used for computeResourceProfile() in the absence of
+  // column stats.
   protected final long DEFAULT_NUM_PARTITIONS = 10;
 
   // Exprs for computing the output partition(s).
@@ -67,31 +68,37 @@ public class HdfsTableSink extends TableSink {
   }
 
   @Override
-  public void computeCosts() {
+  public void computeResourceProfile(TQueryOptions queryOptions) {
     HdfsTable table = (HdfsTable) targetTable_;
     // TODO: Estimate the memory requirements more accurately by partition type.
     HdfsFileFormat format = table.getMajorityFormat();
     PlanNode inputNode = fragment_.getPlanRoot();
-    int numNodes = fragment_.getNumNodes();
-    // Compute the per-host number of partitions, taking the number of nodes
+    int numInstances = fragment_.getNumInstances(queryOptions.getMt_dop());
+    // Compute the per-instance number of partitions, taking the number of nodes
     // and the data partition of the fragment executing this sink into account.
-    long numPartitions = fragment_.getNumDistinctValues(partitionKeyExprs_);
-    if (numPartitions == -1) numPartitions = DEFAULT_NUM_PARTITIONS;
+    long numPartitionsPerInstance =
+        fragment_.getPerInstanceNdv(queryOptions.getMt_dop(), partitionKeyExprs_);
+    if (numPartitionsPerInstance == -1) {
+      numPartitionsPerInstance = DEFAULT_NUM_PARTITIONS;
+    }
     long perPartitionMemReq = getPerPartitionMemReq(format);
 
+    long perInstanceMemEstimate;
     // The estimate is based purely on the per-partition mem req if the input cardinality_
     // or the avg row size is unknown.
     if (inputNode.getCardinality() == -1 || inputNode.getAvgRowSize() == -1) {
-      perHostMemCost_ = numPartitions * perPartitionMemReq;
-      return;
+      perInstanceMemEstimate = numPartitionsPerInstance * perPartitionMemReq;
+    } else {
+      // The per-partition estimate may be higher than the memory required to buffer
+      // the entire input data.
+      long perInstanceInputCardinality =
+          Math.max(1L, inputNode.getCardinality() / numInstances);
+      long perInstanceInputBytes =
+          (long) Math.ceil(perInstanceInputCardinality * inputNode.getAvgRowSize());
+      perInstanceMemEstimate =
+          Math.min(perInstanceInputBytes, numPartitionsPerInstance * perPartitionMemReq);
     }
-
-    // The per-partition estimate may be higher than the memory required to buffer
-    // the entire input data.
-    long perHostInputCardinality = Math.max(1L, inputNode.getCardinality() / numNodes);
-    long perHostInputBytes =
-        (long) Math.ceil(perHostInputCardinality * inputNode.getAvgRowSize());
-    perHostMemCost_ = Math.min(perHostInputBytes, numPartitions * perPartitionMemReq);
+    resourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
   }
 
   /**
@@ -100,10 +107,19 @@ public class HdfsTableSink extends TableSink {
    */
   private long getPerPartitionMemReq(HdfsFileFormat format) {
     switch (format) {
-      // Writing to a Parquet table requires up to 1GB of buffer per partition.
-      // TODO: The per-partition memory requirement is configurable in the QueryOptions.
-      case PARQUET: return 1024L * 1024L * 1024L;
-      case TEXT: return 100L * 1024L;
+      case PARQUET:
+        // Writing to a Parquet table requires up to 1GB of buffer per partition.
+        // TODO: The per-partition memory requirement is configurable in the QueryOptions.
+        return 1024L * 1024L * 1024L;
+      case TEXT:
+      case LZO_TEXT:
+        // Very approximate estimate of amount of data buffered.
+        return 100L * 1024L;
+      case RC_FILE:
+      case SEQUENCE_FILE:
+      case AVRO:
+        // Very approximate estimate of amount of data buffered.
+        return 100L * 1024L;
       default:
         Preconditions.checkState(false, "Unsupported TableSink format " +
             format.toString());
@@ -112,9 +128,8 @@ public class HdfsTableSink extends TableSink {
   }
 
   @Override
-  public String getExplainString(String prefix, String detailPrefix,
-      TExplainLevel explainLevel) {
-    StringBuilder output = new StringBuilder();
+  public void appendSinkExplainString(String prefix, String detailPrefix,
+      TQueryOptions queryOptions, TExplainLevel explainLevel, StringBuilder output) {
     String overwriteStr = ", OVERWRITE=" + (overwrite_ ? "true" : "false");
     String partitionKeyStr = "";
     if (!partitionKeyExprs_.isEmpty()) {
@@ -139,13 +154,7 @@ public class HdfsTableSink extends TableSink {
             + (totalNumPartitions == 0 ? 1 : totalNumPartitions));
       }
       output.append("\n");
-      if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
-        output.append(PrintUtils.printHosts(detailPrefix, fragment_.getNumNodes()));
-        output.append(PrintUtils.printMemCost(" ", perHostMemCost_));
-        output.append("\n");
-      }
     }
-    return output.toString();
   }
 
   @Override

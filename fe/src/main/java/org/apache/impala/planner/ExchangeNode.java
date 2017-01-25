@@ -29,6 +29,7 @@ import org.apache.impala.thrift.TExchangeNode;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
 import com.google.common.base.Preconditions;
 
@@ -181,6 +182,12 @@ public class ExchangeNode extends PlanNode {
   public static double getAvgSerializedRowSize(PlanNode exchInput) {
     return exchInput.getAvgRowSize() +
         (exchInput.getTupleIds().size() * PER_TUPLE_SERIALIZATION_OVERHEAD);
+  }
+
+  @Override
+  public void computeResourceProfile(TQueryOptions queryOptions) {
+    // TODO: add an estimate
+    resourceProfile_ =  new ResourceProfile(0, 0);
   }
 
   @Override

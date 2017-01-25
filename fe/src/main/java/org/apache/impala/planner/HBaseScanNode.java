@@ -494,9 +494,9 @@ public class HBaseScanNode extends ScanNode {
   }
 
   @Override
-  public void computeCosts(TQueryOptions queryOptions) {
+  public void computeResourceProfile(TQueryOptions queryOptions) {
     // TODO: What's a good estimate of memory consumption?
-    perHostMemCost_ = 1024L * 1024L * 1024L;
+    resourceProfile_ =  new ResourceProfile(1024L * 1024L * 1024L, 0);
   }
 
   /**

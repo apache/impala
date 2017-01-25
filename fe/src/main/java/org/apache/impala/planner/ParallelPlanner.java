@@ -17,18 +17,13 @@
 
 package org.apache.impala.planner;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.impala.common.IdGenerator;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 /**
  * The parallel planner is responsible for breaking up a single distributed plan
@@ -182,6 +177,9 @@ public class ParallelPlanner {
       join.getFragment().removeChild(inputFragments.get(i));
       buildFragment.getChildren().add(inputFragments.get(i));
     }
+
+    // compute the resource profile for the newly-added build sink.
+    buildSink.computeResourceProfile(ctx_.getQueryOptions());
 
     // assign plan and cohort id
     buildFragment.setPlanId(planIdGenerator_.getNextId());

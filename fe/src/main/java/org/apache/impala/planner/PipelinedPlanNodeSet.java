@@ -38,7 +38,7 @@ import com.google.common.collect.Sets;
  * set contains all build-side nodes. The second set contains the leftmost
  * scan. Both sets contain all join nodes because they execute and consume
  * resources during the build and probe phases. Similarly, all nodes below a 'blocking'
- * node (e.g, an AggregationNode) are placed into a differnet plan node set than the
+ * node (e.g, an AggregationNode) are placed into a different plan node set than the
  * nodes above it, but the blocking node itself belongs to both sets.
  */
 public class PipelinedPlanNodeSet {
@@ -46,39 +46,32 @@ public class PipelinedPlanNodeSet {
 
   // Minimum per-host resource requirements to ensure that no plan node set can have
   // estimates of zero, even if the contained PlanNodes have estimates of zero.
-  public static final long MIN_PER_HOST_MEM = 10 * 1024 * 1024;
-  public static final int MIN_PER_HOST_VCORES = 1;
+  public static final long MIN_PER_HOST_MEM_ESTIMATE_BYTES = 10 * 1024 * 1024;
 
   // List of plan nodes that execute and consume resources concurrently.
-  private final ArrayList<PlanNode> planNodes = Lists.newArrayList();
+  private final ArrayList<PlanNode> planNodes_ = Lists.newArrayList();
 
   // DataSinks that execute and consume resources concurrently.
   // Primarily used for estimating the cost of insert queries.
-  private final List<DataSink> dataSinks = Lists.newArrayList();
+  private final List<DataSink> dataSinks_ = Lists.newArrayList();
 
-  // Estimated per-host memory and CPU requirements.
-  // Valid after computeResourceEstimates().
-  private long perHostMem = MIN_PER_HOST_MEM;
-  private int perHostVcores = MIN_PER_HOST_VCORES;
-
-  public void add(PlanNode node) {
+  private void addNode(PlanNode node) {
     Preconditions.checkNotNull(node.getFragment());
-    planNodes.add(node);
+    planNodes_.add(node);
   }
 
-  public void addSink(DataSink sink) {
+  private void addSink(DataSink sink) {
     Preconditions.checkNotNull(sink);
-    dataSinks.add(sink);
+    dataSinks_.add(sink);
   }
 
   /**
-   * Computes the estimated per-host memory and CPU requirements of this plan node set.
-   * Optionally excludes unpartitioned fragments from the estimation.
-   * Returns true if at least one plan node was included in the estimation.
-   * Otherwise returns false indicating the estimates are invalid.
+   * Computes the per-host resource profile of this plan node set.
+   *
+   * If there are no nodes included in the estimate, the returned estimate will not be
+   * valid.
    */
-  public boolean computeResourceEstimates(boolean excludeUnpartitionedFragments,
-      TQueryOptions queryOptions) {
+  public ResourceProfile computePerHostResources(TQueryOptions queryOptions) {
     Set<PlanFragment> uniqueFragments = Sets.newHashSet();
 
     // Distinguish the per-host memory estimates for scan nodes and non-scan nodes to
@@ -86,73 +79,65 @@ public class PipelinedPlanNodeSet {
     // scans. The memory required by all concurrent scans of the same type (Hdfs/Hbase)
     // cannot exceed the per-host upper memory bound for that scan type. Intuitively,
     // the amount of I/O buffers is limited by the disk bandwidth.
-    long perHostHbaseScanMem = 0L;
-    long perHostHdfsScanMem = 0L;
-    long perHostNonScanMem = 0L;
+    long hbaseScanMemEstimate = 0L;
+    long hdfsScanMemEstimate = 0L;
+    long nonScanMemEstimate = 0L;
+    long minReservationBytes = 0L;
+    int numNodesIncluded = 0;
 
-    for (int i = 0; i < planNodes.size(); ++i) {
-      PlanNode node = planNodes.get(i);
+    for (PlanNode node : planNodes_) {
       PlanFragment fragment = node.getFragment();
-      if (!fragment.isPartitioned() && excludeUnpartitionedFragments) continue;
-      node.computeCosts(queryOptions);
+      // Multiple instances of a partitioned fragment may execute per host
+      int instancesPerHost = fragment.getNumInstancesPerHost(queryOptions.getMt_dop());
+
+      ResourceProfile nodeProfile = node.getResourceProfile();
+      Preconditions.checkState(nodeProfile.getMemEstimateBytes() >= 0);
+      long memEstimate = instancesPerHost * nodeProfile.getMemEstimateBytes();
+      ++numNodesIncluded;
       uniqueFragments.add(fragment);
-      if (node.getPerHostMemCost() < 0) {
-        LOG.warn(String.format("Invalid per-host memory requirement %s of node %s.\n" +
-            "PlanNode stats are: numNodes_=%s ", node.getPerHostMemCost(),
-            node.getClass().getSimpleName(), node.getNumNodes()));
-      }
       if (node instanceof HBaseScanNode) {
-        perHostHbaseScanMem += node.getPerHostMemCost();
+        hbaseScanMemEstimate += memEstimate;
       } else if (node instanceof HdfsScanNode) {
-        perHostHdfsScanMem += node.getPerHostMemCost();
+        hdfsScanMemEstimate += memEstimate;
       } else {
-        perHostNonScanMem += node.getPerHostMemCost();
+        nonScanMemEstimate += memEstimate;
       }
+      Preconditions.checkState(nodeProfile.getMinReservationBytes() >= 0);
+      minReservationBytes += instancesPerHost * nodeProfile.getMinReservationBytes();
     }
 
-    // The memory required by concurrent scans cannot exceed the upper memory bound
-    // for that scan type.
-    // TODO: In the future, we may want to restrict scanner concurrency based on a
-    // memory limit. This estimation will need to accoung for that as well.
-    perHostHbaseScanMem =
-        Math.min(perHostHbaseScanMem, HBaseScanNode.getPerHostMemUpperBound());
-    perHostHdfsScanMem =
-        Math.min(perHostHdfsScanMem, HdfsScanNode.getPerHostMemUpperBound());
+    if (queryOptions.getMt_dop() == 0) {
+      // The thread tokens for the non-MT path impose a limit on the memory that can
+      // be consumed by concurrent scans.
+      hbaseScanMemEstimate =
+          Math.min(hbaseScanMemEstimate, HBaseScanNode.getPerHostMemUpperBound());
+      hdfsScanMemEstimate =
+          Math.min(hdfsScanMemEstimate, HdfsScanNode.getPerHostMemUpperBound());
+    }
 
-    long perHostDataSinkMem = 0L;
-    for (int i = 0; i < dataSinks.size(); ++i) {
-      DataSink sink = dataSinks.get(i);
+    long dataSinkMemEstimate = 0L;
+    for (DataSink sink: dataSinks_) {
       PlanFragment fragment = sink.getFragment();
-      if (!fragment.isPartitioned() && excludeUnpartitionedFragments) continue;
       // Sanity check that this plan-node set has at least one PlanNode of fragment.
       Preconditions.checkState(uniqueFragments.contains(fragment));
-      sink.computeCosts();
-      if (sink.getPerHostMemCost() < 0) {
-        LOG.warn(String.format("Invalid per-host memory requirement %s of sink %s.\n",
-            sink.getPerHostMemCost(), sink.getClass().getSimpleName()));
-      }
-      perHostDataSinkMem += sink.getPerHostMemCost();
+      int instancesPerHost = fragment.getNumInstancesPerHost(queryOptions.getMt_dop());
+
+      ResourceProfile sinkProfile = sink.getResourceProfile();
+      Preconditions.checkState(sinkProfile.getMemEstimateBytes() >= 0);
+      dataSinkMemEstimate += instancesPerHost * sinkProfile.getMemEstimateBytes();
+      Preconditions.checkState(sinkProfile.getMinReservationBytes() >= 0);
+      minReservationBytes += instancesPerHost * sinkProfile.getMinReservationBytes();
     }
 
     // Combine the memory estimates of all sinks, scans nodes and non-scan nodes.
-    long perHostMem = perHostHdfsScanMem + perHostHbaseScanMem + perHostNonScanMem +
-        perHostDataSinkMem;
-
-    // The backend needs at least one thread per fragment.
-    int perHostVcores = uniqueFragments.size();
-
-    // This plan node set might only have unpartitioned fragments.
-    // Only set estimates if they are valid.
-    if (perHostMem >= 0 && perHostVcores >= 0) {
-      this.perHostMem = perHostMem;
-      this.perHostVcores = perHostVcores;
-      return true;
-    }
-    return false;
+    long perHostMemEstimate =
+        Math.max(MIN_PER_HOST_MEM_ESTIMATE_BYTES, hdfsScanMemEstimate
+                + hbaseScanMemEstimate + nonScanMemEstimate + dataSinkMemEstimate);
+    // This plan node set might only have unpartitioned fragments and be invalid.
+    return numNodesIncluded > 0 ?
+        new ResourceProfile(perHostMemEstimate, minReservationBytes) :
+          ResourceProfile.invalid();
   }
-
-  public long getPerHostMem() { return perHostMem; }
-  public int getPerHostVcores() { return perHostVcores; }
 
   /**
    * Computes and returns the pipelined plan node sets of the given plan.
@@ -175,19 +160,19 @@ public class PipelinedPlanNodeSet {
    */
   private static void computePlanNodeSets(PlanNode node, PipelinedPlanNodeSet lhsSet,
       PipelinedPlanNodeSet rhsSet, ArrayList<PipelinedPlanNodeSet> planNodeSets) {
-    lhsSet.add(node);
+    lhsSet.addNode(node);
     if (node == node.getFragment().getPlanRoot() && node.getFragment().hasSink()) {
       lhsSet.addSink(node.getFragment().getSink());
     }
 
-    if (node instanceof HashJoinNode) {
+    if (node instanceof JoinNode && ((JoinNode)node).isBlockingJoinNode()) {
       // Create a new set for the right-hand sides of joins if necessary.
       if (rhsSet == null) {
         rhsSet = new PipelinedPlanNodeSet();
         planNodeSets.add(rhsSet);
       }
       // The join node itself is added to the lhsSet (above) and the rhsSet.
-      rhsSet.add(node);
+      rhsSet.addNode(node);
       computePlanNodeSets(node.getChild(1), rhsSet, null, planNodeSets);
       computePlanNodeSets(node.getChild(0), lhsSet, rhsSet, planNodeSets);
       return;
@@ -197,8 +182,10 @@ public class PipelinedPlanNodeSet {
       // We add blocking nodes to two plan node sets because they require resources while
       // consuming their input (execution of the preceding set) and while they
       // emit their output (execution of the following set).
+      // TODO: IMPALA-4862: this logic does not accurately reflect the behaviour of
+      // concurrent join builds in the backend
       lhsSet = new PipelinedPlanNodeSet();
-      lhsSet.add(node);
+      lhsSet.addNode(node);
       planNodeSets.add(lhsSet);
       // Join builds under this blocking node belong in a new rhsSet.
       rhsSet = null;
@@ -207,7 +194,9 @@ public class PipelinedPlanNodeSet {
     // Assume that non-join, non-blocking nodes with multiple children
     // (e.g., ExchangeNodes) consume their inputs in an arbitrary order,
     // i.e., all child subtrees execute concurrently.
-    // TODO: This is not true for UnionNodes anymore. Fix the estimates accordingly.
+    // TODO: IMPALA-4862: can overestimate resource consumption of UnionNodes - the
+    // execution of union branches is serialised within a fragment (but not across
+    // fragment boundaries).
     for (PlanNode child: node.getChildren()) {
       computePlanNodeSets(child, lhsSet, rhsSet, planNodeSets);
     }

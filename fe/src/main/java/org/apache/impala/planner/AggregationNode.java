@@ -48,9 +48,9 @@ import com.google.common.collect.Sets;
 public class AggregationNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(AggregationNode.class);
 
-  // Default per-host memory requirement used if no valid stats are available.
+  // Default per-instance memory requirement used if no valid stats are available.
   // TODO: Come up with a more useful heuristic.
-  private final static long DEFAULT_PER_HOST_MEM = 128L * 1024L * 1024L;
+  private final static long DEFAULT_PER_INSTANCE_MEM = 128L * 1024L * 1024L;
 
   // Conservative minimum size of hash table for low-cardinality aggregations.
   private final static long MIN_HASH_TBL_MEM = 10L * 1024L * 1024L;
@@ -278,21 +278,33 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
-  public void computeCosts(TQueryOptions queryOptions) {
-    Preconditions.checkNotNull(fragment_,
-        "PlanNode must be placed into a fragment before calling this method.");
-    perHostMemCost_ = 0;
-    long perHostCardinality = fragment_.getNumDistinctValues(aggInfo_.getGroupingExprs());
-    if (perHostCardinality == -1) {
-      perHostMemCost_ = DEFAULT_PER_HOST_MEM;
-      return;
+  public void computeResourceProfile(TQueryOptions queryOptions) {
+    Preconditions.checkNotNull(
+        fragment_, "PlanNode must be placed into a fragment before calling this method.");
+    // Must be kept in sync with PartitionedAggregationNode::MinRequiredBuffers() in be.
+    long perInstanceMinBuffers;
+    if (aggInfo_.getGroupingExprs().isEmpty() || useStreamingPreagg_) {
+      perInstanceMinBuffers = 0;
+    } else {
+      final int PARTITION_FANOUT = 16;
+      long minBuffers = 2 * PARTITION_FANOUT + 1 + (aggInfo_.needsSerialize() ? 1 : 0);
+      perInstanceMinBuffers = SPILLABLE_BUFFER_BYTES * minBuffers;
     }
 
-    // Per-host cardinality cannot be greater than the total output cardinality.
-    if (cardinality_ != -1) {
-      perHostCardinality = Math.min(perHostCardinality, cardinality_);
+    long perInstanceCardinality = fragment_.getPerInstanceNdv(
+        queryOptions.getMt_dop(), aggInfo_.getGroupingExprs());
+    if (perInstanceCardinality == -1) {
+      resourceProfile_ =
+          new ResourceProfile(DEFAULT_PER_INSTANCE_MEM, perInstanceMinBuffers);
+      return;
     }
-    perHostMemCost_ += Math.max(perHostCardinality * avgRowSize_ *
+    // Per-instance cardinality cannot be greater than the total output cardinality.
+    if (cardinality_ != -1) {
+      perInstanceCardinality = Math.min(perInstanceCardinality, cardinality_);
+    }
+    long perInstanceMemEstimate = (long)Math.max(perInstanceCardinality * avgRowSize_ *
         PlannerContext.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
+    resourceProfile_ =
+        new ResourceProfile(perInstanceMemEstimate, perInstanceMinBuffers);
   }
 }

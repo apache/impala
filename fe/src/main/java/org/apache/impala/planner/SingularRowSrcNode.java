@@ -22,6 +22,8 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
+import org.apache.impala.thrift.TQueryOptions;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -61,6 +63,12 @@ public class SingularRowSrcNode extends PlanNode {
     // The containing SubplanNode has not yet been initialized, so get the number
     // of nodes from the SubplanNode's input.
     numNodes_ = containingSubplanNode_.getChild(0).getNumNodes();
+  }
+
+  @Override
+  public void computeResourceProfile(TQueryOptions queryOptions) {
+    // TODO: add an estimate
+    resourceProfile_ = new ResourceProfile(0, 0);
   }
 
   @Override

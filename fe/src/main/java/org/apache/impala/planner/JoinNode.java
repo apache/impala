@@ -41,9 +41,9 @@ import com.google.common.base.Preconditions;
 public abstract class JoinNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(JoinNode.class);
 
-  // Default per-host memory requirement used if no valid stats are available.
+  // Default per-instance memory requirement used if no valid stats are available.
   // TODO: Come up with a more useful heuristic (e.g., based on scanned partitions).
-  protected final static long DEFAULT_PER_HOST_MEM = 2L * 1024L * 1024L * 1024L;
+  protected final static long DEFAULT_PER_INSTANCE_MEM = 2L * 1024L * 1024L * 1024L;
 
   // Slop in percent allowed when comparing stats for the purpose of determining whether
   // an equi-join condition is a foreign/primary key join.
@@ -153,6 +153,8 @@ public abstract class JoinNode extends PlanNode {
   public void setDistributionMode(DistributionMode distrMode) { distrMode_ = distrMode; }
   public JoinTableId getJoinTableId() { return joinTableId_; }
   public void setJoinTableId(JoinTableId id) { joinTableId_ = id; }
+  /// True if this consumes all of its right input before outputting any rows.
+  abstract public boolean isBlockingJoinNode();
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {

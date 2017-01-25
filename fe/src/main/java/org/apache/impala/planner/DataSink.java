@@ -17,15 +17,9 @@
 
 package org.apache.impala.planner;
 
-import java.util.List;
-
-import org.apache.impala.analysis.Expr;
-import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TQueryOptions;
 
 /**
  * A DataSink describes the destination of a plan fragment's output rows.
@@ -35,30 +29,44 @@ import org.apache.impala.thrift.TExplainLevel;
  */
 public abstract class DataSink {
 
-  // estimated per-host memory requirement for sink;
-  // set in computeCosts(); invalid: -1
-  protected long perHostMemCost_ = -1;
-
   // Fragment that this DataSink belongs to. Set by the PlanFragment enclosing this sink.
   protected PlanFragment fragment_;
+
+  // resource requirements and estimates for this plan node.
+  // set in computeResourceProfile()
+  protected ResourceProfile resourceProfile_ = null;
 
   /**
    * Return an explain string for the DataSink. Each line of the explain will be prefixed
    * by "prefix".
    */
-  public abstract String getExplainString(String prefix, String detailPrefix,
-      TExplainLevel explainLevel);
+  public final String getExplainString(String prefix, String detailPrefix,
+      TQueryOptions queryOptions, TExplainLevel explainLevel) {
+    StringBuilder output = new StringBuilder();
+    appendSinkExplainString(prefix, detailPrefix, queryOptions, explainLevel, output);
+    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      output.append(detailPrefix);
+      output.append(resourceProfile_.getExplainString());
+      output.append("\n");
+    }
+    return output.toString();
+  }
+
+  /**
+   * Append the node-specific lines of the explain string to "output".
+   */
+  abstract protected void appendSinkExplainString(String prefix, String detailPrefix,
+      TQueryOptions queryOptions, TExplainLevel explainLevel, StringBuilder output);
 
   protected abstract TDataSink toThrift();
 
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
   public PlanFragment getFragment() { return fragment_; }
-  public long getPerHostMemCost() { return perHostMemCost_; }
+  public ResourceProfile getResourceProfile() { return resourceProfile_; }
 
   /**
-   * Estimates the cost of executing this DataSink. Currently only sets perHostMemCost.
+   * Compute the resource profile for an instance of this DataSink.
    */
-  public void computeCosts() {
-    perHostMemCost_ = 0;
-  }
+  public abstract void computeResourceProfile(TQueryOptions queryOptions);
+
 }

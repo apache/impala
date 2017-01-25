@@ -24,6 +24,8 @@ import org.apache.impala.analysis.TupleId;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
+import org.apache.impala.thrift.TQueryOptions;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -42,7 +44,6 @@ public class EmptySetNode extends PlanNode {
   public void computeStats(Analyzer analyzer) {
     avgRowSize_ = 0;
     cardinality_ = 0;
-    perHostMemCost_ = 0;
     numNodes_ = 1;
   }
 
@@ -59,6 +60,12 @@ public class EmptySetNode extends PlanNode {
   }
 
   @Override
+  public void computeResourceProfile(TQueryOptions queryOptions) {
+    // TODO: add an estimate
+    resourceProfile_ = new ResourceProfile(0, 0);
+  }
+
+  @Override
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     return String.format("%s%s:%s\n", prefix, id_.toString(), displayName_);
@@ -68,4 +75,5 @@ public class EmptySetNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.EMPTY_SET_NODE;
   }
+
 }

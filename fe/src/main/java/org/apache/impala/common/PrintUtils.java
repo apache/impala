@@ -26,6 +26,7 @@ import static org.apache.impala.common.ByteUnits.TERABYTE;
 import java.text.DecimalFormat;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.impala.planner.PlanFragmentId;
 
 /**
  * Utility functions for pretty printing.
@@ -51,20 +52,19 @@ public class PrintUtils {
         ((cardinality != -1) ? String.valueOf(cardinality) : "unavailable");
   }
 
-  public static String printHosts(String prefix, long numHosts) {
+  public static String printNumHosts(String prefix, long numHosts) {
     return prefix + "hosts=" + ((numHosts != -1) ? numHosts : "unavailable");
   }
 
-  public static String printMemCost(String prefix, long perHostMemCost) {
-    return prefix + "per-host-mem=" +
-        ((perHostMemCost != -1) ? printBytes(perHostMemCost) : "unavailable");
+  public static String printNumInstances(String prefix, long numInstances) {
+    return prefix + "instances=" + ((numInstances != -1) ? numInstances : "unavailable");
   }
 
   /**
    * Prints the given square matrix into matrixStr. Separates cells by cellSpacing.
    */
-  public static void printMatrix(boolean[][] matrix, int cellSpacing,
-      StringBuilder matrixStr) {
+  public static void printMatrix(
+      boolean[][] matrix, int cellSpacing, StringBuilder matrixStr) {
     // Print labels.
     matrixStr.append(StringUtils.repeat(' ', cellSpacing));
     String formatStr = "%Xd".replace("X", String.valueOf(cellSpacing));

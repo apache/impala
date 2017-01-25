@@ -19,9 +19,6 @@ package org.apache.impala.planner;
 
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
@@ -55,6 +52,9 @@ public class HashJoinNode extends JoinNode {
     Preconditions.checkNotNull(eqJoinConjuncts);
     Preconditions.checkState(joinOp_ != JoinOperator.CROSS_JOIN);
   }
+
+  @Override
+  public boolean isBlockingJoinNode() { return true; }
 
   @Override
   public List<BinaryPredicate> getEqJoinConjuncts() { return eqJoinConjuncts_; }
@@ -177,15 +177,24 @@ public class HashJoinNode extends JoinNode {
   }
 
   @Override
-  public void computeCosts(TQueryOptions queryOptions) {
+  public void computeResourceProfile(TQueryOptions queryOptions) {
+    // Must be kept in sync with PartitionedHashJoinBuilder::MinRequiredBuffers() in be.
+    final int PARTITION_FANOUT = 16;
+    long minBuffers = PARTITION_FANOUT + 1
+        + (joinOp_ == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN ? 3 : 0);
+    long perInstanceMinBufferBytes = SPILLABLE_BUFFER_BYTES * minBuffers;
+
+    long perInstanceMemEstimate;
     if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
         || numNodes_ == 0) {
-      perHostMemCost_ = DEFAULT_PER_HOST_MEM;
-      return;
+      perInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
+    } else {
+      perInstanceMemEstimate = (long) Math.ceil(getChild(1).cardinality_
+          * getChild(1).avgRowSize_ * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
+      if (distrMode_ == DistributionMode.PARTITIONED) {
+        perInstanceMemEstimate /= fragment_.getNumInstances(queryOptions.getMt_dop());
+      }
     }
-    perHostMemCost_ =
-        (long) Math.ceil(getChild(1).cardinality_ * getChild(1).avgRowSize_
-          * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
-    if (distrMode_ == DistributionMode.PARTITIONED) perHostMemCost_ /= numNodes_;
+    resourceProfile_ = new ResourceProfile(perInstanceMemEstimate, perInstanceMinBufferBytes);
   }
 }

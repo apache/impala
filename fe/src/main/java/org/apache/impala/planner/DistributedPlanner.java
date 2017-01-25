@@ -19,7 +19,6 @@ package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.AnalysisContext;
@@ -28,7 +27,6 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.QueryStmt;
-import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
@@ -38,8 +36,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
-
 
 /**
  * The distributed planner is responsible for creating an executable, distributed plan
@@ -155,8 +151,8 @@ public class DistributedPlanner {
       result = new PlanFragment(
           ctx_.getNextFragmentId(), root, DataPartition.UNPARTITIONED);
     } else {
-      throw new InternalException(
-          "Cannot create plan fragment for this node type: " + root.getExplainString());
+      throw new InternalException("Cannot create plan fragment for this node type: "
+          + root.getExplainString(ctx_.getQueryOptions()));
     }
     // move 'result' to end, it depends on all of its children
     fragments.remove(result);
@@ -478,7 +474,7 @@ public class DistributedPlanner {
           + Float.toString(lhsTree.getAvgRowSize()));
       LOG.trace("rhs card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
           + Float.toString(rhsTree.getAvgRowSize()));
-      LOG.trace(rhsTree.getExplainString());
+      LOG.trace(rhsTree.getExplainString(ctx_.getQueryOptions()));
     }
 
     boolean doBroadcast = false;

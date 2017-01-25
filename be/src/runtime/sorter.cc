@@ -1376,6 +1376,7 @@ Status Sorter::Init() {
   in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
   sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TUnit::BYTES);
 
+  // Must be kept in sync with SortNode.computeResourceProfile() in fe.
   int min_buffers_required = MIN_BUFFERS_PER_MERGE;
   // Fixed and var-length blocks are separate, so we need MIN_BUFFERS_PER_MERGE
   // blocks for both if there is var-length data.

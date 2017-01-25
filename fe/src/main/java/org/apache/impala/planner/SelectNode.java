@@ -27,6 +27,8 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
+import org.apache.impala.thrift.TQueryOptions;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -77,6 +79,12 @@ public class SelectNode extends PlanNode {
     if (LOG.isTraceEnabled()) {
       LOG.trace("stats Select: cardinality=" + Long.toString(cardinality_));
     }
+  }
+
+  @Override
+  public void computeResourceProfile(TQueryOptions queryOptions) {
+    // TODO: add an estimate
+    resourceProfile_ = new ResourceProfile(0, 0);
   }
 
   @Override

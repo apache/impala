@@ -190,13 +190,6 @@ int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
     has_query_option = true;
   }
 
-  int64_t estimate_limit = numeric_limits<int64_t>::max();
-  bool has_estimate = false;
-  if (request_.__isset.per_host_mem_req && request_.per_host_mem_req > 0) {
-    estimate_limit = request_.per_host_mem_req;
-    has_estimate = true;
-  }
-
   int64_t per_host_mem = 0L;
   // TODO: Remove rm_initial_mem and associated logic when we're sure that clients won't
   // be affected.
@@ -204,13 +197,9 @@ int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
     per_host_mem = query_options_.rm_initial_mem;
   } else if (has_query_option) {
     per_host_mem = query_option_memory_limit;
-  } else if (has_estimate) {
-    per_host_mem = estimate_limit;
   } else {
-    // If no estimate or query option, use the server-side limits anyhow.
-    bool ignored;
-    per_host_mem = ParseUtil::ParseMemSpec(FLAGS_rm_default_memory,
-        &ignored, 0);
+    DCHECK(request_.__isset.per_host_mem_estimate);
+    per_host_mem = request_.per_host_mem_estimate;
   }
   // Cap the memory estimate at the amount of physical memory available. The user's
   // provided value or the estimate from planning can each be unreasonable.

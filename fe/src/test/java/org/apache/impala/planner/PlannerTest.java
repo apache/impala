@@ -369,4 +369,14 @@ public class PlannerTest extends PlannerTestBase {
     // Check that the effective MT_DOP is as expected.
     Assert.assertEquals(actualMtDop, expectedMtDop);
   }
+
+  @Test
+  public void testResourceRequirements() {
+    // Tests the resource requirement computation from the planner.
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
+    runPlannerTestFile("resource-requirements", options, false);
+  }
+
 }

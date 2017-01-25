@@ -1,117 +1,19 @@
 ====
 ---- QUERY
-# Tests explaining a query (TPCDS-Q19)
+# Explain a simple hash join query.
 explain
-select
-  i_brand_id,
-  i_brand,
-  i_manufact_id,
-  i_manufact,
-  sum(ss_ext_sales_price) ext_price
-from
-  tpcds.store_sales
-  join tpcds.item on (store_sales.ss_item_sk = item.i_item_sk)
-  join tpcds.customer on (store_sales.ss_customer_sk = customer.c_customer_sk)
-  join tpcds.customer_address on (customer.c_current_addr_sk = customer_address.ca_address_sk)
-  join tpcds.store on (store_sales.ss_store_sk = store.s_store_sk)
-where
-  ss_date between '1999-11-01' and '1999-11-30'
-  and i_manager_id = 7
-  and substr(ca_zip, 1, 5) <> substr(s_zip, 1, 5)
-group by
-  i_brand,
-  i_brand_id,
-  i_manufact_id,
-  i_manufact
-order by
-  ext_price desc,
-  i_brand,
-  i_brand_id,
-  i_manufact_id,
-  i_manufact
-limit 100
----- RESULTS
-'Estimated Per-Host Requirements: Memory=72.66MB VCores=5'
+select *
+from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
+---- RESULTS: VERIFY_IS_EQUAL
+'Per-Host Resource Reservation: Memory=136.00MB'
+'Per-Host Resource Estimates: Memory=388.41MB'
 ''
-'19:TOP-N [LIMIT=100]'
-'18:EXCHANGE [UNPARTITIONED]'
-'10:TOP-N [LIMIT=100]'
-'17:AGGREGATE [MERGE FINALIZE]'
-'16:EXCHANGE [HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]'
-'09:AGGREGATE'
-'08:HASH JOIN [INNER JOIN, BROADCAST]'
-'|--15:EXCHANGE [BROADCAST]'
-'|  04:SCAN HDFS [tpcds.store]'
-'07:HASH JOIN [INNER JOIN, BROADCAST]'
-'|--14:EXCHANGE [BROADCAST]'
-'|  01:SCAN HDFS [tpcds.item]'
-'06:HASH JOIN [INNER JOIN, BROADCAST]'
-'|--13:EXCHANGE [BROADCAST]'
-'|  00:SCAN HDFS [tpcds.store_sales]'
-'05:HASH JOIN [INNER JOIN, PARTITIONED]'
-'|--12:EXCHANGE [HASH(customer.c_current_addr_sk)]'
-'|  02:SCAN HDFS [tpcds.customer]'
-'11:EXCHANGE [HASH(customer_address.ca_address_sk)]'
-'03:SCAN HDFS [tpcds.customer_address]'
-====
----- QUERY
-# Tests explaining an insert query
-explain insert overwrite functional.alltypessmall (id, string_col)
-partition (year, month)
-select a.id, a.string_col, a.year, a.month from functional.alltypes a
-  left semi join functional.alltypesagg b on (a.id = b.id)
-where a.year > 2009 and a.month = 4
-union distinct
-select id, string_col, year, month from functional.alltypes
----- RESULTS
-'Estimated Per-Host Requirements: Memory=30.00MB VCores=3'
-''
-'WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(year,month)]'
-'14:EXCHANGE [HASH(year,month)]'
-'13:AGGREGATE [MERGE FINALIZE]'
-'12:EXCHANGE [HASH(id,string_col,year,month)]'
-'|--11:AGGREGATE'
-'|  10:MERGE'
-'|  04:SCAN HDFS [functional.alltypes]'
-'05:AGGREGATE'
-'09:MERGE'
-'03:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]'
-'|--07:EXCHANGE [HASH(b.id)]'
-'|  02:SCAN HDFS [functional.alltypesagg b]'
-'06:EXCHANGE [HASH(a.id)]'
-'01:SCAN HDFS [functional.alltypes a]'
-====
----- QUERY
-# Tests explaining an insert query to/from an HBase table
-explain insert into functional_hbase.alltypes
-select a.* from functional_hbase.alltypessmall a
-  cross join functional.alltypessmall b
-where a.year > 2009 and a.month = 4
-union all
-select * from functional_hbase.alltypessmall
----- RESULTS
-'Estimated Per-Host Requirements: Memory=1.02GB VCores=3'
-''
-'WRITE TO HBASE table=functional_hbase.alltypes'
-'06:EXCHANGE [UNPARTITIONED]'
-'|--08:MERGE'
-'|  04:SCAN HBASE [functional_hbase.alltypessmall]'
-'07:MERGE'
-'03:CROSS JOIN [BROADCAST]'
-'|--05:EXCHANGE [BROADCAST]'
-'|  02:SCAN HDFS [functional.alltypessmall b]'
-'01:SCAN HBASE [functional_hbase.alltypessmall a]'
-====
----- QUERY
-# Tests explaining an CTAS statement.
-explain create table t as
-select * from functional.alltypes
-where month = 2
----- RESULTS
-'Estimated Per-Host Requirements: Memory=16.02MB VCores=1'
-''
-'WRITE TO HDFS [functional.t, OVERWRITE=false]'
-'00:SCAN HDFS [functional.alltypes]'
+'PLAN-ROOT SINK'
+'04:EXCHANGE [UNPARTITIONED]'
+'02:HASH JOIN [INNER JOIN, BROADCAST]'
+'|--03:EXCHANGE [BROADCAST]'
+'|  01:SCAN HDFS [tpch.orders]'
+'00:SCAN HDFS [tpch.lineitem]'
 ====
 ---- QUERY
 # Tests the warning about missing table stats in the explain header.
@@ -120,19 +22,7 @@ from functional_avro.alltypes t1
   inner join functional_parquet.alltypessmall t2 on (t1.id = t2.id)
   left outer join functional_avro.alltypes t3 on (t2.id = t3.id)
 where t1.month = 1 and t2.year = 2009 and t3.bool_col = false
----- RESULTS
-'Estimated Per-Host Requirements: Memory=4.03GB VCores=3'
+---- RESULTS: VERIFY_IS_SUBSET
 'WARNING: The following tables are missing relevant table and/or column statistics.'
 'functional_avro.alltypes, functional_parquet.alltypessmall'
-''
-'09:AGGREGATE [MERGE FINALIZE]'
-'08:EXCHANGE [UNPARTITIONED]'
-'05:AGGREGATE'
-'04:HASH JOIN [LEFT OUTER JOIN, BROADCAST]'
-'|--07:EXCHANGE [BROADCAST]'
-'|  02:SCAN HDFS [functional_avro.alltypes t3]'
-'03:HASH JOIN [INNER JOIN, BROADCAST]'
-'|--06:EXCHANGE [BROADCAST]'
-'|  01:SCAN HDFS [functional_parquet.alltypessmall t2]'
-'00:SCAN HDFS [functional_avro.alltypes t1]'
 ====

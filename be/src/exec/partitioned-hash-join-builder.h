@@ -247,6 +247,7 @@ class PhjBuilder : public DataSink {
   /// For NAAJ, we need 3 additional buffers for 'null_aware_partition_',
   /// 'null_aware_probe_partition_' and 'null_probe_rows_'.
   int MinRequiredBuffers() const {
+    // Must be kept in sync with HashJoinNode.computeResourceProfile() in fe.
     int num_reserved_buffers = PARTITION_FANOUT + 1;
     if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) num_reserved_buffers += 3;
     return num_reserved_buffers;

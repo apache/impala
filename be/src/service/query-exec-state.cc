@@ -58,7 +58,7 @@ namespace impala {
 // Keys into the info string map of the runtime profile referring to specific
 // items used by CM for monitoring purposes.
 static const string PER_HOST_MEM_KEY = "Estimated Per-Host Mem";
-static const string PER_HOST_VCORES_KEY = "Estimated Per-Host VCores";
+static const string PER_HOST_MEMORY_RESERVATION_KEY = "Per-Host Memory Reservation";
 static const string TABLES_MISSING_STATS_KEY = "Tables Missing Stats";
 static const string TABLES_WITH_CORRUPT_STATS_KEY = "Tables With Corrupt Table Stats";
 static const string TABLES_WITH_MISSING_DISK_IDS_KEY = "Tables With Missing Disk Ids";
@@ -394,16 +394,16 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
             << "----------------";
     summary_profile_.AddInfoString("Plan", plan_ss.str());
   }
-  // Add info strings consumed by CM: Estimated mem/vcores and tables missing stats.
-  if (query_exec_request.__isset.per_host_mem_req) {
+  // Add info strings consumed by CM: Estimated mem and tables missing stats.
+  if (query_exec_request.__isset.per_host_mem_estimate) {
     stringstream ss;
-    ss << query_exec_request.per_host_mem_req;
+    ss << query_exec_request.per_host_mem_estimate;
     summary_profile_.AddInfoString(PER_HOST_MEM_KEY, ss.str());
   }
-  if (query_exec_request.__isset.per_host_vcores) {
+  if (query_exec_request.__isset.per_host_min_reservation) {
     stringstream ss;
-    ss << query_exec_request.per_host_vcores;
-    summary_profile_.AddInfoString(PER_HOST_VCORES_KEY, ss.str());
+    ss << query_exec_request.per_host_min_reservation;
+    summary_profile_.AddInfoString(PER_HOST_MEMORY_RESERVATION_KEY, ss.str());
   }
   if (!query_exec_request.query_ctx.__isset.parent_query_id &&
       query_exec_request.query_ctx.__isset.tables_missing_stats &&

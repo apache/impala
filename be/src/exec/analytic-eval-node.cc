@@ -177,9 +177,11 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
     }
   }
 
+  // Must be kept in sync with AnalyticEvalNode.computeResourceProfile() in fe.
+  const int MIN_REQUIRED_BUFFERS = 2;
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
       Substitute("AnalyticEvalNode id=$0 ptr=$1", id_, this),
-      2, false, mem_tracker(), state, &client_));
+      MIN_REQUIRED_BUFFERS, false, mem_tracker(), state, &client_));
   return Status::OK();
 }
 

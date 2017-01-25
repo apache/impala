@@ -20,10 +20,10 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.planner.DataPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -698,6 +698,17 @@ public class AggregateInfo extends AggregateInfoBase {
         mergeAggExpr.validateMergeAggFn(aggregateExprs_.get(i));
       }
     }
+  }
+
+  /// Return true if any aggregate functions have a serialize function.
+  /// Only valid to call once analyzed.
+  public boolean needsSerialize() {
+    for (FunctionCallExpr aggregateExpr: aggregateExprs_) {
+      Preconditions.checkState(aggregateExpr.isAnalyzed());
+      AggregateFunction fn = (AggregateFunction)aggregateExpr.getFn();
+      if (fn.getSerializeFnSymbol() != null) return true;
+    }
+    return false;
   }
 
   @Override

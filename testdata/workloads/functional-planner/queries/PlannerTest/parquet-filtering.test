@@ -7,21 +7,23 @@ select count(*) from functional_parquet.alltypes
 where int_col > 1 and int_col * rand() > 50 and int_col is null
 and int_col > tinyint_col;
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=10.00MB mem-reservation=0B
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=165.17KB
+   partitions=24/24 files=24 size=156.57KB
    predicates: int_col IS NULL, int_col > 1, int_col > tinyint_col, int_col * rand() > 50
    table stats: unavailable
    column stats: unavailable
    parquet statistics predicates: int_col > 1
    parquet dictionary predicates: int_col > 1
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=5B cardinality=unavailable
 ====
 # Test a variety of types
@@ -32,20 +34,22 @@ and double_col > 100.00 and date_string_col > '1993-10-01' and string_col > 'aaa
 and timestamp_cmp(timestamp_col, '2016-11-20 00:00:00') = 1
 and year > 2000 and month < 12;
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=10.00MB mem-reservation=0B
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=22/24 files=22 size=151.24KB
+   partitions=22/24 files=22 size=143.36KB
    predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, smallint_col > 50, tinyint_col < 50, string_col > 'aaaa', mod(int_col, 2) = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
    table stats: unavailable
    columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
    parquet statistics predicates: bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, smallint_col > 50, tinyint_col < 50, string_col > 'aaaa', date_string_col > '1993-10-01'
    parquet dictionary predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, smallint_col > 50, tinyint_col < 50, string_col > 'aaaa', mod(int_col, 2) = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=80B cardinality=unavailable
 ====

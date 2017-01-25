@@ -679,6 +679,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// as the partitions aggregate stream needs to be serialized and rewritten.
   /// We do not spill streaming preaggregations, so we do not need to reserve any buffers.
   int MinRequiredBuffers() const {
+    // Must be kept in sync with AggregationNode.computeResourceProfile() in fe.
     if (is_streaming_preagg_) return 0;
     return 2 * PARTITION_FANOUT + 1 + (needs_serialize_ ? 1 : 0);
   }

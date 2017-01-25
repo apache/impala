@@ -40,6 +40,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.MaxRowsProcessedVisitor;
@@ -266,11 +267,14 @@ public class Planner {
       TQueryExecRequest request, TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
     boolean hasHeader = false;
-    if (request.isSetPer_host_mem_req() && request.isSetPer_host_vcores()) {
-      str.append(
-          String.format("Estimated Per-Host Requirements: Memory=%s VCores=%s\n",
-          PrintUtils.printBytes(request.getPer_host_mem_req()),
-          request.per_host_vcores));
+    if (request.isSetPer_host_min_reservation()) {
+      str.append(String.format("Per-Host Resource Reservation: Memory=%s\n",
+              PrintUtils.printBytes(request.getPer_host_min_reservation()))) ;
+      hasHeader = true;
+    }
+    if (request.isSetPer_host_mem_estimate()) {
+      str.append(String.format("Per-Host Resource Estimates: Memory=%s\n",
+          PrintUtils.printBytes(request.getPer_host_mem_estimate())));
       hasHeader = true;
     }
 
@@ -324,12 +328,12 @@ public class Planner {
 
     if (explainLevel.ordinal() < TExplainLevel.VERBOSE.ordinal()) {
       // Print the non-fragmented parallel plan.
-      str.append(fragments.get(0).getExplainString(explainLevel));
+      str.append(fragments.get(0).getExplainString(ctx_.getQueryOptions(), explainLevel));
     } else {
       // Print the fragmented parallel plan.
       for (int i = 0; i < fragments.size(); ++i) {
         PlanFragment fragment = fragments.get(i);
-        str.append(fragment.getExplainString(explainLevel));
+        str.append(fragment.getExplainString(ctx_.getQueryOptions(), explainLevel));
         if (i < fragments.size() - 1) str.append("\n");
       }
     }
@@ -337,91 +341,46 @@ public class Planner {
   }
 
   /**
-   * Returns true if the fragments are for a trivial, coordinator-only query:
-   * Case 1: Only an EmptySetNode, e.g. query has a limit 0.
-   * Case 2: Query has only constant exprs.
-   */
-  private static boolean isTrivialCoordOnlyPlan(List<PlanFragment> fragments) {
-    Preconditions.checkNotNull(fragments);
-    Preconditions.checkState(!fragments.isEmpty());
-    if (fragments.size() > 1) return false;
-    PlanNode root = fragments.get(0).getPlanRoot();
-    if (root instanceof EmptySetNode) return true;
-    if (root instanceof UnionNode && ((UnionNode) root).isConstantUnion()) return true;
-    return false;
-  }
-
-  /**
-   * Estimates the per-host memory and CPU requirements for the given plan fragments,
-   * and sets the results in request.
-   * Optionally excludes the requirements for unpartitioned fragments.
+   * Estimates the per-host resource requirements for the given plans, and sets the
+   * results in request.
    * TODO: The LOG.warn() messages should eventually become Preconditions checks
    * once resource estimation is more robust.
-   * TODO: Revisit and possibly remove during MT work, particularly references to vcores.
    */
-  public void computeResourceReqs(List<PlanFragment> fragments,
-      boolean excludeUnpartitionedFragments,
+  public void computeResourceReqs(List<PlanFragment> planRoots,
       TQueryExecRequest request) {
-    Preconditions.checkState(!fragments.isEmpty());
+    Preconditions.checkState(!planRoots.isEmpty());
     Preconditions.checkNotNull(request);
 
-    // Compute pipelined plan node sets.
-    ArrayList<PipelinedPlanNodeSet> planNodeSets =
-        PipelinedPlanNodeSet.computePlanNodeSets(fragments.get(0).getPlanRoot());
+    // Compute the sum over all plans.
+    // TODO: Revisit during MT work - scheduling of fragments will change and computing
+    // the sum may not be correct or optimal.
+    ResourceProfile totalResources = ResourceProfile.invalid();
+    for (PlanFragment planRoot: planRoots) {
+      ResourceProfile planMaxResources = ResourceProfile.invalid();
+      ArrayList<PlanFragment> fragments = planRoot.getNodesPreOrder();
+      // Compute pipelined plan node sets.
+      ArrayList<PipelinedPlanNodeSet> planNodeSets =
+          PipelinedPlanNodeSet.computePlanNodeSets(fragments.get(0).getPlanRoot());
 
-    // Compute the max of the per-host mem and vcores requirement.
-    // Note that the max mem and vcores may come from different plan node sets.
-    long maxPerHostMem = Long.MIN_VALUE;
-    int maxPerHostVcores = Integer.MIN_VALUE;
-    for (PipelinedPlanNodeSet planNodeSet: planNodeSets) {
-      if (!planNodeSet.computeResourceEstimates(
-          excludeUnpartitionedFragments, ctx_.getQueryOptions())) {
-        continue;
+      // Compute the max of the per-host resources requirement.
+      // Note that the different maxes may come from different plan node sets.
+      for (PipelinedPlanNodeSet planNodeSet : planNodeSets) {
+        TQueryOptions queryOptions = ctx_.getQueryOptions();
+        ResourceProfile perHostResources =
+            planNodeSet.computePerHostResources(queryOptions);
+        if (!perHostResources.isValid()) continue;
+        planMaxResources = ResourceProfile.max(planMaxResources, perHostResources);
       }
-      long perHostMem = planNodeSet.getPerHostMem();
-      int perHostVcores = planNodeSet.getPerHostVcores();
-      if (perHostMem > maxPerHostMem) maxPerHostMem = perHostMem;
-      if (perHostVcores > maxPerHostVcores) maxPerHostVcores = perHostVcores;
+      totalResources = ResourceProfile.sum(totalResources, planMaxResources);
     }
 
-    // Do not ask for more cores than are in the RuntimeEnv.
-    maxPerHostVcores = Math.min(maxPerHostVcores, RuntimeEnv.INSTANCE.getNumCores());
-
-    // Special case for some trivial coordinator-only queries (IMPALA-3053, IMPALA-1092).
-    if (isTrivialCoordOnlyPlan(fragments)) {
-      maxPerHostMem = 1024;
-      maxPerHostVcores = 1;
-    }
-
-    // Set costs to zero if there are only unpartitioned fragments and
-    // excludeUnpartitionedFragments is true.
-    // TODO: handle this case with a better indication for unknown, e.g. -1 or not set.
-    if (maxPerHostMem == Long.MIN_VALUE || maxPerHostVcores == Integer.MIN_VALUE) {
-      boolean allUnpartitioned = true;
-      for (PlanFragment fragment: fragments) {
-        if (fragment.isPartitioned()) {
-          allUnpartitioned = false;
-          break;
-        }
-      }
-      if (allUnpartitioned && excludeUnpartitionedFragments) {
-        maxPerHostMem = 0;
-        maxPerHostVcores = 0;
-      }
-    }
-
-    if (maxPerHostMem < 0 || maxPerHostMem == Long.MIN_VALUE) {
-      LOG.warn("Invalid per-host memory requirement: " + maxPerHostMem);
-    }
-    if (maxPerHostVcores < 0 || maxPerHostVcores == Integer.MIN_VALUE) {
-      LOG.warn("Invalid per-host virtual cores requirement: " + maxPerHostVcores);
-    }
-    request.setPer_host_mem_req(maxPerHostMem);
-    request.setPer_host_vcores((short) maxPerHostVcores);
-
+    Preconditions.checkState(totalResources.getMemEstimateBytes() >= 0);
+    Preconditions.checkState(totalResources.getMinReservationBytes() >= 0);
+    request.setPer_host_mem_estimate(totalResources.getMemEstimateBytes());
+    request.setPer_host_min_reservation(totalResources.getMinReservationBytes());
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Estimated per-host peak memory requirement: " + maxPerHostMem);
-      LOG.trace("Estimated per-host virtual cores requirement: " + maxPerHostVcores);
+      LOG.trace("Per-host min buffer : " + totalResources.getMinReservationBytes());
+      LOG.trace("Estimated per-host memory: " + totalResources.getMemEstimateBytes());
     }
   }
 

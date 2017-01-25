@@ -21,6 +21,8 @@ import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TDataStreamSink;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TQueryOptions;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -38,14 +40,18 @@ public class DataStreamSink extends DataSink {
   }
 
   @Override
-  public String getExplainString(String prefix, String detailPrefix,
-      TExplainLevel detailLevel) {
-    StringBuilder output = new StringBuilder();
+  public void appendSinkExplainString(String prefix, String detailPrefix,
+      TQueryOptions queryOptions, TExplainLevel detailLevel, StringBuilder output) {
     output.append(
         String.format("%sDATASTREAM SINK [FRAGMENT=%s, EXCHANGE=%s, %s]",
         prefix, exchNode_.getFragment().getId().toString(),
         exchNode_.getId().toString(), exchNode_.getDisplayLabelDetail()));
-    return output.toString();
+    output.append("\n");
+  }
+
+  @Override
+  public void computeResourceProfile(TQueryOptions queryOptions) {
+    resourceProfile_ = new ResourceProfile(0, 0);
   }
 
   @Override

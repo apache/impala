@@ -4,42 +4,44 @@ from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
 where 5 + 5 < c_custkey and o_orderkey = (2 + 2)
   and (coalesce(2, 3, 4) * 10) + l_linenumber < (0 * 1)
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 01:SUBPLAN
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=0B mem-reservation=0B
 |  tuple-ids=2,1,0 row-size=52B cardinality=1500000
 |
 |--08:NESTED LOOP JOIN [CROSS JOIN]
-|  |  hosts=3 per-host-mem=unavailable
+|  |  mem-estimate=24B mem-reservation=0B
 |  |  tuple-ids=2,1,0 row-size=52B cardinality=100
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |     parent-subplan=01
-|  |     hosts=3 per-host-mem=unavailable
+|  |     mem-estimate=0B mem-reservation=0B
 |  |     tuple-ids=0 row-size=24B cardinality=1
 |  |
 |  04:SUBPLAN
-|  |  hosts=3 per-host-mem=unavailable
+|  |  mem-estimate=0B mem-reservation=0B
 |  |  tuple-ids=2,1 row-size=28B cardinality=100
 |  |
 |  |--07:NESTED LOOP JOIN [CROSS JOIN]
-|  |  |  hosts=3 per-host-mem=unavailable
+|  |  |  mem-estimate=24B mem-reservation=0B
 |  |  |  tuple-ids=2,1 row-size=28B cardinality=10
 |  |  |
 |  |  |--05:SINGULAR ROW SRC
 |  |  |     parent-subplan=04
-|  |  |     hosts=3 per-host-mem=unavailable
+|  |  |     mem-estimate=0B mem-reservation=0B
 |  |  |     tuple-ids=1 row-size=24B cardinality=1
 |  |  |
 |  |  06:UNNEST [o.o_lineitems]
 |  |     parent-subplan=04
-|  |     hosts=3 per-host-mem=unavailable
+|  |     mem-estimate=0B mem-reservation=0B
 |  |     tuple-ids=2 row-size=0B cardinality=10
 |  |
 |  03:UNNEST [c.c_orders o]
 |     parent-subplan=01
-|     hosts=3 per-host-mem=unavailable
+|     mem-estimate=0B mem-reservation=0B
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
@@ -51,7 +53,7 @@ PLAN-ROOT SINK
    columns missing stats: c_orders
    parquet statistics predicates: c_custkey > 10
    parquet dictionary predicates: c_custkey > 10
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=176.00MB mem-reservation=0B
    tuple-ids=0 row-size=24B cardinality=15000
 ====
 # Test HBase scan node.
@@ -59,7 +61,9 @@ select * from functional_hbase.stringids
 where string_col = cast(4 as string) and 2 + 3 = tinyint_col
   and id between concat('1', '0') and upper('20')
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 00:SCAN HBASE [functional_hbase.stringids]
    start key: 10
@@ -68,19 +72,21 @@ PLAN-ROOT SINK
    predicates: tinyint_col = 5, string_col = '4'
    table stats: 10000 rows total
    column stats: all
-   hosts=100 per-host-mem=unavailable
+   mem-estimate=1.00GB mem-reservation=0B
    tuple-ids=0 row-size=119B cardinality=1
 ====
 # Test datasource scan node.
 select * from functional.alltypes_datasource
 where tinyint_col < (pow(2, 8)) and float_col != 0 and 1 + 1 > int_col
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
 data source predicates: tinyint_col < 256, int_col < 2
 predicates: float_col != 0
-   hosts=1 per-host-mem=unavailable
+   mem-estimate=1.00GB mem-reservation=0B
    tuple-ids=0 row-size=116B cardinality=500
 ====
 # Test aggregation.
@@ -91,20 +97,22 @@ having 1024 * 1024 * count(*) % 2 = 0
   and (sm > 1 or sm > 1)
   and (sm between 5 and 10)
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(2 + id), count(*)
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
 |  having: sum(2 + id) <= 10, sum(2 + id) > 1, sum(2 + id) >= 5, 1048576 * count(*) % 2 = 0
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=10.00MB mem-reservation=264.00MB
 |  tuple-ids=1 row-size=17B cardinality=0
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    table stats: 7300 rows total
    column stats: all
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=20B cardinality=7300
 ====
 # Test hash join.
@@ -114,13 +122,15 @@ left outer join functional.alltypes b
       a.int_col between 0 + 0 + 0 + b.bigint_col and b.bigint_col + ascii('a'))
 where round(1.11 + 2.22 + 3.33 + 4.44, 1) < cast(b.double_col as decimal(3, 2))
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: 2 + a.id = b.id - 2
 |  other join predicates: a.int_col <= b.bigint_col + 97, a.int_col >= 0 + b.bigint_col
 |  other predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=15.68KB mem-reservation=136.00MB
 |  tuple-ids=0,1N row-size=28B cardinality=7300
 |
 |--01:SCAN HDFS [functional.alltypes b]
@@ -129,14 +139,14 @@ PLAN-ROOT SINK
 |     table stats: 7300 rows total
 |     column stats: all
 |     parquet dictionary predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
-|     hosts=3 per-host-mem=unavailable
+|     mem-estimate=128.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=20B cardinality=730
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    table stats: 7300 rows total
    column stats: all
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=7300
 ====
 # Test nested-loop join. Same as above but and with a disjunction in the On clause.
@@ -147,12 +157,14 @@ left outer join functional.alltypes b
       a.int_col between 0 + 0 + 0 + b.bigint_col and b.bigint_col + ascii('a'))
 where cast(b.double_col as decimal(3, 2)) > round(1.11 + 2.22 + 3.33 + 4.44, 1)
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 02:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  join predicates: (2 + a.id = b.id - 2 OR a.int_col >= 0 + b.bigint_col AND a.int_col <= b.bigint_col + 97)
 |  predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=14.26KB mem-reservation=0B
 |  tuple-ids=0,1N row-size=28B cardinality=7300
 |
 |--01:SCAN HDFS [functional.alltypes b]
@@ -161,14 +173,14 @@ PLAN-ROOT SINK
 |     table stats: 7300 rows total
 |     column stats: all
 |     parquet dictionary predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
-|     hosts=3 per-host-mem=unavailable
+|     mem-estimate=128.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=20B cardinality=730
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
    table stats: 7300 rows total
    column stats: all
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=7300
 ====
 # Test distinct aggregation with grouping.
@@ -177,26 +189,28 @@ from functional.alltypes
 group by timestamp_col = cast('2015-11-15' as timestamp) + interval 1 year
 having 1024 * 1024 * count(*) % 2 = 0
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 02:AGGREGATE [FINALIZE]
 |  output: sum(2 + id), count:merge(*)
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
 |  having: 1048576 * count(*) % 2 = 0
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=10.00MB mem-reservation=264.00MB
 |  tuple-ids=2 row-size=17B cardinality=0
 |
 01:AGGREGATE
 |  output: count(*)
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00', 2 + id
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=10.00MB mem-reservation=264.00MB
 |  tuple-ids=1 row-size=17B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    table stats: 7300 rows total
    column stats: all
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=20B cardinality=7300
 ====
 # Test non-grouping distinct aggregation.
@@ -204,25 +218,27 @@ select sum(distinct 1 + 1 + id)
 from functional.alltypes
 having 1024 * 1024 * count(*) % 2 = 0
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 02:AGGREGATE [FINALIZE]
 |  output: sum(2 + id), count:merge(*)
 |  having: 1048576 * zeroifnull(count(*)) % 2 = 0
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=10.00MB mem-reservation=0B
 |  tuple-ids=2 row-size=16B cardinality=0
 |
 01:AGGREGATE
 |  output: count(*)
 |  group by: 2 + id
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=10.00MB mem-reservation=264.00MB
 |  tuple-ids=1 row-size=16B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    table stats: 7300 rows total
    column stats: all
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=7300
 ====
 # Test analytic eval node.
@@ -231,44 +247,48 @@ select first_value(1 + 1 + int_col - (1 - 1)) over
    order by greatest(greatest(10, 20), bigint_col))
 from functional.alltypes
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 02:ANALYTIC
 |  functions: first_value(2 + int_col - 0)
 |  partition by: concat('ab', string_col)
 |  order by: greatest(20, bigint_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=0B mem-reservation=16.00MB
 |  tuple-ids=3,2 row-size=37B cardinality=7300
 |
 01:SORT
 |  order by: concat('ab', string_col) ASC NULLS FIRST, greatest(20, bigint_col) ASC
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=16.00MB mem-reservation=48.00MB
 |  tuple-ids=3 row-size=29B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    table stats: 7300 rows total
    column stats: all
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=29B cardinality=7300
 ====
 # Test sort node.
 select int_col from functional.alltypes
 order by id * abs((factorial(5) / power(2, 4)))
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 01:SORT
 |  order by: id * 7.5 ASC
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=8.00MB mem-reservation=24.00MB
 |  tuple-ids=1 row-size=8B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    table stats: 7300 rows total
    column stats: all
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=7300
 ====
 # Test HDFS table sink.
@@ -276,15 +296,16 @@ insert into functional.alltypes (id, int_col) partition(year,month)
 select id, int_col, cast(1 + 1 + 1 + year as int), cast(month - (1 - 1 - 1) as int)
 from functional.alltypessmall
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(CAST(3 + year AS INT),CAST(month - -1 AS INT))]
 |  partitions=4
-|  hosts=1 per-host-mem=unavailable
+|  mem-estimate=1.56KB mem-reservation=0B
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
    table stats: 100 rows total
    column stats: all
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=16B cardinality=100
 ====
 # Constant folding does not work across query blocks.
@@ -295,11 +316,13 @@ select sum(id + c3) from
     ) v2
   ) v3
 ---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(id + 10 + 20 + 30)
-|  hosts=3 per-host-mem=unavailable
+|  mem-estimate=10.00MB mem-reservation=0B
 |  tuple-ids=4 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
@@ -307,6 +330,6 @@ PLAN-ROOT SINK
    table stats: 7300 rows total
    column stats: all
    limit: 2
-   hosts=3 per-host-mem=unavailable
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=2
 ====

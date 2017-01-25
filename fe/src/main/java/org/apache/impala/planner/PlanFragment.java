@@ -26,11 +26,13 @@ import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TPlanFragmentTree;
+import org.apache.impala.thrift.TQueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +76,8 @@ import com.google.common.collect.Sets;
  *   fix that
  */
 public class PlanFragment extends TreeNode<PlanFragment> {
+  private final static Logger LOG = LoggerFactory.getLogger(PlanFragment.class);
+
   private final PlanFragmentId fragmentId_;
   private PlanId planId_;
   private CohortId cohortId_;
@@ -145,6 +149,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
   /**
    * Finalize plan tree and create stream sink, if needed.
+   * Computes resource profiles for all nodes and sinks in this fragment.
    * If this fragment is hash partitioned, ensures that the corresponding partition
    * exprs of all hash-partitioning senders are cast to identical types.
    * Otherwise, the hashes generated for identical partition values may differ
@@ -159,6 +164,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       streamSink.setFragment(this);
       sink_ = streamSink;
     }
+    computeResourceProfile(analyzer);
 
     if (!dataPartition_.isHashPartitioned()) return;
 
@@ -196,6 +202,19 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   }
 
   /**
+   * Compute the resource profile of the fragment. Must be called after all the
+   * plan nodes and sinks are added to the fragment.
+   */
+  private void computeResourceProfile(Analyzer analyzer) {
+    sink_.computeResourceProfile(analyzer.getQueryOptions());
+    List<PlanNode> nodes = Lists.newArrayList();
+    collectPlanNodes(nodes);
+    for (PlanNode node: nodes) {
+      node.computeResourceProfile(analyzer.getQueryOptions());
+    }
+  }
+
+  /**
    * Return the number of nodes on which the plan fragment will execute.
    * invalid: -1
    */
@@ -203,18 +222,40 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     return dataPartition_ == DataPartition.UNPARTITIONED ? 1 : planRoot_.getNumNodes();
   }
 
- /**
-   * Estimates the per-node number of distinct values of exprs based on the data
-   * partition of this fragment and its number of nodes. Returns -1 for an invalid
-   * estimate, e.g., because getNumDistinctValues() failed on one of the exprs.
+  /**
+   * Return the number of instances of this fragment per host that it executes on.
+   * invalid: -1
    */
-  public long getNumDistinctValues(List<Expr> exprs) {
+  public int getNumInstancesPerHost(int mt_dop) {
+    Preconditions.checkState(mt_dop >= 0);
+    if (dataPartition_ == DataPartition.UNPARTITIONED) return 1;
+    return mt_dop == 0 ? 1 : mt_dop;
+  }
+
+  /**
+   * Return the total number of instances of this fragment across all hosts.
+   * invalid: -1
+   */
+  public int getNumInstances(int mt_dop) {
+    if (dataPartition_ == DataPartition.UNPARTITIONED) return 1;
+    int numNodes = planRoot_.getNumNodes();
+    if (numNodes == -1) return -1;
+    return getNumInstancesPerHost(mt_dop) * numNodes;
+  }
+
+  /**
+    * Estimates the number of distinct values of exprs per fragment instance based on the
+    * data partition of this fragment, the number of nodes, and the degree of parallelism.
+    * Returns -1 for an invalid estimate, e.g., because getNumDistinctValues() failed on
+    * one of the exprs.
+    */
+  public long getPerInstanceNdv(int mt_dop, List<Expr> exprs) {
     Preconditions.checkNotNull(dataPartition_);
     long result = 1;
-    int numNodes = getNumNodes();
-    Preconditions.checkState(numNodes >= 0);
+    int numInstances = getNumInstances(mt_dop);
+    Preconditions.checkState(numInstances >= 0);
     // The number of nodes is zero for empty tables.
-    if (numNodes == 0) return 0;
+    if (numInstances == 0) return 0;
     for (Expr expr: exprs) {
       long numDistinct = expr.getNumDistinctValues();
       if (numDistinct == -1) {
@@ -222,7 +263,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         break;
       }
       if (dataPartition_.getPartitionExprs().contains(expr)) {
-        numDistinct = (long)Math.max((double) numDistinct / (double) numNodes, 1L);
+        numDistinct = (long)Math.max((double) numDistinct / (double) numInstances, 1L);
       }
       result = PlanNode.multiplyCardinalities(result, numDistinct);
     }
@@ -254,8 +295,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     }
   }
 
-  public String getExplainString(TExplainLevel detailLevel) {
-    return getExplainString("", "", detailLevel);
+  public String getExplainString(TQueryOptions queryOptions, TExplainLevel detailLevel) {
+    return getExplainString("", "", queryOptions, detailLevel);
   }
 
   /**
@@ -263,7 +304,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * output will be prefixed by prefix.
    */
   protected final String getExplainString(String rootPrefix, String prefix,
-      TExplainLevel detailLevel) {
+      TQueryOptions queryOptions, TExplainLevel detailLevel) {
     StringBuilder str = new StringBuilder();
     Preconditions.checkState(dataPartition_ != null);
     String detailPrefix = prefix + "|  ";  // sink detail
@@ -272,17 +313,25 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       prefix = "  ";
       rootPrefix = "  ";
       detailPrefix = prefix + "|  ";
-      str.append(String.format("%s:PLAN FRAGMENT [%s]\n", fragmentId_.toString(),
-          dataPartition_.getExplainString()));
+      str.append(getFragmentHeaderString(queryOptions.getMt_dop()));
+      str.append("\n");
       if (sink_ != null && sink_ instanceof DataStreamSink) {
-        str.append(sink_.getExplainString(rootPrefix, prefix, detailLevel) + "\n");
+        str.append(
+            sink_.getExplainString(rootPrefix, detailPrefix, queryOptions, detailLevel));
       }
+    } else if (detailLevel == TExplainLevel.EXTENDED) {
+      // Print a fragment prefix displaying the # nodes and # instances
+      str.append(rootPrefix);
+      str.append(getFragmentHeaderString(queryOptions.getMt_dop()));
+      str.append("\n");
+      rootPrefix = prefix;
     }
 
     String planRootPrefix = rootPrefix;
     // Always print sinks other than DataStreamSinks.
     if (sink_ != null && !(sink_ instanceof DataStreamSink)) {
-      str.append(sink_.getExplainString(rootPrefix, detailPrefix, detailLevel));
+      str.append(
+          sink_.getExplainString(rootPrefix, detailPrefix, queryOptions, detailLevel));
       if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
         str.append(prefix + "|\n");
       }
@@ -290,9 +339,22 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       planRootPrefix = prefix;
     }
     if (planRoot_ != null) {
-      str.append(planRoot_.getExplainString(planRootPrefix, prefix, detailLevel));
+      str.append(
+          planRoot_.getExplainString(planRootPrefix, prefix, queryOptions, detailLevel));
     }
     return str.toString();
+  }
+
+  /**
+   * Get a header string for a fragment in an explain plan.
+   */
+  public String getFragmentHeaderString(int mt_dop) {
+    StringBuilder builder = new StringBuilder();
+    builder.append(String.format("%s:PLAN FRAGMENT [%s]", fragmentId_.toString(),
+        dataPartition_.getExplainString()));
+    builder.append(PrintUtils.printNumHosts(" ", getNumNodes()));
+    builder.append(PrintUtils.printNumInstances(" ", getNumInstances(mt_dop)));
+    return builder.toString();
   }
 
   /** Returns true if this fragment is partitioned. */

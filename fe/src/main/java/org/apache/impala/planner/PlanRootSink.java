@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TQueryOptions;
 
 /**
  * Sink for the root of a query plan that produces result rows. Allows coordination
@@ -28,9 +29,15 @@ import org.apache.impala.thrift.TExplainLevel;
  */
 public class PlanRootSink extends DataSink {
 
-  public String getExplainString(String prefix, String detailPrefix,
-      TExplainLevel explainLevel) {
-    return String.format("%sPLAN-ROOT SINK\n", prefix);
+  public void appendSinkExplainString(String prefix, String detailPrefix,
+      TQueryOptions queryOptions, TExplainLevel explainLevel, StringBuilder output) {
+    output.append(String.format("%sPLAN-ROOT SINK\n", prefix));
+  }
+
+  @Override
+  public void computeResourceProfile(TQueryOptions queryOptions) {
+    // TODO: add a memory estimate
+    resourceProfile_ = new ResourceProfile(0, 0);
   }
 
   protected TDataSink toThrift() {

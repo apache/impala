@@ -32,7 +32,6 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
@@ -51,6 +50,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.THdfsFileBlock;
@@ -72,7 +72,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -82,7 +81,7 @@ import com.google.common.collect.Sets;
  *
  * It's expected that the creator of this object has already done any necessary
  * partition pruning before creating this object. In other words, the 'conjuncts'
- * passed to the constructors are conjucts not fully evaluated by partition pruning
+ * passed to the constructors are conjuncts not fully evaluated by partition pruning
  * and 'partitions' are the remaining partitions after pruning.
  *
  * For scans of tables with Parquet files the class creates an additional list of
@@ -95,14 +94,13 @@ import com.google.common.collect.Sets;
 public class HdfsScanNode extends ScanNode {
   private final static Logger LOG = LoggerFactory.getLogger(HdfsScanNode.class);
 
-  // Read size of the backend I/O manager. Used in computeCosts().
-  private final static long IO_MGR_BUFFER_SIZE = 8L * 1024L * 1024L;
-
   // Maximum number of I/O buffers per thread executing this scan.
+  // TODO: it's unclear how this was chosen - this seems like a very high number
   private final static long MAX_IO_BUFFERS_PER_THREAD = 10;
 
-  // Number of scanner threads per core executing this scan.
-  private final static int THREADS_PER_CORE = 3;
+  // Maximum number of thread tokens per core that may be used to spin up extra scanner
+  // threads. Corresponds to the default value of --num_threads_per_core in the backend.
+  private final static int MAX_THREAD_TOKENS_PER_CORE = 3;
 
   // Factor capturing the worst-case deviation from a uniform distribution of scan ranges
   // among nodes. The factor of 1.2 means that a particular node may have 20% more
@@ -808,10 +806,10 @@ public class HdfsScanNode extends ScanNode {
   }
 
   @Override
-  public void computeCosts(TQueryOptions queryOptions) {
+  public void computeResourceProfile(TQueryOptions queryOptions) {
     Preconditions.checkNotNull(scanRanges_, "Cost estimation requires scan ranges.");
     if (scanRanges_.isEmpty()) {
-      perHostMemCost_ = 0;
+      resourceProfile_ = new ResourceProfile(0, 0);
       return;
     }
     Preconditions.checkState(0 < numNodes_ && numNodes_ <= scanRanges_.size());
@@ -834,34 +832,37 @@ public class HdfsScanNode extends ScanNode {
           (double) scanRanges_.size() / (double) numNodes_) * SCAN_RANGE_SKEW_FACTOR);
     }
 
-    // TODO: The total memory consumption for a particular query depends on the number
-    // of *available* cores, i.e., it depends the resource consumption of other
-    // concurrent queries. Figure out how to account for that.
-    int maxScannerThreads = Math.min(perHostScanRanges,
-        RuntimeEnv.INSTANCE.getNumCores() * THREADS_PER_CORE);
-    // Account for the max scanner threads query option.
-    if (queryOptions.isSetNum_scanner_threads() &&
-        queryOptions.getNum_scanner_threads() > 0) {
-      maxScannerThreads =
-          Math.min(maxScannerThreads, queryOptions.getNum_scanner_threads());
+    int maxScannerThreads;
+    if (queryOptions.getMt_dop() >= 1) {
+      maxScannerThreads = 1;
+    } else {
+      maxScannerThreads = Math.min(perHostScanRanges, RuntimeEnv.INSTANCE.getNumCores());
+      // Account for the max scanner threads query option.
+      if (queryOptions.isSetNum_scanner_threads() &&
+          queryOptions.getNum_scanner_threads() > 0) {
+        maxScannerThreads =
+            Math.min(maxScannerThreads, queryOptions.getNum_scanner_threads());
+      }
     }
 
     long avgScanRangeBytes = (long) Math.ceil(totalBytes_ / (double) scanRanges_.size());
     // The +1 accounts for an extra I/O buffer to read past the scan range due to a
     // trailing record spanning Hdfs blocks.
+    long readSize = BackendConfig.INSTANCE.getReadSize();
     long perThreadIoBuffers =
-        Math.min((long) Math.ceil(avgScanRangeBytes / (double) IO_MGR_BUFFER_SIZE),
+        Math.min((long) Math.ceil(avgScanRangeBytes / (double) readSize),
             MAX_IO_BUFFERS_PER_THREAD) + 1;
-    perHostMemCost_ = maxScannerThreads * perThreadIoBuffers * IO_MGR_BUFFER_SIZE;
+    long perInstanceMemEstimate = maxScannerThreads * perThreadIoBuffers * readSize;
 
     // Sanity check: the tighter estimation should not exceed the per-host maximum.
     long perHostUpperBound = getPerHostMemUpperBound();
-    if (perHostMemCost_ > perHostUpperBound) {
-      LOG.warn(String.format("Per-host mem cost %s exceeded per-host upper bound %s.",
-          PrintUtils.printBytes(perHostMemCost_),
+    if (perInstanceMemEstimate > perHostUpperBound) {
+      LOG.warn(String.format("Per-instance mem cost %s exceeded per-host upper bound %s.",
+          PrintUtils.printBytes(perInstanceMemEstimate),
           PrintUtils.printBytes(perHostUpperBound)));
-      perHostMemCost_ = perHostUpperBound;
+      perInstanceMemEstimate = perHostUpperBound;
     }
+    resourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
   }
 
   /**
@@ -873,9 +874,9 @@ public class HdfsScanNode extends ScanNode {
    */
   public static long getPerHostMemUpperBound() {
     // THREADS_PER_CORE each using a default of
-    // MAX_IO_BUFFERS_PER_THREAD * IO_MGR_BUFFER_SIZE bytes.
-    return (long) RuntimeEnv.INSTANCE.getNumCores() * (long) THREADS_PER_CORE *
-        MAX_IO_BUFFERS_PER_THREAD * IO_MGR_BUFFER_SIZE;
+    // MAX_IO_BUFFERS_PER_THREAD * read_size bytes.
+    return (long) RuntimeEnv.INSTANCE.getNumCores() * (long) MAX_THREAD_TOKENS_PER_CORE *
+        MAX_IO_BUFFERS_PER_THREAD * BackendConfig.INSTANCE.getReadSize();
   }
 
   @Override

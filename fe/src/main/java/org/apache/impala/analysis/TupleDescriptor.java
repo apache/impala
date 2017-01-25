@@ -347,4 +347,14 @@ public class TupleDescriptor {
     }
     return partitionSlots;
   }
+
+  /**
+   * Returns true if the tuple has any variable-length slots.
+   */
+  public boolean hasVarLenSlots() {
+    for (SlotDescriptor slot: slots_) {
+      if (!slot.getType().isFixedLengthType()) return true;
+    }
+    return false;
+  }
 }
