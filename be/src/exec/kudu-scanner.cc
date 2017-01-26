@@ -44,9 +44,9 @@ using kudu::client::KuduScanBatch;
 using kudu::client::KuduSchema;
 using kudu::client::KuduTable;
 
-DEFINE_string(kudu_read_mode, "READ_LATEST", "(Advanced) Sets the Kudu scan ReadMode. "
-    "Supported Kudu read modes are READ_LATEST and READ_AT_SNAPSHOT. Invalid values "
-    "result in using READ_LATEST.");
+DEFINE_string(kudu_read_mode, "READ_AT_SNAPSHOT", "(Advanced) Sets the Kudu scan "
+    "ReadMode. Supported Kudu read modes are READ_LATEST and READ_AT_SNAPSHOT. Invalid "
+    "values result in using READ_AT_SNAPSHOT.");
 DEFINE_bool(pick_only_leaders_for_tests, false,
             "Whether to pick only leader replicas, for tests purposes only.");
 DEFINE_int32(kudu_scanner_keep_alive_period_sec, 15,
@@ -57,7 +57,7 @@ DECLARE_int32(kudu_operation_timeout_ms);
 
 namespace impala {
 
-const string MODE_READ_AT_SNAPSHOT = "READ_AT_SNAPSHOT";
+const string MODE_READ_LATEST = "READ_LATEST";
 
 KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state)
   : scan_node_(scan_node),
@@ -138,9 +138,9 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
                          "Could not set replica selection.");
   }
   kudu::client::KuduScanner::ReadMode mode =
-      MODE_READ_AT_SNAPSHOT == FLAGS_kudu_read_mode ?
-          kudu::client::KuduScanner::READ_AT_SNAPSHOT :
-          kudu::client::KuduScanner::READ_LATEST;
+      MODE_READ_LATEST == FLAGS_kudu_read_mode ?
+          kudu::client::KuduScanner::READ_LATEST :
+          kudu::client::KuduScanner::READ_AT_SNAPSHOT;
   KUDU_RETURN_IF_ERROR(scanner_->SetReadMode(mode), "Could not set scanner ReadMode");
   KUDU_RETURN_IF_ERROR(scanner_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms),
       "Could not set scanner timeout");
