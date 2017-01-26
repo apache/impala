@@ -350,7 +350,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
 
     // If a probe row exists at this point, check whether we need to output the current
     // probe row before getting a new probe batch. (IMPALA-2440)
-    bool probe_row_exists = !probe_side_eos_ || probe_batch_->num_rows() > 0;
+    bool probe_row_exists = probe_batch_->num_rows() > 0;
     if (match_all_probe_ && !matched_probe_ && probe_row_exists) {
       int row_idx = out_batch->AddRow();
       TupleRow* out_row = out_batch->GetRow(row_idx);
