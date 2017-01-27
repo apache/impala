@@ -62,7 +62,7 @@ under the License.
       <conbody>
         <p>
         </p>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
+        <p><b>Bug:</b> <xref keyref="" scope="external" format="html"></xref></p>
         <p><b>Severity:</b> High</p>
         <p><b>Resolution:</b> </p>
         <p><b>Workaround:</b> </p>
@@ -140,6 +140,25 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
       </p>
 
     </conbody>
+
+    <concept id="IMPALA-4828">
+      <title>Altering Kudu table schema outside of Impala may result in crash on read</title>
+      <conbody>
+        <p>
+          Creating a table in Impala, changing the column schema outside of Impala,
+          and then reading again in Impala may result in a crash. Neither Impala nor
+          the Kudu client validates the schema immediately before reading, so Impala may attempt to
+          dereference pointers that aren't there. This happens if a string column is dropped
+          and then a new, non-string column is added with the old string column's name.
+        </p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-4828" scope="external" format="html">IMPALA-4828</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Workaround:</b> Run the statement <codeph>REFRESH <varname>table_name</varname></codeph>
+          after any occasion when the table structure, such as the number, names, and data types
+          of columns, are modified outside of Impala using the Kudu API.
+        </p>
+      </conbody>
+    </concept>
 
     <concept id="IMPALA-1972" rev="IMPALA-1972">
 
@@ -272,24 +291,6 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
       </p>
 
     </conbody>
-
-    <concept id="IMPALA-4106" rev="IMPALA-4106">
-      <title>Use Hive Metastore bulk API for dropping multiple partitions.</title>
-      <conbody>
-        <p>
-          The bulk partition dropping and setting feature of IMPALA-1654 is not as efficient
-          as it could be, because it currently does not use the Hive Metastore bulk API.
-        </p>
-        <p><b>Bug:</b> <xref keyref="IMPALA-4106">IMPALA-4106</xref></p>
-        <p><b>Severity:</b> High</p>
-        <p><b>Workaround:</b> Schedule <codeph>ALTER TABLE</codeph> operations that touch
-          many partitions for times when the table is not undergoing any other DDL operations,
-          and be prepared for the table to be locked for some time while the <codeph>ALTER TABLE</codeph>
-          is in progress. Test the performance of large-scale partition operations in a development
-          environment before trying on tables in a production system.
-        </p>
-      </conbody>
-    </concept>
 
     <concept id="IMPALA-1480" rev="IMPALA-1480">
 
