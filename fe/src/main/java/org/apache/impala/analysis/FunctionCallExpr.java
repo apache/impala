@@ -227,6 +227,26 @@ public class FunctionCallExpr extends Expr {
   public void setIsAnalyticFnCall(boolean v) { isAnalyticFnCall_ = v; }
   public void setIsInternalFnCall(boolean v) { isInternalFnCall_ = v; }
 
+  static boolean isNondeterministicBuiltinFnName(String fnName) {
+    if (fnName.equalsIgnoreCase("rand") || fnName.equalsIgnoreCase("random")
+        || fnName.equalsIgnoreCase("uuid")) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Returns true if function is a non-deterministic builtin function, i.e. for a fixed
+   * input, it may not always produce the same output for every invocation.
+   * Functions that use randomness or variable runtime state are non-deterministic.
+   * This only applies to builtin functions, and does not provide any information
+   * about user defined functions.
+   */
+  public boolean isNondeterministicBuiltinFn() {
+    String fnName = fnName_.getFunction();
+    return isNondeterministicBuiltinFnName(fnName);
+  }
+
   @Override
   protected void toThrift(TExprNode msg) {
     if (isAggregateFunction() || isAnalyticFnCall_) {
@@ -256,8 +276,7 @@ public class FunctionCallExpr extends Expr {
       fnName = path.get(path.size() - 1);
     }
     // Non-deterministic functions are never constant.
-    if (fnName.equalsIgnoreCase("rand") || fnName.equalsIgnoreCase("random")
-        || fnName.equalsIgnoreCase("uuid")) {
+    if (!isNondeterministicBuiltinFnName(fnName)) {
       return false;
     }
     // Sleep is a special function for testing.

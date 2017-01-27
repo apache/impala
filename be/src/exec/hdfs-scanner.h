@@ -210,6 +210,9 @@ class HdfsScanner {
   // that do not support nested types.
   const std::vector<ExprContext*>* scanner_conjunct_ctxs_;
 
+  // Clones of the conjuncts ExprContexts in scan_node_->dict_filter_conjuncts_map().
+  HdfsScanNodeBase::DictFilterConjunctsMap scanner_dict_filter_map_;
+
   /// Holds memory for template tuples. The memory in this pool must remain valid as long
   /// as the row batches produced by this scanner. This typically means that the
   /// ownership is transferred to the last row batch in Close(). Some scanners transfer

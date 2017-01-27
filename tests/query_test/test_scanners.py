@@ -312,6 +312,10 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet-corrupt-rle-counts-abort',
                        vector, unique_database)
 
+  def test_filtering(self, vector):
+    """IMPALA-4624: Test that dictionary filtering eliminates row groups correctly."""
+    self.run_test_case('QueryTest/parquet-filtering', vector)
+
   @SkipIfS3.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad

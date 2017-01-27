@@ -150,6 +150,12 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     num_values_ = 0;
     total_compressed_byte_size_ = 0;
     current_encoding_ = Encoding::PLAIN;
+    column_encodings_.clear();
+    dict_encoding_stats_.clear();
+    data_encoding_stats_.clear();
+    // Repetition/definition level encodings are constant. Incorporate them here.
+    column_encodings_.insert(Encoding::RLE);
+    column_encodings_.insert(Encoding::BIT_PACKED);
   }
 
   // Close this writer. This is only called after Flush() and no more rows will
@@ -237,6 +243,16 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   int64_t total_compressed_byte_size_;
   int64_t total_uncompressed_byte_size_;
   Encoding::type current_encoding_;
+
+  // Set of all encodings used in the column chunk
+  unordered_set<Encoding::type> column_encodings_;
+
+  // Map from the encoding to the number of pages in the column chunk with this encoding
+  // These are used to construct the PageEncodingStats, which provide information
+  // about encoding usage for each different page type. Currently, only dictionary
+  // and data pages are used.
+  unordered_map<Encoding::type, int> dict_encoding_stats_;
+  unordered_map<Encoding::type, int> data_encoding_stats_;
 
   // Created, owned, and set by the derived class.
   DictEncoderBase* dict_encoder_base_;
@@ -515,6 +531,7 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
     DictionaryPageHeader dict_header;
     dict_header.num_values = dict_encoder_base_->num_entries();
     dict_header.encoding = Encoding::PLAIN_DICTIONARY;
+    ++dict_encoding_stats_[dict_header.encoding];
 
     PageHeader header;
     header.type = PageType::DICTIONARY_PAGE;
@@ -597,6 +614,10 @@ void HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
 
   PageHeader& header = current_page_->header;
   header.data_page_header.encoding = current_encoding_;
+
+  // Accumulate encoding statistics
+  column_encodings_.insert(header.data_page_header.encoding);
+  ++data_encoding_stats_[header.data_page_header.encoding];
 
   // Compute size of definition bits
   def_levels_->Flush();
@@ -684,6 +705,9 @@ void HdfsParquetTableWriter::BaseColumnWriter::NewPage() {
 
     DataPageHeader header;
     header.num_values = 0;
+    // The code that populates the column chunk metadata's encodings field
+    // relies on these specific values for the definition/repetition level
+    // encodings.
     header.definition_level_encoding = Encoding::RLE;
     header.repetition_level_encoding = Encoding::BIT_PACKED;
     current_page_->header.__set_data_page_header(header);
@@ -852,13 +876,6 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   for (int i = 0; i < columns_.size(); ++i) {
     ColumnMetaData metadata;
     metadata.type = IMPALA_TO_PARQUET_TYPES[columns_[i]->expr_ctx_->root()->type().type];
-    // Add all encodings that were used in this file.  Currently we use PLAIN and
-    // PLAIN_DICTIONARY for data values and RLE for the definition levels.
-    metadata.encodings.push_back(Encoding::RLE);
-    // Columns are initially dictionary encoded
-    // TODO: we might not have PLAIN encoding in this case
-    metadata.encodings.push_back(Encoding::PLAIN_DICTIONARY);
-    metadata.encodings.push_back(Encoding::PLAIN);
     metadata.path_in_schema.push_back(
         table_desc_->col_descs()[i + num_clustering_cols].name());
     metadata.codec = columns_[i]->codec();
@@ -1014,30 +1031,55 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
     RETURN_IF_ERROR(columns_[i]->Flush(&file_pos_, &data_page_offset, &dict_page_offset));
     DCHECK_GT(data_page_offset, 0);
 
-    current_row_group_->columns[i].meta_data.data_page_offset = data_page_offset;
+    ColumnChunk& col_chunk = current_row_group_->columns[i];
+    ColumnMetaData& col_metadata = col_chunk.meta_data;
+    col_metadata.data_page_offset = data_page_offset;
     if (dict_page_offset >= 0) {
-      current_row_group_->columns[i].meta_data.__set_dictionary_page_offset(
-          dict_page_offset);
+      col_metadata.__set_dictionary_page_offset(dict_page_offset);
     }
 
-    current_row_group_->columns[i].meta_data.num_values = columns_[i]->num_values();
-    current_row_group_->columns[i].meta_data.total_uncompressed_size =
-        columns_[i]->total_uncompressed_size();
-    current_row_group_->columns[i].meta_data.total_compressed_size =
-        columns_[i]->total_compressed_size();
-    current_row_group_->total_byte_size += columns_[i]->total_compressed_size();
-    current_row_group_->num_rows = columns_[i]->num_values();
+    BaseColumnWriter* col_writer = columns_[i].get();
+    col_metadata.num_values = col_writer->num_values();
+    col_metadata.total_uncompressed_size = col_writer->total_uncompressed_size();
+    col_metadata.total_compressed_size = col_writer->total_compressed_size();
+    current_row_group_->total_byte_size += col_writer->total_compressed_size();
+    current_row_group_->num_rows = col_writer->num_values();
     current_row_group_->columns[i].file_offset = file_pos_;
     const string& col_name = table_desc_->col_descs()[i + num_clustering_cols].name();
-    parquet_stats_.per_column_size[col_name] += columns_[i]->total_compressed_size();
+    parquet_stats_.per_column_size[col_name] += col_writer->total_compressed_size();
+
+    // Write encodings and encoding stats for this column
+    col_metadata.encodings.clear();
+    for (Encoding::type encoding : col_writer->column_encodings_) {
+      col_metadata.encodings.push_back(encoding);
+    }
+
+    vector<PageEncodingStats> encoding_stats;
+    // Add dictionary page encoding stats
+    for (const auto& entry: col_writer->dict_encoding_stats_) {
+      PageEncodingStats dict_enc_stat;
+      dict_enc_stat.page_type = PageType::DICTIONARY_PAGE;
+      dict_enc_stat.encoding = entry.first;
+      dict_enc_stat.count = entry.second;
+      encoding_stats.push_back(dict_enc_stat);
+    }
+    // Add data page encoding stats
+    for (const auto& entry: col_writer->data_encoding_stats_) {
+      PageEncodingStats data_enc_stat;
+      data_enc_stat.page_type = PageType::DATA_PAGE;
+      data_enc_stat.encoding = entry.first;
+      data_enc_stat.count = entry.second;
+      encoding_stats.push_back(data_enc_stat);
+    }
+    col_metadata.__set_encoding_stats(encoding_stats);
 
     // Build column statistics and add them to the header.
-    columns_[i]->EncodeRowGroupStats(&current_row_group_->columns[i].meta_data);
+    col_writer->EncodeRowGroupStats(&current_row_group_->columns[i].meta_data);
 
     // Since we don't supported complex schemas, all columns should have the same
     // number of values.
     DCHECK_EQ(current_row_group_->columns[0].meta_data.num_values,
-        columns_[i]->num_values());
+        col_writer->num_values());
 
     // Metadata for this column is complete, write it out to file.  The column metadata
     // goes at the end so that when we have collocated files, the column data can be
@@ -1049,7 +1091,7 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
     RETURN_IF_ERROR(Write(buffer, len));
     file_pos_ += len;
 
-    columns_[i]->Reset();
+    col_writer->Reset();
   }
 
   current_row_group_ = nullptr;

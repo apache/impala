@@ -50,6 +50,7 @@ PLAN-ROOT SINK
    table stats: 150000 rows total
    columns missing stats: c_orders
    parquet statistics predicates: c_custkey > 10
+   parquet dictionary predicates: c_custkey > 10
    hosts=3 per-host-mem=unavailable
    tuple-ids=0 row-size=24B cardinality=15000
 ====
@@ -127,6 +128,7 @@ PLAN-ROOT SINK
 |     predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
 |     table stats: 7300 rows total
 |     column stats: all
+|     parquet dictionary predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
 |     hosts=3 per-host-mem=unavailable
 |     tuple-ids=1 row-size=20B cardinality=730
 |
@@ -158,6 +160,7 @@ PLAN-ROOT SINK
 |     predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
 |     table stats: 7300 rows total
 |     column stats: all
+|     parquet dictionary predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
 |     hosts=3 per-host-mem=unavailable
 |     tuple-ids=1 row-size=20B cardinality=730
 |

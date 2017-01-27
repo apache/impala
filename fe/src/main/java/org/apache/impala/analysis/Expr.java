@@ -163,6 +163,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         public boolean apply(Expr arg) { return arg instanceof BinaryPredicate; }
       };
 
+  public final static com.google.common.base.Predicate<Expr>
+      IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof FunctionCallExpr &&
+             !((FunctionCallExpr)arg).isNondeterministicBuiltinFn();
+        }
+      };
+
   // id that's unique across the entire query statement and is assigned by
   // Analyzer.registerConjuncts(); only assigned for the top-level terms of a
   // conjunction, and therefore null for most Exprs

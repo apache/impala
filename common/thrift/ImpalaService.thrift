@@ -251,6 +251,9 @@ enum TImpalaQueryOptions {
   // Indicates whether to use the new decimal semantics, which includes better
   // rounding and output types for multiply / divide
   DECIMAL_V2,
+
+  // Indicates whether to use dictionary filtering for Parquet files
+  PARQUET_DICTIONARY_FILTERING,
 }
 
 // The summary of a DML statement.

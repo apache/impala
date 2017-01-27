@@ -35,7 +35,7 @@ class TQueryOptions;
 // the DCHECK.
 #define QUERY_OPTS_TABLE\
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),\
-      TImpalaQueryOptions::DECIMAL_V2 + 1);\
+      TImpalaQueryOptions::PARQUET_DICTIONARY_FILTERING + 1);\
   QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED)\
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR)\
   QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)\
@@ -88,6 +88,7 @@ class TQueryOptions;
   QUERY_OPT_FN(scratch_limit, SCRATCH_LIMIT)\
   QUERY_OPT_FN(enable_expr_rewrites, ENABLE_EXPR_REWRITES)\
   QUERY_OPT_FN(decimal_v2, DECIMAL_V2)\
+  QUERY_OPT_FN(parquet_dictionary_filtering, PARQUET_DICTIONARY_FILTERING)\
   ;
 
 

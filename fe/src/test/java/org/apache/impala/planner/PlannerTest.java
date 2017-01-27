@@ -266,6 +266,13 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testParquetFiltering() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("parquet-filtering", options);
+  }
+
+  @Test
   public void testKudu() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     runPlannerTestFile("kudu");

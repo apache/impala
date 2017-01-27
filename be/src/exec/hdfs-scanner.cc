@@ -115,6 +115,12 @@ Status HdfsScanner::Open(ScannerContext* context) {
          scanner_conjuncts_map_.end());
   scanner_conjunct_ctxs_ = &scanner_conjuncts_map_[scan_node_->tuple_desc()->id()];
 
+  // Clone the scan node's dictionary filtering conjuncts map.
+  for (const auto& entry: scan_node_->dict_filter_conjuncts_map()) {
+    RETURN_IF_ERROR(Expr::CloneIfNotExists(entry.second,
+        scan_node_->runtime_state(), &scanner_dict_filter_map_[entry.first]));
+  }
+
   // Initialize the template_tuple_.
   template_tuple_ = scan_node_->InitTemplateTuple(
       context_->partition_descriptor()->partition_key_value_ctxs(),
@@ -128,6 +134,7 @@ Status HdfsScanner::Open(ScannerContext* context) {
 void HdfsScanner::Close(RowBatch* row_batch) {
   if (decompressor_.get() != NULL) decompressor_->Close();
   for (const auto& entry: scanner_conjuncts_map_) Expr::Close(entry.second, state_);
+  for (const auto& entry: scanner_dict_filter_map_) Expr::Close(entry.second, state_);
   obj_pool_.Clear();
   stream_ = NULL;
   context_->ClearStreams();

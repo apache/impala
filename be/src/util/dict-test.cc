@@ -30,7 +30,8 @@
 namespace impala {
 
 template<typename T>
-void ValidateDict(const vector<T>& values, int fixed_buffer_byte_size) {
+void ValidateDict(const vector<T>& values, const vector<T>& dict_values,
+                  int fixed_buffer_byte_size) {
   set<T> values_set(values.begin(), values.end());
 
   MemTracker tracker;
@@ -51,10 +52,20 @@ void ValidateDict(const vector<T>& values, int fixed_buffer_byte_size) {
   DictDecoder<T> decoder;
   ASSERT_TRUE(
       decoder.Reset(dict_buffer, encoder.dict_encoded_size(), fixed_buffer_byte_size));
+
+  // Test direct access to the dictionary via indexes
+  for (int i = 0; i < dict_values.size(); ++i) {
+    T expected_value = dict_values[i];
+    T out_value;
+
+    decoder.GetValue(i, &out_value);
+    EXPECT_EQ(expected_value, out_value);
+  }
+  // Test access to dictionary via internal stream
   ASSERT_OK(decoder.SetData(data_buffer, data_len));
   for (T i: values) {
     T j;
-    decoder.GetValue(&j);
+    decoder.GetNextValue(&j);
     EXPECT_EQ(i, j);
   }
   pool.FreeAll();
@@ -65,6 +76,12 @@ TEST(DictTest, TestStrings) {
   StringValue sv2("foo");
   StringValue sv3("bar");
   StringValue sv4("baz");
+
+  vector<StringValue> dict_values;
+  dict_values.push_back(sv1);
+  dict_values.push_back(sv2);
+  dict_values.push_back(sv3);
+  dict_values.push_back(sv4);
 
   vector<StringValue> values;
   values.push_back(sv1);
@@ -79,13 +96,18 @@ TEST(DictTest, TestStrings) {
   values.push_back(sv3);
   values.push_back(sv4);
 
-  ValidateDict(values, -1);
+  ValidateDict(values, dict_values, -1);
 }
 
 TEST(DictTest, TestTimestamps) {
   TimestampValue tv1("2011-01-01 09:01:01", 19);
   TimestampValue tv2("2012-01-01 09:01:01", 19);
   TimestampValue tv3("2011-01-01 09:01:02", 19);
+
+  vector<TimestampValue> dict_values;
+  dict_values.push_back(tv1);
+  dict_values.push_back(tv2);
+  dict_values.push_back(tv3);
 
   vector<TimestampValue> values;
   values.push_back(tv1);
@@ -95,7 +117,8 @@ TEST(DictTest, TestTimestamps) {
   values.push_back(tv1);
   values.push_back(tv1);
 
-  ValidateDict(values, ParquetPlainEncoder::EncodedByteSize(ColumnType(TYPE_TIMESTAMP)));
+  ValidateDict(values, dict_values,
+      ParquetPlainEncoder::EncodedByteSize(ColumnType(TYPE_TIMESTAMP)));
 }
 
 template<typename T>
@@ -108,12 +131,15 @@ template <> void IncrementValue(Decimal16Value* t) { ++(t->value()); }
 template<typename T>
 void TestNumbers(int max_value, int repeat, int value_byte_size) {
   vector<T> values;
+  vector<T> dict_values;
   for (T val = 0; val < max_value; IncrementValue(&val)) {
     for (int i = 0; i < repeat; ++i) {
       values.push_back(val);
     }
+    dict_values.push_back(val);
   }
-  ValidateDict(values, value_byte_size);
+
+  ValidateDict(values, dict_values, value_byte_size);
 }
 
 template<typename T>

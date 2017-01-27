@@ -155,6 +155,16 @@ Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
       &min_max_conjunct_ctxs_));
   DCHECK(min_max_conjunct_ctxs_.empty() == (min_max_tuple_id_ == -1));
 
+  for (const auto& entry: tnode.hdfs_scan_node.dictionary_filter_conjuncts) {
+    // Convert this slot's list of conjunct indices into a list of pointers
+    // into conjunct_ctxs_.
+    for (int conjunct_idx : entry.second) {
+      DCHECK_LT(conjunct_idx, conjunct_ctxs_.size());
+      ExprContext* conjunct_ctx = conjunct_ctxs_[conjunct_idx];
+      dict_filter_conjuncts_map_[entry.first].push_back(conjunct_ctx);
+    }
+  }
+
   return Status::OK();
 }
 

@@ -58,6 +58,7 @@ PLAN-ROOT SINK
    table stats: unavailable
    column stats: unavailable
    parquet statistics predicates: id < 10
+   parquet dictionary predicates: id < 10
    hosts=3 per-host-mem=unavailable
    tuple-ids=0 row-size=16B cardinality=unavailable
 ---- PARALLELPLANS
@@ -96,6 +97,7 @@ PLAN-ROOT SINK
    table stats: unavailable
    column stats: unavailable
    parquet statistics predicates: id < 10
+   parquet dictionary predicates: id < 10
    hosts=3 per-host-mem=16.00MB
    tuple-ids=0 row-size=16B cardinality=unavailable
 ====
@@ -125,6 +127,7 @@ PLAN-ROOT SINK
    table stats: unavailable
    column stats: unavailable
    parquet statistics predicates: id < 10
+   parquet dictionary predicates: id < 10
    hosts=3 per-host-mem=unavailable
    tuple-ids=0 row-size=8B cardinality=unavailable
 ---- PARALLELPLANS
@@ -157,6 +160,7 @@ PLAN-ROOT SINK
    table stats: unavailable
    column stats: unavailable
    parquet statistics predicates: id < 10
+   parquet dictionary predicates: id < 10
    hosts=3 per-host-mem=16.00MB
    tuple-ids=0 row-size=8B cardinality=unavailable
 ====
@@ -211,6 +215,7 @@ PLAN-ROOT SINK
    table stats: 150000 rows total
    columns missing stats: c_orders
    parquet statistics predicates: c_custkey < 10
+   parquet dictionary predicates: c_custkey < 10
    hosts=3 per-host-mem=unavailable
    tuple-ids=0 row-size=254B cardinality=15000
 ---- PARALLELPLANS
@@ -264,6 +269,7 @@ PLAN-ROOT SINK
    table stats: 150000 rows total
    columns missing stats: c_orders
    parquet statistics predicates: c_custkey < 10
+   parquet dictionary predicates: c_custkey < 10
    hosts=3 per-host-mem=88.00MB
    tuple-ids=0 row-size=254B cardinality=15000
 ====

@@ -444,6 +444,17 @@ class HdfsParquetScanner : public HdfsScanner {
   /// pages in a column chunk.
   boost::scoped_ptr<MemPool> dictionary_pool_;
 
+  /// Column readers that are eligible for dictionary filtering
+  /// These are pointers to elements of column_readers_
+  std::vector<ParquetColumnReader*> dict_filterable_readers_;
+
+  /// Column readers that are not eligible for dictionary filtering
+  /// These are pointers to elements of column_readers_
+  std::vector<ParquetColumnReader*> non_dict_filterable_readers_;
+
+  /// Memory used to store the tuple used for dictionary filtering
+  ScopedBuffer dict_filter_tuple_backing_;
+
   /// Timer for materializing rows.  This ignores time getting the next buffer.
   ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
 
@@ -462,6 +473,9 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Number of scanners that end up doing no reads because their splits don't overlap
   /// with the midpoint of any row-group in the file.
   RuntimeProfile::Counter* num_scanners_with_no_reads_counter_;
+
+  /// Number of row groups skipped due to dictionary filter
+  RuntimeProfile::Counter* num_dict_filtered_row_groups_counter_;
 
   typedef int (*ProcessScratchBatchFn)(HdfsParquetScanner*, RowBatch*);
   /// The codegen'd version of ProcessScratchBatch() if available, NULL otherwise.
@@ -600,6 +614,9 @@ class HdfsParquetScanner : public HdfsScanner {
   Status InitColumns(
       int row_group_idx, const std::vector<ParquetColumnReader*>& column_readers);
 
+  /// Initialize dictionaries for all column readers
+  Status InitDictionaries(const std::vector<ParquetColumnReader*>& column_readers);
+
   /// Performs some validation once we've reached the end of a row group to help detect
   /// bugs or bad input files.
   Status ValidateEndOfRowGroup(const std::vector<ParquetColumnReader*>& column_readers,
@@ -612,6 +629,22 @@ class HdfsParquetScanner : public HdfsScanner {
   /// from mem pools to the given row batch. Closes all column readers.
   /// Should be called after completing a row group and when returning the last batch.
   void FlushRowGroupResources(RowBatch* row_batch);
+
+  /// Evaluates whether the column reader is eligible for dictionary predicates
+  bool IsDictFilterable(ParquetColumnReader* col_reader);
+
+  /// Divides the column readers into dict_filterable_readers_ and
+  /// non_dict_filterable_readers_. Allocates memory for dict_filter_tuple_backing_.
+  Status InitDictFilterStructures();
+
+  /// Returns true if all of the data pages in the column chunk are dictionary encoded
+  bool IsDictionaryEncoded(const parquet::ColumnMetaData& col_metadata);
+
+  /// Checks to see if this row group can be eliminated based on applying conjuncts
+  /// to the dictionary values. Specifically, if any dictionary-encoded column has
+  /// no values that pass the relevant conjuncts, then the row group can be skipped.
+  Status EvalDictionaryFilters(const parquet::RowGroup& row_group,
+      bool* skip_row_group);
 };
 
 } // namespace impala

@@ -1342,13 +1342,13 @@ PLAN-ROOT SINK
 |  hash predicates: n.n_regionkey = r_regionkey
 |
 |--03:SCAN HDFS [tpch_parquet.region r]
-|     partitions=1/1 files=1 size=900B
+|     partitions=1/1 files=1 size=1.01KB
 |     predicates: r.r_regionkey = 1
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--01:SCAN HDFS [tpch_parquet.nation n]
-|     partitions=1/1 files=1 size=2.17KB
+|     partitions=1/1 files=1 size=2.38KB
 |     predicates: n_regionkey = 1, n_name = 'BRAZIL'
 |
 00:SCAN HDFS [tpch_parquet.customer c]

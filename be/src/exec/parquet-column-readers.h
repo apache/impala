@@ -363,6 +363,24 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// next data page if necessary.
   virtual bool NextLevels() { return NextLevels<true>(); }
 
+  // Check the data stream to see if there is a dictionary page. If there is,
+  // use that page to initialize dict_decoder_ and advance the data stream
+  // past the dictionary page.
+  Status InitDictionary();
+
+  // Returns the dictionary or NULL if the dictionary doesn't exist
+  virtual DictDecoderBase* GetDictionaryDecoder() { return nullptr; }
+
+  // Returns whether the datatype for this column requires conversion from the on-disk
+  // format for correctness. For example, timestamps can require an offset to be
+  // applied.
+  virtual bool NeedsConversion() { return false; }
+
+  // Returns whether the datatype for this column requires validation. For example,
+  // the timestamp format has certain bit combinations that are invalid, and these
+  // need to be validated when read from disk.
+  virtual bool NeedsValidation() { return false; }
+
   // TODO: Some encodings might benefit a lot from a SkipValues(int num_rows) if
   // we know this row can be skipped. This could be very useful with stats and big
   // sections can be skipped. Implement that when we can benefit from it.
@@ -408,6 +426,14 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// Header for current data page.
   parquet::PageHeader current_page_header_;
 
+  /// Reads the next page header into next_page_header/next_header_size.
+  /// If the stream reaches the end before reading a complete page header,
+  /// eos is set to true. If peek is false, the stream position is advanced
+  /// past the page header. If peek is true, the stream position is not moved.
+  /// Returns an error status if the next page header could not be read.
+  Status ReadPageHeader(bool peek, parquet::PageHeader* next_page_header,
+      uint32_t* next_header_size, bool* eos);
+
   /// Read the next data page. If a dictionary page is encountered, that will be read and
   /// this function will continue reading the next data page.
   Status ReadDataPage();
@@ -426,8 +452,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   virtual Status CreateDictionaryDecoder(uint8_t* values, int size,
       DictDecoderBase** decoder) = 0;
 
-  /// Return true if the column has an initialized dictionary decoder. Subclass must
-  /// implement this.
+  /// Return true if the column has a dictionary decoder. Subclass must implement this.
   virtual bool HasDictionaryDecoder() = 0;
 
   /// Clear the dictionary decoder so HasDictionaryDecoder() will return false. Subclass

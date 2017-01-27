@@ -19,6 +19,7 @@ package org.apache.impala.planner;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,9 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleDescriptor;
@@ -69,6 +72,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -126,6 +130,11 @@ public class HdfsScanNode extends ScanNode {
   // collection-typed slots. Maps from tuple descriptor to the conjuncts bound by that
   // tuple. Uses a linked hash map for consistent display in explain.
   private final Map<TupleDescriptor, List<Expr>> collectionConjuncts_ =
+      Maps.newLinkedHashMap();
+
+  // Map from SlotIds to indices in PlanNodes.conjuncts_ that are eligible for
+  // dictionary filtering
+  private Map<Integer, List<Integer>> dictionaryFilterConjuncts_ =
       Maps.newLinkedHashMap();
 
   // Indicates corrupt table stats based on the number of non-empty scan ranges and
@@ -202,7 +211,7 @@ public class HdfsScanNode extends ScanNode {
     checkForSupportedFileFormats();
 
     assignCollectionConjuncts(analyzer);
-
+    computeDictionaryFilterConjuncts(analyzer);
     computeMemLayout(analyzer);
 
     // compute scan range locations
@@ -411,6 +420,45 @@ public class HdfsScanNode extends ScanNode {
       }
       // Recursively look for collection-typed slots in nested tuple descriptors.
       assignCollectionConjuncts(itemTupleDesc, analyzer);
+    }
+  }
+
+  /**
+   * Walks through conjuncts and populates dictionaryFilterConjuncts_.
+   */
+  private void computeDictionaryFilterConjuncts(Analyzer analyzer) {
+    for (int conjunct_idx = 0; conjunct_idx < conjuncts_.size(); ++conjunct_idx) {
+      Expr conjunct = conjuncts_.get(conjunct_idx);
+      List<TupleId> tupleIds = Lists.newArrayList();
+      List<SlotId> slotIds = Lists.newArrayList();
+
+      conjunct.getIds(tupleIds, slotIds);
+      Preconditions.checkState(tupleIds.size() == 1);
+      if (slotIds.size() != 1) continue;
+
+      // Check to see if this slot is a collection type. Nested types are
+      // currently not supported. For example, an IsNotEmptyPredicate cannot
+      // be evaluated at the dictionary level.
+      if (analyzer.getSlotDesc(slotIds.get(0)).getType().isCollectionType()) continue;
+
+      // Check to see if this conjunct contains any known randomized function
+      if (conjunct.contains(Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE)) continue;
+
+      // Check to see if the conjunct evaluates to true when the slot is NULL
+      // This is important for dictionary filtering. Dictionaries do not
+      // contain an entry for NULL and do not provide an indication about
+      // whether NULLs are present. A conjunct that evaluates to true on NULL
+      // cannot be evaluated purely on the dictionary.
+      if (analyzer.isTrueWithNullSlots(conjunct)) continue;
+
+      // TODO: Should there be a limit on the cost/structure of the conjunct?
+      Integer slotIdInt = slotIds.get(0).asInt();
+      if (dictionaryFilterConjuncts_.containsKey(slotIdInt)) {
+        dictionaryFilterConjuncts_.get(slotIdInt).add(conjunct_idx);
+      } else {
+        List<Integer> slotList = Lists.newArrayList(conjunct_idx);
+        dictionaryFilterConjuncts_.put(slotIdInt, slotList);
+      }
     }
   }
 
@@ -673,6 +721,7 @@ public class HdfsScanNode extends ScanNode {
       }
       msg.hdfs_scan_node.setMin_max_tuple_id(minMaxTuple_.getId().asInt());
     }
+    msg.hdfs_scan_node.setDictionary_filter_conjuncts(dictionaryFilterConjuncts_);
   }
 
   @Override
@@ -737,6 +786,20 @@ public class HdfsScanNode extends ScanNode {
       if (!minMaxOriginalConjuncts_.isEmpty()) {
         output.append(detailPrefix + "parquet statistics predicates: " +
             getExplainString(minMaxOriginalConjuncts_) + "\n");
+      }
+      if (!dictionaryFilterConjuncts_.isEmpty()) {
+        List<Integer> totalIdxList = Lists.newArrayList();
+        for (List<Integer> idxList : dictionaryFilterConjuncts_.values()) {
+          totalIdxList.addAll(idxList);
+        }
+        // Since the conjuncts are stored by the slot id, they are not necessarily
+        // in the same order as the normal conjuncts. Sort the indices so that the
+        // order matches the normal conjuncts.
+        Collections.sort(totalIdxList);
+        List<Expr> exprList = Lists.newArrayList();
+        for (Integer idx : totalIdxList) exprList.add(conjuncts_.get(idx));
+        output.append(String.format("%sparquet dictionary predicates: %s\n",
+            detailPrefix, getExplainString(exprList)));
       }
     }
     return output.toString();

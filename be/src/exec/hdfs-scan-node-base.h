@@ -160,6 +160,12 @@ class HdfsScanNodeBase : public ScanNode {
   typedef std::map<TupleId, std::vector<ExprContext*>> ConjunctsMap;
   const ConjunctsMap& conjuncts_map() const { return conjuncts_map_; }
 
+  /// Slot Id => Dictionary Filter eligible conjuncts for that slot
+  typedef std::map<SlotId, std::vector<ExprContext*>> DictFilterConjunctsMap;
+  const DictFilterConjunctsMap& dict_filter_conjuncts_map() const {
+    return dict_filter_conjuncts_map_;
+  }
+
   RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length() {
     return max_compressed_text_file_length_;
   }
@@ -335,6 +341,9 @@ class HdfsScanNodeBase : public ScanNode {
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
   /// item tuples). Includes a copy of ExecNode.conjuncts_.
   ConjunctsMap conjuncts_map_;
+
+  /// Dictionary filtering eligible conjuncts for each slot
+  DictFilterConjunctsMap dict_filter_conjuncts_map_;
 
   /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on
   /// the first call to GetNext(). The token manager, in a different thread, will read

@@ -221,6 +221,9 @@ struct TQueryOptions {
 
   // Indicates whether to use the new decimal semantics.
   52: optional bool decimal_v2 = false
+
+  // Indicates whether to use dictionary filtering for Parquet files
+  53: optional bool parquet_dictionary_filtering = true
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

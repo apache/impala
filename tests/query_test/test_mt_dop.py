@@ -97,3 +97,19 @@ class TestMtDopParquet(ImpalaTestSuite):
   def test_parquet_nested(self, vector):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-parquet-nested', vector)
+
+# Parquet filtering test rlies on a specific mt_dop value, so keep in its own test
+class TestMtDopParquetFiltering(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestMtDopParquetFiltering, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_parquet_filtering(self, vector):
+    vector.get_value('exec_option')['mt_dop'] = 3
+    self.run_test_case('QueryTest/mt-dop-parquet-filtering', vector)

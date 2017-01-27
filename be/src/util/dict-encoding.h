@@ -187,6 +187,10 @@ class DictDecoderBase {
 
   virtual int num_entries() const = 0;
 
+  /// Reads the dictionary value at the specified index into the buffer provided.
+  /// The buffer must be large enough to receive the datatype for this dictionary.
+  virtual void GetValue(int index, void* buffer) = 0;
+
  protected:
   RleDecoder data_decoder_;
 };
@@ -209,10 +213,18 @@ class DictDecoder : public DictDecoderBase {
 
   virtual int num_entries() const { return dict_.size(); }
 
+  virtual void GetValue(int index, void* buffer) {
+    T* val_ptr = reinterpret_cast<T*>(buffer);
+    DCHECK_GE(index, 0);
+    DCHECK_LT(index, dict_.size());
+    // TODO: is there any circumstance where this should be a memcpy?
+    *val_ptr = dict_[index];
+  }
+
   /// Returns the next value.  Returns false if the data is invalid.
   /// For StringValues, this does not make a copy of the data.  Instead,
   /// the string data is from the dictionary buffer passed into the c'tor.
-  bool GetValue(T* value);
+  bool GetNextValue(T* value);
 
  private:
   std::vector<T> dict_;
@@ -274,7 +286,7 @@ inline int DictEncoder<StringValue>::AddToTable(const StringValue& value,
 }
 
 template<typename T>
-inline bool DictDecoder<T>::GetValue(T* value) {
+inline bool DictDecoder<T>::GetNextValue(T* value) {
   int index = -1; // Initialize to avoid compiler warning.
   bool result = data_decoder_.Get(&index);
   // Use & to avoid branches.
@@ -286,7 +298,7 @@ inline bool DictDecoder<T>::GetValue(T* value) {
 }
 
 template<>
-inline bool DictDecoder<Decimal16Value>::GetValue(Decimal16Value* value) {
+inline bool DictDecoder<Decimal16Value>::GetNextValue(Decimal16Value* value) {
   int index;
   bool result = data_decoder_.Get(&index);
   if (!result) return false;

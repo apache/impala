@@ -66,12 +66,21 @@ static_assert(BitUtil::IsPowerOf2(BATCHES_PER_FILTER_SELECTIVITY_CHECK),
 // upper bound.
 const int MAX_DICT_HEADER_SIZE = 100;
 
+// Max entries in the dictionary before switching to PLAIN encoding. If a dictionary
+// has fewer entries, then the entire column is dictionary encoded. This threshold
+// is guaranteed to be true for Impala versions 2.9 or below.
+// THIS RECORDS INFORMATION ABOUT PAST BEHAVIOR. DO NOT CHANGE THIS CONSTANT.
+const int LEGACY_IMPALA_MAX_DICT_ENTRIES = 40000;
+
 const int64_t HdfsParquetScanner::FOOTER_SIZE;
 const int16_t HdfsParquetScanner::ROW_GROUP_END;
 const int16_t HdfsParquetScanner::INVALID_LEVEL;
 const int16_t HdfsParquetScanner::INVALID_POS;
 
 const char* HdfsParquetScanner::LLVM_CLASS_NAME = "class.impala::HdfsParquetScanner";
+
+const string PARQUET_MEM_LIMIT_EXCEEDED =
+    "HdfsParquetScanner::$0() failed to allocate $1 bytes for $2.";
 
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
@@ -155,11 +164,13 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
           scan_node->row_desc(), state_->batch_size(), scan_node->mem_tracker())),
       metadata_range_(NULL),
       dictionary_pool_(new MemPool(scan_node->mem_tracker())),
+      dict_filter_tuple_backing_(scan_node->mem_tracker()),
       assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
       process_footer_timer_stats_(NULL),
       num_cols_counter_(NULL),
       num_row_groups_counter_(NULL),
       num_scanners_with_no_reads_counter_(NULL),
+      num_dict_filtered_row_groups_counter_(NULL),
       codegend_process_scratch_batch_fn_(NULL) {
   assemble_rows_timer_.Stop();
 }
@@ -177,6 +188,8 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroups", TUnit::UNIT);
   num_scanners_with_no_reads_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumScannersWithNoReads", TUnit::UNIT);
+  num_dict_filtered_row_groups_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumDictFilteredRowGroups", TUnit::UNIT);
   process_footer_timer_stats_ =
       ADD_SUMMARY_STATS_TIMER(
           scan_node_->runtime_profile(), "FooterProcessingTime");
@@ -243,6 +256,8 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       static_cast<int64_t>(CountScalarColumns(column_readers_)));
   // Set top-level template tuple.
   template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];
+
+  RETURN_IF_ERROR(InitDictFilterStructures());
 
   // The scanner-wide stream was used only to read the file footer.  Each column has added
   // its own stream.
@@ -615,8 +630,39 @@ Status HdfsParquetScanner::NextRowGroup() {
       continue;
     }
 
-    // Prepare column readers for first read
-    RETURN_IF_ERROR(InitColumns(row_group_idx_, column_readers_));
+    // Prepare dictionary filtering columns for first read
+    // This must be done before dictionary filtering, because this code initializes
+    // the column offsets and streams needed to read the dictionaries.
+    // TODO: Restructure the code so that the dictionary can be read without the rest
+    // of the column.
+    RETURN_IF_ERROR(InitColumns(row_group_idx_, dict_filterable_readers_));
+
+    // If there is a dictionary-encoded column where every value is eliminated
+    // by a conjunct, the row group can be eliminated. This initializes dictionaries
+    // for all columns visited.
+    bool skip_row_group_on_dict_filters;
+    Status status = EvalDictionaryFilters(row_group, &skip_row_group_on_dict_filters);
+    if (!status.ok()) {
+      // Either return an error or skip this row group if it is ok to ignore errors
+      RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
+      continue;
+    }
+    if (skip_row_group_on_dict_filters) {
+      COUNTER_ADD(num_dict_filtered_row_groups_counter_, 1);
+      continue;
+    }
+
+    // At this point, the row group has passed any filtering criteria
+    // Prepare non-dictionary filtering column readers for first read and
+    // initialize their dictionaries.
+    RETURN_IF_ERROR(InitColumns(row_group_idx_, non_dict_filterable_readers_));
+    status = InitDictionaries(non_dict_filterable_readers_);
+    if (!status.ok()) {
+      // Either return an error or skip this row group if it is ok to ignore errors
+      RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
+      continue;
+    }
+
     bool seeding_ok = true;
     for (ParquetColumnReader* col_reader: column_readers_) {
       // Seed collection and boolean column readers with NextLevel().
@@ -655,6 +701,204 @@ void HdfsParquetScanner::FlushRowGroupResources(RowBatch* row_batch) {
   for (ParquetColumnReader* col_reader: column_readers_) {
     col_reader->Close(row_batch);
   }
+}
+
+bool HdfsParquetScanner::IsDictFilterable(ParquetColumnReader* col_reader) {
+  // Nested types are not supported yet
+  if (col_reader->IsCollectionReader()) return false;
+
+  BaseScalarColumnReader* scalar_reader =
+    static_cast<BaseScalarColumnReader*>(col_reader);
+  const SlotDescriptor* slot_desc = scalar_reader->slot_desc();
+  // Some queries do not need the column to be materialized, so slot_desc is NULL.
+  // For example, a count(*) with no predicates only needs to count records
+  // rather than materializing the values.
+  if (!slot_desc) return false;
+  // Does this column reader have any dictionary filter conjuncts?
+  auto dict_filter_it = scanner_dict_filter_map_.find(slot_desc->id());
+  if (dict_filter_it == scanner_dict_filter_map_.end()) return false;
+
+  // Certain datatypes (chars, timestamps) do not have the appropriate value in the
+  // file format and must be converted before return. This is true for the
+  // dictionary values, so skip these datatypes for now.
+  // TODO: The values should be converted during dictionary construction and stored
+  // in converted form in the dictionary.
+  if (scalar_reader->NeedsConversion()) return false;
+
+  // Certain datatypes (timestamps) need to validate the value, as certain bit
+  // combinations are not valid. The dictionary values are not validated, so
+  // skip these datatypes for now.
+  // TODO: This should be pushed into dictionary construction.
+  if (scalar_reader->NeedsValidation()) return false;
+
+  return true;
+}
+
+Status HdfsParquetScanner::InitDictFilterStructures() {
+  // Check dictionary filtering query option
+  bool dictionary_filtering_enabled =
+      state_->query_options().parquet_dictionary_filtering;
+
+  // Allocate space for dictionary filtering tuple
+  // Certain queries do not need any columns to be materialized (such as count(*))
+  // and have a tuple size of 0. Explicitly disable dictionary filtering in this case.
+  int tuple_size = scan_node_->tuple_desc()->byte_size();
+  if (tuple_size > 0) {
+    if (!dict_filter_tuple_backing_.TryAllocate(tuple_size)) {
+      string details = Substitute(PARQUET_MEM_LIMIT_EXCEEDED,
+          "InitDictFilterStructures", tuple_size, "Dictionary Filtering Tuple");
+      return scan_node_->mem_tracker()->MemLimitExceeded(state_, details, tuple_size);
+    }
+  } else {
+    dictionary_filtering_enabled = false;
+  }
+
+  // Divide the column readers into a list of column readers that are eligible for
+  // dictionary filtering and a list of column readers that are not. If dictionary
+  // filtering is disabled, all column readers go into the ineligible list.
+  for (ParquetColumnReader* col_reader : column_readers_) {
+    if (dictionary_filtering_enabled && IsDictFilterable(col_reader)) {
+      dict_filterable_readers_.push_back(col_reader);
+    } else {
+      non_dict_filterable_readers_.push_back(col_reader);
+    }
+  }
+  return Status::OK();
+}
+
+bool HdfsParquetScanner::IsDictionaryEncoded(
+    const parquet::ColumnMetaData& col_metadata) {
+  // The Parquet spec allows for column chunks to have mixed encodings
+  // where some data pages are dictionary-encoded and others are plain
+  // encoded. For example, a Parquet file writer might start writing
+  // a column chunk as dictionary encoded, but it will switch to plain
+  // encoding if the dictionary grows too large.
+  //
+  // In order for dictionary filters to skip the entire row group,
+  // the conjuncts must be evaluated on column chunks that are entirely
+  // encoded with the dictionary encoding. There are two checks
+  // available to verify this:
+  // 1. The encoding_stats field on the column chunk metadata provides
+  //    information about the number of data pages written in each
+  //    format. This allows for a specific check of whether all the
+  //    data pages are dictionary encoded.
+  // 2. The encodings field on the column chunk metadata lists the
+  //    encodings used. If this list contains the dictionary encoding
+  //    and does not include unexpected encodings (i.e. encodings not
+  //    associated with definition/repetition levels), then it is entirely
+  //    dictionary encoded.
+
+  if (col_metadata.__isset.encoding_stats) {
+    // Condition #1 above
+    for (const parquet::PageEncodingStats& enc_stat : col_metadata.encoding_stats) {
+      if (enc_stat.page_type == parquet::PageType::DATA_PAGE &&
+          enc_stat.encoding != parquet::Encoding::PLAIN_DICTIONARY &&
+          enc_stat.count > 0) {
+        return false;
+      }
+    }
+  } else {
+    // Condition #2 above
+    bool has_dict_encoding = false;
+    bool has_nondict_encoding = false;
+    for (const parquet::Encoding::type& encoding : col_metadata.encodings) {
+      if (encoding == parquet::Encoding::PLAIN_DICTIONARY) has_dict_encoding = true;
+
+      // RLE and BIT_PACKED are used for repetition/definition levels
+      if (encoding != parquet::Encoding::PLAIN_DICTIONARY &&
+          encoding != parquet::Encoding::RLE &&
+          encoding != parquet::Encoding::BIT_PACKED) {
+        has_nondict_encoding = true;
+        break;
+      }
+    }
+    // Not entirely dictionary encoded if:
+    // 1. No dictionary encoding listed
+    // OR
+    // 2. Some non-dictionary encoding is listed
+    if (!has_dict_encoding || has_nondict_encoding) return false;
+  }
+
+  return true;
+}
+
+Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_group,
+    bool* row_group_eliminated) {
+  *row_group_eliminated = false;
+
+  // TODO: Bootstrapping problem: existing 2.9 files don't have the encoding
+  // stats or encodings set properly, but after this goes in, they will.
+  // Change to 2.9 later.
+  bool is_legacy_impala = false;
+  if (file_version_.application == "impala" && file_version_.VersionLt(2,10,0)) {
+    is_legacy_impala = true;
+  }
+
+  Tuple* dict_filter_tuple =
+      reinterpret_cast<Tuple*>(dict_filter_tuple_backing_.buffer());
+  dict_filter_tuple->Init(scan_node_->tuple_desc()->byte_size());
+  vector<ParquetColumnReader*> deferred_dict_init_list;
+  for (ParquetColumnReader* col_reader : dict_filterable_readers_) {
+    DCHECK(!col_reader->IsCollectionReader());
+    BaseScalarColumnReader* scalar_reader =
+        static_cast<BaseScalarColumnReader*>(col_reader);
+    const parquet::ColumnMetaData& col_metadata =
+        row_group.columns[scalar_reader->col_idx()].meta_data;
+
+    // Legacy impala files cannot be eliminated here, because the only way to
+    // determine whether the column is 100% dictionary encoded requires reading
+    // the dictionary.
+    if (!is_legacy_impala && !IsDictionaryEncoded(col_metadata)) {
+      // We cannot guarantee that this reader is 100% dictionary encoded,
+      // so dictionary filters cannot be used. Defer initializing its dictionary
+      // until after the other filters have been evaluated.
+      deferred_dict_init_list.push_back(scalar_reader);
+      continue;
+    }
+
+    RETURN_IF_ERROR(scalar_reader->InitDictionary());
+    DictDecoderBase* dictionary = scalar_reader->GetDictionaryDecoder();
+    if (!dictionary) continue;
+
+    // Legacy (version < 2.9) Impala files do not spill to PLAIN encoding until
+    // it reaches the maximum number of dictionary entries. If the dictionary
+    // has fewer entries, then it is 100% dictionary encoded.
+    if (is_legacy_impala &&
+        dictionary->num_entries() >= LEGACY_IMPALA_MAX_DICT_ENTRIES) continue;
+
+    const SlotDescriptor* slot_desc = scalar_reader->slot_desc();
+    auto dict_filter_it = scanner_dict_filter_map_.find(slot_desc->id());
+    DCHECK(dict_filter_it != scanner_dict_filter_map_.end());
+    vector<ExprContext*>& dict_filter_conjunct_ctxs = dict_filter_it->second;
+    void* slot = dict_filter_tuple->GetSlot(slot_desc->tuple_offset());
+    bool column_has_match = false;
+    for (int dict_idx = 0; dict_idx < dictionary->num_entries(); ++dict_idx) {
+      dictionary->GetValue(dict_idx, slot);
+
+      // We can only eliminate this row group if no value from the dictionary matches.
+      // If any dictionary value passes the conjuncts, then move on to the next column.
+      TupleRow row;
+      row.SetTuple(0, dict_filter_tuple);
+      if (ExecNode::EvalConjuncts(dict_filter_conjunct_ctxs.data(),
+          dict_filter_conjunct_ctxs.size(), &row)) {
+        column_has_match = true;
+        break;
+      }
+    }
+
+    if (!column_has_match) {
+      // The column contains no value that matches the conjunct. The row group
+      // can be eliminated.
+      *row_group_eliminated = true;
+      return Status::OK();
+    }
+  }
+
+  // Any columns that were not 100% dictionary encoded need to initialize
+  // their dictionaries here.
+  RETURN_IF_ERROR(InitDictionaries(deferred_dict_init_list));
+
+  return Status::OK();
 }
 
 /// High-level steps of this function:
@@ -1422,6 +1666,24 @@ Status HdfsParquetScanner::InitColumns(
   RETURN_IF_ERROR(scan_node_->runtime_state()->io_mgr()->AddScanRanges(
       scan_node_->reader_context(), col_ranges, true));
 
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::InitDictionaries(
+    const vector<ParquetColumnReader*>& column_readers) {
+  for (ParquetColumnReader* col_reader : column_readers) {
+    if (col_reader->IsCollectionReader()) {
+      CollectionColumnReader* collection_reader =
+          static_cast<CollectionColumnReader*>(col_reader);
+      // Recursively init child reader dictionaries
+      RETURN_IF_ERROR(InitDictionaries(*collection_reader->children()));
+      continue;
+    }
+
+    BaseScalarColumnReader* scalar_reader =
+        static_cast<BaseScalarColumnReader*>(col_reader);
+    RETURN_IF_ERROR(scalar_reader->InitDictionary());
+  }
   return Status::OK();
 }
 
