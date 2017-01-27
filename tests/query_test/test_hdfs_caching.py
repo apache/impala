@@ -208,6 +208,25 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     assert num_entries_pre == get_num_cache_requests()
 
   @pytest.mark.execute_serially
+  def test_caching_ddl_drop_database(self, vector):
+    """IMPALA-2518: DROP DATABASE CASCADE should properly drop all impacted cache
+        directives"""
+    num_entries_pre = get_num_cache_requests()
+    # Populates the `cachedb` database with some cached tables and partitions
+    self.client.execute("use cachedb")
+    self.client.execute("create table cached_tbl_nopart (i int) cached in 'testPool'")
+    self.client.execute("insert into cached_tbl_nopart select 1")
+    self.client.execute("create table cached_tbl_part (i int) partitioned by (j int) \
+                         cached in 'testPool'")
+    self.client.execute("insert into cached_tbl_part (i,j) select 1, 2")
+    # We expect the number of cached entities to grow
+    assert num_entries_pre < get_num_cache_requests()
+    self.client.execute("use default")
+    self.client.execute("drop database cachedb cascade")
+    # We want to see the number of cached entities return to the original count
+    assert num_entries_pre == get_num_cache_requests()
+
+  @pytest.mark.execute_serially
   def test_cache_reload_validation(self, vector):
     """This is a set of tests asserting that cache directives modified
        outside of Impala are picked up after reload, cf IMPALA-1645"""

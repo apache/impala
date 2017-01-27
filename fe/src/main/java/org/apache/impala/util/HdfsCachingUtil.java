@@ -127,8 +127,8 @@ public class HdfsCachingUtil {
    * Removes the cache directive associated with the table from HDFS, uncaching all
    * data. Also updates the table's metadata. No-op if the table is not cached.
    */
-  public static void uncacheTbl(org.apache.hadoop.hive.metastore.api.Table table)
-      throws ImpalaRuntimeException {
+  public static void removeTblCacheDirective(
+      org.apache.hadoop.hive.metastore.api.Table table) throws ImpalaRuntimeException {
     Preconditions.checkNotNull(table);
     if (LOG.isTraceEnabled()) {
       LOG.trace("Uncaching table: " + table.getDbName() + "." + table.getTableName());
@@ -145,7 +145,8 @@ public class HdfsCachingUtil {
    * data. Also updates the partition's metadata to remove the cache directive ID.
    * No-op if the table is not cached.
    */
-  public static void uncachePartition(HdfsPartition part) throws ImpalaException {
+  public static void removePartitionCacheDirective(HdfsPartition part)
+      throws ImpalaException {
     Preconditions.checkNotNull(part);
     Long id = getCacheDirectiveId(part.getParameters());
     if (id == null) return;
@@ -156,10 +157,10 @@ public class HdfsCachingUtil {
 
   /**
    * Convenience method for working directly on a metastore partition. See
-   * uncachePartition(HdfsPartition) for more details.
+   * removePartitionCacheDirective(HdfsPartition) for more details.
    */
-  public static void uncachePartition(
-    org.apache.hadoop.hive.metastore.api.Partition part) throws ImpalaException {
+  public static void removePartitionCacheDirective(
+      org.apache.hadoop.hive.metastore.api.Partition part) throws ImpalaException {
     Preconditions.checkNotNull(part);
     Long id = getCacheDirectiveId(part.getParameters());
     if (id == null) return;

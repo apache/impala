@@ -1241,7 +1241,8 @@ public class CatalogOpExecutor {
 
   /**
    * Drops a database from the metastore and removes the database's metadata from the
-   * internal cache. Re-throws any HMS exceptions encountered during the drop.
+   * internal cache. Attempts to remove the HDFS cache directives of the underlying
+   * tables. Re-throws any HMS exceptions encountered during the drop.
    */
   private void dropDatabase(TDropDbParams params, TDdlExecResponse resp)
       throws ImpalaException {
@@ -1272,6 +1273,10 @@ public class CatalogOpExecutor {
         // Nothing was removed from the catalogd's cache.
         resp.result.setVersion(catalog_.getCatalogVersion());
         return;
+      }
+      // Make sure the cache directives, if any, of the underlying tables are removed
+      for (String tableName: removedDb.getAllTableNames()) {
+        uncacheTable(removedDb.getTable(tableName));
       }
       removedObject.setCatalog_version(removedDb.getCatalogVersion());
     }
@@ -1394,28 +1399,7 @@ public class CatalogOpExecutor {
         return;
       }
       resp.result.setVersion(table.getCatalogVersion());
-      if (table instanceof HdfsTable) {
-        HdfsTable hdfsTable = (HdfsTable) table;
-        if (hdfsTable.isMarkedCached()) {
-          try {
-            HdfsCachingUtil.uncacheTbl(table.getMetaStoreTable());
-          } catch (Exception e) {
-            LOG.error("Unable to uncache table: " + table.getFullName(), e);
-          }
-        }
-        if (table.getNumClusteringCols() > 0) {
-          for (HdfsPartition partition: hdfsTable.getPartitions()) {
-            if (partition.isMarkedCached()) {
-              try {
-                HdfsCachingUtil.uncachePartition(partition);
-              } catch (Exception e) {
-                LOG.error("Unable to uncache partition: " +
-                    partition.getPartitionName(), e);
-              }
-            }
-          }
-        }
-      }
+      uncacheTable(table);
     }
     removedObject.setType(TCatalogObjectType.TABLE);
     removedObject.setTable(new TTable());
@@ -1423,6 +1407,34 @@ public class CatalogOpExecutor {
     removedObject.getTable().setDb_name(tableName.getDb());
     removedObject.setCatalog_version(resp.result.getVersion());
     resp.result.setRemoved_catalog_object_DEPRECATED(removedObject);
+  }
+
+  /**
+   * Drops all associated caching requests on the table and/or table's partitions,
+   * uncaching all table data, if applicable. Throws no exceptions, only logs errors.
+   * Does not update the HMS.
+   */
+  private static void uncacheTable(Table table) {
+    if (!(table instanceof HdfsTable)) return;
+    HdfsTable hdfsTable = (HdfsTable) table;
+    if (hdfsTable.isMarkedCached()) {
+      try {
+        HdfsCachingUtil.removeTblCacheDirective(table.getMetaStoreTable());
+      } catch (Exception e) {
+        LOG.error("Unable to uncache table: " + table.getFullName(), e);
+      }
+    }
+    if (table.getNumClusteringCols() > 0) {
+      for (HdfsPartition part: hdfsTable.getPartitions()) {
+        if (part.isMarkedCached()) {
+          try {
+            HdfsCachingUtil.removePartitionCacheDirective(part);
+          } catch (Exception e) {
+            LOG.error("Unable to uncache partition: " + part.getPartitionName(), e);
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -2025,7 +2037,7 @@ public class CatalogOpExecutor {
               part.getPartitionValuesAsStrings(true), dropOptions);
           ++numTargetedPartitions;
           if (part.isMarkedCached()) {
-            HdfsCachingUtil.uncachePartition(part);
+            HdfsCachingUtil.removePartitionCacheDirective(part);
           }
         } catch (NoSuchObjectException e) {
           if (!ifExists) {
@@ -2396,7 +2408,7 @@ public class CatalogOpExecutor {
       catalog_.watchCacheDirs(cacheDirIds, tableName.toThrift());
     } else {
       // Uncache the table.
-      if (cacheDirId != null) HdfsCachingUtil.uncacheTbl(msTbl);
+      if (cacheDirId != null) HdfsCachingUtil.removeTblCacheDirective(msTbl);
       // Uncache all table partitions.
       if (tbl.getNumClusteringCols() > 0) {
         for (HdfsPartition partition: hdfsTable.getPartitions()) {
@@ -2404,7 +2416,7 @@ public class CatalogOpExecutor {
             continue;
           }
           if (partition.isMarkedCached()) {
-            HdfsCachingUtil.uncachePartition(partition);
+            HdfsCachingUtil.removePartitionCacheDirective(partition);
             try {
               applyAlterPartition(tbl, partition);
             } finally {
@@ -2472,7 +2484,7 @@ public class CatalogOpExecutor {
     } else {
       for (HdfsPartition partition : partitions) {
         if (partition.isMarkedCached()) {
-          HdfsCachingUtil.uncachePartition(partition);
+          HdfsCachingUtil.removePartitionCacheDirective(partition);
           modifiedParts.add(partition);
         }
       }
@@ -3156,7 +3168,7 @@ public class CatalogOpExecutor {
                   for (org.apache.hadoop.hive.metastore.api.Partition part:
                       cachedHmsParts) {
                     try {
-                      HdfsCachingUtil.uncachePartition(part);
+                      HdfsCachingUtil.removePartitionCacheDirective(part);
                     } catch (ImpalaException e1) {
                       String msg = String.format(
                           "Partition %s.%s(%s): State: Leaked caching directive. " +
