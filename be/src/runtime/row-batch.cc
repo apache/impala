@@ -17,17 +17,18 @@
 
 #include "runtime/row-batch.h"
 
-#include <stdint.h>  // for intptr_t
+#include <stdint.h> // for intptr_t
 #include <boost/scoped_ptr.hpp>
 
+#include "gen-cpp/Results_types.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "util/compress.h"
-#include "util/decompress.h"
 #include "util/debug-util.h"
+#include "util/decompress.h"
 #include "util/fixed-size-hash-table.h"
-#include "gen-cpp/Results_types.h"
 
 #include "common/names.h"
 
@@ -156,6 +157,10 @@ RowBatch::~RowBatch() {
   }
   for (int i = 0; i < blocks_.size(); ++i) {
     blocks_[i]->Delete();
+  }
+  for (BufferInfo& buffer_info : buffers_) {
+    ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
+        buffer_info.client, &buffer_info.buffer);
   }
   if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
     DCHECK(tuple_ptrs_ != NULL);
@@ -305,6 +310,16 @@ void RowBatch::AddBlock(BufferedBlockMgr::Block* block, FlushMode flush) {
   if (flush == FlushMode::FLUSH_RESOURCES) MarkFlushResources();
 }
 
+void RowBatch::AddBuffer(
+    BufferPool::ClientHandle* client, BufferPool::BufferHandle buffer, FlushMode flush) {
+  auxiliary_mem_usage_ += buffer.len();
+  BufferInfo buffer_info;
+  buffer_info.client = client;
+  buffer_info.buffer = std::move(buffer);
+  buffers_.push_back(std::move(buffer_info));
+  if (flush == FlushMode::FLUSH_RESOURCES) MarkFlushResources();
+}
+
 void RowBatch::Reset() {
   num_rows_ = 0;
   capacity_ = tuple_ptrs_size_ / (num_tuples_per_row_ * sizeof(Tuple*));
@@ -318,6 +333,11 @@ void RowBatch::Reset() {
     blocks_[i]->Delete();
   }
   blocks_.clear();
+  for (BufferInfo& buffer_info : buffers_) {
+    ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
+        buffer_info.client, &buffer_info.buffer);
+  }
+  buffers_.clear();
   auxiliary_mem_usage_ = 0;
   if (!FLAGS_enable_partitioned_aggregation || !FLAGS_enable_partitioned_hash_join) {
     tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_.Allocate(tuple_ptrs_size_));
@@ -336,6 +356,11 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
     dest->AddBlock(blocks_[i], FlushMode::NO_FLUSH_RESOURCES);
   }
   blocks_.clear();
+  for (BufferInfo& buffer_info : buffers_) {
+    dest->AddBuffer(
+        buffer_info.client, std::move(buffer_info.buffer), FlushMode::NO_FLUSH_RESOURCES);
+  }
+  buffers_.clear();
   if (needs_deep_copy_) {
     dest->MarkNeedsDeepCopy();
   } else if (flush_ == FlushMode::FLUSH_RESOURCES) {

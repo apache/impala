@@ -41,6 +41,7 @@ class Expr;
 class LlvmCodeGen;
 class MemTracker;
 class ObjectPool;
+class ReservationTracker;
 class RuntimeFilterBank;
 class ScalarFnCall;
 class Status;
@@ -128,6 +129,9 @@ class RuntimeState {
   DiskIoMgr* io_mgr();
   MemTracker* instance_mem_tracker() { return instance_mem_tracker_.get(); }
   MemTracker* query_mem_tracker() { return query_mem_tracker_; }
+  ReservationTracker* instance_buffer_reservation() {
+    return instance_buffer_reservation_;
+  }
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
@@ -384,6 +388,11 @@ class RuntimeState {
 
   /// Memory usage of this fragment instance, a child of 'query_mem_tracker_'.
   boost::scoped_ptr<MemTracker> instance_mem_tracker_;
+
+  /// Buffer reservation for this fragment instance - a child of the query buffer
+  /// reservation. Non-NULL if 'query_state_' is not NULL and ExecEnv::buffer_pool_
+  /// was created by a backend test. Owned by 'obj_pool_'.
+  ReservationTracker* instance_buffer_reservation_;
 
   /// if true, execution should stop with a CANCELLED status
   bool is_cancelled_;

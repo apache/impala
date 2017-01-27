@@ -77,6 +77,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
   virtual void SetUp() {
     test_env_.reset(new TestEnv());
+    ASSERT_OK(test_env_->Init());
   }
 
   virtual void TearDown() {
@@ -103,7 +104,9 @@ class BufferedBlockMgrTest : public ::testing::Test {
       tmp_dirs.push_back(dir);
       created_tmp_dirs_.push_back(dir);
     }
-    test_env_->InitTmpFileMgr(tmp_dirs, false);
+    test_env_.reset(new TestEnv);
+    test_env_->SetTmpFileMgrArgs(tmp_dirs, false);
+    EXPECT_OK(test_env_->Init());
     EXPECT_EQ(num_dirs, test_env_->tmp_file_mgr()->NumActiveTmpDevices());
     return tmp_dirs;
   }
@@ -146,7 +149,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
   BufferedBlockMgr* CreateMgr(int64_t query_id, int max_buffers, int block_size,
       RuntimeState** query_state = NULL, TQueryOptions* query_options = NULL) {
     RuntimeState* state;
-    EXPECT_OK(test_env_->CreateQueryState(
+    EXPECT_OK(test_env_->CreateQueryStateWithBlockMgr(
         query_id, max_buffers, block_size, query_options, &state));
     if (query_state != NULL) *query_state = state;
     return state->block_mgr();
@@ -1271,8 +1274,8 @@ TEST_F(BufferedBlockMgrTest, ScratchLimitZero) {
   BufferedBlockMgr::Client* client;
   TQueryOptions query_options;
   query_options.scratch_limit = 0;
-  BufferedBlockMgr* block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size_,
-      0, false, &client, NULL, &query_options);
+  BufferedBlockMgr* block_mgr = CreateMgrAndClient(
+      0, max_num_buffers, block_size_, 0, false, &client, NULL, &query_options);
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
   DeleteBlocks(blocks);

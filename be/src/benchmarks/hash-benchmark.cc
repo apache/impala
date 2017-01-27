@@ -423,7 +423,12 @@ int main(int argc, char **argv) {
   Status status;
   RuntimeState* state;
   TestEnv test_env;
-  status = test_env.CreateQueryState(0, 0, 0, nullptr, &state);
+  status = test_env.Init();
+  if (!status.ok()) {
+    cout << "Could not init TestEnv";
+    return -1;
+  }
+  status = test_env.CreateQueryState(0, nullptr, &state);
   if (!status.ok()) {
     cout << "Could not create RuntimeState";
     return -1;

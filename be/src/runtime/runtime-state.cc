@@ -32,14 +32,16 @@
 #include "exprs/expr.h"
 #include "exprs/scalar-fn-call.h"
 #include "runtime/buffered-block-mgr.h"
-#include "runtime/exec-env.h"
-#include "runtime/descriptors.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/data-stream-recvr.h"
+#include "runtime/descriptors.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "runtime/runtime-filter-bank.h"
 #include "runtime/timestamp-value.h"
-#include "runtime/query-state.h"
+#include "util/auth-util.h" // for GetEffectiveUser()
 #include "util/bitmap.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -48,7 +50,6 @@
 #include "util/jni-util.h"
 #include "util/mem-info.h"
 #include "util/pretty-printer.h"
-#include "util/auth-util.h" // for GetEffectiveUser()
 
 #include "common/names.h"
 
@@ -83,6 +84,7 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
     exec_env_(exec_env),
     profile_(obj_pool_.get(), "Fragment " + PrintId(instance_ctx.fragment_instance_id)),
     query_mem_tracker_(query_state_->query_mem_tracker()),
+    instance_buffer_reservation_(nullptr),
     is_cancelled_(false),
     root_node_id_(-1) {
   Init();
@@ -100,6 +102,7 @@ RuntimeState::RuntimeState(
     profile_(obj_pool_.get(), "<unnamed>"),
     query_mem_tracker_(MemTracker::CreateQueryMemTracker(
         query_id(), query_options(), request_pool, obj_pool_.get())),
+    instance_buffer_reservation_(nullptr),
     is_cancelled_(false),
     root_node_id_(-1) {
   Init();
@@ -113,10 +116,8 @@ void RuntimeState::Init() {
   SCOPED_TIMER(profile_.total_time_counter());
 
   // Register with the thread mgr
-  if (exec_env_ != NULL) {
-    resource_pool_ = exec_env_->thread_mgr()->RegisterPool();
-    DCHECK(resource_pool_ != NULL);
-  }
+  resource_pool_ = exec_env_->thread_mgr()->RegisterPool();
+  DCHECK(resource_pool_ != NULL);
 
   total_thread_statistics_ = ADD_THREAD_COUNTERS(runtime_profile(), "TotalThreads");
   total_storage_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalStorageWaitTime");
@@ -125,6 +126,13 @@ void RuntimeState::Init() {
 
   instance_mem_tracker_.reset(new MemTracker(
       runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker_));
+
+  if (query_state_ != nullptr && exec_env_->buffer_pool() != nullptr) {
+    instance_buffer_reservation_ = obj_pool_->Add(new ReservationTracker);
+    instance_buffer_reservation_->InitChildTracker(&profile_,
+        query_state_->buffer_reservation(), instance_mem_tracker_.get(),
+        numeric_limits<int64_t>::max());
+  }
 }
 
 void RuntimeState::InitFilterBank() {
@@ -290,6 +298,9 @@ void RuntimeState::ReleaseResources() {
   }
   block_mgr_.reset(); // Release any block mgr memory, if this is the last reference.
   codegen_.reset(); // Release any memory associated with codegen.
+
+  // Release the reservation, which should be unused at the point.
+  if (instance_buffer_reservation_ != nullptr) instance_buffer_reservation_->Close();
 
   // 'query_mem_tracker_' must be valid as long as 'instance_mem_tracker_' is so
   // delete 'instance_mem_tracker_' first.

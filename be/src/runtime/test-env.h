@@ -18,7 +18,6 @@
 #ifndef IMPALA_RUNTIME_TEST_ENV
 #define IMPALA_RUNTIME_TEST_ENV
 
-#include "runtime/buffered-block-mgr.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
@@ -28,52 +27,69 @@
 
 namespace impala {
 
-/// Helper testing class that creates an environment with a buffered-block-mgr similar
-/// to the one Impala's runtime is using. Only one TestEnv can be active at a time,
-/// because it replaces the global ExecEnv singleton.
+/// Helper testing class that creates an environment with runtime memory management
+/// similar to the one used by the Impala runtime. Only one TestEnv can be active at a
+/// time, because it modifies the global ExecEnv singleton.
 class TestEnv {
  public:
   TestEnv();
   ~TestEnv();
 
-  /// Reinitialize tmp_file_mgr with custom configuration. Only valid to call before
-  /// query states have been created.
-  void InitTmpFileMgr(const std::vector<std::string>& tmp_dirs, bool one_dir_per_device);
+  /// Set custom configuration for TmpFileMgr. Only has effect if called before Init().
+  /// If not called, the default configuration is used.
+  void SetTmpFileMgrArgs(
+      const std::vector<std::string>& tmp_dirs, bool one_dir_per_device);
 
-  /// Create a QueryState and a RuntimeState for a query with a new block manager and
-  /// the given query options. The states are owned by the TestEnv. Returns an error if
-  /// CreateQueryState() has been called with the same query ID already.
-  /// If non-null, 'runtime_state' are set to the newly created RuntimeState. The
-  /// QueryState can be obtained via 'runtime_state'.
-  Status CreateQueryState(int64_t query_id, int max_buffers, int block_size,
+  /// Set configuration for BufferPool. Only has effect if called before Init().
+  /// If not called, a buffer pool with no capacity is created.
+  void SetBufferPoolArgs(int64_t min_buffer_len, int64_t capacity);
+
+  /// Initialize the TestEnv with the specified arguments.
+  Status Init();
+
+  /// Create a QueryState and a RuntimeState for a query with the given query options.
+  /// The states are owned by the TestEnv. Returns an error if CreateQueryState() has
+  /// been called with the same query ID already. 'runtime_state' is set to the newly
+  /// created RuntimeState. The QueryState can be obtained via 'runtime_state'.
+  Status CreateQueryState(
+      int64_t query_id, const TQueryOptions* query_options, RuntimeState** runtime_state);
+
+  /// Same as CreateQueryState() but also creates a BufferedBlockMgr with the provided
+  /// parameters. If 'max_buffers' is -1, there is no limit, otherwise the limit is
+  /// max_buffers * block_size.
+  Status CreateQueryStateWithBlockMgr(int64_t query_id, int max_buffers, int block_size,
       const TQueryOptions* query_options, RuntimeState** runtime_state);
-
   /// Destroy all query states and associated RuntimeStates, BufferedBlockMgrs,
   /// etc, that were created since the last TearDownQueries() call.
   void TearDownQueries();
 
   /// Calculate memory limit accounting for overflow and negative values.
   /// If max_buffers is -1, no memory limit will apply.
-  int64_t CalculateMemLimit(int max_buffers, int block_size);
+  int64_t CalculateMemLimit(int max_buffers, int page_len);
 
   /// Return total of mem tracker consumption for all queries.
   int64_t TotalQueryMemoryConsumption();
 
   ExecEnv* exec_env() { return exec_env_.get(); }
-  MemTracker* io_mgr_tracker() { return io_mgr_tracker_.get(); }
-  MetricGroup* metrics() { return metrics_.get(); }
-  TmpFileMgr* tmp_file_mgr() { return tmp_file_mgr_.get(); }
+  MetricGroup* metrics() { return exec_env_->metrics(); }
+  TmpFileMgr* tmp_file_mgr() { return exec_env_->tmp_file_mgr(); }
 
  private:
   /// Recreate global metric groups.
   void InitMetrics();
 
+  /// Arguments for TmpFileMgr, used in Init().
+  bool have_tmp_file_mgr_args_;
+  std::vector<std::string> tmp_dirs_;
+  bool one_tmp_dir_per_device_;
+
+  /// Arguments for BufferPool, used in Init().
+  int64_t buffer_pool_min_buffer_len_;
+  int64_t buffer_pool_capacity_;
+
   /// Global state for test environment.
   static boost::scoped_ptr<MetricGroup> static_metrics_;
   boost::scoped_ptr<ExecEnv> exec_env_;
-  boost::scoped_ptr<MemTracker> io_mgr_tracker_;
-  boost::scoped_ptr<MetricGroup> metrics_;
-  boost::scoped_ptr<TmpFileMgr> tmp_file_mgr_;
 
   /// Per-query states. TestEnv holds 1 refcount per QueryState in this map.
   std::vector<QueryState*> query_states_;

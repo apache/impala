@@ -26,6 +26,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 add_library(Runtime
   buffered-block-mgr.cc
   buffered-tuple-stream.cc
+  buffered-tuple-stream-v2.cc
   client-cache.cc
   coordinator.cc
   data-stream-mgr.cc
@@ -92,6 +93,7 @@ ADD_BE_TEST(mem-tracker-test)
 ADD_BE_TEST(multi-precision-test)
 ADD_BE_TEST(decimal-test)
 ADD_BE_TEST(buffered-tuple-stream-test)
+ADD_BE_TEST(buffered-tuple-stream-v2-test)
 ADD_BE_TEST(hdfs-fs-cache-test)
 ADD_BE_TEST(tmp-file-mgr-test)
 ADD_BE_TEST(row-batch-serialize-test)

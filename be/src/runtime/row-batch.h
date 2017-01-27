@@ -15,18 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_RUNTIME_ROW_BATCH_H
 #define IMPALA_RUNTIME_ROW_BATCH_H
 
-#include <vector>
 #include <cstring>
+#include <vector>
 #include <boost/scoped_ptr.hpp>
 
 #include "codegen/impala-ir.h"
 #include "common/compiler-util.h"
 #include "common/logging.h"
-#include "runtime/buffered-block-mgr.h" // for BufferedBlockMgr::Block
+#include "runtime/buffered-block-mgr.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/descriptors.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/mem-pool.h"
@@ -208,6 +208,7 @@ class RowBatch {
   MemPool* tuple_data_pool() { return &tuple_data_pool_; }
   int num_io_buffers() const { return io_buffers_.size(); }
   int num_blocks() const { return blocks_.size(); }
+  int num_buffers() const { return buffers_.size(); }
 
   /// Resets the row batch, returning all resources it has accumulated.
   void Reset();
@@ -220,9 +221,17 @@ class RowBatch {
   /// the original owner, even when the ownership of batches is transferred. If the
   /// original owner wants the memory to be released, it should call this with 'mode'
   /// FLUSH_RESOURCES (see MarkFlushResources() for further explanation).
-  /// TODO: after IMPALA-3200, make the ownership transfer model consistent between
-  /// Blocks and I/O buffers.
   void AddBlock(BufferedBlockMgr::Block* block, FlushMode flush);
+
+  /// Adds a buffer to this row batch. The buffer is deleted when freeing resources.
+  /// The buffer's memory remains accounted against the original owner, even when the
+  /// ownership of batches is transferred. If the original owner wants the memory to be
+  /// released, it should call this with 'mode' FLUSH_RESOURCES (see MarkFlushResources()
+  /// for further explanation).
+  /// TODO: IMPALA-4179: after IMPALA-3200, simplify the ownership transfer model and
+  /// make it consistent between buffers and I/O buffers.
+  void AddBuffer(
+      BufferPool::ClientHandle* client, BufferPool::BufferHandle buffer, FlushMode flush);
 
   /// Used by an operator to indicate that it cannot produce more rows until the
   /// resources that it has attached to the row batch are freed or acquired by an
@@ -424,11 +433,19 @@ class RowBatch {
   /// are owned by the BufferedBlockMgr.
   std::vector<BufferedBlockMgr::Block*> blocks_;
 
+  struct BufferInfo {
+    BufferPool::ClientHandle* client;
+    BufferPool::BufferHandle buffer;
+  };
+
+  /// Pages attached to this row batch. See AddBuffer() for ownership semantics.
+  std::vector<BufferInfo> buffers_;
+
   /// String to write compressed tuple data to in Serialize().
   /// This is a string so we can swap() with the string in the TRowBatch we're serializing
   /// to (we don't compress directly into the TRowBatch in case the compressed data is
-  /// longer than the uncompressed data). Swapping avoids copying data to the TRowBatch and
-  /// avoids excess memory allocations: since we reuse RowBatchs and TRowBatchs, and
+  /// longer than the uncompressed data). Swapping avoids copying data to the TRowBatch
+  /// and avoids excess memory allocations: since we reuse RowBatchs and TRowBatchs, and
   /// assuming all row batches are roughly the same size, all strings will eventually be
   /// allocated to the right size.
   std::string compression_scratch_;

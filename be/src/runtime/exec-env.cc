@@ -27,6 +27,8 @@
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "runtime/backend-client.h"
+#include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/client-cache.h"
 #include "runtime/coordinator.h"
 #include "runtime/data-stream-mgr.h"
@@ -42,6 +44,7 @@
 #include "scheduling/scheduler.h"
 #include "service/frontend.h"
 #include "statestore/statestore-subscriber.h"
+#include "util/bit-util.h"
 #include "util/debug-util.h"
 #include "util/debug-util.h"
 #include "util/default-path-handlers.h"
@@ -148,6 +151,8 @@ ExecEnv::ExecEnv()
         "worker", FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
+    buffer_reservation_(nullptr),
+    buffer_pool_(nullptr),
     enable_webserver_(FLAGS_enable_webserver),
     is_fe_tests_(false),
     backend_address_(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port)) {
@@ -202,6 +207,8 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
         "worker", FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
+    buffer_reservation_(nullptr),
+    buffer_pool_(NULL),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     is_fe_tests_(false),
     backend_address_(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port)) {
@@ -229,7 +236,10 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
   exec_env_ = this;
 }
 
-ExecEnv::~ExecEnv() {}
+ExecEnv::~ExecEnv() {
+  if (buffer_reservation_ != nullptr) buffer_reservation_->Close();
+  disk_io_mgr_.reset(); // Need to tear down before mem_tracker_.
+}
 
 Status ExecEnv::InitForFeTests() {
   mem_tracker_.reset(new MemTracker(-1, "Process"));
@@ -272,18 +282,6 @@ Status ExecEnv::StartServices() {
 
   if (bytes_limit < 0) {
     return Status("Failed to parse mem limit from '" + FLAGS_mem_limit + "'.");
-  }
-  // Minimal IO Buffer requirements:
-  //   IO buffer (8MB default) * number of IO buffers per thread (5) *
-  //   number of threads per core * number of cores
-  int64_t min_requirement = disk_io_mgr_->max_read_buffer_size() *
-      DiskIoMgr::DEFAULT_QUEUE_CAPACITY *
-      FLAGS_num_threads_per_core * FLAGS_num_cores;
-  if (bytes_limit < min_requirement) {
-    LOG(WARNING) << "Memory limit "
-                 << PrettyPrinter::Print(bytes_limit, TUnit::BYTES)
-                 << " does not meet minimal memory requirement of "
-                 << PrettyPrinter::Print(min_requirement, TUnit::BYTES);
   }
 
   metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
@@ -353,4 +351,10 @@ Status ExecEnv::StartServices() {
   return Status::OK();
 }
 
+void ExecEnv::InitBufferPool(int64_t min_page_size, int64_t capacity) {
+  DCHECK(buffer_pool_ == nullptr);
+  buffer_pool_.reset(new BufferPool(min_page_size, capacity));
+  buffer_reservation_.reset(new ReservationTracker());
+  buffer_reservation_->InitRootTracker(NULL, capacity);
+}
 }

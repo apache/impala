@@ -15,16 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #include "runtime/query-state.h"
 
-#include <boost/thread/locks.hpp>
 #include <boost/thread/lock_guard.hpp>
+#include <boost/thread/locks.hpp>
 
+#include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
+#include "util/debug-util.h"
 
 #include "common/names.h"
 
@@ -41,7 +43,12 @@ QueryState::ScopedRef::~ScopedRef() {
 }
 
 QueryState::QueryState(const TQueryCtx& query_ctx, const std::string& pool)
-  : query_ctx_(query_ctx), refcnt_(0), prepared_(false), released_resources_(false) {
+  : query_ctx_(query_ctx),
+    refcnt_(0),
+    prepared_(false),
+    released_resources_(false),
+    buffer_reservation_(nullptr),
+    file_group_(nullptr) {
   TQueryOptions& query_options = query_ctx_.client_request.query_options;
   // max_errors does not indicate how many errors in total have been recorded, but rather
   // how many are distinct. It is defined as the sum of the number of generic errors and
@@ -56,8 +63,12 @@ QueryState::QueryState(const TQueryCtx& query_ctx, const std::string& pool)
 }
 
 void QueryState::ReleaseResources() {
+  // Clean up temporary files.
+  if (file_group_ != nullptr) file_group_->Close();
+  // Release any remaining reservation.
+  if (buffer_reservation_ != nullptr) buffer_reservation_->Close();
   // Avoid dangling reference from the parent of 'query_mem_tracker_'.
-  query_mem_tracker_->UnregisterFromParent();
+  if (query_mem_tracker_ != nullptr) query_mem_tracker_->UnregisterFromParent();
   released_resources_ = true;
 }
 
@@ -77,19 +88,27 @@ Status QueryState::Prepare() {
   // Starting a new query creates threads and consumes a non-trivial amount of memory.
   // If we are already starved for memory, fail as early as possible to avoid consuming
   // more resources.
-  MemTracker* process_mem_tracker = ExecEnv::GetInstance()->process_mem_tracker();
+  ExecEnv* exec_env = ExecEnv::GetInstance();
+  MemTracker* process_mem_tracker = exec_env->process_mem_tracker();
   if (process_mem_tracker->LimitExceeded()) {
     string msg = Substitute("Query $0 could not start because the backend Impala daemon "
                             "is over its memory limit",
         PrintId(query_id()));
-    prepare_status_ = process_mem_tracker->MemLimitExceeded(NULL, msg, 0);
-    return prepare_status_;
+    status = process_mem_tracker->MemLimitExceeded(NULL, msg, 0);
+    goto error;
   }
-
-  // TODO: IMPALA-3748: acquire minimum buffer reservation at this point.
-
+  // Do buffer-pool-related setup if running in a backend test that explicitly created
+  // the pool.
+  if (exec_env->buffer_pool() != nullptr) {
+    status = InitBufferPoolState();
+    if (!status.ok()) goto error;
+  }
   prepared_ = true;
   return Status::OK();
+
+error:
+  prepare_status_ = status;
+  return status;
 }
 
 void QueryState::InitMemTrackers(const std::string& pool) {
@@ -101,6 +120,37 @@ void QueryState::InitMemTrackers(const std::string& pool) {
   }
   query_mem_tracker_ =
       MemTracker::CreateQueryMemTracker(query_id(), query_options(), pool, &obj_pool_);
+}
+
+Status QueryState::InitBufferPoolState() {
+  ExecEnv* exec_env = ExecEnv::GetInstance();
+  int64_t query_mem_limit = query_mem_tracker_->limit();
+  if (query_mem_limit == -1) query_mem_limit = numeric_limits<int64_t>::max();
+
+  // TODO: IMPALA-3200: add a default upper bound to buffer pool memory derived from
+  // query_mem_limit.
+  int64_t max_reservation = numeric_limits<int64_t>::max();
+  if (query_options().__isset.max_block_mgr_memory
+      && query_options().max_block_mgr_memory > 0) {
+    max_reservation = query_options().max_block_mgr_memory;
+  }
+
+  // TODO: IMPALA-3748: claim the query-wide minimum reservation.
+  // For now, rely on exec nodes to grab their minimum reservation during Prepare().
+  buffer_reservation_ = obj_pool_.Add(new ReservationTracker);
+  buffer_reservation_->InitChildTracker(
+      NULL, exec_env->buffer_reservation(), query_mem_tracker_, max_reservation);
+
+  // TODO: once there's a mechanism for reporting non-fragment-local profiles,
+  // should make sure to report this profile so it's not going into a black hole.
+  RuntimeProfile* dummy_profile = obj_pool_.Add(new RuntimeProfile(&obj_pool_, "dummy"));
+  // Only create file group if spilling is enabled.
+  if (query_options().scratch_limit != 0 && !query_ctx_.disable_spilling) {
+    file_group_ = obj_pool_.Add(
+        new TmpFileMgr::FileGroup(exec_env->tmp_file_mgr(), exec_env->disk_io_mgr(),
+            dummy_profile, query_id(), query_options().scratch_limit));
+  }
+  return Status::OK();
 }
 
 void QueryState::RegisterFInstance(FragmentInstanceState* fis) {

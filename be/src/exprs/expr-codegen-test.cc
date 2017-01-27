@@ -110,8 +110,8 @@ class ExprCodegenTest : public ::testing::Test {
     TQueryOptions query_options;
     query_options.__set_decimal_v2(true);
     test_env_.reset(new TestEnv());
-    EXPECT_OK(test_env_->CreateQueryState(0, 1, 8 * 1024 * 1024, &query_options,
-        &runtime_state_));
+    ASSERT_OK(test_env_->Init());
+    ASSERT_OK(test_env_->CreateQueryState(0, &query_options, &runtime_state_));
 
     FunctionContext::TypeDesc return_type;
     return_type.type = FunctionContext::TYPE_DECIMAL;

@@ -28,6 +28,7 @@
 
 namespace impala {
 
+class BufferPool;
 class CallableThreadPool;
 class DataStreamMgr;
 class DiskIoMgr;
@@ -42,6 +43,7 @@ class PoolMemTrackerRegistry;
 class MetricGroup;
 class QueryResourceMgr;
 class RequestPoolService;
+class ReservationTracker;
 class Scheduler;
 class StatestoreSubscriber;
 class TestExecEnv;
@@ -65,8 +67,7 @@ class ExecEnv {
   /// we return the most recently created instance.
   static ExecEnv* GetInstance() { return exec_env_; }
 
-  /// Empty destructor because the compiler-generated one requires full
-  /// declarations for classes in scoped_ptrs.
+  /// Destructor - only used in backend tests that create new environment per test.
   virtual ~ExecEnv();
 
   void SetImpalaServer(ImpalaServer* server) { impala_server_ = server; }
@@ -99,6 +100,8 @@ class ExecEnv {
   CallableThreadPool* rpc_pool() { return async_rpc_pool_.get(); }
   QueryExecMgr* query_exec_mgr() { return query_exec_mgr_.get(); }
   PoolMemTrackerRegistry* pool_mem_trackers() { return pool_mem_trackers_.get(); }
+  ReservationTracker* buffer_reservation() { return buffer_reservation_.get(); }
+  BufferPool* buffer_pool() { return buffer_pool_.get(); }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
@@ -143,12 +146,20 @@ class ExecEnv {
   boost::scoped_ptr<CallableThreadPool> async_rpc_pool_;
   boost::scoped_ptr<QueryExecMgr> query_exec_mgr_;
 
+  /// Query-wide buffer pool and the root reservation tracker for the pool. The
+  /// reservation limit is equal to the maximum capacity of the pool.
+  /// For now this is only used by backend tests that create them via InitBufferPool();
+  boost::scoped_ptr<ReservationTracker> buffer_reservation_;
+  boost::scoped_ptr<BufferPool> buffer_pool_;
+
   /// Not owned by this class
   ImpalaServer* impala_server_;
 
   bool enable_webserver_;
 
  private:
+  friend class TestEnv;
+
   static ExecEnv* exec_env_;
   bool is_fe_tests_;
 
@@ -157,6 +168,9 @@ class ExecEnv {
 
   /// fs.defaultFs value set in core-site.xml
   std::string default_fs_;
+
+  /// Initialise 'buffer_pool_' and 'buffer_reservation_' with given capacity.
+  void InitBufferPool(int64_t min_page_len, int64_t capacity);
 };
 
 } // namespace impala

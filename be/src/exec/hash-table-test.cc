@@ -62,6 +62,7 @@ class HashTableTest : public testing::Test {
 
   virtual void SetUp() {
     test_env_.reset(new TestEnv());
+    ASSERT_OK(test_env_->Init());
 
     RowDescriptor desc;
     Status status;
@@ -185,7 +186,7 @@ class HashTableTest : public testing::Test {
   bool CreateHashTable(bool quadratic, int64_t initial_num_buckets,
       scoped_ptr<HashTable>* table, int block_size = 8 * 1024 * 1024,
       int max_num_blocks = 100, int reserved_blocks = 10) {
-    EXPECT_OK(test_env_->CreateQueryState(
+    EXPECT_OK(test_env_->CreateQueryStateWithBlockMgr(
         next_query_id_++, max_num_blocks, block_size, nullptr, &runtime_state_));
     MemTracker* client_tracker =
         pool_.Add(new MemTracker(-1, "client", runtime_state_->instance_mem_tracker()));
@@ -603,7 +604,7 @@ TEST_F(HashTableTest, QuadraticInsertFullTest) {
 
 // Test that hashing empty string updates hash value.
 TEST_F(HashTableTest, HashEmpty) {
-  EXPECT_OK(test_env_->CreateQueryState(
+  EXPECT_OK(test_env_->CreateQueryStateWithBlockMgr(
       0, 100, 8 * 1024 * 1024, nullptr, &runtime_state_));
   scoped_ptr<HashTableCtx> ht_ctx;
   Status status = HashTableCtx::Create(runtime_state_, build_expr_ctxs_, probe_expr_ctxs_,

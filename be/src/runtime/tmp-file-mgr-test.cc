@@ -52,6 +52,7 @@ class TmpFileMgrTest : public ::testing::Test {
     metrics_.reset(new MetricGroup("tmp-file-mgr-test"));
     profile_ = obj_pool_.Add(new RuntimeProfile(&obj_pool_, "tmp-file-mgr-test"));
     test_env_.reset(new TestEnv);
+    ASSERT_OK(test_env_->Init());
     cb_counter_ = 0;
 
     // Reset query options that are modified by tests.

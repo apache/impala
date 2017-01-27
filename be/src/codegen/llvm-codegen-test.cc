@@ -45,8 +45,8 @@ class LlvmCodeGenTest : public testing:: Test {
 
   virtual void SetUp() {
     test_env_.reset(new TestEnv());
-    EXPECT_OK(test_env_->CreateQueryState(0, 1, 8 * 1024 * 1024, nullptr,
-        &runtime_state_));
+    ASSERT_OK(test_env_->Init());
+    ASSERT_OK(test_env_->CreateQueryState(0, nullptr, &runtime_state_));
   }
 
   virtual void TearDown() {

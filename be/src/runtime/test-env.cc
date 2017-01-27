@@ -17,7 +17,11 @@
 
 #include "runtime/test-env.h"
 
+#include <limits>
+
+#include "runtime/buffered-block-mgr.h"
 #include "runtime/query-exec-mgr.h"
+#include "runtime/tmp-file-mgr.h"
 #include "util/disk-info.h"
 #include "util/impalad-metrics.h"
 
@@ -28,46 +32,56 @@
 #include "common/names.h"
 
 using boost::scoped_ptr;
+using std::numeric_limits;
 
 namespace impala {
 
 scoped_ptr<MetricGroup> TestEnv::static_metrics_;
 
-TestEnv::TestEnv() {
+TestEnv::TestEnv()
+  : have_tmp_file_mgr_args_(false),
+    buffer_pool_min_buffer_len_(1024),
+    buffer_pool_capacity_(0) {}
+
+Status TestEnv::Init() {
   if (static_metrics_ == NULL) {
     static_metrics_.reset(new MetricGroup("test-env-static-metrics"));
     ImpaladMetrics::CreateMetrics(static_metrics_.get());
   }
+
   exec_env_.reset(new ExecEnv);
-  exec_env_->InitForFeTests();
-  io_mgr_tracker_.reset(new MemTracker(-1));
-  Status status = exec_env_->disk_io_mgr()->Init(io_mgr_tracker_.get());
-  CHECK(status.ok()) << status.msg().msg();
-  InitMetrics();
-  tmp_file_mgr_.reset(new TmpFileMgr);
-  status = tmp_file_mgr_->Init(metrics_.get());
-  CHECK(status.ok()) << status.msg().msg();
+  // Populate the ExecEnv state that the backend tests need.
+  exec_env_->mem_tracker_.reset(new MemTracker(-1, "Process"));
+  RETURN_IF_ERROR(exec_env_->disk_io_mgr()->Init(exec_env_->process_mem_tracker()));
+  exec_env_->metrics_.reset(new MetricGroup("test-env-metrics"));
+  exec_env_->tmp_file_mgr_.reset(new TmpFileMgr);
+  if (have_tmp_file_mgr_args_) {
+    RETURN_IF_ERROR(
+        tmp_file_mgr()->InitCustom(tmp_dirs_, one_tmp_dir_per_device_, metrics()));
+  } else {
+    RETURN_IF_ERROR(tmp_file_mgr()->Init(metrics()));
+  }
+  exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_);
+  return Status::OK();
 }
 
-void TestEnv::InitMetrics() {
-  metrics_.reset(new MetricGroup("test-env-metrics"));
+void TestEnv::SetTmpFileMgrArgs(
+    const std::vector<std::string>& tmp_dirs, bool one_dir_per_device) {
+  have_tmp_file_mgr_args_ = true;
+  tmp_dirs_ = tmp_dirs;
+  one_tmp_dir_per_device_ = one_dir_per_device;
 }
 
-void TestEnv::InitTmpFileMgr(const vector<string>& tmp_dirs, bool one_dir_per_device) {
-  // Need to recreate metrics to avoid error when registering metric twice.
-  InitMetrics();
-  tmp_file_mgr_.reset(new TmpFileMgr);
-  Status status = tmp_file_mgr_->InitCustom(tmp_dirs, one_dir_per_device, metrics_.get());
-  CHECK(status.ok()) << status.msg().msg();
+void TestEnv::SetBufferPoolArgs(int64_t min_buffer_len, int64_t capacity) {
+  buffer_pool_min_buffer_len_ = min_buffer_len;
+  buffer_pool_capacity_ = capacity;
 }
 
 TestEnv::~TestEnv() {
   // Queries must be torn down first since they are dependent on global state.
   TearDownQueries();
+  exec_env_->disk_io_mgr_.reset();
   exec_env_.reset();
-  io_mgr_tracker_.reset();
-  tmp_file_mgr_.reset();
-  metrics_.reset();
 }
 
 void TestEnv::TearDownQueries() {
@@ -93,8 +107,8 @@ int64_t TestEnv::TotalQueryMemoryConsumption() {
   return total;
 }
 
-Status TestEnv::CreateQueryState(int64_t query_id, int max_buffers, int block_size,
-    const TQueryOptions* query_options, RuntimeState** runtime_state) {
+Status TestEnv::CreateQueryState(
+    int64_t query_id, const TQueryOptions* query_options, RuntimeState** runtime_state) {
   TQueryCtx query_ctx;
   if (query_options != nullptr) query_ctx.client_request.query_options = *query_options;
   query_ctx.query_id.hi = 0;
@@ -110,13 +124,20 @@ Status TestEnv::CreateQueryState(int64_t query_id, int max_buffers, int block_si
       new RuntimeState(qs, fis->fragment_ctx(), fis->instance_ctx(), exec_env_.get()));
   runtime_states_.push_back(rs);
 
-  shared_ptr<BufferedBlockMgr> mgr;
-  RETURN_IF_ERROR(BufferedBlockMgr::Create(rs, qs->query_mem_tracker(),
-      rs->runtime_profile(), tmp_file_mgr_.get(),
-      CalculateMemLimit(max_buffers, block_size), block_size, &mgr));
-  rs->set_block_mgr(mgr);
+  *runtime_state = rs;
+  return Status::OK();
+}
 
-  if (runtime_state != nullptr) *runtime_state = rs;
+Status TestEnv::CreateQueryStateWithBlockMgr(int64_t query_id, int max_buffers,
+    int block_size, const TQueryOptions* query_options, RuntimeState** runtime_state) {
+  RETURN_IF_ERROR(CreateQueryState(query_id, query_options, runtime_state));
+
+  shared_ptr<BufferedBlockMgr> mgr;
+  RETURN_IF_ERROR(BufferedBlockMgr::Create(*runtime_state,
+      (*runtime_state)->query_state()->query_mem_tracker(),
+      (*runtime_state)->runtime_profile(), tmp_file_mgr(),
+      CalculateMemLimit(max_buffers, block_size), block_size, &mgr));
+  (*runtime_state)->set_block_mgr(mgr);
   return Status::OK();
 }
 }

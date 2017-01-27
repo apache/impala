@@ -44,7 +44,10 @@ namespace impala {
 
 class BufferPoolTest : public ::testing::Test {
  public:
-  virtual void SetUp() { test_env_ = obj_pool_.Add(new TestEnv); }
+  virtual void SetUp() {
+    test_env_ = obj_pool_.Add(new TestEnv);
+    ASSERT_OK(test_env_->Init());
+  }
 
   virtual void TearDown() {
     for (auto entry : query_reservations_) {

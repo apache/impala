@@ -26,6 +26,7 @@
 #include "common/object-pool.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
+#include "runtime/tmp-file-mgr.h"
 #include "util/spinlock.h"
 #include "util/uid-util.h"
 
@@ -33,6 +34,7 @@ namespace impala {
 
 class FragmentInstanceState;
 class MemTracker;
+class ReservationTracker;
 
 /// Central class for all backend execution state (example: the FragmentInstanceStates
 /// of the individual fragment instances) created for a particular query.
@@ -94,6 +96,8 @@ class QueryState {
   }
 
   MemTracker* query_mem_tracker() const { return query_mem_tracker_; }
+  ReservationTracker* buffer_reservation() const { return buffer_reservation_; }
+  TmpFileMgr::FileGroup* file_group() const { return file_group_; }
 
   /// Sets up state required for fragment execution: memory reservations, etc. Fails
   /// if resources could not be acquired. Safe to call concurrently and idempotent:
@@ -145,12 +149,26 @@ class QueryState {
   /// The top-level MemTracker for this query (owned by obj_pool_).
   MemTracker* query_mem_tracker_;
 
+  /// Buffer reservation for this query (owned by obj_pool_)
+  /// Only non-null in backend tests that explicitly enabled the new buffer pool
+  /// TODO: this will always be non-null once IMPALA-3200 is done
+  ReservationTracker* buffer_reservation_;
+
+  /// Temporary files for this query (owned by obj_pool_)
+  /// Only non-null in backend tests the explicitly enabled the new buffer pool
+  /// TODO: this will always be non-null once IMPALA-3200 is done
+  TmpFileMgr::FileGroup* file_group_;
+
   /// Create QueryState w/ copy of query_ctx and refcnt of 0.
   /// The query is associated with the resource pool named 'pool'
   QueryState(const TQueryCtx& query_ctx, const std::string& pool);
 
   /// Called from Prepare() to initialize MemTrackers.
   void InitMemTrackers(const std::string& pool);
+
+  /// Called from PrepareForExecution() to setup buffer reservations and the
+  /// file group. Fails if required resources are not available.
+  Status InitBufferPoolState();
 };
 }
 
