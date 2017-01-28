@@ -83,6 +83,13 @@ class KuduTestSuite(ImpalaTestSuite):
     return "".join(choice(string.lowercase) for _ in xrange(10))
 
   @classmethod
+  def to_kudu_table_name(cls, db_name, tbl_name):
+    """Return the name of the underlying Kudu table, from the Impala database and table
+    name. This must be kept in sync with KuduUtil.getDefaultCreateKuduTableName() in the
+    FE."""
+    return "impala::%s.%s" % (db_name, tbl_name)
+
+  @classmethod
   def get_kudu_table_base_name(cls, name):
     return name.split(".")[-1]
 

@@ -35,6 +35,7 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TKuduScanNode;
@@ -146,11 +147,36 @@ public class KuduScanNode extends ScanNode {
     Schema tableSchema = rpcTable.getSchema();
     for (SlotDescriptor desc: getTupleDesc().getSlots()) {
       String colName = desc.getColumn().getName();
+      Type colType = desc.getColumn().getType();
+      ColumnSchema kuduCol = null;
       try {
-        tableSchema.getColumn(colName);
+        kuduCol = tableSchema.getColumn(colName);
       } catch (Exception e) {
         throw new ImpalaRuntimeException("Column '" + colName + "' not found in kudu " +
-            "table " + rpcTable.getName());
+            "table " + rpcTable.getName() + ". The table metadata in Impala may be " +
+            "outdated and need to be refreshed.");
+      }
+
+      Type kuduColType = KuduUtil.toImpalaType(kuduCol.getType());
+      if (!colType.equals(kuduColType)) {
+        throw new ImpalaRuntimeException("Column '" + colName + "' is type " +
+            kuduColType.toSql() + " but Impala expected " + colType.toSql() +
+            ". The table metadata in Impala may be outdated and need to be refreshed.");
+      }
+
+      if (desc.getIsNullable() != kuduCol.isNullable()) {
+        String expected;
+        String actual;
+        if (desc.getIsNullable()) {
+          expected = "nullable";
+          actual = "not nullable";
+        } else {
+          expected = "not nullable";
+          actual = "nullable";
+        }
+        throw new ImpalaRuntimeException("Column '" + colName + "' is " + actual +
+            " but Impala expected it to be " + expected +
+            ". The table metadata in Impala may be outdated and need to be refreshed.");
       }
     }
   }

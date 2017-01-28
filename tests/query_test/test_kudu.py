@@ -95,14 +95,202 @@ class TestKuduOperations(KuduTestSuite):
                   encoding, compression, default, blocksize, nullable, encoding,
                   compression, default, blocksize))
               indx = indx + 1
-              kudu_tbl_name = "impala::%s.%s" % (unique_database, impala_tbl_name)
-              assert kudu_client.table_exists(kudu_tbl_name)
+              assert kudu_client.table_exists(
+                  KuduTestSuite.to_kudu_table_name(unique_database, impala_tbl_name))
+
+  def test_kudu_col_changed(self, cursor, kudu_client, unique_database):
+    """Test changing a Kudu column outside of Impala results in a failure on read with
+       outdated metadata (IMPALA-4828)."""
+    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING)
+        PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
+    assert kudu_client.table_exists(
+        KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+
+    # Force metadata to be loaded on impalads
+    cursor.execute("select * from %s.foo" % (unique_database))
+
+    # Load the table via the Kudu client and change col 's' to be a different type.
+    table = kudu_client.table(KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+    alterer = kudu_client.new_table_alterer(table)
+    alterer.drop_column("s")
+    table = alterer.alter()
+    alterer = kudu_client.new_table_alterer(table)
+    alterer.add_column("s", "int32")
+    table = alterer.alter()
+
+    # Add some rows
+    session = kudu_client.new_session()
+    for i in range(100):
+      op = table.new_insert((i, i))
+      session.apply(op)
+    session.flush()
+
+    # Scanning should result in an error
+    try:
+      cursor.execute("SELECT * FROM %s.foo" % (unique_database))
+      assert False
+    except Exception as e:
+      expected_error = "Column 's' is type INT but Impala expected STRING. The table "\
+          "metadata in Impala may be outdated and need to be refreshed."
+      assert expected_error in str(e)
+
+    # After a REFRESH the scan should succeed
+    cursor.execute("REFRESH %s.foo" % (unique_database))
+    cursor.execute("SELECT * FROM %s.foo" % (unique_database))
+    assert len(cursor.fetchall()) == 100
+
+  def test_kudu_col_not_null_changed(self, cursor, kudu_client, unique_database):
+    """Test changing a NOT NULL Kudu column outside of Impala results in a failure
+       on read with outdated metadata (IMPALA-4828)."""
+    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING NOT NULL)
+        PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
+    assert kudu_client.table_exists(
+        KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+
+    # Force metadata to be loaded on impalads
+    cursor.execute("select * from %s.foo" % (unique_database))
+
+    # Load the table via the Kudu client and change col 's' to be a different type.
+    table = kudu_client.table(KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+    alterer = kudu_client.new_table_alterer(table)
+    alterer.drop_column("s")
+    table = alterer.alter()
+    alterer = kudu_client.new_table_alterer(table)
+    alterer.add_column("s", "string", nullable=True)
+    table = alterer.alter()
+
+    # Add some rows
+    session = kudu_client.new_session()
+    for i in range(100):
+      op = table.new_insert((i, None))
+      session.apply(op)
+    session.flush()
+
+    # Scanning should result in an error
+    try:
+      cursor.execute("SELECT * FROM %s.foo" % (unique_database))
+      assert False
+    except Exception as e:
+      expected_error = "Column 's' is nullable but Impala expected it to be "\
+          "not nullable. The table metadata in Impala may be outdated and need to be "\
+          "refreshed."
+      assert expected_error in str(e)
+
+    # After a REFRESH the scan should succeed
+    cursor.execute("REFRESH %s.foo" % (unique_database))
+    cursor.execute("SELECT * FROM %s.foo" % (unique_database))
+    assert len(cursor.fetchall()) == 100
+
+  def test_kudu_col_null_changed(self, cursor, kudu_client, unique_database):
+    """Test changing a NULL Kudu column outside of Impala results in a failure
+       on read with outdated metadata (IMPALA-4828)."""
+    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING NULL)
+        PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
+    assert kudu_client.table_exists(
+        KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+
+    # Force metadata to be loaded on impalads
+    cursor.execute("select * from %s.foo" % (unique_database))
+
+    # Load the table via the Kudu client and change col 's' to be a different type.
+    table = kudu_client.table(KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+    alterer = kudu_client.new_table_alterer(table)
+    alterer.drop_column("s")
+    table = alterer.alter()
+    alterer = kudu_client.new_table_alterer(table)
+    alterer.add_column("s", "string", nullable=False, default="bar")
+    table = alterer.alter()
+
+    # Add some rows
+    session = kudu_client.new_session()
+    for i in range(100):
+      op = table.new_insert((i, None))
+      session.apply(op)
+    session.flush()
+
+    # Scanning should result in an error
+    try:
+      cursor.execute("SELECT * FROM %s.foo" % (unique_database))
+      assert False
+    except Exception as e:
+      expected_error = "Column 's' is not nullable but Impala expected it to be "\
+          "nullable. The table metadata in Impala may be outdated and need to be "\
+          "refreshed."
+      assert expected_error in str(e)
+
+    # After a REFRESH the scan should succeed
+    cursor.execute("REFRESH %s.foo" % (unique_database))
+    cursor.execute("SELECT * FROM %s.foo" % (unique_database))
+    assert len(cursor.fetchall()) == 100
+
+  def test_kudu_col_added(self, cursor, kudu_client, unique_database):
+    """Test adding a Kudu column outside of Impala."""
+    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY)
+        PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
+    assert kudu_client.table_exists(
+        KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+
+    # Force metadata to be loaded on impalads
+    cursor.execute("select * from %s.foo" % (unique_database))
+
+    # Load the table via the Kudu client and add a new col
+    table = kudu_client.table(KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+    alterer = kudu_client.new_table_alterer(table)
+    alterer.add_column("b", "int32")
+    table = alterer.alter()
+
+    # Add some rows
+    session = kudu_client.new_session()
+    op = table.new_insert((0, 0))
+    session.apply(op)
+    session.flush()
+
+    # Only the first col is visible to Impala. Impala will not know about the missing
+    # column, so '*' is expanded to known columns. This doesn't have a separate check
+    # because the query can proceed and checking would need to fetch metadata from the
+    # Kudu master, which is what REFRESH is for.
+    cursor.execute("SELECT * FROM %s.foo" % (unique_database))
+    assert cursor.fetchall() == [(0, )]
+
+    # After a REFRESH both cols should be visible
+    cursor.execute("REFRESH %s.foo" % (unique_database))
+    cursor.execute("SELECT * FROM %s.foo" % (unique_database))
+    assert cursor.fetchall() == [(0, 0)]
+
+  def test_kudu_col_removed(self, cursor, kudu_client, unique_database):
+    """Test removing a Kudu column outside of Impala."""
+    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING)
+        PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
+    assert kudu_client.table_exists(
+        KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+
+    # Force metadata to be loaded on impalads
+    cursor.execute("select * from %s.foo" % (unique_database))
+    cursor.execute("insert into %s.foo values (0, 'foo')" % (unique_database))
+
+    # Load the table via the Kudu client and change col 's' to be a different type.
+    table = kudu_client.table(KuduTestSuite.to_kudu_table_name(unique_database, "foo"))
+    alterer = kudu_client.new_table_alterer(table)
+    alterer.drop_column("s")
+    table = alterer.alter()
+
+    # Scanning should result in an error
+    try:
+      cursor.execute("SELECT * FROM %s.foo" % (unique_database))
+    except Exception as e:
+      expected_error = "Column 's' not found in kudu table impala::test_kudu_col_removed"
+      assert expected_error in str(e)
+
+    # After a REFRESH the scan should succeed
+    cursor.execute("REFRESH %s.foo" % (unique_database))
+    cursor.execute("SELECT * FROM %s.foo" % (unique_database))
+    assert cursor.fetchall() == [(0, )]
 
   def test_kudu_rename_table(self, cursor, kudu_client, unique_database):
     """Test Kudu table rename"""
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY) PARTITION BY HASH(a)
         PARTITIONS 3 STORED AS KUDU""" % unique_database)
-    kudu_tbl_name = "impala::%s.foo" % unique_database
+    kudu_tbl_name = KuduTestSuite.to_kudu_table_name(unique_database, "foo")
     assert kudu_client.table_exists(kudu_tbl_name)
     new_kudu_tbl_name = "blah"
     cursor.execute("ALTER TABLE %s.foo SET TBLPROPERTIES('kudu.table_name'='%s')" % (
@@ -546,7 +734,7 @@ class TestImpalaKuduIntegration(KuduTestSuite):
     impala_tbl_name = "foo"
     cursor.execute("""CREATE TABLE %s.%s (a INT PRIMARY KEY) PARTITION BY HASH (a)
         PARTITIONS 3 STORED AS KUDU""" % (unique_database, impala_tbl_name))
-    kudu_tbl_name = "impala::%s.%s" % (unique_database, impala_tbl_name)
+    kudu_tbl_name = KuduTestSuite.to_kudu_table_name(unique_database, impala_tbl_name)
     assert kudu_client.table_exists(kudu_tbl_name)
     kudu_client.delete_table(kudu_tbl_name)
     assert not kudu_client.table_exists(kudu_tbl_name)
