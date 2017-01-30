@@ -304,6 +304,16 @@ public class Planner {
       hasHeader = true;
     }
 
+    if (request.query_ctx.isSetTables_missing_diskids()) {
+      List<String> tableNames = Lists.newArrayList();
+      for (TTableName tableName: request.query_ctx.getTables_missing_diskids()) {
+        tableNames.add(tableName.db_name + "." + tableName.table_name);
+      }
+      str.append("WARNING: The following tables have scan ranges with missing " +
+          "disk id information.\n" + Joiner.on(", ").join(tableNames) + "\n");
+      hasHeader = true;
+    }
+
     if (request.query_ctx.isDisable_spilling()) {
       str.append("WARNING: Spilling is disabled for this query as a safety guard.\n" +
           "Reason: Query option disable_unsafe_spills is set, at least one table\n" +

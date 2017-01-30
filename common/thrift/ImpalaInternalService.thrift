@@ -322,6 +322,9 @@ struct TQueryCtx {
   // backend in NativeEvalExprsWithoutRow() in FESupport. This flag is only advisory to
   // avoid the overhead of codegen and can be ignored if codegen is needed functionally.
   14: optional bool disable_codegen_hint = false;
+
+  // List of tables with scan ranges that map to blocks with missing disk IDs.
+  15: optional list<CatalogObjects.TTableName> tables_missing_diskids
 }
 
 // Context to collect information, which is shared among all instances of that plan

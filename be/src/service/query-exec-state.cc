@@ -60,6 +60,7 @@ static const string PER_HOST_MEM_KEY = "Estimated Per-Host Mem";
 static const string PER_HOST_VCORES_KEY = "Estimated Per-Host VCores";
 static const string TABLES_MISSING_STATS_KEY = "Tables Missing Stats";
 static const string TABLES_WITH_CORRUPT_STATS_KEY = "Tables With Corrupt Table Stats";
+static const string TABLES_WITH_MISSING_DISK_IDS_KEY = "Tables With Missing Disk Ids";
 
 ImpalaServer::QueryExecState::QueryExecState(const TQueryCtx& query_ctx,
     ExecEnv* exec_env, Frontend* frontend, ImpalaServer* server,
@@ -426,6 +427,18 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
       ss << tbls[i].db_name << "." << tbls[i].table_name;
     }
     summary_profile_.AddInfoString(TABLES_WITH_CORRUPT_STATS_KEY, ss.str());
+  }
+
+  if (query_exec_request.query_ctx.__isset.tables_missing_diskids &&
+      !query_exec_request.query_ctx.tables_missing_diskids.empty()) {
+    stringstream ss;
+    const vector<TTableName>& tbls =
+        query_exec_request.query_ctx.tables_missing_diskids;
+    for (int i = 0; i < tbls.size(); ++i) {
+      if (i != 0) ss << ",";
+      ss << tbls[i].db_name << "." << tbls[i].table_name;
+    }
+    summary_profile_.AddInfoString(TABLES_WITH_MISSING_DISK_IDS_KEY, ss.str());
   }
 
   {

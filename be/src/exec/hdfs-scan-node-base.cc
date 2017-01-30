@@ -59,9 +59,9 @@
 
 DEFINE_int32(runtime_filter_wait_time_ms, 1000, "(Advanced) the maximum time, in ms, "
     "that a scan node will wait for expected runtime filters to arrive.");
-DEFINE_bool(suppress_unknown_disk_id_warnings, false,
-    "Suppress unknown disk id warnings generated when the HDFS implementation does not"
-    " provide volume/disk information.");
+
+// TODO: Remove this flag in a compatibility-breaking release.
+DEFINE_bool(suppress_unknown_disk_id_warnings, false, "Deprecated.");
 
 #ifndef NDEBUG
 DECLARE_bool(skip_file_runtime_filtering);
@@ -89,7 +89,6 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
       reader_context_(NULL),
       tuple_desc_(NULL),
       hdfs_table_(NULL),
-      unknown_disk_id_warned_(false),
       initial_ranges_issued_(false),
       counters_running_(false),
       max_compressed_text_file_length_(NULL),
@@ -263,14 +262,7 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
     }
 
     bool expected_local = params.__isset.is_remote && !params.is_remote;
-    if (expected_local && params.volume_id == -1) {
-      if (!FLAGS_suppress_unknown_disk_id_warnings && !unknown_disk_id_warned_) {
-        runtime_profile()->AppendExecOption("Missing Volume Id");
-        runtime_state()->LogError(ErrorMsg(TErrorCode::HDFS_SCAN_NODE_UNKNOWN_DISK));
-        unknown_disk_id_warned_ = true;
-      }
-      ++num_ranges_missing_volume_id;
-    }
+    if (expected_local && params.volume_id == -1) ++num_ranges_missing_volume_id;
 
     bool try_cache = params.is_cached;
     if (runtime_state_->query_options().disable_cached_reads) {

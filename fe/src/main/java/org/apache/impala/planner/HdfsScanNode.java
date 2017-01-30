@@ -17,11 +17,15 @@
 
 package org.apache.impala.planner;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
@@ -35,6 +39,8 @@ import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.PrintUtils;
@@ -121,6 +127,14 @@ public class HdfsScanNode extends ScanNode {
   // Number of header lines to skip at the beginning of each file of this table. Only set
   // to values > 0 for hdfs text files.
   private int skipHeaderLineCount_ = 0;
+
+  // Number of scan-ranges/files/partitions that have missing disk ids. Reported in the
+  // explain plan.
+  private int numScanRangesNoDiskIds_ = 0;
+  private int numFilesNoDiskIds_ = 0;
+  private int numPartitionsNoDiskIds_ = 0;
+
+  private static final Configuration CONF = new Configuration();
 
   /**
    * Construct a node to scan given data files into tuples described by 'desc',
@@ -308,7 +322,8 @@ public class HdfsScanNode extends ScanNode {
    * ids, based on the given maximum number of bytes each scan range should scan.
    * Returns the set of file formats being scanned.
    */
-  private Set<HdfsFileFormat> computeScanRangeLocations(Analyzer analyzer) {
+  private Set<HdfsFileFormat> computeScanRangeLocations(Analyzer analyzer)
+      throws ImpalaRuntimeException {
     long maxScanRangeLength = analyzer.getQueryCtx().client_request.getQuery_options()
         .getMax_scan_range_length();
     scanRanges_ = Lists.newArrayList();
@@ -316,7 +331,18 @@ public class HdfsScanNode extends ScanNode {
     for (HdfsPartition partition: partitions_) {
       fileFormats.add(partition.getFileFormat());
       Preconditions.checkState(partition.getId() >= 0);
+      // Missing disk id accounting is only done for file systems that support the notion
+      // of disk/storage ids.
+      FileSystem partitionFs;
+      try {
+        partitionFs = partition.getLocationPath().getFileSystem(CONF);
+      } catch (IOException e) {
+        throw new ImpalaRuntimeException("Error determining partition fs type", e);
+      }
+      boolean checkMissingDiskIds = FileSystemUtil.supportsStorageIds(partitionFs);
+      boolean partitionMissingDiskIds = false;
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
+        boolean fileDescMissingDiskIds = false;
         for (THdfsFileBlock thriftBlock: fileDesc.getFileBlocks()) {
           HdfsPartition.FileBlock block = FileBlock.fromThrift(thriftBlock);
           List<Integer> replicaHostIdxs = block.getReplicaHostIdxs();
@@ -337,6 +363,11 @@ public class HdfsScanNode extends ScanNode {
             // Translate from network address to the global (to this request) host index.
             Integer globalHostIdx = analyzer.getHostIndex().getIndex(networkAddress);
             location.setHost_idx(globalHostIdx);
+            if (checkMissingDiskIds && block.getDiskId(i) == -1) {
+              ++numScanRangesNoDiskIds_;
+              partitionMissingDiskIds = true;
+              fileDescMissingDiskIds = true;
+            }
             location.setVolume_id(block.getDiskId(i));
             location.setIs_cached(block.isCached(i));
             locations.add(location);
@@ -362,7 +393,15 @@ public class HdfsScanNode extends ScanNode {
             currentOffset += currentLength;
           }
         }
+        if (fileDescMissingDiskIds) {
+          ++numFilesNoDiskIds_;
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("File blocks mapping to unknown disk ids. Dir: " +
+                partition.getLocation() + " File:" + fileDesc.toString());
+          }
+        }
       }
+      if (partitionMissingDiskIds) ++numPartitionsNoDiskIds_;
     }
     return fileFormats;
   }
@@ -554,13 +593,13 @@ public class HdfsScanNode extends ScanNode {
     HdfsTable table = (HdfsTable) desc_.getTable();
     output.append(String.format("%s%s [%s", prefix, getDisplayLabel(),
         getDisplayLabelDetail()));
+    int numPartitions = partitions_.size();
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal() &&
         fragment_.isPartitioned()) {
       output.append(", " + fragment_.getDataPartition().getExplainString());
     }
     output.append("]\n");
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
-      int numPartitions = partitions_.size();
       if (tbl_.getNumClusteringCols() == 0) numPartitions = 1;
       output.append(String.format("%spartitions=%s/%s files=%s size=%s", detailPrefix,
           numPartitions, table.getPartitions().size() - 1, totalFiles_,
@@ -586,6 +625,12 @@ public class HdfsScanNode extends ScanNode {
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(getStatsExplainString(detailPrefix, detailLevel));
       output.append("\n");
+      if (numScanRangesNoDiskIds_ > 0) {
+        output.append(String.format("%smissing disk ids: " +
+            "partitions=%s/%s files=%s/%s scan ranges %s/%s\n", detailPrefix,
+            numPartitionsNoDiskIds_, numPartitions, numFilesNoDiskIds_,
+            totalFiles_, numScanRangesNoDiskIds_, scanRanges_.size()));
+      }
     }
     return output.toString();
   }
@@ -663,4 +708,6 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   public boolean hasCorruptTableStats() { return hasCorruptTableStats_; }
+
+  public boolean hasMissingDiskIds() { return numScanRangesNoDiskIds_ > 0; }
 }

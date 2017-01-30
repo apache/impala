@@ -305,10 +305,6 @@ class HdfsScanNodeBase : public ScanNode {
   /// The root of the table's Avro schema, if we're scanning an Avro table.
   ScopedAvroSchemaElement avro_schema_;
 
-  /// If true, the warning that some disk ids are unknown was logged.  Only log this once
-  /// per scan node since it can be noisy.
-  bool unknown_disk_id_warned_;
-
   /// Partitions scanned by this scan node.
   std::unordered_set<int64_t> partition_ids_;
 

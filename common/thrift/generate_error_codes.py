@@ -94,220 +94,216 @@ error_codes = (
   ("SNAPPY_DECOMPRESS_DECOMPRESS_SIZE_INCORRECT", 25,
    "Snappy: Decompressed size is not correct."),
 
-  ("HDFS_SCAN_NODE_UNKNOWN_DISK", 26, "Unknown disk id.  "
-   "This will negatively affect performance. "
-   "Check your hdfs settings to enable block location metadata."),
-
-  ("FRAGMENT_EXECUTOR", 27, "Reserved resource size ($0) is larger than "
+  ("FRAGMENT_EXECUTOR", 26, "Reserved resource size ($0) is larger than "
     "query mem limit ($1), and will be restricted to $1. Configure the reservation "
     "size by setting RM_INITIAL_MEM."),
 
-  ("PARTITIONED_HASH_JOIN_MAX_PARTITION_DEPTH", 28,
+  ("PARTITIONED_HASH_JOIN_MAX_PARTITION_DEPTH", 27,
    "Cannot perform join at hash join node with id $0."
    " The input data was partitioned the maximum number of $1 times."
    " This could mean there is significant skew in the data or the memory limit is"
    " set too low."),
 
-  ("PARTITIONED_AGG_MAX_PARTITION_DEPTH", 29,
+  ("PARTITIONED_AGG_MAX_PARTITION_DEPTH", 28,
    "Cannot perform aggregation at hash aggregation node with id $0."
    " The input data was partitioned the maximum number of $1 times."
    " This could mean there is significant skew in the data or the memory limit is"
    " set too low."),
 
-  ("MISSING_BUILTIN", 30, "Builtin '$0' with symbol '$1' does not exist. "
+  ("MISSING_BUILTIN", 29, "Builtin '$0' with symbol '$1' does not exist. "
    "Verify that all your impalads are the same version."),
 
-  ("RPC_GENERAL_ERROR", 31, "RPC Error: $0"),
-  ("RPC_RECV_TIMEOUT", 32, "RPC recv timed out: $0"),
+  ("RPC_GENERAL_ERROR", 30, "RPC Error: $0"),
+  ("RPC_RECV_TIMEOUT", 31, "RPC recv timed out: $0"),
 
-  ("UDF_VERIFY_FAILED", 33,
+  ("UDF_VERIFY_FAILED", 32,
    "Failed to verify function $0 from LLVM module $1, see log for more details."),
 
-  ("PARQUET_CORRUPT_RLE_BYTES", 34, "File $0 corrupt. RLE level data bytes = $1"),
+  ("PARQUET_CORRUPT_RLE_BYTES", 33, "File $0 corrupt. RLE level data bytes = $1"),
 
-  ("AVRO_DECIMAL_RESOLUTION_ERROR", 35, "Column '$0' has conflicting Avro decimal types. "
+  ("AVRO_DECIMAL_RESOLUTION_ERROR", 34, "Column '$0' has conflicting Avro decimal types. "
    "Table schema $1: $2, file schema $1: $3"),
 
-  ("AVRO_DECIMAL_METADATA_MISMATCH", 36, "Column '$0' has conflicting Avro decimal types. "
+  ("AVRO_DECIMAL_METADATA_MISMATCH", 35, "Column '$0' has conflicting Avro decimal types. "
    "Declared $1: $2, $1 in table's Avro schema: $3"),
 
-  ("AVRO_SCHEMA_RESOLUTION_ERROR", 37, "Unresolvable types for column '$0': "
+  ("AVRO_SCHEMA_RESOLUTION_ERROR", 36, "Unresolvable types for column '$0': "
    "table type: $1, file type: $2"),
 
-  ("AVRO_SCHEMA_METADATA_MISMATCH", 38, "Unresolvable types for column '$0': "
+  ("AVRO_SCHEMA_METADATA_MISMATCH", 37, "Unresolvable types for column '$0': "
    "declared column type: $1, table's Avro schema type: $2"),
 
-  ("AVRO_UNSUPPORTED_DEFAULT_VALUE", 39, "Field $0 is missing from file and default "
+  ("AVRO_UNSUPPORTED_DEFAULT_VALUE", 38, "Field $0 is missing from file and default "
    "values of type $1 are not yet supported."),
 
-  ("AVRO_MISSING_FIELD", 40, "Inconsistent table metadata. Mismatch between column "
+  ("AVRO_MISSING_FIELD", 39, "Inconsistent table metadata. Mismatch between column "
    "definition and Avro schema: cannot read field $0 because there are only $1 fields."),
 
-  ("AVRO_MISSING_DEFAULT", 41,
+  ("AVRO_MISSING_DEFAULT", 40,
    "Field $0 is missing from file and does not have a default value."),
 
-  ("AVRO_NULLABILITY_MISMATCH", 42,
+  ("AVRO_NULLABILITY_MISMATCH", 41,
    "Field $0 is nullable in the file schema but not the table schema."),
 
-  ("AVRO_NOT_A_RECORD", 43,
+  ("AVRO_NOT_A_RECORD", 42,
    "Inconsistent table metadata. Field $0 is not a record in the Avro schema."),
 
-  ("PARQUET_DEF_LEVEL_ERROR", 44, "Could not read definition level, even though metadata"
+  ("PARQUET_DEF_LEVEL_ERROR", 43, "Could not read definition level, even though metadata"
    " states there are $0 values remaining in data page. file=$1"),
 
-  ("PARQUET_NUM_COL_VALS_ERROR", 45, "Mismatched number of values in column index $0 "
+  ("PARQUET_NUM_COL_VALS_ERROR", 44, "Mismatched number of values in column index $0 "
    "($1 vs. $2). file=$3"),
 
-  ("PARQUET_DICT_DECODE_FAILURE", 46, "File '$0' is corrupt: error decoding "
+  ("PARQUET_DICT_DECODE_FAILURE", 45, "File '$0' is corrupt: error decoding "
    "dictionary-encoded value of type $1 at offset $2"),
 
-  ("SSL_PASSWORD_CMD_FAILED", 47,
+  ("SSL_PASSWORD_CMD_FAILED", 46,
    "SSL private-key password command ('$0') failed with error: $1"),
 
-  ("SSL_CERTIFICATE_PATH_BLANK", 48, "The SSL certificate path is blank"),
-  ("SSL_PRIVATE_KEY_PATH_BLANK", 49, "The SSL private key path is blank"),
+  ("SSL_CERTIFICATE_PATH_BLANK", 47, "The SSL certificate path is blank"),
+  ("SSL_PRIVATE_KEY_PATH_BLANK", 48, "The SSL private key path is blank"),
 
-  ("SSL_CERTIFICATE_NOT_FOUND", 50, "The SSL certificate file does not exist at path $0"),
-  ("SSL_PRIVATE_KEY_NOT_FOUND", 51, "The SSL private key file does not exist at path $0"),
+  ("SSL_CERTIFICATE_NOT_FOUND", 49, "The SSL certificate file does not exist at path $0"),
+  ("SSL_PRIVATE_KEY_NOT_FOUND", 50, "The SSL private key file does not exist at path $0"),
 
-  ("SSL_SOCKET_CREATION_FAILED", 52, "SSL socket creation failed: $0"),
+  ("SSL_SOCKET_CREATION_FAILED", 51, "SSL socket creation failed: $0"),
 
-  ("MEM_ALLOC_FAILED", 53, "Memory allocation of $0 bytes failed"),
+  ("MEM_ALLOC_FAILED", 52, "Memory allocation of $0 bytes failed"),
 
-  ("PARQUET_REP_LEVEL_ERROR", 54, "Could not read repetition level, even though metadata"
+  ("PARQUET_REP_LEVEL_ERROR", 53, "Could not read repetition level, even though metadata"
    " states there are $0 values remaining in data page. file=$1"),
 
-  ("PARQUET_UNRECOGNIZED_SCHEMA", 55, "File '$0' has an incompatible Parquet schema for "
+  ("PARQUET_UNRECOGNIZED_SCHEMA", 54, "File '$0' has an incompatible Parquet schema for "
    "column '$1'. Column type: $2, Parquet schema:\\n$3"),
 
-  ("COLLECTION_ALLOC_FAILED", 56, "Failed to allocate $0 bytes for collection '$1'.\\n"
+  ("COLLECTION_ALLOC_FAILED", 55, "Failed to allocate $0 bytes for collection '$1'.\\n"
    "Current buffer size: $2 num tuples: $3."),
 
-  ("TMP_DEVICE_BLACKLISTED", 57,
+  ("TMP_DEVICE_BLACKLISTED", 56,
     "Temporary device for directory $0 is blacklisted from a previous error and cannot "
     "be used."),
 
-  ("TMP_FILE_BLACKLISTED", 58,
+  ("TMP_FILE_BLACKLISTED", 57,
     "Temporary file $0 is blacklisted from a previous error and cannot be expanded."),
 
-  ("RPC_CLIENT_CONNECT_FAILURE", 59,
+  ("RPC_CLIENT_CONNECT_FAILURE", 58,
     "RPC client failed to connect: $0"),
 
-  ("STALE_METADATA_FILE_TOO_SHORT", 60, "Metadata for file '$0' appears stale. "
+  ("STALE_METADATA_FILE_TOO_SHORT", 59, "Metadata for file '$0' appears stale. "
    "Try running \\\"refresh $1\\\" to reload the file metadata."),
 
-  ("PARQUET_BAD_VERSION_NUMBER", 61, "File '$0' has an invalid version number: $1\\n"
+  ("PARQUET_BAD_VERSION_NUMBER", 60, "File '$0' has an invalid version number: $1\\n"
    "This could be due to stale metadata. Try running \\\"refresh $2\\\"."),
 
-  ("SCANNER_INCOMPLETE_READ", 62, "Tried to read $0 bytes but could only read $1 bytes. "
+  ("SCANNER_INCOMPLETE_READ", 61, "Tried to read $0 bytes but could only read $1 bytes. "
    "This may indicate data file corruption. (file $2, byte offset: $3)"),
 
-  ("SCANNER_INVALID_READ", 63, "Invalid read of $0 bytes. This may indicate data file "
+  ("SCANNER_INVALID_READ", 62, "Invalid read of $0 bytes. This may indicate data file "
    "corruption. (file $1, byte offset: $2)"),
 
-  ("AVRO_BAD_VERSION_HEADER", 64, "File '$0' has an invalid version header: $1\\n"
+  ("AVRO_BAD_VERSION_HEADER", 63, "File '$0' has an invalid version header: $1\\n"
    "Make sure the file is an Avro data file."),
 
-  ("UDF_MEM_LIMIT_EXCEEDED", 65, "$0's allocations exceeded memory limits."),
+  ("UDF_MEM_LIMIT_EXCEEDED", 64, "$0's allocations exceeded memory limits."),
 
-  ("BTS_BLOCK_OVERFLOW", 66, "Cannot process row that is bigger than the IO size "
+  ("BTS_BLOCK_OVERFLOW", 65, "Cannot process row that is bigger than the IO size "
    "(row_size=$0, null_indicators_size=$1). To run this query, increase the IO size "
    "(--read_size option)."),
 
-  ("COMPRESSED_FILE_MULTIPLE_BLOCKS", 67,
+  ("COMPRESSED_FILE_MULTIPLE_BLOCKS", 66,
    "For better performance, snappy-, gzip-, and bzip-compressed files "
    "should not be split into multiple HDFS blocks. file=$0 offset $1"),
 
-  ("COMPRESSED_FILE_BLOCK_CORRUPTED", 68,
+  ("COMPRESSED_FILE_BLOCK_CORRUPTED", 67,
    "$0 Data error, likely data corrupted in this block."),
 
-  ("COMPRESSED_FILE_DECOMPRESSOR_ERROR", 69, "$0 Decompressor error at $1, code=$2"),
+  ("COMPRESSED_FILE_DECOMPRESSOR_ERROR", 68, "$0 Decompressor error at $1, code=$2"),
 
-  ("COMPRESSED_FILE_DECOMPRESSOR_NO_PROGRESS", 70,
+  ("COMPRESSED_FILE_DECOMPRESSOR_NO_PROGRESS", 69,
    "Decompression failed to make progress, but end of input is not reached. "
    "File appears corrupted. file=$0"),
 
-  ("COMPRESSED_FILE_TRUNCATED", 71,
+  ("COMPRESSED_FILE_TRUNCATED", 70,
    "Unexpected end of compressed file. File may be truncated. file=$0"),
 
-  ("DATASTREAM_SENDER_TIMEOUT", 72, "Sender timed out waiting for receiver fragment "
+  ("DATASTREAM_SENDER_TIMEOUT", 71, "Sender timed out waiting for receiver fragment "
    "instance: $0"),
 
-  ("KUDU_IMPALA_TYPE_MISSING", 73, "Kudu type $0 is not available in Impala."),
+  ("KUDU_IMPALA_TYPE_MISSING", 72, "Kudu type $0 is not available in Impala."),
 
-  ("IMPALA_KUDU_TYPE_MISSING", 74, "Impala type $0 is not available in Kudu."),
+  ("IMPALA_KUDU_TYPE_MISSING", 73, "Impala type $0 is not available in Kudu."),
 
-  ("KUDU_NOT_SUPPORTED_ON_OS", 75, "Kudu is not supported on this operating system."),
+  ("KUDU_NOT_SUPPORTED_ON_OS", 74, "Kudu is not supported on this operating system."),
 
-  ("KUDU_NOT_ENABLED", 76, "Kudu features are disabled by the startup flag "
+  ("KUDU_NOT_ENABLED", 75, "Kudu features are disabled by the startup flag "
    "--disable_kudu."),
 
-  ("PARTITIONED_HASH_JOIN_REPARTITION_FAILS", 77, "Cannot perform hash join at node with "
+  ("PARTITIONED_HASH_JOIN_REPARTITION_FAILS", 76, "Cannot perform hash join at node with "
    "id $0. Repartitioning did not reduce the size of a spilled partition. Repartitioning "
    "level $1. Number of rows $2."),
 
-  ("PARTITIONED_AGG_REPARTITION_FAILS", 78,  "Cannot perform aggregation at node with "
+  ("PARTITIONED_AGG_REPARTITION_FAILS", 77,  "Cannot perform aggregation at node with "
    "id $0. Repartitioning did not reduce the size of a spilled partition. Repartitioning "
    "level $1. Number of rows $2."),
 
-  ("AVRO_TRUNCATED_BLOCK", 79, "File '$0' is corrupt: truncated data block at offset $1"),
+  ("AVRO_TRUNCATED_BLOCK", 78, "File '$0' is corrupt: truncated data block at offset $1"),
 
-  ("AVRO_INVALID_UNION", 80, "File '$0' is corrupt: invalid union value $1 at offset $2"),
+  ("AVRO_INVALID_UNION", 79, "File '$0' is corrupt: invalid union value $1 at offset $2"),
 
-  ("AVRO_INVALID_BOOLEAN", 81, "File '$0' is corrupt: invalid boolean value $1 at offset "
+  ("AVRO_INVALID_BOOLEAN", 80, "File '$0' is corrupt: invalid boolean value $1 at offset "
    "$2"),
 
-  ("AVRO_INVALID_LENGTH", 82, "File '$0' is corrupt: invalid length $1 at offset $2"),
+  ("AVRO_INVALID_LENGTH", 81, "File '$0' is corrupt: invalid length $1 at offset $2"),
 
-  ("SCANNER_INVALID_INT", 83, "File '$0' is corrupt: invalid encoded integer at offset $1"),
+  ("SCANNER_INVALID_INT", 82, "File '$0' is corrupt: invalid encoded integer at offset $1"),
 
-  ("AVRO_INVALID_RECORD_COUNT", 84, "File '$0' is corrupt: invalid record count $1 at "
+  ("AVRO_INVALID_RECORD_COUNT", 83, "File '$0' is corrupt: invalid record count $1 at "
    "offset $2"),
 
-  ("AVRO_INVALID_COMPRESSED_SIZE", 85, "File '$0' is corrupt: invalid compressed block "
+  ("AVRO_INVALID_COMPRESSED_SIZE", 84, "File '$0' is corrupt: invalid compressed block "
    "size $1 at offset $2"),
 
-  ("AVRO_INVALID_METADATA_COUNT", 86, "File '$0' is corrupt: invalid metadata count $1 "
+  ("AVRO_INVALID_METADATA_COUNT", 85, "File '$0' is corrupt: invalid metadata count $1 "
    "at offset $2"),
 
-  ("SCANNER_STRING_LENGTH_OVERFLOW", 87, "File '$0' could not be read: string $1 was "
+  ("SCANNER_STRING_LENGTH_OVERFLOW", 86, "File '$0' could not be read: string $1 was "
     "longer than supported limit of $2 bytes at offset $3"),
 
-  ("PARQUET_CORRUPT_PLAIN_VALUE", 88, "File '$0' is corrupt: error decoding value of type "
+  ("PARQUET_CORRUPT_PLAIN_VALUE", 87, "File '$0' is corrupt: error decoding value of type "
    "$1 at offset $2"),
 
-  ("PARQUET_CORRUPT_DICTIONARY", 89, "File '$0' is corrupt: error reading dictionary for "
+  ("PARQUET_CORRUPT_DICTIONARY", 88, "File '$0' is corrupt: error reading dictionary for "
    "data of type $1: $2"),
 
-  ("TEXT_PARSER_TRUNCATED_COLUMN", 90, "Length of column is $0 which exceeds maximum "
+  ("TEXT_PARSER_TRUNCATED_COLUMN", 89, "Length of column is $0 which exceeds maximum "
    "supported length of 2147483647 bytes."),
 
-  ("SCRATCH_LIMIT_EXCEEDED", 91, "Scratch space limit of $0 bytes exceeded for query "
+  ("SCRATCH_LIMIT_EXCEEDED", 90, "Scratch space limit of $0 bytes exceeded for query "
    "while spilling data to disk."),
 
-  ("BUFFER_ALLOCATION_FAILED", 92, "Unexpected error allocating $0 byte buffer."),
+  ("BUFFER_ALLOCATION_FAILED", 91, "Unexpected error allocating $0 byte buffer."),
 
-  ("PARQUET_ZERO_ROWS_IN_NON_EMPTY_FILE", 93, "File '$0' is corrupt: metadata indicates "
+  ("PARQUET_ZERO_ROWS_IN_NON_EMPTY_FILE", 92, "File '$0' is corrupt: metadata indicates "
    "a zero row count but there is at least one non-empty row group."),
 
-  ("NO_REGISTERED_BACKENDS", 94, "Cannot schedule query: no registered backends "
+  ("NO_REGISTERED_BACKENDS", 93, "Cannot schedule query: no registered backends "
    "available."),
 
-  ("KUDU_KEY_ALREADY_PRESENT", 95, "Key already present in Kudu table '$0'."),
+  ("KUDU_KEY_ALREADY_PRESENT", 94, "Key already present in Kudu table '$0'."),
 
-  ("KUDU_NOT_FOUND", 96, "Not found in Kudu table '$0': $1"),
+  ("KUDU_NOT_FOUND", 95, "Not found in Kudu table '$0': $1"),
 
-  ("KUDU_SESSION_ERROR", 97, "Error in Kudu table '$0': $1"),
+  ("KUDU_SESSION_ERROR", 96, "Error in Kudu table '$0': $1"),
 
-  ("AVRO_UNSUPPORTED_TYPE", 98, "Column '$0': unsupported Avro type '$1'"),
+  ("AVRO_UNSUPPORTED_TYPE", 97, "Column '$0': unsupported Avro type '$1'"),
 
-  ("AVRO_INVALID_DECIMAL", 99,
+  ("AVRO_INVALID_DECIMAL", 98,
       "Column '$0': invalid Avro decimal type with precision = '$1' scale = '$2'"),
 
-  ("KUDU_NULL_CONSTRAINT_VIOLATION", 100,
+  ("KUDU_NULL_CONSTRAINT_VIOLATION", 99,
       "Row with null value violates nullability constraint on table '$0'."),
 
-  ("PARQUET_TIMESTAMP_OUT_OF_RANGE", 101,
+  ("PARQUET_TIMESTAMP_OUT_OF_RANGE", 100,
    "Parquet file '$0' column '$1' contains an out of range timestamp. "
    "The valid date range is 1400-01-01..9999-12-31."),
 )

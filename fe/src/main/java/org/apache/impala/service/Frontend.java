@@ -86,6 +86,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
@@ -947,14 +948,17 @@ public class Frontend {
     LOG.trace("get scan range locations");
     Set<TTableName> tablesMissingStats = Sets.newTreeSet();
     Set<TTableName> tablesWithCorruptStats = Sets.newTreeSet();
+    Set<TTableName> tablesWithMissingDiskIds = Sets.newTreeSet();
     for (ScanNode scanNode: scanNodes) {
       result.putToPer_node_scan_ranges(
           scanNode.getId().asInt(), scanNode.getScanRangeLocations());
-      if (scanNode.isTableMissingStats()) {
-        tablesMissingStats.add(scanNode.getTupleDesc().getTableName().toThrift());
-      }
-      if (scanNode.hasCorruptTableStats()) {
-        tablesWithCorruptStats.add(scanNode.getTupleDesc().getTableName().toThrift());
+
+      TTableName tableName = scanNode.getTupleDesc().getTableName().toThrift();
+      if (scanNode.isTableMissingStats()) tablesMissingStats.add(tableName);
+      if (scanNode.hasCorruptTableStats()) tablesWithCorruptStats.add(tableName);
+      if (scanNode instanceof HdfsScanNode &&
+          ((HdfsScanNode) scanNode).hasMissingDiskIds()) {
+        tablesWithMissingDiskIds.add(tableName);
       }
     }
 
@@ -963,6 +967,9 @@ public class Frontend {
     }
     for (TTableName tableName: tablesWithCorruptStats) {
       queryCtx.addToTables_with_corrupt_stats(tableName);
+    }
+    for (TTableName tableName: tablesWithMissingDiskIds) {
+      queryCtx.addToTables_missing_diskids(tableName);
     }
 
     // Compute resource requirements after scan range locations because the cost
