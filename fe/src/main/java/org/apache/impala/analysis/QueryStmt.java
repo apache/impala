@@ -250,8 +250,10 @@ public abstract class QueryStmt extends StatementBase {
     ExprSubstitutionMap smap = sortInfo_.createSortTupleInfo(resultExprs_, analyzer);
 
     for (int i = 0; i < smap.size(); ++i) {
-      Preconditions.checkState(smap.getLhs().get(i) instanceof SlotRef);
-      Preconditions.checkState(smap.getRhs().get(i) instanceof SlotRef);
+      if (!(smap.getLhs().get(i) instanceof SlotRef)
+          || !(smap.getRhs().get(i) instanceof SlotRef)) {
+        continue;
+      }
       SlotRef inputSlotRef = (SlotRef) smap.getLhs().get(i);
       SlotRef outputSlotRef = (SlotRef) smap.getRhs().get(i);
       if (hasLimit()) {

@@ -187,6 +187,17 @@ public class SortNode extends PlanNode {
       }
       output.append("\n");
     }
+
+    if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()
+        && info_.getMaterializedOrderingExprs().size() > 0) {
+      output.append(detailPrefix + "materialized: ");
+      for (int i = 0; i < info_.getMaterializedOrderingExprs().size(); ++i) {
+        if (i > 0) output.append(", ");
+        output.append(info_.getMaterializedOrderingExprs().get(i).toSql());
+      }
+      output.append("\n");
+    }
+
     return output.toString();
   }
 

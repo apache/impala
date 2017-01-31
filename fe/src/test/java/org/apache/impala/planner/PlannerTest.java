@@ -19,6 +19,7 @@ package org.apache.impala.planner;
 
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
@@ -32,6 +33,7 @@ import org.junit.Assume;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 // All planner tests, except for S3 specific tests should go here.
 public class PlannerTest extends PlannerTestBase {
@@ -379,4 +381,11 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("resource-requirements", options, false);
   }
 
+  @Test
+  public void testSortExprMaterialization() {
+    addTestFunction("TestFn", Lists.newArrayList(Type.DOUBLE), false);
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("sort-expr-materialization", options);
+  }
 }

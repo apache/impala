@@ -1,0 +1,169 @@
+# sort on a non-deterministic expr, gets materialized
+select * from functional.alltypes order by random()
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SORT
+|  order by: random() ASC
+|  materialized: random()
+|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  tuple-ids=1 row-size=105B cardinality=7300
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   table stats: 7300 rows total
+   column stats: all
+   mem-estimate=128.00MB mem-reservation=0B
+   tuple-ids=0 row-size=97B cardinality=7300
+====
+# sort on a deterministic expr that exceeds the cost threshold
+select * from functional.alltypes order by abs(id) + abs(id)
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SORT
+|  order by: abs(id) + abs(id) ASC
+|  materialized: abs(id) + abs(id)
+|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  tuple-ids=1 row-size=105B cardinality=7300
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   table stats: 7300 rows total
+   column stats: all
+   mem-estimate=128.00MB mem-reservation=0B
+   tuple-ids=0 row-size=97B cardinality=7300
+====
+# sort on a deterministic expr that doesn't exceed the cost threshold
+select * from functional.alltypes order by tinyint_col + 1
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SORT
+|  order by: tinyint_col + 1 ASC
+|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  tuple-ids=1 row-size=97B cardinality=7300
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   table stats: 7300 rows total
+   column stats: all
+   mem-estimate=128.00MB mem-reservation=0B
+   tuple-ids=0 row-size=97B cardinality=7300
+====
+# sort on multiple exprs, subset is materialized
+select * from functional.alltypes
+order by dayofweek(timestamp_col), true, id + 1, string_col = date_string_col, id = tinyint_col
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SORT
+|  order by: dayofweek(timestamp_col) ASC, TRUE ASC, id + 1 ASC, string_col = date_string_col ASC, id = tinyint_col ASC
+|  materialized: dayofweek(timestamp_col), string_col = date_string_col
+|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  tuple-ids=1 row-size=102B cardinality=7300
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   table stats: 7300 rows total
+   column stats: all
+   mem-estimate=128.00MB mem-reservation=0B
+   tuple-ids=0 row-size=97B cardinality=7300
+====
+# expensive analytic order by expr gets materialized
+select last_value(id) over (order by to_date(timestamp_col), bool_col is null)
+from functional.alltypes
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+02:ANALYTIC
+|  functions: last_value(id)
+|  order by: to_date(timestamp_col) ASC, bool_col IS NULL ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=3,2 row-size=41B cardinality=7300
+|
+01:SORT
+|  order by: to_date(timestamp_col) ASC, bool_col IS NULL ASC
+|  materialized: to_date(timestamp_col)
+|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  tuple-ids=3 row-size=37B cardinality=7300
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   table stats: 7300 rows total
+   column stats: all
+   mem-estimate=128.00MB mem-reservation=0B
+   tuple-ids=0 row-size=21B cardinality=7300
+====
+# expensive order by expr in top-n gets materialized
+select id from functional.alltypes order by string_col like 'a.*b', id * bigint_col,
+regexp_replace(string_col, 'a.*b', 'c') limit 10
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:TOP-N [LIMIT=10]
+|  order by: string_col LIKE 'a.*b' ASC, id * bigint_col ASC, regexp_replace(string_col, 'a.*b', 'c') ASC
+|  materialized: string_col LIKE 'a.*b', regexp_replace(string_col, 'a.*b', 'c')
+|  mem-estimate=290B mem-reservation=0B
+|  tuple-ids=1 row-size=29B cardinality=10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   table stats: 7300 rows total
+   column stats: all
+   mem-estimate=128.00MB mem-reservation=0B
+   tuple-ids=0 row-size=29B cardinality=7300
+====
+# sort on udf, gets materialized
+select * from functional.alltypes order by TestFn(double_col)
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SORT
+|  order by: default.testfn(double_col) ASC
+|  materialized: default.testfn(double_col)
+|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  tuple-ids=1 row-size=101B cardinality=7300
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   table stats: 7300 rows total
+   column stats: all
+   mem-estimate=128.00MB mem-reservation=0B
+   tuple-ids=0 row-size=97B cardinality=7300
+====
+# sort expr contains SlotRefs that don't need to be materialized separately
+select concat(date_string_col, string_col) c from functional.alltypes order by c
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SORT
+|  order by: concat(date_string_col, string_col) ASC
+|  materialized: concat(date_string_col, string_col)
+|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  tuple-ids=1 row-size=16B cardinality=7300
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   table stats: 7300 rows total
+   column stats: all
+   mem-estimate=128.00MB mem-reservation=0B
+   tuple-ids=0 row-size=41B cardinality=7300
+====

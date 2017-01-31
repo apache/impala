@@ -17,11 +17,12 @@
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 
-def transpose_results(result):
+def transpose_results(result, map_fn=lambda x: x):
   """Given a query result (list of strings, each string represents a row), return a list
-    of columns, where each column is a list of strings."""
+    of columns, where each column is a list of strings. Optionally, map_fn can be provided
+    to be applied to every value, eg. to convert the strings to their underlying types."""
   split_result = [row.split('\t') for row in result]
-  return [list(l) for l in zip(*split_result)]
+  return [map(map_fn, list(l)) for l in zip(*split_result)]
 
 class TestQueryFullSort(ImpalaTestSuite):
   """Test class to do functional validation of sorting when data is spilled to disk."""
@@ -154,3 +155,43 @@ class TestQueryFullSort(ImpalaTestSuite):
       query, exec_option, table_format=table_format).data)
     assert(result[0] == sorted(result[0]))
 
+class TestRandomSort(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional'
+
+  def test_order_by_random(self):
+    """Tests that 'order by random()' works as expected."""
+    # "order by random()" with different seeds should produce different orderings.
+    seed_query = "select * from functional.alltypestiny order by random(%s)"
+    results_seed0 = self.execute_query(seed_query % "0")
+    results_seed1 = self.execute_query(seed_query % "1")
+    assert results_seed0.data != results_seed1.data
+    assert sorted(results_seed0.data) == sorted(results_seed1.data)
+
+    # Include "random()" in the select list to check that it's sorted correctly.
+    results = transpose_results(self.execute_query(
+        "select random() as r from functional.alltypessmall order by r").data,
+        lambda x: float(x))
+    assert(results[0] == sorted(results[0]))
+
+    # Like above, but with a limit.
+    results = transpose_results(self.execute_query(
+        "select random() as r from functional.alltypes order by r limit 100").data,
+        lambda x: float(x))
+    assert(results == sorted(results))
+
+    # "order by random()" inside an inline view.
+    query = "select r from (select random() r from functional.alltypessmall) v order by r"
+    results = transpose_results(self.execute_query(query).data, lambda x: float(x))
+    assert (results == sorted(results))
+
+  def test_analytic_order_by_random(self):
+    """Tests that a window function over 'order by random()' works as expected."""
+    # Since we use the same random seed and a very small table, the following queries
+    # should be equivalent.
+    results = transpose_results(self.execute_query("select id from "
+        "functional.alltypestiny order by random(2)").data)
+    analytic_results = transpose_results(self.execute_query("select last_value(id) over "
+        "(order by random(2)) from functional.alltypestiny").data)
+    assert results == analytic_results

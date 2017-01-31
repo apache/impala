@@ -168,8 +168,17 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
-          return arg instanceof FunctionCallExpr &&
-             !((FunctionCallExpr)arg).isNondeterministicBuiltinFn();
+          return arg instanceof FunctionCallExpr
+              && ((FunctionCallExpr) arg).isNondeterministicBuiltinFn();
+        }
+      };
+
+  public final static com.google.common.base.Predicate<Expr> IS_UDF_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof FunctionCallExpr
+              && !((FunctionCallExpr) arg).getFnName().isBuiltin();
         }
       };
 

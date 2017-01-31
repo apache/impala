@@ -261,6 +261,7 @@ PLAN-ROOT SINK
 |
 01:SORT
 |  order by: concat('ab', string_col) ASC NULLS FIRST, greatest(20, bigint_col) ASC
+|  materialized: concat('ab', string_col), greatest(20, bigint_col)
 |  mem-estimate=16.00MB mem-reservation=48.00MB
 |  tuple-ids=3 row-size=29B cardinality=7300
 |

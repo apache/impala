@@ -308,8 +308,12 @@ public class AnalyticPlanner {
       }
     }
 
-    SortInfo sortInfo = new SortInfo(
-        Expr.substituteList(sortExprs, sortSmap, analyzer_, false), isAsc, nullsFirst);
+    SortInfo sortInfo = new SortInfo(sortExprs, isAsc, nullsFirst);
+    ExprSubstitutionMap smap =
+        sortInfo.createMaterializedOrderExprs(sortTupleDesc, analyzer_);
+    sortSlotExprs.addAll(smap.getLhs());
+    sortSmap = ExprSubstitutionMap.combine(sortSmap, smap);
+    sortInfo.substituteOrderingExprs(sortSmap, analyzer_);
     if (LOG.isTraceEnabled()) {
       LOG.trace("sortinfo exprs: " + Expr.debugString(sortInfo.getOrderingExprs()));
     }

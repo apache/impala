@@ -234,9 +234,9 @@ public class FunctionCallExpr extends Expr {
   static boolean isNondeterministicBuiltinFnName(String fnName) {
     if (fnName.equalsIgnoreCase("rand") || fnName.equalsIgnoreCase("random")
         || fnName.equalsIgnoreCase("uuid")) {
-      return false;
+      return true;
     }
-    return true;
+    return false;
   }
 
   /**
@@ -280,7 +280,7 @@ public class FunctionCallExpr extends Expr {
       fnName = path.get(path.size() - 1);
     }
     // Non-deterministic functions are never constant.
-    if (!isNondeterministicBuiltinFnName(fnName)) {
+    if (isNondeterministicBuiltinFnName(fnName)) {
       return false;
     }
     // Sleep is a special function for testing.
