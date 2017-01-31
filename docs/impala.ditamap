@@ -205,7 +205,6 @@ under the License.
           <topicref rev="2.6.0 IMPALA-3286" href="topics/impala_prefetch_mode.xml"/>
           <topicref href="topics/impala_query_timeout_s.xml"/>
           <topicref href="topics/impala_request_pool.xml"/>
-          <topicref rev="2.5.0" href="topics/impala_schedule_random_replica.xml"/>
           <topicref rev="2.7.0" href="topics/impala_replica_preference.xml"/>
           <topicref audience="hidden" href="topics/impala_rm_initial_mem.xml"/>
           <topicref href="topics/impala_reservation_request_timeout.xml"/>
@@ -217,6 +216,7 @@ under the License.
           <topicref rev="2.6.0" href="topics/impala_s3_skip_insert_staging.xml"/>
           <topicref rev="2.5.0" href="topics/impala_scan_node_codegen_threshold.xml"/>
           <topicref rev="2.8.0 IMPALA-3671" href="topics/impala_scratch_limit.xml"/>
+          <topicref rev="2.5.0" href="topics/impala_schedule_random_replica.xml"/>
           <!-- This option is for internal use only and might go away without ever being documented. -->
           <!-- <topicref href="topics/impala_seq_compression_mode.xml"/> -->
           <topicref href="topics/impala_support_start_over.xml"/>
