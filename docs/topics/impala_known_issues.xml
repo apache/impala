@@ -212,7 +212,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
 
     <concept id="IMPALA-3441" rev="IMPALA-3441">
 
-      <title></title>
+      <title>Impala should not crash for invalid avro serialized data</title>
 
       <conbody>
 
@@ -305,7 +305,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1480" scope="external" format="html"></xref>IMPALA-1480
+          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1480" scope="external" format="html">IMPALA-1480</xref>
         </p>
 
         <p>
