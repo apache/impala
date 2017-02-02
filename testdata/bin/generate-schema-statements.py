@@ -226,7 +226,7 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     partitioned_by = "partition by hash partitions 3"
 
     # Fetch KUDU host and port from environment
-    kudu_master = os.getenv("KUDU_MASTER_ADDRESS", "127.0.0.1")
+    kudu_master = os.getenv("KUDU_MASTER_HOSTS", "127.0.0.1")
     kudu_master_port = os.getenv("KUDU_MASTER_PORT", "7051")
     row_format_stmt = str()
     tblproperties["kudu.master_addresses"] = \

@@ -27,7 +27,6 @@ import logging
 import os
 import pytest
 
-from common import KUDU_MASTER_HOSTS
 from common.test_result_verifier import QueryTestResult
 from tests.common.patterns import is_valid_impala_identifier
 from tests.comparison.db_connection import ImpalaConnection
@@ -37,17 +36,23 @@ logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('test_configuration')
 
 DEFAULT_CONN_TIMEOUT = 45
-
-def _get_default_nn_http_addr():
-  """Return the namenode ip and webhdfs port if the default shouldn't be used"""
-  if FILESYSTEM == 'isilon':
-    return "%s:%s" % (os.getenv("ISILON_NAMENODE"), ISILON_WEBHDFS_PORT)
-  return None
+DEFAULT_EXPLORATION_STRATEGY = 'core'
+DEFAULT_HDFS_XML_CONF = os.path.join(os.environ['HADOOP_CONF_DIR'], "hdfs-site.xml")
+DEFAULT_HIVE_SERVER2 = 'localhost:11050'
+DEFAULT_IMPALAD_HS2_PORT = '21050'
+DEFAULT_IMPALADS = "localhost:21000,localhost:21001,localhost:21002"
+DEFAULT_KUDU_MASTER_HOSTS = os.getenv('KUDU_MASTER_HOSTS', '127.0.0.1')
+DEFAULT_KUDU_MASTER_PORT = os.getenv('KUDU_MASTER_PORT', '7051')
+DEFAULT_METASTORE_SERVER = 'localhost:9083'
+DEFAULT_NAMENODE_ADDR = None
+if FILESYSTEM == 'isilon':
+  DEFAULT_NAMENODE_ADDR = "{node}:{port}".format(node=os.getenv("ISILON_NAMENODE"),
+                                                 port=ISILON_WEBHDFS_PORT)
 
 
 def pytest_addoption(parser):
   """Adds a new command line options to py.test"""
-  parser.addoption("--exploration_strategy", default="core",
+  parser.addoption("--exploration_strategy", default=DEFAULT_EXPLORATION_STRATEGY,
                    help="Default exploration strategy for all tests. Valid values: core, "
                    "pairwise, exhaustive.")
 
@@ -55,25 +60,27 @@ def pytest_addoption(parser):
                    help="Override exploration strategy for specific workloads using the "
                    "format: workload:exploration_strategy. Ex: tpch:core,tpcds:pairwise.")
 
-  parser.addoption("--impalad", default="localhost:21000,localhost:21001,localhost:21002",
+  parser.addoption("--impalad", default=DEFAULT_IMPALADS,
                    help="A comma-separated list of impalad host:ports to target. Note: "
                    "Not all tests make use of all impalad, some tests target just the "
                    "first item in the list (it is considered the 'default'")
 
-  parser.addoption("--impalad_hs2_port", default="21050",
+  parser.addoption("--impalad_hs2_port", default=DEFAULT_IMPALAD_HS2_PORT,
                    help="The impalad HiveServer2 port.")
 
-  parser.addoption("--metastore_server", default="localhost:9083",
+  parser.addoption("--metastore_server", default=DEFAULT_METASTORE_SERVER,
                    help="The Hive Metastore server host:port to connect to.")
 
-  parser.addoption("--hive_server2", default="localhost:11050",
+  parser.addoption("--hive_server2", default=DEFAULT_HIVE_SERVER2,
                    help="Hive's HiveServer2 host:port to connect to.")
 
-  default_xml_path = os.path.join(os.environ['HADOOP_CONF_DIR'], "hdfs-site.xml")
-  parser.addoption("--minicluster_xml_conf", default=default_xml_path,
+  parser.addoption("--kudu_master_hosts", default=DEFAULT_KUDU_MASTER_HOSTS,
+                   help="Kudu master. Can be supplied as hostname, or hostname:port.")
+
+  parser.addoption("--minicluster_xml_conf", default=DEFAULT_HDFS_XML_CONF,
                    help="The full path to the HDFS xml configuration file")
 
-  parser.addoption("--namenode_http_address", default=_get_default_nn_http_addr(),
+  parser.addoption("--namenode_http_address", default=DEFAULT_NAMENODE_ADDR,
                    help="The host:port for the HDFS Namenode's WebHDFS interface. Takes"
                    " precedence over any configuration read from --minicluster_xml_conf")
 
@@ -298,20 +305,21 @@ def kudu_client():
   """Provides a new Kudu client as a pytest fixture. The client only exists for the
      duration of the method it is used in.
   """
-  if "," in KUDU_MASTER_HOSTS:
+  kudu_master = pytest.config.option.kudu_master_hosts
+
+  if "," in kudu_master:
     raise Exception("Multi-master not supported yet")
-  if ":" in KUDU_MASTER_HOSTS:
-    host, port = KUDU_MASTER_HOSTS.split(":")
+  if ":" in kudu_master:
+    host, port = kudu_master.split(":")
   else:
-    host, port = KUDU_MASTER_HOSTS, 7051
+    host, port = kudu_master, DEFAULT_KUDU_MASTER_PORT
   kudu_client = kudu_connect(host, port)
+  yield kudu_client
+
   try:
-    yield kudu_client
-  finally:
-    try:
-      kudu_client.close()
-    except Exception as e:
-      LOG.warn("Error closing Kudu client: %s", e)
+    kudu_client.close()
+  except Exception as e:
+    LOG.warn("Error closing Kudu client: %s", e)
 
 
 @pytest.yield_fixture(scope="class")
@@ -387,12 +395,17 @@ def __unique_conn(db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
 
 @contextlib.contextmanager
 def __auto_closed_conn(db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
-  """Returns a connection to Impala. This is intended to be used in a "with" block. The
-     connection will be closed upon exiting the block.
+  """Returns a connection to Impala. This is intended to be used in a "with" block.
+     The connection will be closed upon exiting the block.
 
      The returned connection will have a 'db_name' property.
   """
-  conn = impala_connect(database=db_name, timeout=timeout)
+  default_impalad = pytest.config.option.impalad.split(',')[0]
+  impalad_host = default_impalad.split(':')[0]
+  hs2_port = pytest.config.option.impalad_hs2_port
+
+  conn = impala_connect(host=impalad_host, port=hs2_port, database=db_name,
+                        timeout=timeout)
   try:
     conn.db_name = db_name
     yield conn

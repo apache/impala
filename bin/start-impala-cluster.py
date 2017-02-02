@@ -27,9 +27,8 @@ from getpass import getuser
 from time import sleep, time
 from optparse import OptionParser
 from testdata.common import cgroups
-from tests.common import KUDU_MASTER_HOSTS
 
-
+KUDU_MASTER_HOSTS = os.getenv('KUDU_MASTER_HOSTS', '127.0.0.1')
 DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get('IMPALA_MAX_LOG_FILES', 10)
 
 
@@ -72,7 +71,7 @@ parser.add_option("--log_level", type="int", dest="log_level", default=1,
                    help="Set the impalad backend logging level")
 parser.add_option("--jvm_args", dest="jvm_args", default="",
                   help="Additional arguments to pass to the JVM(s) during startup.")
-parser.add_option("--kudu_masters", default=KUDU_MASTER_HOSTS,
+parser.add_option("--kudu_master_hosts", default=KUDU_MASTER_HOSTS,
                   help="The host name or address of the Kudu master. Multiple masters "
                       "can be specified using a comma separated list.")
 
@@ -237,9 +236,9 @@ def start_impalad_instances(cluster_size):
           (mem_limit,  # Goes first so --impalad_args will override it.
            build_impalad_logging_args(i, service_name), build_jvm_args(i),
            build_impalad_port_args(i), param_args)
-    if options.kudu_masters:
+    if options.kudu_master_hosts:
       # Must be prepended, otherwise the java options interfere.
-      args = "-kudu_master_hosts %s %s" % (options.kudu_masters, args)
+      args = "-kudu_master_hosts %s %s" % (options.kudu_master_hosts, args)
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
     exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)
 

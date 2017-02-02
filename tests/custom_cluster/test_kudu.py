@@ -19,10 +19,10 @@ import logging
 import pytest
 from kudu.schema import INT32
 
-from tests.common import KUDU_MASTER_HOSTS
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
 
+KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
 LOG = logging.getLogger(__name__)
 
 class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):

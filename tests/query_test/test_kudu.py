@@ -32,10 +32,11 @@ import logging
 import pytest
 import textwrap
 
-from tests.common import KUDU_MASTER_HOSTS
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.verifiers.metric_verifier import MetricVerifier
+
+KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
 
 LOG = logging.getLogger(__name__)
 
@@ -62,6 +63,8 @@ class TestKuduOperations(KuduTestSuite):
   def test_kudu_partition_ddl(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_partition_ddl', vector, use_db=unique_database)
 
+  @pytest.mark.skipif(pytest.config.option.testing_remote_cluster,
+                      reason="Test references hardcoded hostnames: IMPALA-4873")
   @pytest.mark.execute_serially
   def test_kudu_alter_table(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_alter', vector, use_db=unique_database)
