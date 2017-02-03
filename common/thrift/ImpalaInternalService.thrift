@@ -218,6 +218,9 @@ struct TQueryOptions {
   // Indicates whether the FE should rewrite Exprs for optimization purposes.
   // It's sometimes useful to disable rewrites for testing, e.g., expr-test.cc.
   51: optional bool enable_expr_rewrites = true
+
+  // Indicates whether to use the new decimal semantics.
+  52: optional bool decimal_v2 = false
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

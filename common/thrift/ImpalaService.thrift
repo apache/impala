@@ -242,11 +242,15 @@ enum TImpalaQueryOptions {
   // A limit on the amount of scratch directory space that can be used;
   // Unspecified or a limit of -1 means no limit;
   // Otherwise specified in the same way as MEM_LIMIT.
-  SCRATCH_LIMIT
+  SCRATCH_LIMIT,
 
   // Indicates whether the FE should rewrite Exprs for optimization purposes.
   // It's sometimes useful to disable rewrites for testing, e.g., expr-test.cc.
-  ENABLE_EXPR_REWRITES
+  ENABLE_EXPR_REWRITES,
+
+  // Indicates whether to use the new decimal semantics, which includes better
+  // rounding and output types for multiply / divide
+  DECIMAL_V2,
 }
 
 // The summary of a DML statement.
