@@ -26,6 +26,15 @@ under the License.
   <keydef keys="support_org"><topicmeta><keywords><keyword>Cloudera Support</keyword></keywords></topicmeta></keydef>
 
 <!-- URLs used in external links. Many, perhaps most, to be turned into keydefs to genericize and optionally re-point. -->
+
+  <keydef keys="upstream_hbase_docs" href="https://hbase.apache.org/book.html" scope="external" format="html">
+    <topicmeta><linktext>the Apache HBase documentation</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="upstream_hbase_security_docs" href="https://hbase.apache.org/book.html#security" scope="external" format="html">
+    <topicmeta><linktext>the Security chapter in the Apache HBase documentation</linktext></topicmeta>
+  </keydef>
+
 <!--
 http://aws.amazon.com/cli/
 http://aws.amazon.com/s3/
@@ -38,7 +47,6 @@ http://google-glog.googlecode.com/svn/trunk/doc/glog.html
 http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration
 http://hadoop.apache.org/docs/r0.19.0/distcp.html
 http://haproxy.1wt.eu/
-http://hbase.apache.org/book/ch08s04.html
 http://jdbc.postgresql.org/download.html
 http://radar.oreilly.com/2013/10/cloudera-impala-bringing-the-sql-and-hadoop-worlds-together.html
 http://s3tools.org/s3cmd
@@ -69,10 +77,8 @@ http://www.tpc.org/tpcds/
 https://archive.cloudera.com/cdh/3/hadoop/hdfs_permissions_guide.html
 https://archive.cloudera.com/cdh4/cdh/4/hadoop/hadoop-project-dist/hadoop-common/FileSystemShell.html
 https://archive.cloudera.com/cdh4/cdh/4/hadoop/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html
-https://archive.cloudera.com/cdh4/cdh/4/hbase/
 https://archive.cloudera.com/cdh5/
 https://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration
-https://archive.cloudera.com/cdh5/cdh/5/hbase/
 https://archive.cloudera.com/gplextras/debian/squeeze/amd64/gplextras/cloudera.list
 https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/
 https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/cloudera-gplextras4.repo

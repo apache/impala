@@ -51,11 +51,7 @@ under the License.
     </p>
 
     <p>
-      For background information on HBase, see the snapshot of the Apache HBase site (including documentation) for
-      the level of HBase that comes with
-      <xref href="https://archive.cloudera.com/cdh5/cdh/5/hbase/" scope="external" format="html">CDH 5</xref>. To
-      install HBase on a CDH cluster, see the installation instructions for
-      <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hbase_installation.html" scope="external" format="html">CDH 5</xref>.
+      For background information on HBase, see <xref keyref="upstream_hbase_docs"/>.
     </p>
 
     <p outputclass="toc inpage"/>
@@ -123,9 +119,7 @@ under the License.
       <p>
         To work with an HBase table from Impala, ensure that the <codeph>impala</codeph> user has read/write
         privileges for the HBase table, using the <codeph>GRANT</codeph> command in the HBase shell. For details
-        about HBase security, see the
-        <xref href="http://hbase.apache.org/book/ch08s04.html" format="html" scope="external">Security chapter in
-        the HBase Reference Guide</xref>.
+        about HBase security, see <xref keyref="upstream_hbase_security_docs"/>.
       </p>
     </conbody>
   </concept>
@@ -148,8 +142,8 @@ under the License.
 
       <p>
         To avoid delays if HBase is unavailable during Impala startup or after an <codeph>INVALIDATE
-        METADATA</codeph> statement, <ph rev="upstream">Cloudera</ph> recommends setting timeout values as follows in
-        <filepath>/etc/impala/conf/hbase-site.xml</filepath> (for environments not managed by Cloudera Manager):
+        METADATA</codeph> statement, set timeout values similar to the following in
+        <filepath>/etc/impala/conf/hbase-site.xml</filepath>:
       </p>
 
 <codeblock>&lt;property&gt;
@@ -832,8 +826,7 @@ hbase(main):006:0> quit
         </note>
 
 <codeblock>$ hive
-Logging initialized using configuration in file:/etc/hive/conf.dist/hive-log4j.properties
-Hive history file=/tmp/cloudera/hive_job_log_cloudera_201502101610_1980712808.txt
+...
 hive> use hbase;
 OK
 Time taken: 4.095 seconds
@@ -876,12 +869,7 @@ hive> quit;
 <codeblock>$ impala-shell -i localhost -d hbase
 Starting Impala Shell without Kerberos authentication
 Connected to localhost:21000
-Server version: impalad version 2.1.0-cdh4 RELEASE (build d520a9cdea2fc97e8d5da9fbb0244e60ee416bfa)
-Welcome to the Impala shell. Press TAB twice to see a list of available commands.
-
-Copyright (c) 2012 Cloudera, Inc. All rights reserved.
-
-(Shell build version: Impala Shell v2.1.0-cdh4 (d520a9c) built on Mon Dec  8 21:41:17 PST 2014)
+...
 Query: use `hbase`
 [localhost:21000] > invalidate metadata hbasestringids;
 Fetched 0 row(s) in 0.09s
@@ -916,7 +904,6 @@ Fetched 1 row(s) in 0.54s
 </codeblock>
 
         <note conref="../shared/impala_common.xml#common/invalidate_metadata_hbase"/>
-<!--      </section> -->
     </conbody>
   </concept>
 </concept>
