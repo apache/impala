@@ -111,7 +111,7 @@ class TestInsertQueries(ImpalaTestSuite):
     super(TestInsertQueries, cls).setup_class()
 
   @pytest.mark.execute_serially
-  def test_insert_test(self, vector):
+  def test_insert(self, vector):
     if (vector.get_value('table_format').file_format == 'parquet'):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
           vector.get_value('compression_codec')

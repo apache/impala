@@ -38,7 +38,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_query_timeout=6 --logbuflevel=-1")
-  def test_query_expiration_test(self, vector):
+  def test_query_expiration(self, vector):
     """Confirm that single queries expire if not fetched"""
     impalad = self.cluster.get_first_impalad()
     client = impalad.service.create_beeswax_client()
