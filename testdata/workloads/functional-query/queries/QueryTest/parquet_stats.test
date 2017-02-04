@@ -1,0 +1,231 @@
+====
+---- QUERY
+select id, bool_col from functional_parquet.alltypessmall where int_col < 0
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+set explain_level=2;
+explain select id, bool_col from functional_parquet.alltypessmall where int_col < 0;
+---- RESULTS: VERIFY_IS_SUBSET
+'   parquet statistics predicates: int_col < 0'
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where tinyint_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where smallint_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where int_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where bigint_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where float_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where double_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+# Test with inverted predicate
+select id, bool_col from functional_parquet.alltypessmall where -1 > int_col
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where tinyint_col > 9
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where smallint_col > 9
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select id, bool_col from functional_parquet.alltypessmall where int_col > 9
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where bigint_col > 90
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where float_col > 9.9
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where double_col > 99
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where tinyint_col >= 10
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where tinyint_col <= 0
+---- RESULTS
+12
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 0 .*
+====
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where tinyint_col >= 9
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 0 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where tinyint_col = -1
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where tinyint_col = 10
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+set explain_level=2;
+explain select count(*) from functional_parquet.alltypessmall where tinyint_col = 10
+---- RESULTS: VERIFY_IS_SUBSET
+'   parquet statistics predicates: tinyint_col = 10'
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where id >= 30 and id <= 80
+---- RESULTS
+51
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 1 .*
+====
+---- QUERY
+# Mix with partitioning columns
+select count(*) from functional_parquet.alltypessmall where int_col < 0 and year < 2012
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+# Test that adding a column without stats will not disable stats-based pruning.
+select count(*) from functional_parquet.alltypessmall where int_col < 0 and string_col < ""
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select id, bool_col from functional_parquet.alltypessmall where int_col < 3 - 3
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select id, bool_col from functional_parquet.alltypessmall where int_col < 3 - 3
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+# Test that without expr rewrite and thus without constant folding, constant exprs still
+# can be used to prune row groups.
+set enable_expr_rewrites=0;
+select id, bool_col from functional_parquet.alltypessmall where int_col < 3 - 3
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+select id, bool_col from functional_parquet.alltypessmall where 5 + 5 < int_col
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+# Test that without expr rewrite and thus without constant folding, constant exprs still
+# can be used to prune row groups.
+set enable_expr_rewrites=0;
+select id, bool_col from functional_parquet.alltypessmall where 5 + 5 < int_col
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====

@@ -217,6 +217,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 @SkipIfS3.hive
+# TODO: Should we move this to test_parquet_stats.py?
 class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 
   @classmethod

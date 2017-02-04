@@ -28,8 +28,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
@@ -71,12 +74,17 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
- * Scan of a single single table. Currently limited to full-table scans.
+ * Scan of a single table. Currently limited to full-table scans.
  *
  * It's expected that the creator of this object has already done any necessary
  * partition pruning before creating this object. In other words, the 'conjuncts'
  * passed to the constructors are conjucts not fully evaluated by partition pruning
  * and 'partitions' are the remaining partitions after pruning.
+ *
+ * For scans of tables with Parquet files the class creates an additional list of
+ * conjuncts that are passed to the backend and will be evaluated against the
+ * parquet::Statistics of row groups. If the conjuncts don't match, then whole row groups
+ * will be skipped.
  *
  * TODO: pass in range restrictions.
  */
@@ -136,6 +144,21 @@ public class HdfsScanNode extends ScanNode {
 
   private static final Configuration CONF = new Configuration();
 
+
+  // List of conjuncts for min/max values of parquet::Statistics, that are used to skip
+  // data when scanning Parquet files.
+  private List<Expr> minMaxConjuncts_ = Lists.newArrayList();
+
+  // List of PlanNode conjuncts that have been transformed into conjuncts in
+  // 'minMaxConjuncts_'.
+  private List<Expr> minMaxOriginalConjuncts_ = Lists.newArrayList();
+
+  // Tuple that is used to materialize statistics when scanning Parquet files. For each
+  // column it can contain 0, 1, or 2 slots, depending on whether the column needs to be
+  // evaluated against the min and/or the max value of the corresponding
+  // parquet::Statistics.
+  private TupleDescriptor minMaxTuple_;
+
   /**
    * Construct a node to scan given data files into tuples described by 'desc',
    * with 'conjuncts' being the unevaluated conjuncts bound by the tuple and
@@ -193,6 +216,10 @@ public class HdfsScanNode extends ScanNode {
       useMtScanNode_ = true;
     } else {
       useMtScanNode_ = false;
+    }
+
+    if (fileFormats.contains(HdfsFileFormat.PARQUET)) {
+      computeMinMaxTupleAndConjuncts(analyzer);
     }
 
     // do this at the end so it can take all conjuncts and scan ranges into account
@@ -269,6 +296,73 @@ public class HdfsScanNode extends ScanNode {
   private void assignCollectionConjuncts(Analyzer analyzer) {
     collectionConjuncts_.clear();
     assignCollectionConjuncts(desc_, analyzer);
+  }
+
+  /**
+   * Builds a predicate to evaluate against parquet::Statistics by copying 'inputSlot'
+   * into 'minMaxTuple_', combining 'inputSlot', 'inputPred' and 'op' into a new
+   * predicate, and adding it to 'minMaxConjuncts_'.
+   */
+  private void buildStatsPredicate(Analyzer analyzer, SlotRef inputSlot,
+      BinaryPredicate inputPred, BinaryPredicate.Operator op) {
+    // Obtain the rhs expr of the input predicate
+    Expr constExpr = inputPred.getChild(1);
+    Preconditions.checkState(constExpr.isConstant());
+
+    // Make a new slot descriptor, which adds it to the tuple descriptor.
+    SlotDescriptor slotDesc = analyzer.getDescTbl().copySlotDescriptor(minMaxTuple_,
+        inputSlot.getDesc());
+    SlotRef slot = new SlotRef(slotDesc);
+    BinaryPredicate statsPred = new BinaryPredicate(op, slot, constExpr);
+    statsPred.analyzeNoThrow(analyzer);
+    minMaxConjuncts_.add(statsPred);
+  }
+
+  /**
+   * Analyzes 'conjuncts_', populates 'minMaxTuple_' with slots for statistics values, and
+   * populates 'minMaxConjuncts_' with conjuncts pointing into the 'minMaxTuple_'. Only
+   * conjuncts of the form <slot> <op> <constant> are supported, and <op> must be one of
+   * LT, LE, GE, GT, or EQ.
+   */
+  private void computeMinMaxTupleAndConjuncts(Analyzer analyzer) throws ImpalaException{
+    Preconditions.checkNotNull(desc_.getPath());
+    String tupleName = desc_.getPath().toString() + " statistics";
+    DescriptorTable descTbl = analyzer.getDescTbl();
+    minMaxTuple_ = descTbl.createTupleDescriptor(tupleName);
+    minMaxTuple_.setPath(desc_.getPath());
+
+    for (Expr pred: conjuncts_) {
+      if (!(pred instanceof BinaryPredicate)) continue;
+      BinaryPredicate binaryPred = (BinaryPredicate) pred;
+
+      // We only support slot refs on the left hand side of the predicate, a rewriting
+      // rule makes sure that all compatible exprs are rewritten into this form.
+      if (!(binaryPred.getChild(0) instanceof SlotRef)) continue;
+      SlotRef slot = (SlotRef) binaryPred.getChild(0);
+
+      // This node is a table scan, so this must be a scanning slot.
+      Preconditions.checkState(slot.getDesc().isScanSlot());
+
+      Expr constExpr = binaryPred.getChild(1);
+      // Only constant exprs can be evaluated against parquet::Statistics. This includes
+      // LiteralExpr, but can also be an expr like "1 + 2".
+      if (!constExpr.isConstant()) continue;
+      if (constExpr.isNullLiteral()) continue;
+
+      BinaryPredicate.Operator op = binaryPred.getOp();
+      if (op == BinaryPredicate.Operator.LT || op == BinaryPredicate.Operator.LE ||
+          op == BinaryPredicate.Operator.GE || op == BinaryPredicate.Operator.GT) {
+        minMaxOriginalConjuncts_.add(pred);
+        buildStatsPredicate(analyzer, slot, binaryPred, op);
+      } else if (op == BinaryPredicate.Operator.EQ) {
+        minMaxOriginalConjuncts_.add(pred);
+        // TODO: this could be optimized for boolean columns.
+        buildStatsPredicate(analyzer, slot, binaryPred, BinaryPredicate.Operator.LE);
+        buildStatsPredicate(analyzer, slot, binaryPred, BinaryPredicate.Operator.GE);
+      }
+
+    }
+    minMaxTuple_.computeMemLayout();
   }
 
   /**
@@ -570,6 +664,12 @@ public class HdfsScanNode extends ScanNode {
       msg.hdfs_scan_node.setSkip_header_line_count(skipHeaderLineCount_);
     }
     msg.hdfs_scan_node.setUse_mt_scan_node(useMtScanNode_);
+    if (!minMaxConjuncts_.isEmpty()) {
+      for (Expr e: minMaxConjuncts_) {
+        msg.hdfs_scan_node.addToMin_max_conjuncts(e.treeToThrift());
+      }
+      msg.hdfs_scan_node.setMin_max_tuple_id(minMaxTuple_.getId().asInt());
+    }
   }
 
   @Override
@@ -630,6 +730,10 @@ public class HdfsScanNode extends ScanNode {
             "partitions=%s/%s files=%s/%s scan ranges %s/%s\n", detailPrefix,
             numPartitionsNoDiskIds_, numPartitions, numFilesNoDiskIds_,
             totalFiles_, numScanRangesNoDiskIds_, scanRanges_.size()));
+      }
+      if (!minMaxOriginalConjuncts_.isEmpty()) {
+        output.append(detailPrefix + "parquet statistics predicates: " +
+            getExplainString(minMaxOriginalConjuncts_) + "\n");
       }
     }
     return output.toString();

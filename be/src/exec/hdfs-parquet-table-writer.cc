@@ -18,7 +18,7 @@
 #include "exec/hdfs-parquet-table-writer.h"
 
 #include "common/version.h"
-#include "exec/parquet-column-stats.h"
+#include "exec/parquet-column-stats.inline.h"
 #include "exprs/expr-context.h"
 #include "exprs/expr.h"
 #include "rpc/thrift-util.h"

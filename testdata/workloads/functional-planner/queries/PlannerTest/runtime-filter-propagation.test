@@ -159,12 +159,12 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
-|  other predicates: t1.year + t2.smallint_col = t2.tinyint_col, t1.year = t1.month + t2.int_col, t1.year + t2.int_col = t1.month + t2.tinyint_col
+|  other predicates: t1.year = t1.month + t2.int_col, t2.tinyint_col = t1.year + t2.smallint_col, t1.year + t2.int_col = t1.month + t2.tinyint_col
 |  runtime filters: RF000 <- t2.id
 |
 |--01:SCAN HDFS [functional.alltypesnopart t2]
 |     partitions=1/1 files=0 size=0B
-|     predicates: 1 = t2.bigint_col
+|     predicates: t2.bigint_col = 1
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
@@ -1415,7 +1415,7 @@ PLAN-ROOT SINK
 |
 04:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  join predicates: b.id IS DISTINCT FROM c.id
-|  predicates: b.int_col + b.bigint_col = c.int_col
+|  predicates: c.int_col = b.int_col + b.bigint_col
 |
 |--02:SCAN HDFS [functional.alltypes c]
 |     partitions=24/24 files=24 size=478.45KB

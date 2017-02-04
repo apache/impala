@@ -29,6 +29,7 @@
 #include "exec/hdfs-scanner.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/parquet-column-readers.h"
+#include "exec/parquet-column-stats.h"
 #include "exec/scanner-context.inline.h"
 #include "exprs/expr.h"
 #include "runtime/collection-value-builder.h"
@@ -37,7 +38,6 @@
 #include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter.inline.h"
-#include "runtime/scoped-buffer.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "runtime/string-value.h"
@@ -149,6 +149,7 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
       row_group_idx_(-1),
       row_group_rows_read_(0),
       advance_row_group_(true),
+      min_max_tuple_buffer_(scan_node->mem_tracker()),
       row_batches_produced_(0),
       scratch_batch_(new ScratchTupleBatch(
           scan_node->row_desc(), state_->batch_size(), scan_node->mem_tracker())),
@@ -169,6 +170,9 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   metadata_range_ = stream_->scan_range();
   num_cols_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TUnit::UNIT);
+  num_stats_filtered_row_groups_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumStatsFilteredRowGroups",
+          TUnit::UNIT);
   num_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroups", TUnit::UNIT);
   num_scanners_with_no_reads_counter_ =
@@ -186,6 +190,21 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   }
 
   level_cache_pool_.reset(new MemPool(scan_node_->mem_tracker()));
+
+  // Allocate tuple buffer to evaluate conjuncts on parquet::Statistics.
+  const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
+  if (min_max_tuple_desc) {
+    int64_t tuple_size = min_max_tuple_desc->byte_size();
+    if (!min_max_tuple_buffer_.TryAllocate(tuple_size)) {
+      return Status(Substitute("Could not allocate buffer of $0 bytes for Parquet "
+            "statistics tuple for file '$1'.", tuple_size, filename()));
+    }
+  }
+
+  // Clone the min/max statistics conjuncts.
+  RETURN_IF_ERROR(Expr::CloneIfNotExists(scan_node_->min_max_conjunct_ctxs(),
+      state_, &min_max_conjuncts_ctxs_));
+  min_max_conjuncts_ctxs_to_eval_.reserve(min_max_conjuncts_ctxs_.size());
 
   for (int i = 0; i < context->filter_ctxs().size(); ++i) {
     const FilterContext* ctx = &context->filter_ctxs()[i];
@@ -282,6 +301,8 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
   scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
 
   if (schema_resolver_.get() != nullptr) schema_resolver_.reset();
+
+  Expr::Close(min_max_conjuncts_ctxs_, state_);
 
   for (int i = 0; i < filter_ctxs_.size(); ++i) {
     const FilterStats* stats = filter_ctxs_[i]->stats;
@@ -451,6 +472,64 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
   return Status::OK();
 }
 
+Status HdfsParquetScanner::EvaluateStatsConjuncts(const parquet::RowGroup& row_group,
+    bool* skip_row_group) {
+  *skip_row_group = false;
+
+  const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
+  if (!min_max_tuple_desc) return Status::OK();
+
+  int64_t tuple_size = min_max_tuple_desc->byte_size();
+
+  Tuple* min_max_tuple = reinterpret_cast<Tuple*>(min_max_tuple_buffer_.buffer());
+  min_max_tuple->Init(tuple_size);
+
+  DCHECK(min_max_tuple_desc->slots().size() == min_max_conjuncts_ctxs_.size());
+
+  min_max_conjuncts_ctxs_to_eval_.clear();
+  for (int i = 0; i < min_max_conjuncts_ctxs_.size(); ++i) {
+    SlotDescriptor* slot_desc = min_max_tuple_desc->slots()[i];
+    ExprContext* conjunct = min_max_conjuncts_ctxs_[i];
+    Expr* e = conjunct->root();
+    DCHECK(e->GetChild(0)->is_slotref());
+
+    int col_idx = slot_desc->col_pos() - scan_node_->num_partition_keys();
+    DCHECK(col_idx < row_group.columns.size());
+
+    if (!ParquetMetadataUtils::HasRowGroupStats(row_group, col_idx)) continue;
+    const parquet::Statistics& stats = row_group.columns[col_idx].meta_data.statistics;
+
+    bool stats_read = false;
+    void* slot = min_max_tuple->GetSlot(slot_desc->tuple_offset());
+    const ColumnType& col_type = slot_desc->type();
+
+    if (e->function_name() == "lt" || e->function_name() == "le") {
+      // We need to get min stats.
+      stats_read = ColumnStatsBase::ReadFromThrift(stats, col_type,
+          ColumnStatsBase::StatsField::MIN, slot);
+    } else if (e->function_name() == "gt" || e->function_name() == "ge") {
+      // We need to get max stats.
+      stats_read = ColumnStatsBase::ReadFromThrift(stats, col_type,
+          ColumnStatsBase::StatsField::MAX, slot);
+    } else {
+      DCHECK(false) << "Unsupported function name for statistics evaluation: "
+          << e->function_name();
+    }
+    if (stats_read) min_max_conjuncts_ctxs_to_eval_.push_back(conjunct);
+  }
+
+  if (!min_max_conjuncts_ctxs_to_eval_.empty()) {
+    TupleRow row;
+    row.SetTuple(0, min_max_tuple);
+    if (!ExecNode::EvalConjuncts(&min_max_conjuncts_ctxs_to_eval_[0],
+          min_max_conjuncts_ctxs_to_eval_.size(), &row)) {
+      *skip_row_group = true;
+    }
+  }
+
+  return Status::OK();
+}
+
 Status HdfsParquetScanner::NextRowGroup() {
   const DiskIoMgr::ScanRange* split_range = static_cast<ScanRangeMetadata*>(
       metadata_range_->meta_data())->original_split;
@@ -502,7 +581,16 @@ Status HdfsParquetScanner::NextRowGroup() {
       misaligned_row_group_skipped |= CheckRowGroupOverlapsSplit(row_group, split_range);
       continue;
     }
+
     COUNTER_ADD(num_row_groups_counter_, 1);
+
+    // Evaluate row group statistics.
+    bool skip_row_group_on_stats;
+    RETURN_IF_ERROR(EvaluateStatsConjuncts(row_group, &skip_row_group_on_stats));
+    if (skip_row_group_on_stats) {
+      COUNTER_ADD(num_stats_filtered_row_groups_counter_, 1);
+      continue;
+    }
 
     // Prepare column readers for first read
     RETURN_IF_ERROR(InitColumns(row_group_idx_, column_readers_));

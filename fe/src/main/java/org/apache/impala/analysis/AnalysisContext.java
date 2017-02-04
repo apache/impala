@@ -40,6 +40,7 @@ import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
 import org.apache.impala.rewrite.FoldConstantsRule;
+import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.thrift.TAccessEvent;
@@ -75,10 +76,14 @@ public class AnalysisContext {
     catalog_ = catalog;
     queryCtx_ = queryCtx;
     authzConfig_ = authzConfig;
+    List<ExprRewriteRule> rules = Lists.newArrayList();
     // BetweenPredicates must be rewritten to be executable. Other non-essential
     // expr rewrites can be disabled via a query option. When rewrites are enabled
     // BetweenPredicates should be rewritten first to help trigger other rules.
-    List<ExprRewriteRule> rules = Lists.newArrayList(BetweenToCompoundRule.INSTANCE);
+    rules.add(BetweenToCompoundRule.INSTANCE);
+    // Binary predicates must be rewritten to a canonical form for both Kudu predicate
+    // pushdown and Parquet row group pruning based on min/max statistics.
+    rules.add(NormalizeBinaryPredicatesRule.INSTANCE);
     if (queryCtx.getClient_request().getQuery_options().enable_expr_rewrites) {
       rules.add(FoldConstantsRule.INSTANCE);
       rules.add(NormalizeExprsRule.INSTANCE);

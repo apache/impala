@@ -143,6 +143,13 @@ class HdfsScanNodeBase : public ScanNode {
   /// Returns number of partition key slots.
   int num_materialized_partition_keys() const { return partition_key_slots_.size(); }
 
+  int min_max_tuple_id() const { return min_max_tuple_id_; }
+
+  const std::vector<ExprContext*> min_max_conjunct_ctxs() const {
+    return min_max_conjunct_ctxs_;
+  }
+
+  const TupleDescriptor* min_max_tuple_desc() const { return min_max_tuple_desc_; }
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
   const HdfsTableDescriptor* hdfs_table() { return hdfs_table_; }
   const AvroSchemaElement& avro_schema() { return *avro_schema_.get(); }
@@ -279,6 +286,15 @@ class HdfsScanNodeBase : public ScanNode {
   friend class HdfsScanner;
 
   RuntimeState* runtime_state_;
+
+  /// Tuple id of the tuple used to evaluate conjuncts on parquet::Statistics.
+  const int min_max_tuple_id_;
+
+  /// Conjuncts to evaluate on parquet::Statistics.
+  vector<ExprContext*> min_max_conjunct_ctxs_;
+
+  /// Descriptor for the tuple used to evaluate conjuncts on parquet::Statistics.
+  TupleDescriptor* min_max_tuple_desc_;
 
   // Number of header lines to skip at the beginning of each file of this table. Only set
   // to values > 0 for hdfs text files.

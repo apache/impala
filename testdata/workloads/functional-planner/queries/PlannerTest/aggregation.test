@@ -786,7 +786,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
-   predicates: id % 100 = day
+   predicates: day = id % 100
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -806,7 +806,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
-   predicates: id % 100 = day
+   predicates: day = id % 100
 ====
 # test group_concat with distinct together with another distinct aggregate function
 select count(distinct cast(timestamp_col as string)),

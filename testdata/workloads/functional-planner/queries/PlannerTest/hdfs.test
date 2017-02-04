@@ -1028,5 +1028,5 @@ not implemented: Unsupported non-deterministic predicate: rand() > 100
 # IMPALA-4592: Same as above but the predicate references a partition column.
 select * from functional.alltypes where rand() > year
 ---- PLAN
-not implemented: Unsupported non-deterministic predicate: rand() > year
+not implemented: Unsupported non-deterministic predicate: year < rand()
 ====

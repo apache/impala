@@ -18,14 +18,19 @@
 #ifndef IMPALA_EXEC_PARQUET_COLUMN_STATS_H
 #define IMPALA_EXEC_PARQUET_COLUMN_STATS_H
 
-#include <algorithm>
+#include <string>
 #include <type_traits>
+
+#include "runtime/timestamp-value.h"
+#include "runtime/types.h"
+#include "exec/parquet-common.h"
 
 namespace impala {
 
 /// This class, together with its derivatives, is used to track column statistics when
 /// writing parquet files. It provides an interface to populate a parquet::Statistics
-/// object and attach it to an object supplied by the caller.
+/// object and attach it to an object supplied by the caller. It can also be used to
+/// decode parquet::Statistics into slots.
 ///
 /// We currently support tracking 'min' and 'max' values for statistics. The other two
 /// statistical values in parquet.thrift, 'null_count' and 'distinct_count' are not
@@ -50,8 +55,18 @@ namespace impala {
 /// TODO: Populate null_count and distinct_count.
 class ColumnStatsBase {
  public:
+  /// Enum to select statistics value when reading from parquet::Statistics structs.
+  enum class StatsField { MAX, MIN, NULL_COUNT, DISTINCT_COUNT };
+
   ColumnStatsBase() : has_values_(false) {}
   virtual ~ColumnStatsBase() {}
+
+  /// Decodes the parquet::Statistics from 'row_group' and writes the value selected by
+  /// 'stats_field' into the buffer pointed to by 'slot', based on 'col_type'. Returns
+  /// 'true' if reading statistics for columns of type 'col_type' is supported and
+  /// decoding was successful, 'false' otherwise.
+  static bool ReadFromThrift(const parquet::Statistics& thrift_stats,
+      const ColumnType& col_type, const StatsField& stats_field, void* slot);
 
   /// Merges this statistics object with values from 'other'. If other has not been
   /// initialized, then this object will not be changed.
@@ -96,63 +111,31 @@ class ColumnStats : public ColumnStatsBase {
   ColumnStats(int plain_encoded_value_size)
     : ColumnStatsBase(), plain_encoded_value_size_(plain_encoded_value_size) {}
 
+  /// Decodes the parquet::Statistics from 'row_group' and writes the value selected by
+  /// 'stats_field' into the buffer pointed to by 'slot'. Returns 'true' if reading
+  /// statistics for columns of type 'col_type' is supported and decoding was successful,
+  /// 'false' otherwise.
+  static bool ReadFromThrift(const parquet::Statistics& thrift_stats,
+      const StatsField& stats_field, void* slot);
+
   /// Updates the statistics based on the value 'v'. If necessary, initializes the
   /// statistics.
-  void Update(const T& v) {
-    if (!has_values_) {
-      has_values_ = true;
-      min_value_ = v;
-      max_value_ = v;
-    } else {
-      min_value_ = std::min(min_value_, v);
-      max_value_ = std::max(max_value_, v);
-    }
-  }
+  void Update(const T& v);
 
-  virtual void Merge(const ColumnStatsBase& other) override {
-    DCHECK(dynamic_cast<const ColumnStats<T>*>(&other));
-    const ColumnStats<T>* cs = static_cast<const ColumnStats<T>*>(&other);
-    if (!cs->has_values_) return;
-    if (!has_values_) {
-      has_values_ = true;
-      min_value_ = cs->min_value_;
-      max_value_ = cs->max_value_;
-    } else {
-      min_value_ = std::min(min_value_, cs->min_value_);
-      max_value_ = std::max(max_value_, cs->max_value_);
-    }
-  }
-
-  virtual int64_t BytesNeeded() const override {
-    return BytesNeededInternal(min_value_) + BytesNeededInternal(max_value_);
-  }
-
-  virtual void EncodeToThrift(parquet::Statistics* out) const override {
-    DCHECK(has_values_);
-    string min_str;
-    EncodeValueToString(min_value_, &min_str);
-    out->__set_min(move(min_str));
-    string max_str;
-    EncodeValueToString(max_value_, &max_str);
-    out->__set_max(move(max_str));
-  }
+  virtual void Merge(const ColumnStatsBase& other) override;
+  virtual int64_t BytesNeeded() const override;
+  virtual void EncodeToThrift(parquet::Statistics* out) const override;
 
  protected:
   /// Encodes a single value using parquet's PLAIN encoding and stores it into the
   /// binary string 'out'.
-  void EncodeValueToString(const T& v, string* out) const {
-    int64_t bytes_needed = BytesNeededInternal(v);
-    out->resize(bytes_needed);
-    int64_t bytes_written = ParquetPlainEncoder::Encode(
-        reinterpret_cast<uint8_t*>(&(*out)[0]), bytes_needed, v);
-    DCHECK_EQ(bytes_needed, bytes_written);
-  }
+  void EncodeValueToString(const T& v, std::string* out) const;
+
+  /// Decodes a statistics values from 'buffer' into 'result'.
+  static bool DecodeValueFromThrift(const std::string& buffer, T* result);
 
   /// Returns the number of bytes needed to encode value 'v'.
-  int64_t BytesNeededInternal(const T& v) const {
-    return plain_encoded_value_size_ < 0 ? ParquetPlainEncoder::ByteSize<T>(v) :
-        plain_encoded_value_size_;
-  }
+  int64_t BytesNeededInternal(const T& v) const;
 
   // Size of each encoded value in plain encoding, -1 if the type is variable-length.
   int plain_encoded_value_size_;
@@ -163,40 +146,6 @@ class ColumnStats : public ColumnStatsBase {
   // Maximum value since the last call to Reset().
   T max_value_;
 };
-
-/// Plain encoding for Boolean values is not handled by the ParquetPlainEncoder and thus
-/// needs special handling here.
-template <>
-void ColumnStats<bool>::EncodeValueToString(const bool& v, string* out) const {
-  char c = v;
-  out->assign(1, c);
-}
-
-template <>
-int64_t ColumnStats<bool>::BytesNeededInternal(const bool& v) const {
-  return 1;
-}
-
-/// parquet-mr and subsequently Hive currently do not handle the following types
-/// correctly (PARQUET-251, PARQUET-686), so we disable support for them.
-/// The relevant Impala Jiras are for
-/// - StringValue    IMPALA-4817
-/// - TimestampValue IMPALA-4819
-/// - DecimalValue   IMPALA-4815
-template <>
-void ColumnStats<StringValue>::Update(const StringValue& v) {}
-
-template <>
-void ColumnStats<TimestampValue>::Update(const TimestampValue& v) {}
-
-template <>
-void ColumnStats<Decimal4Value>::Update(const Decimal4Value& v) {}
-
-template <>
-void ColumnStats<Decimal8Value>::Update(const Decimal8Value& v) {}
-
-template <>
-void ColumnStats<Decimal16Value>::Update(const Decimal16Value& v) {}
 
 } // end ns impala
 #endif

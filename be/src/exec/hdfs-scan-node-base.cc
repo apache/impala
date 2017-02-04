@@ -83,6 +83,9 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
       runtime_state_(NULL),
+      min_max_tuple_id_(tnode.hdfs_scan_node.__isset.min_max_tuple_id ?
+          tnode.hdfs_scan_node.min_max_tuple_id : -1),
+      min_max_tuple_desc_(nullptr),
       skip_header_line_count_(tnode.hdfs_scan_node.__isset.skip_header_line_count ?
           tnode.hdfs_scan_node.skip_header_line_count : 0),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
@@ -146,6 +149,12 @@ Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
   // Add row batch conjuncts
   DCHECK(conjuncts_map_[tuple_id_].empty());
   conjuncts_map_[tuple_id_] = conjunct_ctxs_;
+
+  // Add min max conjuncts
+  RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, tnode.hdfs_scan_node.min_max_conjuncts,
+      &min_max_conjunct_ctxs_));
+  DCHECK(min_max_conjunct_ctxs_.empty() == (min_max_tuple_id_ == -1));
+
   return Status::OK();
 }
 
@@ -167,6 +176,17 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
         state->obj_pool()->Add(new RowDescriptor(tuple_desc, /* is_nullable */ false));
     RETURN_IF_ERROR(
         Expr::Prepare(entry.second, state, *collection_row_desc, expr_mem_tracker()));
+  }
+
+  // Prepare min max statistics conjuncts.
+  if (min_max_tuple_id_ != -1) {
+    min_max_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(min_max_tuple_id_);
+    DCHECK(min_max_tuple_desc_ != NULL);
+    RowDescriptor* min_max_row_desc =
+        state->obj_pool()->Add(new RowDescriptor(min_max_tuple_desc_, /* is_nullable */
+        false));
+    RETURN_IF_ERROR(Expr::Prepare(min_max_conjunct_ctxs_, state, *min_max_row_desc,
+        expr_mem_tracker()));
   }
 
   // One-time initialisation of state that is constant across scan ranges
@@ -352,6 +372,9 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
     RETURN_IF_ERROR(Expr::Open(entry.second, state));
   }
 
+  // Open min max conjuncts
+  RETURN_IF_ERROR(Expr::Open(min_max_conjunct_ctxs_, state));
+
   for (FilterContext& filter: filter_ctxs_) RETURN_IF_ERROR(filter.expr_ctx->Open(state));
 
   // Create template tuples for all partitions.
@@ -457,6 +480,8 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
     if (tid_conjunct.first == tuple_id_) continue;
     Expr::Close(tid_conjunct.second, state);
   }
+
+  Expr::Close(min_max_conjunct_ctxs_, state);
 
   for (auto& filter_ctx: filter_ctxs_) filter_ctx.expr_ctx->Close(state);
   ScanNode::Close(state);

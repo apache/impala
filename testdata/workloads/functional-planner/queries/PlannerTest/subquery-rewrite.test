@@ -1473,7 +1473,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: tt1.month = t1.id
-|  other predicates: zeroifnull(count(tt1.smallint_col)) < t1.id
+|  other predicates: t1.id > zeroifnull(count(tt1.smallint_col))
 |  runtime filters: RF000 <- t1.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t1]
@@ -1535,7 +1535,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: s.id = t.id
-|  other predicates: ifnull(sample(int_col), '') = t.string_col
+|  other predicates: t.string_col = ifnull(sample(int_col), '')
 |  runtime filters: RF000 <- t.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t]
@@ -2028,11 +2028,11 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 files=11 size=814.73KB
-|     predicates: 20 <= a.int_col, a.smallint_col >= 10
+|     predicates: a.int_col >= 20, a.smallint_col >= 10
 |
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
-   predicates: 20 >= t.bigint_col, t.string_col <= t.date_string_col
+   predicates: t.bigint_col <= 20, t.string_col <= t.date_string_col
    runtime filters: RF000 -> id
 ====
 # IMPALA-4423: Correlated EXISTS and NOT EXISTS subqueries with aggregates. Both

@@ -252,12 +252,9 @@ public class BinaryPredicate extends Predicate {
    * TODO: revisit CAST handling at the caller
    */
   public Expr getSlotBinding(SlotId id) {
-    // check left operand
+    // BinaryPredicates are normalized, so we only need to check the left operand.
     SlotRef slotRef = getChild(0).unwrapSlotRef(false);
     if (slotRef != null && slotRef.getSlotId() == id) return getChild(1);
-    // check right operand
-    slotRef = getChild(1).unwrapSlotRef(false);
-    if (slotRef != null && slotRef.getSlotId() == id) return getChild(0);
     return null;
   }
 
@@ -285,15 +282,11 @@ public class BinaryPredicate extends Predicate {
   }
 
   /**
-   * If predicate is of the form "<SlotRef> op <Expr>" or "<Expr> op <SlotRef>",
-   * returns the SlotRef, otherwise returns null.
+   * If predicate is of the form "<SlotRef> op <Expr>", returns the SlotRef, otherwise
+   * returns null.
    */
   @Override
-  public SlotRef getBoundSlot() {
-    SlotRef slotRef = getChild(0).unwrapSlotRef(true);
-    if (slotRef != null) return slotRef;
-    return getChild(1).unwrapSlotRef(true);
-  }
+  public SlotRef getBoundSlot() { return getChild(0).unwrapSlotRef(true); }
 
   /**
    * Negates a BinaryPredicate.

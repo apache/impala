@@ -24,6 +24,7 @@
 #include "exec/parquet-common.h"
 #include "exec/parquet-scratch-tuple-batch.h"
 #include "exec/parquet-metadata-utils.h"
+#include "runtime/scoped-buffer.h"
 #include "util/runtime-profile-counters.h"
 
 namespace impala {
@@ -375,7 +376,19 @@ class HdfsParquetScanner : public HdfsScanner {
 
   boost::scoped_ptr<ParquetSchemaResolver> schema_resolver_;
 
-  /// Cached runtime filter contexts, one for each filter that applies to this column.
+  /// Buffer to back tuples when reading parquet::Statistics.
+  ScopedBuffer min_max_tuple_buffer_;
+
+  /// Min/max statistics contexts, owned by HdfsScanner::state_->obj_pool_.
+  vector<ExprContext*> min_max_conjuncts_ctxs_;
+
+  /// Used in EvaluateRowGroupStats() to store non-owning copies of conjunct pointers from
+  /// 'min_max_conjunct_ctxs_'. It is declared here to avoid the dynamic allocation
+  /// overhead.
+  vector<ExprContext*> min_max_conjuncts_ctxs_to_eval_;
+
+  /// Cached runtime filter contexts, one for each filter that applies to this column,
+  /// owned by instances of this class.
   vector<const FilterContext*> filter_ctxs_;
 
   struct LocalFilterStats {
@@ -440,6 +453,9 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Number of columns that need to be read.
   RuntimeProfile::Counter* num_cols_counter_;
 
+  /// Number of row groups that are skipped because of Parquet row group statistics.
+  RuntimeProfile::Counter* num_stats_filtered_row_groups_counter_;
+
   /// Number of row groups that need to be read.
   RuntimeProfile::Counter* num_row_groups_counter_;
 
@@ -454,6 +470,11 @@ class HdfsParquetScanner : public HdfsScanner {
   const char* filename() const { return metadata_range_->file(); }
 
   virtual Status GetNextInternal(RowBatch* row_batch);
+
+  /// Evaluates the min/max predicates of the 'scan_node_' using the parquet::Statistics
+  /// of 'row_group'. Sets 'skip_row_group' to true if the row group can be skipped,
+  /// 'false' otherwise.
+  Status EvaluateStatsConjuncts(const parquet::RowGroup& row_group, bool* skip_row_group);
 
   /// Check runtime filters' effectiveness every BATCHES_PER_FILTER_SELECTIVITY_CHECK
   /// row batches. Will update 'filter_stats_'.

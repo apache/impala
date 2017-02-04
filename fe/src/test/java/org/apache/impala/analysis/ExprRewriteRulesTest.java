@@ -28,6 +28,7 @@ import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
 import org.apache.impala.rewrite.FoldConstantsRule;
+import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
 import org.junit.Assert;
 import org.junit.Test;
@@ -336,5 +337,22 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("true and id = 0", rule, null);
     RewritesOk("false or id = 1", rule, null);
     RewritesOk("false or true", rule, null);
+  }
+
+  @Test
+  public void TestNormalizeBinaryPredicatesRule() throws AnalysisException {
+    ExprRewriteRule rule = NormalizeBinaryPredicatesRule.INSTANCE;
+
+    RewritesOk("0 = id", rule, "id = 0");
+    RewritesOk("cast(0 as double) = id", rule, "id = CAST(0 AS DOUBLE)");
+    RewritesOk("1 + 1 = cast(id as int)", rule, "CAST(id AS INT) = 1 + 1");
+
+    // Verify that these don't get rewritten.
+    RewritesOk("id = 5", rule, null);
+    RewritesOk("5 = id + 2", rule, null);
+    RewritesOk("cast(id as int) = int_col", rule, null);
+    RewritesOk("int_col = cast(id as int)", rule, null);
+    RewritesOk("int_col = tinyint_col", rule, null);
+    RewritesOk("tinyint_col = int_col", rule, null);
   }
 }

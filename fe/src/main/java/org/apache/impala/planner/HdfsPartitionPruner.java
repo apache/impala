@@ -89,7 +89,7 @@ public class HdfsPartitionPruner {
 
   /**
    * Return a list of partitions left after applying the conjuncts. Please note
-   * that conjunts used for filtering will be removed from the list 'conjuncts'.
+   * that conjuncts used for filtering will be removed from the list 'conjuncts'.
    * If 'allowEmpty' is False, empty partitions are not returned.
    */
   public List<HdfsPartition> prunePartitions(

@@ -204,6 +204,13 @@ struct THdfsScanNode {
   // If this is true then the MT_DOP query option must be > 0.
   // TODO: Remove this option when the MT scan node supports all file formats.
   6: optional bool use_mt_scan_node
+
+  // Conjuncts that can be evaluated against parquet::Statistics using the tuple
+  // referenced by 'min_max_tuple_id'.
+  7: optional list<Exprs.TExpr> min_max_conjuncts
+
+  // Tuple to evaluate 'min_max_conjuncts' against.
+  8: optional Types.TTupleId min_max_tuple_id
 }
 
 struct TDataSourceScanNode {

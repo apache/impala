@@ -27,6 +27,7 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "exec/parquet-common.h"
+#include "exec/parquet-column-stats.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 
@@ -215,6 +216,13 @@ Status ParquetMetadataUtils::ValidateColumn(const parquet::FileMetaData& file_me
     RETURN_IF_ERROR(state->LogOrReturnError(msg));
   }
   return Status::OK();
+}
+
+bool ParquetMetadataUtils::HasRowGroupStats(const parquet::RowGroup& row_group,
+    int col_idx) {
+  DCHECK(col_idx < row_group.columns.size());
+  const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
+  return col_chunk.__isset.meta_data && col_chunk.meta_data.__isset.statistics;
 }
 
 ParquetFileVersion::ParquetFileVersion(const string& created_by) {

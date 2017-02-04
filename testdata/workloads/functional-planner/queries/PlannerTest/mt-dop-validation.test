@@ -57,6 +57,7 @@ PLAN-ROOT SINK
    predicates: id < 10
    table stats: unavailable
    column stats: unavailable
+   parquet statistics predicates: id < 10
    hosts=3 per-host-mem=unavailable
    tuple-ids=0 row-size=16B cardinality=unavailable
 ---- PARALLELPLANS
@@ -94,6 +95,7 @@ PLAN-ROOT SINK
    predicates: id < 10
    table stats: unavailable
    column stats: unavailable
+   parquet statistics predicates: id < 10
    hosts=3 per-host-mem=16.00MB
    tuple-ids=0 row-size=16B cardinality=unavailable
 ====
@@ -110,18 +112,19 @@ PLAN-ROOT SINK
 |  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  hosts=3 per-host-mem=unavailable
-|  tuple-ids=3,2 row-size=16B cardinality=unavailable
+|  tuple-ids=4,3 row-size=16B cardinality=unavailable
 |
 01:SORT
 |  order by: int_col ASC NULLS FIRST, id ASC
 |  hosts=3 per-host-mem=unavailable
-|  tuple-ids=3 row-size=8B cardinality=unavailable
+|  tuple-ids=4 row-size=8B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partitions=24/24 files=24 size=156.57KB
    predicates: id < 10
    table stats: unavailable
    column stats: unavailable
+   parquet statistics predicates: id < 10
    hosts=3 per-host-mem=unavailable
    tuple-ids=0 row-size=8B cardinality=unavailable
 ---- PARALLELPLANS
@@ -129,7 +132,7 @@ PLAN-ROOT SINK
 |
 04:EXCHANGE [UNPARTITIONED]
 |  hosts=3 per-host-mem=unavailable
-|  tuple-ids=3,2 row-size=16B cardinality=unavailable
+|  tuple-ids=4,3 row-size=16B cardinality=unavailable
 |
 02:ANALYTIC
 |  functions: row_number()
@@ -137,12 +140,12 @@ PLAN-ROOT SINK
 |  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  hosts=3 per-host-mem=0B
-|  tuple-ids=3,2 row-size=16B cardinality=unavailable
+|  tuple-ids=4,3 row-size=16B cardinality=unavailable
 |
 01:SORT
 |  order by: int_col ASC NULLS FIRST, id ASC
 |  hosts=3 per-host-mem=0B
-|  tuple-ids=3 row-size=8B cardinality=unavailable
+|  tuple-ids=4 row-size=8B cardinality=unavailable
 |
 03:EXCHANGE [HASH(int_col)]
 |  hosts=3 per-host-mem=0B
@@ -153,6 +156,7 @@ PLAN-ROOT SINK
    predicates: id < 10
    table stats: unavailable
    column stats: unavailable
+   parquet statistics predicates: id < 10
    hosts=3 per-host-mem=16.00MB
    tuple-ids=0 row-size=8B cardinality=unavailable
 ====
@@ -206,6 +210,7 @@ PLAN-ROOT SINK
    predicates on o_lineitems: l_linenumber < 3
    table stats: 150000 rows total
    columns missing stats: c_orders
+   parquet statistics predicates: c_custkey < 10
    hosts=3 per-host-mem=unavailable
    tuple-ids=0 row-size=254B cardinality=15000
 ---- PARALLELPLANS
@@ -258,6 +263,7 @@ PLAN-ROOT SINK
    predicates on o_lineitems: l_linenumber < 3
    table stats: 150000 rows total
    columns missing stats: c_orders
+   parquet statistics predicates: c_custkey < 10
    hosts=3 per-host-mem=88.00MB
    tuple-ids=0 row-size=254B cardinality=15000
 ====

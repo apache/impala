@@ -88,8 +88,7 @@ public class KuduScanNode extends ScanNode {
   // From analyzer.getHostIndex().getIndex(address)
   private final Set<Integer> hostIndexSet_ = Sets.newHashSet();
 
-  // List of conjuncts that can be pushed down to Kudu, after they have been normalized
-  // by BinaryPredicate.normalizeSlotRefComparison(). Used for computing stats and
+  // List of conjuncts that can be pushed down to Kudu. Used for computing stats and
   // explain strings.
   private final List<Expr> kuduConjuncts_ = Lists.newArrayList();
 
@@ -327,12 +326,14 @@ public class KuduScanNode extends ScanNode {
     BinaryPredicate predicate = (BinaryPredicate) expr;
 
     // TODO KUDU-931 look into handling implicit/explicit casts on the SlotRef.
-    predicate = normalizeSlotRefComparison(predicate, analyzer);
-    if (predicate == null) return false;
+
     ComparisonOp op = getKuduOperator(predicate.getOp());
     if (op == null) return false;
 
+    if (!(predicate.getChild(0) instanceof SlotRef)) return false;
     SlotRef ref = (SlotRef) predicate.getChild(0);
+
+    if (!(predicate.getChild(1) instanceof LiteralExpr)) return false;
     LiteralExpr literal = (LiteralExpr) predicate.getChild(1);
 
     // Cannot push predicates with null literal values (KUDU-1595).
@@ -457,32 +458,5 @@ public class KuduScanNode extends ScanNode {
       case EQ: return ComparisonOp.EQUAL;
       default: return null;
     }
-  }
-
-
-  /**
-   * Normalizes and returns a copy of 'predicate' consisting of an uncast SlotRef and a
-   * constant Expr into the following form: <SlotRef> <Op> <LiteralExpr>.
-   * Assumes that constant expressions have already been folded.
-   */
-  private static BinaryPredicate normalizeSlotRefComparison(BinaryPredicate predicate,
-      Analyzer analyzer) {
-    SlotRef ref = null;
-    if (predicate.getChild(0) instanceof SlotRef) {
-      ref = (SlotRef) predicate.getChild(0);
-    } else if (predicate.getChild(1) instanceof SlotRef) {
-      ref = (SlotRef) predicate.getChild(1);
-    }
-
-    if (ref == null) return null;
-    if (ref != predicate.getChild(0)) {
-      Preconditions.checkState(ref == predicate.getChild(1));
-      predicate = new BinaryPredicate(predicate.getOp().converse(), ref,
-          predicate.getChild(0));
-      predicate.analyzeNoThrow(analyzer);
-    }
-
-    if (!(predicate.getChild(1) instanceof LiteralExpr)) return null;
-    return predicate;
   }
 }

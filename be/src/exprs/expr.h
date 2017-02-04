@@ -146,6 +146,8 @@ class Expr {
   virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow*);
   virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow*);
 
+  const std::string& function_name() const { return fn_.name.function_name; }
+
   /// Get the number of digits after the decimal that should be displayed for this value.
   /// Returns -1 if no scale has been specified (currently the scale is only set for
   /// doubles set by RoundUpTo). GetValue() must have already been called.

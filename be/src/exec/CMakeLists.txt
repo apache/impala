@@ -70,6 +70,7 @@ add_library(Exec
   nested-loop-join-builder.cc
   nested-loop-join-node.cc
   parquet-column-readers.cc
+  parquet-column-stats.cc
   parquet-metadata-utils.cc
   partitioned-aggregation-node.cc
   partitioned-aggregation-node-ir.cc

@@ -102,7 +102,7 @@ and zip > 1 and zip < 50
 PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: id <= 20, zip <= 30, id >= 10, zip < 50, zip <= 5, zip > 1, zip >= 0, name = 'foo'
+   kudu predicates: id <= 20, id >= 10, zip < 50, zip <= 30, zip <= 5, zip > 1, zip >= 0, name = 'foo'
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
@@ -112,7 +112,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   kudu predicates: id <= 20, zip <= 30, id >= 10, zip < 50, zip <= 5, zip > 1, zip >= 0, name = 'foo'
+   kudu predicates: id <= 20, id >= 10, zip < 50, zip <= 30, zip <= 5, zip > 1, zip >= 0, name = 'foo'
 ====
 # Test constant folding.
 select * from functional_kudu.testtbl
@@ -122,7 +122,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
-   kudu predicates: id < 103, id <= 60, id < 40
+   kudu predicates: id < 103, id < 40, id <= 60
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
@@ -133,7 +133,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
-   kudu predicates: id < 103, id <= 60, id < 40
+   kudu predicates: id < 103, id < 40, id <= 60
 ====
 # Some predicates can be pushed down but others can't (predicate on an non-const value).
 select * from functional_kudu.testtbl
@@ -216,7 +216,7 @@ PLAN-ROOT SINK
 |  output: count(*)
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   kudu predicates: id > 1475059865, id < 1475059775
+   kudu predicates: id < 1475059775, id > 1475059865
 ====
 # IMPALA-2521: clustered insert into table adds sort node.
 insert into table functional_kudu.alltypes /*+ clustered */
