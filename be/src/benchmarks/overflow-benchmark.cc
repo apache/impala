@@ -431,7 +431,6 @@ void TestClzBranchFree(int batch_size, void* d) {
 
 int main(int argc, char** argv) {
   CpuInfo::Init();
-  DecimalUtil::InitMaxUnscaledDecimal16();
   cout << Benchmark::GetMachineInfo() << endl;
 
   TestData data;

@@ -32,16 +32,15 @@ namespace impala {
 class DecimalUtil {
  public:
   /// Maximum absolute value of a valid Decimal4Value. This is 9 digits of 9's.
-  static const int32_t MAX_UNSCALED_DECIMAL4;
+  static const int32_t MAX_UNSCALED_DECIMAL4 = 999999999;
 
   /// Maximum absolute value of a valid Decimal8Value. This is 18 digits of 9's.
-  static const int64_t MAX_UNSCALED_DECIMAL8;
+  static const int64_t MAX_UNSCALED_DECIMAL8 = 999999999999999999;
 
   /// Maximum absolute value a valid Decimal16Value. This is 38 digits of 9's.
-  static int128_t MAX_UNSCALED_DECIMAL16;
-
-  /// Initializes MAX_UNSCALED_DECIMAL16. Must be called once before using it.
-  static void InitMaxUnscaledDecimal16();
+  static const int128_t MAX_UNSCALED_DECIMAL16 = 99 + 100 *
+      (MAX_UNSCALED_DECIMAL8 + (1 + MAX_UNSCALED_DECIMAL8) *
+       static_cast<int128_t>(MAX_UNSCALED_DECIMAL8));
 
   /// TODO: do we need to handle overflow here or at a higher abstraction.
   template<typename T>

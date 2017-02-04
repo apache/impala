@@ -20,18 +20,8 @@
 
 namespace impala {
 
-const int32_t DecimalUtil::MAX_UNSCALED_DECIMAL4 = 999999999;
-const int64_t DecimalUtil::MAX_UNSCALED_DECIMAL8 = 999999999999999999;
-int128_t DecimalUtil::MAX_UNSCALED_DECIMAL16;
-
-// We can't write 38 9's as a literal in C++, so generate it a different way.
-void DecimalUtil::InitMaxUnscaledDecimal16() {
-  // TODO: is there a better way to do this?
-  MAX_UNSCALED_DECIMAL16 = 0;
-  for (int i = 0; i < ColumnType::MAX_PRECISION; ++i) {
-    MAX_UNSCALED_DECIMAL16 *= 10;
-    MAX_UNSCALED_DECIMAL16 += 9;
-  }
-}
+const int32_t DecimalUtil::MAX_UNSCALED_DECIMAL4;
+const int64_t DecimalUtil::MAX_UNSCALED_DECIMAL8;
+const int128_t DecimalUtil::MAX_UNSCALED_DECIMAL16;
 
 }

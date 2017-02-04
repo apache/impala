@@ -38,11 +38,8 @@ inline DecimalValue<T> DecimalValue<T>::FromDouble(int precision, int scale, dou
 
   // Multiply the double by the scale.
   // Unfortunately, this conversion is not exact, and there is a loss of precision.
-  // Despite having enough bits in the mantissa to represent all the leading bits in
-  // powers of 10 up to around 10**38, the conversion done is still inexact.  Writing
-  // literals directly as 1.0e23 produces exactly the same number.  The error starts
-  // around 1.0e23 and can take either positive or negative values.  This means the
-  // multiplication can cause an unwanted decimal overflow.
+  // The error starts around 1.0e23 and can take either positive or negative values.
+  // This means the multiplication can cause an unwanted decimal overflow.
   d *= DecimalUtil::GetScaleMultiplier<double>(scale);
 
   // Decimal V2 behavior
