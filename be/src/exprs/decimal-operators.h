@@ -104,7 +104,7 @@ class DecimalOperators {
   };
 
   /// Evaluates a round from 'val' and returns the result, using the rounding rule of
-  /// 'type'.
+  /// 'op. Returns DecimalVal::null() on overflow.
   static DecimalVal RoundDecimal(FunctionContext* context,
       const DecimalVal& val, int val_precision, int val_scale, int output_precision,
       int output_scale, const DecimalRoundOp& op);

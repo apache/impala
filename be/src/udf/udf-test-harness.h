@@ -24,6 +24,7 @@
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 
+#include "runtime/runtime-state.h"
 #include "udf/udf.h"
 #include "udf/udf-debug.h"
 
@@ -36,7 +37,8 @@ class UdfTestHarness {
   /// argument of the UDF not including the FunctionContext*. The caller is responsible
   /// for calling delete on it. This context has additional debugging validation enabled.
   static FunctionContext* CreateTestContext(const FunctionContext::TypeDesc& return_type,
-      const std::vector<FunctionContext::TypeDesc>& arg_types);
+      const std::vector<FunctionContext::TypeDesc>& arg_types,
+      impala::RuntimeState* state = nullptr);
 
   /// Use with test contexts to test use of IsArgConstant() and GetConstantArg().
   /// constant_args should contain an AnyVal* for each argument of the UDF not including

@@ -79,7 +79,8 @@ inline const T DecimalValue<T>::fractional_part(int scale) const {
 
 template<typename T>
 inline DecimalValue<T> DecimalValue<T>::ScaleTo(int src_scale, int dst_scale,
-    int dst_precision, bool* overflow) const { int delta_scale = src_scale - dst_scale;
+    int dst_precision, bool* overflow) const {
+  int delta_scale = src_scale - dst_scale;
   T result = value();
   T max_value = DecimalUtil::GetScaleMultiplier<T>(dst_precision);
   if (delta_scale >= 0) {

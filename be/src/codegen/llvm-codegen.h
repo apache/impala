@@ -153,16 +153,8 @@ class LlvmCodeGen {
   /// 'codegen' will contain the created object on success.
   /// 'parent_mem_tracker' - if non-NULL, the CodeGen MemTracker is created under this.
   /// 'id' is used for outputting the IR module for debugging.
-  static Status CreateImpalaCodegen(ObjectPool*, MemTracker* parent_mem_tracker,
+  static Status CreateImpalaCodegen(RuntimeState* state, MemTracker* parent_mem_tracker,
       const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
-
-  /// Creates a LlvmCodeGen instance initialized with the module bitcode from 'file'.
-  /// 'codegen' will contain the created object on success. The functions in the module
-  /// are materialized lazily. Getting a reference to a function via GetFunction() will
-  /// materialize the function and its callees recursively.
-  static Status CreateFromFile(ObjectPool*, MemTracker* parent_mem_tracker,
-      const std::string& file, const std::string& id,
-      boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   /// Removes all jit compiled dynamically linked functions from the process.
   ~LlvmCodeGen();
@@ -204,6 +196,7 @@ class LlvmCodeGen {
     void AddArgument(const NamedVariable& var) {
       args_.push_back(var);
     }
+
     void AddArgument(const std::string& name, llvm::Type* type) {
       args_.push_back(NamedVariable(name, type));
     }
@@ -332,6 +325,17 @@ class LlvmCodeGen {
   /// return value is the number of calls replaced.
   int ReplaceCallSitesWithValue(llvm::Function* caller, llvm::Value* replacement,
       const std::string& target_name);
+
+  /// This function replaces calls to FunctionContextImpl::GetConstFnAttr() with constants
+  /// derived from 'return_type', 'arg_types' and the runtime state 'state_'. Please note
+  /// that this function only replaces call instructions inside 'fn' so to replace the
+  /// call to FunctionContextImpl::GetConstFnAttr() inside the callee functions, please
+  /// inline the callee functions (by annotating them with IR_ALWAYS_INLINE).
+  ///
+  /// TODO: implement a loop unroller (or use LLVM's) so we can use
+  /// FunctionContextImpl::GetConstFnAttr() in loops
+  int InlineConstFnAttrs(const FunctionContext::TypeDesc& return_type,
+      const std::vector<FunctionContext::TypeDesc>& arg_types, llvm::Function* fn);
 
   /// Returns a copy of fn. The copy is added to the module.
   llvm::Function* CloneFunction(llvm::Function* fn);
@@ -471,8 +475,9 @@ class LlvmCodeGen {
   llvm::Type* void_type() { return void_type_; }
   llvm::Type* i128_type() { return llvm::Type::getIntNTy(context(), 128); }
 
-  /// Fils in 'symbols' with all the symbols in the module.
-  void GetSymbols(boost::unordered_set<std::string>* symbols);
+  /// Load the module temporarily and populate 'symbols' with the symbols in the module.
+  static Status GetSymbols(const string& file, const string& module_id,
+      boost::unordered_set<std::string>* symbols);
 
   /// Generates function to return min/max(v1, v2)
   llvm::Function* CodegenMinMax(const ColumnType& type, bool min);
@@ -524,18 +529,27 @@ class LlvmCodeGen {
   static void FindGlobalUsers(llvm::User* val, std::vector<llvm::GlobalObject*>* users);
 
   /// Top level codegen object. 'module_id' is used for debugging when outputting the IR.
-  LlvmCodeGen(
-      ObjectPool* pool, MemTracker* parent_mem_tracker, const std::string& module_id);
+  LlvmCodeGen(RuntimeState* state, ObjectPool* pool, MemTracker* parent_mem_tracker,
+      const std::string& module_id);
 
   /// Initializes the jitter and execution engine with the given module.
   Status Init(std::unique_ptr<llvm::Module> module);
+
+  /// Creates a LlvmCodeGen instance initialized with the module bitcode from 'file'.
+  /// 'codegen' will contain the created object on success. The functions in the module
+  /// are materialized lazily. Getting a reference to a function via GetFunction() will
+  /// materialize the function and its callees recursively.
+  static Status CreateFromFile(RuntimeState* state, ObjectPool* pool,
+      MemTracker* parent_mem_tracker, const std::string& file,
+      const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   /// Creates a LlvmCodeGen instance initialized with the module bitcode in memory.
   /// 'codegen' will contain the created object on success. The functions in the module
   /// are materialized lazily. Getting a reference to a function via GetFunction() will
   /// materialize the function and its callees recursively.
-  static Status CreateFromMemory(ObjectPool* pool, MemTracker* parent_mem_tracker,
-      const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
+  static Status CreateFromMemory(RuntimeState* state, ObjectPool* pool,
+      MemTracker* parent_mem_tracker, const std::string& id,
+      boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   /// Loads an LLVM module from 'file' which is the local path to the LLVM bitcode file.
   /// The functions in the module are materialized lazily. Getting a reference to the
@@ -638,6 +652,10 @@ class LlvmCodeGen {
   /// code (they may have been inlined by gcc). These functions are always materialized
   /// when a module is loaded to ensure that LLVM can resolve references to them.
   static boost::unordered_set<std::string> fns_to_always_materialize_;
+
+  /// Pointer to the RuntimeState which owns this codegen object. Needed in
+  /// InlineConstFnAttr() to access the query options.
+  const RuntimeState* state_;
 
   /// ID used for debugging (can be e.g. the fragment instance ID)
   std::string id_;

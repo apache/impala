@@ -58,12 +58,14 @@
 #include "codegen/instruction-counter.h"
 #include "codegen/mcjit-mem-mgr.h"
 #include "common/logging.h"
+#include "exprs/anyval-util.h"
 #include "impala-ir/impala-ir-names.h"
 #include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 #include "util/cpu-info.h"
@@ -170,7 +172,8 @@ Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
 
   ObjectPool init_pool;
   scoped_ptr<LlvmCodeGen> init_codegen;
-  RETURN_IF_ERROR(LlvmCodeGen::CreateFromMemory(&init_pool, NULL, "init", &init_codegen));
+  RETURN_IF_ERROR(LlvmCodeGen::CreateFromMemory(
+      nullptr, &init_pool, nullptr, "init", &init_codegen));
   // LLVM will construct "use" lists only when the entire module is materialized.
   RETURN_IF_ERROR(init_codegen->MaterializeModule());
 
@@ -209,9 +212,10 @@ Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
   return Status::OK();
 }
 
-LlvmCodeGen::LlvmCodeGen(
-    ObjectPool* pool, MemTracker* parent_mem_tracker, const string& id)
-  : id_(id),
+LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
+    MemTracker* parent_mem_tracker, const string& id)
+  : state_(state),
+    id_(id),
     profile_(pool, "CodeGen"),
     mem_tracker_(new MemTracker(&profile_, -1, "CodeGen", parent_mem_tracker)),
     optimizations_enabled_(false),
@@ -233,9 +237,10 @@ LlvmCodeGen::LlvmCodeGen(
   num_instructions_ = ADD_COUNTER(&profile_, "NumInstructions", TUnit::UNIT);
 }
 
-Status LlvmCodeGen::CreateFromFile(ObjectPool* pool, MemTracker* parent_mem_tracker,
-    const string& file, const string& id, scoped_ptr<LlvmCodeGen>* codegen) {
-  codegen->reset(new LlvmCodeGen(pool, parent_mem_tracker, id));
+Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
+    MemTracker* parent_mem_tracker, const string& file, const string& id,
+    scoped_ptr<LlvmCodeGen>* codegen) {
+  codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
   SCOPED_TIMER((*codegen)->profile_.total_time_counter());
 
   unique_ptr<Module> loaded_module;
@@ -244,9 +249,9 @@ Status LlvmCodeGen::CreateFromFile(ObjectPool* pool, MemTracker* parent_mem_trac
   return (*codegen)->Init(std::move(loaded_module));
 }
 
-Status LlvmCodeGen::CreateFromMemory(ObjectPool* pool, MemTracker* parent_mem_tracker,
-    const string& id, scoped_ptr<LlvmCodeGen>* codegen) {
-  codegen->reset(new LlvmCodeGen(pool, parent_mem_tracker, id));
+Status LlvmCodeGen::CreateFromMemory(RuntimeState* state, ObjectPool* pool,
+    MemTracker* parent_mem_tracker, const string& id, scoped_ptr<LlvmCodeGen>* codegen) {
+  codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
   SCOPED_TIMER((*codegen)->profile_.total_time_counter());
 
   // Select the appropriate IR version. We cannot use LLVM IR with SSE4.2 instructions on
@@ -355,9 +360,12 @@ void LlvmCodeGen::StripGlobalCtorsDtors(llvm::Module* module) {
   if (destructors != NULL) destructors->eraseFromParent();
 }
 
-Status LlvmCodeGen::CreateImpalaCodegen(ObjectPool* pool, MemTracker* parent_mem_tracker,
-    const string& id, scoped_ptr<LlvmCodeGen>* codegen_ret) {
-  RETURN_IF_ERROR(CreateFromMemory(pool, parent_mem_tracker, id, codegen_ret));
+Status LlvmCodeGen::CreateImpalaCodegen(RuntimeState* state,
+    MemTracker* parent_mem_tracker, const string& id,
+    scoped_ptr<LlvmCodeGen>* codegen_ret) {
+  DCHECK(state != nullptr);
+  RETURN_IF_ERROR(CreateFromMemory(
+      state, state->obj_pool(), parent_mem_tracker, id, codegen_ret));
   LlvmCodeGen* codegen = codegen_ret->get();
 
   // Parse module for cross compiled functions and types
@@ -681,17 +689,19 @@ Function* LlvmCodeGen::GetFunction(IRFunction::Type ir_type, bool clone) {
 bool LlvmCodeGen::VerifyFunction(Function* fn) {
   if (is_corrupt_) return false;
 
-  // Check that there are no calls to Expr::GetConstant(). These should all have been
-  // inlined via Expr::InlineConstants().
+  // Check that there are no calls to FunctionContextImpl::GetConstFnAttr(). These should all
+  // have been inlined via InlineConstFnAttrs().
   for (inst_iterator iter = inst_begin(fn); iter != inst_end(fn); ++iter) {
     Instruction* instr = &*iter;
     if (!isa<CallInst>(instr)) continue;
     CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
     Function* called_fn = call_instr->getCalledFunction();
-    // look for call to Expr::GetConstant()
-    if (called_fn != NULL &&
-        called_fn->getName().find(Expr::GET_CONSTANT_INT_SYMBOL_PREFIX) != string::npos) {
-      LOG(ERROR) << "Found call to Expr::GetConstant*(): " << Print(call_instr);
+
+    // Look for call to FunctionContextImpl::GetConstFnAttr().
+    if (called_fn != nullptr &&
+        called_fn->getName() == FunctionContextImpl::GET_CONST_FN_ATTR_SYMBOL) {
+      LOG(ERROR) << "Found call to FunctionContextImpl::GetConstFnAttr(): "
+                 << Print(call_instr);
       is_corrupt_ = true;
       break;
     }
@@ -914,6 +924,47 @@ int LlvmCodeGen::ReplaceCallSitesWithBoolConst(llvm::Function* caller, bool cons
     const string& target_name) {
   Value* replacement = ConstantInt::get(Type::getInt1Ty(context()), constant);
   return ReplaceCallSitesWithValue(caller, replacement, target_name);
+}
+
+int LlvmCodeGen::InlineConstFnAttrs(const FunctionContext::TypeDesc& ret_type,
+    const vector<FunctionContext::TypeDesc>& arg_types, Function* fn) {
+  int replaced = 0;
+  for (inst_iterator iter = inst_begin(fn), end = inst_end(fn); iter != end; ) {
+    // Increment iter now so we don't mess it up modifying the instruction below
+    Instruction* instr = &*(iter++);
+
+    // Look for call instructions
+    if (!isa<CallInst>(instr)) continue;
+    CallInst* call_instr = cast<CallInst>(instr);
+    Function* called_fn = call_instr->getCalledFunction();
+
+    // Look for call to FunctionContextImpl::GetConstFnAttr().
+    if (called_fn == nullptr ||
+        called_fn->getName() != FunctionContextImpl::GET_CONST_FN_ATTR_SYMBOL) {
+      continue;
+    }
+
+    // 't' and 'i' arguments must be constant
+    ConstantInt* t_arg = dyn_cast<ConstantInt>(call_instr->getArgOperand(1));
+    ConstantInt* i_arg = dyn_cast<ConstantInt>(call_instr->getArgOperand(2));
+    // This optimization is only applied to built-ins which should have constant args.
+    DCHECK(t_arg != nullptr)
+        << "Non-constant 't' argument to FunctionContextImpl::GetConstFnAttr()";
+    DCHECK(i_arg != nullptr)
+        << "Non-constant 'i' argument to FunctionContextImpl::GetConstFnAttr";
+
+    // Replace the called function with the appropriate constant
+    FunctionContextImpl::ConstFnAttr t_val =
+        static_cast<FunctionContextImpl::ConstFnAttr>(t_arg->getSExtValue());
+    int i_val = static_cast<int>(i_arg->getSExtValue());
+    DCHECK(state_ != nullptr);
+    // All supported constants are currently integers.
+    call_instr->replaceAllUsesWith(ConstantInt::get(GetType(TYPE_INT),
+        FunctionContextImpl::GetConstFnAttr(state_, ret_type, arg_types, t_val, i_val)));
+    call_instr->eraseFromParent();
+    ++replaced;
+  }
+  return replaced;
 }
 
 void LlvmCodeGen::FindCallSites(Function* caller, const string& target_name,
@@ -1216,10 +1267,15 @@ void LlvmCodeGen::CodegenDebugTrace(LlvmBuilder* builder, const char* str,
   builder->CreateCall(printf, calling_args);
 }
 
-void LlvmCodeGen::GetSymbols(unordered_set<string>* symbols) {
-  for (const Function& fn: module_->functions()) {
+Status LlvmCodeGen::GetSymbols(const string& file, const string& module_id,
+    unordered_set<string>* symbols) {
+  ObjectPool pool;
+  scoped_ptr<LlvmCodeGen> codegen;
+  RETURN_IF_ERROR(CreateFromFile(nullptr, &pool, nullptr, file, module_id, &codegen));
+  for (const Function& fn: codegen->module_->functions()) {
     if (fn.isMaterializable()) symbols->insert(fn.getName());
   }
+  return Status::OK();
 }
 
 // TODO: cache this function (e.g. all min(int, int) are identical).

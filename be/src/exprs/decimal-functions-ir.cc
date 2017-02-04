@@ -28,17 +28,17 @@
 
 namespace impala {
 
-IntVal DecimalFunctions::Precision(FunctionContext* context, const DecimalVal& val) {
-  return IntVal(Expr::GetConstantInt(*context, Expr::ARG_TYPE_PRECISION, 0));
+IntVal DecimalFunctions::Precision(FunctionContext* ctx, const DecimalVal& val) {
+  return IntVal(ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_PRECISION, 0));
 }
 
-IntVal DecimalFunctions::Scale(FunctionContext* context, const DecimalVal& val) {
-  return IntVal(Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0));
+IntVal DecimalFunctions::Scale(FunctionContext* ctx, const DecimalVal& val) {
+  return IntVal(ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SCALE, 0));
 }
 
-DecimalVal DecimalFunctions::Abs(FunctionContext* context, const DecimalVal& val) {
+DecimalVal DecimalFunctions::Abs(FunctionContext* ctx, const DecimalVal& val) {
   if (val.is_null) return DecimalVal::null();
-  int type_byte_size = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SIZE, 0);
+  int type_byte_size = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SIZE, 0);
   switch (type_byte_size) {
     case 4:
       return DecimalVal(abs(val.val4));
@@ -52,79 +52,83 @@ DecimalVal DecimalFunctions::Abs(FunctionContext* context, const DecimalVal& val
   }
 }
 
-DecimalVal DecimalFunctions::Ceil(FunctionContext* context, const DecimalVal& val) {
-  return DecimalOperators::RoundDecimal(context, val, DecimalOperators::CEIL);
+DecimalVal DecimalFunctions::Ceil(FunctionContext* ctx, const DecimalVal& val) {
+  return DecimalOperators::RoundDecimal(ctx, val, DecimalOperators::CEIL);
 }
 
-DecimalVal DecimalFunctions::Floor(FunctionContext* context, const DecimalVal& val) {
-  return DecimalOperators::RoundDecimal(context, val, DecimalOperators::FLOOR);
+DecimalVal DecimalFunctions::Floor(FunctionContext* ctx, const DecimalVal& val) {
+  return DecimalOperators::RoundDecimal(ctx, val, DecimalOperators::FLOOR);
 }
 
-DecimalVal DecimalFunctions::Round(FunctionContext* context, const DecimalVal& val) {
-  return DecimalOperators::RoundDecimal(context, val, DecimalOperators::ROUND);
+DecimalVal DecimalFunctions::Round(FunctionContext* ctx, const DecimalVal& val) {
+  return DecimalOperators::RoundDecimal(ctx, val, DecimalOperators::ROUND);
 }
 
 /// Always inline in IR module so that constants can be replaced.
 IR_ALWAYS_INLINE DecimalVal DecimalFunctions::RoundTo(
-    FunctionContext* context, const DecimalVal& val, int scale,
+    FunctionContext* ctx, const DecimalVal& val, int scale,
     DecimalOperators::DecimalRoundOp op) {
-  int val_precision = Expr::GetConstantInt(*context, Expr::ARG_TYPE_PRECISION, 0);
-  int val_scale = Expr::GetConstantInt(*context, Expr::ARG_TYPE_SCALE, 0);
-  int return_precision = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_PRECISION);
-  int return_scale = Expr::GetConstantInt(*context, Expr::RETURN_TYPE_SCALE);
+  int val_precision =
+      ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_PRECISION, 0);
+  int val_scale =
+      ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SCALE, 0);
+  int return_precision =
+      ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_PRECISION);
+  int return_scale =
+      ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_SCALE);
   if (scale < 0) {
-    return DecimalOperators::RoundDecimalNegativeScale(context,
+    return DecimalOperators::RoundDecimalNegativeScale(ctx,
         val, val_precision, val_scale, return_precision, return_scale, op, -scale);
   } else {
-    return DecimalOperators::RoundDecimal(context,
+    return DecimalOperators::RoundDecimal(ctx,
         val, val_precision, val_scale, return_precision, return_scale, op);
   }
 }
 
 DecimalVal DecimalFunctions::RoundTo(
-    FunctionContext* context, const DecimalVal& val, const TinyIntVal& scale) {
+    FunctionContext* ctx, const DecimalVal& val, const TinyIntVal& scale) {
   DCHECK(!scale.is_null);
-  return RoundTo(context, val, scale.val, DecimalOperators::ROUND);
+  return RoundTo(ctx, val, scale.val, DecimalOperators::ROUND);
 }
 DecimalVal DecimalFunctions::RoundTo(
-    FunctionContext* context, const DecimalVal& val, const SmallIntVal& scale) {
+    FunctionContext* ctx, const DecimalVal& val, const SmallIntVal& scale) {
   DCHECK(!scale.is_null);
-  return RoundTo(context, val, scale.val, DecimalOperators::ROUND);
+  return RoundTo(ctx, val, scale.val, DecimalOperators::ROUND);
 }
 DecimalVal DecimalFunctions::RoundTo(
-    FunctionContext* context, const DecimalVal& val, const IntVal& scale) {
+    FunctionContext* ctx, const DecimalVal& val, const IntVal& scale) {
   DCHECK(!scale.is_null);
-  return RoundTo(context, val, scale.val, DecimalOperators::ROUND);
+  return RoundTo(ctx, val, scale.val, DecimalOperators::ROUND);
 }
 DecimalVal DecimalFunctions::RoundTo(
-    FunctionContext* context, const DecimalVal& val, const BigIntVal& scale) {
+    FunctionContext* ctx, const DecimalVal& val, const BigIntVal& scale) {
   DCHECK(!scale.is_null);
-  return RoundTo(context, val, scale.val, DecimalOperators::ROUND);
+  return RoundTo(ctx, val, scale.val, DecimalOperators::ROUND);
 }
 
-DecimalVal DecimalFunctions::Truncate(FunctionContext* context, const DecimalVal& val) {
-  return DecimalOperators::RoundDecimal(context, val, DecimalOperators::TRUNCATE);
+DecimalVal DecimalFunctions::Truncate(FunctionContext* ctx, const DecimalVal& val) {
+  return DecimalOperators::RoundDecimal(ctx, val, DecimalOperators::TRUNCATE);
 }
 
 DecimalVal DecimalFunctions::TruncateTo(
-    FunctionContext* context, const DecimalVal& val, const TinyIntVal& scale) {
+    FunctionContext* ctx, const DecimalVal& val, const TinyIntVal& scale) {
   DCHECK(!scale.is_null);
-  return RoundTo(context, val, scale.val, DecimalOperators::TRUNCATE);
+  return RoundTo(ctx, val, scale.val, DecimalOperators::TRUNCATE);
 }
 DecimalVal DecimalFunctions::TruncateTo(
-    FunctionContext* context, const DecimalVal& val, const SmallIntVal& scale) {
+    FunctionContext* ctx, const DecimalVal& val, const SmallIntVal& scale) {
   DCHECK(!scale.is_null);
-  return RoundTo(context, val, scale.val, DecimalOperators::TRUNCATE);
+  return RoundTo(ctx, val, scale.val, DecimalOperators::TRUNCATE);
 }
 DecimalVal DecimalFunctions::TruncateTo(
-    FunctionContext* context, const DecimalVal& val, const IntVal& scale) {
+    FunctionContext* ctx, const DecimalVal& val, const IntVal& scale) {
   DCHECK(!scale.is_null);
-  return RoundTo(context, val, scale.val, DecimalOperators::TRUNCATE);
+  return RoundTo(ctx, val, scale.val, DecimalOperators::TRUNCATE);
 }
 DecimalVal DecimalFunctions::TruncateTo(
-    FunctionContext* context, const DecimalVal& val, const BigIntVal& scale) {
+    FunctionContext* ctx, const DecimalVal& val, const BigIntVal& scale) {
   DCHECK(!scale.is_null);
-  return RoundTo(context, val, scale.val, DecimalOperators::TRUNCATE);
+  return RoundTo(ctx, val, scale.val, DecimalOperators::TRUNCATE);
 }
 
 }

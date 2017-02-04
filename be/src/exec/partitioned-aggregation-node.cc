@@ -1681,8 +1681,8 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
     // Call the UDA to update/merge 'src' into 'dst', with the result stored in
     // 'updated_dst_val'.
     CodegenAnyVal updated_dst_val;
-    RETURN_IF_ERROR(CodegenCallUda(
-        codegen, &builder, evaluator, agg_fn_ctx_arg, input_vals, dst, &updated_dst_val));
+    RETURN_IF_ERROR(CodegenCallUda(codegen, &builder, evaluator, agg_fn_ctx_arg,
+        input_vals, dst, &updated_dst_val));
     result = updated_dst_val.ToNativeValue();
 
     if (slot_desc->is_nullable() && !special_null_handling) {
@@ -1717,7 +1717,7 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
 }
 
 Status PartitionedAggregationNode::CodegenCallUda(LlvmCodeGen* codegen,
-    LlvmBuilder* builder, AggFnEvaluator* evaluator, Value* agg_fn_ctx,
+    LlvmBuilder* builder, AggFnEvaluator* evaluator, Value* agg_fn_ctx_arg,
     const vector<CodegenAnyVal>& input_vals, const CodegenAnyVal& dst,
     CodegenAnyVal* updated_dst_val) {
   DCHECK_EQ(evaluator->input_expr_ctxs().size(), input_vals.size());
@@ -1727,7 +1727,7 @@ Status PartitionedAggregationNode::CodegenCallUda(LlvmCodeGen* codegen,
   // Set up arguments for call to UDA, which are the FunctionContext*, followed by
   // pointers to all input values, followed by a pointer to the destination value.
   vector<Value*> uda_fn_args;
-  uda_fn_args.push_back(agg_fn_ctx);
+  uda_fn_args.push_back(agg_fn_ctx_arg);
 
   // Create pointers to input args to pass to uda_fn. We must use the unlowered type,
   // e.g. IntVal, because the UDA interface expects the values to be passed as const

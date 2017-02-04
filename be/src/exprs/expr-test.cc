@@ -1335,6 +1335,16 @@ DecimalTestCase decimal_cases[] = {
     {{ false, 1, 32, 1 }, { false, 1, 32, 1 }} },
   { "mod(cast('-1.23' as decimal(32,2)), cast('1.0' as decimal(32,2)))",
     {{ false, -23, 32, 2 }, { false, -23, 32, 2 }} },
+  { "cast(cast(0.12344 as decimal(6,5)) as decimal(6,4))",
+    {{ false, 1234, 6, 4 }, { false, 1234, 6, 4 }} },
+  { "cast(cast(0.12345 as decimal(6,5)) as decimal(6,4))",
+    {{ false, 1234, 6, 4 }, { false, 1235, 6, 4 }} },
+  { "cast(cast('0.999' as decimal(4,3)) as decimal(1,0))",
+    {{ false, 0, 1, 0 }, { false, 1, 1, 0 }} },
+  { "cast(cast(999999999.99 as DECIMAL(11,2)) as DECIMAL(9,0))",
+    {{ false, 999999999, 9, 0 }, { true, 0, 9, 0 }} },
+  { "cast(cast(-999999999.99 as DECIMAL(11,2)) as DECIMAL(9,0))",
+    {{ false, -999999999, 9, 0 }, { true, 0, 9, 0 }} },
   { "mod(cast(NULL as decimal(2,0)), cast('10' as decimal(2,0)))",
     {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
   { "mod(cast('10' as decimal(2,0)), cast(NULL as decimal(2,0)))",
@@ -1357,7 +1367,7 @@ TEST_F(ExprTest, DecimalArithmeticExprs) {
     string opt = "DECIMAL_V2=" + lexical_cast<string>(v2);
     executor_->pushExecOption(opt);
     for (const DecimalTestCase& c : decimal_cases) {
-      const DecimalExpectedResult& r = c.expected[0];
+      const DecimalExpectedResult& r = c.expected[v2];
       const ColumnType& type = ColumnType::CreateDecimalType(r.precision, r.scale);
       if (r.null) {
         TestIsNull(c.expr, type);

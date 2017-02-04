@@ -528,7 +528,7 @@ Status AggFnEvaluator::GetUpdateOrMergeFunction(LlvmCodeGen* codegen, Function**
   if (!(*uda_fn)->isDeclaration()) {
     // TODO: IMPALA-4785: we should also replace references to GetIntermediateType()
     // with constants.
-    Expr::InlineConstants(GetOutputTypeDesc(), arg_type_descs_, codegen, *uda_fn);
+    codegen->InlineConstFnAttrs(GetOutputTypeDesc(), arg_type_descs_, *uda_fn);
     *uda_fn = codegen->FinalizeFunction(*uda_fn);
     if (*uda_fn == NULL) {
       return Status(TErrorCode::UDF_VERIFY_FAILED, symbol, fn_.hdfs_location);

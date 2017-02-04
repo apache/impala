@@ -433,7 +433,7 @@ template <typename T> T MathFunctions::Negative(FunctionContext* ctx, const T& v
 template <>
 DecimalVal MathFunctions::Negative(FunctionContext* ctx, const DecimalVal& val) {
   if (val.is_null) return val;
-  int type_byte_size = Expr::GetConstantInt(*ctx, Expr::RETURN_TYPE_SIZE);
+  int type_byte_size = ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_SIZE);
   switch (type_byte_size) {
     case 4:
       return DecimalVal(-val.val4);
@@ -519,7 +519,7 @@ template <bool ISLEAST> DecimalVal MathFunctions::LeastGreatest(
   DCHECK_GT(num_args, 0);
   if (args[0].is_null) return DecimalVal::null();
   DecimalVal result_val = args[0];
-  int type_byte_size = Expr::GetConstantInt(*ctx, Expr::RETURN_TYPE_SIZE);
+  int type_byte_size = ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_SIZE);
   for (int i = 1; i < num_args; ++i) {
     if (args[i].is_null) return DecimalVal::null();
     switch (type_byte_size) {

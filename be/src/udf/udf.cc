@@ -82,7 +82,12 @@ class RuntimeState {
     assert(false);
   }
 
-  bool abort_on_error() {
+  bool abort_on_error() const {
+    assert(false);
+    return false;
+  }
+
+  bool decimal_v2() const {
     assert(false);
     return false;
   }
@@ -99,6 +104,7 @@ class RuntimeState {
 }
 
 #else
+#include "exprs/anyval-util.h"
 #include "runtime/free-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
@@ -114,6 +120,8 @@ using std::pair;
 const int FunctionContextImpl::VARARGS_BUFFER_ALIGNMENT;
 const char* FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME =
     "class.impala_udf::FunctionContext";
+const char* FunctionContextImpl::GET_CONST_FN_ATTR_SYMBOL =
+    "_ZN6impala19FunctionContextImpl14GetConstFnAttrENS0_11ConstFnAttrEi";
 
 static const int MAX_WARNINGS = 1000;
 
@@ -500,4 +508,54 @@ StringVal StringVal::CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t l
 const FunctionContext::TypeDesc* FunctionContext::GetArgType(int arg_idx) const {
   if (arg_idx < 0 || arg_idx >= impl_->arg_types_.size()) return NULL;
   return &impl_->arg_types_[arg_idx];
+}
+
+static int GetTypeByteSize(const FunctionContext::TypeDesc& type) {
+#if defined(IMPALA_UDF_SDK_BUILD) && IMPALA_UDF_SDK_BUILD
+  return 0;
+#else
+  return AnyValUtil::TypeDescToColumnType(type).GetByteSize();
+#endif
+}
+
+int FunctionContextImpl::GetConstFnAttr(FunctionContextImpl::ConstFnAttr t, int i) {
+  return GetConstFnAttr(state_, return_type_, arg_types_, t, i);
+}
+
+int FunctionContextImpl::GetConstFnAttr(const RuntimeState* state,
+    const FunctionContext::TypeDesc& return_type,
+    const vector<FunctionContext::TypeDesc>& arg_types,
+    ConstFnAttr t, int i) {
+  switch (t) {
+    case RETURN_TYPE_SIZE:
+      assert(i == -1);
+      return GetTypeByteSize(return_type);
+    case RETURN_TYPE_PRECISION:
+      assert(i == -1);
+      assert(return_type.type == FunctionContext::TYPE_DECIMAL);
+      return return_type.precision;
+    case RETURN_TYPE_SCALE:
+      assert(i == -1);
+      assert(return_type.type == FunctionContext::TYPE_DECIMAL);
+      return return_type.scale;
+    case ARG_TYPE_SIZE:
+      assert(i >= 0);
+      assert(i < arg_types.size());
+      return GetTypeByteSize(arg_types[i]);
+    case ARG_TYPE_PRECISION:
+      assert(i >= 0);
+      assert(i < arg_types.size());
+      assert(arg_types[i].type == FunctionContext::TYPE_DECIMAL);
+      return arg_types[i].precision;
+    case ARG_TYPE_SCALE:
+      assert(i >= 0);
+      assert(i < arg_types.size());
+      assert(arg_types[i].type == FunctionContext::TYPE_DECIMAL);
+      return arg_types[i].scale;
+    case DECIMAL_V2:
+      return state->decimal_v2();
+    default:
+      assert(false);
+      return -1;
+  }
 }

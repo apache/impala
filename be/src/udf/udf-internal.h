@@ -132,12 +132,53 @@ class FunctionContextImpl {
     return arg_types_;
   }
 
-  // UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'
-  // that require 16-byte memory alignment.
+  RuntimeState* state() { return state_; }
+
+  /// Various static attributes of the UDF/UDA that can be injected as constants
+  /// by codegen. Note that the argument types refer to those in the UDF/UDA signature,
+  /// not the arguments of the C++ functions implementing the UDF/UDA. Any change to
+  /// this enum must be reflected in FunctionContextImpl::GetConstFnAttr().
+  enum ConstFnAttr {
+    /// RETURN_TYPE_*: properties of FunctionContext::GetReturnType()
+    RETURN_TYPE_SIZE, // int
+    RETURN_TYPE_PRECISION, // int
+    RETURN_TYPE_SCALE, // int
+    /// ARG_TYPE_* with parameter i: properties of FunctionContext::GetArgType(i)
+    ARG_TYPE_SIZE, // int[]
+    ARG_TYPE_PRECISION, // int[]
+    ARG_TYPE_SCALE, // int[]
+    /// True if decimal_v2 query option is set.
+    DECIMAL_V2,
+  };
+
+  /// This function returns the various static attributes of the UDF/UDA. Calls to this
+  /// function are replaced by constants injected by codegen. If codegen is disabled,
+  /// this function is interpreted as-is.
+  ///
+  /// 't' is the static function attribute defined in the ConstFnAttr enum above.
+  /// For function attributes of arguments, 'i' holds the argument number (0 indexed).
+  /// Please note that argument refers to the arguments in the signature of the UDF or UDA.
+  /// 'i' must always be an immediate integer value in order to utilize the constant
+  /// replacement when codegen is enabled. e.g., it cannot be a variable or an expression
+  /// like "1 + 1".
+  ///
+  int GetConstFnAttr(ConstFnAttr t, int i = -1);
+
+  /// Return the function attribute 't' defined in ConstFnAttr above.
+  static int GetConstFnAttr(const RuntimeState* state,
+      const impala_udf::FunctionContext::TypeDesc& return_type,
+      const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
+      ConstFnAttr t, int i = -1);
+
+  /// UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'
+  /// that require 16-byte memory alignment.
   static const int VARARGS_BUFFER_ALIGNMENT = 16;
+
+  /// The LLVM class name for FunctionContext. Used for handcrafted IR.
   static const char* LLVM_FUNCTIONCONTEXT_NAME;
 
-  RuntimeState* state() { return state_; }
+  /// FunctionContextImpl::GetConstFnAttr() symbol. Used for call sites replacement.
+  static const char* GET_CONST_FN_ATTR_SYMBOL;
 
  private:
   friend class impala_udf::FunctionContext;

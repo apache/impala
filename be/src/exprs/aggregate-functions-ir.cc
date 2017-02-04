@@ -401,7 +401,7 @@ IR_ALWAYS_INLINE void AggregateFunctions::DecimalAvgAddOrRemove(FunctionContext*
   // Since the src and dst are guaranteed to be the same scale, we can just
   // do a simple add.
   int m = remove ? -1 : 1;
-  switch (Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_SIZE, 0)) {
+  switch (ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SIZE, 0)) {
     case 4:
       avg->sum.val16 += m * src.val4;
       break;
@@ -511,7 +511,7 @@ IR_ALWAYS_INLINE void AggregateFunctions::SumDecimalAddOrSubtract(FunctionContex
     const DecimalVal& src, DecimalVal* dst, bool subtract) {
   if (src.is_null) return;
   if (dst->is_null) InitZero<DecimalVal>(ctx, dst);
-  int precision = Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_PRECISION, 0);
+  int precision = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_PRECISION, 0);
   // Since the src and dst are guaranteed to be the same scale, we can just
   // do a simple add.
   int m = subtract ? -1 : 1;
@@ -573,7 +573,7 @@ template<>
 void AggregateFunctions::Min(FunctionContext* ctx,
     const DecimalVal& src, DecimalVal* dst) {
   if (src.is_null) return;
-  int precision = Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_PRECISION, 0);
+  int precision = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_PRECISION, 0);
   if (precision <= 9) {
     if (dst->is_null || src.val4 < dst->val4) *dst = src;
   } else if (precision <= 19) {
@@ -587,7 +587,7 @@ template<>
 void AggregateFunctions::Max(FunctionContext* ctx,
     const DecimalVal& src, DecimalVal* dst) {
   if (src.is_null) return;
-  int precision = Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_PRECISION, 0);
+  int precision = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_PRECISION, 0);
   if (precision <= 9) {
     if (dst->is_null || src.val4 > dst->val4) *dst = src;
   } else if (precision <= 19) {
@@ -1200,8 +1200,8 @@ void AggregateFunctions::HllUpdate(
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, HLL_LEN);
-  uint64_t hash_value = AnyValUtil::HashDecimal64(
-      src, Expr::GetConstantInt(*ctx, Expr::ARG_TYPE_SIZE, 0), HashUtil::FNV64_SEED);
+  int byte_size = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SIZE, 0);
+  uint64_t hash_value = AnyValUtil::HashDecimal64(src, byte_size, HashUtil::FNV64_SEED);
   if (hash_value != 0) {
     // Use the lower bits to index into the number of streams and then
     // find the first 1 bit after the index bits.

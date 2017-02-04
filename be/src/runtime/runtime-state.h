@@ -104,6 +104,7 @@ class RuntimeState {
   bool abort_on_default_limit_exceeded() const {
     return query_options().abort_on_default_limit_exceeded;
   }
+  bool decimal_v2() const { return query_options().decimal_v2; }
   const TQueryCtx& query_ctx() const;
   const TPlanFragmentInstanceCtx& instance_ctx() const { return *instance_ctx_; }
   const TUniqueId& session_id() const { return query_ctx().session.session_id; }

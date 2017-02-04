@@ -82,7 +82,7 @@ Frontend::Frontend() {
     {"getTableFiles", "([B)[B", &get_table_files_id_},
     {"showCreateFunction", "([B)Ljava/lang/String;", &show_create_function_id_},
     {"buildTestDescriptorTable", "([B)[B", &build_test_descriptor_table_id_}
-};
+  };
 
   JNIEnv* jni_env = getJNIEnv();
   // create instance of java class JniFrontend

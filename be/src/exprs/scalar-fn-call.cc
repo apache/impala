@@ -316,8 +316,8 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
       NumFixedArgs(), vararg_start_idx_ != -1, &udf, &cache_entry_));
   // Inline constants into the function if it has an IR body.
   if (!udf->isDeclaration()) {
-    InlineConstants(AnyValUtil::ColumnTypeToTypeDesc(type_),
-        AnyValUtil::ColumnTypesToTypeDescs(arg_types), codegen, udf);
+    codegen->InlineConstFnAttrs(AnyValUtil::ColumnTypeToTypeDesc(type_),
+        AnyValUtil::ColumnTypesToTypeDescs(arg_types), udf);
     udf = codegen->FinalizeFunction(udf);
     if (udf == NULL) {
       return Status(

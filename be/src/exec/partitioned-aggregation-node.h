@@ -651,7 +651,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// operation is applied. The instruction sequence for the UDA call is inserted at
   /// the insert position of 'builder'.
   Status CodegenCallUda(LlvmCodeGen* codegen, LlvmBuilder* builder,
-      AggFnEvaluator* evaluator, llvm::Value* agg_fn_ctx,
+      AggFnEvaluator* evaluator, llvm::Value* agg_fn_ctx_arg,
       const std::vector<CodegenAnyVal>& input_vals, const CodegenAnyVal& dst_val,
       CodegenAnyVal* updated_dst_val);
 
