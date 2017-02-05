@@ -27,7 +27,7 @@ from tempfile import mkdtemp as make_tmp_dir
 from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfIsilon, SkipIfLocal, SkipIfS3
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path
@@ -214,6 +214,9 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
       rmtree(tmp_dir)
 
 
+@SkipIfIsilon.hive
+@SkipIfLocal.hive
+@SkipIfS3.hive
 class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 
   @classmethod
