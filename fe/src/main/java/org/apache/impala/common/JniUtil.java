@@ -22,6 +22,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryUsage;
 import java.util.ArrayList;
@@ -142,6 +143,41 @@ public class JniUtil {
         }
       }
     }
+
+    if (request.get_all || request.getMemory_pool().equals("heap")) {
+      // Populate heap usage
+      MemoryMXBean mBean = ManagementFactory.getMemoryMXBean();
+      TJvmMemoryPool heap = new TJvmMemoryPool();
+      MemoryUsage heapUsage = mBean.getHeapMemoryUsage();
+      heap.setCommitted(heapUsage.getCommitted());
+      heap.setInit(heapUsage.getInit());
+      heap.setMax(heapUsage.getMax());
+      heap.setUsed(heapUsage.getUsed());
+      heap.setName("heap");
+      heap.setPeak_committed(0);
+      heap.setPeak_init(0);
+      heap.setPeak_max(0);
+      heap.setPeak_used(0);
+      jvmMetrics.getMemory_pools().add(heap);
+    }
+
+    if (request.get_all || request.getMemory_pool().equals("non-heap")) {
+      // Populate non-heap usage
+      MemoryMXBean mBean = ManagementFactory.getMemoryMXBean();
+      TJvmMemoryPool nonHeap = new TJvmMemoryPool();
+      MemoryUsage nonHeapUsage = mBean.getNonHeapMemoryUsage();
+      nonHeap.setCommitted(nonHeapUsage.getCommitted());
+      nonHeap.setInit(nonHeapUsage.getInit());
+      nonHeap.setMax(nonHeapUsage.getMax());
+      nonHeap.setUsed(nonHeapUsage.getUsed());
+      nonHeap.setName("non-heap");
+      nonHeap.setPeak_committed(0);
+      nonHeap.setPeak_init(0);
+      nonHeap.setPeak_max(0);
+      nonHeap.setPeak_used(0);
+      jvmMetrics.getMemory_pools().add(nonHeap);
+    }
+
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(jvmMetrics);

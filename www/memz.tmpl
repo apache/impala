@@ -28,15 +28,15 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
 <h3>Breakdown</h3>
 <pre>{{detailed}}</pre>
 
-{{?jvm}}
-<h3>JVM memory total usage</h3>
+{{?jvm_heap}}
+<h3>JVM heap usage</h3>
 <table class='table table-bordered table-hover'>
   <tr>
     <th>Name</th>
     <th>Value</th>
     <th>Description</th>
   </tr>
-  {{#jvm}}
+  {{#jvm_heap}}
   <tr>
     <td><tt>{{name}}</tt></td>
     {{! Is this a stats metric? }}
@@ -54,8 +54,68 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
       {{description}}
     </td>
   </tr>
-  {{/jvm}}
+  {{/jvm_heap}}
 </table>
-{{/jvm}}
+{{/jvm_heap}}
+
+{{?jvm_non_heap}}
+<h3>JVM non-heap usage</h3>
+<table class='table table-bordered table-hover'>
+  <tr>
+    <th>Name</th>
+    <th>Value</th>
+    <th>Description</th>
+  </tr>
+  {{#jvm_non_heap}}
+  <tr>
+    <td><tt>{{name}}</tt></td>
+    {{! Is this a stats metric? }}
+    {{?mean}}
+    <td>
+      Last (of {{count}}): <strong>{{last}}</strong>.
+      Min: {{min}}, max: {{max}}, avg: {{mean}}</td>
+    {{/mean}}
+    {{^mean}}
+    <td>
+      {{human_readable}}
+    </td>
+    {{/mean}}
+    <td>
+      {{description}}
+    </td>
+  </tr>
+  {{/jvm_non_heap}}
+</table>
+{{/jvm_non_heap}}
+
+{{?jvm_total}}
+<h3>JVM total memory usage</h3>
+<table class='table table-bordered table-hover'>
+  <tr>
+    <th>Name</th>
+    <th>Value</th>
+    <th>Description</th>
+  </tr>
+  {{#jvm_total}}
+  <tr>
+    <td><tt>{{name}}</tt></td>
+    {{! Is this a stats metric? }}
+    {{?mean}}
+    <td>
+      Last (of {{count}}): <strong>{{last}}</strong>.
+      Min: {{min}}, max: {{max}}, avg: {{mean}}</td>
+    {{/mean}}
+    {{^mean}}
+    <td>
+      {{human_readable}}
+    </td>
+    {{/mean}}
+    <td>
+      {{description}}
+    </td>
+  </tr>
+  {{/jvm_total}}
+</table>
+{{/jvm_total}}
 
 {{> www/common-footer.tmpl }}

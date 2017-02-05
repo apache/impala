@@ -148,17 +148,23 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
     if (jvm_group != NULL) {
       Value jvm(kObjectType);
       jvm_group->ToJson(false, document, &jvm);
+      Value heap(kArrayType);
+      Value non_heap(kArrayType);
       Value total(kArrayType);
       for (SizeType i = 0; i < jvm["metrics"].Size(); ++i) {
         if (strstr(jvm["metrics"][i]["name"].GetString(), "total") != nullptr) {
           total.PushBack(jvm["metrics"][i], document->GetAllocator());
+        } else if (strstr(jvm["metrics"][i]["name"].GetString(), "non-heap") != nullptr) {
+          non_heap.PushBack(jvm["metrics"][i], document->GetAllocator());
+        } else if (strstr(jvm["metrics"][i]["name"].GetString(), "heap") != nullptr) {
+          heap.PushBack(jvm["metrics"][i], document->GetAllocator());
         }
       }
-      document->AddMember("jvm", total, document->GetAllocator());
-
+      document->AddMember("jvm_total", total, document->GetAllocator());
+      document->AddMember("jvm_heap", heap, document->GetAllocator());
+      document->AddMember("jvm_non_heap", non_heap, document->GetAllocator());
     }
   }
-
 }
 
 
