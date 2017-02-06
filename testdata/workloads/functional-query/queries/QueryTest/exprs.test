@@ -2692,3 +2692,18 @@ where id = case when false then 0 when 1 = 1 then 1 else 2 end
 ---- TYPES
 INT,TINYINT
 ====
+---- QUERY
+# IMPALA-4849: verify that DISTINCT with a CASE that is rewritten analyzes correctly.
+select distinct case when true then id else 0 end from functional.alltypestiny
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+---- TYPES
+INT
+====

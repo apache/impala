@@ -103,7 +103,7 @@ public class SelectList {
 
   public void reset() {
     for (SelectListItem item: items_) {
-      if (!item.isStar()) item.getExpr().reset();
+      if (!item.isStar()) item.setExpr(item.getExpr().reset());
     }
   }
 }
