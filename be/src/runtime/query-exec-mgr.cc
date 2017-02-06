@@ -33,7 +33,8 @@
 #include "util/impalad-metrics.h"
 #include "util/debug-util.h"
 
-using boost::lock_guard;
+#include "common/names.h"
+
 using namespace impala;
 
 // TODO: this logging should go into a per query log.

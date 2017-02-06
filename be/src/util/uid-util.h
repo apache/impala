@@ -25,7 +25,6 @@
 
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 #include "util/debug-util.h"
-#include "common/names.h"
 
 namespace impala {
 

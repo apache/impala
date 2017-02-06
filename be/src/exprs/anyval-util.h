@@ -25,8 +25,6 @@
 #include "util/decimal-util.h"
 #include "util/hash-util.h"
 
-#include "common/names.h"
-
 using namespace impala_udf;
 
 namespace impala {

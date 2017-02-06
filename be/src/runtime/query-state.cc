@@ -26,6 +26,8 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
 
+#include "common/names.h"
+
 using namespace impala;
 
 QueryState::ScopedRef::ScopedRef(const TUniqueId& query_id) {

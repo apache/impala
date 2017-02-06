@@ -20,11 +20,9 @@
 
 #include <map>
 #include <string>
-
 #include <boost/cstdint.hpp>
-#include "common/logging.h"
-#include "common/names.h"
 
+#include "common/logging.h"
 
 namespace impala {
 
@@ -86,20 +84,20 @@ class ProcessStateInfo {
   /// to be thread safe.
   ProcessStateInfo();
 
-  string DebugString() const;
+  std::string DebugString() const;
 
-  int GetInt(const string& state_key) const;
-  int64_t GetInt64(const string& state_key) const;
-  string GetString(const string& state_key) const;
+  int GetInt(const std::string& state_key) const;
+  int64_t GetInt64(const std::string& state_key) const;
+  std::string GetString(const std::string& state_key) const;
 
   /// Original data's unit is B or KB.
-  int64_t GetBytes(const string& state_key) const;
+  int64_t GetBytes(const std::string& state_key) const;
  private:
-  typedef map<string, string> ProcessStateMap;
+  typedef std::map<std::string, std::string> ProcessStateMap;
   ProcessStateMap process_state_map_;
 
   /// The description info for each file.
-  typedef map<int, string> FileDescriptorMap;
+  typedef std::map<int, std::string> FileDescriptorMap;
   FileDescriptorMap fd_desc_;
 
   /// Read I/O info from /proc/<pid>/io.

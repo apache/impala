@@ -24,8 +24,6 @@
 
 #include <stdlib.h>
 
-#include "common/names.h"
-
 namespace impala {
 
 inline int WriteStream::WriteByte(uint8_t val) {

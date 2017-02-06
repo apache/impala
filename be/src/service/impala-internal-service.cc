@@ -20,12 +20,15 @@
 #include <boost/lexical_cast.hpp>
 
 #include "common/status.h"
+#include "gutil/strings/substitute.h"
 #include "service/impala-server.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/query-state.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/exec-env.h"
 #include "testutil/fault-injection-util.h"
+
+#include "common/names.h"
 
 using namespace impala;
 

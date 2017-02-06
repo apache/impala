@@ -29,6 +29,8 @@
 #include "runtime/query-state.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
+#include "common/names.h"
+
 using namespace impala;
 
 FragmentInstanceState::FragmentInstanceState(
