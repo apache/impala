@@ -62,14 +62,13 @@ public abstract class Type {
   public static final ScalarType TIMESTAMP = new ScalarType(PrimitiveType.TIMESTAMP);
   public static final ScalarType DATE = new ScalarType(PrimitiveType.DATE);
   public static final ScalarType DATETIME = new ScalarType(PrimitiveType.DATETIME);
-  public static final ScalarType DEFAULT_DECIMAL = (ScalarType)
+  public static final ScalarType DEFAULT_DECIMAL =
       ScalarType.createDecimalType(ScalarType.DEFAULT_PRECISION,
           ScalarType.DEFAULT_SCALE);
-  public static final ScalarType DECIMAL =
-      (ScalarType) ScalarType.createDecimalTypeInternal(-1, -1);
+  public static final ScalarType DECIMAL = ScalarType.createWildCardDecimalType();
   public static final ScalarType DEFAULT_VARCHAR = ScalarType.createVarcharType(-1);
   public static final ScalarType VARCHAR = ScalarType.createVarcharType(-1);
-  public static final ScalarType CHAR = (ScalarType) ScalarType.createCharType(-1);
+  public static final ScalarType CHAR = ScalarType.createCharType(-1);
 
   private static ArrayList<ScalarType> integerTypes;
   private static ArrayList<ScalarType> numericTypes;

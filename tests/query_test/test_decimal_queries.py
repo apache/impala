@@ -20,11 +20,10 @@
 from copy import copy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import create_exec_option_dimension_from_dict
 from tests.common.test_vector import ImpalaTestDimension
 
 class TestDecimalQueries(ImpalaTestSuite):
-  BATCH_SIZES = [0, 1]
-
   @classmethod
   def get_workload(cls):
     return 'functional-query'
@@ -33,8 +32,9 @@ class TestDecimalQueries(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestDecimalQueries, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('batch_size', *TestDecimalQueries.BATCH_SIZES))
-
+      create_exec_option_dimension_from_dict({
+        'decimal_v2' : ['false', 'true'],
+        'batch_size' : [0, 1]}))
     # Hive < 0.11 does not support decimal so we can't run these tests against the other
     # file formats.
     # TODO: Enable them on Hive >= 0.11.
@@ -44,9 +44,24 @@ class TestDecimalQueries(ImpalaTestSuite):
          v.get_value('table_format').file_format == 'parquet')
 
   def test_queries(self, vector):
-    new_vector = copy(vector)
-    new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
-    self.run_test_case('QueryTest/decimal', new_vector)
+    self.run_test_case('QueryTest/decimal', vector)
+
+# Tests involving DECIMAL typed expressions. The results depend on whether DECIMAL
+# version 1 or version 2 are enabled, so the .test file itself toggles the DECIMAL_V2
+# query option.
+class TestDecimalExprs(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestDecimalExprs, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        (v.get_value('table_format').file_format == 'parquet'))
+
+  def test_exprs(self, vector):
+    self.run_test_case('QueryTest/decimal-exprs', vector)
 
 # TODO: when we have a good way to produce Avro decimal data (e.g. upgrade Hive), we can
 # run Avro through the same tests as above instead of using avro_decimal_tbl.

@@ -1287,89 +1287,164 @@ struct DecimalExpectedResult {
 };
 
 struct DecimalTestCase {
+
+  // Return the expected result for the given DECIMAL version. When the expected V1 and
+  // V2 results are the same, allows the V2 expected result to be unspecified in the
+  // test case table. When V2 expected results aren't specified, V2 entries have both
+  // 'null' set to false and 'precision' set to 0, which is an illegal combination and
+  // signals that V1 results should be used instead.
+  const DecimalExpectedResult& Expected(bool v2) const {
+    if (v2 && (expected[1].null || expected[1].precision != 0)) return expected[1];
+    // Either testing version 1, or the results for version 2 were not specified.
+    return expected[0];
+  }
+
+  // Expression to execute.
   string expr;
-  DecimalExpectedResult expected[2]; // Version 1 and Version 2
+
+  // Expected results for version 1 and Version 2. Version 2 results can be left unset
+  // when the expected result is the same between versions.
+  DecimalExpectedResult expected[2];
 };
 
 // Format is:
 // { Test Expression (as a string),
-//  { Decimal V1 expected results, Decimal V2 expected results } }
+//  { expected null, scaled_val, precision, scale for V1
+//    expected null, scaled_val, precision, scale for V2 }}
 DecimalTestCase decimal_cases[] = {
-  { "1.23 + cast(1 as decimal(4,3))",
-    {{ false, 2230, 5, 3 }, { false, 2230, 5, 3 }} },
-  { "1.23 - cast(0.23 as decimal(10,3))",
-    {{ false, 1000, 11, 3 }, { false, 1000, 11, 3 }} },
-  { "1.23 * cast(1 as decimal(20,3))",
-    {{ false, 123000, 23, 5 }, { false, 123000, 23, 5 }} },
-  { "cast(1.23 as decimal(8,2)) / cast(1 as decimal(4,3))",
-    {{ false, 12300000, 16, 7}, { false, 12300000, 16, 7}} },
-  { "cast(1.23 as decimal(8,2)) % cast(1 as decimal(10,3))",
-    {{ false, 230, 9, 3 }, { false, 230, 9, 3 }} },
-  { "cast(1.23 as decimal(8,2)) + cast(1 as decimal(20,3))",
-    {{ false, 2230, 21, 3 }, { false, 2230, 21, 3 }} },
-  { "cast(1.23 as decimal(30,2)) - cast(1 as decimal(4,3))",
-    {{ false, 230, 32, 3 }, { false, 230, 32, 3 }} },
-  { "cast(1.23 as decimal(30,2)) * cast(1 as decimal(10,3))",
-    {{ false, 123000, 38, 5 }, { false, 123000, 38, 5 }} },
+  // Test add/subtract operators
+  { "1.23 + cast(1 as decimal(4,3))", {{ false, 2230, 5, 3 }}},
+  { "1.23 - cast(0.23 as decimal(10,3))", {{ false, 1000, 11, 3 }}},
+  { "cast(1.23 as decimal(8,2)) + cast(1 as decimal(20,3))", {{ false, 2230, 21, 3 }}},
+  { "cast(1.23 as decimal(30,2)) - cast(1 as decimal(4,3))", {{ false, 230, 32, 3 }}},
+  { "cast(1 as decimal(38,0)) + cast(.2 as decimal(38,1))", {{ false, 12, 38, 1 }}},
+  // Test multiply operator
+  { "cast(1.23 as decimal(30,2)) * cast(1 as decimal(10,3))", {{ false, 123000, 38, 5 }}},
+  { "1.23 * cast(1 as decimal(20,3))", {{ false, 123000, 23, 5 }}},
+  // Test divide operator
+  { "cast(1.23 as decimal(8,2)) / cast(1 as decimal(4,3))", {{ false, 12300000, 16, 7}}},
   { "cast(1.23 as decimal(30,2)) / cast(1 as decimal(20,3))",
-    {{ false, 1230, 38, 3 }, { false, 1230, 38, 3 }} },
-  { "cast(1 as decimal(38,0)) + cast(.2 as decimal(38,1))",
-    {{ false, 12, 38, 1 }, { false, 12, 38, 1 }} },
+    {{ false,     1230, 38, 3 },
+     { false, 12300000, 38, 7 }}},
   { "cast(1 as decimal(38,0)) / cast(.2 as decimal(38,1))",
-    {{ false, 50, 38, 1 }, { false, 50, 38, 1 }} },
-  { "mod(cast('1' as decimal(2,0)), cast('10' as decimal(2,0)))",
-    {{ false, 1, 2, 0 }, { false, 1, 2, 0 }} },
-  { "mod(cast('1.1' as decimal(2,1)), cast('1.0' as decimal(2,1)))",
-    {{ false, 1, 2,1 }, { false, 1, 2,1 }} },
+    {{ false,      50, 38, 1 },
+     { false, 5000000, 38, 6 }}},
+  { "cast(1 as decimal(38,0)) / cast(3 as decimal(38,0))",
+    {{ false,      0, 38, 0 },
+     { false, 333333, 38, 6 }}},
+  { "cast(99999999999999999999999999999999999999 as decimal(38,0)) / "
+    "cast(99999999999999999999999999999999999999 as decimal(38,0))",
+    {{ false,       1, 38, 0 },
+     { false, 1000000, 38, 6 }}},
+  { "cast(99999999999999999999999999999999999999 as decimal(38,0)) / "
+    "cast(0.00000000000000000000000000000000000001 as decimal(38,38))",
+    {{ true, 0, 38, 38 },
+     { true, 0, 38,  6 }}},
+  { "cast(0.00000000000000000000000000000000000001 as decimal(38,38)) / "
+    "cast(99999999999999999999999999999999999999 as decimal(38,0))",
+    {{ false, 0, 38, 38 }}},
+  { "cast(0.00000000000000000000000000000000000001 as decimal(38,38)) / "
+    "cast(0.00000000000000000000000000000000000001 as decimal(38,38))",
+    {{ true,        0, 38, 38 },
+     { false, 1000000, 38,  6 }}},
+  { "cast(9999999999999999999.9999999999999999999 as decimal(38,19)) / "
+    "cast(99999999999999999999999999999.999999999 as decimal(38,9))",
+    {{ false, 1000000000, 38, 19 },
+     { false,          1, 38, 10 }}},
+  { "cast(999999999999999999999999999999999999.99 as decimal(38,2)) / "
+    "cast(99999999999.999999999999999999999999999 as decimal(38,27))",
+    {{ true,  0, 38, 27 },
+     { false, static_cast<int128_t>(10) * 10000000000ll *
+       10000000000ll * 10000000000ll, 38, 6 }}},
+  { "cast(-2.12 as decimal(17,2)) / cast(12515.95 as decimal(17,2))",
+    {{ false, -16938386618674571, 37, 20 }}},
+  { "cast(-2.12 as decimal(18,2)) / cast(12515.95 as decimal(18,2))",
+    {{ false,                  0, 38,  2 },
+     { false, -16938386618674571, 38, 20 }}},
+  { "cast(737373 as decimal(6,0)) / cast(.52525252 as decimal(38,38))",
+    {{ true,              0, 38, 38 },
+     { false, 1403844764038, 38,  6 }}},
+  { "cast(0.000001 as decimal(6,6)) / "
+    "cast(0.0000000000000000000000000000000000001 as decimal(38,38))",
+    {{ true, 0, 38, 38 },
+     { false, static_cast<int128_t>(10000000ll) *
+       10000000000ll * 10000000000ll * 10000000000ll, 38, 6 }}},
+  { "cast(98765432109876543210 as decimal(20,0)) / "
+    "cast(98765432109876543211 as decimal(20,0))",
+    {{ false,                  0, 38,  0 },
+     { false, 999999999999999999, 38, 18 }}},
+  { "cast(111111.1111 as decimal(20, 10)) / cast(.7777 as decimal(38, 38))",
+    {{ true,             0, 38, 38 },
+     { false, 142871429985, 38,  6 }}},
+  // Test modulo operator
+  { "cast(1.23 as decimal(8,2)) % cast(1 as decimal(10,3))", {{ false, 230, 9, 3 }}},
+  { "cast(1 as decimal(38,0)) % cast(.2 as decimal(38,1))", {{ false, 0, 38, 1 }}},
+  { "cast(1 as decimal(38,0)) % cast(3 as decimal(38,0))", {{ false, 1, 38, 0 }}},
+  { "cast(-2.12 as decimal(17,2)) % cast(12515.95 as decimal(17,2))",
+    {{ false, -212, 17, 2 }}},
+  { "cast(-2.12 as decimal(18,2)) % cast(12515.95 as decimal(18,2))",
+    {{ false, -212, 18, 2 }}},
+  { "cast(99999999999999999999999999999999999999 as decimal(38,0)) % "
+    "cast(99999999999999999999999999999999999999 as decimal(38,0))",
+    {{ false, 0, 38, 0 }}},
+  { "cast(998 as decimal(38,0)) % cast(0.999 as decimal(38,38))", {{ false, 0, 38, 38 }}},
+  { "cast(0.998 as decimal(38,38)) % cast(999 as decimal(38,0))", {{ false, 0, 38, 38 }}},
+  { "cast(0.00000000000000000000000000000000000001 as decimal(38,38)) % "
+    "cast(0.0000000000000000000000000000000000001 as decimal(38,38))",
+    {{ false, 1, 38, 38 }}},
+  // Test MOD builtin
+  { "mod(cast('1' as decimal(2,0)), cast('10' as decimal(2,0)))", {{ false, 1, 2, 0 }}},
+  { "mod(cast('1.1' as decimal(2,1)), cast('1.0' as decimal(2,1)))", {{ false, 1, 2, 1 }}},
   { "mod(cast('-1.23' as decimal(5,2)), cast('1.0' as decimal(5,2)))",
-    {{ false, -23, 5,2 }, { false, -23, 5,2 }} },
-  { "mod(cast('1' as decimal(12,0)), cast('10' as decimal(12,0)))",
-    {{ false, 1, 12, 0 }, { false, 1, 12, 0 }} },
+    {{ false, -23, 5, 2 }}},
+  { "mod(cast('1' as decimal(12,0)), cast('10' as decimal(12,0)))", {{ false, 1, 12, 0 }}},
   { "mod(cast('1.1' as decimal(12,1)), cast('1.0' as decimal(12,1)))",
-    {{ false, 1, 12, 1 }, { false, 1, 12, 1 }} },
+    {{ false, 1, 12, 1 }}},
   { "mod(cast('-1.23' as decimal(12,2)), cast('1.0' as decimal(12,2)))",
-    {{ false, -23, 12, 2 }, { false, -23, 12, 2 }} },
+    {{ false, -23, 12, 2 }}},
   { "mod(cast('1' as decimal(32,0)), cast('10' as decimal(32,0)))",
-    {{ false, 1, 32, 0 }, { false, 1, 32, 0 }} },
+    {{ false, 1, 32, 0 }}},
   { "mod(cast('1.1' as decimal(32,1)), cast('1.0' as decimal(32,1)))",
-    {{ false, 1, 32, 1 }, { false, 1, 32, 1 }} },
+    {{ false, 1, 32, 1 }}},
   { "mod(cast('-1.23' as decimal(32,2)), cast('1.0' as decimal(32,2)))",
-    {{ false, -23, 32, 2 }, { false, -23, 32, 2 }} },
+    {{ false, -23, 32, 2 }}},
+  { "mod(cast(NULL as decimal(2,0)), cast('10' as decimal(2,0)))", {{ true, 0, 2, 0 }}},
+  { "mod(cast('10' as decimal(2,0)), cast(NULL as decimal(2,0)))", {{ true, 0, 2, 0 }}},
+  { "mod(cast('10' as decimal(2,0)), cast('0' as decimal(2,0)))", {{ true, 0, 2, 0 }}},
+  { "mod(cast('10' as decimal(2,0)), cast('0' as decimal(2,0)))", {{ true, 0, 2, 0 }}},
+  { "mod(cast(NULL as decimal(2,0)), NULL)", {{ true, 0, 2, 0 }}},
+  // Test CAST DECIMAL -> DECIMAL
   { "cast(cast(0.12344 as decimal(6,5)) as decimal(6,4))",
-    {{ false, 1234, 6, 4 }, { false, 1234, 6, 4 }} },
+    {{ false, 1234, 6, 4 }}},
   { "cast(cast(0.12345 as decimal(6,5)) as decimal(6,4))",
-    {{ false, 1234, 6, 4 }, { false, 1235, 6, 4 }} },
+    {{ false, 1234, 6, 4 },
+     { false, 1235, 6, 4 }}},
   { "cast(cast('0.999' as decimal(4,3)) as decimal(1,0))",
-    {{ false, 0, 1, 0 }, { false, 1, 1, 0 }} },
+    {{ false, 0, 1, 0 },
+     { false, 1, 1, 0 }}},
   { "cast(cast(999999999.99 as DECIMAL(11,2)) as DECIMAL(9,0))",
-    {{ false, 999999999, 9, 0 }, { true, 0, 9, 0 }} },
+    {{ false, 999999999, 9, 0 },
+     { true, 0, 9, 0 }}},
   { "cast(cast(-999999999.99 as DECIMAL(11,2)) as DECIMAL(9,0))",
-    {{ false, -999999999, 9, 0 }, { true, 0, 9, 0 }} },
-  { "mod(cast(NULL as decimal(2,0)), cast('10' as decimal(2,0)))",
-    {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
-  { "mod(cast('10' as decimal(2,0)), cast(NULL as decimal(2,0)))",
-    {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
-  { "mod(cast('10' as decimal(2,0)), cast('0' as decimal(2,0)))",
-    {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
-  { "mod(cast('10' as decimal(2,0)), cast('0' as decimal(2,0)))",
-    {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
-  { "mod(cast(NULL as decimal(2,0)), NULL)",
-    {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
+    {{ false, -999999999, 9, 0 },
+     { true, 0, 9, 0 }}},
   // IMPALA-2233: Test that implicit casts do not lose precision.
   // The overload greatest(decimal(*,*)) is available and should be used.
   { "greatest(0, cast('99999.1111' as decimal(30,10)))",
-    {{ false, 999991111000000, 30, 10 }, { false, 999991111000000, 30, 10 }} }
+    {{ false, 999991111000000, 30, 10 },
+     { false, 999991111000000, 30, 10 }}}
 };
 
 TEST_F(ExprTest, DecimalArithmeticExprs) {
   // Test with both decimal_v2={false, true}
-  for (int v2 = 0; v2 <= 1; ++v2) {
+  for (int v2: { 0, 1 }) {
     string opt = "DECIMAL_V2=" + lexical_cast<string>(v2);
-    executor_->pushExecOption(opt);
+    executor_->PushExecOption(opt);
     for (const DecimalTestCase& c : decimal_cases) {
-      const DecimalExpectedResult& r = c.expected[v2];
+      const DecimalExpectedResult& r = c.Expected(v2);
       const ColumnType& type = ColumnType::CreateDecimalType(r.precision, r.scale);
       if (r.null) {
+        TestDecimalResultType(c.expr, type);
         TestIsNull(c.expr, type);
       } else {
         switch (type.GetByteSize()) {
@@ -1387,7 +1462,7 @@ TEST_F(ExprTest, DecimalArithmeticExprs) {
         }
       }
     }
-    executor_->popExecOption();
+    executor_->PopExecOption();
   }
 }
 
@@ -6252,19 +6327,19 @@ int main(int argc, char **argv) {
   int ret;
   disable_codegen_ = true;
   enable_expr_rewrites_ = false;
-  executor_->clearExecOptions();
-  executor_->pushExecOption("ENABLE_EXPR_REWRITES=0");
-  executor_->pushExecOption("DISABLE_CODEGEN=1");
+  executor_->ClearExecOptions();
+  executor_->PushExecOption("ENABLE_EXPR_REWRITES=0");
+  executor_->PushExecOption("DISABLE_CODEGEN=1");
   cout << "Running without codegen" << endl;
   ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;
 
   disable_codegen_ = false;
   enable_expr_rewrites_ = false;
-  executor_->clearExecOptions();
-  executor_->pushExecOption("ENABLE_EXPR_REWRITES=0");
-  executor_->pushExecOption("DISABLE_CODEGEN=0");
-  executor_->pushExecOption("EXEC_SINGLE_NODE_ROWS_THRESHOLD=0");
+  executor_->ClearExecOptions();
+  executor_->PushExecOption("ENABLE_EXPR_REWRITES=0");
+  executor_->PushExecOption("DISABLE_CODEGEN=0");
+  executor_->PushExecOption("EXEC_SINGLE_NODE_ROWS_THRESHOLD=0");
   cout << endl << "Running with codegen" << endl;
   ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;
@@ -6272,9 +6347,9 @@ int main(int argc, char **argv) {
   // Enable FE expr rewrites to get test for constant folding over all exprs.
   disable_codegen_ = true;
   enable_expr_rewrites_ = true;
-  executor_->clearExecOptions();
-  executor_->pushExecOption("ENABLE_EXPR_REWRITES=1");
-  executor_->pushExecOption("DISABLE_CODEGEN=1");
+  executor_->ClearExecOptions();
+  executor_->PushExecOption("ENABLE_EXPR_REWRITES=1");
+  executor_->PushExecOption("DISABLE_CODEGEN=1");
   cout << endl << "Running without codegen and expr rewrites" << endl;
   return RUN_ALL_TESTS();
 }

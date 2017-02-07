@@ -386,7 +386,7 @@ public class FunctionCallExpr extends Expr {
       }
     }
     Preconditions.checkState(returnType.isDecimal() && !returnType.isWildcardDecimal());
-    return ScalarType.createDecimalTypeInternal(digitsBefore + digitsAfter, digitsAfter);
+    return ScalarType.createClippedDecimalType(digitsBefore + digitsAfter, digitsAfter);
   }
 
   @Override

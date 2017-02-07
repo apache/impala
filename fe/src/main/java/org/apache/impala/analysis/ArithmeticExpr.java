@@ -199,7 +199,8 @@ public class ArithmeticExpr extends Expr {
       case DIVIDE:
       case MULTIPLY:
       case MOD:
-        type_ = TypesUtil.getArithmeticResultType(t0, t1, op_);
+        type_ = TypesUtil.getArithmeticResultType(t0, t1, op_,
+            analyzer.getQueryOptions().isDecimal_v2());
         // If both of the children are null, we'll default to the DOUBLE version of the
         // operator. This prevents the BE from seeing NULL_TYPE.
         if (type_.isNull()) type_ = Type.DOUBLE;

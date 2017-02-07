@@ -1,0 +1,73 @@
+====
+---- QUERY
+# Test DECIMAL V1 divide result type
+set decimal_v2=false;
+select d1 / d2, d2 / d1, d3 / d4, d5 / d3, d3 / d5 from decimal_tbl;
+---- RESULTS
+0.55535553555,1.8006482982,NULL,10000.0891810008,0.000099999108197945064
+21.12612612612,0.0473347547,NULL,0.2544210023,3.930493123209169054441
+37.07207207207,0.0269744835,NULL,0.0000810000,12345.678900000000000000000
+37.07207207207,0.0269744835,NULL,0.0908820008,11.003278877005347593582
+398.92492492492,0.0025067373,NULL,0.0000630900,15850.349728459731155875669
+---- TYPES
+DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+====
+---- QUERY
+# Verify DECIMAL V2. Differences with V1:
+#  * d3/d4 does not overflow
+#  * d5/d3 has more scale
+set decimal_v2=true;
+select d1 / d2, d2 / d1, d3 / d4, d5 / d3, d3 / d5 from decimal_tbl;
+---- RESULTS
+0.55535553555,1.8006482982,10.000000,10000.08918100081154710738507,0.000099999108197945064
+21.12612612612,0.0473347547,100.000000,0.25442100231523112106860,3.930493123209169054441
+37.07207207207,0.0269744835,1000.000000,0.09088200082702620752593,11.003278877005347593582
+37.07207207207,0.0269744835,10000.000000,0.00008100000073710000670,12345.678900000000000000000
+398.92492492492,0.0025067373,100000.000000,0.00006309009057411982422,15850.349728459731155875669
+---- TYPES
+DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+====
+---- QUERY
+# Test casting behavior without decimal_v2 query option set.
+set decimal_v2=false;
+select cast(d3 as decimal(20, 3)) from functional.decimal_tbl;
+---- RESULTS
+1.234
+12.345
+123.456
+1234.567
+12345.678
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Test casting behavior with decimal_v2 query option set.
+set decimal_v2=true;
+select cast(d3 as decimal(20, 3)) from functional.decimal_tbl;
+---- RESULTS
+1.235
+12.346
+123.457
+1234.568
+12345.679
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Test casting behavior without decimal_v2 query option set.
+set decimal_v2=false;
+select sum(cast(d3 as DECIMAL(20,2)) + cast(d5 as DECIMAL(20,4))) from functional.decimal_tbl;
+---- RESULTS
+26078.2788
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Test casting behavior with decimal_v2 query option set.
+set decimal_v2=true;
+select sum(cast(d3 as DECIMAL(20,2)) + cast(d5 as DECIMAL(20,4))) from functional.decimal_tbl;
+---- RESULTS
+26078.3189
+---- TYPES
+DECIMAL
+====

@@ -87,8 +87,7 @@ public class TypesUtil {
     int p2 = t2.decimalPrecision();
     int digitsBefore = Math.max(p1 - s1, p2 - s2);
     int digitsAfter = Math.max(s1, s2);
-    return ScalarType.createDecimalTypeInternal(
-        digitsBefore + digitsAfter, digitsAfter);
+    return ScalarType.createClippedDecimalType(digitsBefore + digitsAfter, digitsAfter);
   }
 
   /**
@@ -96,7 +95,7 @@ public class TypesUtil {
    * if the operation does not make sense for the types.
    */
   public static Type getArithmeticResultType(Type t1, Type t2,
-      ArithmeticExpr.Operator op) throws AnalysisException {
+      ArithmeticExpr.Operator op, boolean decimal_v2) throws AnalysisException {
     Preconditions.checkState(t1.isNumericType() || t1.isNull());
     Preconditions.checkState(t2.isNumericType() || t2.isNull());
 
@@ -117,7 +116,7 @@ public class TypesUtil {
       t2 = ((ScalarType) t2).getMinResolutionDecimal();
       Preconditions.checkState(t1.isDecimal());
       Preconditions.checkState(t2.isDecimal());
-      return getDecimalArithmeticResultType(t1, t2, op);
+      return getDecimalArithmeticResultType(t1, t2, op, decimal_v2);
     }
 
     Type type = null;
@@ -147,15 +146,36 @@ public class TypesUtil {
   }
 
   /**
-   * Returns the resulting typical type from (t1 op t2)
-   * These rules are mostly taken from the hive/sql server rules with some changes.
+   * Returns the result type for (t1 op t2) where t1 and t2 are both DECIMAL, depending
+   * on whether DECIMAL version 1 or DECIMAL version 2 is enabled.
+   *
+   * TODO: IMPALA-4924: remove DECIMAL V1 code.
+   */
+  private static ScalarType getDecimalArithmeticResultType(Type t1, Type t2,
+      ArithmeticExpr.Operator op, boolean decimal_v2) throws AnalysisException {
+    if (decimal_v2) return getDecimalArithmeticResultTypeV2(t1, t2, op);
+    return getDecimalArithmeticResultTypeV1(t1, t2, op);
+  }
+
+  /**
+   * Returns the result type for (t1 op t2) where t1 and t2 are both DECIMAL, used when
+   * DECIMAL version 1 is enabled.
+   *
+   * These rules were mostly taken from the (pre Dec 2016) Hive / sql server rules with
+   * some changes.
    * http://blogs.msdn.com/b/sqlprogrammability/archive/2006/03/29/564110.aspx
+   * https://msdn.microsoft.com/en-us/library/ms190476.aspx
    *
    * Changes:
    *  - Multiply does not need +1 for the result precision.
-   *  - Divide scale truncation is different.
+   *  - Divide scale truncation is different. When the maximum precision is exceeded,
+   *    unlike SQL server, we do not try to preserve at least a scale of 6.
+   *  - For other operators, when maximum precision is exceeded, we clip the precision
+   *    and scale at maximum precision rather tha reducing scale. Therefore, we
+   *    sacrifice digits to the left of the decimal point before sacrificing digits to
+   *    the right.
    */
-  public static ScalarType getDecimalArithmeticResultType(Type t1, Type t2,
+  private static ScalarType getDecimalArithmeticResultTypeV1(Type t1, Type t2,
       ArithmeticExpr.Operator op) throws AnalysisException {
     Preconditions.checkState(t1.isFullySpecifiedDecimal());
     Preconditions.checkState(t2.isFullySpecifiedDecimal());
@@ -170,10 +190,10 @@ public class TypesUtil {
     switch (op) {
       case ADD:
       case SUBTRACT:
-        return ScalarType.createDecimalTypeInternal(
+        return ScalarType.createClippedDecimalType(
             sMax + Math.max(p1 - s1, p2 - s2) + 1, sMax);
       case MULTIPLY:
-        return ScalarType.createDecimalTypeInternal(p1 + p2, s1 + s2);
+        return ScalarType.createClippedDecimalType(p1 + p2, s1 + s2);
       case DIVIDE:
         int resultScale = Math.max(DECIMAL_DIVISION_SCALE_INCREMENT, s1 + p2 + 1);
         int resultPrecision = p1 - s1 + s2 + resultScale;
@@ -187,14 +207,63 @@ public class TypesUtil {
           resultScale = Math.max(s1, s2);
           resultPrecision = ScalarType.MAX_PRECISION;
         }
-        return ScalarType.createDecimalTypeInternal(resultPrecision, resultScale);
+        return ScalarType.createClippedDecimalType(resultPrecision, resultScale);
       case MOD:
-        return ScalarType.createDecimalTypeInternal(
+        return ScalarType.createClippedDecimalType(
             Math.min(p1 - s1, p2 - s2) + sMax, sMax);
       default:
         throw new AnalysisException(
             "Operation '" + op + "' is not allowed for decimal types.");
     }
+  }
+
+  /**
+   * Returns the result type for (t1 op t2) where t1 and t2 are both DECIMAL, used when
+   * DECIMAL version 2 is enabled.
+   *
+   * These rules are similar to (post Dec 2016) Hive / sql server rules.
+   * http://blogs.msdn.com/b/sqlprogrammability/archive/2006/03/29/564110.aspx
+   * https://msdn.microsoft.com/en-us/library/ms190476.aspx
+   *
+   * TODO: implement V2 rules for ADD/SUB/MULTIPLY.
+   *
+   * Changes:
+   *  - There are slight difference with how precision/scale reduction occurs compared
+   *    to SQL server when the desired precision is more than the maximum supported
+   *    precision.  But an algorithm of reducing scale to a minimum of 6 is used.
+   */
+  private static ScalarType getDecimalArithmeticResultTypeV2(Type t1, Type t2,
+      ArithmeticExpr.Operator op) throws AnalysisException {
+    Preconditions.checkState(t1.isFullySpecifiedDecimal());
+    Preconditions.checkState(t2.isFullySpecifiedDecimal());
+    ScalarType st1 = (ScalarType) t1;
+    ScalarType st2 = (ScalarType) t2;
+    int s1 = st1.decimalScale();
+    int s2 = st2.decimalScale();
+    int p1 = st1.decimalPrecision();
+    int p2 = st2.decimalPrecision();
+    int resultScale;
+    int resultPrecision;
+
+    switch (op) {
+      case DIVIDE:
+        // Divide result always gets at least MIN_ADJUSTED_SCALE decimal places.
+        resultScale = Math.max(ScalarType.MIN_ADJUSTED_SCALE, s1 + p2 + 1);
+        resultPrecision = p1 - s1 + s2 + resultScale;
+        break;
+      case MOD:
+        resultScale = Math.max(s1, s2);
+        resultPrecision = Math.min(p1 - s1, p2 - s2) + resultScale;
+        break;
+      case ADD:
+      case SUBTRACT:
+      case MULTIPLY:
+      default:
+        // Not yet implemented - fall back to V1 rules.
+        return getDecimalArithmeticResultTypeV1(t1, t2, op);
+    }
+    // Use the scale reduction technique when resultPrecision is too large.
+    return ScalarType.createAdjustedDecimalType(resultPrecision, resultScale);
   }
 
   /**

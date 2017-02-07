@@ -228,15 +228,15 @@ template<typename RESULT_T>
 inline DecimalValue<RESULT_T> DecimalValue<T>::Divide(int this_scale,
     const DecimalValue& other, int other_scale, int result_precision, int result_scale,
     bool* is_nan, bool* overflow) const {
-  DCHECK_GE(result_scale, this_scale);
+  DCHECK_GE(result_scale + other_scale, this_scale);
   if (other.value() == 0) {
     // Divide by 0.
     *is_nan = true;
     return DecimalValue<RESULT_T>();
   }
-  // We need to scale x up by the result precision and then do an integer divide.
-  // This truncates the result to the output precision.
-  // TODO: confirm with standard that truncate is okay.
+  // We need to scale x up by the result scale and then do an integer divide.
+  // This truncates the result to the output scale.
+  // TODO: implement rounding when decimal_v2=true.
   int scale_by = result_scale + other_scale - this_scale;
   // Use higher precision ints for intermediates to avoid overflows. Divides lead to
   // large numbers very quickly (and get eliminated by the int divide).
