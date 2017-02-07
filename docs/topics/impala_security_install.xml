@@ -35,8 +35,7 @@ under the License.
       Impala 1.1 comes set up with all the software and settings needed to enable security when you run the
       <cmdname>impalad</cmdname> daemon with the new security-related options (<codeph>-server_name</codeph> and
       <codeph>-authorization_policy_file</codeph>). You do not need to change any environment variables or install
-      any additional JAR files. In a cluster managed by Cloudera Manager, you do not need to change any settings in
-      Cloudera Manager.
+      any additional JAR files.
     </p>
   </conbody>
 </concept>

@@ -37,13 +37,12 @@ under the License.
   <conbody>
 
     <p>
-      Impala includes a fine-grained authorization framework for Hadoop, based on the Sentry
-      open source project. Sentry authorization was added in Impala 1.1.0. Together with the Kerberos authentication
-      framework, Sentry takes Hadoop security to a new level needed for the requirements of highly regulated industries
-      such as healthcare, financial services, and government. Impala also includes
-      an auditing capability; Impala generates the audit data, the Cloudera Navigator product consolidates
-      the audit data from all nodes in the cluster, and Cloudera Manager lets you filter, visualize, and produce
-      reports. The auditing feature was added in Impala 1.1.1.
+      Impala includes a fine-grained authorization framework for Hadoop, based on Apache Sentry.
+      Sentry authorization was added in Impala 1.1.0. Together with the Kerberos
+      authentication framework, Sentry takes Hadoop security to a new level needed for the requirements of
+      highly regulated industries such as healthcare, financial services, and government. Impala also includes
+      an auditing capability which was added in Impala 1.1.1; Impala generates the audit data which can be
+      consumed, filtered, and visualized by cluster-management components focused on governance.
     </p>
 
     <p>
@@ -114,9 +113,9 @@ under the License.
           What operations were attempted, and did they succeed or not? This feature provides a way to look back and
           diagnose whether attempts were made to perform unauthorized operations. You use this information to track
           down suspicious activity, and to see where changes are needed in authorization policies. The audit data
-          produced by this feature is collected by the Cloudera Manager product and then presented in a
-          user-friendly form by the Cloudera Manager product. See <xref href="impala_auditing.xml#auditing"/> for
-          details about setting up and managing auditing.
+          produced by this feature can be collected and presented in a user-friendly form by cluster-management
+          software. See <xref href="impala_auditing.xml#auditing"/> for details about setting up and managing
+          auditing.
         </dd>
 
       </dlentry>

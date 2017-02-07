@@ -605,16 +605,15 @@ under the License.
       Sentry logs all facts that lead up to authorization decisions at the debug level. If you do not understand
       why Sentry is denying access, the best way to debug is to temporarily turn on debug logging:
       <ul>
-        <li audience="Cloudera">
+        <li audience="hidden">
           In Cloudera Manager, add <codeph>log4j.logger.org.apache.sentry=DEBUG</codeph> to the logging settings
           for your service through the corresponding <uicontrol>Logging Safety Valve</uicontrol> field for the
           Impala, Hive Server 2, or Solr Server services.
         </li>
 
         <li>
-          On systems not managed by Cloudera Manager, add <codeph>log4j.logger.org.apache.sentry=DEBUG</codeph>
-          to the <filepath>log4j.properties</filepath> file on each host in the cluster, in the appropriate
-          configuration directory for each service.
+          Add <codeph>log4j.logger.org.apache.sentry=DEBUG</codeph> to the <filepath>log4j.properties</filepath>
+          file on each host in the cluster, in the appropriate configuration directory for each service.
         </li>
       </ul>
       Specifically, look for exceptions and messages such as:

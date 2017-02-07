@@ -37,21 +37,24 @@ under the License.
 
     <p>
       <indexterm audience="hidden">SSL</indexterm>
-      Impala supports TLS/SSL network encryption, between Impala and client programs, and between the Impala-related daemons running on
-      different nodes in the cluster. This feature is important when you also use other features such as Kerberos authentication or Sentry
-      authorization, where credentials are being transmitted back and forth.
-      <!-- Formerly: conref="../shared/CDHVariables.xml#xd_583c10bfdbd326ba-3ca24a24-13d80143249- -7f9a/CMCDH_EitherOK" -->
-      <note type="important" id="CMCDH_EitherOK">
+      Impala supports TLS/SSL network encryption, between Impala and client
+      programs, and between the Impala-related daemons running on different nodes
+      in the cluster. This feature is important when you also use other features such as Kerberos
+      authentication or Sentry authorization, where credentials are being
+      transmitted back and forth.
+      <note type="important" id="CMCDH_EitherOK" audience="hidden">
         <ul id="ul_e2s_bcd_np">
-          <li>You can use either Cloudera Manager or the following command-line instructions
-            to complete this configuration.</li>
+          <li>You can use either Cloudera Manager or the following command-line
+            instructions to complete this configuration.</li>
           <!-- Took out another too-specific conref, to the CDH minor version also in CDHVariables.xml. -->
-          <li>This information applies specifically to the version of Impala shown in the HTML page header
-            or on the PDF title page.
-            If you use an earlier version of CDH, see the documentation for that version located at
-            <xref href="http://www.cloudera.com/content/support/en/documentation.html" format="html" scope="external">Cloudera Documentation</xref>.</li>
-        </ul></note>
-      />
+          <li>This information applies specifically to the version of Impala
+            shown in the HTML page header or on the PDF title page. If you use
+            an earlier version of CDH, see the documentation for that version
+            located at <xref
+              href="http://www.cloudera.com/content/support/en/documentation.html"
+              format="html" scope="external">Cloudera Documentation</xref>.</li>
+        </ul>
+      </note>
     </p>
 
   </conbody>
@@ -194,11 +197,6 @@ under the License.
     <title>Using the Command Line</title>
 
     <conbody>
-
-<!--
-Info from Henry, from https://docs.google.com/a/cloudera.com/document/d/1u00CJ8WRzXR-1AK_WnQlR6LMtY-7Rc3eHaKNgw3IZvA/edit
--->
-
       <p>
         To enable SSL for when client applications connect to Impala, add both of the following flags to the <cmdname>impalad</cmdname> startup options:
       </p>
@@ -230,9 +228,8 @@ Info from Henry, from https://docs.google.com/a/cloudera.com/document/d/1u00CJ8W
       </p>
 
       <p>
-        Since Impala uses passphrase-less certificates in PEM format, you can reuse a host's existing Java keystore by converting it to the
-        PEM format. For instructions, see
-        <xref audience="integrated" href="cm_sg_openssl_jks.xml#concept_ek3_sdl_rp"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_openssl_jks.html" scope="external" format="html"/>.
+        Since Impala uses passphrase-less certificates in PEM format, you can reuse a host's existing Java keystore
+        by using the <codeph>openssl</codeph> toolkit to convert it to the PEM format.
       </p>
 
       <section id="secref">
@@ -240,8 +237,7 @@ Info from Henry, from https://docs.google.com/a/cloudera.com/document/d/1u00CJ8W
         <title>Configuring TLS/SSL Communication for the Impala Shell</title>
 
         <p>
-          Typically, a client program has corresponding configuration properties in Cloudera Manager to verify that it is connecting to the
-          right server. For example, with SSL enabled for Impala, you use the following options when starting the
+          With SSL enabled for Impala, use the following options when starting the
           <cmdname>impala-shell</cmdname> interpreter:
         </p>
 
