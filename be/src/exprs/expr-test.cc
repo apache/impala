@@ -402,7 +402,8 @@ class ExprTest : public testing::Test {
 
   // Decimals don't work with TestValue.
   // TODO: figure out what operators need to be implemented to work with EXPECT_EQ
-  template <typename T>
+  // TODO: verify that the result type has the same precision/scale as 'expected_type'.
+  template<typename T>
   void TestDecimalValue(const string& expr, const T& expected_result,
       const ColumnType& expected_type) {
     const string value = GetValue(expr, expected_type);
@@ -1265,64 +1266,108 @@ TEST_F(ExprTest, ArithmeticExprs) {
   TestFactorialArithmeticOp();
 }
 
-TEST_F(ExprTest, DecimalArithmeticExprs) {
-  TestDecimalValue("1.23 + cast(1 as decimal(4,3))",
-                   Decimal4Value(2230), ColumnType::CreateDecimalType(5,3));
-  TestDecimalValue("1.23 - cast(0.23 as decimal(10,3))",
-                   Decimal4Value(1000), ColumnType::CreateDecimalType(11,3));
-  TestDecimalValue("1.23 * cast(1 as decimal(20,3))",
-                   Decimal4Value(123000), ColumnType::CreateDecimalType(23,5));
-  TestDecimalValue("cast(1.23 as decimal(8,2)) / cast(1 as decimal(4,3))",
-                   Decimal4Value(12300000), ColumnType::CreateDecimalType(16,7));
-  TestDecimalValue("cast(1.23 as decimal(8,2)) % cast(1 as decimal(10,3))",
-                   Decimal4Value(230), ColumnType::CreateDecimalType(9,3));
-  TestDecimalValue("cast(1.23 as decimal(8,2)) + cast(1 as decimal(20,3))",
-                   Decimal4Value(2230), ColumnType::CreateDecimalType(21, 3));
-  TestDecimalValue("cast(1.23 as decimal(30,2)) - cast(1 as decimal(4,3))",
-                   Decimal4Value(230), ColumnType::CreateDecimalType(34,3));
-  TestDecimalValue("cast(1.23 as decimal(30,2)) * cast(1 as decimal(10,3))",
-                   Decimal4Value(123000), ColumnType::CreateDecimalType(38,5));
-  TestDecimalValue("cast(1.23 as decimal(30,2)) / cast(1 as decimal(20,3))",
-                   Decimal4Value(1230), ColumnType::CreateDecimalType(38, 3));
-  TestDecimalValue("cast(1 as decimal(38,0)) + cast(.2 as decimal(38,1))",
-                   Decimal4Value(12), ColumnType::CreateDecimalType(38, 1));
-  TestDecimalValue("cast(1 as decimal(38,0)) / cast(.2 as decimal(38,1))",
-                   Decimal4Value(50), ColumnType::CreateDecimalType(38, 1));
+// Use a table-driven approach to test DECIMAL expressions to make it easier to test
+// both the old (decimal_v2=false) and new (decimal_v2=true) DECIMAL semantics.
+struct DecimalExpectedResult {
+  bool null;
+  int128_t scaled_val;
+  int precision;
+  int scale;
+};
 
-  // Test mod() UDF
-  TestDecimalValue("mod(cast('1' as decimal(2,0)), cast('10' as decimal(2,0)))",
-      Decimal4Value(1), ColumnType::CreateDecimalType(2, 0));
-  TestDecimalValue("mod(cast('1.1' as decimal(2,1)), cast('1.0' as decimal(2,1)))",
-      Decimal4Value(1), ColumnType::CreateDecimalType(2,1));
-  TestDecimalValue("mod(cast('-1.23' as decimal(5,2)), cast('1.0' as decimal(5,2)))",
-      Decimal4Value(-23), ColumnType::CreateDecimalType(5,2));
-  TestDecimalValue("mod(cast('1' as decimal(12,0)), cast('10' as decimal(12,0)))",
-      Decimal8Value(1), ColumnType::CreateDecimalType(12, 0));
-  TestDecimalValue("mod(cast('1.1' as decimal(12,1)), cast('1.0' as decimal(12,1)))",
-      Decimal8Value(1), ColumnType::CreateDecimalType(12,1));
-  TestDecimalValue("mod(cast('-1.23' as decimal(12,2)), cast('1.0' as decimal(12,2)))",
-      Decimal8Value(-23), ColumnType::CreateDecimalType(12,2));
-  TestDecimalValue("mod(cast('1' as decimal(32,0)), cast('10' as decimal(32,0)))",
-      Decimal16Value(1), ColumnType::CreateDecimalType(32, 0));
-  TestDecimalValue("mod(cast('1.1' as decimal(32,1)), cast('1.0' as decimal(32,1)))",
-      Decimal16Value(1), ColumnType::CreateDecimalType(32,1));
-  TestDecimalValue("mod(cast('-1.23' as decimal(32,2)), cast('1.0' as decimal(32,2)))",
-      Decimal16Value(-23), ColumnType::CreateDecimalType(32,2));
-  TestIsNull("mod(cast(NULL as decimal(2,0)), cast('10' as decimal(2,0)))",
-      ColumnType::CreateDecimalType(2,0));
-  TestIsNull("mod(cast('10' as decimal(2,0)), cast(NULL as decimal(2,0)))",
-      ColumnType::CreateDecimalType(2,0));
-  TestIsNull("mod(cast('10' as decimal(2,0)), cast('0' as decimal(2,0)))",
-      ColumnType::CreateDecimalType(2,0));
-  TestIsNull("mod(cast('10' as decimal(2,0)), cast('0' as decimal(2,0)))",
-      ColumnType::CreateDecimalType(2,0));
-  TestIsNull("mod(cast(NULL as decimal(2,0)), NULL)",
-      ColumnType::CreateDecimalType(2,0));
+struct DecimalTestCase {
+  string expr;
+  DecimalExpectedResult expected[2]; // Version 1 and Version 2
+};
 
+// Format is:
+// { Test Expression (as a string),
+//  { Decimal V1 expected results, Decimal V2 expected results } }
+DecimalTestCase decimal_cases[] = {
+  { "1.23 + cast(1 as decimal(4,3))",
+    {{ false, 2230, 5, 3 }, { false, 2230, 5, 3 }} },
+  { "1.23 - cast(0.23 as decimal(10,3))",
+    {{ false, 1000, 11, 3 }, { false, 1000, 11, 3 }} },
+  { "1.23 * cast(1 as decimal(20,3))",
+    {{ false, 123000, 23, 5 }, { false, 123000, 23, 5 }} },
+  { "cast(1.23 as decimal(8,2)) / cast(1 as decimal(4,3))",
+    {{ false, 12300000, 16, 7}, { false, 12300000, 16, 7}} },
+  { "cast(1.23 as decimal(8,2)) % cast(1 as decimal(10,3))",
+    {{ false, 230, 9, 3 }, { false, 230, 9, 3 }} },
+  { "cast(1.23 as decimal(8,2)) + cast(1 as decimal(20,3))",
+    {{ false, 2230, 21, 3 }, { false, 2230, 21, 3 }} },
+  { "cast(1.23 as decimal(30,2)) - cast(1 as decimal(4,3))",
+    {{ false, 230, 34, 3 }, { false, 230, 34, 3 }} },
+  { "cast(1.23 as decimal(30,2)) * cast(1 as decimal(10,3))",
+    {{ false, 123000, 38, 5 }, { false, 123000, 38, 5 }} },
+  { "cast(1.23 as decimal(30,2)) / cast(1 as decimal(20,3))",
+    {{ false, 1230, 38, 3 }, { false, 1230, 38, 3 }} },
+  { "cast(1 as decimal(38,0)) + cast(.2 as decimal(38,1))",
+    {{ false, 12, 38, 1 }, { false, 12, 38, 1 }} },
+  { "cast(1 as decimal(38,0)) / cast(.2 as decimal(38,1))",
+    {{ false, 50, 38, 1 }, { false, 50, 38, 1 }} },
+  { "mod(cast('1' as decimal(2,0)), cast('10' as decimal(2,0)))",
+    {{ false, 1, 2, 0 }, { false, 1, 2, 0 }} },
+  { "mod(cast('1.1' as decimal(2,1)), cast('1.0' as decimal(2,1)))",
+    {{ false, 1, 2,1 }, { false, 1, 2,1 }} },
+  { "mod(cast('-1.23' as decimal(5,2)), cast('1.0' as decimal(5,2)))",
+    {{ false, -23, 5,2 }, { false, -23, 5,2 }} },
+  { "mod(cast('1' as decimal(12,0)), cast('10' as decimal(12,0)))",
+    {{ false, 1, 12, 0 }, { false, 1, 12, 0 }} },
+  { "mod(cast('1.1' as decimal(12,1)), cast('1.0' as decimal(12,1)))",
+    {{ false, 1, 12, 1 }, { false, 1, 12, 1 }} },
+  { "mod(cast('-1.23' as decimal(12,2)), cast('1.0' as decimal(12,2)))",
+    {{ false, -23, 12, 2 }, { false, -23, 12, 2 }} },
+  { "mod(cast('1' as decimal(32,0)), cast('10' as decimal(32,0)))",
+    {{ false, 1, 32, 0 }, { false, 1, 32, 0 }} },
+  { "mod(cast('1.1' as decimal(32,1)), cast('1.0' as decimal(32,1)))",
+    {{ false, 1, 32, 1 }, { false, 1, 32, 1 }} },
+  { "mod(cast('-1.23' as decimal(32,2)), cast('1.0' as decimal(32,2)))",
+    {{ false, -23, 32, 2 }, { false, -23, 32, 2 }} },
+  { "mod(cast(NULL as decimal(2,0)), cast('10' as decimal(2,0)))",
+    {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
+  { "mod(cast('10' as decimal(2,0)), cast(NULL as decimal(2,0)))",
+    {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
+  { "mod(cast('10' as decimal(2,0)), cast('0' as decimal(2,0)))",
+    {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
+  { "mod(cast('10' as decimal(2,0)), cast('0' as decimal(2,0)))",
+    {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
+  { "mod(cast(NULL as decimal(2,0)), NULL)",
+    {{ true, 0, 2, 0 }, { true, 0, 2, 0 }} },
   // IMPALA-2233: Test that implicit casts do not lose precision.
   // The overload greatest(decimal(*,*)) is available and should be used.
-  TestDecimalValue("greatest(0, cast('99999.1111' as decimal(30,10)))",
-      Decimal8Value(999991111000000), ColumnType::CreateDecimalType(30, 10));
+  { "greatest(0, cast('99999.1111' as decimal(30,10)))",
+    {{ false, 999991111000000, 30, 10 }, { false, 999991111000000, 30, 10 }} }
+};
+
+TEST_F(ExprTest, DecimalArithmeticExprs) {
+  // Test with both decimal_v2={false, true}
+  for (int v2 = 0; v2 <= 1; ++v2) {
+    string opt = "DECIMAL_V2=" + lexical_cast<string>(v2);
+    executor_->pushExecOption(opt);
+    for (const DecimalTestCase& c : decimal_cases) {
+      const DecimalExpectedResult& r = c.expected[0];
+      const ColumnType& type = ColumnType::CreateDecimalType(r.precision, r.scale);
+      if (r.null) {
+        TestIsNull(c.expr, type);
+      } else {
+        switch (type.GetByteSize()) {
+          case 4:
+            TestDecimalValue(c.expr, Decimal4Value(r.scaled_val), type);
+            break;
+          case 8:
+            TestDecimalValue(c.expr, Decimal8Value(r.scaled_val), type);
+            break;
+          case 16:
+            TestDecimalValue(c.expr, Decimal16Value(r.scaled_val), type);
+            break;
+          default:
+            DCHECK(false) << type << " " << type.GetByteSize();
+        }
+      }
+    }
+    executor_->popExecOption();
+  }
 }
 
 // There are two tests of ranges, the second of which requires a cast
@@ -6184,34 +6229,31 @@ int main(int argc, char **argv) {
   // Disable FE expr rewrites to make sure the Exprs get executed exactly as specified
   // in the tests here.
   int ret;
-  vector<string> options;
-  options.push_back("ENABLE_EXPR_REWRITES=0");
-  options.push_back("DISABLE_CODEGEN=1");
   disable_codegen_ = true;
   enable_expr_rewrites_ = false;
-  executor_->setExecOptions(options);
+  executor_->clearExecOptions();
+  executor_->pushExecOption("ENABLE_EXPR_REWRITES=0");
+  executor_->pushExecOption("DISABLE_CODEGEN=1");
   cout << "Running without codegen" << endl;
   ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;
 
-  options.clear();
-  options.push_back("ENABLE_EXPR_REWRITES=0");
-  options.push_back("DISABLE_CODEGEN=0");
-  options.push_back("EXEC_SINGLE_NODE_ROWS_THRESHOLD=0");
   disable_codegen_ = false;
   enable_expr_rewrites_ = false;
-  executor_->setExecOptions(options);
+  executor_->clearExecOptions();
+  executor_->pushExecOption("ENABLE_EXPR_REWRITES=0");
+  executor_->pushExecOption("DISABLE_CODEGEN=0");
+  executor_->pushExecOption("EXEC_SINGLE_NODE_ROWS_THRESHOLD=0");
   cout << endl << "Running with codegen" << endl;
   ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;
 
   // Enable FE expr rewrites to get test for constant folding over all exprs.
-  options.clear();
-  options.push_back("ENABLE_EXPR_REWRITES=1");
-  options.push_back("DISABLE_CODEGEN=1");
   disable_codegen_ = true;
   enable_expr_rewrites_ = true;
-  executor_->setExecOptions(options);
+  executor_->clearExecOptions();
+  executor_->pushExecOption("ENABLE_EXPR_REWRITES=1");
+  executor_->pushExecOption("DISABLE_CODEGEN=1");
   cout << endl << "Running without codegen and expr rewrites" << endl;
   return RUN_ALL_TESTS();
 }
