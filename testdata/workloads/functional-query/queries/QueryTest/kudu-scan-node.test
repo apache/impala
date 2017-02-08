@@ -55,3 +55,33 @@ select count(int_col) from functional_kudu.tinyinttable
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-4859: Test Kudu IS NULL/IS NOT NULL pushdown
+select count(*) from functional_kudu.alltypesagg where id < 10 and float_col is null;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from functional_kudu.alltypesagg where id < 10 and float_col is not null;
+---- RESULTS
+9
+---- TYPES
+BIGINT
+====
+---- QUERY
+# alltypes.id is primary key/not nullable, verify IS NOT NULL/IS NULL pushdown works
+select count(*) from functional_kudu.alltypes where id is not null;
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from functional_kudu.alltypes where id is null;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

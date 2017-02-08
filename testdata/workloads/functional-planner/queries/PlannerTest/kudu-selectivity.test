@@ -130,3 +130,17 @@ F00:PLAN FRAGMENT [UNPARTITIONED]
      hosts=3 per-host-mem=unavailable
      tuple-ids=0 row-size=126B cardinality=4
 ====
+select * from functional_kudu.alltypes where
+tinyint_col is not null and
+smallint_col is null and
+cast(date_string_col as tinyint) is null
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED]
+  PLAN-ROOT SINK
+  |
+  00:SCAN KUDU [functional_kudu.alltypes]
+     predicates: CAST(date_string_col AS TINYINT) IS NULL
+     kudu predicates: smallint_col IS NULL, tinyint_col IS NOT NULL
+     hosts=3 per-host-mem=unavailable
+     tuple-ids=0 row-size=126B cardinality=730
+====

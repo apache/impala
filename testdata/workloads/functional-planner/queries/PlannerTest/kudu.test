@@ -166,7 +166,8 @@ where cast(sin(id) as boolean) = true and name is null
 PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   predicates: name IS NULL, CAST(sin(id) AS BOOLEAN) = TRUE
+   predicates: CAST(sin(id) AS BOOLEAN) = TRUE
+   kudu predicates: name IS NULL
 ---- SCANRANGELOCATIONS
 NODE 0:
   ScanToken{table=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
@@ -178,7 +179,8 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-   predicates: name IS NULL, CAST(sin(id) AS BOOLEAN) = TRUE
+   predicates: CAST(sin(id) AS BOOLEAN) = TRUE
+   kudu predicates: name IS NULL
 ====
 # IMPALA-3856: KuduScanNode crash when pushing predicates including a cast
 select o_orderkey from tpch_kudu.orders where o_orderkey < 10.0 order by 1
