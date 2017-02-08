@@ -115,6 +115,10 @@ public class HdfsTable extends Table {
   // Table property key for skip.header.line.count
   public static final String TBL_PROP_SKIP_HEADER_LINE_COUNT = "skip.header.line.count";
 
+  // Table property key for parquet.mr.int96.write.zone
+  public static final String TBL_PROP_PARQUET_MR_WRITE_ZONE =
+      "parquet.mr.int96.write.zone";
+
   // An invalid network address, which will always be treated as remote.
   private final static TNetworkAddress REMOTE_NETWORK_ADDRESS =
       new TNetworkAddress("remote*addr", 0);
@@ -1374,6 +1378,18 @@ public class HdfsTable extends Table {
     }
     if (skipHeaderLineCount < 0) error.append(error_msg);
     return skipHeaderLineCount;
+  }
+
+  /**
+   * Returns the value of the 'parquet.mr.int96.write.zone' table property. If the value
+   * is not set for the table, returns null.
+   */
+  public String getParquetMrWriteZone() {
+    org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
+    if (msTbl == null) return null;
+    Map<String, String> tblProperties = msTbl.getParameters();
+    if (tblProperties == null) return null;
+    return tblProperties.get(TBL_PROP_PARQUET_MR_WRITE_ZONE);
   }
 
   /**

@@ -153,6 +153,7 @@ class HdfsScanNodeBase : public ScanNode {
   const AvroSchemaElement& avro_schema() { return *avro_schema_.get(); }
   RuntimeState* runtime_state() { return runtime_state_; }
   int skip_header_line_count() const { return skip_header_line_count_; }
+  const std::string& parquet_mr_write_zone() const { return parquet_mr_write_zone_; }
   DiskIoRequestContext* reader_context() { return reader_context_; }
 
   typedef std::map<TupleId, std::vector<ExprContext*>> ConjunctsMap;
@@ -311,6 +312,11 @@ class HdfsScanNodeBase : public ScanNode {
   // Number of header lines to skip at the beginning of each file of this table. Only set
   // to values > 0 for hdfs text files.
   const int skip_header_line_count_;
+
+  // Time zone for adjusting timestamp values read from Parquet files written by
+  // parquet-mr. If conversion should not occur, this is set to an empty string. Otherwise
+  // FE guarantees that this is a valid time zone.
+  const std::string parquet_mr_write_zone_;
 
   /// Tuple id resolved in Prepare() to set tuple_desc_
   const int tuple_id_;

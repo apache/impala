@@ -16,6 +16,8 @@
 // under the License.
 
 #include "runtime/timestamp-value.h"
+#include "exprs/timestamp-functions.h"
+#include "exprs/timezone_db.h"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
@@ -26,6 +28,8 @@
 using boost::date_time::not_a_date_time;
 using boost::gregorian::date;
 using boost::gregorian::date_duration;
+using boost::local_time::local_date_time;
+using boost::local_time::time_zone_ptr;
 using boost::posix_time::nanoseconds;
 using boost::posix_time::ptime;
 using boost::posix_time::ptime_from_tm;
@@ -68,7 +72,7 @@ int TimestampValue::Format(const DateTimeFormatContext& dt_ctx, int len, char* b
   return TimestampParser::Format(dt_ctx, date_, time_, len, buff);
 }
 
-void TimestampValue::UtcToLocal() {
+Status TimestampValue::UtcToLocal() {
   DCHECK(HasDateAndTime());
   // Previously, conversion was done using boost functions but it was found to be
   // too slow. Doing the conversion without function calls (which also avoids some
@@ -83,7 +87,7 @@ void TimestampValue::UtcToLocal() {
     tm temp;
     if (UNLIKELY(NULL == localtime_r(&utc, &temp))) {
       *this = ptime(not_a_date_time);
-      return;
+      return Status("Failed to convert timestamp to local time.");
     }
     // Unlikely but a time zone conversion may push the value over the min/max
     // boundary resulting in an exception.
@@ -93,9 +97,33 @@ void TimestampValue::UtcToLocal() {
         static_cast<unsigned short>(temp.tm_mday));
     time_ = time_duration(temp.tm_hour, temp.tm_min, temp.tm_sec,
         time().fractional_seconds());
-  } catch (std::exception& /* from Boost */) {
+  } catch (std::exception& from_boost) {
+    Status s("Failed to convert timestamp to local time.");
+    s.AddDetail(from_boost.what());
     *this = ptime(not_a_date_time);
+    return s;
   }
+  return Status::OK();
+}
+
+bool TimestampValue::FromUtc(const std::string& timezone_str) {
+  DCHECK(HasDateAndTime());
+  time_zone_ptr timezone = TimezoneDatabase::FindTimezone(timezone_str, *this, true);
+  if (UNLIKELY(timezone == NULL)) {
+    *this = ptime(not_a_date_time);
+    return false;
+  }
+  return FromUtc(timezone);
+}
+
+bool TimestampValue::FromUtc(time_zone_ptr timezone) {
+  DCHECK(HasDateAndTime());
+  DCHECK(timezone != NULL);
+  ptime temp;
+  ToPtime(&temp);
+  local_date_time lt(temp, timezone);
+  *this = lt.local_time();
+  return true;
 }
 
 ostream& operator<<(ostream& os, const TimestampValue& timestamp_value) {

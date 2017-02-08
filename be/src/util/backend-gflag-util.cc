@@ -26,6 +26,7 @@
 // Configs for the Frontend and the Catalog.
 DECLARE_bool(load_catalog_in_background);
 DECLARE_bool(load_auth_to_local_rules);
+DECLARE_bool(set_parquet_mr_int96_write_zone_to_utc_on_new_tables);
 DECLARE_int32(non_impala_java_vlog);
 DECLARE_int32(read_size);
 DECLARE_int32(num_metadata_loading_threads);
@@ -51,6 +52,8 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   TBackendGflags cfg;
   cfg.__set_authorization_policy_file(FLAGS_authorization_policy_file);
   cfg.__set_load_catalog_in_background(FLAGS_load_catalog_in_background);
+  cfg.__set_set_parquet_mr_int96_write_zone_to_utc_on_new_tables(
+      FLAGS_set_parquet_mr_int96_write_zone_to_utc_on_new_tables);
   cfg.__set_server_name(FLAGS_server_name);
   cfg.__set_sentry_config(FLAGS_sentry_config);
   cfg.__set_authorization_policy_provider_class(

@@ -196,8 +196,32 @@ void TimestampFunctions::UnixAndFromUnixClose(FunctionContext* context,
   }
 }
 
+time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz) {
+  if (tz.empty()) return NULL;
+
+  // Look up time zone in 'tz_database' by region.
+  time_zone_ptr tzp = tz_database_.time_zone_from_region(tz);
+  if (tzp != NULL) return tzp;
+
+  // Look up time zone in 'tz_database' by name variations. The following name variations
+  // are considered:
+  // - daylight savings abbreviation
+  // - standard abbreviation
+  // - daylight savings name
+  // - standard name
+  for (const string& tz_region: tz_region_list_) {
+    time_zone_ptr tzp = tz_database_.time_zone_from_region(tz_region);
+    DCHECK(tzp != NULL);
+    if (tzp->dst_zone_abbrev() == tz) return tzp;
+    if (tzp->std_zone_abbrev() == tz) return tzp;
+    if (tzp->dst_zone_name() == tz) return tzp;
+    if (tzp->std_zone_name() == tz) return tzp;
+  }
+  return NULL;
+}
+
 time_zone_ptr TimezoneDatabase::FindTimezone(
-    const string& tz, const TimestampValue& tv, bool tv_in_utc) {
+        const string& tz, const TimestampValue& tv, bool tv_in_utc) {
   // The backing database does not handle timezone rule changes.
   if (iequals("Europe/Moscow", tz) || iequals("Moscow", tz) || iequals("MSK", tz)) {
     if (tv.date().year() < 2011 || (tv.date().year() == 2011 && tv.date().month() < 4)) {
@@ -228,20 +252,11 @@ time_zone_ptr TimezoneDatabase::FindTimezone(
     }
   }
 
-  // See if they specified a zone id
-  time_zone_ptr tzp = tz_database_.time_zone_from_region(tz);
-  if (tzp != NULL) return tzp;
+  return FindTimezone(tz);
+}
 
-  for (vector<string>::const_iterator iter = tz_region_list_.begin();
-       iter != tz_region_list_.end(); ++iter) {
-    time_zone_ptr tzp = tz_database_.time_zone_from_region(*iter);
-    DCHECK(tzp != NULL);
-    if (tzp->dst_zone_abbrev() == tz) return tzp;
-    if (tzp->std_zone_abbrev() == tz) return tzp;
-    if (tzp->dst_zone_name() == tz) return tzp;
-    if (tzp->std_zone_name() == tz) return tzp;
-  }
-  return time_zone_ptr();
+bool TimezoneDatabase::IsTimestampDependentTimezone(const string& tz) {
+    return iequals("Europe/Moscow", tz) || iequals("Moscow", tz) || iequals("MSK", tz);
 }
 
 }

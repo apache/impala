@@ -54,4 +54,8 @@ struct TBackendGflags {
   16: required i32 kudu_operation_timeout_ms
 
   17: required i32 initial_hms_cnxn_timeout_s
+
+  // If true, new HDFS tables created using CREATE TABLE and CREATE TABLE LIKE <file>
+  // regardless of format will have the "parquet.mr.int96.write.zone" property set to UTC.
+  18: required bool set_parquet_mr_int96_write_zone_to_utc_on_new_tables
 }

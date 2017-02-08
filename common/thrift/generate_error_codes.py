@@ -315,6 +315,9 @@ error_codes = (
 
   ("SCRATCH_READ_TRUNCATED", 102, "Error reading $0 bytes from scratch file '$1' at "
    "offset $2: could only read $3 bytes"),
+
+  ("PARQUET_MR_TIMESTAMP_CONVERSION_FAILED", 103, "Failed to convert timestamp '$0' to "
+   "timezone '$1' for a Parquet file in table '$2'."),
 )
 
 import sys

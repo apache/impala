@@ -28,6 +28,8 @@
 #include "exec/catalog-op-executor.h"
 #include "exprs/expr-context.h"
 #include "exprs/expr.h"
+#include "exprs/timestamp-functions.h"
+#include "exprs/timezone_db.h"
 #include "gen-cpp/Data_types.h"
 #include "gen-cpp/Frontend_types.h"
 #include "rpc/jni-thrift-util.h"
@@ -37,6 +39,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/runtime-state.h"
+#include "runtime/timestamp-value.h"
 #include "service/impala-server.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -66,6 +69,7 @@ Java_org_apache_impala_service_FeSupport_NativeFeTestInit(
   // Init the JVM to load the classes in JniUtil that are needed for returning
   // exceptions to the FE.
   InitCommonRuntime(1, &name, true, TestInfo::FE_TEST);
+  ABORT_IF_ERROR(TimezoneDatabase::Initialize());
   LlvmCodeGen::InitializeLlvm(true);
   ExecEnv* exec_env = new ExecEnv(); // This also caches it from the process.
   exec_env->InitForFeTests();
@@ -346,6 +350,17 @@ Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad(
   return result_bytes;
 }
 
+// Used to call native code from the FE to check if a timezone string is valid or not.
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_org_apache_impala_service_FeSupport_NativeCheckIsValidTimeZone(
+    JNIEnv* env, jclass caller_class, jstring timezone) {
+  const char *tz = env->GetStringUTFChars(timezone, NULL);
+  jboolean tz_found = tz != NULL && TimezoneDatabase::FindTimezone(tz) != NULL;
+  env->ReleaseStringUTFChars(timezone, tz);
+  return tz_found;
+}
+
 namespace impala {
 
 static JNINativeMethod native_methods[] = {
@@ -369,6 +384,10 @@ static JNINativeMethod native_methods[] = {
     (char*)"NativePrioritizeLoad", (char*)"([B)[B",
     (void*)::Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad
   },
+  {
+    (char*)"NativeCheckIsValidTimeZone", (char*)"(Ljava/lang/String;)Z",
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeCheckIsValidTimeZone
+  }
 };
 
 void InitFeSupport(bool disable_codegen) {

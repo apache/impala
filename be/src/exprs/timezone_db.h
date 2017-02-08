@@ -42,6 +42,15 @@ class TimezoneDatabase {
   static boost::local_time::time_zone_ptr FindTimezone(const std::string& tz,
       const TimestampValue& tv, bool tv_in_utc);
 
+  /// Converts the name of a timezone to a boost timezone object without taking into
+  /// account the timestamp. May not work correctly when IsTimestampDependentTimezone(tz)
+  /// is true, e.g. Moscow timezone.
+  /// If 'tz' is not found in the database, nullptr is returned.
+  static boost::local_time::time_zone_ptr FindTimezone(const std::string& tz);
+
+  /// Returns true if 'tz' specifies a timezone that was changed in the past.
+  static bool IsTimestampDependentTimezone(const std::string& tz);
+
   /// Moscow timezone UTC+3 with DST, for use before March 27, 2011.
   static const boost::local_time::time_zone_ptr TIMEZONE_MSK_PRE_2011_DST;
 

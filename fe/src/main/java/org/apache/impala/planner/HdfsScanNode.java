@@ -151,7 +151,6 @@ public class HdfsScanNode extends ScanNode {
 
   private static final Configuration CONF = new Configuration();
 
-
   // List of conjuncts for min/max values of parquet::Statistics, that are used to skip
   // data when scanning Parquet files.
   private List<Expr> minMaxConjuncts_ = Lists.newArrayList();
@@ -718,6 +717,10 @@ public class HdfsScanNode extends ScanNode {
     }
     if (skipHeaderLineCount_ > 0) {
       msg.hdfs_scan_node.setSkip_header_line_count(skipHeaderLineCount_);
+    }
+    String parquetMrWriteZone = tbl_.getParquetMrWriteZone();
+    if (parquetMrWriteZone != null) {
+      msg.hdfs_scan_node.setParquet_mr_write_zone(parquetMrWriteZone);
     }
     msg.hdfs_scan_node.setUse_mt_scan_node(useMtScanNode_);
     if (!minMaxConjuncts_.isEmpty()) {

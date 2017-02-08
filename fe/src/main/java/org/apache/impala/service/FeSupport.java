@@ -84,6 +84,10 @@ public class FeSupport {
   // using Java Thrift bindings.
   public native static byte[] NativePrioritizeLoad(byte[] thriftReq);
 
+  // Returns true if timezone String is valid according to the BE timezone database, false
+  // otherwise.
+  public native static boolean NativeCheckIsValidTimeZone(String timezone);
+
   /**
    * Locally caches the jar at the specified HDFS location.
    *
@@ -259,6 +263,16 @@ public class FeSupport {
       // this should never happen
       throw new InternalException("Error processing request: " + e.getMessage(), e);
     }
+  }
+
+  public static boolean CheckIsValidTimeZone(String timezone) {
+    if (timezone == null) return false;
+    try {
+      return NativeCheckIsValidTimeZone(timezone);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+    }
+    return NativeCheckIsValidTimeZone(timezone);
   }
 
   /**

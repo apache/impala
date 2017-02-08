@@ -664,6 +664,58 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestParquetMrInt96WriteZone() {
+    // Attempt to set 'parquet.mr.int96.write.zone' when creating a table. Positive cases.
+    AnalyzesOk("create table tbl (i int) tblproperties " +
+        "('parquet.mr.int96.write.zone'='EST')");
+    AnalyzesOk("create table tbl tblproperties " +
+        "('parquet.mr.int96.write.zone'='EST') " +
+        "as select * from functional.alltypesnopart");
+    AnalyzesOk("create external table tbl like parquet " +
+        "'/test-warehouse/alltypesagg_hive_13_1_parquet/" +
+        "alltypesagg_hive_13_1.parquet' " +
+        "stored as parquet " +
+        "tblproperties ('parquet.mr.int96.write.zone'='EST')");
+    // Cannot set 'parquet.mr.int96.write.zone' table property when creating a non-HDFS
+    // table.
+    AnalysisError("create external table tbl stored as kudu tblproperties (" +
+        "'kudu.table_name'='tab'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080, 127.0.0.1:8081'," +
+        "'parquet.mr.int96.write.zone'='EST')",
+        "Table property 'parquet.mr.int96.write.zone' is only supported for HDFS " +
+        "tables.");
+    // Cannot set 'parquet.mr.int96.write.zone' table property to an invalid time zone
+    // when creating a table.
+    AnalysisError("create table tbl (i int) tblproperties" +
+        "('parquet.mr.int96.write.zone'='garbage')",
+        "Invalid time zone in the 'parquet.mr.int96.write.zone' table property: garbage");
+    AnalysisError("create table tbl tblproperties " +
+        "('parquet.mr.int96.write.zone'='garbage') " +
+        "as select * from functional.alltypesnopart",
+        "Invalid time zone in the 'parquet.mr.int96.write.zone' table property: garbage");
+    AnalysisError("create external table tbl like parquet " +
+        "'/test-warehouse/alltypesagg_hive_13_1_parquet/" +
+        "alltypesagg_hive_13_1.parquet' " +
+        "stored as parquet " +
+        "tblproperties ('parquet.mr.int96.write.zone'='garbage')",
+        "Invalid time zone in the 'parquet.mr.int96.write.zone' table property: garbage");
+
+    // Attempt to set 'parquet.mr.int96.write.zone' table property. Positive case.
+    AnalyzesOk("alter table functional.alltypes set tblproperties" +
+        "('parquet.mr.int96.write.zone'='EST')");
+    // Cannot set 'parquet.mr.int96.write.zone' table property on a table not backed by
+    // HDFS.
+    AnalysisError("alter table functional_kudu.alltypes set tblproperties" +
+        "('parquet.mr.int96.write.zone'='EST')",
+        "Table property 'parquet.mr.int96.write.zone' is only supported for HDFS " +
+        "tables.");
+    // Cannot set 'parquet.mr.int96.write.zone' table property to an invalid time zone.
+    AnalysisError("alter table functional.alltypes set tblproperties" +
+        "('parquet.mr.int96.write.zone'='garbage')",
+        "Invalid time zone in the 'parquet.mr.int96.write.zone' table property: garbage");
+  }
+
+  @Test
   public void TestAlterTableSetCached() {
     // Positive cases
     AnalyzesOk("alter table functional.alltypesnopart set cached in 'testPool'");
