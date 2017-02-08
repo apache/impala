@@ -337,12 +337,7 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
                  << ". Will try another scratch file.";
     scratch_errors_.push_back(status);
   }
-  // TODO: IMPALA-4697: the merged errors do not show up in the query error log,
-  // so we must point users to the impalad error log.
-  Status err_status(
-      "No usable scratch files: space could not be allocated in any of "
-      "the configured scratch directories (--scratch_dirs). See logs for previous "
-      "errors that may have caused this.");
+  Status err_status(TErrorCode::SCRATCH_ALLOCATION_FAILED);
   // Include all previous errors that may have caused the failure.
   for (Status& err : scratch_errors_) err_status.MergeStatus(err);
   return err_status;

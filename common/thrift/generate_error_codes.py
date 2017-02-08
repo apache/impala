@@ -306,6 +306,12 @@ error_codes = (
   ("PARQUET_TIMESTAMP_OUT_OF_RANGE", 100,
    "Parquet file '$0' column '$1' contains an out of range timestamp. "
    "The valid date range is 1400-01-01..9999-12-31."),
+
+  # TODO: IMPALA-4697: the merged errors do not show up in the query error log,
+  # so we must point users to the impalad error log.
+  ("SCRATCH_ALLOCATION_FAILED", 102, "Could not create files in any configured scratch "
+   "directories (--scratch_dirs). See logs for previous errors that may have prevented "
+   "creating or writing scratch files."),
 )
 
 import sys

@@ -216,16 +216,27 @@ class BufferedBlockMgrTest : public ::testing::Test {
   }
 
   // Pin all blocks. By default, expect no errors from Unpin() calls. If
-  // expect_cancelled is true, returning cancelled is allowed.
+  // expected_error_codes is non-NULL, returning one of the error codes is
+  // also allowed.
   void UnpinBlocks(const vector<BufferedBlockMgr::Block*>& blocks,
-      bool expect_cancelled = false) {
+      const vector<TErrorCode::type>* expected_error_codes = nullptr,
+      int delay_between_unpins_ms = 0) {
     for (int i = 0; i < blocks.size(); ++i) {
       Status status = blocks[i]->Unpin();
-      if (expect_cancelled) {
-        ASSERT_TRUE(status.ok() || status.IsCancelled()) << status.msg().msg();
+      if (!status.ok() && expected_error_codes != nullptr) {
+        // Check if it's one of the expected errors.
+        bool is_expected_error = false;
+        for (TErrorCode::type code : *expected_error_codes) {
+          if (status.code() == code) {
+            is_expected_error = true;
+            break;
+          }
+        }
+        ASSERT_TRUE(is_expected_error) << status.msg().msg();
       } else {
         ASSERT_TRUE(status.ok()) << status.msg().msg();
       }
+      if (delay_between_unpins_ms > 0) SleepForMs(delay_between_unpins_ms);
     }
   }
 
@@ -581,6 +592,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
   /// before destroying block mgr.
   void TestRuntimeStateTeardown(bool write_error, bool wait_for_writes);
 
+  void TestWriteError(int write_delay_ms);
+
   scoped_ptr<TestEnv> test_env_;
   ObjectPool pool_;
   vector<string> created_tmp_dirs_;
@@ -916,7 +929,8 @@ void BufferedBlockMgrTest::TestRuntimeStateTeardown(
 
   // Unpin will initiate writes. If the write error propagates fast enough, some Unpin()
   // calls may see a cancelled block mgr.
-  UnpinBlocks(blocks, write_error);
+  vector<TErrorCode::type> cancelled_code = {TErrorCode::CANCELLED};
+  UnpinBlocks(blocks, write_error ? &cancelled_code : nullptr);
 
   // Tear down while writes are in flight. The block mgr may outlive the runtime state
   // because it may be referenced by other runtime states. This test simulates this
@@ -982,12 +996,13 @@ static int remove_scratch_perms() {
 // Test that the block manager behaves correctly after a write error.  Delete the scratch
 // directory before an operation that would cause a write and test that subsequent API
 // calls return 'CANCELLED' correctly.
-TEST_F(BufferedBlockMgrTest, WriteError) {
+void BufferedBlockMgrTest::TestWriteError(int write_delay_ms) {
   int max_num_buffers = 2;
   const int block_size = 1024;
   BufferedBlockMgr* block_mgr;
   BufferedBlockMgr::Client* client;
   block_mgr = CreateMgrAndClient(0, max_num_buffers, block_size, 0, false, &client);
+  block_mgr->set_debug_write_delay_ms(write_delay_ms);
 
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr, client, max_num_buffers, &blocks);
@@ -999,7 +1014,11 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   // Remove the backing storage so that future writes will fail
   int num_files = remove_scratch_perms();
   ASSERT_GT(num_files, 0);
-  UnpinBlocks(blocks, true);
+  vector<TErrorCode::type> expected_error_codes = {TErrorCode::CANCELLED,
+      TErrorCode::SCRATCH_ALLOCATION_FAILED};
+  // Give the first write a chance to fail before the second write starts.
+  int interval_ms = 10;
+  UnpinBlocks(blocks, &expected_error_codes, interval_ms);
   WaitForWrites(block_mgr);
   // Subsequent calls should fail.
   DeleteBlocks(blocks);
@@ -1008,6 +1027,16 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   ASSERT_TRUE(new_block == NULL);
 
   TearDownMgrs();
+}
+
+TEST_F(BufferedBlockMgrTest, WriteError) {
+  TestWriteError(0);
+}
+
+// Regression test for IMPALA-4842 - inject a delay in the write to
+// reproduce the issue.
+TEST_F(BufferedBlockMgrTest, WriteErrorWriteDelay) {
+  TestWriteError(100);
 }
 
 // Test block manager error handling when temporary file space cannot be allocated to
@@ -1216,11 +1245,10 @@ TEST_F(BufferedBlockMgrTest, NoDirsAllocationError) {
   stringstream error_string;
   PrintErrorMap(&error_string, error_log);
   LOG(INFO) << "Errors: " << error_string.str();
-  ASSERT_NE(
-      string::npos, error_string.str().find("No usable scratch files: space could "
-                                            "not be allocated in any of the configured "
-                                            "scratch directories (--scratch_dirs)"))
-      << error_string.str();
+  // SCRATCH_ALLOCATION_FAILED error should exist in the error log.
+  ErrorLogMap::const_iterator it = error_log.find(TErrorCode::SCRATCH_ALLOCATION_FAILED);
+  ASSERT_NE(it, error_log.end());
+  ASSERT_GT(it->second.count, 0);
   DeleteBlocks(blocks);
 }
 
