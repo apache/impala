@@ -366,7 +366,7 @@ class ImpalaTestSuite(BaseTestSuite):
         if len(query_options_changed) > 0:
           self.__restore_query_options(query_options_changed, target_impalad_client)
 
-      if 'CATCH' in test_section:
+      if 'CATCH' in test_section and '__NO_ERROR__' not in test_section['CATCH']:
         expected_str = " or ".join(test_section['CATCH']).strip() \
           .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
           .replace('$NAMENODE', NAMENODE) \
