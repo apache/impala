@@ -417,9 +417,10 @@ struct BooleanVal : public AnyVal {
 };
 
 struct TinyIntVal : public AnyVal {
-  int8_t val;
+  using underlying_type_t = int8_t;
+  underlying_type_t val;
 
-  TinyIntVal(int8_t val = 0) : val(val) { }
+  TinyIntVal(underlying_type_t val = 0) : val(val) { }
 
   static TinyIntVal null() {
     TinyIntVal result;
@@ -436,9 +437,10 @@ struct TinyIntVal : public AnyVal {
 };
 
 struct SmallIntVal : public AnyVal {
-  int16_t val;
+  using underlying_type_t = int16_t;
+  underlying_type_t val;
 
-  SmallIntVal(int16_t val = 0) : val(val) { }
+  SmallIntVal(underlying_type_t val = 0) : val(val) { }
 
   static SmallIntVal null() {
     SmallIntVal result;
@@ -455,9 +457,10 @@ struct SmallIntVal : public AnyVal {
 };
 
 struct IntVal : public AnyVal {
-  int32_t val;
+  using underlying_type_t = int32_t;
+  underlying_type_t val;
 
-  IntVal(int32_t val = 0) : val(val) { }
+  IntVal(underlying_type_t val = 0) : val(val) { }
 
   static IntVal null() {
     IntVal result;
@@ -474,9 +477,10 @@ struct IntVal : public AnyVal {
 };
 
 struct BigIntVal : public AnyVal {
-  int64_t val;
+  using underlying_type_t = int64_t;
+  underlying_type_t val;
 
-  BigIntVal(int64_t val = 0) : val(val) { }
+  BigIntVal(underlying_type_t val = 0) : val(val) { }
 
   static BigIntVal null() {
     BigIntVal result;

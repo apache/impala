@@ -34,11 +34,11 @@
 
 namespace impala {
 
-#define RETURN_IF_OVERFLOW(ctx, overflow) \
+#define RETURN_IF_OVERFLOW(ctx, overflow, return_type) \
   do {\
     if (UNLIKELY(overflow)) {\
       ctx->AddWarning("Expression overflowed, returning NULL");\
-      return DecimalVal::null();\
+      return return_type::null();\
     }\
   } while (false)
 
@@ -49,17 +49,17 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::IntToDecimalVal(
   switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4: {
       Decimal4Value dv = Decimal4Value::FromInt(precision, scale, val, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(dv.value());
     }
     case 8: {
       Decimal8Value dv = Decimal8Value::FromInt(precision, scale, val, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(dv.value());
     }
     case 16: {
       Decimal16Value dv = Decimal16Value::FromInt(precision, scale, val, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(dv.value());
     }
     default:
@@ -72,23 +72,24 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::IntToDecimalVal(
 IR_ALWAYS_INLINE DecimalVal DecimalOperators::FloatToDecimalVal(
     FunctionContext* ctx, int precision, int scale, double val) {
   bool overflow = false;
+  const bool round = ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2);
   switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4: {
       Decimal4Value dv =
-          Decimal4Value::FromDouble(precision, scale, val, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+          Decimal4Value::FromDouble(precision, scale, val, round, &overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(dv.value());
     }
     case 8: {
       Decimal8Value dv =
-          Decimal8Value::FromDouble(precision, scale, val, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+          Decimal8Value::FromDouble(precision, scale, val, round, &overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(dv.value());
     }
     case 16: {
       Decimal16Value dv =
-          Decimal16Value::FromDouble(precision, scale, val, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+          Decimal16Value::FromDouble(precision, scale, val, round, &overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(dv.value());
     }
     default:
@@ -112,21 +113,21 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext*
     case 4: {
       Decimal4Value scaled_val = val.ScaleTo(
           val_scale, output_scale, output_precision, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
     case 8: {
       Decimal8Value val8 = ToDecimal8(val, &overflow);
       Decimal8Value scaled_val = val8.ScaleTo(
           val_scale, output_scale, output_precision, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
     case 16: {
       Decimal16Value val16 = ToDecimal16(val, &overflow);
       Decimal16Value scaled_val = val16.ScaleTo(
           val_scale, output_scale, output_precision, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
     default:
@@ -143,20 +144,20 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext*
       Decimal8Value scaled_val = val.ScaleTo(
           val_scale, output_scale, output_precision, &overflow);
       Decimal4Value val4 = ToDecimal4(scaled_val, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(val4.value());
     }
     case 8: {
       Decimal8Value scaled_val = val.ScaleTo(
           val_scale, output_scale, output_precision, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
     case 16: {
       Decimal16Value val16 = ToDecimal16(val, &overflow);
       Decimal16Value scaled_val = val16.ScaleTo(
           val_scale, output_scale, output_precision, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
     default:
@@ -173,20 +174,20 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext*
       Decimal16Value scaled_val = val.ScaleTo(
           val_scale, output_scale, output_precision, &overflow);
       Decimal4Value val4 = ToDecimal4(scaled_val, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(val4.value());
     }
     case 8: {
       Decimal16Value scaled_val = val.ScaleTo(
           val_scale, output_scale, output_precision, &overflow);
       Decimal8Value val8 = ToDecimal8(scaled_val, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(val8.value());
     }
     case 16: {
       Decimal16Value scaled_val = val.ScaleTo(
           val_scale, output_scale, output_precision, &overflow);
-      RETURN_IF_OVERFLOW(ctx, overflow);
+      RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
     default:
@@ -292,18 +293,39 @@ static inline Decimal16Value GetDecimal16Value(
       FunctionContext* ctx, const DecimalVal& val) { \
     if (val.is_null) return to_type::null(); \
     int scale = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SCALE, 0); \
+    bool overflow = false; \
+    /* TODO: IMPALA-4929: remove DECIMAL V1 code */ \
+    const bool round = ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2); \
     switch (ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SIZE, 0)) { \
       case 4: { \
         Decimal4Value dv(val.val4); \
-        return to_type(dv.whole_part(scale)); \
+        if (round) { \
+          auto val = dv.ToInt<to_type>(scale, &overflow); \
+          RETURN_IF_OVERFLOW(ctx, overflow, to_type); \
+          return to_type(val); \
+        } else { \
+          return to_type(dv.whole_part(scale)); \
+        } \
       } \
       case 8: { \
         Decimal8Value dv(val.val8); \
-        return to_type(dv.whole_part(scale)); \
+        if (round) { \
+          auto val = dv.ToInt<to_type>(scale, &overflow); \
+          RETURN_IF_OVERFLOW(ctx, overflow, to_type); \
+          return to_type(val); \
+        } else { \
+          return to_type(dv.whole_part(scale)); \
+        } \
       } \
       case 16: { \
         Decimal16Value dv(val.val16); \
-        return to_type(dv.whole_part(scale)); \
+        if (round) { \
+          auto val = dv.ToInt<to_type>(scale, &overflow); \
+          RETURN_IF_OVERFLOW(ctx, overflow, to_type); \
+          return to_type(val); \
+        } else { \
+          return to_type(dv.whole_part(scale)); \
+        } \
       } \
       default:\
         DCHECK(false); \
@@ -477,7 +499,7 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::RoundDecimal(FunctionContext* ctx,
   // overflow if output_precision >= val_precision. Otherwise, result can overflow.
   bool overflow = output_precision < val_precision &&
       abs(result.val16) >= DecimalUtil::GetScaleMultiplier<int128_t>(output_precision);
-  RETURN_IF_OVERFLOW(ctx, overflow);
+  RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
   return result;
 }
 
@@ -679,7 +701,7 @@ BooleanVal DecimalOperators::CastToBooleanVal(
         Decimal16Value y_val = GetDecimal16Value(y, y_size, &overflow); \
         Decimal16Value result = x_val.OP_FN<int128_t>(x_scale, y_val, y_scale, \
             return_precision, return_scale, &overflow); \
-        RETURN_IF_OVERFLOW(ctx, overflow); \
+        RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal); \
         return DecimalVal(result.value()); \
       } \
       default: \
@@ -726,7 +748,7 @@ BooleanVal DecimalOperators::CastToBooleanVal(
         Decimal16Value y_val = GetDecimal16Value(y, y_size, &overflow); \
         Decimal16Value result = x_val.OP_FN<int128_t>(x_scale, y_val, y_scale, \
             return_precision, return_scale, &is_nan, &overflow); \
-        RETURN_IF_OVERFLOW(ctx, overflow); \
+        RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal); \
         if (is_nan) return DecimalVal::null(); \
         return DecimalVal(result.value()); \
       } \

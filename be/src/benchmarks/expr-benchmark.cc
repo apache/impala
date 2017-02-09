@@ -22,11 +22,16 @@
 #include <thrift/Thrift.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
+#include "runtime/exec-env.h"
+#include "runtime/runtime-state.h"
+
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
+#include "util/backend-gflag-util.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
+#include "util/jni-util.h"
 #include "rpc/jni-thrift-util.h"
 
 #include "gen-cpp/Types_types.h"
@@ -41,9 +46,12 @@
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
 #include "rpc/thrift-server.h"
+#include "codegen/llvm-codegen.h"
+#include "common/init.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "runtime/mem-tracker.h"
+#include "service/fe-support.h"
 #include "service/impala-server.h"
 
 #include "common/names.h"
@@ -56,19 +64,8 @@ using namespace impala;
 class Planner {
  public:
   Planner() {
-    JNIEnv* jni_env = getJNIEnv();
-    // create instance of java class JniFrontend
-    jclass fe_class = jni_env->FindClass("org/apache/impala/service/JniFrontend");
-    jmethodID fe_ctor = jni_env->GetMethodID(fe_class, "<init>", "(Z)V");
-    EXIT_IF_EXC(jni_env);
-    create_exec_request_id_ =
-        jni_env->GetMethodID(fe_class, "createExecRequest", "([B)[B");
-    EXIT_IF_EXC(jni_env);
-
-    jboolean lazy = true;
-    jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy);
-    EXIT_IF_EXC(jni_env);
-    ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
+    frontend_.SetCatalogInitialized();
+    exec_env_.InitForFeTests();
   }
 
   Status GeneratePlan(const string& stmt, TExecRequest* result) {
@@ -77,22 +74,19 @@ class Planner {
     query_ctx.client_request.query_options = query_options_;
     query_ctx.__set_session(session_state_);
     ImpalaServer::PrepareQueryContext(&query_ctx);
+    runtime_state_.reset(new RuntimeState(query_ctx, &exec_env_, ""));
 
-    JNIEnv* jni_env = getJNIEnv();
-    JniLocalFrame jni_frame;
-    RETURN_IF_ERROR(jni_frame.push(jni_env));
-    jbyteArray request_bytes;
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &query_ctx, &request_bytes));
-    jbyteArray result_bytes = static_cast<jbyteArray>(
-        jni_env->CallObjectMethod(fe_, create_exec_request_id_, request_bytes));
-    RETURN_ERROR_IF_EXC(jni_env);
-    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
-    return Status::OK();
+    return frontend_.GetExecRequest(query_ctx, result);
+  }
+
+  RuntimeState* GetRuntimeState() {
+    return runtime_state_.get();
   }
 
  private:
-  jobject fe_;  // instance of org.apache.impala.service.JniFrontend
-  jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
+  Frontend frontend_;
+  ExecEnv exec_env_;
+  scoped_ptr<RuntimeState> runtime_state_;
 
   TQueryOptions query_options_;
   TSessionState session_state_;
@@ -103,7 +97,7 @@ struct TestData {
   int64_t dummy_result;
 };
 
-Planner planner;
+Planner* planner;
 ObjectPool pool;
 MemTracker tracker;
 
@@ -114,7 +108,7 @@ static Status PrepareSelectList(const TExecRequest& request, ExprContext** ctx) 
   vector<TExpr> texprs = query_request.plan_exec_info[0].fragments[0].output_exprs;
   DCHECK_EQ(texprs.size(), 1);
   RETURN_IF_ERROR(Expr::CreateExprTree(&pool, texprs[0], ctx));
-  RETURN_IF_ERROR((*ctx)->Prepare(NULL, RowDescriptor(), &tracker));
+  RETURN_IF_ERROR((*ctx)->Prepare(planner->GetRuntimeState(), RowDescriptor(), &tracker));
   return Status::OK();
 }
 
@@ -124,7 +118,7 @@ static TestData* GenerateBenchmarkExprs(const string& query, bool codegen) {
   ss << "select " << query;
   TestData* test_data = new TestData;
   TExecRequest request;
-  ABORT_IF_ERROR(planner.GeneratePlan(ss.str(), &request));
+  ABORT_IF_ERROR(planner->GeneratePlan(ss.str(), &request));
   ABORT_IF_ERROR(PrepareSelectList(request, &test_data->ctx));
   return test_data;
 }
@@ -218,6 +212,50 @@ Benchmark* BenchmarkCast() {
   BENCHMARK("string_to_int", "cast('1234' as INT)");
   BENCHMARK("string_to_float", "cast('1234.5678' as FLOAT)");
   BENCHMARK("string_to_timestamp", "cast('2011-10-22 09:10:11' as TIMESTAMP)");
+  return suite;
+}
+
+Benchmark* BenchmarkDecimalCast() {
+  Benchmark* suite = new Benchmark("Decimal Casts");
+  BENCHMARK("int_to_decimal4", "cast 12345678 as DECIMAL(9,2)");
+  BENCHMARK("decimal4_to_decimal4", "cast 12345678.5 as DECIMAL(9,2)");
+  BENCHMARK("decimal8_to_decimal4", "cast 12345678.345 as DECIMAL(9,2)");
+  BENCHMARK("decimal16_to_decimal4", "cast 12345678.123456783456789 as DECIMAL(9,2)");
+  BENCHMARK("double_to_decimal4", "cast e() as DECIMAL(9,7)");
+  BENCHMARK("string_to_decimal4", "cast '12345678.123456783456789' as DECIMAL(9,2)");
+  BENCHMARK("int_to_decimal8", "cast 12345678 as DECIMAL(18,2)");
+  BENCHMARK("decimal4_to_decimal8", "cast 12345678.5 as DECIMAL(18,2)");
+  BENCHMARK("decimal8_to_decimal8", "cast 12345678.345 as DECIMAL(18,2)");
+  BENCHMARK("decimal16_to_decimal8", "cast 12345678.123456783456789 as DECIMAL(18,2)");
+  BENCHMARK("double_to_decimal8", "cast e() as DECIMAL(18,7)");
+  BENCHMARK("string_to_decimal8", "cast '12345678.123456783456789' as DECIMAL(18,7)");
+  BENCHMARK("int_to_decimal16", "cast 12345678 as DECIMAL(28,2)");
+  BENCHMARK("decimal4_to_decimal16", "cast 12345678.5 as DECIMAL(28,2)");
+  BENCHMARK("decimal8_to_decimal16", "cast 12345678.345 as DECIMAL(28,2)");
+  BENCHMARK("decimal16_to_decimal16", "cast 12345678.123456783456789 as DECIMAL(28,2)");
+  BENCHMARK("double_to_decimal16", "cast e() as DECIMAL(28,7)");
+  BENCHMARK("string_to_decimal16", "cast '12345678.123456783456789' as DECIMAL(28,7)");
+  BENCHMARK("decimal4_to_tinyint", "cast 78.5 as TINYINT");
+  BENCHMARK("decimal8_to_tinyint", "cast 0.12345678345 as TINYINT");
+  BENCHMARK("decimal16_to_tinyint", "cast 78.12345678123456783456789 as TINYINT");
+  BENCHMARK("decimal4_to_smallint", "cast 78.5 as SMALLINT");
+  BENCHMARK("decimal8_to_smallint", "cast 0.12345678345 as SMALLINT");
+  BENCHMARK("decimal16_to_smallint", "cast 78.12345678123456783456789 as SMALLINT");
+  BENCHMARK("decimal4_to_int", "cast 12345678.5 as INT");
+  BENCHMARK("decimal8_to_int", "cast 12345678.345 as INT");
+  BENCHMARK("decimal16_to_int", "cast 12345678.123456783456789 as INT");
+  BENCHMARK("decimal4_to_bigint", "cast 12345678.5 as BIGINT");
+  BENCHMARK("decimal8_to_bigint", "cast 12345678.345 as BIGINT");
+  BENCHMARK("decimal16_to_bigint", "cast 12345678.123456783456789 as BIGINT");
+  BENCHMARK("decimal4_to_float", "cast 12345678.5 as FLOAT");
+  BENCHMARK("decimal8_to_float", "cast 12345678.345 as FLOAT");
+  BENCHMARK("decimal16_to_float", "cast 12345678.123456783456789 as FLOAT");
+  BENCHMARK("decimal4_to_double", "cast 12345678.5 as DOUBLE");
+  BENCHMARK("decimal8_to_double", "cast 12345678.345 as DOUBLE");
+  BENCHMARK("decimal16_to_double", "cast 12345678.123456783456789 as DOUBLE");
+  BENCHMARK("decimal4_to_string", "cast 12345678.5 as STRING");
+  BENCHMARK("decimal8_to_string", "cast 12345678.345 as STRING");
+  BENCHMARK("decimal16_to_string", "cast 12345678.123456783456789 as STRING");
   return suite;
 }
 
@@ -516,13 +554,20 @@ Benchmark* BenchmarkTimestampFunctions() {
 }
 
 int main(int argc, char** argv) {
-  CpuInfo::Init();
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport(false);
+  impala::LlvmCodeGen::InitializeLlvm();
+
+  // Dynamically construct at runtime as the planner initialization depends on
+  // static objects being initialized in other compilation modules.
+  planner = new Planner();
 
   // Generate all the tests first (this does the planning)
   Benchmark* literals = BenchmarkLiterals();
   Benchmark* arithmetics = BenchmarkArithmetic();
   Benchmark* like = BenchmarkLike();
   Benchmark* cast = BenchmarkCast();
+  Benchmark* decimal_cast = BenchmarkDecimalCast();
   Benchmark* conditional_fns = BenchmarkConditionalFunctions();
   Benchmark* string_fns = BenchmarkStringFunctions();
   Benchmark* url_fns = BenchmarkUrlFunctions();
@@ -534,6 +579,7 @@ int main(int argc, char** argv) {
   cout << arithmetics->Measure() << endl;
   cout << like->Measure() << endl;
   cout << cast->Measure() << endl;
+  cout << decimal_cast->Measure() << endl;
   cout << conditional_fns->Measure() << endl;
   cout << string_fns->Measure() << endl;
   cout << url_fns->Measure() << endl;

@@ -20,7 +20,9 @@
 
 #include "runtime/decimal-value.h"
 
+#include <cmath>
 #include <iomanip>
+#include <limits>
 #include <ostream>
 #include <sstream>
 
@@ -32,17 +34,29 @@ namespace impala {
 
 template<typename T>
 inline DecimalValue<T> DecimalValue<T>::FromDouble(int precision, int scale, double d,
-    bool* overflow) {
-  // Check overflow.
-  T max_value = DecimalUtil::GetScaleMultiplier<T>(precision - scale);
-  if (abs(d) >= max_value) {
+    bool round, bool* overflow) {
+
+  // Multiply the double by the scale.
+  // Unfortunately, this conversion is not exact, and there is a loss of precision.
+  // Despite having enough bits in the mantissa to represent all the leading bits in
+  // powers of 10 up to around 10**38, the conversion done is still inexact.  Writing
+  // literals directly as 1.0e23 produces exactly the same number.  The error starts
+  // around 1.0e23 and can take either positive or negative values.  This means the
+  // multiplication can cause an unwanted decimal overflow.
+  d *= DecimalUtil::GetScaleMultiplier<double>(scale);
+
+  // Decimal V2 behavior
+  // TODO: IMPALA-4924: remove DECIMAL V1 code
+  if (round) d = std::round(d);
+
+  const T max_value = DecimalUtil::GetScaleMultiplier<T>(precision);
+  DCHECK(max_value > 0);  // no DCHECK_GT because of int128_t
+  if (UNLIKELY(std::isnan(d)) || UNLIKELY(std::fabs(d) >= max_value)) {
     *overflow = true;
     return DecimalValue();
   }
 
-  // Multiply the double by the scale.
-  d *= DecimalUtil::GetScaleMultiplier<double>(scale);
-  // Truncate and just take the integer part.
+  // Return the rounded or truncated integer part.
   return DecimalValue(static_cast<T>(d));
 }
 
@@ -75,6 +89,36 @@ inline const T DecimalValue<T>::whole_part(int scale) const {
 template<typename T>
 inline const T DecimalValue<T>::fractional_part(int scale) const {
   return abs(value()) % DecimalUtil::GetScaleMultiplier<T>(scale);
+}
+
+// Note: this expects RESULT_T to be a UDF AnyVal subclass which defines
+// RESULT_T::underlying_type_t to be the representative type
+template<typename T>
+template<typename RESULT_T>
+inline typename RESULT_T::underlying_type_t DecimalValue<T>::ToInt(int scale,
+    bool* overflow) const {
+  const T divisor = DecimalUtil::GetScaleMultiplier<T>(scale);
+  const T v = value();
+  T result;
+  if (divisor == 1) {
+    result = v;
+  } else {
+    result = v / divisor;
+    const T remainder = v % divisor;
+    // Divisor is always a multiple of 2, so no loss of precision when shifting down
+    DCHECK(divisor % 2 == 0);  // No DCHECK_EQ as this is possibly an int128_t
+    // N.B. also - no std::abs for int128_t
+    if (abs(remainder) >= divisor >> 1) {
+      // Round away from zero.
+      // Note this trick works with both signed and unsigned types
+      const int shift = std::numeric_limits<T>::digits;
+      result += 1 | (result >> shift);
+    }
+  }
+  *overflow |=
+      result > std::numeric_limits<typename RESULT_T::underlying_type_t>::max() ||
+      result < std::numeric_limits<typename RESULT_T::underlying_type_t>::min();
+  return result;
 }
 
 template<typename T>

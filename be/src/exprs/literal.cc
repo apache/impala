@@ -182,13 +182,13 @@ Literal::Literal(ColumnType type, double v)
     bool overflow = false;
     switch (type.GetByteSize()) {
       case 4:
-        value_.decimal4_val = Decimal4Value::FromDouble(type, v, &overflow);
+        value_.decimal4_val = Decimal4Value::FromDouble(type, v, true, &overflow);
         break;
       case 8:
-        value_.decimal8_val = Decimal8Value::FromDouble(type, v, &overflow);
+        value_.decimal8_val = Decimal8Value::FromDouble(type, v, true, &overflow);
         break;
       case 16:
-        value_.decimal16_val = Decimal16Value::FromDouble(type, v, &overflow);
+        value_.decimal16_val = Decimal16Value::FromDouble(type, v, true, &overflow);
         break;
     }
     DCHECK(!overflow);

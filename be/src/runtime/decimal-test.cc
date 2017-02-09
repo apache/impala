@@ -101,90 +101,151 @@ TEST(DoubleToDecimal, Basic) {
   Decimal16Value d16;
 
   bool overflow = false;
-  d4 = Decimal4Value::FromDouble(t1, 1.1, &overflow);
+  d4 = Decimal4Value::FromDouble(t1, 1.9, true, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), 2);
+  VerifyToString(d4, t1, "2");
+
+  d4 = Decimal4Value::FromDouble(t1, 1.9, false, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d4.value(), 1);
   VerifyToString(d4, t1, "1");
 
-  d4 = Decimal4Value::FromDouble(t4, 1, &overflow);
+  d4 = Decimal4Value::FromDouble(t4, 1, true, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d4.value(), 1);
   VerifyToString(d4, t4, "1");
 
-  d4 = Decimal4Value::FromDouble(t4, 0, &overflow);
+  d4 = Decimal4Value::FromDouble(t4, 0, true, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d4.value(), 0);
   VerifyToString(d4, t4, "0");
 
-  d4 = Decimal4Value::FromDouble(t4, -1, &overflow);
+  d4 = Decimal4Value::FromDouble(t4, 9.9, false, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), 9);
+  VerifyToString(d4, t4, "9");
+
+  d4 = Decimal4Value::FromDouble(t4, 9.9, true, &overflow);
+  EXPECT_TRUE(overflow);
+  overflow = false;
+
+  d4 = Decimal4Value::FromDouble(t4, -1, true, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d4.value(), -1);
   VerifyToString(d4, t4, "-1");
 
-  d4 = Decimal4Value::FromDouble(t5, 0.1, &overflow);
+  d4 = Decimal4Value::FromDouble(t4, -9.9, false, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), -9);
+  VerifyToString(d4, t4, "-9");
+
+  d4 = Decimal4Value::FromDouble(t4, -9.9, true, &overflow);
+  EXPECT_TRUE(overflow);
+  overflow = false;
+
+  d4 = Decimal4Value::FromDouble(t5, 0.1, true, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d4.value(), 1);
   VerifyToString(d4, t5, "0.1");
 
-  d4 = Decimal4Value::FromDouble(t5, 0.0, &overflow);
+  d4 = Decimal4Value::FromDouble(t5, 0.0, true, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d4.value(), 0);
   VerifyToString(d4, t5, "0.0");
 
-  d4 = Decimal4Value::FromDouble(t5, -0.1, &overflow);
+  d4 = Decimal4Value::FromDouble(t5, -0.1, true, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d4.value(), -1);
   VerifyToString(d4, t5, "-0.1");
 
   overflow = false;
-  d8 = Decimal8Value::FromDouble(t2, -100.1, &overflow);
+  d8 = Decimal8Value::FromDouble(t2, -100.1, true, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d8.value(), -10010000);
   VerifyToString(d8, t2, "-100.10000");
 
   overflow = false;
-  d16 = Decimal16Value::FromDouble(t3, -.1, &overflow);
+  d16 = Decimal16Value::FromDouble(t3, -0.1, true, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d16.value(), -1000000000);
   VerifyToString(d16, t3, "-0.1000000000");
 
   // Test overflow
   overflow = false;
-  Decimal4Value::FromDouble(t1, 999999999.123, &overflow);
+  Decimal4Value::FromDouble(t1, 999999999.123, false, &overflow);
   EXPECT_FALSE(overflow);
 
   overflow = false;
-  Decimal4Value::FromDouble(t1, 1234567890.1, &overflow);
+  Decimal4Value::FromDouble(t1, 1234567890.1, false, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  Decimal8Value::FromDouble(t1, -1234567890.123, &overflow);
+  Decimal8Value::FromDouble(t1, -1234567890.123, false, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  Decimal8Value::FromDouble(t2, 99999.1234567, &overflow);
+  Decimal8Value::FromDouble(t2, 99999.1234567, false, &overflow);
   EXPECT_FALSE(overflow);
 
   overflow = false;
-  Decimal8Value::FromDouble(t2, 100000.1, &overflow);
+  Decimal8Value::FromDouble(t2, 100000.1, false, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  Decimal8Value::FromDouble(t2, -123456.123, &overflow);
+  Decimal8Value::FromDouble(t2, -123456.123, false, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  d16 = Decimal16Value::FromDouble(t3, 0.1234, &overflow);
+  d16 = Decimal16Value::FromDouble(t3, 0.1234, true, &overflow);
   EXPECT_FALSE(overflow);
   VerifyToString(d16, t3, "0.1234000000");
 
   overflow = false;
-  Decimal16Value::FromDouble(t3, 1.1, &overflow);
+  Decimal16Value::FromDouble(t3, 1.1, true, &overflow);
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  Decimal16Value::FromDouble(t3, -1.1, &overflow);
+  Decimal16Value::FromDouble(t3, -1.1, true, &overflow);
   EXPECT_TRUE(overflow);
+
+  overflow = false;
+  Decimal16Value::FromDouble(t3, 0.99999999999, false, &overflow);
+  EXPECT_FALSE(overflow);
+
+  overflow = false;
+  Decimal16Value::FromDouble(t3, 0.99999999999, true, &overflow);
+  EXPECT_TRUE(overflow);
+
+  overflow = false;
+  Decimal16Value::FromDouble(t3, -0.99999999999, false, &overflow);
+  EXPECT_FALSE(overflow);
+
+  overflow = false;
+  Decimal16Value::FromDouble(t3, -0.99999999999, true, &overflow);
+  EXPECT_TRUE(overflow);
+  overflow = false;
+
+  // Test half rounding behavior
+  d4 = Decimal4Value::FromDouble(t4, 0.499999999, true, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), 0);
+  VerifyToString(d4, t4, "0");
+
+  d4 = Decimal4Value::FromDouble(t4, 0.5, true, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), 1);
+  VerifyToString(d4, t4, "1");
+
+  d4 = Decimal4Value::FromDouble(t4, -0.499999999, true, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), 0);
+  VerifyToString(d4, t4, "0");
+
+  d4 = Decimal4Value::FromDouble(t4, -0.5, true, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), -1);
+  VerifyToString(d4, t4, "-1");
 }
 
 TEST(StringToDecimal, Basic) {

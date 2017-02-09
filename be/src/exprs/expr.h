@@ -209,17 +209,6 @@ class Expr {
   /// Convenience function for closing multiple expr trees.
   static void Close(const std::vector<ExprContext*>& ctxs, RuntimeState* state);
 
-  /// Create a new literal expr of 'type' with initial 'data'.
-  /// data should match the ColumnType (i.e. type == TYPE_INT, data is a int*)
-  /// The new Expr will be allocated from the pool.
-  static Expr* CreateLiteral(ObjectPool* pool, const ColumnType& type, void* data);
-
-  /// Create a new literal expr of 'type' by parsing the string.
-  /// NULL will be returned if the string and type are not compatible.
-  /// The new Expr will be allocated from the pool.
-  static Expr* CreateLiteral(ObjectPool* pool, const ColumnType& type,
-      const std::string&);
-
   /// Computes a memory efficient layout for storing the results of evaluating
   /// 'exprs'. The results are assumed to be void* slot types (vs AnyVal types). Varlen
   /// data is not included (e.g. there will be space for a StringValue, but not the data

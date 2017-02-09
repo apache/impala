@@ -49,13 +49,15 @@ class DecimalValue {
     return *this;
   }
 
-  /// Returns the closest Decimal to 'd' of type 't', truncating digits that
-  /// cannot be represented.
-  static inline DecimalValue FromDouble(const ColumnType& t, double d, bool* overflow) {
-    return FromDouble(t.precision, t.scale, d, overflow);
+  /// Returns the closest Decimal to 'd' of type 't', rounding to the nearest integer
+  /// if 'round' is true, truncating the decimal places otherwise
+  static inline DecimalValue FromDouble(const ColumnType& t, double d, bool round,
+      bool* overflow) {
+    return FromDouble(t.precision, t.scale, d, round, overflow);
   }
 
-  static inline DecimalValue FromDouble(int precision, int scale, double d, bool* overflow);
+  static inline DecimalValue FromDouble(int precision, int scale, double d,
+      bool round, bool* overflow);
 
   /// Assigns *result as a decimal.
   static inline DecimalValue FromInt(const ColumnType& t, int64_t d, bool* overflow) {
@@ -225,6 +227,13 @@ class DecimalValue {
   }
 
   inline const T fractional_part(int scale) const;
+
+  /// Returns the value as an integer, setting overflow to true on overflow,
+  /// and leaving unchanged otherwise.  Rounds to the nearest integer, defined
+  /// as half / round away from zero.  Template parameter RESULT_T should be a
+  /// UDF Val type which defines an integer underlying type as underlying_type_t
+  template <typename RESULT_T>
+  inline typename RESULT_T::underlying_type_t ToInt(int scale, bool* overflow) const;
 
   /// Returns an approximate double for this decimal.
   inline double ToDouble(const ColumnType& type) const {
