@@ -303,7 +303,10 @@ string ColumnType::DebugString() const {
       ss << "CHAR(" << len << ")";
       return ss.str();
     case TYPE_DECIMAL:
-      ss << "DECIMAL(" << precision << ", " << scale << ")";
+      ss << "DECIMAL(" << precision << "," << scale << ")";
+      return ss.str();
+    case TYPE_VARCHAR:
+      ss << "VARCHAR(" << len << ")";
       return ss.str();
     default:
       return TypeToString(type);
