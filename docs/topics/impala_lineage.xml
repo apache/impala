@@ -42,25 +42,25 @@ under the License.
     <p rev="2.2.0">
       <indexterm audience="hidden">lineage</indexterm>
       <indexterm audience="hidden">column lineage</indexterm>
-      <term>Lineage</term> is a feature in the Cloudera Navigator data
-      management component that helps you track where data originated, and how
+      <term>Lineage</term> is a feature that helps you track where data originated, and how
       data propagates through the system through SQL statements such as
         <codeph>SELECT</codeph>, <codeph>INSERT</codeph>, and <codeph>CREATE
-        TABLE AS SELECT</codeph>. Impala is covered by the Cloudera Navigator
-      lineage features in <keyword keyref="impala22_full"/> and higher. </p>
-
+        TABLE AS SELECT</codeph>.
+    </p>
     <p>
-      This type of tracking is important in high-security configurations, especially in highly regulated industries
-      such as healthcare, pharmaceuticals, financial services and intelligence. For such kinds of sensitive data, it is important to know all
+      This type of tracking is important in high-security configurations, especially in
+      highly regulated industries such as healthcare, pharmaceuticals, financial services and
+      intelligence. For such kinds of sensitive data, it is important to know all
       the places in the system that contain that data or other data derived from it; to verify who has accessed
       that data; and to be able to doublecheck that the data used to make a decision was processed correctly and
       not tampered with.
     </p>
 
-    <p>
+    <p audience="hidden">
       You interact with this feature through <term>lineage diagrams</term> showing relationships between tables and
       columns. For instructions about interpreting lineage diagrams, see
-      <xref audience="integrated" href="cn_iu_lineage.xml" /><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cn_iu_lineage.html" scope="external" format="html"/>.
+      <xref audience="integrated" href="cn_iu_lineage.xml" />
+      <xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cn_iu_lineage.html" scope="external" format="html"/>.
     </p>
 
     <section id="column_lineage">
@@ -118,10 +118,11 @@ under the License.
       </p>
 
       <p>
-        To enable or disable this feature on a system not managed by Cloudera Manager, set or remove the
-        <codeph>-lineage_event_log_dir</codeph> configuration option for the <cmdname>impalad</cmdname> daemon. For
+        To enable or disable this feature, set or remove the <codeph>-lineage_event_log_dir</codeph>
+        configuration option for the <cmdname>impalad</cmdname> daemon. <ph audience="hidden">For
         information about turning the lineage feature on and off through Cloudera Manager, see
-        <xref audience="integrated" href="datamgmt_impala_lineage_log.xml"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/datamgmt_impala_lineage_log.html" scope="external" format="html"/>.
+        <xref audience="integrated" href="datamgmt_impala_lineage_log.xml"/>
+        <xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/datamgmt_impala_lineage_log.html" scope="external" format="html"/>.</ph>
       </p>
 
     </section>
