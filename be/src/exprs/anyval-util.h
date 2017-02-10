@@ -18,6 +18,8 @@
 #ifndef IMPALA_EXPRS_ANYVAL_UTIL_H
 #define IMPALA_EXPRS_ANYVAL_UTIL_H
 
+#include <algorithm>
+
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
@@ -218,7 +220,7 @@ class AnyValUtil {
   static void TruncateIfNecessary(const FunctionContext::TypeDesc& type, StringVal *val) {
     if (type.type == FunctionContext::TYPE_VARCHAR) {
       DCHECK(type.len >= 0);
-      val->len = min(val->len, type.len);
+      val->len = std::min(val->len, type.len);
     }
   }
 
