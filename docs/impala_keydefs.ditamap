@@ -33,6 +33,18 @@ under the License.
   </keydef>
 -->
 
+  <keydef href="https://web.mit.edu/kerberos/krb5-latest/doc/admin/install_kdc.html" scope="external" format="html" keys="mit_install_kdc">
+    <topicmeta><linktext>Kerberos Key Distribution Center (KDC)</linktext></topicmeta>
+  </keydef>
+
+  <keydef href="https://web.mit.edu/kerberos/krb5-latest/doc/index.html" scope="external" format="html" keys="mit_kerberos_docs">
+    <topicmeta><linktext>MIT Kerberos documentation</linktext></topicmeta>
+  </keydef>
+
+  <keydef href="https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SecureMode.html#Authentication" scope="external" format="html" keys="upstream_hadoop_authentication">
+    <topicmeta><linktext>Authentication in Hadoop</linktext></topicmeta>
+  </keydef>
+
   <keydef keys="upstream_hbase_docs" href="https://hbase.apache.org/book.html" scope="external" format="html">
     <topicmeta><linktext>the Apache HBase documentation</linktext></topicmeta>
   </keydef>

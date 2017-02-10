@@ -564,28 +564,31 @@ under the License.
     <p rev="IMPALA-2660 CDH-40241" id="auth_to_local_instructions">
       In <keyword keyref="impala26_full"/> and higher, Impala recognizes the <codeph>auth_to_local</codeph> setting,
       specified through the HDFS configuration setting
-      <codeph>hadoop.security.auth_to_local</codeph>
-      or the Cloudera Manager setting
-      <uicontrol>Additional Rules to Map Kerberos Principals to Short Names</uicontrol>.
+      <codeph>hadoop.security.auth_to_local</codeph>.
       This feature is disabled by default, to avoid an unexpected change in security-related behavior.
       To enable it:
       <ul>
         <li>
           <p>
-            For clusters not managed by Cloudera Manager, specify <codeph>--load_auth_to_local_rules=true</codeph>
-            in the <cmdname>impalad</cmdname> and <cmdname>catalogd</cmdname>configuration settings.
+            Specify <codeph>--load_auth_to_local_rules=true</codeph>
+            in the <cmdname>impalad</cmdname> and <cmdname>catalogd</cmdname> configuration settings.
           </p>
         </li>
-        <li audience="Cloudera">
+        <li audience="hidden">
           <p>
             For clusters managed by Cloudera Manager, select the 
             <uicontrol>Use HDFS Rules to Map Kerberos Principals to Short Names</uicontrol>
             checkbox to enable the service-wide <codeph>load_auth_to_local_rules</codeph> configuration setting.
+            Use the Cloudera Manager setting, <uicontrol>Additional Rules to Map Kerberos Principals to Short Names</uicontrol>,
+            to insert mapping rules.
             Then restart the Impala service.
+          </p>
+          <p>
+            See <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_auth_to_local_isolate.html" scope="external" format="html">Using Auth-to-Local Rules to Isolate Cluster Users</xref>
+            for general information about this feature.
           </p>
         </li>
       </ul>
-      See <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_auth_to_local_isolate.html" scope="external" format="html">Using Auth-to-Local Rules to Isolate Cluster Users</xref> for general information about this feature.
     </p>
 
     <note id="authentication_vs_authorization">

@@ -47,12 +47,13 @@ under the License.
 
     <note conref="../shared/impala_common.xml#common/authentication_vs_authorization"/>
 
-    <p outputclass="toc inpage"/>
-
     <p>
       An alternative form of authentication you can use is Kerberos, described in
       <xref href="impala_kerberos.xml#kerberos"/>.
     </p>
+
+    <p outputclass="toc inpage"/>
+
   </conbody>
 
   <concept id="ldap_prereqs">
@@ -121,8 +122,8 @@ under the License.
           <codeph>--ldap_uri</codeph> sets the URI of the LDAP server to use. Typically, the URI is prefixed with
           <codeph>ldap://</codeph>. In Impala 1.4.0 and higher, you can specify secure SSL-based LDAP transport by
           using the prefix <codeph>ldaps://</codeph>. The URI can optionally specify the port, for example:
-          <codeph>ldap://ldap_server.cloudera.com:389</codeph> or
-          <codeph>ldaps://ldap_server.cloudera.com:636</codeph>. (389 and 636 are the default ports for non-SSL and
+          <codeph>ldap://ldap_server.example.com:389</codeph> or
+          <codeph>ldaps://ldap_server.example.com:636</codeph>. (389 and 636 are the default ports for non-SSL and
           SSL LDAP connections, respectively.)
         </li>
 
@@ -160,8 +161,8 @@ under the License.
       <p>
         However, LDAP servers often require more complex, structured usernames for authentication. Impala supports
         three ways of transforming the short name (for example, <codeph>'henry'</codeph>) to a more complicated
-        string. If necessary, specify one of the following configuration options when starting the
-        <cmdname>impalad</cmdname> daemon on each DataNode:
+        string. If necessary, specify one of the following configuration options
+        when starting the <cmdname>impalad</cmdname> daemon on each DataNode:
       </p>
 
       <ul>
@@ -183,11 +184,6 @@ under the License.
           bind name of <codeph>"user=henry,OU=foo,CN=bar"</codeph>.
         </li>
       </ul>
-
-      <p rev="CDH-26854">
-        For clusters not managed by Cloudera Manager,
-        specify the option on the <cmdname>impalad</cmdname> command line.
-      </p>
 
       <p audience="hidden">
         For clusters managed by Cloudera Manager 5.4.0 and higher,

@@ -76,7 +76,7 @@ under the License.
       <xref href="http://blog.cloudera.com/blog/2013/07/how-hiveserver2-brings-security-and-concurrency-to-apache-hive/" scope="external" format="html">this
       Cloudera blog post</xref> for background information about the delegation capability in HiveServer2.
     </p>
-
+    <!-- Link to Cloudera blog post -->
     <p>
       To set up authentication for the delegated users:
     </p>
@@ -92,11 +92,8 @@ under the License.
 
       <li>
         <p>
-          On the client side, follow the instructions in the <q>Using User Name and Password</q> section in the
-          <xref href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Connectors/PDF/Cloudera-ODBC-Driver-for-Impala-Install-Guide.pdf" scope="external" format="pdf">ODBC
-          driver installation guide</xref>. Then search for <q>delegation</q> in that same installation guide to
-          learn about the <uicontrol>Delegation UID</uicontrol> field and <codeph>DelegationUID</codeph> configuration keyword to enable the delegation feature for
-          ODBC-based BI tools.
+          On the client side, to learn how to enable delegation, consult the documentation
+          for the ODBC driver you are using.
         </p>
       </li>
     </ul>
