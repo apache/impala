@@ -119,6 +119,8 @@ do
       ;;
     -testexhaustive)
       EXPLORATION_STRATEGY=exhaustive
+      # See bin/run-all-tests.sh and IMPALA-3947 for more information on
+      # what this means.
       ;;
     -snapshot_file)
       SNAPSHOT_FILE="${2-}"
@@ -172,7 +174,7 @@ do
       echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
            "running Hadoop services unless any -format* is True"
       echo "[-format] : Format the minicluster, metastore db, and sentry policy db"\
-           " [Default: False]"
+           "[Default: False]"
       echo "[-format_cluster] : Format the minicluster [Default: False]"
       echo "[-format_metastore] : Format the metastore db [Default: False]"
       echo "[-format_sentry_policy_db] : Format the Sentry policy db [Default: False]"
@@ -183,16 +185,17 @@ do
       echo "[-skiptests] : Skips execution of all tests"
       echo "[-notests] : Skips building and execution of all tests"
       echo "[-start_minicluster] : Start test cluster including Impala and all"\
-            " its dependencies. If already running, all services are restarted."\
-            " Regenerates test cluster config files. [Default: True if running "\
-            " tests or loading data, False otherwise]"
+           "its dependencies. If already running, all services are restarted."\
+           "Regenerates test cluster config files. [Default: True if running"\
+           "tests or loading data, False otherwise]"
       echo "[-start_impala_cluster] : Start Impala minicluster after build"\
-           " [Default: False]"
+           "[Default: False]"
       echo "[-testpairwise] : Run tests in 'pairwise' mode (increases"\
            "test execution time)"
-      echo "[-testexhaustive] : Run tests in 'exhaustive' mode (significantly increases"\
-           "test execution time)"
-      echo "[-testdata] : Loads test data. Implied as true if -snapshot_file is "\
+      echo "[-testexhaustive] : Run tests in 'exhaustive' mode, which significantly"\
+           "increases test execution time. ONLY APPLIES to suites with workloads:"\
+           "functional-query, targeted-stress"
+      echo "[-testdata] : Loads test data. Implied as true if -snapshot_file is"\
            "specified. If -snapshot_file is not specified, data will be regenerated."
       echo "[-snapshot_file <file name>] : Load test data from a snapshot file"
       echo "[-metastore_snapshot_file <file_name>]: Load the hive metastore snapshot"

@@ -87,11 +87,23 @@ do
   esac
 done
 
-# The EXPLORATION_STRATEGY parameter should only apply to the
-# functional-query workload because the larger datasets (ex. tpch) are
-# not generated in all table formats.
+# IMPALA-3947: "Exhaustive" tests are actually based on workload. This
+# means what we colloquially call "exhaustive" tests are actually
+# "exhaustive tests whose workloads are in this set below". Not all
+# workloads are able to be exhaustively run through buildall.sh. For
+# example, the tpch workload is never run exhaustively, because the
+# relatively large size of tpch means data loading in all exhaustive
+# formats takes much longer and data load snapshots containing tpch in
+# all exhaustive formats are much larger to store and take longer to
+# load.
+#
+# XXX If you change the --workload_exploration_strategy set below,
+# please update the buildall.sh help text for -testexhaustive.
 COMMON_PYTEST_ARGS="--maxfail=${MAX_PYTEST_FAILURES} --exploration_strategy=core"`
-    `" --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY"
+    `" --workload_exploration_strategy="`
+        `"functional-query:${EXPLORATION_STRATEGY},"`
+        `"targeted-stress:${EXPLORATION_STRATEGY}"
+
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # Only one impalad is supported when running against local filesystem.
   COMMON_PYTEST_ARGS+=" --impalad=localhost:21000"
