@@ -18,10 +18,12 @@
 package org.apache.impala.util;
 
 import java.util.Collection;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
@@ -35,7 +37,18 @@ import com.google.common.collect.Sets;
 public class DisjointSet<T> {
   // Maps from an item to its item set.
   private final Map<T, Set<T>> itemSets_ = Maps.newHashMap();
-  private final Set<Set<T>> uniqueSets_ = Sets.newHashSet();
+
+  // Stores the set of item sets in its keySet(). All keys are mapped to the same
+  // dummy value which is only used for validating the removal of entries.
+  // An IdentityHashMap is needed here instead of a regular HashSet because the Set<T>
+  // elements are mutated after inserting them. In a conventional HashSet mutating
+  // elements after they are inserted may cause problems because the hashCode() of the
+  // object during insertion may be different than its hashCode() after mutation. So,
+  // after changing the element it may not be possible to remove/find it again in the
+  // HashSet (looking in the wrong hash bucket), even using the same object reference.
+  private final IdentityHashMap<Set<T>, Object> uniqueSets_ =
+      new IdentityHashMap<Set<T>, Object>();
+  private static final Object DUMMY_VALUE = new Object();
 
   /**
    * Returns the item set corresponding to the given item or null if it
@@ -43,7 +56,7 @@ public class DisjointSet<T> {
    */
   public Set<T> get(T item) { return itemSets_.get(item); }
 
-  public Set<Set<T>> getSets() { return uniqueSets_; }
+  public Set<Set<T>> getSets() { return uniqueSets_.keySet(); }
 
   /**
    * Registers a new item set with a single item. Returns the new item set.
@@ -56,7 +69,7 @@ public class DisjointSet<T> {
     }
     Set<T> s = Sets.newHashSet(item);
     itemSets_.put(item, s);
-    uniqueSets_.add(s);
+    uniqueSets_.put(s, DUMMY_VALUE);
     return s;
   }
 
@@ -94,7 +107,8 @@ public class DisjointSet<T> {
       mergedItems.add(item);
       itemSets_.put(item, mergedItems);
     }
-    uniqueSets_.remove(updateItems);
+    Object removedValue = uniqueSets_.remove(updateItems);
+    Preconditions.checkState(removedValue == DUMMY_VALUE);
     return true;
   }
 
@@ -125,6 +139,7 @@ public class DisjointSet<T> {
    * Throws an IllegalStateException if an inconsistency is detected.
    */
   public void checkConsistency() {
+    // Validate map from item to item set.
     Set<Set<T>> validatedSets = Sets.newHashSet();
     for (Set<T> itemSet: itemSets_.values()) {
       // Avoid checking the same item set multiple times.
@@ -133,10 +148,22 @@ public class DisjointSet<T> {
       // the set itself.
       for (T item: itemSet) {
         if (itemSet != itemSets_.get(item)) {
-          throw new IllegalStateException("DisjointSet is in an inconsistent state.");
+          throw new IllegalStateException(
+              "DisjointSet is in an inconsistent state. Failed item set validation.");
         }
       }
       validatedSets.add(itemSet);
+    }
+
+    // Validate set of item sets. Every element should appear in exactly one item set.
+    Set<T> seenItems = Sets.newHashSet();
+    for (Set<T> itemSet: uniqueSets_.keySet()) {
+      for (T item: itemSet) {
+        if (!seenItems.add(item)) {
+          throw new IllegalStateException(
+              "DisjointSet is in an inconsistent state. Failed unique set validation.");
+        }
+      }
     }
   }
 }

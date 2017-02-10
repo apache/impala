@@ -56,6 +56,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -1979,6 +1980,12 @@ public class Analyzer {
     globalState_.valueTransferGraph = new ValueTransferGraph();
     globalState_.valueTransferGraph.computeValueTransfers();
 
+    // Validate the value-transfer graph in single-node planner tests.
+    if (RuntimeEnv.INSTANCE.isTestEnv() && getQueryOptions().num_nodes == 1) {
+      Preconditions.checkState(validateValueTransferGraph(),
+          "Failed to validate value-transfer graph.");
+    }
+
     // we start out by assigning each slot to its own equiv class
     int numSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
     for (int i = 0; i < numSlots; ++i) {
@@ -2941,7 +2948,7 @@ public class Analyzer {
       for (Pair<SlotId, SlotId> vt: valueTransfers) {
         expectedValueTransfer[vt.first.asInt()][vt.second.asInt()] = true;
       }
-      // Set registered value tranfers in expectedValueTransfer.
+      // Set registered value transfers in expectedValueTransfer.
       for (Pair<SlotId, SlotId> vt: globalState_.registeredValueTransfers) {
         expectedValueTransfer[vt.first.asInt()][vt.second.asInt()] = true;
       }

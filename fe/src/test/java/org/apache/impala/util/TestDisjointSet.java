@@ -157,4 +157,21 @@ public class TestDisjointSet {
         && ds.get(1).containsAll(Lists.newArrayList(1, 2, 3, 4, 5, 6, 7, 8)));
     ds.checkConsistency();
   }
+
+  /**
+   * IMPALA-4916: Tests that the set of item sets is maintained correctly.
+   */
+  @Test
+  public void testUniqueSets() throws Exception {
+    DisjointSet<Integer> ds = new DisjointSet<Integer>();
+
+    int uniqueElements = 100;
+    // Generate several 2-element item sets.
+    for (int i = 0; i < uniqueElements; i += 2) ds.union(i, i + 1);
+    // Connect several item sets into one big item set. This stresses the logic
+    // of maintaining the set of item sets.
+    for (int i = uniqueElements/2; i < uniqueElements; ++i) ds.union(i, i + 1);
+
+    ds.checkConsistency();
+  }
 }

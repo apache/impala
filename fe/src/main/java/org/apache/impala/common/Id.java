@@ -36,9 +36,7 @@ public class Id<IdType extends Id<IdType>> implements Comparable<Id<IdType>> {
   public int asInt() { return id_; }
 
   @Override
-  public int hashCode() {
-    return Integer.valueOf(id_).hashCode();
-  }
+  public int hashCode() { return id_; }
 
   @Override
   public String toString() {
