@@ -309,7 +309,7 @@ error_codes = (
 
   # TODO: IMPALA-4697: the merged errors do not show up in the query error log,
   # so we must point users to the impalad error log.
-  ("SCRATCH_ALLOCATION_FAILED", 102, "Could not create files in any configured scratch "
+  ("SCRATCH_ALLOCATION_FAILED", 101, "Could not create files in any configured scratch "
    "directories (--scratch_dirs). See logs for previous errors that may have prevented "
    "creating or writing scratch files."),
 )
