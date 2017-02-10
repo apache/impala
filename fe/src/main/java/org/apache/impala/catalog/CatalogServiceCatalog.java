@@ -974,7 +974,7 @@ public class CatalogServiceCatalog extends Catalog {
           throw new TableLoadingException("Error loading metadata for table: " +
               db.getName() + "." + tblName.getTable_name(), e);
         }
-        tbl.load(false, msClient.getHiveClient(), msTbl);
+        tbl.load(true, msClient.getHiveClient(), msTbl);
       }
       tbl.setCatalogVersion(newCatalogVersion);
       LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));
