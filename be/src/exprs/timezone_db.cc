@@ -36,6 +36,8 @@ vector<string> TimezoneDatabase::tz_region_list_;
 
 const time_zone_ptr TimezoneDatabase::TIMEZONE_MSK_PRE_2011_DST(time_zone_ptr(
     new posix_time_zone(string("MSK+03MSK+01,M3.5.0/02:00:00,M10.5.0/03:00:00"))));
+const time_zone_ptr TimezoneDatabase::TIMEZONE_MSK_PRE_2014(time_zone_ptr(
+    new posix_time_zone(string("MSK+04"))));
 
 const char* TimezoneDatabase::TIMEZONE_DATABASE_STR = "\"ID\",\"STD ABBR\",\"STD NAME\",\"DST ABBR\",\"DST NAME\",\"GMT offset\",\"DST adjustment\",\"DST Start Date rule\",\"Start time\",\"DST End date rule\",\"End time\"\n\
 \"ACT\",\"ACST\",\"Australian Central Standard Time (Northern Territory)\",\"\",\"\",\"+09:30:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
@@ -502,7 +504,7 @@ const char* TimezoneDatabase::TIMEZONE_DATABASE_STR = "\"ID\",\"STD ABBR\",\"STD
 \"Europe/Mariehamn\",\"EET\",\"Eastern European Time\",\"EEST\",\"Eastern European Summer Time\",\"+02:00:00\",\"+01:00:00\",\"-1;0;3\",\"+01:00:00\",\"-1;0;10\",\"+01:00:00\"\n\
 \"Europe/Minsk\",\"MSK\",\"Moscow Standard Time\",\"\",\"\",\"+03:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
 \"Europe/Monaco\",\"CET\",\"Central European Time\",\"CEST\",\"Central European Summer Time\",\"+01:00:00\",\"+01:00:00\",\"-1;0;3\",\"+01:00:00\",\"-1;0;10\",\"+01:00:00\"\n\
-\"Europe/Moscow\",\"MSK\",\"Moscow Standard Time\",\"\",\"\",\"+04:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
+\"Europe/Moscow\",\"MSK\",\"Moscow Standard Time\",\"\",\"\",\"+03:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
 \"Europe/Nicosia\",\"EET\",\"Eastern European Time\",\"EEST\",\"Eastern European Summer Time\",\"+02:00:00\",\"+01:00:00\",\"-1;0;3\",\"+01:00:00\",\"-1;0;10\",\"+01:00:00\"\n\
 \"Europe/Oslo\",\"CET\",\"Central European Time\",\"CEST\",\"Central European Summer Time\",\"+01:00:00\",\"+01:00:00\",\"-1;0;3\",\"+01:00:00\",\"-1;0;10\",\"+01:00:00\"\n\
 \"Europe/Paris\",\"CET\",\"Central European Time\",\"CEST\",\"Central European Summer Time\",\"+01:00:00\",\"+01:00:00\",\"-1;0;3\",\"+01:00:00\",\"-1;0;10\",\"+01:00:00\"\n\

@@ -4416,28 +4416,66 @@ TEST_F(ExprTest, UnaryOperators) {
   TestValue("-1 & 8", TYPE_TINYINT, 8);
 }
 
-// TODO: I think a lot of these casts are not necessary and we should fix this
-TEST_F(ExprTest, TimestampFunctions) {
-  // Regression test for IMPALA-4209
-  TestStringValue("cast(from_utc_timestamp(cast(1301180400 as timestamp),"
-      "'Europe/Moscow') as string)", "2011-03-27 03:00:00");
-  TestStringValue("cast(from_utc_timestamp(cast(1301180399 as timestamp),"
-      "'Europe/Moscow') as string)", "2011-03-27 01:59:59");
-  TestStringValue("cast(from_utc_timestamp(cast(1288404000 as timestamp),"
-      "'Europe/Moscow') as string)", "2010-10-30 06:00:00");
-  TestStringValue("cast(from_utc_timestamp(cast(1288584000 as timestamp),"
-      "'Europe/Moscow') as string)", "2010-11-01 07:00:00");
-  TestStringValue("cast(from_utc_timestamp(cast(1301104740 as timestamp),"
-      "'Europe/Moscow') as string)", "2011-03-26 04:59:00");
-  TestStringValue("cast(from_utc_timestamp(cast(1301277600 as timestamp),"
-      "'Europe/Moscow') as string)", "2011-03-28 06:00:00");
-  TestStringValue("cast(from_utc_timestamp(cast(1324947600 as timestamp),"
-      "'Europe/Moscow') as string)", "2011-12-27 05:00:00");
-  TestStringValue("cast(from_utc_timestamp(cast(1325725200 as timestamp),"
-      "'Europe/Moscow') as string)", "2012-01-05 05:00:00");
-  TestStringValue("cast(from_utc_timestamp(cast(1333594800 as timestamp),"
-      "'Europe/Moscow') as string)", "2012-04-05 07:00:00");
+TEST_F(ExprTest, MoscowTimezoneConversion) {
+#pragma push_macro("UTC_TO_MSC")
+#pragma push_macro("MSC_TO_UTC")
+#define UTC_TO_MSC(X) ("cast(from_utc_timestamp('" X "', 'Europe/Moscow') as string)")
+#define MSC_TO_UTC(X) ("cast(to_utc_timestamp('" X "', 'Europe/Moscow') as string)")
 
+  // IMPALA-4209: Moscow time change in 2011.
+  // Last DST change before the transition.
+  TestStringValue(UTC_TO_MSC("2010-10-30 22:59:59"), "2010-10-31 02:59:59");
+  TestStringValue(UTC_TO_MSC("2010-10-30 23:00:00"), "2010-10-31 02:00:00");
+  TestStringValue(MSC_TO_UTC("2010-10-31 01:59:59"), "2010-10-30 21:59:59");
+  // Since 2am to 2:59:59.999...am MSC happens twice, the ambiguity gets resolved by
+  // returning null.
+  TestIsNull(MSC_TO_UTC("2010-10-31 02:00:00"), TYPE_STRING);
+  TestIsNull(MSC_TO_UTC("2010-10-31 02:59:59"), TYPE_STRING);
+  TestStringValue(MSC_TO_UTC("2010-10-31 03:00:00"), "2010-10-31 00:00:00");
+
+  // Moscow time transitions to UTC+4.
+  TestStringValue(UTC_TO_MSC("2011-03-26 22:59:59"), "2011-03-27 01:59:59");
+  TestStringValue(UTC_TO_MSC("2011-03-26 23:00:00"), "2011-03-27 03:00:00");
+  TestStringValue(MSC_TO_UTC("2011-03-27 01:59:59"), "2011-03-26 22:59:59");
+  // Since 2am to 2:59:59.999...am MSC happens twice, the ambiguity gets resolved by
+  // returning null.
+  TestIsNull(MSC_TO_UTC("2011-03-27 02:00:00"), TYPE_STRING);
+  TestIsNull(MSC_TO_UTC("2011-03-27 02:59:59"), TYPE_STRING);
+  TestStringValue(MSC_TO_UTC("2011-03-27 03:00:00"), "2011-03-26 23:00:00");
+
+  // No more DST after the transition.
+  TestStringValue(UTC_TO_MSC("2011-12-20 09:00:00"), "2011-12-20 13:00:00");
+  TestStringValue(UTC_TO_MSC("2012-06-20 09:00:00"), "2012-06-20 13:00:00");
+  TestStringValue(UTC_TO_MSC("2012-12-20 09:00:00"), "2012-12-20 13:00:00");
+  TestStringValue(MSC_TO_UTC("2011-12-20 13:00:00"), "2011-12-20 09:00:00");
+  TestStringValue(MSC_TO_UTC("2012-06-20 13:00:00"), "2012-06-20 09:00:00");
+  TestStringValue(MSC_TO_UTC("2012-12-20 13:00:00"), "2012-12-20 09:00:00");
+
+  // IMPALA-4546: Moscow time change in 2014.
+  // UTC+4 is changed to UTC+3
+  TestStringValue(UTC_TO_MSC("2014-10-25 21:59:59"), "2014-10-26 01:59:59");
+  TestStringValue(UTC_TO_MSC("2014-10-25 22:00:00"), "2014-10-26 01:00:00");
+  TestStringValue(UTC_TO_MSC("2014-10-25 23:00:00"), "2014-10-26 02:00:00");
+  TestStringValue(MSC_TO_UTC("2014-10-26 00:59:59"), "2014-10-25 20:59:59");
+  // Since 1am to 1:59:59.999...am MSC happens twice, the ambiguity gets resolved by
+  // returning null.
+  TestIsNull(MSC_TO_UTC("2014-10-26 01:00:00"), TYPE_STRING);
+  TestIsNull(MSC_TO_UTC("2014-10-26 01:59:59"), TYPE_STRING);
+  TestStringValue(MSC_TO_UTC("2014-10-26 02:00:00"), "2014-10-25 23:00:00");
+
+  // Still no DST after the transition.
+  TestStringValue(UTC_TO_MSC("2014-12-20 09:00:00"), "2014-12-20 12:00:00");
+  TestStringValue(UTC_TO_MSC("2015-06-20 09:00:00"), "2015-06-20 12:00:00");
+  TestStringValue(UTC_TO_MSC("2015-12-20 09:00:00"), "2015-12-20 12:00:00");
+  TestStringValue(MSC_TO_UTC("2014-12-20 12:00:00"), "2014-12-20 09:00:00");
+  TestStringValue(MSC_TO_UTC("2015-06-20 12:00:00"), "2015-06-20 09:00:00");
+  TestStringValue(MSC_TO_UTC("2015-12-20 12:00:00"), "2015-12-20 09:00:00");
+
+#pragma pop_macro("MSC_TO_UTC")
+#pragma pop_macro("UTC_TO_MSC")
+}
+
+TEST_F(ExprTest, TimestampFunctions) {
   // Regression for IMPALA-1105
   TestIsNull("cast(cast('NOTATIMESTAMP' as timestamp) as string)", TYPE_STRING);
 

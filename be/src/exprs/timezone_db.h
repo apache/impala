@@ -34,14 +34,19 @@ class TimezoneDatabase {
   /// Set up the static timezone database.
   static Status Initialize();
 
-  /// Converts the name of a timezone to a boost timezone object.
-  /// Some countries change their timezones, the tiemstamp is required to correctly
-  /// determine the timezone information.
+  /// Converts the name of a timezone to a boost timezone object. In some cases, the
+  /// timestamp is required to determine the timezone because occasionally timezone
+  /// rules change. The flag "tv_in_utc" specifies whether the given timestamp value is
+  /// in the UTC timezone. If the flag is false, then the timestamp value is assumed to
+  /// be in the 'tz' timezone.
   static boost::local_time::time_zone_ptr FindTimezone(const std::string& tz,
-      const TimestampValue& tv);
+      const TimestampValue& tv, bool tv_in_utc);
 
-  /// Moscow Timezone No Daylight Savings Time (GMT+4), for use after March 2011
+  /// Moscow timezone UTC+3 with DST, for use before March 27, 2011.
   static const boost::local_time::time_zone_ptr TIMEZONE_MSK_PRE_2011_DST;
+
+  /// Moscow timezone UTC+4 with no DST, for use before October 26, 2014.
+  static const boost::local_time::time_zone_ptr TIMEZONE_MSK_PRE_2014;
 
  private:
   static const char* TIMEZONE_DATABASE_STR;
