@@ -1,0 +1,110 @@
+# This test file covers alter table statements that add multiple partitions and use hdfs caching
+====
+---- QUERY
+create table i1670B_alter (s string) partitioned by (i integer);
+alter table i1670B_alter add
+partition (i=1) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670B_alter/i1'
+cached in 'testPool' with replication=3
+partition (i=2) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670B_alter/i2'
+partition (i=3) uncached;
+show partitions i1670B_alter;
+---- RESULTS
+'1',-1,0,'0B','0B','3','TEXT','false',regex:.*/i1
+'2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i2
+'3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i=3
+'Total',-1,0,'0B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# IMPALA-1670: Set up i1670C_alter table for the next test case.
+create table i1670C_alter (s string) partitioned by (i integer);
+alter table i1670C_alter add
+partition (i=2) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670C_alter/i2A'
+cached in 'testPool' with replication=2
+partition (i=4) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670C_alter/i4A' uncached;
+show partitions i1670C_alter;
+---- RESULTS
+'2',-1,0,'0B','0B','2','TEXT','false',regex:.*/i2A
+'4',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i4A
+'Total',-1,0,'0B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# IMPALA-1670: If 'IF NOT EXISTS' is used ALTER TABLE ADD PARTITION works with preexisting
+# partitions. Location and caching options of existing partitions are not modified.
+alter table i1670C_alter add if not exists
+partition (i=1) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670C_alter/i1B'
+partition (i=2) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670C_alter/i2B' uncached
+partition (i=3) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670C_alter/i3B'
+cached in 'testPool' with replication=3
+partition (i=4) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670C_alter/i4B'
+cached in 'testPool' with replication=4;
+show partitions i1670C_alter;
+---- RESULTS
+'1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i1B
+'2',-1,0,'0B','0B','2','TEXT','false',regex:.*/i2A
+'3',-1,0,'0B','0B','3','TEXT','false',regex:.*/i3B
+'4',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i4A
+'Total',-1,0,'0B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# IMPALA-1670: Partitions without explicit CACHED IN/UNCACHED clause inherit cacheop from
+# the parent table
+create table i1670D_alter (s string) partitioned by (i integer)
+cached in 'testPool' with replication=7;
+alter table i1670D_alter add
+partition (i=1) cached in 'testPool' with replication=5
+partition (i=2)
+partition (i=3) uncached
+partition (i=4);
+show partitions i1670D_alter;
+---- RESULTS
+'1',-1,0,'0B','0B','5','TEXT','false',regex:.*/i=1
+'2',-1,0,'0B','0B','7','TEXT','false',regex:.*/i=2
+'3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*/i=3
+'4',-1,0,'0B','0B','7','TEXT','false',regex:.*/i=4
+'Total',-1,0,'0B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# IMPALA-1670: After INVALIDATE METADATA Impala can access previously added partitions and
+# partition data.
+create table i1670E_alter (a int) partitioned by (x int);
+alter table i1670E_alter add partition (x=1)
+partition (x=2) uncached
+partition (x=3) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670E_alter/x3'
+cached in 'testPool' with replication=7;
+insert into i1670E_alter partition(x=1) values (1), (2), (3);
+insert into i1670E_alter partition(x=2) values (1), (2), (3), (4);
+insert into i1670E_alter partition(x=3) values (1);
+invalidate metadata i1670E_alter;
+====
+---- QUERY
+show partitions i1670E_alter;
+---- RESULTS
+'1',-1,1,regex:.*,'NOT CACHED','NOT CACHED','TEXT','false',regex:.*/x=1
+'2',-1,1,regex:.*,'NOT CACHED','NOT CACHED','TEXT','false',regex:.*/x=2
+'3',-1,1,regex:.*,regex:.*,'7','TEXT','false',regex:.*/x3
+'Total',-1,3,regex:.*,regex:.*,'','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select x, a from i1670E_alter order by x, a;
+---- RESULTS
+1,1
+1,2
+1,3
+2,1
+2,2
+2,3
+2,4
+3,1
+---- TYPES
+INT, INT
+====
