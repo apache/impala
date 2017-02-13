@@ -16,12 +16,15 @@
 # under the License.
 
 import pytest
+import time
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.verifiers.metric_verifier import MetricVerifier
 
-class TestFragmentLifecycle(ImpalaTestSuite):
+# TODO: Debug actions leak into other tests in the same suite (if not explicitly
+# unset). Ensure they get unset between tests.
+class TestFragmentLifecycleWithDebugActions(ImpalaTestSuite):
   """Using the debug action interface, check that failed queries correctly clean up *all*
   fragments"""
 
@@ -67,3 +70,25 @@ class TestFragmentLifecycle(ImpalaTestSuite):
       #
       # TODO: Fix when we have cancellable RPCs.
       v.wait_for_metric(self.IN_FLIGHT_FRAGMENTS, 0, timeout=125)
+
+class TestFragmentLifecycle(ImpalaTestSuite):
+  def test_finst_cancel_when_query_complete(self):
+    """Regression test for IMPALA-4295: if a query returns all its rows before all its
+    finsts have completed, it should cancel the finsts and complete promptly."""
+    now = time.time()
+
+    # Query designed to produce 1024 (the limit) rows very quickly from the first union
+    # child, but the second one takes a very long time to complete. Without fix for
+    # IMPALA-4295, the whole query waits for the second child to complete.
+
+    # Due to IMPALA-5671, the limit must be a multiple of the row batch size - if it's
+    # reached during production of a row batch, processing moves to the second child, and
+    # the query will take a long time complete.
+    self.client.execute("with l as (select 1 from functional.alltypes), r as"
+      " (select count(*) from tpch_parquet.lineitem a cross join tpch_parquet.lineitem b)"
+      "select * from l union all (select * from r) LIMIT 1024")
+    end = time.time()
+
+    # Query typically completes in < 2s, but if cross join is fully evaluated, will take >
+    # 10 minutes. Pick 2 minutes as a reasonable midpoint to avoid false negatives.
+    assert end - now < 120, "Query took too long to complete: " + duration + "s"

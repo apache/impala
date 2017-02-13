@@ -977,6 +977,10 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
     return Status::OK();
   }
 
+  // If all results have been returned, return a cancelled status to force the fragment
+  // instance to stop executing.
+  if (!done && returned_all_results_) return Status::CANCELLED;
+
   if (done) {
     lock_guard<mutex> l(lock_);
     DCHECK_GT(num_remaining_backends_, 0);
