@@ -41,8 +41,8 @@ if [[ -d "${AUX_CUSTOM_DIR}" ]]
 then
   ARGS+=("${AUX_CUSTOM_DIR}")
 fi
-ARGS+=("--junitxml=\"${RESULTS_DIR}/TEST-impala-custom-cluster.xml\"")
-ARGS+=("--resultlog=\"${RESULTS_DIR}/TEST-impala-custom-cluster.log\"")
+ARGS+=("--junitxml=${RESULTS_DIR}/TEST-impala-custom-cluster.xml")
+ARGS+=("--resultlog=${RESULTS_DIR}/TEST-impala-custom-cluster.log")
 ARGS+=("$@")
 
 impala-py.test "${ARGS[@]}"
