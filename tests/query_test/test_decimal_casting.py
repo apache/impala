@@ -18,7 +18,7 @@
 # Validates that casting to Decimal works.
 #
 import pytest
-from decimal import Decimal, getcontext, ROUND_DOWN
+from decimal import Decimal, getcontext, ROUND_DOWN, ROUND_HALF_UP
 from metacomm.combinatorics.all_pairs2 import all_pairs2 as all_pairs
 from random import randint
 
@@ -31,8 +31,9 @@ class TestDecimalCasting(ImpalaTestSuite):
 
   Specifically, this test suite ensures that:
     - overflows and underflows and handled correctly.
-    - casts from floats/string to their exact decimal types are correct.
+    - casts from decimal/string to their exact decimal types are correct.
     - max/min/NULL/0 can be expressed with their respective decimal types.
+    - TODO: Add cases for cast from float/double to decimal types.
   """
   DECIMAL_TYPES_MAP = {
       # All possible decimal types.
@@ -43,9 +44,9 @@ class TestDecimalCasting(ImpalaTestSuite):
       # mimics test_vectors.py and takes a subset of all decimal types
       'pairwise' : all_pairs([(p, s) for p in xrange(1, 39) for s in xrange(0, p + 1)])
   }
-  # We can cast for numerics, string or decimal types.
-  CAST_FROM = ['string', 'number', 'decimal']
-  # Set the default precisin to 38 to operate on decimal values.
+  # We can cast for numerics or string types.
+  CAST_FROM = ['string', 'number']
+  # Set the default precision to 38 to operate on decimal values.
   getcontext().prec = 38
   # Represents a 0 in decimal
   DECIMAL_ZERO = Decimal('0')
@@ -62,11 +63,8 @@ class TestDecimalCasting(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('cast_from', *TestDecimalCasting.CAST_FROM))
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension_from_dict(
-        {'decimal_v2': ['false']}))
+        {'decimal_v2': ['false','true']}))
     cls.iterations = 1
-
-  def setup_method(self, method):
-    self.max_bigint = int(self.execute_scalar("select max_bigint()"))
 
   def _gen_decimal_val(self, precision, scale):
     """Generates a Decimal object with the exact number of digits as the precision."""
@@ -79,22 +77,14 @@ class TestDecimalCasting(ImpalaTestSuite):
     return Decimal(num) if randint(0,1) else Decimal("-{0}".format(num))
 
   def _assert_decimal_result(self, cast, actual, expected):
-    assert actual == expected, "Cast: {0}, Expected: {1}, Actual: {2}".format(cast,\
+    assert expected == actual, "Cast: {0}, Expected: {1}, Actual: {2}".format(cast,\
         expected, actual)
 
-  def _normalize_cast_expr(self, decimal_val, scale, cast_from):
-    """Convert the decimal value to a string litetal to avoid overflow.
-
-    If an integer literal is greater than the max bigint supported by Impala, it
-    overflows. This methods replaces it with a string literal.
-    """
-    # Decimal({1},{2}) is the target type to cast to. If casting from decimal,
-    # Decimal({3},{4}) is the intermediate type to cast {0} to.
-    if (scale == 0 and abs(decimal_val) > self.max_bigint) or (cast_from == 'string'):
+  def _normalize_cast_expr(self, decimal_val, precision, cast_from):
+    # Due to IMPALA-4936, casts from double which overflows decimal type don't work
+    # reliably. So casting from string for now until IMPALA-4936 is fixed.
+    if precision > 38 or cast_from == 'string':
       return "select cast('{0}' as Decimal({1},{2}))"
-    elif cast_from == 'decimal':
-      base_cast = "cast('{0}' as Decimal({3},{4}))"
-      return "select cast(" + base_cast + " as Decimal({1},{2}))"
     else:
       return "select cast({0} as Decimal({1},{2}))"
 
@@ -110,18 +100,16 @@ class TestDecimalCasting(ImpalaTestSuite):
     dec_max = Decimal('{0}.{1}'.format('9' * (precision - scale), '9' * scale))
     # Multiplying large values eith -1 can produce an overflow.
     dec_min = Decimal('-{0}'.format(str(dec_max)))
-    cast = self._normalize_cast_expr(dec_max, scale, vector.get_value('cast_from'))
+    cast = self._normalize_cast_expr(dec_max, precision, vector.get_value('cast_from'))
     # Test max
-    res = Decimal(self.execute_scalar(\
-        cast.format(dec_max, precision, scale, precision, scale)))
+    res = Decimal(self.execute_scalar(cast.format(dec_max, precision, scale)))
     self._assert_decimal_result(cast, res, dec_max)
     # Test Min
-    res = Decimal(self.execute_scalar(\
-        cast.format(dec_min, precision, scale, precision, scale)))
+    res = Decimal(self.execute_scalar(cast.format(dec_min, precision, scale)))
     self._assert_decimal_result(cast, res, dec_min)
     # Test zero
     res = Decimal(self.execute_scalar(\
-        cast.format(TestDecimalCasting.DECIMAL_ZERO, precision, scale, precision, scale)))
+        cast.format(TestDecimalCasting.DECIMAL_ZERO, precision, scale)))
     self._assert_decimal_result(cast, res, TestDecimalCasting.DECIMAL_ZERO)
     # Test NULL
     null_cast = "select cast(NULL as Decimal({0}, {1}))".format(precision, scale)
@@ -136,8 +124,8 @@ class TestDecimalCasting(ImpalaTestSuite):
       pytest.skip("Casting between the same decimal type isn't interesting")
     for i in xrange(self.iterations):
       val = self._gen_decimal_val(precision, scale)
-      cast = self._normalize_cast_expr(val, scale, vector.get_value('cast_from'))\
-          .format(val, precision, scale, precision, scale)
+      cast = self._normalize_cast_expr(val, precision, vector.get_value('cast_from'))\
+          .format(val, precision, scale)
       res = Decimal(self.execute_scalar(cast))
       self._assert_decimal_result(cast, res, val)
 
@@ -149,8 +137,8 @@ class TestDecimalCasting(ImpalaTestSuite):
       # Generate a decimal with a larger precision than the one we're casting to.
       from_precision = randint(precision + 1, 39)
       val = self._gen_decimal_val(from_precision, scale)
-      cast = self._normalize_cast_expr(val, scale, vector.get_value('cast_from'))\
-          .format(val, precision, scale, min(38, from_precision), scale)
+      cast = self._normalize_cast_expr(val, from_precision,\
+          vector.get_value('cast_from')).format(val, precision, scale)
       res = self.execute_scalar(cast)
       self._assert_decimal_result(cast, res, 'NULL')
 
@@ -160,16 +148,19 @@ class TestDecimalCasting(ImpalaTestSuite):
     """
     precision, scale = vector.get_value('decimal_type')
     is_decimal_v2 = vector.get_value('exec_option')['decimal_v2'] == 'true'
+    cast_from = vector.get_value('cast_from')
+
     if precision == scale:
       pytest.skip("Cannot underflow scale when precision and scale are equal")
     for i in xrange(self.iterations):
       from_scale = randint(scale + 1, precision)
       val = self._gen_decimal_val(precision, from_scale)
-      cast = self._normalize_cast_expr(val, scale, vector.get_value('cast_from'))\
-          .format(val, precision, scale, precision, from_scale)
+      cast = self._normalize_cast_expr(val, precision, cast_from)\
+          .format(val, precision, scale)
       res = Decimal(self.execute_scalar(cast, vector.get_value('exec_option')))
-      if is_decimal_v2:
-        expected_val = val.quantize(Decimal('0e-%s' % scale))
+      # TODO: Remove check for cast_from once string to decimal is supported in decimal_v2.
+      if is_decimal_v2 and cast_from != 'string':
+        expected_val = val.quantize(Decimal('0e-%s' % scale), rounding=ROUND_HALF_UP)
       else:
         expected_val = val.quantize(Decimal('0e-%s' % scale), rounding=ROUND_DOWN)
       self._assert_decimal_result(cast, res, expected_val)
