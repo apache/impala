@@ -51,7 +51,6 @@ under the License.
     <topicref href="topics/impala_schema_design.xml"/>
   </topicref>
   <topicref audience="standalone" href="topics/impala_install.xml#install">
-    <topicref href="topics/impala_noncm_installation.xml#noncm_installation"/>
 <!-- Removed when Hue docs were removed from main library. Might be worth resurrecting someday as general Impala+Hue topic. -->
 <!--		<topicref href="impala_hue_xi20559.xml"/> -->
   </topicref>

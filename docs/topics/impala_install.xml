@@ -37,15 +37,48 @@ under the License.
       <indexterm audience="hidden">cluster</indexterm>
       <indexterm audience="hidden">DataNodes</indexterm>
       <indexterm audience="hidden">NameNode</indexterm>
-      <indexterm audience="hidden">Cloudera Manager</indexterm>
       <indexterm audience="hidden">impalad</indexterm>
       <indexterm audience="hidden">impala-shell</indexterm>
       <indexterm audience="hidden">statestored</indexterm>
-      Impala is an open-source project that returns rapid responses to
-      queries.
+      Impala is an open-source analytic database for Apache Hadoop
+      that returns rapid responses to queries.
     </p>
 
-    <p outputclass="toc inpage"/>
+    <p>
+      Follow these steps to set up Impala on a cluster by building from source:
+    </p>
+
+<!-- Steps adapted from http://impala.apache.org/downloads.html -->
+
+    <ul>
+      <li>
+        <p>
+          Download the latest release. See
+          <xref href="http://impala.apache.org/downloads.html" scope="external" format="html">the Impala downloads page</xref>
+          for the link to the latest release.
+        </p>
+      </li>
+      <li>
+        <p>
+          Check the <filepath>README.md</filepath> file for a pointer
+          to the build instructions.
+        </p>
+      </li>
+      <li>
+        <p>
+          Please check the MD5 and SHA1 and GPG signature, the latter by using the code signing keys of the release managers.
+        </p>
+      </li>
+      <li>
+        <p>
+          Developers interested in working on Impala can clone the Impala source repository:
+<codeblock>
+git clone https://git-wip-us.apache.org/repos/asf/incubator-impala.git
+</codeblock>
+        </p>
+      </li>
+    </ul>
+
   </conbody>
 
   <concept id="install_details">
