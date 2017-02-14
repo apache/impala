@@ -559,9 +559,9 @@ int64_t Lz4Decompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
 Status Lz4Decompressor::ProcessBlock(bool output_preallocated, int64_t input_length,
     const uint8_t* input, int64_t* output_length, uint8_t** output) {
   DCHECK(output_preallocated) << "Lz4 Codec implementation must have allocated output";
-  // LZ4_uncompress will cause a segmentation fault if passed a NULL output.
+  // LZ4_decompress_fast will cause a segmentation fault if passed a NULL output.
   if(*output_length == 0) return Status::OK();
-  if (LZ4_uncompress(reinterpret_cast<const char*>(input),
+  if (LZ4_decompress_fast(reinterpret_cast<const char*>(input),
           reinterpret_cast<char*>(*output), *output_length) != input_length) {
     return Status("Lz4: uncompress failed");
   }

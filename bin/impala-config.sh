@@ -72,7 +72,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=339-7dba579b79
+export IMPALA_TOOLCHAIN_BUILD_ID=344-715ee51bdc
 
 # Versions of toolchain dependencies.
 # -----------------------------------
@@ -95,7 +95,7 @@ export IMPALA_LLVM_ASAN_VERSION=3.8.0-p1
 # Debug builds should use the release+asserts build to get additional coverage.
 # Don't use the LLVM debug build because the binaries are too large to distribute.
 export IMPALA_LLVM_DEBUG_VERSION=3.8.0-asserts-p1
-export IMPALA_LZ4_VERSION=svn
+export IMPALA_LZ4_VERSION=1.7.5
 export IMPALA_OPENLDAP_VERSION=2.4.25
 export IMPALA_OPENSSL_VERSION=0.9.8zf
 export IMPALA_PROTOBUF_VERSION=2.6.1
