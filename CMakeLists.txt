@@ -93,6 +93,10 @@ if (APPLE)
   set_dep_root(OPENSSL)
 endif()
 
+# The boost-cmake project hasn't been maintained for years. Let's make sure we
+# don't accidentally use it if it can be found.
+set(Boost_NO_BOOST_CMAKE ON)
+
 set(Boost_USE_STATIC_LIBS NOT ${BUILD_SHARED_LIBS})
 set(Boost_USE_STATIC_RUNTIME ON)
 
