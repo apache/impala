@@ -1160,6 +1160,8 @@ select histogram(timestamp_col) from functional.alltypestiny;
 STRING
 ====
 ---- QUERY
+# IMPALA-4787: appx_median() on a medium sized dataset. This should excercise merge() with
+# differently sized inputs in the Reservoir Sampling algorithm.
 select
 appx_median(bool_col),
 appx_median(tinyint_col),
@@ -1169,11 +1171,22 @@ appx_median(float_col),
 appx_median(double_col),
 appx_median(string_col),
 appx_median(timestamp_col)
-from alltypestiny
+from alltypes
 ---- RESULTS
-true,1,1,1,1.100000023841858,10.1,'1',2009-03-01 00:00:00
+true,5,5,5,5.5,50.5,'5',2010-01-01 00:00:00
 ---- TYPES
 BOOLEAN, TINYINT, SMALLINT, INT, FLOAT, DOUBLE, STRING, TIMESTAMP
+====
+---- QUERY
+# IMPALA-4787: appx_median on a large dataset. This requires several buffer resizes in the
+# Reservoir Sampling algorithm.
+select appx_median(l_returnflag)
+from tpch.lineitem
+where l_returnflag = "N"
+---- RESULTS
+'N'
+---- TYPES
+STRING
 ====
 ---- QUERY
 # IMPALA-1419: Agg fn containing arithmetic expr on NULL fails

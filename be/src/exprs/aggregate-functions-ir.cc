@@ -40,10 +40,11 @@
 
 using boost::uniform_int;
 using boost::ranlux64_3;
-using std::push_heap;
-using std::pop_heap;
-using std::map;
 using std::make_pair;
+using std::map;
+using std::nth_element;
+using std::pop_heap;
+using std::push_heap;
 
 namespace {
 // Threshold for each precision where it's better to use linear counting instead
@@ -122,9 +123,6 @@ int64_t HllEstimateBias(int64_t estimate) {
 
 }
 
-// TODO: this file should be cross compiled and then all of the builtin
-// aggregate functions will have a codegen enabled path. Then we can remove
-// the custom code in aggregation node.
 namespace impala {
 
 // This function initializes StringVal 'dst' with a newly allocated buffer of
@@ -902,8 +900,6 @@ BigIntVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& 
 // TODO: Expose as constant argument parameters to the UDA.
 const static int NUM_BUCKETS = 100;
 const static int NUM_SAMPLES_PER_BUCKET = 200;
-const static int NUM_SAMPLES = NUM_BUCKETS * NUM_SAMPLES_PER_BUCKET;
-const static int MAX_STRING_SAMPLE_LEN = 10;
 
 template <typename T>
 struct ReservoirSample {
@@ -918,6 +914,9 @@ struct ReservoirSample {
   // Gets a copy of the sample value that allocates memory from ctx, if necessary.
   T GetValue(FunctionContext* ctx) { return val; }
 };
+
+// Maximum length of a string sample.
+const static int MAX_STRING_SAMPLE_LEN = 10;
 
 // Template specialization for StringVal because we do not store the StringVal itself.
 // Instead, we keep fixed size arrays and truncate longer strings if necessary.
@@ -939,82 +938,6 @@ struct ReservoirSample<StringVal> {
     return StringVal::CopyFrom(ctx, &val[0], len);
   }
 };
-
-template <typename T>
-struct ReservoirSampleState {
-  ReservoirSample<T> samples[NUM_SAMPLES];
-
-  // Number of collected samples.
-  int num_samples;
-
-  // Number of values over which the samples were collected.
-  int64_t source_size;
-
-  // Random number generator for generating 64-bit integers
-  // TODO: Replace with mt19937_64 when upgrading boost
-  ranlux64_3 rng;
-
-  int64_t GetNext64(int64_t max) {
-    uniform_int<int64_t> dist(0, max);
-    return dist(rng);
-  }
-};
-
-template <typename T>
-void AggregateFunctions::ReservoirSampleInit(FunctionContext* ctx, StringVal* dst) {
-  AllocBuffer(ctx, dst, sizeof(ReservoirSampleState<T>));
-  if (UNLIKELY(dst->is_null)) {
-    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
-    return;
-  }
-  *reinterpret_cast<ReservoirSampleState<T>*>(dst->ptr) = ReservoirSampleState<T>();
-}
-
-template <typename T>
-void AggregateFunctions::ReservoirSampleUpdate(FunctionContext* ctx, const T& src,
-    StringVal* dst) {
-  if (src.is_null) return;
-  DCHECK(!dst->is_null);
-  DCHECK_EQ(dst->len, sizeof(ReservoirSampleState<T>));
-  ReservoirSampleState<T>* state = reinterpret_cast<ReservoirSampleState<T>*>(dst->ptr);
-
-  if (state->num_samples < NUM_SAMPLES) {
-    state->samples[state->num_samples++] = ReservoirSample<T>(src);
-  } else {
-    int64_t r = state->GetNext64(state->source_size);
-    if (r < NUM_SAMPLES) state->samples[r] = ReservoirSample<T>(src);
-  }
-  ++state->source_size;
-}
-
-template <typename T>
-StringVal AggregateFunctions::ReservoirSampleSerialize(FunctionContext* ctx,
-    const StringVal& src) {
-  if (UNLIKELY(src.is_null)) return src;
-  StringVal result = StringVal::CopyFrom(ctx, src.ptr, src.len);
-  ctx->Free(src.ptr);
-  if (UNLIKELY(result.is_null)) return result;
-
-  ReservoirSampleState<T>* state = reinterpret_cast<ReservoirSampleState<T>*>(result.ptr);
-  // Assign keys to the samples that haven't been set (i.e. if serializing after
-  // Update()). In weighted reservoir sampling the keys are typically assigned as the
-  // sources are being sampled, but this requires maintaining the samples in sorted order
-  // (by key) and it accomplishes the same thing at this point because all data points
-  // coming into Update() get the same weight. When the samples are later merged, they do
-  // have different weights (set here) that are proportional to the source_size, i.e.
-  // samples selected from a larger stream are more likely to end up in the final sample
-  // set. In order to avoid the extra overhead in Update(), we approximate the keys by
-  // picking random numbers in the range [(SOURCE_SIZE - SAMPLE_SIZE)/(SOURCE_SIZE), 1].
-  // This weights the keys by SOURCE_SIZE and implies that the samples picked had the
-  // highest keys, because values not sampled would have keys between 0 and
-  // (SOURCE_SIZE - SAMPLE_SIZE)/(SOURCE_SIZE).
-  for (int i = 0; i < state->num_samples; ++i) {
-    if (state->samples[i].key >= 0) continue;
-    int r = rand() % state->num_samples;
-    state->samples[i].key = ((double) state->source_size - r) / state->source_size;
-  }
-  return result;
-}
 
 template <typename T>
 bool SampleValLess(const ReservoirSample<T>& i, const ReservoirSample<T>& j) {
@@ -1050,38 +973,280 @@ bool SampleKeyGreater(const ReservoirSample<T>& i, const ReservoirSample<T>& j) 
   return i.key > j.key;
 }
 
+// Keeps track of the current state of the reservoir sampling algorithm. The samples are
+// stored in a dynamically sized array. Initially, the the samples array is stored in a
+// separate memory allocation. This class is responsible for managing the memory of the
+// array and reallocating when the array is full. When this object is serialized into an
+// output buffer, the samples array is inlined into the output buffer as well.
+template <typename T>
+class ReservoirSampleState {
+ public:
+  ReservoirSampleState(FunctionContext* ctx)
+    : num_samples_(0),
+      capacity_(INIT_CAPACITY),
+      source_size_(0),
+      sample_array_inline_(false),
+      samples_(NULL) {
+    // Allocate some initial memory for the samples array.
+    size_t buffer_len = sizeof(ReservoirSample<T>) * capacity_;
+    uint8_t* ptr = ctx->Allocate(buffer_len);
+    if (ptr == NULL) {
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+      return;
+    }
+    samples_ = reinterpret_cast<ReservoirSample<T>*>(ptr);
+  }
+
+  // Returns a pointer to a ReservoirSample at idx.
+  ReservoirSample<T>* GetSample(int64_t idx) {
+    DCHECK(samples_ != NULL);
+    DCHECK_LT(idx, num_samples_);
+    DCHECK_LE(num_samples_, capacity_);
+    DCHECK_GE(idx, 0);
+    return &samples_[idx];
+  }
+
+  // Adds a sample and increments the source size. Doubles the capacity of the sample
+  // array if necessary. If max capacity is reached, randomly evicts a sample (as
+  // required by the algorithm). Returns false if the attempt to double the capacity
+  // fails, true otherwise.
+  bool AddSample(FunctionContext* ctx, const ReservoirSample<T>& s) {
+    DCHECK(samples_ != NULL);
+    DCHECK_LE(num_samples_, MAX_CAPACITY);
+    if (num_samples_ < MAX_CAPACITY) {
+      if (num_samples_ == capacity_) {
+        bool result = IncreaseCapacity(ctx, capacity_ * 2);
+        if (!result) return false;
+      }
+      DCHECK_LT(num_samples_, capacity_);
+      samples_[num_samples_++] = s;
+    } else {
+      DCHECK_EQ(num_samples_, MAX_CAPACITY);
+      DCHECK(!sample_array_inline_);
+      int64_t idx = GetNext64(source_size_);
+      if (idx < MAX_CAPACITY) samples_[idx] = s;
+    }
+    ++source_size_;
+    return true;
+  }
+
+  // Same as above.
+  bool AddSample(FunctionContext* ctx, const T& s) {
+    return AddSample(ctx, ReservoirSample<T>(s));
+  }
+
+  // Returns a buffer with a serialized ReservoirSampleState and the array of samples it
+  // contains. The samples array must not be inlined; i.e. it must be in a separate memory
+  // allocation. Returns a buffer containing this object and inlined samples array. The
+  // memory containing this object and the samples array is freed. The serialized object
+  // in the output buffer requires a call to Deserialize() before use.
+  StringVal Serialize(FunctionContext* ctx) {
+    DCHECK(samples_ != NULL);
+    DCHECK(!sample_array_inline_);
+    // Assign keys to the samples that haven't been set (i.e. if serializing after
+    // Update()). In weighted reservoir sampling the keys are typically assigned as the
+    // sources are being sampled, but this requires maintaining the samples in sorted
+    // order (by key) and it accomplishes the same thing at this point because all data
+    // points coming into Update() get the same weight. When the samples are later merged,
+    // they do have different weights (set here) that are proportional to the source_size,
+    // i.e. samples selected from a larger stream are more likely to end up in the final
+    // sample set. In order to avoid the extra overhead in Update(), we approximate the
+    // keys by picking random numbers in the range
+    // [(SOURCE_SIZE - SAMPLE_SIZE)/(SOURCE_SIZE), 1]. This weights the keys by
+    // SOURCE_SIZE and implies that the samples picked had the highest keys, because
+    // values not sampled would have keys between 0 and
+    // (SOURCE_SIZE - SAMPLE_SIZE)/(SOURCE_SIZE).
+    for (int i = 0; i < num_samples_; ++i) {
+      if (samples_[i].key >= 0) continue;
+      int r = rand() % num_samples_;
+      samples_[i].key = ((double) source_size_ - r) / source_size_;
+    }
+    capacity_ = num_samples_;
+    sample_array_inline_ = true;
+
+    size_t buffer_len = sizeof(ReservoirSampleState<T>) +
+        sizeof(ReservoirSample<T>) * num_samples_;
+    StringVal dst = StringVal::CopyFrom(
+        ctx, reinterpret_cast<uint8_t*>(this), buffer_len);
+    memcpy(dst.ptr + sizeof(ReservoirSampleState<T>),
+        reinterpret_cast<uint8_t*>(samples_), sizeof(ReservoirSample<T>) * num_samples_);
+    ctx->Free(reinterpret_cast<uint8_t*>(samples_));
+    ctx->Free(reinterpret_cast<uint8_t*>(this));
+    return dst;
+  }
+
+  // Updates the pointer to the samples array. Must be called before using this object in
+  // Merge().
+  void Deserialize() {
+    DCHECK(sample_array_inline_);
+    samples_ = reinterpret_cast<ReservoirSample<T>*>(this + 1);
+  }
+
+  // Merges the samples in "other_state" into the current state by following the
+  // reservoir sampling algorithm. If necessary, increases the capacity to fit the
+  // samples from "other_state". In the case of failure to increase the size of the
+  // array, returns.
+  void Merge(FunctionContext* ctx, ReservoirSampleState<T>* other_state) {
+    DCHECK(samples_ != NULL);
+    DCHECK_GT(capacity_, 0);
+    other_state->Deserialize();
+    int src_idx = 0;
+    // We can increase the capacity significantly here and skip several doublings because
+    // we know the number of elements in the other state up front.
+    if (capacity_ < MAX_CAPACITY) {
+      int necessary_capacity = num_samples_ + other_state->num_samples();
+      if (capacity_ < necessary_capacity) {
+        bool result = IncreaseCapacity(ctx, necessary_capacity);
+        if (!result) return;
+      }
+    }
+
+    // First, fill up the dst samples if they don't already exist. The samples are now
+    // ordered as a min-heap on the key.
+    while (num_samples_ < MAX_CAPACITY && src_idx < other_state->num_samples()) {
+      DCHECK_GE(other_state->GetSample(src_idx)->key, 0);
+      bool result = AddSample(ctx, *other_state->GetSample(src_idx++));
+      if (!result) return;
+      push_heap(&samples_[0], &samples_[num_samples_], SampleKeyGreater<T>);
+    }
+
+    // Then for every sample from source, take the sample if the key is greater than
+    // the minimum key in the min-heap.
+    while (src_idx < other_state->num_samples()) {
+      DCHECK_GE(other_state->GetSample(src_idx)->key, 0);
+      if (other_state->GetSample(src_idx)->key > samples_[0].key) {
+        pop_heap(&samples_[0], &samples_[num_samples_], SampleKeyGreater<T>);
+        samples_[MAX_CAPACITY - 1] = *other_state->GetSample(src_idx);
+        push_heap(&samples_[0], &samples_[num_samples_], SampleKeyGreater<T>);
+      }
+      ++src_idx;
+    }
+
+    source_size_ += other_state->source_size();
+  }
+
+  // Returns the median element.
+  T GetMedian(FunctionContext* ctx) {
+    if (num_samples_ == 0) return T::null();
+    ReservoirSample<T>* mid_point = GetSample(num_samples_ / 2);
+    nth_element(&samples_[0], mid_point, &samples_[num_samples_], SampleValLess<T>);
+    return mid_point->GetValue(ctx);
+  }
+
+  // Sorts the samples.
+  void SortSamples() {
+    sort(&samples_[0], &samples_[num_samples_], SampleValLess<T>);
+  }
+
+  // Deletes this object by freeing the memory that contains the array of samples (if not
+  // inlined) and itself.
+  void Delete(FunctionContext* ctx) {
+    if (!sample_array_inline_) ctx->Free(reinterpret_cast<uint8_t*>(samples_));
+    ctx->Free(reinterpret_cast<uint8_t*>(this));
+  }
+
+  int num_samples() { return num_samples_; }
+  int64_t source_size() { return source_size_; }
+
+ private:
+  // The initial capacity of the samples array.
+  const static int INIT_CAPACITY = 16;
+
+  // Maximum capacity of the samples array.
+  const static int MAX_CAPACITY = NUM_BUCKETS * NUM_SAMPLES_PER_BUCKET;
+
+  // Number of collected samples.
+  int num_samples_;
+
+  // Size of the "samples_" array.
+  int capacity_;
+
+  // Number of values over which the samples were collected.
+  int64_t source_size_;
+
+  // Random number generator for generating 64-bit integers
+  // TODO: Replace with mt19937_64 when upgrading boost
+  ranlux64_3 rng_;
+
+  // True if the array of samples is in the same memory allocation as this object. If
+  // false, this object is responsible for freeing the memory.
+  bool sample_array_inline_;
+
+  // Points to the array of ReservoirSamples. The array may be located inline (right after
+  // this object), or in a separate memory allocation.
+  ReservoirSample<T>* samples_;
+
+  // Increases the capacity of the "samples_" array to "new_capacity" rounded up to a
+  // power of two by reallocating. Should only be called if the samples array is not
+  // inline. Returns false if the operation fails.
+  bool IncreaseCapacity(FunctionContext* ctx, int new_capacity) {
+    DCHECK(samples_ != NULL);
+    DCHECK(!sample_array_inline_);
+    DCHECK_LT(capacity_, MAX_CAPACITY);
+    DCHECK_GT(new_capacity, capacity_);
+    new_capacity = BitUtil::RoundUpToPowerOfTwo(new_capacity);
+    if (new_capacity > MAX_CAPACITY) new_capacity = MAX_CAPACITY;
+    size_t buffer_len = sizeof(ReservoirSample<T>) * new_capacity;
+    uint8_t* ptr = ctx->Reallocate(reinterpret_cast<uint8_t*>(samples_), buffer_len);
+    if (ptr == NULL) {
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+      return false;
+    }
+    samples_ = reinterpret_cast<ReservoirSample<T>*>(ptr);
+    capacity_ = new_capacity;
+    return true;
+  }
+
+  // Returns a random integer in the range [0, max].
+  int64_t GetNext64(int64_t max) {
+    uniform_int<int64_t> dist(0, max);
+    return dist(rng_);
+  }
+};
+
+template <typename T>
+void AggregateFunctions::ReservoirSampleInit(FunctionContext* ctx, StringVal* dst) {
+  AllocBuffer(ctx, dst, sizeof(ReservoirSampleState<T>));
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  ReservoirSampleState<T>* dst_state =
+      reinterpret_cast<ReservoirSampleState<T>*>(dst->ptr);
+  *dst_state = ReservoirSampleState<T>(ctx);
+}
+
+template <typename T>
+void AggregateFunctions::ReservoirSampleUpdate(FunctionContext* ctx, const T& src,
+    StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  ReservoirSampleState<T>* dst_state =
+      reinterpret_cast<ReservoirSampleState<T>*>(dst->ptr);
+  dst_state->AddSample(ctx, src);
+}
+
+template <typename T>
+StringVal AggregateFunctions::ReservoirSampleSerialize(FunctionContext* ctx,
+    const StringVal& src) {
+  if (UNLIKELY(src.is_null)) return src;
+  ReservoirSampleState<T>* src_state =
+      reinterpret_cast<ReservoirSampleState<T>*>(src.ptr);
+  StringVal result = src_state->Serialize(ctx);
+  return result;
+}
+
 template <typename T>
 void AggregateFunctions::ReservoirSampleMerge(FunctionContext* ctx,
-    const StringVal& src_val, StringVal* dst_val) {
-  if (src_val.is_null) return;
-  DCHECK(!dst_val->is_null);
-  DCHECK(!src_val.is_null);
-  DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
-  DCHECK_EQ(dst_val->len, sizeof(ReservoirSampleState<T>));
-  ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
-  ReservoirSampleState<T>* dst = reinterpret_cast<ReservoirSampleState<T>*>(dst_val->ptr);
-
-  int src_idx = 0;
-  int src_max = src->num_samples;
-  // First, fill up the dst samples if they don't already exist. The samples are now
-  // ordered as a min-heap on the key.
-  while (dst->num_samples < NUM_SAMPLES && src_idx < src_max) {
-    DCHECK_GE(src->samples[src_idx].key, 0);
-    dst->samples[dst->num_samples++] = src->samples[src_idx++];
-    push_heap(dst->samples, dst->samples + dst->num_samples, SampleKeyGreater<T>);
-  }
-  // Then for every sample from source, take the sample if the key is greater than
-  // the minimum key in the min-heap.
-  while (src_idx < src_max) {
-    DCHECK_GE(src->samples[src_idx].key, 0);
-    if (src->samples[src_idx].key > dst->samples[0].key) {
-      pop_heap(dst->samples, dst->samples + NUM_SAMPLES, SampleKeyGreater<T>);
-      dst->samples[NUM_SAMPLES - 1] = src->samples[src_idx];
-      push_heap(dst->samples, dst->samples + NUM_SAMPLES, SampleKeyGreater<T>);
-    }
-    ++src_idx;
-  }
-  dst->source_size += src->source_size;
+    const StringVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK(!src.is_null);
+  ReservoirSampleState<T>* src_state =
+      reinterpret_cast<ReservoirSampleState<T>*>(src.ptr);
+  ReservoirSampleState<T>* dst_state =
+      reinterpret_cast<ReservoirSampleState<T>*>(dst->ptr);
+  dst_state->Merge(ctx, src_state);
 }
 
 template <typename T>
@@ -1112,64 +1277,56 @@ void PrintSample(const ReservoirSample<TimestampVal>& v, ostream* os) {
 
 template <typename T>
 StringVal AggregateFunctions::ReservoirSampleFinalize(FunctionContext* ctx,
-    const StringVal& src_val) {
-  if (UNLIKELY(src_val.is_null)) return src_val;
-  DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
-  ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
+    const StringVal& src) {
+  if (UNLIKELY(src.is_null)) return src;
+  ReservoirSampleState<T>* src_state =
+      reinterpret_cast<ReservoirSampleState<T>*>(src.ptr);
 
   stringstream out;
-  for (int i = 0; i < src->num_samples; ++i) {
-    PrintSample<T>(src->samples[i], &out);
-    if (i < (src->num_samples - 1)) out << ", ";
+  for (int i = 0; i < src_state->num_samples(); ++i) {
+    PrintSample<T>(*src_state->GetSample(i), &out);
+    if (i < (src_state->num_samples() - 1)) out << ", ";
   }
   const string& out_str = out.str();
   StringVal result_str(ctx, out_str.size());
   if (LIKELY(!result_str.is_null)) {
     memcpy(result_str.ptr, out_str.c_str(), result_str.len);
   }
-  ctx->Free(src_val.ptr);
+  src_state->Delete(ctx);
   return result_str;
 }
 
 template <typename T>
 StringVal AggregateFunctions::HistogramFinalize(FunctionContext* ctx,
-    const StringVal& src_val) {
-  if (UNLIKELY(src_val.is_null)) return src_val;
-  DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
+    const StringVal& src) {
+  if (UNLIKELY(src.is_null)) return src;
 
-  ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
-  sort(src->samples, src->samples + src->num_samples, SampleValLess<T>);
+  ReservoirSampleState<T>* src_state =
+      reinterpret_cast<ReservoirSampleState<T>*>(src.ptr);
+  src_state->SortSamples();
 
   stringstream out;
-  int num_buckets = min(src->num_samples, NUM_BUCKETS);
-  int samples_per_bucket = max(src->num_samples / NUM_BUCKETS, 1);
+  int num_buckets = min(src_state->num_samples(), NUM_BUCKETS);
+  int samples_per_bucket = max(src_state->num_samples() / NUM_BUCKETS, 1);
   for (int bucket_idx = 0; bucket_idx < num_buckets; ++bucket_idx) {
     int sample_idx = (bucket_idx + 1) * samples_per_bucket - 1;
-    PrintSample<T>(src->samples[sample_idx], &out);
+    PrintSample<T>(*(src_state->GetSample(sample_idx)), &out);
     if (bucket_idx < (num_buckets - 1)) out << ", ";
   }
   const string& out_str = out.str();
   StringVal result_str = StringVal::CopyFrom(ctx,
       reinterpret_cast<const uint8_t*>(out_str.c_str()), out_str.size());
-  ctx->Free(src_val.ptr);
+  src_state->Delete(ctx);
   return result_str;
 }
 
 template <typename T>
-T AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx,
-    const StringVal& src_val) {
-  if (UNLIKELY(src_val.is_null)) return T::null();
-  DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
-
-  ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
-  if (src->num_samples == 0) {
-    ctx->Free(src_val.ptr);
-    return T::null();
-  }
-  sort(src->samples, src->samples + src->num_samples, SampleValLess<T>);
-
-  T result = src->samples[src->num_samples / 2].GetValue(ctx);
-  ctx->Free(src_val.ptr);
+T AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx, const StringVal& src) {
+  if (UNLIKELY(src.is_null)) return T::null();
+  ReservoirSampleState<T>* src_state =
+      reinterpret_cast<ReservoirSampleState<T>*>(src.ptr);
+  T result = src_state->GetMedian(ctx);
+  src_state->Delete(ctx);
   return result;
 }
 

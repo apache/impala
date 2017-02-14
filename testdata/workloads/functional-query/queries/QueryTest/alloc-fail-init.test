@@ -33,7 +33,7 @@ FunctionContext::Allocate() failed to allocate 16 bytes.
 ---- QUERY
 select sample(timestamp_col) from functional.alltypes
 ---- CATCH
-FunctionContext::Allocate() failed to allocate 480232 bytes.
+FunctionContext::Allocate() failed to allocate 248 bytes.
 ====
 ---- QUERY
 select distinctpc(int_col) from functional.alltypes
@@ -93,5 +93,5 @@ FunctionContextImpl::AllocateLocal() failed to allocate 120 bytes.
 ---- QUERY
 select appx_median(int_col) from functional.alltypes
 ---- CATCH
-FunctionContext::Allocate() failed to allocate 320232 bytes.
+FunctionContext::Allocate() failed to allocate 248 bytes.
 ====
