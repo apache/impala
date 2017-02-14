@@ -211,8 +211,8 @@ enum {
   ACCESS_LOG_FILE, ENABLE_DIRECTORY_LISTING, ERROR_LOG_FILE,
   GLOBAL_PASSWORDS_FILE, INDEX_FILES, ENABLE_KEEP_ALIVE, ACCESS_CONTROL_LIST,
   EXTRA_MIME_TYPES, LISTENING_PORTS, DOCUMENT_ROOT, SSL_CERTIFICATE, SSL_PRIVATE_KEY,
-  SSL_PRIVATE_KEY_PASSWORD, NUM_THREADS, RUN_AS_USER, REWRITE, HIDE_FILES,
-  REQUEST_TIMEOUT, NUM_OPTIONS
+  SSL_PRIVATE_KEY_PASSWORD, SSL_GLOBAL_INIT, NUM_THREADS, RUN_AS_USER, REWRITE,
+  HIDE_FILES, REQUEST_TIMEOUT, NUM_OPTIONS
 };
 
 static const char *config_options[] = {
@@ -238,6 +238,7 @@ static const char *config_options[] = {
   "ssl_certificate", NULL,
   "ssl_private_key", NULL,
   "ssl_private_key_password", NULL,
+  "ssl_global_init", "yes",
   "num_threads", "50",
   "run_as_user", NULL,
   "url_rewrite_patterns", NULL,
@@ -4193,11 +4194,38 @@ static int set_ssl_option(struct sq_context *ctx) {
   const char *private_key = ctx->config[SSL_PRIVATE_KEY];
   if (private_key == NULL) private_key = pem;
 
-  // Initialize SSL library
-  SSL_library_init();
-  SSL_load_error_strings();
+  // Initialize SSL library, unless the user has disabled this.
+  int should_init_ssl = (sq_strcasecmp(ctx->config[SSL_GLOBAL_INIT], "yes") == 0);
+  if (should_init_ssl) {
+    SSL_library_init();
+    SSL_load_error_strings();
+    // Initialize locking callbacks, needed for thread safety.
+    // http://www.openssl.org/support/faq.html#PROG1
+    size = sizeof(pthread_mutex_t) * CRYPTO_num_locks();
+    if ((ssl_mutexes = (pthread_mutex_t *) malloc((size_t)size)) == NULL) {
+      cry(fc(ctx), "%s: cannot allocate mutexes: %s", __func__, ssl_error());
+      return 0;
+    }
+
+    for (i = 0; i < CRYPTO_num_locks(); i++) {
+      pthread_mutex_init(&ssl_mutexes[i], NULL);
+    }
+
+    CRYPTO_set_locking_callback(&ssl_locking_callback);
+    CRYPTO_set_id_callback(&ssl_id_callback);
+  }
 
   if ((ctx->ssl_ctx = SSL_CTX_new(SSLv23_server_method())) == NULL) {
+    unsigned long err_code = ERR_peek_error();
+    // If it looks like the error is due to SSL not being initialized,
+    // provide a better error.
+    if (!should_init_ssl &&
+        ERR_GET_LIB(err_code) == ERR_LIB_SSL &&
+        ERR_GET_REASON(err_code) == SSL_R_LIBRARY_HAS_NO_CIPHERS) {
+      cry(fc(ctx), "SSL_CTX_new failed: %s was disabled: OpenSSL must "
+                   "be initialized before starting squeasel",
+                   config_options[SSL_GLOBAL_INIT * 2]);
+    }
     cry(fc(ctx), "SSL_CTX_new (server) error: %s", ssl_error());
     return 0;
   }
@@ -4223,32 +4251,18 @@ static int set_ssl_option(struct sq_context *ctx) {
     (void) SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, pem);
   }
 
-  // Initialize locking callbacks, needed for thread safety.
-  // http://www.openssl.org/support/faq.html#PROG1
-  size = sizeof(pthread_mutex_t) * CRYPTO_num_locks();
-  if ((ssl_mutexes = (pthread_mutex_t *) malloc((size_t)size)) == NULL) {
-    cry(fc(ctx), "%s: cannot allocate mutexes: %s", __func__, ssl_error());
-    return 0;
-  }
-
-  for (i = 0; i < CRYPTO_num_locks(); i++) {
-    pthread_mutex_init(&ssl_mutexes[i], NULL);
-  }
-
-  CRYPTO_set_locking_callback(&ssl_locking_callback);
-  CRYPTO_set_id_callback(&ssl_id_callback);
 
   return 1;
 }
 
 static void uninitialize_ssl(struct sq_context *ctx) {
   int i;
-  if (ctx->ssl_ctx != NULL) {
+  if (ctx->ssl_ctx != NULL &&
+      sq_strcasecmp(ctx->config[SSL_GLOBAL_INIT], "yes") == 0) {
     CRYPTO_set_locking_callback(NULL);
     for (i = 0; i < CRYPTO_num_locks(); i++) {
       pthread_mutex_destroy(&ssl_mutexes[i]);
     }
-    CRYPTO_set_locking_callback(NULL);
     CRYPTO_set_id_callback(NULL);
   }
 }
@@ -4501,6 +4515,7 @@ static int consume_socket(struct sq_context *ctx, struct socket *sp) {
     clock_get_time(cclock, &mts);
     mach_port_deallocate(mach_task_self(), cclock);
     timeout.tv_sec = mts.tv_sec;
+    timeout.tv_nsec = (long) mts.tv_nsec;
 #endif
 
     ctx->num_free_threads++;

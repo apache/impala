@@ -955,6 +955,8 @@ Status NoAuthProvider::WrapClientTransport(const string& hostname,
 }
 
 Status AuthManager::Init() {
+  ssl_socket_factory_.reset(new TSSLSocketFactory());
+
   bool use_ldap = false;
   const string excl_msg = "--$0 and --$1 are mutually exclusive "
       "and should not be set together";

@@ -253,6 +253,10 @@ Status Webserver::Start() {
 
   string key_password;
   if (IsSecure()) {
+    // Impala initializes OpenSSL (see authentication.h).
+    options.push_back("ssl_global_init");
+    options.push_back("false");
+
     options.push_back("ssl_certificate");
     options.push_back(FLAGS_webserver_certificate_file.c_str());
 
