@@ -44,9 +44,6 @@
 
 DEFINE_int32(kudu_max_row_batches, 0, "The maximum size of the row batch queue, "
     " for Kudu scanners.");
-DEFINE_int32(kudu_scanner_keep_alive_period_us, 15 * 1000L * 1000L,
-    "The period at which Kudu Scanners should send keep-alive requests to the tablet "
-    "server to ensure that scanners do not time out.");
 
 using boost::algorithm::to_lower_copy;
 using kudu::client::KuduClient;
