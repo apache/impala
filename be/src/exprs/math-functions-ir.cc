@@ -15,21 +15,22 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exprs/math-functions.h"
-
 #include <iomanip>
 #include <random>
 #include <sstream>
 #include <math.h>
-
+#include <stdint.h>
+#include <string>
 #include "exprs/anyval-util.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/operators.h"
+#include "exprs/math-functions.h"
 #include "util/string-parser.h"
+#include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "thirdparty/pcg-cpp-0.98/include/pcg_random.hpp"
-
+#include "exprs/decimal-operators.h"
 #include "common/names.h"
 
 using std::uppercase;
@@ -429,6 +430,153 @@ DoubleVal MathFunctions::FmodDouble(FunctionContext* ctx, const DoubleVal& a,
     const DoubleVal& b) {
   if (a.is_null || b.is_null || b.val == 0) return DoubleVal::null();
   return DoubleVal(fmod(a.val, b.val));
+}
+
+// The bucket_number is evaluated using the following formula:
+//
+//   bucket_number = dist_from_min * num_buckets / range_size
+//      where -
+//        dist_from_min = expr - min_range
+//        range_size = max_range - min_range
+//        buckets = number of buckets
+//
+// The results of the above subtractions are stored in Decimal16Value to avoid an overflow
+// in the following cases:
+//   case 1:
+//      T1 is decimal8Value
+//         When evaluating this particular expression
+//            dist_from_min = expr - min_range
+//         If expr is a max positive value which can be represented in decimal8Value and
+//         min_range < 0 the resulting dist_from_min can be represented in decimal16Val
+//         without overflowing
+//   case 2:
+//      T1 is decimal16Value
+//         Subtracting a negative min_range from expr can result in an overflow in which
+//         case the function errors out. There is no decimal32Val to handle this. So
+//         storing it in decimal16Value.
+//   case 3:
+//      T1 is decimal4Value
+//         We can store the results in a decimal8Value. But this change hard codes to
+//         store the result in decimal16Val for now to be compatible with the other
+//         decimal*Vals
+//
+// The result of this multiplication dist_from_min * buckets is stored as a int256_t
+// if storing it in a int128_t would overflow.
+//
+// To perform the division, range_size is scaled up. The scale and precision of the
+// numerator and denominator are adjusted to be the same. This avoids the need to compute
+// the resulting scale and precision.
+template <class  T1>
+BigIntVal MathFunctions::WidthBucketImpl(FunctionContext* ctx,
+    const T1& expr, const T1& min_range,
+    const T1& max_range, const IntVal& num_buckets) {
+  // FE casts expr, min_range and max_range to be of the scale and precision
+  int input_scale = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SCALE, 1);
+  int input_precision = ctx->impl()->GetConstFnAttr(
+      FunctionContextImpl::ARG_TYPE_PRECISION, 1);
+
+  bool overflow = false;
+  Decimal16Value range_size = max_range.template Subtract<int128_t>(input_scale,
+      min_range, input_scale, input_precision, input_scale, false, &overflow);
+  if (UNLIKELY(overflow)) {
+    ostringstream error_msg;
+    error_msg << "Overflow while evaluating the difference between min_range: " <<
+        min_range.value() << " and max_range: " << max_range.value();
+    ctx->SetError(error_msg.str().c_str());
+    return BigIntVal::null();
+  }
+
+  if (UNLIKELY(num_buckets.val <= 0)) {
+    ostringstream error_msg;
+    error_msg << "Number of buckets should be greater than zero:" << num_buckets.val;
+    ctx->SetError(error_msg.str().c_str());
+    return BigIntVal::null();
+  }
+
+  if (UNLIKELY(min_range >= max_range)) {
+    ctx->SetError("Lower bound cannot be greater than or equal to the upper bound");
+    return BigIntVal::null();
+  }
+
+  if (UNLIKELY(expr < min_range)) return 0;
+
+  if (UNLIKELY(expr >= max_range)) {
+    BigIntVal result;
+    result.val = num_buckets.val;
+    ++result.val;
+    return result;
+  }
+
+  Decimal16Value dist_from_min = expr.template Subtract<int128_t>(input_scale,
+      min_range, input_scale, input_precision, input_scale, false, &overflow);
+  DCHECK_EQ(overflow, false);
+
+  Decimal16Value buckets = Decimal16Value::FromInt(input_precision, input_scale,
+      num_buckets.val, &overflow);
+
+  bool needs_int256 = false;
+  // Check if dist_from_min * buckets would overflow and if there is a need to
+  // store the intermediate results in int256_t to avoid an overflows
+  // Check if scaling up range size overflows and if there is a need to store the
+  // intermediate results in int256_t to avoid the overflow
+  if (UNLIKELY(BitUtil::CountLeadingZeros(abs(buckets.value())) +
+      BitUtil::CountLeadingZeros(abs(dist_from_min.value())) <= 128 ||
+      BitUtil::CountLeadingZeros(range_size.value()) +
+      detail::MinLeadingZerosAfterScaling(BitUtil::CountLeadingZeros(
+      range_size.value()), input_scale) <= 128)) {
+    needs_int256 = true;
+  }
+
+  int128_t result;
+  if (needs_int256) {
+    // resulting scale should be 2 * input_scale as per multiplication rules
+    int256_t x = ConvertToInt256(buckets.value()) * ConvertToInt256(
+        dist_from_min.value());
+
+    // Since "range_size" and "x" have different scales, the divison would require
+    // evaluating the resulting scale. To avoid this we scale up the denominator to
+    // match the scale of the numerator.
+    int256_t y = DecimalUtil::MultiplyByScale<int256_t>(ConvertToInt256(
+        range_size.value()), input_scale, false);
+    result = ConvertToInt128(x / y, DecimalUtil::MAX_UNSCALED_DECIMAL16,
+        &overflow);
+    DCHECK_EQ(overflow, false);
+  } else {
+    // resulting scale should be 2 * input_scale as per multiplication rules
+    int128_t x = buckets.value() * dist_from_min.value();
+
+    // Since "range_size" and "x" have different scales, the divison would require
+    // evaluating the resulting scale. To avoid this we scale up the denominator to
+    // match the scale of the numerator.
+    int128_t y = DecimalUtil::MultiplyByScale<int128_t>(range_size.value(),
+        input_scale, false);
+    result = x / y; // NOLINT: clang-tidy thinks y may equal zero here.
+  }
+  return (BigIntVal(abs(result) + 1));
+}
+
+BigIntVal MathFunctions::WidthBucket(FunctionContext* ctx, const DecimalVal& expr,
+    const DecimalVal& min_range, const DecimalVal& max_range,
+    const IntVal& num_buckets) {
+  if (expr.is_null || min_range.is_null || max_range.is_null || num_buckets.is_null) {
+    return BigIntVal::null();
+  }
+
+  int arg_size_type = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SIZE, 0);
+  switch (arg_size_type) {
+    case 4:
+      return WidthBucketImpl<Decimal4Value> (ctx, Decimal4Value(expr.val4),
+          Decimal4Value(min_range.val4), Decimal4Value(max_range.val4), num_buckets);
+    case 8:
+      return WidthBucketImpl<Decimal8Value> (ctx, Decimal8Value(expr.val8),
+          Decimal8Value(min_range.val8), Decimal8Value(max_range.val8), num_buckets);
+    case 16:
+      return WidthBucketImpl<Decimal16Value>(ctx, Decimal16Value(expr.val16),
+         Decimal16Value(min_range.val16), Decimal16Value(max_range.val16), num_buckets);
+    default:
+      DCHECK(false);
+      return BigIntVal::null();
+  }
 }
 
 template <typename T> T MathFunctions::Positive(FunctionContext* ctx, const T& val) {

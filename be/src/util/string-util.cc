@@ -65,4 +65,12 @@ bool CommaSeparatedContains(const std::string& cs_list, const std::string& item)
   return false;
 }
 
+bool EndsWith(const std::string& full_string, const std::string& end) {
+  if (full_string.size() >= end.size()) {
+    return (full_string.compare(full_string.size() - end.size(), end.size(),
+        end) == 0);
+  }
+  return false;
+}
+
 }

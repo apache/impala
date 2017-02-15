@@ -59,6 +59,7 @@
 #include "udf/udf-test-harness.h"
 #include "util/debug-util.h"
 #include "util/string-parser.h"
+#include "util/string-util.h"
 #include "util/test-info.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
@@ -582,6 +583,17 @@ class ExprTest : public testing::Test {
     vector<FieldSchema> result_types;
     Status status = executor_->Exec(stmt, &result_types);
     ASSERT_FALSE(status.ok()) << "stmt: " << stmt << "\nunexpected Status::OK.";
+  }
+
+  // "Execute 'expr' and check that the returned error ends with 'error_string'"
+  void TestErrorString(const string& expr, const string& error_string) {
+    string stmt = "select " + expr;
+    vector<FieldSchema> result_types;
+    string result_row;
+    Status status = executor_->Exec(stmt, &result_types);
+    status = executor_->FetchResult(&result_row);
+    ASSERT_FALSE(status.ok());
+    ASSERT_TRUE(EndsWith(status.msg().msg(), error_string));
   }
 
   template <typename T> void TestFixedPointComparisons(bool test_boundaries) {
@@ -5300,6 +5312,59 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("sqrt(121.0)", TYPE_DOUBLE, 11.0);
   TestValue("sqrt(2.0)", TYPE_DOUBLE, sqrt(2.0));
   TestValue("dsqrt(81.0)", TYPE_DOUBLE, 9);
+
+  TestValue("width_bucket(6.3, 2, 17, 2)", TYPE_BIGINT, 1);
+  TestValue("width_bucket(11, 6, 14, 3)", TYPE_BIGINT, 2);
+  TestValue("width_bucket(-1, -5, 5, 3)", TYPE_BIGINT, 2);
+  TestValue("width_bucket(1, -5, 5, 3)", TYPE_BIGINT, 2);
+  TestValue("width_bucket(3, 5, 20.1, 4)", TYPE_BIGINT, 0);
+  TestIsNull("width_bucket(NULL, 5, 20.1, 4)", TYPE_BIGINT);
+  TestIsNull("width_bucket(22, NULL, 20.1, 4)", TYPE_BIGINT);
+  TestIsNull("width_bucket(22, 5, NULL, 4)", TYPE_BIGINT);
+  TestIsNull("width_bucket(22, 5, 20.1, NULL)", TYPE_BIGINT);
+
+  TestValue("width_bucket(22, 5, 20.1, 4)", TYPE_BIGINT, 5);
+  // Test when the result (bucket number) is greater than the max value that can be
+  // stored in a IntVal
+  TestValue("width_bucket(22, 5, 20.1, 2147483647)", TYPE_BIGINT, 2147483648);
+  // Test when min and max of the bucket width range are equal.
+  TestErrorString("width_bucket(22, 5, 5, 4)",
+      "UDF ERROR: Lower bound cannot be greater than or equal to the upper bound\n");
+  // Test when min > max
+  TestErrorString("width_bucket(22, 50, 5, 4)",
+      "UDF ERROR: Lower bound cannot be greater than or equal to the upper bound\n");
+  // Test max - min will overflow during width_bucket evaluation
+  TestErrorString("width_bucket(11, -9, 99999999999999999999999999999999999999, 4000)",
+      "UDF ERROR: Overflow while evaluating the difference between min_range: -9 and "
+      "max_range: 99999999999999999999999999999999999999\n");
+  // If expr - min overflows during width_bucket evaluation, max - min will also
+  // overflow. Since we evaluate max - min before evaluating expr - min, we will never
+  // end up overflowing expr - min.
+  TestErrorString("width_bucket(1, -99999999999999999999999999999999999999, 9, 40)",
+      "UDF ERROR: Overflow while evaluating the difference between min_range: "
+      "-99999999999999999999999999999999999999 and max_range: 9\n");
+  // Test when dist_from_min * buckets cannot be stored in a int128_t (overflows)
+  // and needs to be stored in a int256_t
+  TestValue("width_bucket(8000000000000000000000000000000000000,"
+      "100000000000000000000000000000000000, 9000000000000000000000000000000000000,"
+      "900000)", TYPE_BIGINT, 798877);
+  // Test when range_size * GetScaleMultiplier(input_scale) cannot be stored in a
+  // int128_t (overflows) and needs to be stored in a int256_t
+  TestValue("width_bucket(100000000, 199999.77777777777777777777777777, 99999999999.99999"
+    ", 40)", TYPE_BIGINT, 1);
+  // Test with max values for expr and num_bucket when the width_bucket can be
+  // evaluated with int128_t. Incrementing one of them will require using int256_t for
+  // width_bucket evaluation
+  TestValue("width_bucket(9999999999999999999999999999999999999, 1,"
+            "99999999999999999999999999999999999999, 15)", TYPE_BIGINT, 2);
+  // Test with the smallest value of num_bucket for the given combination of expr,
+  // max and min value that would require int256_t for evalation
+  TestValue("width_bucket(9999999999999999999999999999999999999, 1,"
+            "99999999999999999999999999999999999999, 16)", TYPE_BIGINT, 2);
+  // Test with the smallest value of expr for the given combination of num_buckets,
+  // max and min value that would require int256_t for evalation
+  TestValue("width_bucket(10000000000000000000000000000000000000, 1,"
+            "99999999999999999999999999999999999999, 15)", TYPE_BIGINT, 2);
 
   // Run twice to test deterministic behavior.
   for (uint32_t seed : {0, 1234}) {

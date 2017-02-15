@@ -388,7 +388,8 @@ visible_functions = [
    '_ZN6impala13MathFunctions13LeastGreatestILb0EEEN10impala_udf9StringValEPNS2_15FunctionContextEiPKS3_'],
   [['greatest'], 'DECIMAL', ['DECIMAL', '...'],
    '_ZN6impala13MathFunctions13LeastGreatestILb0EEEN10impala_udf10DecimalValEPNS2_15FunctionContextEiPKS3_'],
-
+  [['width_bucket'], 'BIGINT', ['DECIMAL', 'DECIMAL', 'DECIMAL', 'INT'],
+    '_ZN6impala13MathFunctions11WidthBucketEPN10impala_udf15FunctionContextERKNS1_10DecimalValES6_S6_RKNS1_6IntValE'],
   # Decimal Functions
   # TODO: oracle has decimal support for transcendental functions (e.g. sin()) to very
   # high precisions. Do we need them? It's unclear if other databases do the same.

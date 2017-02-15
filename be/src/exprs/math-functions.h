@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_EXPRS_MATH_FUNCTIONS_H
 #define IMPALA_EXPRS_MATH_FUNCTIONS_H
 
@@ -112,6 +111,11 @@ class MathFunctions {
   template <bool ISLEAST> static DecimalVal LeastGreatest(
       FunctionContext*, int num_args, const DecimalVal* args);
 
+
+  static BigIntVal WidthBucket(FunctionContext* ctx, const DecimalVal& expr,
+      const DecimalVal& min_range, const DecimalVal& max_range,
+      const IntVal& num_buckets);
+
  private:
   static const int32_t MIN_BASE = 2;
   static const int32_t MAX_BASE = 36;
@@ -135,6 +139,15 @@ class MathFunctions {
   /// Returns false otherwise, indicating some other error condition.
   static bool HandleParseResult(int8_t dest_base, int64_t* num,
       StringParser::ParseResult parse_res);
+
+  /// This function creates equiwidth histograms , where the histogram range
+  /// is divided into num_buckets buckets having identical sizes. This function
+  /// returns the bucket in which the expr value would fall. min_val and
+  /// max_val are the minimum and maximum value of the histogram range
+  /// respectively.
+  template <typename T1>
+  static BigIntVal WidthBucketImpl(FunctionContext* ctx,const T1& expr,
+      const T1& min_range,const T1& max_range, const IntVal& num_buckets);
 };
 
 }

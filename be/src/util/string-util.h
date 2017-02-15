@@ -40,6 +40,10 @@ Status TruncateUp(const std::string& str, int32_t max_length, std::string* resul
 /// Return true if the comma-separated string 'cs_list' contains 'item' as one of
 /// the comma-separated values.
 bool CommaSeparatedContains(const std::string& cs_list, const std::string& item);
+
+/// Return true if a given string 'full_str' ends with the characters in the
+/// 'end' string
+bool EndsWith(const std::string& full_string, const std::string& end);
 }
 
 #endif
