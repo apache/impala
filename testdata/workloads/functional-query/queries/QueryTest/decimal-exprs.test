@@ -30,7 +30,7 @@ DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
 ---- QUERY
 # Test casting behavior without decimal_v2 query option set.
 set decimal_v2=false;
-select cast(d3 as decimal(20, 3)) from functional.decimal_tbl;
+select cast(d3 as decimal(20, 3)) from decimal_tbl;
 ---- RESULTS
 1.234
 12.345
@@ -43,7 +43,7 @@ DECIMAL
 ---- QUERY
 # Test casting behavior with decimal_v2 query option set.
 set decimal_v2=true;
-select cast(d3 as decimal(20, 3)) from functional.decimal_tbl;
+select cast(d3 as decimal(20, 3)) from decimal_tbl;
 ---- RESULTS
 1.235
 12.346
@@ -56,7 +56,7 @@ DECIMAL
 ---- QUERY
 # Test casting behavior without decimal_v2 query option set.
 set decimal_v2=false;
-select sum(cast(d3 as DECIMAL(20,2)) + cast(d5 as DECIMAL(20,4))) from functional.decimal_tbl;
+select sum(cast(d3 as DECIMAL(20,2)) + cast(d5 as DECIMAL(20,4))) from decimal_tbl;
 ---- RESULTS
 26078.2788
 ---- TYPES
@@ -65,9 +65,144 @@ DECIMAL
 ---- QUERY
 # Test casting behavior with decimal_v2 query option set.
 set decimal_v2=true;
-select sum(cast(d3 as DECIMAL(20,2)) + cast(d5 as DECIMAL(20,4))) from functional.decimal_tbl;
+select sum(cast(d3 as DECIMAL(20,2)) + cast(d5 as DECIMAL(20,4))) from decimal_tbl;
 ---- RESULTS
 26078.3189
 ---- TYPES
 DECIMAL
+====
+---- QUERY
+# Test AVG() with DECIMAL_V1
+set decimal_v2=false;
+select avg(d1), avg(d2), avg(d3), avg(d4), avg(d5), avg(d6) from decimal_tbl;
+---- RESULTS
+32222,666,2743.4567651580,0.12345678900000000000000000000000000000,2472.20577,1
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+# Test AVG() with DECIMAL_V2
+set decimal_v2=true;
+select avg(d1), avg(d2), avg(d3), avg(d4), avg(d5), avg(d6) from decimal_tbl;
+---- RESULTS
+32222.200000,666.400000,2743.4567651580,0.12345678900000000000000000000000000000,2472.205778,1.000000
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+# Test AVG() with DECIMAL_V1
+set decimal_v2=false;
+select l_tax, avg(cast(l_extendedprice as decimal(38,10))), avg(l_extendedprice)
+from tpch_parquet.lineitem group by l_tax order by 1;
+---- RESULTS
+0.00,38241.5984613546,38241.59
+0.01,38283.5417664599,38283.54
+0.02,38250.4873094187,38250.48
+0.03,38259.2810374789,38259.28
+0.04,38247.1967454731,38247.19
+0.05,38234.8480874721,38234.84
+0.06,38246.4342924027,38246.43
+0.07,38281.1963710003,38281.19
+0.08,38251.6233675941,38251.62
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+# Test AVG() with DECIMAL_V2
+set decimal_v2=true;
+select l_tax, avg(cast(l_extendedprice as decimal(38,10))), avg(l_extendedprice)
+from tpch_parquet.lineitem group by l_tax order by 1;
+---- RESULTS
+0.00,38241.5984613546,38241.598461
+0.01,38283.5417664599,38283.541766
+0.02,38250.4873094187,38250.487309
+0.03,38259.2810374789,38259.281037
+0.04,38247.1967454731,38247.196745
+0.05,38234.8480874721,38234.848087
+0.06,38246.4342924027,38246.434292
+0.07,38281.1963710003,38281.196371
+0.08,38251.6233675941,38251.623367
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+# Test AVG() with DECIMAL_V1
+set decimal_v2=false;
+select avg(l_extendedprice) as a from tpch_parquet.lineitem
+group by l_tax having a > 38247.190 order by 1;
+---- RESULTS
+38250.48
+38251.62
+38259.28
+38281.19
+38283.54
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Test AVG() with DECIMAL_V2
+set decimal_v2=true;
+select avg(l_extendedprice) as a from tpch_parquet.lineitem
+group by l_tax having a > 38247.190 order by 1;
+---- RESULTS
+38247.196745
+38250.487309
+38251.623367
+38259.281037
+38281.196371
+38283.541766
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Test sum() and avg() analytic fns with start bounds (tests Remove() for decimal)
+# with DECIMAL_V1
+set decimal_v2=false;
+select
+sum(c1) over (order by c1 rows between 5 preceding and current row),
+sum(c2) over (order by c1 rows between 5 preceding and 5 following),
+sum(c3) over (order by c1 rows between 5 preceding and 2 preceding),
+avg(c1) over (order by c1 rows between 5 preceding and current row),
+avg(c2) over (order by c1 rows between 5 preceding and 5 following),
+avg(c3) over (order by c1 rows between 5 preceding and 2 preceding)
+from decimal_tiny where c2 < 112
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0.0000,618.33330,NULL,0.0000,103.05555,NULL
+0.1111,725.66662,NULL,0.0555,103.66666,NULL
+0.3333,834.22216,0.0,0.1111,104.27777,0.0
+0.6666,943.99992,0.1,0.1666,104.88888,0.0
+1.1110,1054.99990,0.3,0.2222,105.49999,0.1
+1.6665,1054.99990,0.6,0.2777,105.49999,0.1
+2.3331,954.99990,1.0,0.3888,106.11110,0.2
+2.9997,853.77768,1.4,0.4999,106.72221,0.3
+3.6663,751.33324,1.8,0.6110,107.33332,0.4
+4.3329,647.66658,2.2,0.7221,107.94443,0.5
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+# Test sum() and avg() analytic fns with start bounds (tests Remove() for decimal)
+# with DECIMAL_V2
+set decimal_v2=true;
+select
+sum(c1) over (order by c1 rows between 5 preceding and current row),
+sum(c2) over (order by c1 rows between 5 preceding and 5 following),
+sum(c3) over (order by c1 rows between 5 preceding and 2 preceding),
+avg(c1) over (order by c1 rows between 5 preceding and current row),
+avg(c2) over (order by c1 rows between 5 preceding and 5 following),
+avg(c3) over (order by c1 rows between 5 preceding and 2 preceding)
+from decimal_tiny where c2 < 112
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0.0000,618.33330,NULL,0.000000,103.055550,NULL
+0.1111,725.66662,NULL,0.055550,103.666660,NULL
+0.3333,834.22216,0.0,0.111100,104.277770,0.000000
+0.6666,943.99992,0.1,0.166650,104.888880,0.050000
+1.1110,1054.99990,0.3,0.222200,105.499990,0.100000
+1.6665,1054.99990,0.6,0.277750,105.499990,0.150000
+2.3331,954.99990,1.0,0.388850,106.111100,0.250000
+2.9997,853.77768,1.4,0.499950,106.722210,0.350000
+3.6663,751.33324,1.8,0.611050,107.333320,0.450000
+4.3329,647.66658,2.2,0.722150,107.944430,0.550000
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
 ====

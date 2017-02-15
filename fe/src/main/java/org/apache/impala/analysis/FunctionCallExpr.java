@@ -331,7 +331,21 @@ public class FunctionCallExpr extends Expr {
 
     int digitsBefore = childType.decimalPrecision() - childType.decimalScale();
     int digitsAfter = childType.decimalScale();
-    if (fnName_.getFunction().equalsIgnoreCase("ceil") ||
+    if (fnName_.getFunction().equalsIgnoreCase("avg") &&
+        analyzer.getQueryOptions().isDecimal_v2()) {
+      // AVG() always gets at least MIN_ADJUSTED_SCALE decimal places since it performs
+      // an implicit divide. The output type isn't always the same as SUM()/COUNT().
+      // Scale is set the same as MS SQL Server, which takes the max of the input scale
+      // and MIN_ADJUST_SCALE. For precision, MS SQL always sets it to 38. We choose to
+      // trim it down to the size that's needed because the absolute value of the result
+      // is less than the absolute value of the largest input. Using a smaller precision
+      // allows for better DECIMAL types to be chosen for the overall expression when
+      // AVG() is a subexpression. For DECIMAL_V1, we set the output type to be the same
+      // as the input type.
+      int resultScale = Math.max(ScalarType.MIN_ADJUSTED_SCALE, digitsAfter);
+      int resultPrecision = digitsBefore + resultScale;
+      return ScalarType.createAdjustedDecimalType(resultPrecision, resultScale);
+    } else if (fnName_.getFunction().equalsIgnoreCase("ceil") ||
                fnName_.getFunction().equalsIgnoreCase("ceiling") ||
                fnName_.getFunction().equals("floor") ||
                fnName_.getFunction().equals("dfloor")) {

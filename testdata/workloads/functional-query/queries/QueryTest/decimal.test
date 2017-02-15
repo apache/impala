@@ -134,23 +134,6 @@ order by t1.c1 desc limit 3
 DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
 ====
 ---- QUERY
-select avg(d1), avg(d2), avg(d3), avg(d4), avg(d5), avg(d6) from decimal_tbl;
----- RESULTS
-32222,666,2743.4567651580,0.12345678900000000000000000000000000000,2472.20577,1
----- TYPES
-decimal,decimal,decimal,decimal,decimal,decimal
-====
----- QUERY
-select d1, avg(d2), avg(d3), avg(d4), avg(d5), avg(d6) from decimal_tbl group by d1;
----- RESULTS
-132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889,1
-2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100,1
-1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900,1
-12345,333,679.0123395000,0.12345678900000000000000000000000000000,5.66000,1
----- TYPES
-decimal,decimal,decimal,decimal,decimal,decimal
-====
----- QUERY
 select count(d1), count(d2), count(d3), count(d4), count(d5), count(d6) from decimal_tbl;
 ---- RESULTS
 5,5,5,5,5,5
@@ -217,18 +200,6 @@ select d1, ndv(d2), ndv(d3), ndv(d4), ndv(d5), ndv(d6) from decimal_tbl group by
 12345,1,2,1,2,1
 ---- TYPES
 decimal,bigint,bigint,bigint,bigint,bigint
-====
----- QUERY
-select cast(avg(c1) as decimal(10,4)) as c from decimal_tiny
-group by c3 having c > 5.5 order by 1
----- RESULTS
-5.5550
-5.6661
-5.7772
-5.8883
-5.9994
----- TYPES
-decimal
 ====
 ---- QUERY
 select a.c1 from decimal_tiny a left semi join decimal_tiny b on a.c1=b.c3
@@ -344,28 +315,15 @@ select * from decimal_tiny
 DECIMAL, DECIMAL, DECIMAL
 ====
 ---- QUERY
-# Test sum() and avg() analytic fns with start bounds (tests Remove() for decimal)
-select
-sum(c1) over (order by c1 rows between 5 preceding and current row),
-sum(c2) over (order by c1 rows between 5 preceding and 5 following),
-sum(c3) over (order by c1 rows between 5 preceding and 2 preceding),
-avg(c1) over (order by c1 rows between 5 preceding and current row),
-avg(c2) over (order by c1 rows between 5 preceding and 5 following),
-avg(c3) over (order by c1 rows between 5 preceding and 2 preceding)
-from decimal_tiny where c2 < 112
----- RESULTS: VERIFY_IS_EQUAL_SORTED
-0.0000,618.33330,NULL,0.0000,103.05555,NULL
-0.1111,725.66662,NULL,0.0555,103.66666,NULL
-0.3333,834.22216,0.0,0.1111,104.27777,0.0
-0.6666,943.99992,0.1,0.1666,104.88888,0.0
-1.1110,1054.99990,0.3,0.2222,105.49999,0.1
-1.6665,1054.99990,0.6,0.2777,105.49999,0.1
-2.3331,954.99990,1.0,0.3888,106.11110,0.2
-2.9997,853.77768,1.4,0.4999,106.72221,0.3
-3.6663,751.33324,1.8,0.6110,107.33332,0.4
-4.3329,647.66658,2.2,0.7221,107.94443,0.5
+# Test group-by with decimal
+select d1, d2, sum(d3), sum(d4), sum(d5), sum(d6) from decimal_tbl group by d1,d2;
+---- RESULTS
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889,1
+12345,333,1358.0246790000,0.24691357800000000000000000000000000000,11.32000,2
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900,1
+2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100,1
 ---- TYPES
-DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+decimal,decimal,decimal,decimal,decimal,decimal
 ====
 ---- QUERY
 # IMPALA-1559: FIRST_VALUE rewrite function intermediate type not matching slot type

@@ -437,19 +437,18 @@ DecimalVal AggregateFunctions::DecimalAvgGetValue(FunctionContext* ctx,
     const StringVal& src) {
   DecimalAvgState* val_struct = reinterpret_cast<DecimalAvgState*>(src.ptr);
   if (val_struct->count == 0) return DecimalVal::null();
-  const FunctionContext::TypeDesc& output_desc = ctx->GetReturnType();
-  DCHECK_EQ(FunctionContext::TYPE_DECIMAL, output_desc.type);
   Decimal16Value sum(val_struct->sum.val16);
   Decimal16Value count(val_struct->count);
-  // The scale of the accumulated sum must be the same as the scale of the return type.
-  // TODO: Investigate whether this is always the right thing to do. Does the current
-  // implementation result in an unacceptable loss of output precision?
-  ColumnType sum_type = ColumnType::CreateDecimalType(38, output_desc.scale);
-  ColumnType count_type = ColumnType::CreateDecimalType(38, 0);
+
+  int output_precision =
+      ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_PRECISION);
+  int output_scale = ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_SCALE);
+  // The scale of the accumulated sum is set to the scale of the input type.
+  int sum_scale = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SCALE, 0);
   bool is_nan = false;
   bool overflow = false;
-  Decimal16Value result = sum.Divide<int128_t>(sum_type, count, count_type,
-      output_desc.precision, output_desc.scale, &is_nan, &overflow);
+  Decimal16Value result = sum.Divide<int128_t>(sum_scale, count, 0 /* count's scale */,
+      output_precision, output_scale, &is_nan, &overflow);
   if (UNLIKELY(is_nan)) return DecimalVal::null();
   if (UNLIKELY(overflow)) {
     ctx->AddWarning("Avg computation overflowed, returning NULL");

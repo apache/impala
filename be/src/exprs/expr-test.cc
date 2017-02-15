@@ -403,38 +403,50 @@ class ExprTest : public testing::Test {
         "1970-01-01 00:00:00");
   }
 
-  // Verify that 'expr' has the same precision and scale as 'expected_type'.
-  void TestDecimalResultType(const string& expr, const ColumnType& expected_type) {
-    const string typeof_expr = "typeof(" + expr + ")";
-    const string typeof_result = GetValue(typeof_expr, TYPE_STRING);
-    EXPECT_EQ(expected_type.DebugString(), typeof_result) << typeof_expr;
+  // Verify that output of 'query' has the same precision and scale as 'expected_type'.
+  // 'query' is an expression, optionally followed by a from clause which is needed
+  // for testing aggregate expressions.
+  void TestDecimalResultType(const string& query, const ColumnType& expected_type) {
+    // For the case with from clause, we need to generate the "typeof query" by first
+    // extracting the select list.
+    size_t from_offset = query.find("from");
+    string typeof_query;
+    if (from_offset != string::npos) {
+      int query_len = query.length();
+      typeof_query = "typeof(" + query.substr(0, from_offset) + ")" +
+          query.substr(from_offset, query_len - from_offset);
+    } else {
+      typeof_query = "typeof(" + query + ")";
+    }
+    const string typeof_result = GetValue(typeof_query, TYPE_STRING);
+    EXPECT_EQ(expected_type.DebugString(), typeof_result) << typeof_query;
   }
 
   // Decimals don't work with TestValue.
   // TODO: figure out what operators need to be implemented to work with EXPECT_EQ
   template<typename T>
-  void TestDecimalValue(const string& expr, const T& expected_result,
+  void TestDecimalValue(const string& query, const T& expected_result,
       const ColumnType& expected_type) {
     // Verify precision and scale of the expression match the expected type.
-    TestDecimalResultType(expr, expected_type);
+    TestDecimalResultType(query, expected_type);
     // Verify the expression result matches the expected result, for the given the
     // precision and scale.
-    const string value = GetValue(expr, expected_type);
+    const string value = GetValue(query, expected_type);
     StringParser::ParseResult result;
     // These require that we've passed the correct type to StringToDecimal(), so these
     // results are valid only when TestDecimalResultType() succeeded.
     switch (expected_type.GetByteSize()) {
       case 4:
         EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int32_t>(
-            &value[0], value.size(), expected_type, &result).value()) << expr;
+            &value[0], value.size(), expected_type, &result).value()) << query;
         break;
       case 8:
         EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int64_t>(
-            &value[0], value.size(), expected_type, &result).value()) << expr;
+            &value[0], value.size(), expected_type, &result).value()) << query;
         break;
       case 16:
         EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int128_t>(
-            &value[0], value.size(), expected_type, &result).value()) << expr;
+            &value[0], value.size(), expected_type, &result).value()) << query;
         break;
       default:
         EXPECT_TRUE(false) << expected_type << " " << expected_type.GetByteSize();
@@ -1435,7 +1447,48 @@ DecimalTestCase decimal_cases[] = {
   // The overload greatest(decimal(*,*)) is available and should be used.
   { "greatest(0, cast('99999.1111' as decimal(30,10)))",
     {{ false, 999991111000000, 30, 10 },
-     { false, 999991111000000, 30, 10 }}}
+     { false, 999991111000000, 30, 10 }}},
+  // Test AVG() with DECIMAL
+  { "avg(d) from (values((cast(100000000000000000000000000000000.00000 as DECIMAL(38,5)) "
+    "as d))) as t",
+    {{ false, static_cast<int128_t>(10000000ll) *
+       10000000000ll * 10000000000ll * 10000000000ll, 38, 5 },
+     { true, 0, 38, 6}}},
+  { "avg(d) from (values((cast(1234567890 as DECIMAL(10,0)) as d))) as t",
+    {{false, 1234567890, 10, 0},
+     {false, 1234567890000000, 16, 6}}},
+  { "avg(d) from (values((cast(1234567.89 as DECIMAL(10,2)) as d))) as t",
+    {{false, 123456789, 10, 2},
+     {false, 1234567890000, 14, 6}}},
+  { "avg(d) from (values((cast(10000000000000000000000000000000 as DECIMAL(32,0)) "
+    "as d))) as t",
+    {{false, static_cast<int128_t>(10) *
+      10000000000ll * 10000000000ll * 10000000000ll, 32, 0},
+     {false, static_cast<int128_t>(10000000) *
+      10000000000ll * 10000000000ll * 10000000000ll, 38, 6}}},
+  { "avg(d) from (values((cast(100000000000000000000000000000000 as DECIMAL(33,0)) "
+    "as d))) as t",
+    {{false, static_cast<int128_t>(100) *
+      10000000000ll * 10000000000ll * 10000000000ll, 33, 0},
+     {true, 0, 38, 6}}},
+  { "avg(d) from (values((cast(100000000000000000000000000000000.0 as DECIMAL(34,1)) "
+    "as d))) as t",
+    {{false, static_cast<int128_t>(1000) *
+      10000000000ll * 10000000000ll * 10000000000ll, 34, 1},
+     {true, 0, 38, 6}}},
+  { "avg(d) from (values((cast(100000000000000000000000000000000.00000 as DECIMAL(38,5)) "
+    "as d))) as t",
+    {{false, static_cast<int128_t>(10000000) *
+      10000000000ll * 10000000000ll * 10000000000ll, 38, 5},
+     {true, 0, 38, 6}}},
+  { "avg(d) from (values((cast(10000000000000000000000000000000.000000 as DECIMAL(38,6)) "
+    "as d))) as t",
+    {{false, static_cast<int128_t>(10000000) *
+      10000000000ll * 10000000000ll * 10000000000ll, 38, 6}}},
+  { "avg(d) from (values((cast(0.10000000000000000000000000000000000000 as DECIMAL(38,38)) "
+    "as d))) as t",
+    {{false, static_cast<int128_t>(10000000) *
+      10000000000ll * 10000000000ll * 10000000000ll, 38, 38}}}
 };
 
 TEST_F(ExprTest, DecimalArithmeticExprs) {
