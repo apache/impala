@@ -30,6 +30,7 @@ namespace impala {
 jclass JniUtil::jni_util_cl_ = NULL;
 jclass JniUtil::internal_exc_cl_ = NULL;
 jmethodID JniUtil::get_jvm_metrics_id_ = NULL;
+jmethodID JniUtil::get_jvm_threads_id_ = NULL;
 jmethodID JniUtil::throwable_to_string_id_ = NULL;
 jmethodID JniUtil::throwable_to_stack_trace_id_ = NULL;
 
@@ -139,6 +140,12 @@ Status JniUtil::Init() {
     return Status("Failed to find JniUtil.getJvmMetrics method.");
   }
 
+  get_jvm_threads_id_ =
+      env->GetStaticMethodID(jni_util_cl_, "getJvmThreadsInfo", "([B)[B");
+  if (get_jvm_threads_id_ == NULL) {
+    if (env->ExceptionOccurred()) env->ExceptionDescribe();
+    return Status("Failed to find JniUtil.getJvmThreadsInfo method.");
+  }
 
   return Status::OK();
 }
@@ -180,6 +187,11 @@ Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& pr
 Status JniUtil::GetJvmMetrics(const TGetJvmMetricsRequest& request,
     TGetJvmMetricsResponse* result) {
   return JniUtil::CallJniMethod(jni_util_class(), get_jvm_metrics_id_, request, result);
+}
+
+Status JniUtil::GetJvmThreadsInfo(const TGetJvmThreadsInfoRequest& request,
+    TGetJvmThreadsInfoResponse* result) {
+  return JniUtil::CallJniMethod(jni_util_class(), get_jvm_threads_id_, request, result);
 }
 
 Status JniUtil::LoadJniMethod(JNIEnv* env, const jclass& jni_class,

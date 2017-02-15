@@ -76,7 +76,7 @@ int ImpaladMain(int argc, char** argv) {
 
   // start backend service for the coordinator on be_port
   ExecEnv exec_env;
-  StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver());
+  StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver(), true);
   InitRpcEventTracing(exec_env.webserver());
 
   ThriftServer* beeswax_server = NULL;

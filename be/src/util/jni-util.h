@@ -221,6 +221,11 @@ class JniUtil {
   static Status GetJvmMetrics(const TGetJvmMetricsRequest& request,
       TGetJvmMetricsResponse* result);
 
+  // Populates 'result' with information about live JVM threads. Returns
+  // Status::OK unless there is an exception.
+  static Status GetJvmThreadsInfo(const TGetJvmThreadsInfoRequest& request,
+      TGetJvmThreadsInfoResponse* result);
+
   /// Loads a method whose signature is in the supplied descriptor. Returns Status::OK
   /// and sets descriptor->method_id to a JNI method handle if successful, otherwise an
   /// error status is returned.
@@ -330,6 +335,7 @@ class JniUtil {
   static jmethodID throwable_to_string_id_;
   static jmethodID throwable_to_stack_trace_id_;
   static jmethodID get_jvm_metrics_id_;
+  static jmethodID get_jvm_threads_id_;
 };
 
 }

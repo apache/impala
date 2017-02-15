@@ -26,6 +26,7 @@
 #include "util/coding-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
+#include "util/jni-util.h"
 #include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/os-util.h"
@@ -38,8 +39,12 @@ using namespace rapidjson;
 
 namespace impala {
 
+static const string JVM_THREADS_WEB_PAGE = "/jvm-threadz";
+static const string JVM_THREADS_TEMPLATE = "jvm-threadz.tmpl";
 static const string THREADS_WEB_PAGE = "/threadz";
 static const string THREADS_TEMPLATE = "threadz.tmpl";
+static const string THREAD_GROUP_WEB_PAGE = "/thread-group";
+static const string THREAD_GROUP_TEMPLATE = "/thread-group.tmpl";
 
 class ThreadMgr;
 
@@ -50,13 +55,39 @@ class ThreadMgr;
 // manager after the destruction can be avoided.
 shared_ptr<ThreadMgr> thread_manager;
 
+namespace {
+
+// Example output:
+// "overview" : {
+//   "thread_count" : 30,
+//   "daemon_count" : 4,
+//   "peak_count" : 40
+// }
+// "threads": [
+//   {
+//     "summary" : "main ID:1 RUNNABLE",
+//     "cpu_time_sec" : 1.303,
+//     "user_time_sec" : 2.323,
+//     "blocked_time_ms" : -1,
+//     "blocked_count" : 20,
+//     "is_native" : false
+//   },
+//   { ... }
+// ]
+void JvmThreadsUrlCallback(const Webserver::ArgumentMap& args, Document* doc);
+
+void ThreadOverviewUrlCallback(bool include_jvm_threads,
+    const Webserver::ArgumentMap& args, Document* document);
+
+}
+
 // A singleton class that tracks all live threads, and groups them together for easy
 // auditing. Used only by Thread.
 class ThreadMgr {
  public:
   ThreadMgr() : metrics_enabled_(false) { }
 
-  Status StartInstrumentation(MetricGroup* metrics, Webserver* webserver);
+  Status StartInstrumentation(MetricGroup* metrics);
 
   // Registers a thread to the supplied category. The key is a boost::thread::id, used
   // instead of the system TID since boost::thread::id is always available, unlike
@@ -67,6 +98,46 @@ class ThreadMgr {
   // Removes a thread from the supplied category. If the thread has
   // already been removed, this is a no-op.
   void RemoveThread(const thread::id& boost_id, const string& category);
+
+  // Example output:
+  // "total_threads": 144,
+  //   "thread-groups": [
+  //       {
+  //         "name": "common",
+  //             "size": 1
+  //             },
+  //       {
+  //         "name": "disk-io-mgr",
+  //             "size": 2
+  //             },
+  //       {
+  //         "name": "hdfs-worker-pool",
+  //             "size": 16
+  //             },
+  //             ... etc ...
+  //      ]
+  void GetThreadOverview(Document* document);
+
+  // Example output:
+  // "thread-group": {
+  //   "category": "disk-io-mgr",
+  //       "size": 2
+  //       },
+  //   "threads": [
+  //       {
+  //         "name": "work-loop(Disk: 0, Thread: 0)-17049",
+  //             "user_ns": 0,
+  //             "kernel_ns": 0,
+  //             "iowait_ns": 0
+  //             },
+  //       {
+  //         "name": "work-loop(Disk: 1, Thread: 0)-17050",
+  //             "user_ns": 0,
+  //             "kernel_ns": 0,
+  //             "iowait_ns": 0
+  //             }
+  //        ]
+  void ThreadGroupUrlCallback(const Webserver::ArgumentMap& args, Document* output);
 
  private:
   // Container class for any details we want to capture about a thread
@@ -110,69 +181,16 @@ class ThreadMgr {
   // current number of running threads.
   IntGauge* total_threads_metric_;
   IntGauge* current_num_threads_metric_;
-
-  // Webpage callbacks; print all threads by category
-  // Example output:
-  // "total_threads": 144,
-  //   "thread-groups": [
-  //       {
-  //         "name": "common",
-  //             "size": 1
-  //             },
-  //       {
-  //         "name": "disk-io-mgr",
-  //             "size": 2
-  //             },
-  //       {
-  //         "name": "hdfs-worker-pool",
-  //             "size": 16
-  //             },
-  //             ... etc ...
-  //      ]
-  void ThreadGroupUrlCallback(const Webserver::ArgumentMap& args, Document* output);
-
-  // Example output:
-  // "thread-group": {
-  //   "category": "disk-io-mgr",
-  //       "size": 2
-  //       },
-  //   "threads": [
-  //       {
-  //         "name": "work-loop(Disk: 0, Thread: 0)-17049",
-  //             "user_ns": 0,
-  //             "kernel_ns": 0,
-  //             "iowait_ns": 0
-  //             },
-  //       {
-  //         "name": "work-loop(Disk: 1, Thread: 0)-17050",
-  //             "user_ns": 0,
-  //             "kernel_ns": 0,
-  //             "iowait_ns": 0
-  //             }
-  //        ]
-  void ThreadOverviewUrlCallback(const Webserver::ArgumentMap& args, Document* document);
 };
 
-Status ThreadMgr::StartInstrumentation(MetricGroup* metrics, Webserver* webserver) {
+Status ThreadMgr::StartInstrumentation(MetricGroup* metrics) {
   DCHECK(metrics != NULL);
-  DCHECK(webserver != NULL);
   lock_guard<mutex> l(lock_);
   metrics_enabled_ = true;
   total_threads_metric_ = metrics->AddGauge<int64_t>(
       "thread-manager.total-threads-created", 0L);
   current_num_threads_metric_ = metrics->AddGauge<int64_t>(
       "thread-manager.running-threads", 0L);
-
-  Webserver::UrlCallback template_callback =
-      bind<void>(mem_fn(&ThreadMgr::ThreadOverviewUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback(THREADS_WEB_PAGE, THREADS_TEMPLATE,
-      template_callback);
-
-  Webserver::UrlCallback overview_callback =
-      bind<void>(mem_fn(&ThreadMgr::ThreadGroupUrlCallback), this, _1, _2);
-  webserver->RegisterUrlCallback("/thread-group", "thread-group.tmpl",
-      overview_callback, false);
-
   return Status::OK();
 }
 
@@ -194,8 +212,7 @@ void ThreadMgr::RemoveThread(const thread::id& boost_id, const string& category)
   if (metrics_enabled_) current_num_threads_metric_->Increment(-1L);
 }
 
-void ThreadMgr::ThreadOverviewUrlCallback(const Webserver::ArgumentMap& args,
-    Document* document) {
+void ThreadMgr::GetThreadOverview(Document* document) {
   lock_guard<mutex> l(lock_);
   if (metrics_enabled_) {
     document->AddMember("total_threads", current_num_threads_metric_->value(),
@@ -261,17 +278,8 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
   document->AddMember("threads", lst, document->GetAllocator());
 }
 
-void InitThreading() {
-  DCHECK(thread_manager.get() == NULL);
-  thread_manager.reset(new ThreadMgr());
-}
-
-Status StartThreadInstrumentation(MetricGroup* metrics, Webserver* webserver) {
-  return thread_manager->StartInstrumentation(metrics, webserver);
-}
-
 void Thread::StartThread(const ThreadFunctor& functor) {
-  DCHECK(thread_manager.get() != NULL)
+  DCHECK(thread_manager.get() != nullptr)
       << "Thread created before InitThreading called";
   DCHECK(tid_ == UNINITIALISED_THREAD_ID) << "StartThread called twice";
 
@@ -325,6 +333,107 @@ Status ThreadGroup::AddThread(Thread* thread) {
 
 void ThreadGroup::JoinAll() {
   for (const Thread& thread: threads_) thread.Join();
+}
+
+namespace {
+
+void RegisterUrlCallbacks(bool include_jvm_threads, Webserver* webserver) {
+  DCHECK(webserver != nullptr);
+  auto overview_callback = [include_jvm_threads]
+      (const Webserver::ArgumentMap& args, Document* doc) {
+    ThreadOverviewUrlCallback(include_jvm_threads, args, doc);
+  };
+  webserver->RegisterUrlCallback(THREADS_WEB_PAGE, THREADS_TEMPLATE, overview_callback);
+
+  auto group_callback = [] (const Webserver::ArgumentMap& args, Document* doc) {
+    thread_manager->ThreadGroupUrlCallback(args, doc);
+  };
+  webserver->RegisterUrlCallback(THREAD_GROUP_WEB_PAGE, THREAD_GROUP_TEMPLATE,
+      group_callback, false);
+
+  if (include_jvm_threads) {
+    auto jvm_threads_callback = [] (const Webserver::ArgumentMap& args, Document* doc) {
+      JvmThreadsUrlCallback(args, doc);
+    };
+    webserver->RegisterUrlCallback(JVM_THREADS_WEB_PAGE, JVM_THREADS_TEMPLATE,
+        jvm_threads_callback, false);
+  }
+}
+
+void ThreadOverviewUrlCallback(bool include_jvm_threads,
+    const Webserver::ArgumentMap& args, Document* document) {
+  thread_manager->GetThreadOverview(document);
+  if (!include_jvm_threads) return;
+
+  // Add information about the JVM threads
+  TGetJvmThreadsInfoRequest request;
+  request.get_complete_info = false;
+  TGetJvmThreadsInfoResponse response;
+  Status status = JniUtil::GetJvmThreadsInfo(request, &response);
+  if (!status.ok()) {
+    Value error(Substitute("Couldn't retrieve information about JVM threads: $0",
+        status.GetDetail()).c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    return;
+  }
+  Value jvm_threads_val(kObjectType);
+  jvm_threads_val.AddMember("name", "jvm", document->GetAllocator());
+  jvm_threads_val.AddMember("total", response.total_thread_count,
+      document->GetAllocator());
+  jvm_threads_val.AddMember("daemon", response.daemon_thread_count,
+      document->GetAllocator());
+  document->AddMember("jvm-threads", jvm_threads_val, document->GetAllocator());
+}
+
+void JvmThreadsUrlCallback(const Webserver::ArgumentMap& args, Document* doc) {
+  DCHECK(doc != NULL);
+  TGetJvmThreadsInfoRequest request;
+  request.get_complete_info = true;
+  TGetJvmThreadsInfoResponse response;
+  Status status = JniUtil::GetJvmThreadsInfo(request, &response);
+  if (!status.ok()) {
+    Value error(Substitute("Couldn't retrieve information about JVM threads: $0",
+        status.GetDetail()).c_str(), doc->GetAllocator());
+    doc->AddMember("error", error, doc->GetAllocator());
+    return;
+  }
+  Value overview(kObjectType);
+  overview.AddMember("thread_count", response.total_thread_count, doc->GetAllocator());
+  overview.AddMember("daemon_count", response.daemon_thread_count, doc->GetAllocator());
+  overview.AddMember("peak_count", response.peak_thread_count, doc->GetAllocator());
+  doc->AddMember("overview", overview, doc->GetAllocator());
+
+  Value lst(kArrayType);
+  for (const TJvmThreadInfo& thread: response.threads) {
+    Value val(kObjectType);
+    Value summary(thread.summary.c_str(), doc->GetAllocator());
+    val.AddMember("summary", summary, doc->GetAllocator());
+    val.AddMember("cpu_time_sec", static_cast<double>(thread.cpu_time_in_ns) / 1e9,
+        doc->GetAllocator());
+    val.AddMember("user_time_sec", static_cast<double>(thread.user_time_in_ns) / 1e9,
+        doc->GetAllocator());
+    val.AddMember("blocked_time_ms", thread.blocked_time_in_ms, doc->GetAllocator());
+    val.AddMember("blocked_count", thread.blocked_count, doc->GetAllocator());
+    val.AddMember("is_native", thread.is_in_native, doc->GetAllocator());
+    lst.PushBack(val, doc->GetAllocator());
+  }
+  doc->AddMember("jvm-threads", lst, doc->GetAllocator());
+}
+
+}
+
+void InitThreading() {
+  DCHECK(thread_manager.get() == nullptr);
+  thread_manager.reset(new ThreadMgr());
+}
+
+Status StartThreadInstrumentation(MetricGroup* metrics, Webserver* webserver,
+    bool include_jvm_threads) {
+  DCHECK(metrics != nullptr);
+  DCHECK(webserver != nullptr);
+  RETURN_IF_ERROR(thread_manager->StartInstrumentation(metrics));
+  RegisterUrlCallbacks(include_jvm_threads, webserver);
+  return Status::OK();
 }
 
 }

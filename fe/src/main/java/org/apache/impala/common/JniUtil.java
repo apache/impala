@@ -25,7 +25,11 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryUsage;
+import java.lang.management.RuntimeMXBean;
+import java.lang.management.ThreadMXBean;
+import java.lang.management.ThreadInfo;
 import java.util.ArrayList;
+import java.util.Map;
 
 import org.apache.thrift.TBase;
 import org.apache.thrift.TSerializer;
@@ -34,9 +38,14 @@ import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
 
+import com.google.common.base.Joiner;
+
 import org.apache.impala.thrift.TGetJvmMetricsRequest;
 import org.apache.impala.thrift.TGetJvmMetricsResponse;
+import org.apache.impala.thrift.TGetJvmThreadsInfoRequest;
+import org.apache.impala.thrift.TGetJvmThreadsInfoResponse;
 import org.apache.impala.thrift.TJvmMemoryPool;
+import org.apache.impala.thrift.TJvmThreadInfo;
 
 /**
  * Utility class with methods intended for JNI clients
@@ -187,15 +196,50 @@ public class JniUtil {
   }
 
   /**
-   * Get Java version and vendor information
+   * Get information about the live JVM threads.
+   */
+  public static byte[] getJvmThreadsInfo(byte[] argument) throws ImpalaException {
+    TGetJvmThreadsInfoRequest request = new TGetJvmThreadsInfoRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, argument);
+    TGetJvmThreadsInfoResponse response = new TGetJvmThreadsInfoResponse();
+    ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+    response.setTotal_thread_count(threadBean.getThreadCount());
+    response.setDaemon_thread_count(threadBean.getDaemonThreadCount());
+    response.setPeak_thread_count(threadBean.getPeakThreadCount());
+    if (request.get_complete_info) {
+      for (ThreadInfo threadInfo: threadBean.dumpAllThreads(true, true)) {
+        TJvmThreadInfo tThreadInfo = new TJvmThreadInfo();
+        long id = threadInfo.getThreadId();
+        tThreadInfo.setSummary(threadInfo.toString());
+        tThreadInfo.setCpu_time_in_ns(threadBean.getThreadCpuTime(id));
+        tThreadInfo.setUser_time_in_ns(threadBean.getThreadUserTime(id));
+        tThreadInfo.setBlocked_count(threadInfo.getBlockedCount());
+        tThreadInfo.setBlocked_time_in_ms(threadInfo.getBlockedTime());
+        tThreadInfo.setIs_in_native(threadInfo.isInNative());
+        response.addToThreads(tThreadInfo);
+      }
+    }
+
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(response);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * Get Java version, input arguments and system properties.
    */
   public static String getJavaVersion() {
+    RuntimeMXBean runtime = ManagementFactory.getRuntimeMXBean();
     StringBuilder sb = new StringBuilder();
-    sb.append("Java Version Info: ");
-    sb.append(System.getProperty("java.runtime.name"));
-    sb.append(" (");
-    sb.append(System.getProperty("java.runtime.version"));
-    sb.append(")");
+    sb.append("Java Input arguments:\n");
+    sb.append(Joiner.on(" ").join(runtime.getInputArguments()));
+    sb.append("\nJava System properties:\n");
+    for (Map.Entry<String, String> entry: runtime.getSystemProperties().entrySet()) {
+      sb.append(entry.getKey() + ":" + entry.getValue() + "\n");
+    }
     return sb.toString();
   }
 }

@@ -715,6 +715,51 @@ struct TGetJvmMetricsResponse {
   1: required list<TJvmMemoryPool> memory_pools
 }
 
+// Contains information about a JVM thread
+struct TJvmThreadInfo {
+  // Summary of a JVM thread. Includes stacktraces, locked monitors
+  // and synchronizers.
+  1: required string summary
+
+  // The total CPU time for this thread in nanoseconds
+  2: required i64 cpu_time_in_ns
+
+  // The CPU time that this thread has executed in user mode in nanoseconds
+  3: required i64 user_time_in_ns
+
+  // The number of times this thread blocked to enter or reenter a monitor
+  4: required i64 blocked_count
+
+  // Approximate accumulated elapsed time (in milliseconds) that this thread has blocked
+  // to enter or reenter a monitor
+  5: required i64 blocked_time_in_ms
+
+  // True if this thread is executing native code via the Java Native Interface (JNI)
+  6: required bool is_in_native
+}
+
+// Request to get information about JVM threads
+struct TGetJvmThreadsInfoRequest {
+  // If set, return complete info about JVM threads. Otherwise, return only
+  // the total number of live JVM threads.
+  1: required bool get_complete_info
+}
+
+struct TGetJvmThreadsInfoResponse {
+  // The current number of live threads including both daemon and non-daemon threads
+  1: required i32 total_thread_count
+
+  // The current number of live daemon threads
+  2: required i32 daemon_thread_count
+
+  // The peak live thread count since the Java virtual machine started
+  3: required i32 peak_thread_count
+
+  // Information about JVM threads. It is not included when
+  // TGetJvmThreadsInfoRequest.get_complete_info is false.
+  4: optional list<TJvmThreadInfo> threads
+}
+
 struct TGetHadoopConfigRequest {
   // The value of the <name> in the config <property>
   1: required string name

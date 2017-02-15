@@ -188,8 +188,10 @@ class ThreadGroup {
 void InitThreading();
 
 /// Registers /threadz with the debug webserver, and creates thread-tracking metrics under
-/// the "thread-manager." prefix
-Status StartThreadInstrumentation(MetricGroup* metrics, Webserver* webserver);
+/// the "thread-manager." If 'include_jvm_threads' is true, shows information about
+/// live JVM threads in the web UI.
+Status StartThreadInstrumentation(MetricGroup* metrics, Webserver* webserver,
+    bool include_jvm_threads);
 }
 
 #endif
