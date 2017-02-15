@@ -504,12 +504,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         ScalarType decimalType = (ScalarType) childType;
         result = decimalType.getMinResolutionDecimal();
       } else {
-        Preconditions.checkState(childType.isDecimal() || result.isDecimal());
         result = Type.getAssignmentCompatibleType(
             result, childType, false, strictDecimal);
       }
     }
     if (result != null && !result.isNull()) {
+      result = ((ScalarType)result).getMinResolutionDecimal();
       Preconditions.checkState(result.isDecimal() || result.isInvalid());
       Preconditions.checkState(!result.isWildcardDecimal());
     }
