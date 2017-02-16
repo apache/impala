@@ -1799,12 +1799,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Invalid column/field name: ???");
     AnalysisError("create table new_table (i int) PARTITIONED BY (`^&*` int)",
         "Invalid column/field name: ^&*");
-    // Test HMS constraint on type name length.
-    AnalyzesOk(String.format("create table t (i %s)",
-        genTypeSql(MetaStoreUtil.MAX_TYPE_NAME_LENGTH)));
-    AnalysisError(String.format("create table t (i %s)",
-        genTypeSql(MetaStoreUtil.MAX_TYPE_NAME_LENGTH + 1)),
-        "Type of column 'i' exceeds maximum type length of 4000 characters:");
     // Test HMS constraint on comment length.
     AnalyzesOk(String.format("create table t (i int comment '%s')",
         StringUtils.repeat("c", MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH)));
@@ -1863,39 +1857,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "Tables produced by an external data source do not support the column type: " +
           type.name());
     }
-  }
-
-  /**
-   * Generates a valid type string with exactly the given number of characters.
-   * The type is a struct with at least two fields.
-   * The given length must be at least "struct<s:int,c:int>".length() == 19.
-   */
-  private String genTypeSql(int length) {
-    Preconditions.checkState(length >= 19);
-    StringBuilder result = new StringBuilder();
-    result.append("struct<s:int");
-    // The middle fields always have a fixed length.
-    int midFieldLen = ",f000:int".length();
-    // The last field has a variable length, but this is the minimum.
-    int lastFieldMinLen = ",f:int".length();
-    int fieldIdx = 0;
-    while (result.length() < length - midFieldLen - lastFieldMinLen) {
-      String fieldStr = String.format(",f%03d:int", fieldIdx);
-      result.append(fieldStr);
-      ++fieldIdx;
-    }
-    Preconditions.checkState(result.length() == length - 1 ||
-        result.length() < length - lastFieldMinLen);
-    // Generate last field with a variable length.
-    if (result.length() < length - 1) {
-      int fieldNameLen = length - result.length() - ",:int".length() - 1;
-      Preconditions.checkState(fieldNameLen > 0);
-      String fieldStr = String.format(",%s:int", StringUtils.repeat("f", fieldNameLen));
-      result.append(fieldStr);
-    }
-    result.append(">");
-    Preconditions.checkState(result.length() == length);
-    return result.toString();
   }
 
   @Test

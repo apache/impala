@@ -44,9 +44,6 @@ public class MetaStoreUtil {
   // for Postgres it is 4000, but for most other databases it is 256.
   public static final int CREATE_MAX_COMMENT_LENGTH = 256;
 
-  // Maximum length of the string representation of a type that the HMS can store.
-  public static final int MAX_TYPE_NAME_LENGTH = 4000;
-
   // The longest strings Hive accepts for [serde] property keys.
   public static final int MAX_PROPERTY_KEY_LENGTH = 256;
 

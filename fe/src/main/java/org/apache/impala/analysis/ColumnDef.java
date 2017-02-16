@@ -176,18 +176,11 @@ public class ColumnDef {
     }
     Preconditions.checkNotNull(type_);
     Preconditions.checkState(type_.isValid());
-    // Check HMS constraints of type and comment.
-    String typeSql = type_.toSql();
-    if (typeSql.length() > MetaStoreUtil.MAX_TYPE_NAME_LENGTH) {
-      throw new AnalysisException(String.format(
-          "Type of column '%s' exceeds maximum type length of %d characters:\n" +
-          "%s has %d characters.", colName_, MetaStoreUtil.MAX_TYPE_NAME_LENGTH,
-          typeSql, typeSql.length()));
-    }
     if (hasKuduOptions()) {
       Preconditions.checkNotNull(analyzer);
       analyzeKuduOptions(analyzer);
     }
+    // Check HMS constraints on comment.
     if (comment_ != null &&
         comment_.length() > MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH) {
       throw new AnalysisException(String.format(
