@@ -163,14 +163,8 @@ public class ComputeStatsStmt extends StatementBase {
 
     for (int i = startColIdx; i < table_.getColumns().size(); ++i) {
       Column c = table_.getColumns().get(i);
-      Type type = c.getType();
+      if (ignoreColumn(c)) continue;
 
-      // Ignore columns with an invalid/unsupported type. For example, complex types in
-      // an HBase-backed table will appear as invalid types.
-      if (!type.isValid() || !type.isSupported()
-          || c.getType().isComplexType()) {
-        continue;
-      }
       // NDV approximation function. Add explicit alias for later identification when
       // updating the Metastore.
       String colRefSql = ToSqlUtils.getIdentSql(c.getName());
@@ -189,6 +183,7 @@ public class ComputeStatsStmt extends StatementBase {
       }
 
       // For STRING columns also compute the max and avg string length.
+      Type type = c.getType();
       if (type.isStringType()) {
         columnStatsSelectList.add("MAX(length(" + colRefSql + "))");
         columnStatsSelectList.add("AVG(length(" + colRefSql + "))");
@@ -313,12 +308,13 @@ public class ComputeStatsStmt extends StatementBase {
         boolean tableIsMissingColStats = false;
 
         // We'll warn the user if a column is missing stats (and therefore we rescan the
-        // whole table), but if all columns are missing stats, the table just doesn't have
-        // any stats and there's no need to warn.
+        // whole table), but if all columns are missing stats, the table just doesn't
+        // have any stats and there's no need to warn.
         boolean allColumnsMissingStats = true;
         String exampleColumnMissingStats = null;
         // Partition columns always have stats, so exclude them from this search
         for (Column col: table_.getNonClusteringColumns()) {
+          if (ignoreColumn(col)) continue;
           if (!col.getStats().hasStats()) {
             if (!tableIsMissingColStats) {
               tableIsMissingColStats = true;
@@ -525,6 +521,16 @@ public class ComputeStatsStmt extends StatementBase {
       }
       ++pos;
     }
+  }
+
+  /**
+   * Returns true if the given column should be ignored for the purpose of computing
+   * column stats. Columns with an invalid/unsupported/complex type are ignored.
+   * For example, complex types in an HBase-backed table will appear as invalid types.
+   */
+  private boolean ignoreColumn(Column c) {
+    Type t = c.getType();
+    return !t.isValid() || !t.isSupported() || t.isComplexType();
   }
 
   public String getTblStatsQuery() { return tableStatsQueryStr_; }

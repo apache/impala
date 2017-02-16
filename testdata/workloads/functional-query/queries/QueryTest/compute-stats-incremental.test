@@ -527,3 +527,35 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
+---- QUERY
+# IMPALA-4854: Tests incremental computation in the presence of complex-typed columns.
+create external table complextypestbl_part
+  like parquet '$FILESYSTEM_PREFIX/test-warehouse/complextypestbl_parquet/nullable.parq'
+  partitioned by (p int) stored as parquet;
+alter table complextypestbl_part add partition (p=0)
+  location '$FILESYSTEM_PREFIX/test-warehouse/complextypestbl_parquet/';
+alter table complextypestbl_part add partition (p=1)
+  location '$FILESYSTEM_PREFIX/test-warehouse/complextypestbl_parquet/';
+compute incremental stats complextypestbl_part;
+---- RESULTS
+'Updated 2 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+# The table was not changed. Validate that the next compute incremental stats is a no-op.
+compute incremental stats complextypestbl_part;
+---- RESULTS
+---- ERRORS
+No partitions selected for incremental stats update
+====
+---- QUERY
+# Add a new partition and check that only stats for the new partition are computed.
+alter table complextypestbl_part add partition (p=2)
+  location '$FILESYSTEM_PREFIX/test-warehouse/complextypestbl_parquet/';
+compute incremental stats complextypestbl_part;
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
