@@ -17,22 +17,19 @@
 
 package org.apache.impala.catalog;
 
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.log4j.Logger;
-
 import org.apache.impala.analysis.TableName;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAccessLevel;
@@ -44,6 +41,8 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.HdfsCachingUtil;
+import org.apache.log4j.Logger;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -69,7 +68,7 @@ public abstract class Table implements CatalogObject {
   protected TTableDescriptor tableDesc_;
   protected TAccessLevel accessLevel_ = TAccessLevel.READ_WRITE;
   // Lock protecting this table
-  private final ReentrantLock tableLock_ = new ReentrantLock(true);
+  private final ReentrantLock tableLock_ = new ReentrantLock();
 
   // Number of clustering columns.
   protected int numClusteringCols_;
@@ -297,7 +296,22 @@ public abstract class Table implements CatalogObject {
     }
   }
 
+  /**
+   * Must be called with 'tableLock_' held to protect against concurrent modifications
+   * while producing the TTable result.
+   */
   public TTable toThrift() {
+    // It would be simple to acquire and release the lock in this function.
+    // However, in most cases toThrift() is called after modifying a table for which
+    // the table lock should already be held, and we want the toThrift() to be consistent
+    // with the modification. So this check helps us identify places where the lock
+    // acquisition is probably missing entirely.
+    if (!tableLock_.isHeldByCurrentThread()) {
+      throw new IllegalStateException(
+          "Table.toThrift() called without holding the table lock: " +
+              getFullName() + " " + getClass().getName());
+    }
+
     TTable table = new TTable(db_.getName(), name_);
     table.setAccess_level(accessLevel_);
 

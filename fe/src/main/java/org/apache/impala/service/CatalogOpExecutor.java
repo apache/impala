@@ -3069,63 +3069,50 @@ public class CatalogOpExecutor {
     resp.getResult().setCatalog_service_id(JniCatalog.getServiceId());
 
     if (req.isSetTable_name()) {
-      // Tracks any CatalogObjects updated/added/removed as a result of
-      // the invalidate metadata or refresh call. For refresh() it is only expected
-      // that a table be modified, but for invalidateTable() the table's parent database
-      // may have also been added if it did not previously exist in the catalog.
-      Pair<Db, Table> modifiedObjects = new Pair<Db, Table>(null, null);
-
-      boolean wasRemoved = false;
+      // Results of an invalidate operation, indicating whether the table was removed
+      // from the Metastore, and whether a new database was added to Impala as a result
+      // of the invalidate operation. Always false for refresh.
+      Reference<Boolean> tblWasRemoved = new Reference<Boolean>(false);
+      Reference<Boolean> dbWasAdded = new Reference<Boolean>(false);
+      // Thrift representation of the result of the invalidate/refresh operation.
+      TCatalogObject updatedThriftTable = null;
       if (req.isIs_refresh()) {
         TableName tblName = TableName.fromThrift(req.getTable_name());
         Table tbl = getExistingTable(tblName.getDb(), tblName.getTbl());
-        if (tbl == null) {
-          modifiedObjects.second = null;
-        } else {
+        if (tbl != null) {
           if (req.isSetPartition_spec()) {
-            modifiedObjects.second = catalog_.reloadPartition(tbl,
-                req.getPartition_spec());
+            updatedThriftTable = catalog_.reloadPartition(tbl, req.getPartition_spec());
           } else {
-            modifiedObjects.second = catalog_.reloadTable(tbl);
+            updatedThriftTable = catalog_.reloadTable(tbl);
           }
         }
       } else {
-        wasRemoved = catalog_.invalidateTable(req.getTable_name(), modifiedObjects);
+        updatedThriftTable = catalog_.invalidateTable(
+            req.getTable_name(), tblWasRemoved, dbWasAdded);
       }
 
-      if (modifiedObjects.first == null) {
-        if (modifiedObjects.second == null) {
-          // Table does not exist in the meta store and Impala catalog, throw error.
-          throw new TableNotFoundException("Table not found: " +
-              req.getTable_name().getDb_name() + "." +
-              req.getTable_name().getTable_name());
-        }
-        TCatalogObject thriftTable = modifiedObjects.second.toTCatalogObject();
+      if (updatedThriftTable == null) {
+        // Table does not exist in the Metastore and Impala catalog, throw error.
+        throw new TableNotFoundException("Table not found: " +
+            req.getTable_name().getDb_name() + "." +
+            req.getTable_name().getTable_name());
+      }
+
+      if (!dbWasAdded.getRef()) {
         // Return the TCatalogObject in the result to indicate this request can be
         // processed as a direct DDL operation.
-        if (wasRemoved) {
-          resp.getResult().setRemoved_catalog_object_DEPRECATED(thriftTable);
+        if (tblWasRemoved.getRef()) {
+          resp.getResult().setRemoved_catalog_object_DEPRECATED(updatedThriftTable);
         } else {
-          resp.getResult().setUpdated_catalog_object_DEPRECATED(thriftTable);
+          resp.getResult().setUpdated_catalog_object_DEPRECATED(updatedThriftTable);
         }
-        resp.getResult().setVersion(thriftTable.getCatalog_version());
       } else {
-        // If there were two catalog objects modified it indicates there was an
-        // "invalidateTable()" call that added a new table AND database to the catalog.
+        // Since multiple catalog objects were modified (db and table), don't treat this
+        // as a direct DDL operation. Set the overall catalog version and the impalad
+        // will wait for a statestore heartbeat that contains the update.
         Preconditions.checkState(!req.isIs_refresh());
-        Preconditions.checkNotNull(modifiedObjects.first);
-        Preconditions.checkNotNull(modifiedObjects.second);
-
-        // The database should always have a lower catalog version than the table because
-        // it needs to be created before the table can be added.
-        Preconditions.checkState(modifiedObjects.first.getCatalogVersion() <
-            modifiedObjects.second.getCatalogVersion());
-
-        // Since multiple catalog objects were modified, don't treat this as a direct DDL
-        // operation. Just set the overall catalog version and the impalad will wait for
-        // a statestore heartbeat that contains the update.
-        resp.getResult().setVersion(modifiedObjects.second.getCatalogVersion());
       }
+      resp.getResult().setVersion(updatedThriftTable.getCatalog_version());
     } else {
       // Invalidate the entire catalog if no table name is provided.
       Preconditions.checkArgument(!req.isIs_refresh());

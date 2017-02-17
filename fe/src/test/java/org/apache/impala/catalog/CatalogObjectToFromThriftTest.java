@@ -21,15 +21,10 @@ import static org.junit.Assert.fail;
 
 import java.util.Map;
 
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
-
-import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.THBaseTable;
@@ -37,6 +32,11 @@ import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableType;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
 import com.google.common.collect.Lists;
 
 /**
@@ -59,7 +59,7 @@ public class CatalogObjectToFromThriftTest {
                         "functional_seq"};
     for (String dbName: dbNames) {
       Table table = catalog_.getOrLoadTable(dbName, "alltypes");
-      TTable thriftTable = table.toThrift();
+      TTable thriftTable = getThriftTable(table);
       Assert.assertEquals(thriftTable.tbl_name, "alltypes");
       Assert.assertEquals(thriftTable.db_name, dbName);
       Assert.assertTrue(thriftTable.isSetTable_type());
@@ -125,7 +125,7 @@ public class CatalogObjectToFromThriftTest {
   public void TestMismatchedAvroAndTableSchemas() throws CatalogException {
     Table table = catalog_.getOrLoadTable("functional_avro_snap",
         "schema_resolution_test");
-    TTable thriftTable = table.toThrift();
+    TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "schema_resolution_test");
     Assert.assertTrue(thriftTable.isSetTable_type());
     Assert.assertEquals(thriftTable.getColumns().size(), 8);
@@ -145,7 +145,7 @@ public class CatalogObjectToFromThriftTest {
   public void TestHBaseTables() throws CatalogException {
     String dbName = "functional_hbase";
     Table table = catalog_.getOrLoadTable(dbName, "alltypes");
-    TTable thriftTable = table.toThrift();
+    TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "alltypes");
     Assert.assertEquals(thriftTable.db_name, dbName);
     Assert.assertTrue(thriftTable.isSetTable_type());
@@ -174,7 +174,7 @@ public class CatalogObjectToFromThriftTest {
       throws CatalogException {
     String dbName = "functional_hbase";
     Table table = catalog_.getOrLoadTable(dbName, "alltypessmallbinary");
-    TTable thriftTable = table.toThrift();
+    TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "alltypessmallbinary");
     Assert.assertEquals(thriftTable.db_name, dbName);
     Assert.assertTrue(thriftTable.isSetTable_type());
@@ -206,7 +206,7 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestTableLoadingErrors() throws ImpalaException {
     Table table = catalog_.getOrLoadTable("functional", "hive_index_tbl");
-    TTable thriftTable = table.toThrift();
+    TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "hive_index_tbl");
     Assert.assertEquals(thriftTable.db_name, "functional");
 
@@ -237,11 +237,22 @@ public class CatalogObjectToFromThriftTest {
   @Test
   public void TestView() throws CatalogException {
     Table table = catalog_.getOrLoadTable("functional", "view_view");
-    TTable thriftTable = table.toThrift();
+    TTable thriftTable = getThriftTable(table);
     Assert.assertEquals(thriftTable.tbl_name, "view_view");
     Assert.assertEquals(thriftTable.db_name, "functional");
     Assert.assertFalse(thriftTable.isSetHdfs_table());
     Assert.assertFalse(thriftTable.isSetHbase_table());
     Assert.assertTrue(thriftTable.isSetMetastore_table());
+  }
+
+  private TTable getThriftTable(Table table) {
+    TTable thriftTable = null;
+    table.getLock().lock();
+    try {
+      thriftTable = table.toThrift();
+    } finally {
+      table.getLock().unlock();
+    }
+    return thriftTable;
   }
 }

@@ -52,6 +52,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.JniUtil;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.Reference;
 import org.apache.impala.hive.executor.UdfExecutor;
 import org.apache.impala.thrift.TCatalog;
 import org.apache.impala.thrift.TCatalogObject;
@@ -925,13 +926,14 @@ public class CatalogServiceCatalog extends Catalog {
    * Reloads metadata for table 'tbl'. If 'tbl' is an IncompleteTable, it makes an
    * asynchronous request to the table loading manager to create a proper table instance
    * and load the metadata from Hive Metastore. Otherwise, it updates table metadata
-   * in-place by calling the load() function on the specified table. Returns 'tbl', if it
-   * is a fully loaded table (e.g. HdfsTable, HBaseTable, etc). Otherwise, returns a
-   * newly constructed fully loaded table. Applies proper synchronization to protect the
-   * metadata load from concurrent table modifications and assigns a new catalog version.
+   * in-place by calling the load() function on the specified table. Returns the
+   * TCatalogObject representing 'tbl', if it is a fully loaded table (e.g. HdfsTable,
+   * HBaseTable, etc). Otherwise, returns a newly constructed fully loaded TCatalogObject.
+   * Applies proper synchronization to protect the metadata load from concurrent table
+   * modifications and assigns a new catalog version.
    * Throws a CatalogException if there is an error loading table metadata.
    */
-  public Table reloadTable(Table tbl) throws CatalogException {
+  public TCatalogObject reloadTable(Table tbl) throws CatalogException {
     LOG.info(String.format("Refreshing table metadata: %s", tbl.getFullName()));
     TTableName tblName = new TTableName(tbl.getDb().getName().toLowerCase(),
         tbl.getName().toLowerCase());
@@ -951,7 +953,8 @@ public class CatalogServiceCatalog extends Catalog {
       try {
         // The table may have been dropped/modified while the load was in progress, so
         // only apply the update if the existing table hasn't changed.
-        return replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion);
+        Table result = replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion);
+        return result.toTCatalogObject();
       } finally {
         loadReq.close();
         LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));
@@ -978,7 +981,7 @@ public class CatalogServiceCatalog extends Catalog {
       }
       tbl.setCatalogVersion(newCatalogVersion);
       LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));
-      return tbl;
+      return tbl.toTCatalogObject();
     } finally {
       Preconditions.checkState(!catalogLock_.isWriteLockedByCurrentThread());
       tbl.getLock().unlock();
@@ -986,13 +989,12 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Reloads the metadata of a table with name 'tableName'. Returns the table or null if
-   * the table does not exist.
+   * Reloads the metadata of a table with name 'tableName'.
    */
-  public Table reloadTable(TTableName tableName) throws CatalogException {
+  public void reloadTable(TTableName tableName) throws CatalogException {
     Table table = getTable(tableName.getDb_name(), tableName.getTable_name());
-    if (table == null) return null;
-    return reloadTable(table);
+    if (table == null) return;
+    reloadTable(table);
   }
 
   /**
@@ -1047,27 +1049,25 @@ public class CatalogServiceCatalog extends Catalog {
    * Invalidates the table in the catalog cache, potentially adding/removing the table
    * from the cache based on whether it exists in the Hive Metastore.
    * The invalidation logic is:
-   * - If the table exists in the metastore, add it to the catalog as an uninitialized
+   * - If the table exists in the Metastore, add it to the catalog as an uninitialized
    *   IncompleteTable (replacing any existing entry). The table metadata will be
    *   loaded lazily, on the next access. If the parent database for this table does not
    *   yet exist in Impala's cache it will also be added.
-   * - If the table does not exist in the metastore, remove it from the catalog cache.
-   * - If we are unable to determine whether the table exists in the metastore (there was
+   * - If the table does not exist in the Metastore, remove it from the catalog cache.
+   * - If we are unable to determine whether the table exists in the Metastore (there was
    *   an exception thrown making the RPC), invalidate any existing Table by replacing
    *   it with an uninitialized IncompleteTable.
-   *
-   * The parameter updatedObjects is a Pair that contains details on what catalog objects
-   * were modified as a result of the invalidateTable() call. The first item in the Pair
-   * is a Db which will only be set if a new database was added as a result of this call,
-   * otherwise it will be null. The second item in the Pair is the Table that was
-   * modified/added/removed.
-   * Returns a flag that indicates whether the items in updatedObjects were removed
-   * (returns true) or added/modified (return false). Only Tables should ever be removed.
+   * Returns the thrift representation of the added/updated/removed table, or null if
+   * the table was not present in the catalog cache or the Metastore.
+   * Sets tblWasRemoved to true if the table was absent from the Metastore and it was
+   * removed from the catalog cache.
+   * Sets dbWasAdded to true if both a new database and table were added to the catalog
+   * cache.
    */
-  public boolean invalidateTable(TTableName tableName, Pair<Db, Table> updatedObjects) {
-    Preconditions.checkNotNull(updatedObjects);
-    updatedObjects.first = null;
-    updatedObjects.second = null;
+  public TCatalogObject invalidateTable(TTableName tableName,
+      Reference<Boolean> tblWasRemoved, Reference<Boolean> dbWasAdded) {
+    tblWasRemoved.setRef(false);
+    dbWasAdded.setRef(false);
     String dbName = tableName.getDb_name();
     String tblName = tableName.getTable_name();
     LOG.info(String.format("Invalidating table metadata: %s.%s", dbName, tblName));
@@ -1092,17 +1092,19 @@ public class CatalogServiceCatalog extends Catalog {
       }
 
       if (tableExistsInMetaStore != null && !tableExistsInMetaStore) {
-        updatedObjects.second = removeTable(dbName, tblName);
-        return true;
+        Table result = removeTable(dbName, tblName);
+        if (result == null) return null;
+        tblWasRemoved.setRef(true);
+        return result.toTCatalogObject();
       }
 
       db = getDb(dbName);
       if ((db == null || !db.containsTable(tblName)) && tableExistsInMetaStore == null) {
         // The table does not exist in our cache AND it is unknown whether the
-        // table exists in the metastore. Do nothing.
-        return false;
+        // table exists in the Metastore. Do nothing.
+        return null;
       } else if (db == null && tableExistsInMetaStore) {
-        // The table exists in the metastore, but our cache does not contain the parent
+        // The table exists in the Metastore, but our cache does not contain the parent
         // database. A new db will be added to the cache along with the new table. msDb
         // must be valid since tableExistsInMetaStore is true.
         try {
@@ -1111,11 +1113,11 @@ public class CatalogServiceCatalog extends Catalog {
           db = new Db(dbName, this, msDb);
           db.setCatalogVersion(incrementAndGetCatalogVersion());
           addDb(db);
-          updatedObjects.first = db;
+          dbWasAdded.setRef(true);
         } catch (TException e) {
-          // The metastore database cannot be get. Log the error and return.
+          // The Metastore database cannot be get. Log the error and return.
           LOG.error("Error executing getDatabase() metastore call: " + dbName, e);
-          return false;
+          return null;
         }
       }
     }
@@ -1130,8 +1132,12 @@ public class CatalogServiceCatalog extends Catalog {
       tableLoadingMgr_.backgroundLoad(new TTableName(dbName.toLowerCase(),
           tblName.toLowerCase()));
     }
-    updatedObjects.second = newTable;
-    return false;
+    if (dbWasAdded.getRef()) {
+      // The database should always have a lower catalog version than the table because
+      // it needs to be created before the table can be added.
+      Preconditions.checkState(db.getCatalogVersion() < newTable.getCatalogVersion());
+    }
+    return newTable.toTCatalogObject();
   }
 
   /**
@@ -1290,10 +1296,10 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Reloads metadata for the partition defined by the partition spec
-   * 'partitionSpec' in table 'tbl'. Returns the table object with partition
-   * metadata reloaded
+   * 'partitionSpec' in table 'tbl'. Returns the resulting table's TCatalogObject after
+   * the partition metadata was reloaded.
    */
-  public Table reloadPartition(Table tbl, List<TPartitionKeyValue> partitionSpec)
+  public TCatalogObject reloadPartition(Table tbl, List<TPartitionKeyValue> partitionSpec)
       throws CatalogException {
     if (!tryLockTable(tbl)) {
       throw new CatalogException(String.format("Error reloading partition of table %s " +
@@ -1324,7 +1330,7 @@ public class CatalogServiceCatalog extends Catalog {
             hdfsTable.dropPartition(partitionSpec);
             hdfsTable.setCatalogVersion(newCatalogVersion);
           }
-          return hdfsTable;
+          return hdfsTable.toTCatalogObject();
         } catch (Exception e) {
           throw new CatalogException("Error loading metadata for partition: "
               + hdfsTable.getFullName() + " " + partitionName, e);
@@ -1334,7 +1340,7 @@ public class CatalogServiceCatalog extends Catalog {
       hdfsTable.setCatalogVersion(newCatalogVersion);
       LOG.info(String.format("Refreshed partition metadata: %s %s",
           hdfsTable.getFullName(), partitionName));
-      return hdfsTable;
+      return hdfsTable.toTCatalogObject();
     } finally {
       Preconditions.checkState(!catalogLock_.isWriteLockedByCurrentThread());
       tbl.getLock().unlock();
