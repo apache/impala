@@ -120,10 +120,10 @@ if [[ $OSTYPE == "darwin"* ]]; then
 fi
 
 # Kudu version in the toolchain; provides libkudu_client.so and minicluster binaries.
-export IMPALA_KUDU_VERSION=cd7b0dd
+export IMPALA_KUDU_VERSION=2b0edbe
 
 # Kudu version used to identify Java client jar from maven
-export KUDU_JAVA_VERSION=1.2.0-SNAPSHOT
+export KUDU_JAVA_VERSION=1.3.0-SNAPSHOT
 
 # Versions of Hadoop ecosystem dependencies.
 # ------------------------------------------

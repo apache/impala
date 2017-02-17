@@ -204,7 +204,7 @@ class TestKuduOperations(KuduTestSuite):
     # Add some rows
     session = kudu_client.new_session()
     for i in range(100):
-      op = table.new_insert((i, None))
+      op = table.new_insert((i, "foo"))
       session.apply(op)
     session.flush()
 
