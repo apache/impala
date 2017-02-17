@@ -52,7 +52,7 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
-  <concept id="product_compatibility_matrix">
+  <concept id="product_compatibility_matrix" audience="hidden">
 
     <title>Product Compatibility Matrix</title>
 
@@ -130,13 +130,23 @@ under the License.
               the metastore database. For the process of installing and configuring the metastore, see
               <xref href="impala_install.xml#install"/>.
             </p>
-            <p>
+            <p audience="hidden">
               Always configure a <b>Hive metastore service</b> rather than connecting directly to the metastore
               database. The Hive metastore service is required to interoperate between possibly different levels of
               metastore APIs used by CDH and Impala, and avoids known issues with connecting directly to the
               metastore database. The Hive metastore service is set up for you by default if you install through
               Cloudera Manager 4.5 or higher.
             </p>
+            
+            <p>
+              Always configure a <b>Hive metastore service</b> rather than connecting directly to the metastore
+              database. The Hive metastore service is required to interoperate between different levels of
+              metastore APIs if this is necessary for your environment, and using it avoids known issues with 
+              connecting directly to the metastore database.
+            </p>
+            
+            
+            
             <p>
               A summary of the metastore installation process is as follows:
             </p>

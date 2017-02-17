@@ -34,12 +34,18 @@ under the License.
 
     <p id="p_24">
       This section describes the mandatory and recommended configuration settings for Impala. If Impala is
+      installed using cluster management software, some of these configurations might be completed automatically; you must still
+      configure short-circuit reads manually. If you want to customize your environment, consider making the changes described in this topic.
+    </p>
+    
+    <p id="p_twenty-four" audience="hidden">
+      This section describes the mandatory and recommended configuration settings for Impala. If Impala is
       installed using Cloudera Manager, some of these configurations are completed automatically; you must still
       configure short-circuit reads manually. If you installed Impala without Cloudera Manager, or if you want to
       customize your environment, consider making the changes described in this topic.
     </p>
 
-    <p>
+    <p audience="hidden">
 <!-- Could conref this paragraph from ciiu_install.xml. -->
       In some cases, depending on the level of Impala, CDH, and Cloudera Manager, you might need to add particular
       component configuration details in one of the free-form fields on the Impala configuration pages within
@@ -48,16 +54,21 @@ under the License.
 
     <ul>
       <li>
-        You must enable short-circuit reads, whether or not Impala was installed through Cloudera Manager. This
-        setting goes in the Impala configuration settings, not the Hadoop-wide settings.
+        You must enable short-circuit reads, whether or not Impala was installed with cluster
+        management software. This setting goes in the Impala configuration settings, not the Hadoop-wide settings.
       </li>
-
+      
       <li>
+        You must enable block location tracking, and you can optionally enable native checksumming for optimal performance.
+      </li>
+      
+
+      <li audience="hidden">
         If you installed Impala in an environment that is not managed by Cloudera Manager, you must enable block
         location tracking, and you can optionally enable native checksumming for optimal performance.
       </li>
 
-      <li>
+      <li audience="hidden">
         If you deployed Impala using Cloudera Manager see
         <xref href="impala_perf_testing.xml#performance_testing"/> to confirm proper configuration.
       </li>
@@ -76,9 +87,13 @@ under the License.
         client. <codeph>libhadoop.so</codeph> is not available if you have
         installed from a tarball. You must install from an
         <codeph>.rpm</codeph>, <codeph>.deb</codeph>, or parcel to use
-        short-circuit local reads. <note> If you use Cloudera Manager, you can
+        short-circuit local reads. 
+        
+        <note audience="hidden"> 
+          If you use Cloudera Manager, you can
           enable short-circuit reads through a checkbox in the user interface
-          and that setting takes effect for Impala as well. </note>
+          and that setting takes effect for Impala as well. 
+        </note>
       </p>
       <p>
         <b>To configure DataNodes for short-circuit reads:</b>
