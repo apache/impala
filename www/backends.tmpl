@@ -20,10 +20,28 @@ under the License.
 
 <h2>Known backend(s): {{%backends}}</h2>
 
-<ul class="list-group">
-{{#backends}}
-<li class="list-group-item">{{.}}</li>
-{{/backends}}
-</ul>
+<table id="backends" class='table table-hover table-bordered'>
+  <thead>
+    <tr>
+      <th>Backend</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#backends}}
+    <tr>
+      <td>{{.}}</td>
+    </tr>
+    {{/backends}}
+  </tbody>
+</table>
+
+<script>
+    $(document).ready(function() {
+        $('#backends').DataTable({
+            "order": [[ 0, "desc" ]],
+            "pageLength": 100
+        });
+    });
+</script>
 
 {{> www/common-footer.tmpl}}

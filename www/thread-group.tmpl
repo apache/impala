@@ -20,7 +20,7 @@ under the License.
 
 <h2>Thread Group: {{thread-group.category}}</h2>
 
-<table id="{{thread-group.category}}-tbl" class='table table-hover table-bordered'
+<table id="threads-tbl" class='table table-hover table-bordered'
        style='table-layout:fixed; word-wrap: break-word'>
   <thead>
     <tr>
@@ -44,7 +44,7 @@ under the License.
 
 <script>
     $(document).ready(function() {
-        $('#{{thread-group.category}}-tbl').DataTable({
+        $('#threads-tbl').DataTable({
             "order": [[ 1, "desc" ]],
             "pageLength": 100
         });
