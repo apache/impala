@@ -3674,7 +3674,7 @@ sudo pip-python install ssl</codeblock>
           </li>
           <li>
             <p>
-              On systems not managed by Cloudera Manager, put this environment variable setting into the
+              On systems not using cluster management software, put this environment variable setting into the
               startup script for the <cmdname>catalogd</cmdname> daemon, then restart the <cmdname>catalogd</cmdname>
               daemon.
             </p>

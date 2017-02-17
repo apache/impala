@@ -101,11 +101,8 @@ under the License.
 
     <conbody>
 
-      <p>
-        When you run Impala in a non-Cloudera Manager environment, the Impala server,
-        statestore, and catalog services start up using values provided in a defaults file,
-        <filepath>/etc/default/impala</filepath>.
-      </p>
+      <p> The Impala server, statestore, and catalog services start up using values provided in a
+        defaults file, <filepath>/etc/default/impala</filepath>. </p>
 
       <p>
         This file includes information about many resources used by Impala. Most of the defaults
@@ -234,10 +231,7 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
         </li>
 
         <li>
-          <p>
-            Core dump enablement. To enable core dumps on systems not managed by Cloudera
-            Manager, change:
-          </p>
+          <p> Core dump enablement. To enable core dumps, change: </p>
 <codeblock>export ENABLE_CORE_DUMPS=${ENABLE_COREDUMPS:-false}</codeblock>
           <p>
             to:
@@ -550,9 +544,7 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
         <codeph>http://<varname>impala_hostname</varname>:25010/varz</codeph> for the
         <cmdname>statestored</cmdname> daemon, or
         <codeph>http://<varname>impala_hostname</varname>:25020/varz</codeph> for the
-        <cmdname>catalogd</cmdname> daemon. In the Cloudera Manager interface, you can see the
-        link to the appropriate <uicontrol><varname>service_name</varname> Web UI</uicontrol>
-        page when you look at the status page for a specific daemon on a specific host.
+        <cmdname>catalogd</cmdname> daemon.
       </p>
 
     </conbody>

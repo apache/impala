@@ -264,10 +264,7 @@ $ sudo apt-get install hadoop-lzo-cdh4 # Optional; if this package is already in
 
     <conbody>
 
-      <p>
-        To upgrade Impala on a cluster not managed by Cloudera Manager, run these Linux commands on the appropriate
-        hosts in your cluster:
-      </p>
+      <p> To upgrade Impala, run these Linux commands on the appropriate hosts in your cluster: </p>
 
       <ol>
         <li>
