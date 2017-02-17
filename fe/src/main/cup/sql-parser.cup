@@ -273,6 +273,7 @@ terminal
 
 terminal COLON, SEMICOLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET,
   RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
+terminal UNARYSIGN; // Placeholder terminal for unary -/+
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, NOTEQUAL, LESSTHAN, GREATERTHAN;
 terminal FACTORIAL; // Placeholder terminal for postfix factorial operator
@@ -513,6 +514,7 @@ precedence left EQUAL, NOTEQUAL, LESSTHAN, GREATERTHAN, KW_FROM, KW_DISTINCT;
 precedence left ADD, SUBTRACT;
 precedence left STAR, DIVIDE, MOD, KW_DIV;
 precedence left BITAND, BITOR, BITXOR, BITNOT;
+precedence left UNARYSIGN;
 precedence left FACTORIAL;
 precedence left KW_ORDER, KW_BY, KW_LIMIT;
 precedence left LPAREN, RPAREN;
@@ -2608,8 +2610,10 @@ sign_chain_expr ::=
                                   new NumericLiteral(BigDecimal.valueOf(-1)), e);
     }
   :}
+  %prec UNARYSIGN
   | ADD expr:e
   {: RESULT = e; :}
+  %prec UNARYSIGN
   ;
 
 expr ::=

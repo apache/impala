@@ -1392,6 +1392,18 @@ DecimalTestCase decimal_cases[] = {
   { "cast(111111.1111 as decimal(20, 10)) / cast(.7777 as decimal(38, 38))",
     {{ true,             0, 38, 38 },
      { false, 142871429985, 38,  6 }}},
+  { "2.0 / 3.0",
+    {{ false,   6666, 6, 4},
+     { false, 666666, 8, 6}}},
+  { "-2.0 / 3.0",
+    {{ false,   -6666, 6, 4},
+     { false, -666666, 8, 6}}},
+  { "2.0 / -3.0",
+    {{ false,   -6666, 6, 4},
+     { false, -666666, 8, 6}}},
+  { "-2.0 / -3.0",
+    {{ false,   6666, 6, 4},
+     { false, 666666, 8, 6}}},
   // Test modulo operator
   { "cast(1.23 as decimal(8,2)) % cast(1 as decimal(10,3))", {{ false, 230, 9, 3 }}},
   { "cast(1 as decimal(38,0)) % cast(.2 as decimal(38,1))", {{ false, 0, 38, 1 }}},
@@ -4028,12 +4040,17 @@ TEST_F(ExprTest, UnaryOperators) {
   TestValue("- -1", TYPE_TINYINT, 1);
   TestValue("+-1", TYPE_TINYINT, -1);
   TestValue("++1", TYPE_TINYINT, 1);
+  TestValue("~1", TYPE_TINYINT, -2);
 
   TestValue("+cast(1. as float)", TYPE_FLOAT, 1.0f);
   TestValue("+cast(1.0 as float)", TYPE_FLOAT, 1.0f);
   TestValue("-cast(1.0 as float)", TYPE_DOUBLE, -1.0);
 
   TestValue("1 - - - 1", TYPE_SMALLINT, 0);
+
+  // IMPALA-4877: Verify that unary minus has high precedence and is integrated into
+  // literals.
+  TestValue("-1 & 8", TYPE_TINYINT, 8);
 }
 
 // TODO: I think a lot of these casts are not necessary and we should fix this
