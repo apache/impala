@@ -87,7 +87,7 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
       the temporary data for the spill-to-disk feature, that configuration is
       not recommended due to the need to transfer the data both ways using remote I/O.
     </p>
-
+    
     <p>
       When tuning Impala queries on HDFS, you typically try to avoid any remote reads.
       When the data resides on Isilon storage, all the I/O consists of remote reads.
@@ -96,10 +96,8 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
       primarily convenience of not having to move or copy large volumes of data to HDFS,
       rather than raw query performance. You can increase the performance of Impala
       I/O for Isilon systems by increasing the value for the
-      <codeph>num_remote_hdfs_io_threads</codeph> configuration parameter,
-      in the Cloudera Manager user interface for clusters using Cloudera Manager,
-      or through the <codeph>--num_remote_hdfs_io_threads</codeph> startup option
-      for the <cmdname>impalad</cmdname> daemon on clusters not using Cloudera Manager.
+      <codeph>--num_remote_hdfs_io_threads</codeph> startup option for the
+      <cmdname>impalad</cmdname> daemon.
     </p>
 
     <!-- <p outputclass="toc inpage"/> -->

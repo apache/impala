@@ -185,8 +185,7 @@ under the License.
     <conbody>
 
       <p>
-        If you are using Impala in an environment not managed by Cloudera Manager, review Impala log files on each
-        host, when you have traced an issue back to a specific system.
+        Review Impala log files on each host, when you have traced an issue back to a specific system.
       </p>
 
     </conbody>
@@ -359,13 +358,14 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
     <title>Setting Logging Levels</title>
 
     <conbody>
-
+      
       <p>
-        Impala uses the GLOG system, which supports three logging levels. You can adjust the logging levels using
-        the Cloudera Manager Admin Console. You can adjust logging levels without going through the Cloudera
-        Manager Admin Console by exporting variable settings. To change logging settings manually, use a command
+        Impala uses the GLOG system, which supports three logging levels. You can adjust logging levels
+        by exporting variable settings. To change logging settings manually, use a command
         similar to the following on each node before starting <codeph>impalad</codeph>:
       </p>
+      
+    
 
 <codeblock>export GLOG_v=1</codeblock>
 
@@ -438,13 +438,12 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
       <p>
         <indexterm audience="hidden">redaction</indexterm>
         <term>Log redaction</term> is a security feature that prevents sensitive information from being displayed in
-        locations used by administrators for monitoring and troubleshooting, such as log files, the Cloudera Manager
-        user interface, and the Impala debug web user interface. You configure regular expressions that match
-        sensitive types of information processed by your system, such as credit card numbers or tax IDs, and literals
-        matching these patterns are obfuscated wherever they would normally be recorded in log files or displayed in
-        administration or debugging user interfaces.
+        locations used by administrators for monitoring and troubleshooting, such as log files and the Impala debug web
+        user interface. You configure regular expressions that match sensitive types of information processed by your
+        system, such as credit card numbers or tax IDs, and literals matching these patterns are obfuscated wherever
+        they would normally be recorded in log files or displayed in administration or debugging user interfaces.
       </p>
-
+      
       <p>
         In a security context, the log redaction feature is complementary to the Sentry authorization framework.
         Sentry prevents unauthorized users from being able to directly access table data. Redaction prevents

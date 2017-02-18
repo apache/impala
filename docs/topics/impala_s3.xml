@@ -148,6 +148,13 @@ under the License.
 </codeblock>
 
       <p>
+        After specifying the credentials, restart both the Impala and
+        Hive services. (Restarting Hive is required because Impala queries, CREATE TABLE statements, and so on go
+        through the Hive metastore.)
+      </p>
+      
+         
+      <p audience="hidden">
         As of CDH 5.8, these settings do not have corresponding controls in the Cloudera Manager user interface.
         Specify them in the <uicontrol>HDFS Client Advanced Configuration Snippet (Safety Valve) for
         core-site.xml</uicontrol> field. After specifying the credentials, restart both the Impala and Hive
