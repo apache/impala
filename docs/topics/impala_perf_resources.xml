@@ -64,8 +64,15 @@ under the License.
           hold cached metadata.
         </p>
       </li>
-
+      
       <li>
+        <p>
+          For production deployments, implement resource isolation using your cluster management
+          tool.
+        </p>
+      </li>
+
+      <li audience="hidden">
         <p>
           For production deployment, <ph rev="upstream">Cloudera</ph> recommends that you implement resource isolation using mechanisms
           such as cgroups, which you can configure using Cloudera Manager. For details, see the

@@ -294,7 +294,7 @@ Memory Usage: Additional Notes
         </dlentry>
       </dl>
 
-      <p>
+      <p audience="hidden">
         As of CDH 5.3, not all of these flags are present in the Cloudera Manager user interface. Some must be set
         using the <uicontrol>Advanced Configuration Snippet</uicontrol> fields for the statestore component.
       </p>
@@ -795,7 +795,15 @@ While these authentication requests are being processed, any submitted Impala qu
 During this period, the KDC and DNS may be slow to respond to requests from components other than Impala,
 so other secure services might be affected temporarily.
 </p>
+  
 <p>
+  To reduce the frequency  of the <codeph>kinit</codeph> renewal that initiates
+  a new set of authentication requests, increase the <codeph>kerberos_reinit_interval</codeph> 
+  configuration setting for the <cmdname>impalad</cmdname> daemons. Currently, the default is 60 minutes. 
+  Consider using a higher value such as 360 (6 hours). 
+</p>  
+  
+<p audience="hidden">
 To reduce the frequency of the <codeph>kinit</codeph> renewal that initiates a new set of
 authentication requests, increase the <codeph>kerberos_reinit_interval</codeph> configuration setting
 for the <cmdname>impalad</cmdname> daemons. Currently, the default for a cluster not managed by

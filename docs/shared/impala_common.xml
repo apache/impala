@@ -574,6 +574,14 @@ under the License.
             in the <cmdname>impalad</cmdname> and <cmdname>catalogd</cmdname> configuration settings.
           </p>
         </li>
+        <li audience="hidden">
+          <p>
+            For clusters managed by Cloudera Manager, select the 
+            <uicontrol>Use HDFS Rules to Map Kerberos Principals to Short Names</uicontrol>
+            checkbox to enable the service-wide <codeph>load_auth_to_local_rules</codeph> configuration setting.
+            Then restart the Impala service.
+          </p>
+        </li>
       </ul>
     </p>
 
@@ -1455,15 +1463,14 @@ explain select s from yy2 where year in (select year from yy where year between 
         operation finishes. (Multiple concurrent queries can perform operations that use the <q>spill to disk</q>
         technique, without any name conflicts for these temporary files.) You can specify a different location by
         starting the <cmdname>impalad</cmdname> daemon with the
-        <codeph>--scratch_dirs="<varname>path_to_directory</varname>"</codeph> configuration option or the
-        equivalent configuration option in the Cloudera Manager user interface. You can specify a single directory,
-        or a comma-separated list of directories. The scratch directories must be on the local filesystem, not in
-        HDFS. You might specify different directory paths for different hosts, depending on the capacity and speed
-        of the available storage devices. In CDH 5.5 / Impala 2.3 or higher, Impala successfully starts (with a warning
-        written to the log) if it cannot create or read and write files in one of the scratch directories.
-        If there is less than 1 GB free on the filesystem where that directory resides, Impala still runs, but writes a
-        warning message to its log.  If Impala encounters an error reading or writing files in a scratch directory during
-        a query, Impala logs the error and the query fails.
+        <codeph>--scratch_dirs="<varname>path_to_directory</varname>"</codeph> configuration option. 
+        You can specify a single directory, or a comma-separated list of directories. The scratch directories must 
+        be on the local filesystem, not in HDFS. You might specify different directory paths for different hosts, 
+        depending on the capacity and speed of the available storage devices. In CDH 5.5 / Impala 2.3 or higher, 
+        Impala successfully starts (with a warning written to the log) if it cannot create or read and write files 
+        in one of the scratch directories. If there is less than 1 GB free on the filesystem where that directory resides, 
+        Impala still runs, but writes a warning message to its log.  If Impala encounters an error reading or writing 
+        files in a scratch directory during a query, Impala logs the error and the query fails.
       </p>
 
       <p id="order_by_view_restriction">
@@ -3114,7 +3121,7 @@ select * from header_line limit 10;
             Other security settings may prevent Impala from writing core dumps even when this option is enabled.
           </p>
         </li>
-        <li rev="CDH-34070" audience="Cloudera">
+        <li rev="CDH-34070" audience="hidden">
           <p>
             On systems managed by Cloudera Manager, the default location for core dumps is on a temporary
             filesystem, which can lead to out-of-space issues if the core dumps are large, frequent, or
@@ -3177,7 +3184,7 @@ sudo pip-python install ssl</codeblock>
         <codeph>SYNC_DDL</codeph> query option.
       </note>
 
-      <p rev="1.2" id="cm48_upgrade" audience="Cloudera"><!-- conref'ed in 2 places under 'incompatible changes' -->
+      <p rev="1.2" id="cm48_upgrade" audience="hidden"><!-- conref'ed in 2 places under 'incompatible changes' -->
         In a Cloudera Manager environment, the catalog service is not recognized or managed by Cloudera Manager
         versions prior to 4.8. Cloudera Manager 4.8 and higher require the catalog service to be present for
         Impala. Therefore, if you upgrade to Cloudera Manager 4.8 or higher, you must also upgrade Impala to 1.2.1
@@ -3644,7 +3651,7 @@ sudo pip-python install ssl</codeblock>
   JAVA_TOOL_OPTIONS="-Xmx8g"
   </codeblock>
           </li>
-          <li audience="Cloudera">
+          <li audience="hidden">
             <p rev="OPSAPS-26483">
               On systems managed by Cloudera Manager, include this value in the configuration field
               <uicontrol>Java Heap Size of Catalog Server in Bytes</uicontrol> (Cloudera Manager 5.7 and higher), or
