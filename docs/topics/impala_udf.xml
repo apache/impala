@@ -437,8 +437,16 @@ and other examples demonstrating this technique in
           (RHEL-based distributions) or <codeph>impala-udf-dev</codeph> (Ubuntu and Debian).
         </li>
       </ol>
-
+      
+      
       <note>
+        
+        The UDF development code does not rely on Impala being installed on the same machine. You can write and
+        compile UDFs on a minimal development system, then deploy them on a different one for use with Impala.
+        
+      </note>
+
+      <note audience="hidden">
         The UDF development code does not rely on Impala being installed on the same machine. You can write and
         compile UDFs on a minimal development system, then deploy them on a different one for use with Impala. If
         you develop UDFs on a server managed by Cloudera Manager through the parcel mechanism, you still install

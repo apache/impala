@@ -55,7 +55,15 @@ under the License.
 
     <conbody>
 
-      <ul>
+      <p>
+        Limits on memory usage are enforced by Impala's process memory limit (the <codeph>MEM_LIMIT</codeph>
+        query option setting). The admission control feature checks this setting to decide how many queries
+        can be safely run at the same time. Then the Impala daemon enforces the limit by activating the
+        spill-to-disk mechanism when necessary, or cancelling a query altogether if the limit is exceeded at runtime.
+      </p>
+      
+      
+      <ul audience="hidden">
         <li>
           If Cloudera Manager Static Partitioning is used, it creates a cgroup in which Impala runs.
           This cgroup limits CPU, network, and IO according to the static partitioning policy.
