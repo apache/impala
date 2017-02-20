@@ -56,6 +56,63 @@ TEST(ReadWriteUtil, BigEndian) {
   TestBigEndian<uint64_t>(0xffffffffffffff);
 }
 
+TEST(ReadWriteUtil, ZeroCompressedLongRequiredBytes) {
+  // Small longs stored in 1 byte
+  for (int64_t val = -112; val <= 127; val++) {
+    EXPECT_EQ(1, ReadWriteUtil::VLongRequiredBytes(val));
+  }
+  // Small longs stored in 2 bytes
+  for (int64_t val = -128; val < -112; val++) {
+    EXPECT_EQ(2, ReadWriteUtil::VLongRequiredBytes(val));
+  }
+  // Positive longs stored in 3-9 bytes
+  int64_t val = 0x7000ab00cd00ef00;
+  for (int sh = 0; sh <= 6; sh++) {
+    EXPECT_EQ(9 - sh, ReadWriteUtil::VLongRequiredBytes(val));
+    val = val >> 8;
+  }
+  // Negative longs stored 3-9 bytes
+  val = 0x8000ab00cd00ef00;
+  for (int sh = 0; sh <= 6; sh++) {
+    EXPECT_EQ(9 - sh, ReadWriteUtil::VLongRequiredBytes(val));
+    val = val >> 8;
+  }
+  //Max/min long is stored in 9 bytes
+  EXPECT_EQ(9, ReadWriteUtil::VLongRequiredBytes(0x7fffffffffffffff));
+  EXPECT_EQ(9, ReadWriteUtil::VLongRequiredBytes(0x8000000000000000));
+}
+
+void TestPutGetZeroCompressedLong(int64_t val) {
+  uint8_t buffer[9];
+  int64_t read_val;
+  int64_t num_bytes = ReadWriteUtil::PutVLong(val, buffer);
+  int64_t read_bytes = ReadWriteUtil::GetVLong(buffer, &read_val);
+  EXPECT_EQ(read_bytes, num_bytes);
+  EXPECT_EQ(read_val, val);
+}
+
+TEST(ReadWriteUtil, ZeroCompressedLong) {
+  //1 byte longs
+  for (int64_t val = -128; val <= 127; val++) {
+    TestPutGetZeroCompressedLong(val);
+  }
+  //2+ byte positive longs
+  int64_t val = 0x70100000200000ab;
+  for (int sh = 0; sh <= 6; sh++) {
+    TestPutGetZeroCompressedLong(val);
+    val = val >> 8;
+  }
+  //2+ byte negative longs
+  val = 0x80100000200000ab;
+  for (int sh = 0; sh <= 6; sh++) {
+    TestPutGetZeroCompressedLong(val);
+    val = val >> 8;
+  }
+  //Max/min long
+  TestPutGetZeroCompressedLong(0x7fffffffffffffff);
+  TestPutGetZeroCompressedLong(0x8000000000000000);
+}
+
 }
 
 IMPALA_TEST_MAIN();

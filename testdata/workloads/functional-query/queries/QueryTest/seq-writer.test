@@ -1,8 +1,5 @@
 ====
 ---- QUERY
-drop table if exists __seq_write;
-====
----- QUERY
 SET COMPRESSION_CODEC=NONE;
 SET ALLOW_UNSUPPORTED_FORMATS=1;
 SET SEQ_COMPRESSION_MODE=BLOCK;
@@ -92,5 +89,192 @@ select * from __seq_write;
 INT,STRING,DOUBLE
 ====
 ---- QUERY
-drop table __seq_write;
+# IMPALA-3079: Create a table containing larger seq files with NONE+RECORD and then read
+# it back
+SET COMPRESSION_CODEC=NONE;
+SET SEQ_COMPRESSION_MODE=RECORD;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table store_sales_seq_none_rec like tpcds_parquet.store_sales
+stored as SEQUENCEFILE;
+insert into store_sales_seq_none_rec partition(ss_sold_date_sk)
+select * from tpcds_parquet.store_sales
+where ss_sold_date_sk between 2450816 and 2451200;
+====
+---- QUERY
+select count(*) from store_sales_seq_none_rec;
+---- RESULTS
+37999
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-3079: Create a table containing larger seq files with DEFAULT+RECORD and then
+# read it back
+SET COMPRESSION_CODEC=DEFAULT;
+SET SEQ_COMPRESSION_MODE=RECORD;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table store_sales_seq_def_rec like tpcds_parquet.store_sales
+stored as SEQUENCEFILE;
+insert into store_sales_seq_def_rec partition(ss_sold_date_sk)
+select * from tpcds_parquet.store_sales
+where ss_sold_date_sk between 2450816 and 2451200;
+====
+---- QUERY
+select count(*) from store_sales_seq_def_rec;
+---- RESULTS
+37999
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-3079: Create a table containing larger seq files with SNAPPY_BLOCKED+RECORD and
+# then read it back
+SET COMPRESSION_CODEC=SNAPPY_BLOCKED;
+SET SEQ_COMPRESSION_MODE=RECORD;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table store_sales_seq_snapb_rec like tpcds_parquet.store_sales
+stored as SEQUENCEFILE;
+insert into store_sales_seq_snapb_rec partition(ss_sold_date_sk)
+select * from tpcds_parquet.store_sales
+where ss_sold_date_sk between 2450816 and 2451200;
+====
+---- QUERY
+select count(*) from store_sales_seq_snapb_rec;
+---- RESULTS
+37999
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-3079: Create a table containing larger seq files with SNAPPY+RECORD and then read
+# it back
+SET COMPRESSION_CODEC=SNAPPY;
+SET SEQ_COMPRESSION_MODE=RECORD;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table store_sales_seq_snap_rec like tpcds_parquet.store_sales
+stored as SEQUENCEFILE;
+insert into store_sales_seq_snap_rec partition(ss_sold_date_sk)
+select * from tpcds_parquet.store_sales
+where ss_sold_date_sk between 2450816 and 2451200;
+====
+---- QUERY
+select count(*) from store_sales_seq_snap_rec;
+---- RESULTS
+37999
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-3079: Create a table containing larger seq files with GZIP+RECORD and then read
+# it back
+SET COMPRESSION_CODEC=GZIP;
+SET SEQ_COMPRESSION_MODE=RECORD;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table store_sales_seq_gzip_rec like tpcds_parquet.store_sales
+stored as SEQUENCEFILE;
+insert into store_sales_seq_gzip_rec partition(ss_sold_date_sk)
+select * from tpcds_parquet.store_sales
+where ss_sold_date_sk between 2450816 and 2451200;
+====
+---- QUERY
+select count(*) from store_sales_seq_gzip_rec;
+---- RESULTS
+37999
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-3079: Create a table containing larger seq files with NONE+BLOCK and then read it
+# back
+SET COMPRESSION_CODEC=NONE;
+SET SEQ_COMPRESSION_MODE=BLOCK;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table store_sales_seq_none_block like tpcds_parquet.store_sales
+stored as SEQUENCEFILE;
+insert into store_sales_seq_none_block partition(ss_sold_date_sk)
+select * from tpcds_parquet.store_sales
+where ss_sold_date_sk between 2450816 and 2451200;
+====
+---- QUERY
+select count(*) from store_sales_seq_none_block;
+---- RESULTS
+37999
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-3079: Create a table containing larger seq files with DEFAULT+BLOCK and then read
+# it back
+SET COMPRESSION_CODEC=DEFAULT;
+SET SEQ_COMPRESSION_MODE=BLOCK;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table store_sales_seq_def_block like tpcds_parquet.store_sales
+stored as SEQUENCEFILE;
+insert into store_sales_seq_def_block partition(ss_sold_date_sk)
+select * from tpcds_parquet.store_sales
+where ss_sold_date_sk between 2450816 and 2451200;
+====
+---- QUERY
+select count(*) from store_sales_seq_def_block;
+---- RESULTS
+37999
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-3079: Create a table containing larger seq files with SNAPPY_BLOCKED+BLOCK and
+# then read it back
+SET COMPRESSION_CODEC=SNAPPY_BLOCKED;
+SET SEQ_COMPRESSION_MODE=BLOCK;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table store_sales_seq_snapb_block like tpcds_parquet.store_sales
+stored as SEQUENCEFILE;
+insert into store_sales_seq_snapb_block partition(ss_sold_date_sk)
+select * from tpcds_parquet.store_sales
+where ss_sold_date_sk between 2450816 and 2451200;
+====
+---- QUERY
+select count(*) from store_sales_seq_snapb_block;
+---- RESULTS
+37999
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-3079: Create a table containing larger seq files with SNAPPY+BLOCK and then read
+# it back
+SET COMPRESSION_CODEC=SNAPPY;
+SET SEQ_COMPRESSION_MODE=BLOCK;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table store_sales_seq_snap_block like tpcds_parquet.store_sales
+stored as SEQUENCEFILE;
+insert into store_sales_seq_snap_block partition(ss_sold_date_sk)
+select * from tpcds_parquet.store_sales
+where ss_sold_date_sk between 2450816 and 2451200;
+====
+---- QUERY
+select count(*) from store_sales_seq_snap_block;
+---- RESULTS
+37999
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-3079: Create a table containing larger seq files with GZIP+BLOCK and then read it
+# back
+SET COMPRESSION_CODEC=GZIP;
+SET SEQ_COMPRESSION_MODE=BLOCK;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table store_sales_seq_gzip_block like tpcds_parquet.store_sales
+stored as SEQUENCEFILE;
+insert into store_sales_seq_gzip_block partition(ss_sold_date_sk)
+select * from tpcds_parquet.store_sales
+where ss_sold_date_sk between 2450816 and 2451200;
+====
+---- QUERY
+select count(*) from store_sales_seq_gzip_block;
+---- RESULTS
+37999
+---- TYPES
+BIGINT
 ====

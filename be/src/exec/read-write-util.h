@@ -60,11 +60,11 @@ class ReadWriteUtil {
   static int GetVInt(uint8_t* buf, int32_t* vint);
 
   /// Writes a variable-length Long or int value to a byte buffer.
-  /// Returns the number of bytes written
+  /// Returns the number of bytes written.
   static int64_t PutVLong(int64_t val, uint8_t* buf);
   static int64_t PutVInt(int32_t val, uint8_t* buf);
 
-  /// returns size of the encoded long value, not including the 1 byte for length
+  /// Returns size of the encoded long value, including the 1 byte for length.
   static int VLongRequiredBytes(int64_t val);
 
   /// Read a variable-length Long value from a byte buffer starting at the specified
@@ -211,41 +211,63 @@ inline int ReadWriteUtil::GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong)
   return len;
 }
 
+// Returns size of the encoded long value, including the 1 byte for length for val < -112
+// or val > 127.
 inline int ReadWriteUtil::VLongRequiredBytes(int64_t val) {
-  // returns size of the encoded long value, not including the 1 byte for length
-  if (val & 0xFF00000000000000llu) return 8;
-  if (val & 0x00FF000000000000llu) return 7;
-  if (val & 0x0000FF0000000000llu) return 6;
-  if (val & 0x000000FF00000000llu) return 5;
-  if (val & 0x00000000FF000000llu) return 4;
-  if (val & 0x0000000000FF0000llu) return 3;
-  if (val & 0x000000000000FF00llu) return 2;
-  // Values between -112 and 127 are stored using 1 byte,
-  // values between -127 and -112 are stored using 2 bytes
-  // See ReadWriteUtil::DecodeVIntSize for this case
-  if (val < -112) return 2;
-  return 1;
+  if (val >= -112 && val <= 127) return 1;
+  // If 'val' is negtive, take the one's complement.
+  if (val < 0) val = ~val;
+  return 9 - __builtin_clzll(val)/8;
 }
 
+// Serializes 'val' to a binary stream with zero-compressed encoding. For -112<=val<=127,
+// only one byte is used with the actual value. For other values of 'val', the first byte
+// value indicates whether the long is positive or negative, and the number of bytes that
+// follow. If the first byte value v is between -113 and -120, the following long is
+// positive, with number of bytes that follow are -(v+112). If the first byte value v is
+// between -121 and -128, the following long is negative, with number of bytes that follow
+// are -(v+120). Bytes are stored in the high-non-zero-byte-first order. Returns the
+// number of bytes written.
+// For more information, see the documentation for 'WritableUtils.writeVLong()' method:
+// https://hadoop.apache.org/docs/r2.7.2/api/org/apache/hadoop/io/WritableUtils.html
 inline int64_t ReadWriteUtil::PutVLong(int64_t val, uint8_t* buf) {
   int64_t num_bytes = VLongRequiredBytes(val);
 
   if (num_bytes == 1) {
+    DCHECK(val >= -112 && val <= 127);
     // store the value itself instead of the length
     buf[0] = static_cast<int8_t>(val);
     return 1;
   }
 
   // This is how we encode the length for a length less than or equal to 8
-  buf[0] = -119 + num_bytes;
-
-  // write to buffer in reversed endianness
-  for (int i = 0; i < num_bytes; ++i) {
-    buf[i+1] = (val >> (8 * (num_bytes - i - 1))) & 0xFF;
+  DCHECK_GE(num_bytes, 2);
+  DCHECK_LE(num_bytes, 9);
+  if (val < 0) {
+    DCHECK_LT(val, -112);
+    // The first byte in 'buf' should contain a value between -121 and -128 that makes the
+    // following condition true: -(buf[0] + 120) == num_bytes - 1.
+    // Note that 'num_bytes' includes the 1 extra byte for length.
+    buf[0] = -(num_bytes + 119);
+    // If 'val' is negtive, take the one's complement.
+    // See the source code for WritableUtils.writeVLong() method:
+    // https://hadoop.apache.org/docs/r2.7.2/api/src-html/org/apache/hadoop/io/
+    // WritableUtils.html#line.271
+    val = ~val;
+  } else {
+    DCHECK_GT(val, 127);
+    // The first byte in 'buf' should contain a value between -113 and -120 that makes the
+    // following condition true: -(buf[0] + 112) == num_bytes - 1.
+    // Note that 'num_bytes' includes the 1 extra byte for length.
+    buf[0] = -(num_bytes + 111);
   }
 
-  // +1 for the length byte
-  return num_bytes + 1;
+  // write to the buffer in Big Endianness
+  for (int i = 1; i < num_bytes; ++i) {
+    buf[i] = (val >> (8 * (num_bytes - i - 1))) & 0xFF;
+  }
+
+  return num_bytes;
 }
 
 inline int64_t ReadWriteUtil::PutVInt(int32_t val, uint8_t* buf) {

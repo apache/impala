@@ -73,8 +73,15 @@ class DecompressorTest : public ::testing::Test {
       DecompressInsufficientOutputBuffer(compressor.get(), decompressor.get(),
           sizeof(input_), input_);
     } else {
-      CompressAndDecompress(compressor.get(), decompressor.get(), sizeof(input_),
+      CompressAndDecompress(compressor.get(), decompressor.get(), sizeof(input_), input_);
+      // Test with odd-length input (to test the calculation of block-sizes in
+      // SnappyBlockCompressor)
+      CompressAndDecompress(compressor.get(), decompressor.get(), sizeof(input_) - 1,
           input_);
+      // Test with input length of 1024 (to test SnappyBlockCompressor with a single
+      // block)
+      CompressAndDecompress(compressor.get(), decompressor.get(), 1024, input_);
+      // Test with empty input
       if (format != THdfsCompression::BZIP2) {
         CompressAndDecompress(compressor.get(), decompressor.get(), 0, NULL);
       } else {

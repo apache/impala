@@ -204,13 +204,27 @@ Status SnappyBlockCompressor::ProcessBlock(bool output_preallocated,
     int64_t input_length, const uint8_t* input, int64_t *output_length,
     uint8_t** output) {
   DCHECK_GE(input_length, 0);
-  // Hadoop uses a block compression scheme on top of snappy.  First there is
-  // an integer which is the size of the decompressed data followed by a
-  // sequence of compressed blocks each preceded with an integer size.
-  // For testing purposes we are going to generate two blocks.
-  int64_t block_size = input_length / 2;
-  size_t length = snappy::MaxCompressedLength(block_size) * 2;
-  length += 3 * sizeof (int32_t);
+  // Hadoop uses a block compression scheme on top of snappy. The layout is as follows:
+  // - size of the entire decompressed data (4 bytes)
+  // - size of the 1st compressed block (4 bytes)
+  // - 1st compressed block
+  // - size of the 2nd compressed block (4 bytes)
+  // - 2nd compressed block
+  // ...
+  // For testing purposes we are going to generate two blocks if input_length >= 4K.
+  vector<int64_t> block_sizes;
+  size_t length;
+  if (input_length == 0) {
+    length = sizeof (int32_t);
+  } else if (input_length < 4 * 1024) {
+    block_sizes.push_back(input_length);
+    length = snappy::MaxCompressedLength(block_sizes[0]) + 2 * sizeof (int32_t);
+  } else {
+    block_sizes.push_back(input_length / 2);
+    block_sizes.push_back(input_length - block_sizes[0]);
+    length = snappy::MaxCompressedLength(block_sizes[0]) +
+        snappy::MaxCompressedLength(block_sizes[1]) + 3 * sizeof (int32_t);
+  }
   DCHECK(!output_preallocated || length <= *output_length);
 
   if (output_preallocated) {
@@ -222,13 +236,12 @@ Status SnappyBlockCompressor::ProcessBlock(bool output_preallocated,
   }
 
   uint8_t* outp = out_buffer_;
-  uint8_t* sizep;
   ReadWriteUtil::PutInt(outp, static_cast<uint32_t>(input_length));
   outp += sizeof (int32_t);
-  while (input_length > 0) {
+  for (int64_t block_size: block_sizes) {
     // TODO: should this be a while or a do-while loop? Check what Hadoop does.
     // Point at the spot to store the compressed size.
-    sizep = outp;
+    uint8_t* sizep = outp;
     outp += sizeof (int32_t);
     size_t size;
     snappy::RawCompress(reinterpret_cast<const char*>(input),
@@ -236,8 +249,8 @@ Status SnappyBlockCompressor::ProcessBlock(bool output_preallocated,
 
     ReadWriteUtil::PutInt(sizep, static_cast<uint32_t>(size));
     input += block_size;
-    input_length -= block_size;
     outp += size;
+    DCHECK_LE(outp - out_buffer_, length);
   }
 
   *output = out_buffer_;

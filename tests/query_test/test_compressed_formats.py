@@ -144,18 +144,43 @@ class TestTableWriters(ImpalaTestSuite):
         (v.get_value('table_format').file_format =='text' and
         v.get_value('table_format').compression_codec == 'none'))
 
-  def test_seq_writer(self, vector):
-    # TODO debug this test, same as seq writer.
-    # This caused by a zlib failure. Suspected cause is too small a buffer
-    # passed to zlib for compression; similar to IMPALA-424
-    pytest.skip()
-    self.run_test_case('QueryTest/seq-writer', vector)
+  def test_seq_writer(self, vector, unique_database):
+    self.run_test_case('QueryTest/seq-writer', vector, unique_database)
+
+  def test_seq_writer_hive_compatibility(self, vector, unique_database):
+    self.client.execute('set ALLOW_UNSUPPORTED_FORMATS=1')
+    # Write sequence files with different compression codec/compression mode and then read
+    # it back in Impala and Hive.
+    # Note that we don't test snappy here as the snappy codec used by Impala does not seem
+    # to be fully compatible with the snappy codec used by Hive.
+    for comp_codec, comp_mode in [('NONE', 'RECORD'), ('NONE', 'BLOCK'),
+                                  ('DEFAULT', 'RECORD'), ('DEFAULT', 'BLOCK'),
+                                  ('GZIP', 'RECORD'), ('GZIP', 'BLOCK')]:
+      table_name = '%s.seq_tbl_%s_%s' % (unique_database, comp_codec, comp_mode)
+      self.client.execute('set COMPRESSION_CODEC=%s' % comp_codec)
+      self.client.execute('set SEQ_COMPRESSION_MODE=%s' % comp_mode)
+      self.client.execute('create table %s like functional.zipcode_incomes stored as '
+          'sequencefile' % table_name)
+      # Write sequence file of size greater than 4K
+      self.client.execute('insert into %s select * from functional.zipcode_incomes where '
+          'zip >= "5"' % table_name)
+      # Write sequence file of size less than 4K
+      self.client.execute('insert into %s select * from functional.zipcode_incomes where '
+          'zip="00601"' % table_name)
+      # Read it back in Impala
+      output = self.client.execute('select count(*) from %s' % table_name)
+      assert '16541' == output.get_data()
+      # Read it back in Hive
+      output = self.run_stmt_in_hive('select count(*) from %s' % table_name)
+      assert '16541' == output.split('\n')[1]
 
   def test_avro_writer(self, vector):
     self.run_test_case('QueryTest/avro-writer', vector)
 
   def test_text_writer(self, vector):
-    # TODO debug this test, same as seq writer.
+    # TODO debug this test.
+    # This caused by a zlib failure. Suspected cause is too small a buffer
+    # passed to zlib for compression; similar to IMPALA-424
     pytest.skip()
     self.run_test_case('QueryTest/text-writer', vector)
 

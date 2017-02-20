@@ -36,6 +36,66 @@ class RuntimeState;
 struct StringValue;
 struct OutputPartition;
 
+/// Sequence files are flat files consisting of binary key/value pairs. Essentially there
+/// are 3 different formats for sequence files depending on the 'compression_codec' and
+/// 'seq_compression_mode' query options:
+/// - Uncompressed sequence file format
+/// - Record-compressed sequence file format
+/// - Block-compressed sequence file format
+/// All of them share a common header described below.
+///
+/// Sequence File Header
+/// --------------------
+/// - version - 3 bytes of magic header SEQ, followed by 1 byte of actual version number
+///   (e.g. SEQ4 or SEQ6)
+/// - keyClassName - key class
+/// - valueClassName - value class
+/// - compression - A boolean which specifies if compression is turned on for keys/values
+///   in this file.
+/// - blockCompression - A boolean which specifies if block-compression is turned on for
+///   keys/values in this file.
+/// - compression codec - compression codec class which is used for compression of keys
+///   and/or values (if compression is enabled).
+/// - metadata - SequenceFile.Metadata for this file.
+/// - sync - A 16 byte sync marker to denote end of the header.
+///
+/// Uncompressed Sequence File Format
+/// ---------------------------------
+/// - Header
+/// - Record
+///   - Record length
+///   - Key length
+///   - Key
+///   - Value
+/// - "\xFF\xFF\xFF\xFF" followed by a sync-marker every few 100 bytes or so.
+///
+/// Record-Compressed Sequence File Format
+/// --------------------------------------
+/// - Header
+/// - Record
+///   - Record length
+///   - Key length
+///   - Key
+///   - Compressed Value
+/// - "\xFF\xFF\xFF\xFF" followed by a sync-marker every few 100 bytes or so.
+///
+/// Block-Compressed Sequence File Format
+/// -------------------------------------
+/// - Header
+/// - Record Block
+///   - Uncompressed number of records in the block
+///   - Compressed key-lengths block-size
+///   - Compressed key-lengths block
+///   - Compressed keys block-size
+///   - Compressed keys block
+///   - Compressed value-lengths block-size
+///   - Compressed value-lengths block
+///   - Compressed values block-size
+///   - Compressed values block
+/// - "\xFF\xFF\xFF\xFF" followed by a sync-marker every block.
+/// The compressed blocks of key lengths and value lengths consist of the actual lengths
+/// of individual keys/values encoded in zero-compressed integer format.
+
 /// Consumes rows and outputs the rows into a sequence file in HDFS
 /// Output is buffered to fill sequence file blocks.
 class HdfsSequenceTableWriter : public HdfsTableWriter {
@@ -67,7 +127,8 @@ class HdfsSequenceTableWriter : public HdfsTableWriter {
   /// writes the SEQ file header to HDFS
   Status WriteFileHeader();
 
-  /// writes the contents of out_ as a single compressed block
+  /// writes the contents of out_value_lengths_block_ and out_ as a single
+  /// block-compressed record.
   Status WriteCompressedBlock();
 
   /// writes the tuple row to the given buffer; separates fields by field_delim_,
@@ -87,6 +148,10 @@ class HdfsSequenceTableWriter : public HdfsTableWriter {
 
   /// buffer which holds accumulated output
   WriteStream out_;
+
+  /// buffer which holds accumulated value-lengths output (used with block-compressed
+  /// sequence files)
+  WriteStream out_value_lengths_block_;
 
   /// Temporary Buffer for a single row
   WriteStream row_buf_;
@@ -119,10 +184,12 @@ class HdfsSequenceTableWriter : public HdfsTableWriter {
   /// A -1 infront of the sync marker, used in decompressed formats
   std::string neg1_sync_marker_;
 
+  /// Name of java class to use when reading the keys
+  static const char* KEY_CLASS_NAME;
   /// Name of java class to use when reading the values
   static const char* VALUE_CLASS_NAME;
   /// Magic characters used to identify the file type
-  static uint8_t SEQ6_CODE[4];
+  static const uint8_t SEQ6_CODE[4];
 };
 
 } // namespace impala
