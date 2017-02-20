@@ -4122,8 +4122,19 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
           <b>Bug:</b>
           <xref href="https://issues.cloudera.org/browse/IMPALA-1019" scope="external" format="html">IMPALA-1019</xref>
         </p>
-
+        
         <p>
+          <b>Workaround:</b> On CDH 5.0.x, upgrade to CDH 5.0.4 with Impala 1.3.2, where this issue is fixed. In
+          Impala 1.3.0 or 1.3.1 on CDH 5.0.x, do not use HDFS caching for Impala data files in Impala internal or
+          external tables. If some of these data files are cached (for example because they are used by other
+          components that take advantage of HDFS caching), set the query option
+          <codeph>DISABLE_CACHED_READS=true</codeph>. To set that option for all Impala queries across all
+          sessions, start <cmdname>impalad</cmdname> with the <codeph>-default_query_options</codeph> option and
+          include this setting in the option argument.
+        </p>
+        
+
+        <p audience="hidden">
           <b>Workaround:</b> On CDH 5.0.x, upgrade to CDH 5.0.4 with Impala 1.3.2, where this issue is fixed. In
           Impala 1.3.0 or 1.3.1 on CDH 5.0.x, do not use HDFS caching for Impala data files in Impala internal or
           external tables. If some of these data files are cached (for example because they are used by other
@@ -4371,10 +4382,20 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
           <b>Bug:</b>
           <xref href="https://issues.cloudera.org/browse/IMPALA-1019" scope="external" format="html">IMPALA-1019</xref>
         </p>
-
+        
         <p>
           <b>Workaround:</b> Upgrade to CDH 5.0.4 with Impala 1.3.2, where this issue is fixed. In
           Impala 1.3.0 or 1.3.1, do not use HDFS caching for Impala data files in Impala internal or
+          external tables. If some of these data files are cached (for example because they are used by other
+          components that take advantage of HDFS caching), set the query option
+          <codeph>DISABLE_CACHED_READS=true</codeph>. To set that option for all Impala queries across all
+          sessions, start <cmdname>impalad</cmdname> with the <codeph>-default_query_options</codeph> option and
+          include this setting in the option argument.
+        </p>
+
+        <p audience="hidden">
+          <b>Workaround:</b> On CDH 5.0.x, upgrade to CDH 5.0.4 with Impala 1.3.2, where this issue is fixed. In
+          Impala 1.3.0 or 1.3.1 on CDH 5.0.x, do not use HDFS caching for Impala data files in Impala internal or
           external tables. If some of these data files are cached (for example because they are used by other
           components that take advantage of HDFS caching), set the query option
           <codeph>DISABLE_CACHED_READS=true</codeph>. To set that option for all Impala queries across all
