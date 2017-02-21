@@ -337,7 +337,7 @@ else()
 endif()
 # When KUDU_IS_SUPPORTED is false, the Kudu client is expected to be a non-functional
 # stub. It's still needed to link though.
-find_package(kuduClient REQUIRED)
+find_package(kuduClient REQUIRED NO_DEFAULT_PATH)
 include_directories(SYSTEM ${KUDU_CLIENT_INCLUDE_DIR})
 
 # find jni headers and libs
