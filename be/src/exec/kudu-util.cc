@@ -81,7 +81,7 @@ void LogKuduMessage(void* unused, kudu::client::KuduLogSeverity severity,
   // Note: use raw ints instead of the nice LogSeverity typedef
   // that can be found in glog/log_severity.h as it has an import
   // conflict with gutil/logging-inl.h (indirectly imported).
-  int glog_severity;
+  int glog_severity = 0;
 
   switch (severity) {
     case kudu::client::SEVERITY_INFO: glog_severity = 0; break;
