@@ -68,6 +68,9 @@ under the License.
   <topicref href="topics/impala_admin.xml">
     <topicref audience="standalone" href="topics/impala_admission.xml"/>
     <topicref audience="standalone" href="topics/impala_resource_management.xml"/>
+
+<!--<topicref href="topics/impala_howto_rm.xml"/>-->
+
     <topicref href="topics/impala_timeouts.xml"/>
     <topicref href="topics/impala_proxy.xml"/>
     <topicref href="topics/impala_disk_space.xml"/>
