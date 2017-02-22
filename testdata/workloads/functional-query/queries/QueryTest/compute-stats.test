@@ -64,7 +64,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Adding a column shouldn't cause the stats to be dropped.
@@ -91,7 +91,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'month','INT',12,0,4,4
 'new_col','INT',-1,-1,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Changing a column shouldn't cause the stats of other columns to be dropped.
@@ -120,7 +120,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'month','INT',12,0,4,4
 'new_col2','INT',-1,-1,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Removing a column shouldn't cause the stats to be dropped.
@@ -146,7 +146,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # drop stats from this table
@@ -205,7 +205,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Add partitions with NULL values and check for stats.
@@ -231,7 +231,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',3,1,4,4
 'month','INT',13,1,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 alter table alltypes add partition (year=2011, month=NULL)
@@ -256,7 +256,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',4,1,4,4
 'month','INT',13,2,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Drop the partitions with NULL values and check for stats.
@@ -283,7 +283,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',3,0,4,4
 'month','INT',13,1,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 alter table alltypes drop partition (year=2011, month=NULL)
@@ -309,7 +309,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # drop stats from this table a second time, should not throw an error.
@@ -356,7 +356,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'string_col','STRING',10,-1,1,1
 'timestamp_col','TIMESTAMP',101,-1,16,16
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # IMPALA-4767: Test that ALTER TABLE commands preserve table stats.
@@ -437,7 +437,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # IMPALA-4767: Test that ALTER TABLE commands preserve table stats.
@@ -515,7 +515,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # IMPALA-867: Test computing stats on Avro tables created by Hive with
@@ -568,7 +568,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Avro table with an extra column definition.
@@ -607,7 +607,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Avro table with missing two column definitions.
@@ -643,7 +643,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Avro table with one column definition having a different
@@ -682,7 +682,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Avro table without an Avro schema created by Hive.
@@ -721,7 +721,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Test Avro table created without any column definitions.
@@ -766,7 +766,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # IMPALA-1104: Test computing stats on Avro tables created by Impala
@@ -815,7 +815,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # IMPALA-1104: Test computing stats on Avro tables created by Impala
@@ -864,7 +864,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # IMPALA-883: Compute table stats for an empty partition.
@@ -1009,7 +1009,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','CHAR(5)',1,0,5,5
 'day','VARCHAR(13)',3,1,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Test that compute stats on a Hive-created Avro table without column defs
@@ -1036,7 +1036,7 @@ show column stats alltypes_no_coldef
 'string_col','STRING',0,-1,0,0
 'timestamp_col','STRING',0,-1,0,0
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Test that compute stats works on wide tables.
@@ -2052,5 +2052,5 @@ show column stats widetable_1000_cols
 'double_col125','DOUBLE',5,-1,8,8
 'string_col125','STRING',5,-1,1,1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====

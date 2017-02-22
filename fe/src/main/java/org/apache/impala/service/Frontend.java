@@ -700,7 +700,7 @@ public class Frontend {
     resultSchema.addToColumns(
         new TColumn("#Distinct Values", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("#Nulls", Type.BIGINT.toThrift()));
-    resultSchema.addToColumns(new TColumn("Max Size", Type.INT.toThrift()));
+    resultSchema.addToColumns(new TColumn("Max Size", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("Avg Size", Type.DOUBLE.toThrift()));
 
     for (Column c: table.getColumnsInHiveOrder()) {

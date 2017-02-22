@@ -176,7 +176,7 @@ class TestFetch(HS2TestSuite):
     fetch_results_resp = self.__query_and_fetch("SHOW COLUMN STATS functional.alltypes")
     num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
     assert num_rows == 13
-    assert re.match(r"id, INT, -?\d+, -?\d+, (NULL|\d+), 4.0", result) is not None
+    assert re.match(r"id, INT, -?\d+, -?\d+, -?\d+, 4.0", result) is not None
 
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
   def test_execute_select_v1(self):

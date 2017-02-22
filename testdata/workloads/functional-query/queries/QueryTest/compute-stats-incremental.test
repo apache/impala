@@ -62,7 +62,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 drop incremental stats alltypes_incremental partition(year=2010, month=12)
@@ -155,7 +155,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 create table incremental_empty_partitioned (i int) partitioned by (j int);
@@ -256,7 +256,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Confirm that dropping stats drops incremental stats as well
@@ -495,7 +495,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','CHAR(5)',1,0,5,5
 'day','VARCHAR(13)',3,1,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Populate a new partition to verify the incremental stats update
@@ -525,7 +525,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','CHAR(5)',2,0,5,5
 'day','VARCHAR(13)',4,1,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # IMPALA-4854: Tests incremental computation in the presence of complex-typed columns.
