@@ -103,8 +103,7 @@ under the License.
         <p>
           Make sure that the HDFS trashcan is configured correctly. When you remove files from HDFS, the space
           might not be reclaimed for use by other files until sometime later, when the trashcan is emptied. See
-          <xref href="impala_drop_table.xml#drop_table"/> and the FAQ entry
-          <xref href="impala_faq.xml#faq_sql/faq_drop_table_space"/> for details. See
+          <xref href="impala_drop_table.xml#drop_table"/> for details. See
           <xref href="impala_prereqs.xml#prereqs_account"/> for permissions needed for the HDFS trashcan to operate
           correctly.
         </p>
