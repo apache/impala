@@ -46,7 +46,23 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
-<!-- All 2.7.x / 5.9.x subsections go under here -->
+<!-- All 2.8.x subsections go under here -->
+
+  <concept rev="2.8.0" id="fixed_issues_280">
+
+    <title>Issues Fixed in <keyword keyref="impala28_full"/></title>
+
+    <conbody>
+
+      <p>
+        For the full list of Impala fixed issues in <keyword keyref="impala28_full"/>, see
+        <xref href="https://issues.cloudera.org/issues/?jql=type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.8.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.8.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">this report in the Impala JIRA tracker</xref>.
+      </p>
+
+    </conbody>
+  </concept>
+
+<!-- All 2.7.x subsections go under here -->
 
   <concept rev="2.7.0" id="fixed_issues_270">
 
@@ -77,7 +93,7 @@ under the License.
     </conbody>
   </concept>
 
-<!-- All 2.6.x / 5.8.x subsections go under here -->
+<!-- All 2.6.x subsections go under here -->
 
   <concept rev="2.6.3" id="fixed_issues_263">
     <title>Issues Fixed in Impala for CDH 5.8.3</title>
@@ -258,7 +274,7 @@ under the License.
     </concept>
 
   </concept>
-<!-- All 2.5.x / 5.7.x subsections go under here -->
+<!-- All 2.5.x subsections go under here -->
 
   <concept rev="2.5.4" id="fixed_issues_254">
     <title>Issues Fixed in Impala for CDH 5.7.4</title>
@@ -615,7 +631,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
 
   </concept>
 
-<!-- All 2.4.x / 5.6.x subsections go under here -->
+<!-- All 2.4.x subsections go under here -->
 
   <concept rev="2.4.1" id="fixed_issues_241">
 
@@ -664,7 +680,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
 
   </concept>
 
-<!-- All 2.3.x / 5.5.x subsections go under here -->
+<!-- All 2.3.x subsections go under here -->
 
   <concept rev="2.3.4" id="fixed_issues_234">
 
@@ -1262,7 +1278,7 @@ IMPALA-1917
 
   </concept>
 
-<!-- All 2.2.x / 5.4.x subsections go under here -->
+<!-- All 2.2.x subsections go under here -->
 
   <concept rev="2.2.10" id="fixed_issues_2210">
 
@@ -2378,7 +2394,7 @@ IMPALA-1607
 
   </concept>
 
-<!-- All 2.1.x / 5.3.x subsections go under here -->
+<!-- All 2.1.x subsections go under here -->
 
   <concept rev="2.3.10" id="fixed_issues_2310">
 
