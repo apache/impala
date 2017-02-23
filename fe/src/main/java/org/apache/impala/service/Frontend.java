@@ -1026,8 +1026,7 @@ public class Frontend {
         queryCtx.client_request.query_options.isDisable_unsafe_spills()
           && !queryCtx.tables_missing_stats.isEmpty()
           && !analysisResult.getAnalyzer().hasPlanHints();
-    // for now, always disable spilling for multi-threaded execution
-    if (isMtExec || disableSpilling) queryCtx.setDisable_spilling(true);
+    queryCtx.setDisable_spilling(disableSpilling);
 
     // assign fragment idx
     int idx = 0;
