@@ -1,0 +1,30 @@
+====
+---- QUERY
+# Filter root-level scalar column in file with nested types.
+select count(*) from functional_parquet.complextypestbl where id < 1
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 2 .*
+row_regex: .*NumStatsFilteredRowGroups: 2 .*
+====
+---- QUERY
+# Filter root-level scalar column in file with nested types.
+select id, int_array.item
+from   functional_parquet.complextypestbl, complextypestbl.int_array
+where  id < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 2 .*
+row_regex: .*NumStatsFilteredRowGroups: 2 .*
+====
+---- QUERY
+# Nested columns do not support stats based filtering.
+select id, int_array.item
+from   functional_parquet.complextypestbl, functional_parquet.complextypestbl.int_array
+where  int_array.item < -1;
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 2 .*
+row_regex: .*NumStatsFilteredRowGroups: 0 .*
+====
