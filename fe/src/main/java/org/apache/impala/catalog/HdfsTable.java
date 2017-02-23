@@ -815,7 +815,7 @@ public class HdfsTable extends Table {
       // Iterate through the current snapshot of the partition directory listing to
       // figure out files that were newly added/modified.
       List<FileDescriptor> newFileDescs = Lists.newArrayList();
-      int newPartSizeBytes = 0;
+      long newPartSizeBytes = 0;
       for (FileStatus fileStatus : fs.listStatus(partDir)) {
         if (!FileSystemUtil.isValidDataFile(fileStatus)) continue;
         String fileName = fileStatus.getPath().getName().toString();
