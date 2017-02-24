@@ -122,9 +122,7 @@ $ impala-shell -i <varname>some.other.hostname</varname>:<varname>port_number</v
           You should see a prompt like the following:
         </p>
 <codeblock>Welcome to the Impala shell. Press TAB twice to see a list of available commands.
-
-Copyright (c) <varname>year</varname> Cloudera, Inc. All rights reserved.
-
+...
 <ph conref="../shared/ImpalaVariables.xml#impala_vars/ShellBanner"/>
 [Not connected] &gt; </codeblock>
       </li>

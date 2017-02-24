@@ -130,10 +130,8 @@ under the License.
 <codeblock rev="upstream">$ impala-shell -i localhost --quiet
 Starting Impala Shell without Kerberos authentication
 Welcome to the Impala shell. Press TAB twice to see a list of available commands.
-
-Copyright (c) 2012 Cloudera, Inc. All rights reserved.
-
-(Shell build version: Impala Shell v...
+...
+<ph conref="../shared/ImpalaVariables.xml#impala_vars/ShellBanner"/>
 [localhost:21000] > select version();
 +-------------------------------------------
 | version()
@@ -1705,13 +1703,12 @@ queries and perform some copy and transform operations into other tables.
 
 <codeblock rev="upstream">$ impala-shell -i localhost
 Starting Impala Shell without Kerberos authentication
+
 Connected to localhost:21000
-Server version: impalad version 2.2.0-cdh5 RELEASE (build 2ffd73a4255cefd521362ffe1cfb37463f67f75c)
+<ph conref="../shared/ImpalaVariables.xml#impala_vars/ImpaladBanner"/>
 Welcome to the Impala shell. Press TAB twice to see a list of available commands.
-
-Copyright (c) 2012 Cloudera, Inc. All rights reserved.
-
-(Shell build version: Impala Shell v2.1.2-cdh5 (92438b7) built on Tue Feb 24 12:36:33 PST 2015)
+...
+<ph conref="../shared/ImpalaVariables.xml#impala_vars/ShellBanner"/>
 [localhost:21000] > create database airline_data;
 [localhost:21000] > use airline_data;
 [localhost:21000] > create external table airlines_external
@@ -2130,12 +2127,10 @@ Goodbye jrussell
 $ impala-shell -i localhost -B -d airline_data;
 Starting Impala Shell without Kerberos authentication
 Connected to localhost:21000
-Server version: impalad version 2.2.0-cdh5 RELEASE (build 2ffd73a4255cefd521362ffe1cfb37463f67f75c)
+<ph conref="../shared/ImpalaVariables.xml#impala_vars/ImpaladBanner"/>
 Welcome to the Impala shell. Press TAB twice to see a list of available commands.
-
-Copyright (c) 2012 Cloudera, Inc. All rights reserved.
-
-(Shell build version: Impala Shell v2.1.2-cdh5 (92438b7) built on Tue Feb 24 12:36:33 PST 2015)
+...
+<ph conref="../shared/ImpalaVariables.xml#impala_vars/ShellBanner"/>
 [localhost:21000] > show create table airlines_external;
 "CREATE EXTERNAL TABLE airline_data.airlines_external (
   year INT COMMENT 'inferred from: optional int32 year',

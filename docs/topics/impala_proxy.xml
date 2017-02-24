@@ -632,9 +632,7 @@ Using service name 'impala'
 Connected to c2104.hal.cloudera.com:25003
 <ph conref="../shared/ImpalaVariables.xml#impala_vars/ImpaladBanner"/>
 Welcome to the Impala shell. Press TAB twice to see a list of available commands.
-
-Copyright (c) 2012 Cloudera, Inc. All rights reserved.
-
+...
 <ph conref="../shared/ImpalaVariables.xml#impala_vars/ShellBanner"/>
 [c2104.hal.cloudera.com:25003] &gt; show tables;
 Query: show tables
