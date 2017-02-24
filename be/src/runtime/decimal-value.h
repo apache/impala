@@ -60,10 +60,6 @@ class DecimalValue {
       bool round, bool* overflow);
 
   /// Assigns *result as a decimal.
-  static inline DecimalValue FromInt(const ColumnType& t, int64_t d, bool* overflow) {
-    return FromInt(t.precision, t.scale, d, overflow);
-  }
-
   static inline DecimalValue FromInt(int precision, int scale, int64_t d, bool* overflow);
 
   /// The overloaded operators assume that this and other have the same scale. They are
@@ -102,11 +98,6 @@ class DecimalValue {
   /// Returns a new decimal scaled by from src_type to dst_type.
   /// e.g. If this value was 1100 at scale 3 and the dst_type had scale two, the
   /// result would be 110. (In both cases representing the decimal 1.1).
-  inline DecimalValue ScaleTo(const ColumnType& src_type, const ColumnType& dst_type,
-      bool* overflow) const {
-    return ScaleTo(src_type.scale, dst_type.scale, dst_type.precision, overflow);
-  }
-
   inline DecimalValue ScaleTo(int src_scale, int dst_scale, int dst_precision,
       bool* overflow) const;
 
@@ -119,71 +110,33 @@ class DecimalValue {
   /// not valid.
   /// RESULT_T needs to be larger than T to avoid overflow issues.
   template<typename RESULT_T>
-  inline DecimalValue<RESULT_T> Add(const ColumnType& this_type,
-      const DecimalValue& other, const ColumnType& other_type, int result_precision,
-      int result_scale, bool* overflow) const {
-    return Add<RESULT_T>(this_type.scale, other, other_type.scale, result_precision,
-        result_scale, overflow);
-  }
-
-  template<typename RESULT_T>
   inline DecimalValue<RESULT_T> Add(int this_scale, const DecimalValue& other,
-      int other_scale, int result_precision, int result_scale, bool* overflow) const;
-
-  template<typename RESULT_T>
-  inline DecimalValue<RESULT_T> Subtract(const ColumnType& this_type,
-      const DecimalValue& other, const ColumnType& other_type, int result_precision,
-      int result_scale, bool* overflow) const {
-    return Add<RESULT_T>(this_type, -other, other_type, result_precision,
-        result_scale, overflow);
-  }
+      int other_scale, int result_precision, int result_scale, bool round,
+      bool* overflow) const;
 
   template<typename RESULT_T>
   inline DecimalValue<RESULT_T> Subtract(int this_scale, const DecimalValue& other,
-      int other_scale, int result_precision, int result_scale, bool* overflow) const {
+      int other_scale, int result_precision, int result_scale, bool round,
+      bool* overflow) const {
     return Add<RESULT_T>(this_scale, -other, other_scale, result_precision,
-        result_scale, overflow);
-  }
-
-  template<typename RESULT_T>
-  inline DecimalValue<RESULT_T> Multiply(const ColumnType& this_type,
-      const DecimalValue& other, const ColumnType& other_type, int result_precision,
-      int result_scale, bool* overflow) const {
-    return Multiply<RESULT_T>(this_type.scale, other, other_type.scale, result_precision,
-        result_scale, overflow);
+        result_scale, round, overflow);
   }
 
   template<typename RESULT_T>
   inline DecimalValue<RESULT_T> Multiply(int this_scale, const DecimalValue& other,
-      int other_scale, int result_precision, int result_scale, bool* overflow) const;
-
-  /// is_nan is set to true if 'other' is 0. The value returned is undefined.
-  template<typename RESULT_T>
-  inline DecimalValue<RESULT_T> Divide(const ColumnType& this_type,
-      const DecimalValue& other, const ColumnType& other_type, int result_precision,
-      int result_scale, bool* is_nan, bool* overflow) const {
-    return Divide<RESULT_T>(this_type.scale, other, other_type.scale, result_precision,
-        result_scale, is_nan, overflow);
-  }
-
-  template<typename RESULT_T>
-  inline DecimalValue<RESULT_T> Divide(int this_scale, const DecimalValue& other,
-      int other_scale, int result_precision, int result_scale, bool* is_nan,
+      int other_scale, int result_precision, int result_scale, bool round,
       bool* overflow) const;
 
   /// is_nan is set to true if 'other' is 0. The value returned is undefined.
   template<typename RESULT_T>
-  inline DecimalValue<RESULT_T> Mod(const ColumnType& this_type,
-      const DecimalValue& other, const ColumnType& other_type, int result_precision,
-      int result_scale, bool* is_nan, bool* overflow) const {
-    return Mod<RESULT_T>(this_type.scale, other, other_type.scale, result_precision,
-        result_scale, is_nan, overflow);
-  }
+  inline DecimalValue<RESULT_T> Divide(int this_scale, const DecimalValue& other,
+      int other_scale, int result_precision, int result_scale, bool round,
+      bool* is_nan, bool* overflow) const;
 
   template<typename RESULT_T>
   inline DecimalValue<RESULT_T> Mod(int this_scale, const DecimalValue& other,
-      int other_scale, int result_precision, int result_scale, bool* is_nan,
-      bool* overflow) const;
+      int other_scale, int result_precision, int result_scale, bool round,
+      bool* is_nan, bool* overflow) const;
 
   /// Compares this and other. Returns 0 if equal, < 0 if this < other and > 0 if
   /// this > other.
@@ -215,17 +168,9 @@ class DecimalValue {
   inline T& value() { return value_; }
 
   /// Returns the value of the decimal before the decimal point.
-  inline const T whole_part(const ColumnType& t) const {
-    return whole_part(t.scale);
-  }
-
   inline const T whole_part(int scale) const;
 
   /// Returns the value of the decimal after the decimal point.
-  inline const T fractional_part(const ColumnType& t) const {
-    return fractional_part(t.scale);
-  }
-
   inline const T fractional_part(int scale) const;
 
   /// Returns the value as an integer, setting overflow to true on overflow,
@@ -236,10 +181,6 @@ class DecimalValue {
   inline typename RESULT_T::underlying_type_t ToInt(int scale, bool* overflow) const;
 
   /// Returns an approximate double for this decimal.
-  inline double ToDouble(const ColumnType& type) const {
-    return ToDouble(type.scale);
-  }
-
   inline double ToDouble(int scale) const;
 
   inline uint32_t Hash(int seed = 0) const;

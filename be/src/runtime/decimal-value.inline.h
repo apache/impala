@@ -110,9 +110,8 @@ inline typename RESULT_T::underlying_type_t DecimalValue<T>::ToInt(int scale,
     // N.B. also - no std::abs for int128_t
     if (abs(remainder) >= divisor >> 1) {
       // Round away from zero.
-      // Note this trick works with both signed and unsigned types
-      const int shift = std::numeric_limits<T>::digits;
-      result += 1 | (result >> shift);
+      // Bias at zero must be corrected by sign of dividend.
+      result += BitUtil::Sign(v);
     }
   }
   *overflow |=
@@ -148,7 +147,7 @@ template<typename T>
 template<typename RESULT_T>
 inline DecimalValue<RESULT_T> DecimalValue<T>::Add(int this_scale,
     const DecimalValue& other, int other_scale, int result_precision, int result_scale,
-    bool* overflow) const {
+    bool round, bool* overflow) const {
   DCHECK_EQ(result_scale, std::max(this_scale, other_scale));
   RESULT_T x = 0;
   RESULT_T y = 0;
@@ -170,7 +169,7 @@ template<typename T>
 template<typename RESULT_T>
 inline DecimalValue<RESULT_T> DecimalValue<T>::Add(int this_scale,
     const DecimalValue& other, int other_scale, int result_precision, int result_scale,
-    bool* overflow) const {
+    bool round, bool* overflow) const {
   DCHECK_EQ(result_scale, std::max(this_scale, other_scale));
   RESULT_T x = 0;
   RESULT_T y = 0;
@@ -193,6 +192,30 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Add(int this_scale,
 }
 #endif
 
+namespace detail {
+
+// Helper function to scale down over multiplied values back into result type,
+// truncating if round is false or rounding otherwise.
+template<typename T, typename RESULT_T>
+inline RESULT_T ScaleDownAndRound(RESULT_T value, int delta_scale, bool round) {
+  DCHECK_GT(delta_scale, 0);
+  // Multiplier can always be computed in potentially smaller type T
+  T multiplier = DecimalUtil::GetScaleMultiplier<T>(delta_scale);
+  DCHECK(multiplier > 1 && multiplier % 2 == 0);
+  RESULT_T result = value / multiplier;
+  if (round) {
+    RESULT_T remainder = value % multiplier;
+    // In general, shifting down the multiplier is not safe, but we know
+    // here that it is a multiple of two.
+    if (abs(remainder) > (multiplier >> 1)) {
+      // Bias at zero must be corrected by sign of dividend.
+      result += BitUtil::Sign(value);
+    }
+  }
+  return result;
+}
+}
+
 // Use __builtin_mul_overflow on GCC if available.
 // Avoid using on Clang: it requires a function __muloti present in the Clang runtime
 // library but not the GCC runtime library and regresses performance.
@@ -201,7 +224,7 @@ template<typename T>
 template<typename RESULT_T>
 inline DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
     const DecimalValue& other, int other_scale, int result_precision, int result_scale,
-    bool* overflow) const {
+    bool round, bool* overflow) const {
   // In the non-overflow case, we don't need to adjust by the scale since
   // that is already handled by the FE when it computes the result decimal type.
   // e.g. 1.23 * .2 (scale 2, scale 1 respectively) is identical to:
@@ -209,16 +232,10 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
   // The result scale in this case is the sum of the input scales.
   RESULT_T x = value();
   RESULT_T y = other.value();
-  if (x == 0 || y == 0) {
-    // Handle zero to avoid divide by zero in the overflow check below.
-    return DecimalValue<RESULT_T>(0);
-  }
   RESULT_T result = 0;
   if (result_precision == ColumnType::MAX_PRECISION) {
     DCHECK_EQ(sizeof(RESULT_T), 16);
-    // Check overflow
     *overflow |= __builtin_mul_overflow(x, y, &result);
-    *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
   } else {
     result = x * y;
   }
@@ -227,8 +244,12 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
     // In this case, the required resulting scale is larger than the max we support.
     // We cap the resulting scale to the max supported scale (e.g. truncate) in the FE.
     // TODO: we could also return NULL.
-    DCHECK_GT(delta_scale, 0);
-    result /= DecimalUtil::GetScaleMultiplier<T>(delta_scale);
+    result = detail::ScaleDownAndRound<T, RESULT_T>(result, delta_scale, round);
+
+    // Check overflow again after rounding since +/-1 could cause decimal overflow
+    if (round && result_precision == ColumnType::MAX_PRECISION) {
+      *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
+    }
   }
   return DecimalValue<RESULT_T>(result);
 }
@@ -237,7 +258,7 @@ template<typename T>
 template<typename RESULT_T>
 DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
     const DecimalValue& other, int other_scale, int result_precision, int result_scale,
-    bool* overflow) const {
+    bool round, bool* overflow) const {
   // In the non-overflow case, we don't need to adjust by the scale since
   // that is already handled by the FE when it computes the result decimal type.
   // e.g. 1.23 * .2 (scale 2, scale 1 respectively) is identical to:
@@ -260,8 +281,11 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
     // In this case, the required resulting scale is larger than the max we support.
     // We cap the resulting scale to the max supported scale (e.g. truncate) in the FE.
     // TODO: we could also return NULL.
-    DCHECK_GT(delta_scale, 0);
-    result /= DecimalUtil::GetScaleMultiplier<T>(delta_scale);
+    result = detail::ScaleDownAndRound<T, RESULT_T>(result, delta_scale, round);
+    // Check overflow again after rounding since +/-1 could cause decimal overflow
+    if (result_precision == ColumnType::MAX_PRECISION) {
+      *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
+    }
   }
   return DecimalValue<RESULT_T>(result);
 }
@@ -271,7 +295,7 @@ template<typename T>
 template<typename RESULT_T>
 inline DecimalValue<RESULT_T> DecimalValue<T>::Divide(int this_scale,
     const DecimalValue& other, int other_scale, int result_precision, int result_scale,
-    bool* is_nan, bool* overflow) const {
+    bool round, bool* is_nan, bool* overflow) const {
   DCHECK_GE(result_scale + other_scale, this_scale);
   if (other.value() == 0) {
     // Divide by 0.
@@ -280,20 +304,57 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Divide(int this_scale,
   }
   // We need to scale x up by the result scale and then do an integer divide.
   // This truncates the result to the output scale.
-  // TODO: implement rounding when decimal_v2=true.
   int scale_by = result_scale + other_scale - this_scale;
   // Use higher precision ints for intermediates to avoid overflows. Divides lead to
   // large numbers very quickly (and get eliminated by the int divide).
   if (sizeof(T) == 16) {
-    int256_t x = DecimalUtil::MultiplyByScale<int256_t>(
-        ConvertToInt256(value()), scale_by);
-    int256_t y = ConvertToInt256(other.value());
+    int128_t x_sp = value();
+    int256_t x = DecimalUtil::MultiplyByScale<int256_t>(ConvertToInt256(x_sp), scale_by);
+    int128_t y_sp = other.value();
+    int256_t y = ConvertToInt256(y_sp);
     int128_t r = ConvertToInt128(x / y, DecimalUtil::MAX_UNSCALED_DECIMAL16, overflow);
+    if (round) {
+      int256_t remainder = x % y;
+      // The following is frought with apparent difficulty, as there is only 1 bit
+      // free in the implementation of int128_t representing our maximum value and
+      // doubling such a value would overflow in two's complement.  However, we
+      // converted y to a 256 bit value, and remainder must be less than y, so there
+      // is plenty of space.  Building a value to DCHECK for this is rather awkward, but
+      // quite obviously 2 * MAX_UNSCALED_DECIMAL16 has plenty of room in 256 bits.
+      // This will need to be fixed if we optimize to get back a 128-bit signed value.
+      if (abs(2 * remainder) >= abs(y)) {
+        // Bias at zero must be corrected by sign of divisor and dividend.
+        r += (BitUtil::Sign(x_sp) ^ BitUtil::Sign(y_sp)) + 1;
+      }
+    }
+    // Check overflow again after rounding since +/-1 could cause decimal overflow
+    if (result_precision == ColumnType::MAX_PRECISION) {
+      *overflow |= abs(r) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
+    }
     return DecimalValue<RESULT_T>(r);
   } else {
+    DCHECK(DecimalUtil::GetScaleMultiplier<RESULT_T>(scale_by) > 0);
     int128_t x = DecimalUtil::MultiplyByScale<RESULT_T>(value(), scale_by);
     int128_t y = other.value();
     int128_t r = x / y;
+    if (round) {
+      int128_t remainder = x % y;
+      // No overflow because doubling the result of 8-byte integers fits in 128 bits
+      DCHECK_LT(sizeof(T), sizeof(remainder));
+      if (abs(2 * remainder) >= abs(y)) {
+        // No bias at zero.  The result scale was chosen such that the smallest non-zero
+        // 'x' divided by the largest 'y' will always produce a non-zero result.
+        // If higher precision were required due to a very large scale, we would be
+        // computing in 256 bits, where getting a zero result is actually a posibility.
+        // In addition, we know the dividend is non-zero, since there was a remainder.
+        // The two conditions combined mean that the result must also be non-zero.
+        DCHECK(r != 0);
+        r += BitUtil::Sign(r);
+      }
+    }
+    DCHECK(abs(r) <= DecimalUtil::MAX_UNSCALED_DECIMAL16 &&
+        (sizeof(RESULT_T) > 8 || abs(r) <= DecimalUtil::MAX_UNSCALED_DECIMAL8) &&
+        (sizeof(RESULT_T) > 4 || abs(r) <= DecimalUtil::MAX_UNSCALED_DECIMAL4));
     return DecimalValue<RESULT_T>(static_cast<RESULT_T>(r));
   }
 }
@@ -302,7 +363,7 @@ template<typename T>
 template<typename RESULT_T>
 inline DecimalValue<RESULT_T> DecimalValue<T>::Mod(int this_scale,
     const DecimalValue& other, int other_scale, int result_precision, int result_scale,
-    bool* is_nan, bool* overflow) const {
+    bool round, bool* is_nan, bool* overflow) const {
   DCHECK_EQ(result_scale, std::max(this_scale, other_scale));
   if (other.value() == 0) {
     // Mod by 0.

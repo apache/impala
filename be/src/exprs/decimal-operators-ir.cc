@@ -679,20 +679,22 @@ BooleanVal DecimalOperators::CastToBooleanVal(
         ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_PRECISION); \
     int return_scale = \
         ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_SCALE); \
+    bool round = \
+        ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2); \
     switch (ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_SIZE)) { \
       case 4: { \
         Decimal4Value x_val = GetDecimal4Value(x, x_size, &overflow); \
         Decimal4Value y_val = GetDecimal4Value(y, y_size, &overflow); \
         Decimal4Value result = x_val.OP_FN<int32_t>(x_scale, y_val, y_scale, \
-            return_precision, return_scale, &overflow); \
-        DCHECK(!overflow) << "Cannot overflow except with Decimal17Value"; \
+            return_precision, return_scale, round, &overflow); \
+        DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         return DecimalVal(result.value()); \
       } \
       case 8: { \
         Decimal8Value x_val = GetDecimal8Value(x, x_size, &overflow); \
         Decimal8Value y_val = GetDecimal8Value(y, y_size, &overflow); \
         Decimal8Value result = x_val.OP_FN<int64_t>(x_scale, y_val, y_scale, \
-            return_precision, return_scale, &overflow); \
+            return_precision, return_scale, round, &overflow); \
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         return DecimalVal(result.value()); \
       } \
@@ -700,7 +702,7 @@ BooleanVal DecimalOperators::CastToBooleanVal(
         Decimal16Value x_val = GetDecimal16Value(x, x_size, &overflow); \
         Decimal16Value y_val = GetDecimal16Value(y, y_size, &overflow); \
         Decimal16Value result = x_val.OP_FN<int128_t>(x_scale, y_val, y_scale, \
-            return_precision, return_scale, &overflow); \
+            return_precision, return_scale, round, &overflow); \
         RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal); \
         return DecimalVal(result.value()); \
       } \
@@ -724,12 +726,14 @@ BooleanVal DecimalOperators::CastToBooleanVal(
         ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_PRECISION); \
     int return_scale = \
         ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_SCALE); \
+    bool round = \
+        ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2); \
     switch (ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_SIZE)) { \
       case 4: { \
         Decimal4Value x_val = GetDecimal4Value(x, x_size, &overflow); \
         Decimal4Value y_val = GetDecimal4Value(y, y_size, &overflow); \
         Decimal4Value result = x_val.OP_FN<int32_t>(x_scale, y_val, y_scale, \
-            return_precision, return_scale, &is_nan, &overflow); \
+            return_precision, return_scale, round, &is_nan, &overflow); \
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         if (is_nan) return DecimalVal::null(); \
         return DecimalVal(result.value()); \
@@ -738,7 +742,7 @@ BooleanVal DecimalOperators::CastToBooleanVal(
         Decimal8Value x_val = GetDecimal8Value(x, x_size, &overflow); \
         Decimal8Value y_val = GetDecimal8Value(y, y_size, &overflow); \
         Decimal8Value result = x_val.OP_FN<int64_t>(x_scale, y_val, y_scale, \
-            return_precision, return_scale, &is_nan, &overflow); \
+            return_precision, return_scale, round, &is_nan, &overflow); \
         DCHECK(!overflow) << "Cannot overflow except with Decimal16Value"; \
         if (is_nan) return DecimalVal::null(); \
         return DecimalVal(result.value()); \
@@ -747,7 +751,7 @@ BooleanVal DecimalOperators::CastToBooleanVal(
         Decimal16Value x_val = GetDecimal16Value(x, x_size, &overflow); \
         Decimal16Value y_val = GetDecimal16Value(y, y_size, &overflow); \
         Decimal16Value result = x_val.OP_FN<int128_t>(x_scale, y_val, y_scale, \
-            return_precision, return_scale, &is_nan, &overflow); \
+            return_precision, return_scale, round, &is_nan, &overflow); \
         RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal); \
         if (is_nan) return DecimalVal::null(); \
         return DecimalVal(result.value()); \

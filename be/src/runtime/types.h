@@ -84,6 +84,7 @@ struct ColumnType {
   /// Must be kept in sync with FE's max precision/scale.
   static const int MAX_PRECISION = 38;
   static const int MAX_SCALE = MAX_PRECISION;
+  static const int MIN_ADJUSTED_SCALE = 6;
 
   /// The maximum precision representable by a 4-byte decimal (Decimal4Value)
   static const int MAX_DECIMAL4_PRECISION = 9;
@@ -138,6 +139,17 @@ struct ColumnType {
     ret.precision = precision;
     ret.scale = scale;
     return ret;
+  }
+
+  // Matches the results of createAdjustedDecimalType in front-end code.
+  static ColumnType CreateAdjustedDecimalType(int precision, int scale) {
+    if (precision > MAX_PRECISION) {
+      int min_scale = std::min(scale, MIN_ADJUSTED_SCALE);
+      int delta = precision - MAX_PRECISION;
+      precision = MAX_PRECISION;
+      scale = std::max(scale - delta, min_scale);
+    }
+    return CreateDecimalType(precision, scale);
   }
 
   static ColumnType FromThrift(const TColumnType& t) {

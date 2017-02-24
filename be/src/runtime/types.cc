@@ -30,6 +30,13 @@ using namespace llvm;
 
 namespace impala {
 
+const int ColumnType::MAX_PRECISION;
+const int ColumnType::MAX_SCALE;
+const int ColumnType::MIN_ADJUSTED_SCALE;
+
+const int ColumnType::MAX_DECIMAL4_PRECISION;
+const int ColumnType::MAX_DECIMAL8_PRECISION;
+
 const char* ColumnType::LLVM_CLASS_NAME = "struct.impala::ColumnType";
 
 ColumnType::ColumnType(const std::vector<TTypeNode>& types, int* idx)

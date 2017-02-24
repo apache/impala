@@ -29,8 +29,36 @@
 #include "util/cpu-info.h"
 
 #include "common/names.h"
+#include "runtime/multi-precision.h"
 
 namespace impala {
+
+TEST(BitUtil, UnsignedWidth) {
+  EXPECT_EQ(BitUtil::UnsignedWidth<signed char>(), 7);
+  EXPECT_EQ(BitUtil::UnsignedWidth<unsigned char>(), 8);
+  EXPECT_EQ(BitUtil::UnsignedWidth<volatile long long>(), 63);
+  EXPECT_EQ(BitUtil::UnsignedWidth<unsigned long long&>(), 64);
+  EXPECT_EQ(BitUtil::UnsignedWidth<const int128_t&>(), 127);
+  EXPECT_EQ(BitUtil::UnsignedWidth<const volatile unsigned __int128&>(), 128);
+}
+
+TEST(BitUtil, Sign) {
+  EXPECT_EQ(BitUtil::Sign<int>(0), 1);
+  EXPECT_EQ(BitUtil::Sign<int>(1), 1);
+  EXPECT_EQ(BitUtil::Sign<int>(-1), -1);
+  EXPECT_EQ(BitUtil::Sign<int>(200), 1);
+  EXPECT_EQ(BitUtil::Sign<int>(-200), -1);
+  EXPECT_EQ(BitUtil::Sign<unsigned int>(0), 1);
+  EXPECT_EQ(BitUtil::Sign<unsigned int>(1), 1);
+  EXPECT_EQ(BitUtil::Sign<unsigned int>(-1U), 1);
+  EXPECT_EQ(BitUtil::Sign<unsigned int>(200), 1);
+  EXPECT_EQ(BitUtil::Sign<unsigned int>(-200), 1);
+  EXPECT_EQ(BitUtil::Sign<int128_t>(0), 1);
+  EXPECT_EQ(BitUtil::Sign<int128_t>(1), 1);
+  EXPECT_EQ(BitUtil::Sign<int128_t>(-1), -1);
+  EXPECT_EQ(BitUtil::Sign<int128_t>(200), 1);
+  EXPECT_EQ(BitUtil::Sign<int128_t>(-200), -1);
+}
 
 TEST(BitUtil, Ceil) {
   EXPECT_EQ(BitUtil::Ceil(0, 1), 0);

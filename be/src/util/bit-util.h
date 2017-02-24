@@ -26,8 +26,8 @@
 #endif
 
 #include <climits>
-
 #include <limits>
+#include <typeinfo>
 
 #include <boost/type_traits/make_unsigned.hpp>
 
@@ -43,6 +43,29 @@ using boost::make_unsigned;
 /// TODO: is this in boost or something else like that?
 class BitUtil {
  public:
+
+  /// Returns the width of the integer portion of the type, not counting the sign bit.
+  /// Not safe for use with unknown or non-native types, so make it undefined
+  template<typename T, typename CVR_REMOVED = typename std::decay<T>::type,
+      typename std::enable_if<std::is_integral<CVR_REMOVED>{} ||
+                              std::is_same<CVR_REMOVED, unsigned __int128>{} ||
+                              std::is_same<CVR_REMOVED, __int128>{}, int>::type = 0>
+  constexpr static inline int UnsignedWidth() {
+    return std::is_integral<CVR_REMOVED>::value ?
+        std::numeric_limits<CVR_REMOVED>::digits :
+        std::is_same<CVR_REMOVED, unsigned __int128>::value ? 128 :
+        std::is_same<CVR_REMOVED, __int128>::value ? 127 : -1;
+  }
+
+  /// Return an integer signifying the sign of the value, returning +1 for
+  /// positive integers (and zero), -1 for negative integers.
+  /// The extra shift is to silence GCC warnings about full width shift on
+  /// unsigned types.  It compiles out in optimized builds into the expected increment
+  template<typename T>
+  constexpr static inline T Sign(T value) {
+    return 1 | ((value >> (UnsignedWidth<T>() - 1)) >> 1);
+  }
+
   /// Returns the ceil of value/divisor
   constexpr static inline int64_t Ceil(int64_t value, int64_t divisor) {
     return value / divisor + (value % divisor != 0);
