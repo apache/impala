@@ -336,12 +336,15 @@ public class HdfsScanNode extends ScanNode {
       BinaryPredicate binaryPred = (BinaryPredicate) pred;
 
       // We only support slot refs on the left hand side of the predicate, a rewriting
-      // rule makes sure that all compatible exprs are rewritten into this form.
-      if (!(binaryPred.getChild(0) instanceof SlotRef)) continue;
-      SlotRef slot = (SlotRef) binaryPred.getChild(0);
+      // rule makes sure that all compatible exprs are rewritten into this form. Only
+      // implicit casts are supported.
+      SlotRef slot = binaryPred.getChild(0).unwrapSlotRef(true);
+      if (slot == null) continue;
 
       // This node is a table scan, so this must be a scanning slot.
       Preconditions.checkState(slot.getDesc().isScanSlot());
+      // If the column is null, then this can be a 'pos' scanning slot of a nested type.
+      if (slot.getDesc().getColumn() == null) continue;
 
       Expr constExpr = binaryPred.getChild(1);
       // Only constant exprs can be evaluated against parquet::Statistics. This includes

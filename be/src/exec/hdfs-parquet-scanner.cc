@@ -193,7 +193,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 
   // Allocate tuple buffer to evaluate conjuncts on parquet::Statistics.
   const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
-  if (min_max_tuple_desc) {
+  if (min_max_tuple_desc != nullptr) {
     int64_t tuple_size = min_max_tuple_desc->byte_size();
     if (!min_max_tuple_buffer_.TryAllocate(tuple_size)) {
       return Status(Substitute("Could not allocate buffer of $0 bytes for Parquet "
@@ -484,16 +484,39 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(const parquet::RowGroup& row_g
   Tuple* min_max_tuple = reinterpret_cast<Tuple*>(min_max_tuple_buffer_.buffer());
   min_max_tuple->Init(tuple_size);
 
-  DCHECK(min_max_tuple_desc->slots().size() == min_max_conjuncts_ctxs_.size());
+  DCHECK_EQ(min_max_tuple_desc->slots().size(), min_max_conjuncts_ctxs_.size());
 
   min_max_conjuncts_ctxs_to_eval_.clear();
   for (int i = 0; i < min_max_conjuncts_ctxs_.size(); ++i) {
     SlotDescriptor* slot_desc = min_max_tuple_desc->slots()[i];
     ExprContext* conjunct = min_max_conjuncts_ctxs_[i];
-    Expr* e = conjunct->root();
-    DCHECK(e->GetChild(0)->is_slotref());
 
-    int col_idx = slot_desc->col_pos() - scan_node_->num_partition_keys();
+    // Resolve column path to determine col idx.
+    SchemaNode* node = nullptr;
+    bool pos_field;
+    bool missing_field;
+    RETURN_IF_ERROR(schema_resolver_->ResolvePath(slot_desc->col_path(),
+        &node, &pos_field, &missing_field));
+
+    if (missing_field) {
+      // We are selecting a column that is not in the file. We would set its slot to NULL
+      // during the scan, so any predicate would evaluate to false. Return early. NULL
+      // comparisons cannot happen here, since predicates with NULL literals are filtered
+      // in the frontend.
+      *skip_row_group = true;
+      return Status::OK();
+    }
+
+    if (pos_field) {
+      // The planner should not send predicates with 'pos' for stats filtering to the BE.
+      // In case there is a bug, we return an error, which will abort the query.
+      stringstream err;
+      err << "Statistics not supported for pos fields: " << slot_desc->DebugString();
+      DCHECK(false) << err.str();
+      return Status(err.str());
+    }
+
+    int col_idx = node->col_idx;
     DCHECK(col_idx < row_group.columns.size());
 
     if (!ParquetMetadataUtils::HasRowGroupStats(row_group, col_idx)) continue;
@@ -503,17 +526,17 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(const parquet::RowGroup& row_g
     void* slot = min_max_tuple->GetSlot(slot_desc->tuple_offset());
     const ColumnType& col_type = slot_desc->type();
 
-    if (e->function_name() == "lt" || e->function_name() == "le") {
+    const string& fn_name = conjunct->root()->function_name();
+    if (fn_name == "lt" || fn_name == "le") {
       // We need to get min stats.
       stats_read = ColumnStatsBase::ReadFromThrift(stats, col_type,
           ColumnStatsBase::StatsField::MIN, slot);
-    } else if (e->function_name() == "gt" || e->function_name() == "ge") {
+    } else if (fn_name == "gt" || fn_name == "ge") {
       // We need to get max stats.
       stats_read = ColumnStatsBase::ReadFromThrift(stats, col_type,
           ColumnStatsBase::StatsField::MAX, slot);
     } else {
-      DCHECK(false) << "Unsupported function name for statistics evaluation: "
-          << e->function_name();
+      DCHECK(false) << "Unsupported function name for statistics evaluation: " << fn_name;
     }
     if (stats_read) min_max_conjuncts_ctxs_to_eval_.push_back(conjunct);
   }

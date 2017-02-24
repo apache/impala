@@ -255,10 +255,7 @@ class Expr {
 
  protected:
   friend class AggFnEvaluator;
-  friend class CastExpr;
-  friend class ComputeFunctions;
   friend class DecimalFunctions;
-  friend class DecimalLliteral;
   friend class DecimalOperators;
   friend class MathFunctions;
   friend class StringFunctions;
@@ -267,7 +264,6 @@ class Expr {
   friend class UtilityFunctions;
   friend class CaseExpr;
   friend class InPredicate;
-  friend class FunctionCall;
   friend class ScalarFnCall;
 
   Expr(const ColumnType& type, bool is_constant, bool is_slotref);

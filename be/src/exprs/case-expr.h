@@ -45,7 +45,6 @@ class CaseExpr: public Expr {
 
  protected:
   friend class Expr;
-  friend class ComputeFunctions;
   friend class ConditionalFunctions;
   friend class DecimalOperators;
 

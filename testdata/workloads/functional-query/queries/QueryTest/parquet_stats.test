@@ -229,3 +229,53 @@ select id, bool_col from functional_parquet.alltypessmall where 5 + 5 < int_col
 row_regex: .*NumRowGroups: 4 .*
 row_regex: .*NumStatsFilteredRowGroups: 4 .*
 ====
+---- QUERY
+# Test name based column resolution
+create table name_resolve stored as parquet as select * from functional_parquet.alltypessmall;
+alter table name_resolve replace columns (int_col int, bool_col boolean, tinyint_col tinyint, smallint_col smallint, id int);
+set parquet_fallback_schema_resolution=NAME;
+# If this picks up the stats from int_col, then it will filter all row groups and return
+# an incorrect result.
+select count(*) from name_resolve where id > 10;
+---- RESULTS
+89
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 1 .*
+row_regex: .*NumStatsFilteredRowGroups: 0 .*
+====
+---- QUERY
+# Query that has an implicit cast to a larger integer type
+select count(*) from functional_parquet.alltypessmall where tinyint_col > 1000000000000
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 4 .*
+====
+---- QUERY
+# Predicates with explicit casts are not supported when evaluating parquet::Statistics.
+select count(*) from functional_parquet.alltypessmall where '0' > cast(tinyint_col as string)
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 4 .*
+row_regex: .*NumStatsFilteredRowGroups: 0 .*
+====
+---- QUERY
+# Explicit casts between numerical types can violate the transitivity of "min()", so they
+# are not supported when evaluating parquet::Statistics.
+select count(*) from functional_parquet.alltypes where cast(id as tinyint) < 10;
+---- RESULTS
+3878
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 24 .*
+row_regex: .*NumStatsFilteredRowGroups: 0 .*
+====
+---- QUERY
+select count(*) from functional_parquet.complextypestbl.int_array where pos < 5;
+---- RESULTS
+9
+---- RUNTIME_PROFILE
+row_regex: .*NumRowGroups: 2 .*
+row_regex: .*NumStatsFilteredRowGroups: 0 .*
+====
