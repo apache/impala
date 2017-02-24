@@ -125,8 +125,7 @@ under the License.
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
 
     <p>
-      This type is available using Impala 2.0 or higher under CDH 4, or with Impala on CDH 5.2 or higher. There are
-      no compatibility issues with other components when exchanging data files or running Impala on CDH 4.
+      This type is available using <keyword keyref="impala20_full"/> or higher.
     </p>
 
     <p>

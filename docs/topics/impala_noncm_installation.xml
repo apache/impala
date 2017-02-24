@@ -75,8 +75,8 @@ under the License.
           described in the CDH Installation Guide).
         </p>
         <p>
-          <ph rev="upstream">Cloudera</ph> recommends setting up a Hive metastore service rather than connecting directly to the metastore
-          database; this configuration is required when running Impala under CDH 4.1. Make sure the
+          Whenever practical, set up a Hive metastore service rather than connecting directly to the metastore
+          database. Make sure the
           <filepath>/etc/impala/conf/hive-site.xml</filepath> file contains the following setting, substituting the
           appropriate hostname for <varname>metastore_server_host</varname>:
         </p>
@@ -106,7 +106,7 @@ $</codeblock>
 
       <li>
         Confirm that your package management command is aware of the Impala repository settings, as described in
-        <xref href="impala_prereqs.xml#prereqs"/>. (For CDH 4, this is a different repository than for CDH.) You
+        <xref href="impala_prereqs.xml#prereqs"/>. You
         might need to download a repo or list file into a system directory underneath <filepath>/etc</filepath>.
       </li>
 

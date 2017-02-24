@@ -51,8 +51,8 @@ under the License.
         limits on the number of concurrent queries or the amount of memory used. The queries are queued, and
         executed as other queries finish and resources become available. You can control the concurrency limits,
         and specify different limits for different groups of users to divide cluster resources according to the
-        priorities of different classes of users. This feature is new in Impala 1.3, and works with both CDH 4 and
-        CDH 5. See <xref href="impala_admission.xml#admission_control"/> for details.
+        priorities of different classes of users. This feature is new in Impala 1.3.
+        See <xref href="impala_admission.xml#admission_control"/> for details.
       </li>
 
       <li>

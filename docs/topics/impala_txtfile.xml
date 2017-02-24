@@ -537,8 +537,8 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</codeblock>
 
             <note rev="1.2.0">
               <p rev="1.2.0">
-                <ph rev="upstream">The name of the Hadoop LZO package changed between CDH 4 and CDH 5. In CDH 4, the package name was
-                <codeph>hadoop-lzo-cdh4</codeph>. In CDH 5 and higher, the package name is <codeph>hadoop-lzo</codeph>.</ph>
+                The name of the Hadoop LZO package changed in the distant past.
+                Currently, the package name is <codeph>hadoop-lzo</codeph>.
               </p>
             </note>
 

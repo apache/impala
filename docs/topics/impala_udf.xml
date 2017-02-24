@@ -204,7 +204,7 @@ select real_words(letters) from word_games;</codeblock>
             Typically, a Java UDF will execute several times slower in Impala than the equivalent native UDF
             written in C++.
           </li>
-          <li rev="2.5.0 IMPALA-2843 CDH-39148">
+          <li rev="2.5.0 IMPALA-2843">
             In <keyword keyref="impala25_full"/> and higher, you can transparently call Hive Java UDFs through Impala,
             or call Impala Java UDFs through Hive. This feature does not apply to built-in Hive functions.
             Any Impala Java UDFs created with older versions must be re-created using new <codeph>CREATE FUNCTION</codeph>
@@ -282,7 +282,7 @@ select real_words(letters) from word_games;</codeblock>
             <codeph>WHERE</codeph> clause), directly on a column, and on the results of a string expression:
           </p>
 
-<!-- To do: adapt for signatureless syntax per CDH-39148 / IMPALA-2843. -->
+<!-- To do: adapt for signatureless syntax per IMPALA-2843. -->
 <codeblock>[localhost:21000] &gt; create database udfs;
 [localhost:21000] &gt; use udfs;
 localhost:21000] &gt; create function lower(string) returns string location '/user/hive/udfs/hive.jar' symbol='org.apache.hadoop.hive.ql.udf.UDFLower';
@@ -414,7 +414,7 @@ and other examples demonstrating this technique in
 
     <conbody>
 
-      <p rev="CDH-37080">
+      <p rev="">
         To develop UDFs for Impala, download and install the <codeph>impala-udf-devel</codeph> package (RHEL-based
         distributions) or <codeph>impala-udf-dev</codeph> (Ubuntu and Debian). This package contains
         header files, sample source, and build configuration files.
@@ -422,18 +422,16 @@ and other examples demonstrating this technique in
 
       <ol>
         <li>
-          Start at <xref href="https://archive.cloudera.com/cdh5/" scope="external" format="html"/> for the CDH 5
-          package, or <xref href="https://archive.cloudera.com/impala/" scope="external" format="html"/> for the CDH
-          4 package.
+          Start at <xref href="https://archive.cloudera.com/cdh5/" scope="external" format="html"/>.
         </li>
 
         <li>
           Locate the appropriate <codeph>.repo</codeph> or list file for your operating system version, such as
           <xref href="https://archive.cloudera.com/impala/redhat/6/x86_64/impala/cloudera-impala.repo" scope="external" format="html">the
-          <codeph>.repo</codeph> file for CDH 4 on RHEL 6</xref>.
+          <codeph>.repo</codeph> file for RHEL 6</xref>.
         </li>
 
-        <li rev="CDH-37080">
+        <li>
           Use the familiar <codeph>yum</codeph>, <codeph>zypper</codeph>, or <codeph>apt-get</codeph> commands
           depending on your operating system. For the package name, specify <codeph>impala-udf-devel</codeph>
           (RHEL-based distributions) or <codeph>impala-udf-dev</codeph> (Ubuntu and Debian).
@@ -1253,7 +1251,7 @@ StringVal StringConcatFinalize(FunctionContext* context, const StringVal&amp; va
       </conbody>
     </concept>
 
-    <concept rev="2.3.0 IMPALA-1829 CDH-30572" id="udf_intermediate">
+    <concept rev="2.3.0 IMPALA-1829" id="udf_intermediate">
 
       <title>Intermediate Results for UDAs</title>
 
@@ -1346,7 +1344,7 @@ StringVal StringConcatFinalize(FunctionContext* context, const StringVal&amp; va
         Prerequisites for the build environment are:
       </p>
 
-<codeblock rev="CDH-37080"># Use the appropriate package installation command for your Linux distribution.
+<codeblock rev=""># Use the appropriate package installation command for your Linux distribution.
 sudo yum install gcc-c++ cmake boost-devel
 sudo yum install impala-udf-devel
 # The package name on Ubuntu and Debian is impala-udf-dev.

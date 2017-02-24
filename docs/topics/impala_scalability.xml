@@ -200,7 +200,7 @@ Memory Usage: Additional Notes
     <conbody>
 
       <p>
-        Before CDH 5.3, the statestore sent only one kind of message to its subscribers. This message contained all
+        Before <keyword keyref="impala21_full"/>, the statestore sent only one kind of message to its subscribers. This message contained all
         updates for any topics that a subscriber had subscribed to. It also served to let subscribers know that the
         statestore had not failed, and conversely the statestore used the success of sending a heartbeat to a
         subscriber to decide whether or not the subscriber had failed.
@@ -216,7 +216,7 @@ Memory Usage: Additional Notes
       </p>
 
       <p>
-        As of CDH 5.3, the statestore now sends topic updates and heartbeats in separate messages. This allows the
+        As of <keyword keyref="impala21_full"/>, the statestore now sends topic updates and heartbeats in separate messages. This allows the
         statestore to send and receive a steady stream of lightweight heartbeats, and removes the requirement to
         send topic updates according to a fixed schedule, reducing statestore network overhead.
       </p>
@@ -424,7 +424,7 @@ Memory Usage: Additional Notes
       </p>
 
       <p rev="2.2.0">
-        Prior to Impala 2.2 (CDH 5.4), the extra memory buffer for an operator that might spill to disk
+        Prior to Impala 2.2, the extra memory buffer for an operator that might spill to disk
         was allocated when the data structure used by the applicable SQL operator reaches 16 MB in size,
         and the memory buffer itself was 512 MB. In Impala 2.2, these values are halved: the threshold value
         is 8 MB and the memory buffer is 256 MB. <ph rev="2.3.0">In <keyword keyref="impala23_full"/> and higher, the memory for the buffer
@@ -442,10 +442,10 @@ Memory Usage: Additional Notes
       </p>
 
       <p>
-        <b>Added in:</b> This feature was added to the <codeph>ORDER BY</codeph> clause in Impala 1.4 for CDH 4,
-        and in CDH 5.1. This feature was extended to cover join queries, aggregation functions, and analytic
-        functions in Impala 2.0 for CDH 4, and in CDH 5.2. The size of the memory work area required by
-        each operator that spills was reduced from 512 megabytes to 256 megabytes in Impala 2.2 (CDH 5.4).
+        <b>Added in:</b> This feature was added to the <codeph>ORDER BY</codeph> clause in Impala 1.4.
+        This feature was extended to cover join queries, aggregation functions, and analytic
+        functions in Impala 2.0. The size of the memory work area required by
+        each operator that spills was reduced from 512 megabytes to 256 megabytes in Impala 2.2.
       </p>
 
       <p>

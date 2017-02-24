@@ -3060,8 +3060,9 @@ under the License.
     <conbody>
 
       <note>
-        Impala 1.2.1 works with CDH 4. Its feature set is a superset of features in the Impala 1.2.0 beta, with the
-        exception of resource management, which relies on CDH 5.
+        The Impala 1.2.1 feature set is a superset of features in the Impala 1.2.0 beta, with the
+        exception of resource management, which relies on resource management infrastructure in the
+        underlying Hadoop distribution.
       </note>
 
       <p>
@@ -3797,12 +3798,6 @@ under the License.
         </li>
       </ul>
 
-      <p>
-        In this version, both CDH 4.1 and 4.2 are supported, but due to performance improvements added, we highly
-        recommend you use CDH 4.2 or higher to see the full benefit. If you are using Cloudera Manager, version 4.5
-        is required.
-      </p>
-
     </conbody>
 
   </concept>
@@ -3833,10 +3828,6 @@ under the License.
               Ubuntu 10.04/12.04 and Debian 6.03
             </li>
           </ul>
-        </li>
-
-        <li>
-          Cloudera Manager 4.5 and CDH 4.2 support Impala 0.6.
         </li>
 
         <li>

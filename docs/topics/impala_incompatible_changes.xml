@@ -1226,7 +1226,6 @@ select * from `cross`;</codeblock>
         to Impala 1.2.x in general.
       </p>
 
-<!-- <note conref="common.xml#common/cdh4_cdh5_upgrade"/> -->
     </conbody>
   </concept>
 
@@ -1249,12 +1248,6 @@ select * from `cross`;</codeblock>
           </p>
         </li>
       </ul>
-
-      <p>
-        Impala 1.2.1 goes along with CDH 4.5 and Cloudera Manager 4.8. If you used the beta version Impala 1.2.0
-        that came with the beta of CDH 5, Impala 1.2.1 includes all the features of Impala 1.2.0 except for
-        resource management, which relies on the YARN framework from CDH 5.
-      </p>
 
       <p>
         The new <cmdname>catalogd</cmdname> service might require changes to any user-written scripts that stop,

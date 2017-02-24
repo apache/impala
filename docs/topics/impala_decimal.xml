@@ -717,10 +717,6 @@ Expression '1' (type: INT) would need to be cast to DECIMAL(9,0) for column 'x'
         depending on the precision specified for the <codeph>DECIMAL</codeph> column.
       </li>
 
-      <li>
-        Parquet files containing <codeph>DECIMAL</codeph> columns are not expected to be readable under CDH 4. See
-        the <b>Compatibility</b> section for details.
-      </li>
     </ul>
 
     <p>

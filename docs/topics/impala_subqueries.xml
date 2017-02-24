@@ -227,7 +227,7 @@ Therefore, this is not an efficient construct to use with Impala queries for HBa
     </p>
 
     <p>
-      <b>Added in:</b> Subqueries are substantially enhanced starting in Impala 2.0 for CDH 4, and CDH 5.2.0. Now,
+      <b>Added in:</b> Subqueries are substantially enhanced starting in Impala 2.0. Now,
       they can be used in the <codeph>WHERE</codeph> clause, in combination with clauses such as
       <codeph>EXISTS</codeph> and <codeph>IN</codeph>, rather than just in the <codeph>FROM</codeph> clause.
     </p>

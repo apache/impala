@@ -714,7 +714,7 @@ Returned 1 row(s) in 13.35s
     <conbody>
 
       <p>
-        Starting in CDH 4.5, you can read and write Parquet data files from other CDH components.
+        You can read and write Parquet data files from other CDH components.
         <ph audience="integrated">See <xref href="cdh_ig_parquet.xml#parquet_format"/> for details.</ph>
       </p>
 
@@ -728,7 +728,7 @@ Returned 1 row(s) in 13.35s
 
       <p>
         Previously, it was not possible to create Parquet data through Impala and reuse that table within Hive. Now
-        that Parquet support is available for Hive in CDH 4.5, reusing existing Impala Parquet data files in Hive
+        that Parquet support is available for Hive, reusing existing Impala Parquet data files in Hive
         requires updating the table metadata. Use the following command if you are already running Impala 1.1.1 or
         higher:
       </p>

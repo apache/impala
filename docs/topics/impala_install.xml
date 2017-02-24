@@ -41,16 +41,9 @@ under the License.
       <indexterm audience="hidden">impalad</indexterm>
       <indexterm audience="hidden">impala-shell</indexterm>
       <indexterm audience="hidden">statestored</indexterm>
-      Impala is an open-source add-on to the Cloudera Enterprise Core that returns rapid responses to
+      Impala is an open-source project that returns rapid responses to
       queries.
     </p>
-
-    <note>
-      <p>
-        Under CDH 5, Impala is included as part of the CDH installation and no separate steps are needed.
-        <ph audience="standalone">Therefore, the instruction steps in this section apply to CDH 4 only.</ph>
-      </p>
-    </note>
 
     <p outputclass="toc inpage"/>
   </conbody>

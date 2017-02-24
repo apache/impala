@@ -216,8 +216,7 @@ for this information.
         <li>
           The <codeph>DECIMAL</codeph> type is defined in Avro as a <codeph>BYTE</codeph> type with the
           <codeph>logicalType</codeph> property set to <codeph>"decimal"</codeph> and a specified precision and
-          scale. Use <codeph>DECIMAL</codeph> in Avro tables only under CDH 5. The infrastructure and components
-          under CDH 4 do not have reliable <codeph>DECIMAL</codeph> support.
+          scale.
         </li>
 
         <li>
@@ -255,7 +254,7 @@ for this information.
           An Impala <codeph>TIMESTAMP</codeph> column definition maps to an Avro <codeph>STRING</codeph> and is presented as a <codeph>STRING</codeph>
           in the reconciled schema, because Avro has no binary <codeph>TIMESTAMP</codeph> representation.
           As a result, no Avro table can have a <codeph>TIMESTAMP</codeph> column; this restriction is the same as
-          in earlier CDH and Impala releases.
+          in earlier Impala releases.
         </li>
         </ul>
       </p>
