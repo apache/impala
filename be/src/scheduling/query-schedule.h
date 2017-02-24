@@ -103,7 +103,7 @@ struct FragmentExecParams {
 ///
 /// QuerySchedule is a container class for scheduling data, but it doesn't contain
 /// scheduling logic itself. Its state either comes from the static TQueryExecRequest
-/// or is computed by SimpleScheduler.
+/// or is computed by Scheduler.
 class QuerySchedule {
  public:
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
@@ -209,7 +209,7 @@ class QuerySchedule {
   std::vector<int32_t> plan_node_to_plan_node_idx_;
 
   // populated in Init() and Scheduler::Schedule()
-  // (SimpleScheduler::ComputeFInstanceExecParams()), indexed by fragment idx
+  // (Scheduler::ComputeFInstanceExecParams()), indexed by fragment idx
   // (TPlanFragment.idx)
   std::vector<FragmentExecParams> fragment_exec_params_;
 

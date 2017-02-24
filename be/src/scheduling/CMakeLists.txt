@@ -28,12 +28,12 @@ add_library(Scheduling STATIC
   backend-config.cc
   query-schedule.cc
   request-pool-service.cc
-  simple-scheduler-test-util.cc
-  simple-scheduler.cc
+  scheduler-test-util.cc
+  scheduler.cc
 )
 add_dependencies(Scheduling thrift-deps)
 
-ADD_BE_TEST(simple-scheduler-test)
+ADD_BE_TEST(scheduler-test)
 ADD_BE_TEST(backend-config-test)
 # TODO: Add BE test
 # ADD_BE_TEST(admission-controller-test)

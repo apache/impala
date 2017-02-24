@@ -15,13 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "scheduling/simple-scheduler.h"
+#include "scheduling/scheduler.h"
 
-#include <atomic>
+#include <algorithm>
 #include <random>
 #include <vector>
-#include <algorithm>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
@@ -29,21 +27,13 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
-#include "util/metrics.h"
-#include "runtime/exec-env.h"
-#include "service/impala-server.h"
-
-#include "statestore/statestore-subscriber.h"
-#include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
-
-#include "util/network-util.h"
-#include "util/uid-util.h"
+#include "gen-cpp/Types_types.h"
+#include "rapidjson/rapidjson.h"
+#include "statestore/statestore-subscriber.h"
 #include "util/container-util.h"
-#include "util/debug-util.h"
-#include "util/error-util.h"
-#include "util/mem-info.h"
-#include "util/parse-util.h"
+#include "util/metrics.h"
+#include "util/network-util.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
@@ -65,15 +55,14 @@ static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 static const string NUM_BACKENDS_KEY("simple-scheduler.num-backends");
 
-
 static const string BACKENDS_WEB_PAGE = "/backends";
 static const string BACKENDS_TEMPLATE = "backends.tmpl";
 
-const string SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
+const string Scheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
-SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
-    const string& backend_id, const TNetworkAddress& backend_address,
-    MetricGroup* metrics, Webserver* webserver, RequestPoolService* request_pool_service)
+Scheduler::Scheduler(StatestoreSubscriber* subscriber, const string& backend_id,
+    const TNetworkAddress& backend_address, MetricGroup* metrics, Webserver* webserver,
+    RequestPoolService* request_pool_service)
   : backend_config_(std::make_shared<const BackendConfig>()),
     metrics_(metrics->GetOrCreateChildGroup("scheduler")),
     webserver_(webserver),
@@ -93,8 +82,8 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
   }
 }
 
-SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
-    MetricGroup* metrics, Webserver* webserver, RequestPoolService* request_pool_service)
+Scheduler::Scheduler(const vector<TNetworkAddress>& backends, MetricGroup* metrics,
+    Webserver* webserver, RequestPoolService* request_pool_service)
   : backend_config_(std::make_shared<const BackendConfig>(backends)),
     metrics_(metrics),
     webserver_(webserver),
@@ -114,8 +103,8 @@ SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
   }
 }
 
-Status SimpleScheduler::Init() {
-  LOG(INFO) << "Starting simple scheduler";
+Status Scheduler::Init() {
+  LOG(INFO) << "Starting scheduler";
 
   // Figure out what our IP address is, so that each subscriber
   // doesn't have to resolve it on every heartbeat.
@@ -124,28 +113,28 @@ Status SimpleScheduler::Init() {
   Status status = HostnameToIpAddr(hostname, &ip);
   if (!status.ok()) {
     VLOG(1) << status.GetDetail();
-    status.AddDetail("SimpleScheduler failed to start");
+    status.AddDetail("Scheduler failed to start");
     return status;
   }
 
   local_backend_descriptor_.ip_address = ip;
-  LOG(INFO) << "Simple-scheduler using " << ip << " as IP address";
+  LOG(INFO) << "Scheduler using " << ip << " as IP address";
 
   coord_only_backend_config_.AddBackend(local_backend_descriptor_);
 
   if (webserver_ != NULL) {
     Webserver::UrlCallback backends_callback =
-        bind<void>(mem_fn(&SimpleScheduler::BackendsUrlCallback), this, _1, _2);
-    webserver_->RegisterUrlCallback(BACKENDS_WEB_PAGE, BACKENDS_TEMPLATE,
-        backends_callback);
+        bind<void>(mem_fn(&Scheduler::BackendsUrlCallback), this, _1, _2);
+    webserver_->RegisterUrlCallback(
+        BACKENDS_WEB_PAGE, BACKENDS_TEMPLATE, backends_callback);
   }
 
   if (statestore_subscriber_ != NULL) {
     StatestoreSubscriber::UpdateCallback cb =
-        bind<void>(mem_fn(&SimpleScheduler::UpdateMembership), this, _1, _2);
+        bind<void>(mem_fn(&Scheduler::UpdateMembership), this, _1, _2);
     Status status = statestore_subscriber_->AddTopic(IMPALA_MEMBERSHIP_TOPIC, true, cb);
     if (!status.ok()) {
-      status.AddDetail("SimpleScheduler failed to register membership topic");
+      status.AddDetail("Scheduler failed to register membership topic");
       return status;
     }
     if (!FLAGS_disable_admission_control) {
@@ -160,8 +149,8 @@ Status SimpleScheduler::Init() {
     total_assignments_ = metrics_->AddCounter<int64_t>(ASSIGNMENTS_KEY, 0);
     total_local_assignments_ = metrics_->AddCounter<int64_t>(LOCAL_ASSIGNMENTS_KEY, 0);
     initialized_ = metrics_->AddProperty(SCHEDULER_INIT_KEY, true);
-    num_fragment_instances_metric_ = metrics_->AddGauge<int64_t>(
-        NUM_BACKENDS_KEY, num_backends);
+    num_fragment_instances_metric_ =
+        metrics_->AddGauge<int64_t>(NUM_BACKENDS_KEY, num_backends);
   }
 
   if (statestore_subscriber_ != NULL) {
@@ -179,13 +168,13 @@ Status SimpleScheduler::Init() {
   return Status::OK();
 }
 
-void SimpleScheduler::BackendsUrlCallback(const Webserver::ArgumentMap& args,
-    Document* document) {
+void Scheduler::BackendsUrlCallback(
+    const Webserver::ArgumentMap& args, Document* document) {
   BackendConfig::BackendList backends;
   BackendConfigPtr backend_config = GetBackendConfig();
   backend_config->GetAllBackends(&backends);
   Value backends_list(kArrayType);
-  for (const TBackendDescriptor& backend: backends) {
+  for (const TBackendDescriptor& backend : backends) {
     Value str(TNetworkAddressToString(backend.address).c_str(), document->GetAllocator());
     backends_list.PushBack(str, document->GetAllocator());
   }
@@ -193,7 +182,7 @@ void SimpleScheduler::BackendsUrlCallback(const Webserver::ArgumentMap& args,
   document->AddMember("backends", backends_list, document->GetAllocator());
 }
 
-void SimpleScheduler::UpdateMembership(
+void Scheduler::UpdateMembership(
     const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
   // First look to see if the topic(s) we're interested in have an update
@@ -236,7 +225,7 @@ void SimpleScheduler::UpdateMembership(
       continue;
     }
     if (be_desc.ip_address.empty()) {
-      // Each scheduler resolves its hostname locally in SimpleScheduler::Init() and
+      // Each scheduler resolves its hostname locally in Scheduler::Init() and
       // adds the IP address to local_backend_descriptor_. If it is empty, then either
       // that code has been changed, or someone else is sending malformed packets.
       VLOG(1) << "Ignoring subscription request with empty IP address from subscriber: "
@@ -294,25 +283,25 @@ void SimpleScheduler::UpdateMembership(
   }
 }
 
-SimpleScheduler::BackendConfigPtr SimpleScheduler::GetBackendConfig() const {
+Scheduler::BackendConfigPtr Scheduler::GetBackendConfig() const {
   lock_guard<mutex> l(backend_config_lock_);
   DCHECK(backend_config_.get() != NULL);
   BackendConfigPtr backend_config = backend_config_;
   return backend_config;
 }
 
-void SimpleScheduler::SetBackendConfig(const BackendConfigPtr& backend_config) {
+void Scheduler::SetBackendConfig(const BackendConfigPtr& backend_config) {
   lock_guard<mutex> l(backend_config_lock_);
   backend_config_ = backend_config;
 }
 
-Status SimpleScheduler::ComputeScanRangeAssignment(QuerySchedule* schedule) {
+Status Scheduler::ComputeScanRangeAssignment(QuerySchedule* schedule) {
   RuntimeProfile::Counter* total_assignment_timer =
       ADD_TIMER(schedule->summary_profile(), "ComputeScanRangeAssignmentTimer");
   BackendConfigPtr backend_config = GetBackendConfig();
   const TQueryExecRequest& exec_request = schedule->request();
-  for (const TPlanExecInfo& plan_exec_info: exec_request.plan_exec_info) {
-    for (const auto& entry: plan_exec_info.per_node_scan_ranges) {
+  for (const TPlanExecInfo& plan_exec_info : exec_request.plan_exec_info) {
+    for (const auto& entry : plan_exec_info.per_node_scan_ranges) {
       const TPlanNodeId node_id = entry.first;
       const TPlanFragment& fragment = schedule->GetContainingFragment(node_id);
       bool exec_at_coord = (fragment.partition.type == TPartitionType::UNPARTITIONED);
@@ -320,37 +309,38 @@ Status SimpleScheduler::ComputeScanRangeAssignment(QuerySchedule* schedule) {
       const TPlanNode& node = schedule->GetNode(node_id);
       DCHECK_EQ(node.node_id, node_id);
 
-      const TReplicaPreference::type* node_replica_preference =
-          node.__isset.hdfs_scan_node && node.hdfs_scan_node.__isset.replica_preference
-            ? &node.hdfs_scan_node.replica_preference : NULL;
-      bool node_random_replica =
-          node.__isset.hdfs_scan_node && node.hdfs_scan_node.__isset.random_replica
-            && node.hdfs_scan_node.random_replica;
+      bool has_preference =
+          node.__isset.hdfs_scan_node && node.hdfs_scan_node.__isset.replica_preference;
+      const TReplicaPreference::type* node_replica_preference = has_preference ?
+          &node.hdfs_scan_node.replica_preference :
+          nullptr;
+      bool node_random_replica = node.__isset.hdfs_scan_node
+          && node.hdfs_scan_node.__isset.random_replica
+          && node.hdfs_scan_node.random_replica;
 
       FragmentScanRangeAssignment* assignment =
           &schedule->GetFragmentExecParams(fragment.idx)->scan_range_assignment;
-      RETURN_IF_ERROR(ComputeScanRangeAssignment(
-          *backend_config, node_id, node_replica_preference, node_random_replica,
-          entry.second, exec_request.host_list, exec_at_coord,
-          schedule->query_options(), total_assignment_timer, assignment));
+      RETURN_IF_ERROR(
+          ComputeScanRangeAssignment(*backend_config, node_id, node_replica_preference,
+              node_random_replica, entry.second, exec_request.host_list, exec_at_coord,
+              schedule->query_options(), total_assignment_timer, assignment));
       schedule->IncNumScanRanges(entry.second.size());
     }
   }
   return Status::OK();
 }
 
-void SimpleScheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
+void Scheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
   const TQueryExecRequest& exec_request = schedule->request();
 
   // for each plan, compute the FInstanceExecParams for the tree of fragments
-  for (const TPlanExecInfo& plan_exec_info: exec_request.plan_exec_info) {
+  for (const TPlanExecInfo& plan_exec_info : exec_request.plan_exec_info) {
     // set instance_id, host, per_node_scan_ranges
     ComputeFragmentExecParams(plan_exec_info,
-        schedule->GetFragmentExecParams(plan_exec_info.fragments[0].idx),
-        schedule);
+        schedule->GetFragmentExecParams(plan_exec_info.fragments[0].idx), schedule);
 
     // Set destinations, per_exch_num_senders, sender_id.
-    for (const TPlanFragment& src_fragment: plan_exec_info.fragments) {
+    for (const TPlanFragment& src_fragment : plan_exec_info.fragments) {
       if (!src_fragment.output_sink.__isset.stream_sink) continue;
       FragmentIdx dest_idx =
           schedule->GetFragmentIdx(src_fragment.output_sink.stream_sink.dest_node_id);
@@ -358,8 +348,7 @@ void SimpleScheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
       const TPlanFragment& dest_fragment = plan_exec_info.fragments[dest_idx];
       FragmentExecParams* dest_params =
           schedule->GetFragmentExecParams(dest_fragment.idx);
-      FragmentExecParams* src_params =
-          schedule->GetFragmentExecParams(src_fragment.idx);
+      FragmentExecParams* src_params = schedule->GetFragmentExecParams(src_fragment.idx);
 
       // populate src_params->destinations
       src_params->destinations.resize(dest_params->instance_exec_params.size());
@@ -372,10 +361,9 @@ void SimpleScheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
       // enumerate senders consecutively;
       // for distributed merge we need to enumerate senders across fragment instances
       const TDataStreamSink& sink = src_fragment.output_sink.stream_sink;
-      DCHECK(
-          sink.output_partition.type == TPartitionType::UNPARTITIONED
-            || sink.output_partition.type == TPartitionType::HASH_PARTITIONED
-            || sink.output_partition.type == TPartitionType::RANDOM);
+      DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
+          || sink.output_partition.type == TPartitionType::HASH_PARTITIONED
+          || sink.output_partition.type == TPartitionType::RANDOM);
       PlanNodeId exch_id = sink.dest_node_id;
       int sender_id_base = dest_params->per_exch_num_senders[exch_id];
       dest_params->per_exch_num_senders[exch_id] +=
@@ -388,11 +376,10 @@ void SimpleScheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
   }
 }
 
-void SimpleScheduler::ComputeFragmentExecParams(
-    const TPlanExecInfo& plan_exec_info, FragmentExecParams* fragment_params,
-    QuerySchedule* schedule) {
+void Scheduler::ComputeFragmentExecParams(const TPlanExecInfo& plan_exec_info,
+    FragmentExecParams* fragment_params, QuerySchedule* schedule) {
   // traverse input fragments
-  for (FragmentIdx input_fragment_idx: fragment_params->input_fragments) {
+  for (FragmentIdx input_fragment_idx : fragment_params->input_fragments) {
     ComputeFragmentExecParams(
         plan_exec_info, schedule->GetFragmentExecParams(input_fragment_idx), schedule);
   }
@@ -437,36 +424,36 @@ void SimpleScheduler::ComputeFragmentExecParams(
   }
 }
 
-void SimpleScheduler::CreateUnionInstances(
+void Scheduler::CreateUnionInstances(
     FragmentExecParams* fragment_params, QuerySchedule* schedule) {
   const TPlanFragment& fragment = fragment_params->fragment;
   DCHECK(ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE));
 
   // Add hosts of scan nodes.
-  vector<TPlanNodeType::type> scan_node_types {
-    TPlanNodeType::HDFS_SCAN_NODE, TPlanNodeType::HBASE_SCAN_NODE,
-    TPlanNodeType::DATA_SOURCE_NODE, TPlanNodeType::KUDU_SCAN_NODE};
+  vector<TPlanNodeType::type> scan_node_types{TPlanNodeType::HDFS_SCAN_NODE,
+      TPlanNodeType::HBASE_SCAN_NODE, TPlanNodeType::DATA_SOURCE_NODE,
+      TPlanNodeType::KUDU_SCAN_NODE};
   vector<TPlanNodeId> scan_node_ids;
   FindNodes(fragment.plan, scan_node_types, &scan_node_ids);
   vector<TNetworkAddress> scan_hosts;
-  for (TPlanNodeId id: scan_node_ids) GetScanHosts(id, *fragment_params, &scan_hosts);
+  for (TPlanNodeId id : scan_node_ids) GetScanHosts(id, *fragment_params, &scan_hosts);
 
   unordered_set<TNetworkAddress> hosts(scan_hosts.begin(), scan_hosts.end());
 
   // Add hosts of input fragments.
-  for (FragmentIdx idx: fragment_params->input_fragments) {
+  for (FragmentIdx idx : fragment_params->input_fragments) {
     const FragmentExecParams& input_params = *schedule->GetFragmentExecParams(idx);
-    for (const FInstanceExecParams& instance_params: input_params.instance_exec_params) {
+    for (const FInstanceExecParams& instance_params : input_params.instance_exec_params) {
       hosts.insert(instance_params.host);
     }
   }
-  DCHECK(!hosts.empty())
-      << "no hosts for fragment " << fragment.idx << " with a UnionNode";
+  DCHECK(!hosts.empty()) << "no hosts for fragment " << fragment.idx
+                         << " with a UnionNode";
 
   // create a single instance per host
   // TODO-MT: figure out how to parallelize Union
   int per_fragment_idx = 0;
-  for (const TNetworkAddress& host: hosts) {
+  for (const TNetworkAddress& host : hosts) {
     fragment_params->instance_exec_params.emplace_back(
         schedule->GetNextInstanceId(), host, per_fragment_idx++, *fragment_params);
     // assign all scan ranges
@@ -477,22 +464,21 @@ void SimpleScheduler::CreateUnionInstances(
   }
 }
 
-void SimpleScheduler::CreateScanInstances(
-    PlanNodeId leftmost_scan_id, FragmentExecParams* fragment_params,
-    QuerySchedule* schedule) {
+void Scheduler::CreateScanInstances(PlanNodeId leftmost_scan_id,
+    FragmentExecParams* fragment_params, QuerySchedule* schedule) {
   int max_num_instances =
       schedule->request().query_ctx.client_request.query_options.mt_dop;
   if (max_num_instances == 0) max_num_instances = 1;
 
   if (fragment_params->scan_range_assignment.empty()) {
     // this scan doesn't have any scan ranges: run a single instance on the coordinator
-    fragment_params->instance_exec_params.emplace_back(
-        schedule->GetNextInstanceId(), local_backend_descriptor_.address, 0, *fragment_params);
+    fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
+        local_backend_descriptor_.address, 0, *fragment_params);
     return;
   }
 
   int per_fragment_instance_idx = 0;
-  for (const auto& assignment_entry: fragment_params->scan_range_assignment) {
+  for (const auto& assignment_entry : fragment_params->scan_range_assignment) {
     // evenly divide up the scan ranges of the leftmost scan between at most
     // <dop> instances
     const TNetworkAddress& host = assignment_entry.first;
@@ -501,7 +487,7 @@ void SimpleScheduler::CreateScanInstances(
     const vector<TScanRangeParams>& params_list = scan_ranges_it->second;
 
     int64 total_size = 0;
-    for (const TScanRangeParams& params: params_list) {
+    for (const TScanRangeParams& params : params_list) {
       if (params.scan_range.__isset.hdfs_file_split) {
         total_size += params.scan_range.hdfs_file_split.length;
       } else {
@@ -519,7 +505,7 @@ void SimpleScheduler::CreateScanInstances(
     DCHECK_GT(num_instances, 0);
     float avg_bytes_per_instance = static_cast<float>(total_size) / num_instances;
     int64_t total_assigned_bytes = 0;
-    int params_idx = 0;  // into params_list
+    int params_idx = 0; // into params_list
     for (int i = 0; i < num_instances; ++i) {
       fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
           host, per_fragment_instance_idx++, *fragment_params);
@@ -552,29 +538,27 @@ void SimpleScheduler::CreateScanInstances(
       }
       if (params_idx == params_list.size()) break; // nothing left to assign
     }
-    DCHECK_EQ(params_idx, params_list.size());  // everything got assigned
+    DCHECK_EQ(params_idx, params_list.size()); // everything got assigned
     DCHECK_EQ(total_assigned_bytes, total_size);
   }
 }
 
-void SimpleScheduler::CreateCollocatedInstances(
+void Scheduler::CreateCollocatedInstances(
     FragmentExecParams* fragment_params, QuerySchedule* schedule) {
   DCHECK_GE(fragment_params->input_fragments.size(), 1);
   const FragmentExecParams* input_fragment_params =
       schedule->GetFragmentExecParams(fragment_params->input_fragments[0]);
   int per_fragment_instance_idx = 0;
-  for (const FInstanceExecParams& input_instance_params:
+  for (const FInstanceExecParams& input_instance_params :
       input_fragment_params->instance_exec_params) {
-    fragment_params->instance_exec_params.emplace_back(
-        schedule->GetNextInstanceId(), input_instance_params.host,
-        per_fragment_instance_idx++, *fragment_params);
+    fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
+        input_instance_params.host, per_fragment_instance_idx++, *fragment_params);
   }
 }
 
-Status SimpleScheduler::ComputeScanRangeAssignment(
-    const BackendConfig& backend_config, PlanNodeId node_id,
-    const TReplicaPreference::type* node_replica_preference, bool node_random_replica,
-    const vector<TScanRangeLocationList>& locations,
+Status Scheduler::ComputeScanRangeAssignment(const BackendConfig& backend_config,
+    PlanNodeId node_id, const TReplicaPreference::type* node_replica_preference,
+    bool node_random_replica, const vector<TScanRangeLocationList>& locations,
     const vector<TNetworkAddress>& host_list, bool exec_at_coord,
     const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
     FragmentScanRangeAssignment* assignment) {
@@ -590,8 +574,8 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
 
   // The query option to disable cached reads adjusts the memory base distance to view
   // all replicas as having a distance disk_local or worse.
-  if (query_options.disable_cached_reads &&
-      base_distance == TReplicaPreference::CACHE_LOCAL) {
+  if (query_options.disable_cached_reads
+      && base_distance == TReplicaPreference::CACHE_LOCAL) {
     base_distance = TReplicaPreference::DISK_LOCAL;
   }
 
@@ -610,7 +594,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
 
   // Loop over all scan ranges, select a backend for those with local impalads and collect
   // all others for later processing.
-  for (const TScanRangeLocationList& scan_range_locations: locations) {
+  for (const TScanRangeLocationList& scan_range_locations : locations) {
     TReplicaPreference::type min_distance = TReplicaPreference::REMOTE;
 
     // Select backend host for the current scan range.
@@ -623,7 +607,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
       // Collect backend candidates with smallest memory distance.
       vector<IpAddr> backend_candidates;
       if (base_distance < TReplicaPreference::REMOTE) {
-        for (const TScanRangeLocation& location: scan_range_locations.locations) {
+        for (const TScanRangeLocation& location : scan_range_locations.locations) {
           const TNetworkAddress& replica_host = host_list[location.host_idx];
           // Determine the adjusted memory distance to the closest backend for the replica
           // host.
@@ -656,7 +640,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
             }
           }
         }
-      }  // End of candidate selection.
+      } // End of candidate selection.
       DCHECK(!backend_candidates.empty() || min_distance == TReplicaPreference::REMOTE);
 
       // Check the effective memory distance of the candidates to decide whether to treat
@@ -677,23 +661,23 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
       // Remote reads will always break ties by backend rank.
       bool decide_local_assignment_by_rank = random_replica || cached_replica;
       const IpAddr* backend_ip = NULL;
-      backend_ip = assignment_ctx.SelectLocalBackendHost(backend_candidates,
-          decide_local_assignment_by_rank);
+      backend_ip = assignment_ctx.SelectLocalBackendHost(
+          backend_candidates, decide_local_assignment_by_rank);
       TBackendDescriptor backend;
       assignment_ctx.SelectBackendOnHost(*backend_ip, &backend);
-      assignment_ctx.RecordScanRangeAssignment(backend, node_id, host_list,
-          scan_range_locations, assignment);
-    }  // End of backend host selection.
-  }  // End of for loop over scan ranges.
+      assignment_ctx.RecordScanRangeAssignment(
+          backend, node_id, host_list, scan_range_locations, assignment);
+    } // End of backend host selection.
+  } // End of for loop over scan ranges.
 
   // Assign remote scans to backends.
-  for (const TScanRangeLocationList* scan_range_locations: remote_scan_range_locations) {
+  for (const TScanRangeLocationList* scan_range_locations : remote_scan_range_locations) {
     DCHECK(!exec_at_coord);
     const IpAddr* backend_ip = assignment_ctx.SelectRemoteBackendHost();
     TBackendDescriptor backend;
     assignment_ctx.SelectBackendOnHost(*backend_ip, &backend);
-    assignment_ctx.RecordScanRangeAssignment(backend, node_id, host_list,
-        *scan_range_locations, assignment);
+    assignment_ctx.RecordScanRangeAssignment(
+        backend, node_id, host_list, *scan_range_locations, assignment);
   }
 
   if (VLOG_FILE_IS_ON) assignment_ctx.PrintAssignment(*assignment);
@@ -701,7 +685,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
   return Status::OK();
 }
 
-PlanNodeId SimpleScheduler::FindLeftmostNode(
+PlanNodeId Scheduler::FindLeftmostNode(
     const TPlan& plan, const vector<TPlanNodeType::type>& types) {
   // the first node with num_children == 0 is the leftmost node
   int node_idx = 0;
@@ -719,22 +703,22 @@ PlanNodeId SimpleScheduler::FindLeftmostNode(
   return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
 }
 
-PlanNodeId SimpleScheduler::FindLeftmostScan(const TPlan& plan) {
-  vector<TPlanNodeType::type> scan_node_types {
-      TPlanNodeType::HDFS_SCAN_NODE, TPlanNodeType::HBASE_SCAN_NODE,
-      TPlanNodeType::DATA_SOURCE_NODE, TPlanNodeType::KUDU_SCAN_NODE};
+PlanNodeId Scheduler::FindLeftmostScan(const TPlan& plan) {
+  vector<TPlanNodeType::type> scan_node_types{TPlanNodeType::HDFS_SCAN_NODE,
+      TPlanNodeType::HBASE_SCAN_NODE, TPlanNodeType::DATA_SOURCE_NODE,
+      TPlanNodeType::KUDU_SCAN_NODE};
   return FindLeftmostNode(plan, scan_node_types);
 }
 
-bool SimpleScheduler::ContainsNode(const TPlan& plan, TPlanNodeType::type type) {
+bool Scheduler::ContainsNode(const TPlan& plan, TPlanNodeType::type type) {
   for (int i = 0; i < plan.nodes.size(); ++i) {
     if (plan.nodes[i].node_type == type) return true;
   }
   return false;
 }
 
-void SimpleScheduler::FindNodes(const TPlan& plan,
-    const vector<TPlanNodeType::type>& types, vector<TPlanNodeId>* results) {
+void Scheduler::FindNodes(const TPlan& plan, const vector<TPlanNodeType::type>& types,
+    vector<TPlanNodeId>* results) {
   for (int i = 0; i < plan.nodes.size(); ++i) {
     for (int j = 0; j < types.size(); ++j) {
       if (plan.nodes[i].node_type == types[j]) {
@@ -745,10 +729,10 @@ void SimpleScheduler::FindNodes(const TPlan& plan,
   }
 }
 
-void SimpleScheduler::GetScanHosts(TPlanNodeId scan_id,
-    const FragmentExecParams& params, vector<TNetworkAddress>* scan_hosts) {
+void Scheduler::GetScanHosts(TPlanNodeId scan_id, const FragmentExecParams& params,
+    vector<TNetworkAddress>* scan_hosts) {
   // Get the list of impalad host from scan_range_assignment_
-  for (const FragmentScanRangeAssignment::value_type& scan_range_assignment:
+  for (const FragmentScanRangeAssignment::value_type& scan_range_assignment :
       params.scan_range_assignment) {
     const PerNodeScanRanges& per_node_scan_ranges = scan_range_assignment.second;
     if (per_node_scan_ranges.find(scan_id) != per_node_scan_ranges.end()) {
@@ -766,7 +750,7 @@ void SimpleScheduler::GetScanHosts(TPlanNodeId scan_id,
   }
 }
 
-Status SimpleScheduler::Schedule(QuerySchedule* schedule) {
+Status Scheduler::Schedule(QuerySchedule* schedule) {
   string resolved_pool;
   RETURN_IF_ERROR(request_pool_service_->ResolveRequestPool(
       schedule->request().query_ctx, &resolved_pool));
@@ -781,8 +765,8 @@ Status SimpleScheduler::Schedule(QuerySchedule* schedule) {
 
   // compute unique hosts
   unordered_set<TNetworkAddress> unique_hosts;
-  for (const FragmentExecParams& f: schedule->fragment_exec_params()) {
-    for (const FInstanceExecParams& i: f.instance_exec_params) {
+  for (const FragmentExecParams& f : schedule->fragment_exec_params()) {
+    for (const FInstanceExecParams& i : f.instance_exec_params) {
       unique_hosts.insert(i.host);
     }
   }
@@ -794,17 +778,17 @@ Status SimpleScheduler::Schedule(QuerySchedule* schedule) {
   return Status::OK();
 }
 
-Status SimpleScheduler::Release(QuerySchedule* schedule) {
+Status Scheduler::Release(QuerySchedule* schedule) {
   if (!FLAGS_disable_admission_control) {
     RETURN_IF_ERROR(admission_controller_->ReleaseQuery(schedule));
   }
   return Status::OK();
 }
 
-SimpleScheduler::AssignmentCtx::AssignmentCtx(
-    const BackendConfig& backend_config,
+Scheduler::AssignmentCtx::AssignmentCtx(const BackendConfig& backend_config,
     IntCounter* total_assignments, IntCounter* total_local_assignments)
-  : backend_config_(backend_config), first_unused_backend_idx_(0),
+  : backend_config_(backend_config),
+    first_unused_backend_idx_(0),
     total_assignments_(total_assignments),
     total_local_assignments_(total_local_assignments) {
   DCHECK_GT(backend_config.NumBackends(), 0);
@@ -813,10 +797,10 @@ SimpleScheduler::AssignmentCtx::AssignmentCtx(
   std::shuffle(random_backend_order_.begin(), random_backend_order_.end(), g);
   // Initialize inverted map for backend rank lookups
   int i = 0;
-  for (const IpAddr& ip: random_backend_order_) random_backend_rank_[ip] = i++;
+  for (const IpAddr& ip : random_backend_order_) random_backend_rank_[ip] = i++;
 }
 
-const IpAddr* SimpleScheduler::AssignmentCtx::SelectLocalBackendHost(
+const IpAddr* Scheduler::AssignmentCtx::SelectLocalBackendHost(
     const std::vector<IpAddr>& data_locations, bool break_ties_by_rank) {
   DCHECK(!data_locations.empty());
   // List of candidate indexes into 'data_locations'.
@@ -848,7 +832,7 @@ const IpAddr* SimpleScheduler::AssignmentCtx::SelectLocalBackendHost(
   return &data_locations[*min_rank_idx];
 }
 
-const IpAddr* SimpleScheduler::AssignmentCtx::SelectRemoteBackendHost() {
+const IpAddr* Scheduler::AssignmentCtx::SelectRemoteBackendHost() {
   const IpAddr* candidate_ip;
   if (HasUnusedBackends()) {
     // Pick next unused backend.
@@ -864,24 +848,24 @@ const IpAddr* SimpleScheduler::AssignmentCtx::SelectRemoteBackendHost() {
   return candidate_ip;
 }
 
-bool SimpleScheduler::AssignmentCtx::HasUnusedBackends() const {
+bool Scheduler::AssignmentCtx::HasUnusedBackends() const {
   return first_unused_backend_idx_ < random_backend_order_.size();
 }
 
-const IpAddr* SimpleScheduler::AssignmentCtx::GetNextUnusedBackendAndIncrement() {
+const IpAddr* Scheduler::AssignmentCtx::GetNextUnusedBackendAndIncrement() {
   DCHECK(HasUnusedBackends());
   const IpAddr* ip = &random_backend_order_[first_unused_backend_idx_++];
   return ip;
 }
 
-int SimpleScheduler::AssignmentCtx::GetBackendRank(const IpAddr& ip) const {
+int Scheduler::AssignmentCtx::GetBackendRank(const IpAddr& ip) const {
   auto it = random_backend_rank_.find(ip);
   DCHECK(it != random_backend_rank_.end());
   return it->second;
 }
 
-void SimpleScheduler::AssignmentCtx::SelectBackendOnHost(const IpAddr& backend_ip,
-    TBackendDescriptor* backend) {
+void Scheduler::AssignmentCtx::SelectBackendOnHost(
+    const IpAddr& backend_ip, TBackendDescriptor* backend) {
   DCHECK(backend_config_.LookUpBackendIp(backend_ip, NULL));
   const BackendConfig::BackendList& backends_on_host =
       backend_config_.GetBackendListForHost(backend_ip);
@@ -890,8 +874,8 @@ void SimpleScheduler::AssignmentCtx::SelectBackendOnHost(const IpAddr& backend_i
     *backend = *backends_on_host.begin();
   } else {
     BackendConfig::BackendList::const_iterator* next_backend_on_host;
-    next_backend_on_host = FindOrInsert(&next_backend_per_host_, backend_ip,
-        backends_on_host.begin());
+    next_backend_on_host =
+        FindOrInsert(&next_backend_per_host_, backend_ip, backends_on_host.begin());
     DCHECK(find(backends_on_host.begin(), backends_on_host.end(), **next_backend_on_host)
         != backends_on_host.end());
     *backend = **next_backend_on_host;
@@ -903,7 +887,7 @@ void SimpleScheduler::AssignmentCtx::SelectBackendOnHost(const IpAddr& backend_i
   }
 }
 
-void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
+void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
     const TBackendDescriptor& backend, PlanNodeId node_id,
     const vector<TNetworkAddress>& host_list,
     const TScanRangeLocationList& scan_range_locations,
@@ -921,8 +905,8 @@ void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
   bool ret = backend_config_.LookUpBackendIp(backend.address.hostname, &backend_ip);
   DCHECK(ret);
   DCHECK(!backend_ip.empty());
-  assignment_heap_.InsertOrUpdate(backend_ip, scan_range_length,
-      GetBackendRank(backend_ip));
+  assignment_heap_.InsertOrUpdate(
+      backend_ip, scan_range_length, GetBackendRank(backend_ip));
 
   // See if the read will be remote. This is not the case if the impalad runs on one of
   // the replica's datanodes.
@@ -931,7 +915,7 @@ void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
   // decide which replica to use so we keep those at default values.
   int volume_id = -1;
   bool is_cached = false;
-  for (const TScanRangeLocation& location: scan_range_locations.locations) {
+  for (const TScanRangeLocation& location : scan_range_locations.locations) {
     const TNetworkAddress& replica_host = host_list[location.host_idx];
     IpAddr replica_ip;
     if (backend_config_.LookUpBackendIp(replica_host.hostname, &replica_ip)
@@ -969,25 +953,25 @@ void SimpleScheduler::AssignmentCtx::RecordScanRangeAssignment(
   scan_range_params_list->push_back(scan_range_params);
 
   if (VLOG_FILE_IS_ON) {
-    VLOG_FILE << "SimpleScheduler assignment to backend: " << backend.address
-        << "(" << (remote_read ? "remote" : "local") << " selection)";
+    VLOG_FILE << "Scheduler assignment to backend: " << backend.address << "("
+              << (remote_read ? "remote" : "local") << " selection)";
   }
 }
 
-void SimpleScheduler::AssignmentCtx::PrintAssignment(
+void Scheduler::AssignmentCtx::PrintAssignment(
     const FragmentScanRangeAssignment& assignment) {
-  VLOG_FILE << "Total remote scan volume = " <<
-    PrettyPrinter::Print(assignment_byte_counters_.remote_bytes, TUnit::BYTES);
-  VLOG_FILE << "Total local scan volume = " <<
-    PrettyPrinter::Print(assignment_byte_counters_.local_bytes, TUnit::BYTES);
-  VLOG_FILE << "Total cached scan volume = " <<
-    PrettyPrinter::Print(assignment_byte_counters_.cached_bytes, TUnit::BYTES);
+  VLOG_FILE << "Total remote scan volume = "
+            << PrettyPrinter::Print(assignment_byte_counters_.remote_bytes, TUnit::BYTES);
+  VLOG_FILE << "Total local scan volume = "
+            << PrettyPrinter::Print(assignment_byte_counters_.local_bytes, TUnit::BYTES);
+  VLOG_FILE << "Total cached scan volume = "
+            << PrettyPrinter::Print(assignment_byte_counters_.cached_bytes, TUnit::BYTES);
 
-  for (const FragmentScanRangeAssignment::value_type& entry: assignment) {
+  for (const FragmentScanRangeAssignment::value_type& entry : assignment) {
     VLOG_FILE << "ScanRangeAssignment: server=" << ThriftDebugString(entry.first);
-    for (const PerNodeScanRanges::value_type& per_node_scan_ranges: entry.second) {
+    for (const PerNodeScanRanges::value_type& per_node_scan_ranges : entry.second) {
       stringstream str;
-      for (const TScanRangeParams& params: per_node_scan_ranges.second) {
+      for (const TScanRangeParams& params : per_node_scan_ranges.second) {
         str << ThriftDebugString(params) << " ";
       }
       VLOG_FILE << "node_id=" << per_node_scan_ranges.first << " ranges=" << str.str();
@@ -995,8 +979,8 @@ void SimpleScheduler::AssignmentCtx::PrintAssignment(
   }
 }
 
-void SimpleScheduler::AddressableAssignmentHeap::InsertOrUpdate(const IpAddr& ip,
-    int64_t assigned_bytes, int rank) {
+void Scheduler::AddressableAssignmentHeap::InsertOrUpdate(
+    const IpAddr& ip, int64_t assigned_bytes, int rank) {
   auto handle_it = backend_handles_.find(ip);
   if (handle_it == backend_handles_.end()) {
     AssignmentHeap::handle_type handle = backend_heap_.push({assigned_bytes, rank, ip});
@@ -1009,5 +993,4 @@ void SimpleScheduler::AddressableAssignmentHeap::InsertOrUpdate(const IpAddr& ip
     backend_heap_.decrease(handle);
   }
 }
-
 }

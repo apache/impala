@@ -587,7 +587,7 @@ public class HdfsScanNode extends ScanNode {
 
   /**
    * Estimate the number of impalad nodes that this scan node will execute on (which is
-   * ultimately determined by the scheduling done by the backend's SimpleScheduler).
+   * ultimately determined by the scheduling done by the backend's Scheduler).
    * Assume that scan ranges that can be scheduled locally will be, and that scan
    * ranges that cannot will be round-robined across the cluster.
    */

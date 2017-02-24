@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "simple-scheduler-test-util.h"
-#include "simple-scheduler.h"
+#include "scheduling/scheduler-test-util.h"
+#include "scheduling/scheduler.h"
 
 #include "common/names.h"
 
@@ -49,7 +49,7 @@ void SampleNElements(int n, const vector<T>& in, vector<T>* out) {
   for (int idx : idxs) out->push_back(in[idx]);
 }
 
-/// Define constants from simple-scheduler-test-util.h here.
+/// Define constants from scheduler-test-util.h here.
 const int Cluster::BACKEND_PORT = 1000;
 const int Cluster::DATANODE_PORT = 2000;
 const string Cluster::HOSTNAME_PREFIX = "host_";
@@ -462,7 +462,7 @@ Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
 void SchedulerWrapper::AddBackend(const Host& host) {
   // Add to topic delta
   TTopicDelta delta;
-  delta.topic_name = SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC;
+  delta.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;
   delta.is_delta = true;
   AddHostToTopicDelta(host, &delta);
   SendTopicDelta(delta);
@@ -471,7 +471,7 @@ void SchedulerWrapper::AddBackend(const Host& host) {
 void SchedulerWrapper::RemoveBackend(const Host& host) {
   // Add deletion to topic delta
   TTopicDelta delta;
-  delta.topic_name = SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC;
+  delta.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;
   delta.is_delta = true;
   delta.topic_deletions.push_back(host.ip);
   SendTopicDelta(delta);
@@ -479,7 +479,7 @@ void SchedulerWrapper::RemoveBackend(const Host& host) {
 
 void SchedulerWrapper::SendFullMembershipMap() {
   TTopicDelta delta;
-  delta.topic_name = SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC;
+  delta.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;
   delta.is_delta = false;
   for (const Host& host : plan_.cluster().hosts()) {
     if (host.be_port >= 0) AddHostToTopicDelta(host, &delta);
@@ -489,7 +489,7 @@ void SchedulerWrapper::SendFullMembershipMap() {
 
 void SchedulerWrapper::SendEmptyUpdate() {
   TTopicDelta delta;
-  delta.topic_name = SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC;
+  delta.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;
   delta.is_delta = true;
   SendTopicDelta(delta);
 }
@@ -504,7 +504,7 @@ void SchedulerWrapper::InitializeScheduler() {
   scheduler_backend_address.hostname = scheduler_host.ip;
   scheduler_backend_address.port = scheduler_host.be_port;
 
-  scheduler_.reset(new SimpleScheduler(
+  scheduler_.reset(new Scheduler(
       NULL, scheduler_backend_id, scheduler_backend_address, &metrics_, NULL, NULL));
   scheduler_->Init();
   // Initialize the scheduler backend maps.
@@ -535,7 +535,7 @@ void SchedulerWrapper::SendTopicDelta(const TTopicDelta& delta) {
   DCHECK(scheduler_ != NULL);
   // Wrap in topic delta map.
   StatestoreSubscriber::TopicDeltaMap delta_map;
-  delta_map.emplace(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC, delta);
+  delta_map.emplace(Scheduler::IMPALA_MEMBERSHIP_TOPIC, delta);
 
   // Send to the scheduler.
   vector<TTopicDelta> dummy_result;

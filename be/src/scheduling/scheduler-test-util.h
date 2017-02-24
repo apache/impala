@@ -15,6 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#ifndef SCHEDULING_SCHEDULER_TEST_UTIL_H
+#define SCHEDULING_SCHEDULER_TEST_UTIL_H
+
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -28,7 +31,7 @@
 
 namespace impala {
 
-class SimpleScheduler;
+class Scheduler;
 class TTopicDelta;
 
 namespace test {
@@ -251,7 +254,7 @@ class Plan {
   /// Map from plan host index to an index in 'referenced_datanodes_'.
   std::unordered_map<int, int> host_idx_to_datanode_idx_;
 
-  /// List of all scan range locations, which can be passed to the SimpleScheduler.
+  /// List of all scan range locations, which can be passed to the Scheduler.
   std::vector<TScanRangeLocationList> scan_range_locations_;
 
   /// Initialize a TScanRangeLocationList object in place.
@@ -415,7 +418,7 @@ class Result {
       NumAssignedBytesPerBackend* num_assignments_per_backend) const;
 };
 
-/// This class wraps the SimpleScheduler and provides helper for easier instrumentation
+/// This class wraps the Scheduler and provides helper for easier instrumentation
 /// during tests.
 class SchedulerWrapper {
  public:
@@ -446,7 +449,7 @@ class SchedulerWrapper {
 
  private:
   const Plan& plan_;
-  boost::scoped_ptr<SimpleScheduler> scheduler_;
+  boost::scoped_ptr<Scheduler> scheduler_;
   MetricGroup metrics_;
 
   /// Initialize the internal scheduler object. The method uses the 'real' constructor
@@ -464,3 +467,5 @@ class SchedulerWrapper {
 
 } // end namespace test
 } // end namespace impala
+
+#endif

@@ -27,7 +27,7 @@ import com.google.common.collect.Sets;
 /**
  * Singleton class that represents a snapshot of the Impalad cluster membership.  Host
  * membership is determined by both IP address and hostname (to mimic the backend's
- * SimpleScheduler).  A new snapshot is created whenever the cluster membership changes
+ * Scheduler).  A new snapshot is created whenever the cluster membership changes
  * so that clients don't need to hold a lock while examining a snapshot.
  */
 public class MembershipSnapshot {
@@ -48,7 +48,7 @@ public class MembershipSnapshot {
   private final int numNodes_;
 
   // Used only to construct the initial MembershipSnapshot.  Before we get the first
-  // snapshot, assume one node (the localhost) to mimic SimpleScheduler.
+  // snapshot, assume one node (the localhost) to mimic Scheduler.
   private MembershipSnapshot() {
     hostnames_ = Sets.newHashSet();
     ipAddresses_ = Sets.newHashSet();

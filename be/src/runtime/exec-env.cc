@@ -35,11 +35,11 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/thread-resource-mgr.h"
 #include "runtime/query-exec-mgr.h"
+#include "runtime/thread-resource-mgr.h"
 #include "runtime/tmp-file-mgr.h"
 #include "scheduling/request-pool-service.h"
-#include "scheduling/simple-scheduler.h"
+#include "scheduling/scheduler.h"
 #include "service/frontend.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/debug-util.h"
@@ -163,13 +163,13 @@ ExecEnv::ExecEnv()
         Substitute("impalad@$0", TNetworkAddressToString(backend_address_)),
         subscriber_address, statestore_address, metrics_.get()));
 
-    scheduler_.reset(new SimpleScheduler(statestore_subscriber_.get(),
+    scheduler_.reset(new Scheduler(statestore_subscriber_.get(),
         statestore_subscriber_->id(), backend_address_, metrics_.get(), webserver_.get(),
         request_pool_service_.get()));
   } else {
     vector<TNetworkAddress> addresses;
     addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
-    scheduler_.reset(new SimpleScheduler(
+    scheduler_.reset(new Scheduler(
         addresses, metrics_.get(), webserver_.get(), request_pool_service_.get()));
   }
   exec_env_ = this;
@@ -217,13 +217,13 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
         Substitute("impalad@$0", TNetworkAddressToString(backend_address_)),
         subscriber_address, statestore_address, metrics_.get()));
 
-    scheduler_.reset(new SimpleScheduler(statestore_subscriber_.get(),
+    scheduler_.reset(new Scheduler(statestore_subscriber_.get(),
         statestore_subscriber_->id(), backend_address_, metrics_.get(), webserver_.get(),
         request_pool_service_.get()));
   } else {
     vector<TNetworkAddress> addresses;
     addresses.push_back(MakeNetworkAddress(hostname, backend_port));
-    scheduler_.reset(new SimpleScheduler(
+    scheduler_.reset(new Scheduler(
         addresses, metrics_.get(), webserver_.get(), request_pool_service_.get()));
   }
   exec_env_ = this;

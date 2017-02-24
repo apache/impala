@@ -23,13 +23,13 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
-#include "scheduling/simple-scheduler.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "scheduling/scheduler.h"
 #include "util/debug-util.h"
-#include "util/time.h"
-#include "util/runtime-profile-counters.h"
 #include "util/pretty-printer.h"
+#include "util/runtime-profile-counters.h"
+#include "util/time.h"
 
 #include "common/names.h"
 
@@ -198,7 +198,7 @@ string AdmissionController::PoolStats::DebugString() const {
 }
 
 // TODO: do we need host_id_ to come from host_addr or can it just take the same id
-// the SimpleScheduler has (coming from the StatestoreSubscriber)?
+// the Scheduler has (coming from the StatestoreSubscriber)?
 AdmissionController::AdmissionController(RequestPoolService* request_pool_service,
     MetricGroup* metrics, const TNetworkAddress& host_addr)
     : request_pool_service_(request_pool_service),

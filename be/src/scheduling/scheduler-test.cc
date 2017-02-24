@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "simple-scheduler.h"
+#include "scheduling/scheduler.h"
 #include "common/logging.h"
-#include "simple-scheduler-test-util.h"
+#include "scheduling/scheduler-test-util.h"
 #include "testutil/gtest-util.h"
 
 using namespace impala;
@@ -327,7 +327,7 @@ TEST_F(SchedulerTest, TestSendUpdates) {
   Cluster cluster;
   // 3 hosts, only first two run backends. This allows us to remove one of the backends
   // from the scheduler and then verify that reads are assigned to the other backend.
-  for (int i=0; i < 3; ++i) cluster.AddHost(i < 2, true);
+  for (int i = 0; i < 3; ++i) cluster.AddHost(i < 2, true);
 
   Schema schema(cluster);
   schema.AddMultiBlockTable("T1", 1, ReplicaPlacement::REMOTE_ONLY, 1);
@@ -421,6 +421,6 @@ TEST_F(SchedulerTest, TestExecAtCoordWithoutLocalBackend) {
   EXPECT_TRUE(status.ok());
 }
 
-}  // end namespace impala
+} // end namespace impala
 
 IMPALA_TEST_MAIN();

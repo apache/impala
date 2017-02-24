@@ -45,19 +45,19 @@
 #include "common/version.h"
 #include "exec/external-data-source-executor.h"
 #include "rpc/authentication.h"
-#include "rpc/thrift-util.h"
-#include "rpc/thrift-thread.h"
 #include "rpc/rpc-trace.h"
+#include "rpc/thrift-thread.h"
+#include "rpc/thrift-util.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/lib-cache.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/tmp-file-mgr.h"
-#include "service/impala-internal-service.h"
+#include "scheduling/scheduler.h"
 #include "service/impala-http-handler.h"
+#include "service/impala-internal-service.h"
 #include "service/query-exec-state.h"
-#include "scheduling/simple-scheduler.h"
 #include "util/bit-util.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
@@ -68,11 +68,11 @@
 #include "util/network-util.h"
 #include "util/parse-util.h"
 #include "util/redactor.h"
+#include "util/runtime-profile-counters.h"
+#include "util/runtime-profile.h"
 #include "util/string-parser.h"
 #include "util/summary-util.h"
 #include "util/uid-util.h"
-#include "util/runtime-profile.h"
-#include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
@@ -331,7 +331,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   if (exec_env->subscriber() != NULL) {
     StatestoreSubscriber::UpdateCallback cb =
         bind<void>(mem_fn(&ImpalaServer::MembershipCallback), this, _1, _2);
-    exec_env->subscriber()->AddTopic(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC, true, cb);
+    exec_env->subscriber()->AddTopic(Scheduler::IMPALA_MEMBERSHIP_TOPIC, true, cb);
 
     StatestoreSubscriber::UpdateCallback catalog_cb =
         bind<void>(mem_fn(&ImpalaServer::CatalogUpdateCallback), this, _1, _2);
@@ -1454,7 +1454,7 @@ void ImpalaServer::MembershipCallback(
   // TODO: Consider rate-limiting this. In the short term, best to have
   // statestore heartbeat less frequently.
   StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
-      incoming_topic_deltas.find(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC);
+      incoming_topic_deltas.find(Scheduler::IMPALA_MEMBERSHIP_TOPIC);
 
   if (topic != incoming_topic_deltas.end()) {
     const TTopicDelta& delta = topic->second;
