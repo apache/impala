@@ -1078,6 +1078,9 @@ int_col int
 bigint_col bigint
 float_col float
 double_col double
+decimal0_col DECIMAL(13,4)
+decimal1_col DECIMAL(38,0)
+decimal2_col DECIMAL(38,38)
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- LOAD

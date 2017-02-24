@@ -1,7 +1,9 @@
 ====
 ---- QUERY
-# Tests overflow
-select * from Overflow
+# Tests overflow. Note that decimal columns produce error on overflow
+# even without --strict_mode, so we don't select the decimal columns in
+# this test case.
+select tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col from Overflow
 ---- TYPES
 tinyint, smallint, int, bigint, float, double
 ---- RESULTS

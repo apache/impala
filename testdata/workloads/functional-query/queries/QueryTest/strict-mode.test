@@ -8,6 +8,9 @@ Error converting column: 2 to INT
 Error converting column: 3 to BIGINT
 Error converting column: 4 to FLOAT
 Error converting column: 5 to DOUBLE
+Error converting column: 6 to DECIMAL(13,4)
+Error converting column: 7 to DECIMAL(38,0)
+Error converting column: 8 to DECIMAL(38,38)
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
 Error converting column: 0 to TINYINT
 Error converting column: 1 to SMALLINT
@@ -15,11 +18,14 @@ Error converting column: 2 to INT
 Error converting column: 3 to BIGINT
 Error converting column: 4 to FLOAT
 Error converting column: 5 to DOUBLE
+Error converting column: 6 to DECIMAL(13,4)
+Error converting column: 7 to DECIMAL(38,0)
+Error converting column: 8 to DECIMAL(38,38)
 row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
 ---- RESULTS
-1,2,3,4,5.5,6.6
-NULL,NULL,NULL,NULL,NULL,NULL
-NULL,NULL,NULL,NULL,NULL,NULL
+1,2,3,4,5.5,6.6,123456789.1234,99999999999999999999999999999999999999,0.00000000000000000000000000000000000001
+NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
 ---- TYPES
-tinyint, smallint, int, bigint, float, double
+tinyint, smallint, int, bigint, float, double, decimal, decimal, decimal
 ====

@@ -29,3 +29,18 @@ select double_col from overflow
 ---- CATCH
 Error converting column: 5 to DOUBLE
 ====
+---- QUERY
+select decimal0_col from overflow
+---- CATCH
+Error converting column: 6 to DECIMAL
+====
+---- QUERY
+select decimal1_col from overflow
+---- CATCH
+Error converting column: 7 to DECIMAL
+====
+---- QUERY
+select decimal2_col from overflow
+---- CATCH
+Error converting column: 8 to DECIMAL
+====
