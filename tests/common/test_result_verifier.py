@@ -404,7 +404,7 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
     VERIFIER_MAP[verifier](expected, actual)
   except AssertionError:
     if update_section:
-      test_section[results_section] = join_section_lines(actual.result_list)
+      test_section[result_section] = join_section_lines(actual.result_list)
     else:
       raise
 
