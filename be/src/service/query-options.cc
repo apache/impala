@@ -396,6 +396,26 @@ Status impala::SetQueryOption(const string& key, const string& value,
         }
         break;
       }
+      case TImpalaQueryOptions::PARQUET_ARRAY_RESOLUTION: {
+        if (iequals(value, "three_level") ||
+            value == to_string(TParquetArrayResolution::THREE_LEVEL)) {
+          query_options->__set_parquet_array_resolution(
+              TParquetArrayResolution::THREE_LEVEL);
+        } else if (iequals(value, "two_level") ||
+            value == to_string(TParquetArrayResolution::TWO_LEVEL)) {
+          query_options->__set_parquet_array_resolution(
+              TParquetArrayResolution::TWO_LEVEL);
+        } else if (iequals(value, "two_level_then_three_level") ||
+            value == to_string(TParquetArrayResolution::TWO_LEVEL_THEN_THREE_LEVEL)) {
+          query_options->__set_parquet_array_resolution(
+              TParquetArrayResolution::TWO_LEVEL_THEN_THREE_LEVEL);
+        } else {
+          return Status(Substitute("Invalid PARQUET_ARRAY_RESOLUTION option: '$0'. "
+              "Valid options are 'THREE_LEVEL', 'TWO_LEVEL' and "
+              "'TWO_LEVEL_THEN_THREE_LEVEL'.", value));
+        }
+        break;
+      }
       case TImpalaQueryOptions::MT_DOP: {
         StringParser::ParseResult result;
         const int32_t dop =

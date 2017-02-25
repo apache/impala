@@ -121,12 +121,16 @@ struct SchemaNode {
 
 /// Utility class to resolve SchemaPaths (e.g., from a table descriptor) against a
 /// Parquet file schema. Supports resolution by field index or by field name.
+/// Supports different policies for resolving nested arrays based on the modern
+/// three-level encoding or the legacy encodings (one and two level).
 class ParquetSchemaResolver {
  public:
   ParquetSchemaResolver(const HdfsTableDescriptor& tbl_desc,
-      TParquetFallbackSchemaResolution::type fallback_schema_resolution)
+      TParquetFallbackSchemaResolution::type fallback_schema_resolution,
+      TParquetArrayResolution::type array_resolution)
     : tbl_desc_(tbl_desc),
       fallback_schema_resolution_(fallback_schema_resolution),
+      array_resolution_(array_resolution),
       filename_(NULL) {
   }
 
@@ -146,15 +150,31 @@ class ParquetSchemaResolver {
   /// 'pos_field' is set to false. Returns a non-OK status if 'path' cannot be resolved
   /// against the file's schema (e.g., unrecognized collection schema).
   ///
-  /// Tries to resolve assuming either two- or three-level array encoding in
-  /// 'schema_'. Returns a bad status if resolution fails in both cases.
+  /// Tries to resolve fields within lists according to the 'ordered_array_encodings_'.
+  /// Returns a bad status if resolution fails for all attempted array encodings.
   Status ResolvePath(const SchemaPath& path, SchemaNode** node, bool* pos_field,
       bool* missing_field) const;
 
  private:
+  /// The 'array_encoding' parameter determines whether to assume one-, two-, or
+  /// three-level array encoding. The returned status is not logged (i.e. it's an expected
+  /// error).
+  enum ArrayEncoding {
+    ONE_LEVEL,
+    TWO_LEVEL,
+    THREE_LEVEL,
+    NUM_ARRAY_ENCODINGS
+  };
+
   /// An arbitrary limit on the number of children per schema node we support.
   /// Used to sanity-check Parquet schemas.
   static const int SCHEMA_NODE_CHILDREN_SANITY_LIMIT = 64 * 1024;
+
+  /// Maps from the array-resolution policy to the ordered array encodings that should
+  /// be tried during path resolution. All entries have the ONE_LEVEL encoding at the end
+  /// because there is no ambiguity between the one-level and the other encodings (there
+  /// is no harm in trying it).
+  static const std::vector<ArrayEncoding> ORDERED_ARRAY_ENCODINGS[];
 
   /// Unflattens the schema metadata from a Parquet file metadata and converts it to our
   /// SchemaNode representation. Returns the result in 'node' unless an error status is
@@ -166,15 +186,6 @@ class ParquetSchemaResolver {
   Status CreateSchemaTree(const std::vector<parquet::SchemaElement>& schema,
       int max_def_level, int max_rep_level, int ira_def_level, int* idx, int* col_idx,
       SchemaNode* node) const;
-
-  /// The 'array_encoding' parameter determines whether to assume one-, two-, or
-  /// three-level array encoding. The returned status is not logged (i.e. it's an expected
-  /// error).
-  enum ArrayEncoding {
-    ONE_LEVEL,
-    TWO_LEVEL,
-    THREE_LEVEL
-  };
 
   Status ResolvePathHelper(ArrayEncoding array_encoding, const SchemaPath& path,
       SchemaNode** node, bool* pos_field, bool* missing_field) const;
@@ -208,6 +219,7 @@ class ParquetSchemaResolver {
 
   const HdfsTableDescriptor& tbl_desc_;
   const TParquetFallbackSchemaResolution::type fallback_schema_resolution_;
+  const TParquetArrayResolution::type array_resolution_;
   const char* filename_;
 
   /// Root node of our internal schema representation populated in Init().

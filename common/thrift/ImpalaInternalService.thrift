@@ -49,6 +49,14 @@ enum TParquetFallbackSchemaResolution {
   NAME
 }
 
+// The order of the enum values needs to be kepy in sync with
+// ParquetMetadataUtils::ORDERED_ARRAY_ENCODINGS in parquet-metadata-utils.cc.
+enum TParquetArrayResolution {
+  THREE_LEVEL,
+  TWO_LEVEL,
+  TWO_LEVEL_THEN_THREE_LEVEL
+}
+
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
 // respective defaults. Query options can be set in the following ways:
 //
@@ -224,6 +232,10 @@ struct TQueryOptions {
 
   // Indicates whether to use dictionary filtering for Parquet files
   53: optional bool parquet_dictionary_filtering = true
+
+  // Policy for resolving nested array fields in Parquet files.
+  54: optional TParquetArrayResolution parquet_array_resolution =
+    TParquetArrayResolution.TWO_LEVEL_THEN_THREE_LEVEL
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

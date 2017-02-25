@@ -40,6 +40,14 @@ using boost::algorithm::token_compress_on;
 
 namespace impala {
 
+// Needs to be in sync with the order of enum values declared in TParquetArrayResolution.
+const std::vector<ParquetSchemaResolver::ArrayEncoding>
+    ParquetSchemaResolver::ORDERED_ARRAY_ENCODINGS[] =
+        {{ParquetSchemaResolver::THREE_LEVEL, ParquetSchemaResolver::ONE_LEVEL},
+         {ParquetSchemaResolver::TWO_LEVEL, ParquetSchemaResolver::ONE_LEVEL},
+         {ParquetSchemaResolver::TWO_LEVEL, ParquetSchemaResolver::THREE_LEVEL,
+             ParquetSchemaResolver::ONE_LEVEL}};
+
 Status ParquetMetadataUtils::ValidateFileVersion(
     const parquet::FileMetaData& file_metadata, const char* filename) {
   if (file_metadata.version > PARQUET_CURRENT_VERSION) {
@@ -384,39 +392,41 @@ Status ParquetSchemaResolver::CreateSchemaTree(
 Status ParquetSchemaResolver::ResolvePath(const SchemaPath& path, SchemaNode** node,
     bool* pos_field, bool* missing_field) const {
   *missing_field = false;
-  // First try two-level array encoding.
-  bool missing_field_two_level;
-  Status status_two_level =
-      ResolvePathHelper(TWO_LEVEL, path, node, pos_field, &missing_field_two_level);
-  if (missing_field_two_level) DCHECK(status_two_level.ok());
-  if (status_two_level.ok() && !missing_field_two_level) return Status::OK();
-  // The two-level resolution failed or reported a missing field, try three-level array
-  // encoding.
-  bool missing_field_three_level;
-  Status status_three_level =
-      ResolvePathHelper(THREE_LEVEL, path, node, pos_field, &missing_field_three_level);
-  if (missing_field_three_level) DCHECK(status_three_level.ok());
-  if (status_three_level.ok() && !missing_field_three_level) return Status::OK();
-  // The three-level resolution failed or reported a missing field, try one-level array
-  // encoding.
-  bool missing_field_one_level;
-  Status status_one_level =
-      ResolvePathHelper(ONE_LEVEL, path, node, pos_field, &missing_field_one_level);
-  if (missing_field_one_level) DCHECK(status_one_level.ok());
-  if (status_one_level.ok() && !missing_field_one_level) return Status::OK();
+  const vector<ArrayEncoding>& ordered_array_encodings =
+      ORDERED_ARRAY_ENCODINGS[array_resolution_];
+
+  bool any_missing_field = false;
+  Status statuses[NUM_ARRAY_ENCODINGS];
+  for (const auto& array_encoding: ordered_array_encodings) {
+    bool current_missing_field;
+    statuses[array_encoding] = ResolvePathHelper(
+        array_encoding, path, node, pos_field, &current_missing_field);
+    if (current_missing_field) DCHECK(statuses[array_encoding].ok());
+    if (statuses[array_encoding].ok() && !current_missing_field) return Status::OK();
+    any_missing_field = any_missing_field || current_missing_field;
+  }
   // None of resolutions yielded a node. Set *missing_field to true if any of the
   // resolutions reported a missing a field.
-  if (missing_field_one_level || missing_field_two_level || missing_field_three_level) {
+  if (any_missing_field) {
     *node = NULL;
     *missing_field = true;
     return Status::OK();
   }
-  // All resolutions failed. Log and return the status from the three-level resolution
-  // (which is technically the standard).
-  DCHECK(!status_one_level.ok() && !status_two_level.ok() && !status_three_level.ok());
+
+  // All resolutions failed. Log and return the most relevant status. The three-level
+  // encoding is the Parquet standard, so always prefer that. Prefer the two-level over
+  // the one-level because the two-level can be specifically selected via a query option.
+  Status error_status = Status::OK();
+  for (int i = THREE_LEVEL; i >= ONE_LEVEL; --i) {
+    if (!statuses[i].ok()) {
+      error_status = statuses[i];
+      break;
+    }
+  }
+  DCHECK(!error_status.ok());
   *node = NULL;
-  VLOG_QUERY << status_three_level.msg().msg() << "\n" << GetStackTrace();
-  return status_three_level;
+  VLOG_QUERY << error_status.msg().msg() << "\n" << GetStackTrace();
+  return error_status;
 }
 
 Status ParquetSchemaResolver::ResolvePathHelper(ArrayEncoding array_encoding,

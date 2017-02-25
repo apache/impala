@@ -246,7 +246,8 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 
   // Parse the file schema into an internal representation for schema resolution.
   schema_resolver_.reset(new ParquetSchemaResolver(*scan_node_->hdfs_table(),
-      state_->query_options().parquet_fallback_schema_resolution));
+      state_->query_options().parquet_fallback_schema_resolution,
+      state_->query_options().parquet_array_resolution));
   RETURN_IF_ERROR(schema_resolver_->Init(&file_metadata_, filename()));
 
   // We've processed the metadata and there are columns that need to be materialized.

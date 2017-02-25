@@ -1,0 +1,96 @@
+====
+---- QUERY
+# The reference 's2.f22' is resolved assuming the 2-level encoding, and incorrectly
+# returns the data of 'f11' because the data file uses the 3-level encoding.
+# The other references are only resolvable assuming the 3-level encoding.
+# This demonstrates the 2/3-level ambiguity with index-based resolution.
+set parquet_fallback_schema_resolution=position;
+set parquet_array_resolution=two_level_then_three_level;
+select f11, f12, s2.f21, s2.f22 from ambig_modern.ambigarray;
+---- RESULTS
+11,12,21,11
+110,120,210,110
+---- TYPES
+int,int,int,int
+====
+---- QUERY
+# s2.f22' incorrectly returns the data of 'f11'.
+set parquet_fallback_schema_resolution=position;
+set parquet_array_resolution=two_level;
+select s2.f22 from ambig_modern.ambigarray;
+---- RESULTS
+11
+110
+---- TYPES
+int
+====
+---- QUERY
+# 'f21' does not resolve with the 2-level encoding because it matches
+# a Parquet group in the schema.
+set parquet_fallback_schema_resolution=position;
+set parquet_array_resolution=two_level;
+select s2.f21 from ambig_modern.ambigarray;
+---- RESULTS
+---- CATCH
+has an incompatible Parquet schema
+---- TYPES
+int
+====
+---- QUERY
+# 'f11' and 'f12' are interpreted as missing fields.
+set parquet_fallback_schema_resolution=position;
+set parquet_array_resolution=two_level;
+select f11, f12 from ambig_modern.ambigarray;
+---- RESULTS
+NULL,NULL
+NULL,NULL
+---- TYPES
+int,int
+====
+---- QUERY
+# Everything resolves correctly using the THREE_LEVEL array resolution policy,
+# because the data file uses the 3-level encoding.
+set parquet_fallback_schema_resolution=position;
+set parquet_array_resolution=three_level;
+select f11, f12, s2.f21, s2.f22 from ambig_modern.ambigarray;
+---- RESULTS
+11,12,21,22
+110,120,210,220
+---- TYPES
+int,int,int,int
+====
+---- QUERY
+# Everything resolves correctly using the THREE_LEVEL array resolution policy,
+# combined with resolution by name.
+set parquet_fallback_schema_resolution=name;
+set parquet_array_resolution=three_level;
+select f11, f12, s2.f21, s2.f22 from ambig_modern.ambigarray;
+---- RESULTS
+11,12,21,22
+110,120,210,220
+---- TYPES
+int,int,int,int
+====
+---- QUERY
+# Everything resolves correctly using the TWO_LEVEL_THEN_THREE array resolution
+# policy, combined with resolution by name. The problematic 's2.f22' reference
+# works because the 2-level resolution fails due to a field-name mismatch,
+# but the 3-level resolution succeeds.
+set parquet_fallback_schema_resolution=name;
+set parquet_array_resolution=two_level_then_three_level;
+select f11, f12, s2.f21, s2.f22 from ambig_modern.ambigarray;
+---- RESULTS
+11,12,21,22
+110,120,210,220
+---- TYPES
+int,int,int,int
+====
+---- QUERY
+# Test setting a bad value for PARQUET_ARRAY_RESOLUTION.
+set parquet_array_resolution=bad_value;
+select f11, f12, s2.f21, s2.f22 from ambig_modern.ambigarray;
+---- CATCH
+Invalid PARQUET_ARRAY_RESOLUTION option: 'bad_value'. Valid options are 'THREE_LEVEL', 'TWO_LEVEL' and 'TWO_LEVEL_THEN_THREE_LEVEL'.
+---- TYPES
+int,int,int,int
+====

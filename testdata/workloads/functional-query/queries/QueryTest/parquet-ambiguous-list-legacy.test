@@ -1,0 +1,71 @@
+====
+---- QUERY
+# Everythig resolves correctly assuming the 2-level encoding because the
+# data file indeed uses the 2-level encoding.
+set parquet_fallback_schema_resolution=position;
+set parquet_array_resolution=two_level_then_three_level;
+select f11, f12, s2.f21, s2.f22 from ambig_legacy.ambigarray;
+---- RESULTS
+11,12,21,22
+110,120,210,220
+---- TYPES
+int,int,int,int
+====
+---- QUERY
+# Same as above but with name-based resolution.
+set parquet_fallback_schema_resolution=name;
+set parquet_array_resolution=two_level_then_three_level;
+select f11, f12, s2.f21, s2.f22 from ambig_legacy.ambigarray;
+---- RESULTS
+11,12,21,22
+110,120,210,220
+---- TYPES
+int,int,int,int
+====
+---- QUERY
+# Everythig resolves correctly with TWO_LEVEL and POSITION because the
+# data file indeed uses the 2-level encoding.
+set parquet_fallback_schema_resolution=position;
+set parquet_array_resolution=two_level;
+select f11, f12, s2.f21, s2.f22 from ambig_legacy.ambigarray;
+---- RESULTS
+11,12,21,22
+110,120,210,220
+---- TYPES
+int,int,int,int
+====
+---- QUERY
+# Everythig resolves correctly with TWO_LEVEL and NAME because the
+# data file indeed uses the 2-level encoding.
+set parquet_fallback_schema_resolution=name;
+set parquet_array_resolution=two_level;
+select f11, f12, s2.f21, s2.f22 from ambig_legacy.ambigarray;
+---- RESULTS
+11,12,21,22
+110,120,210,220
+---- TYPES
+int,int,int,int
+====
+---- QUERY
+# Incorrect field resolutions with THREE_LEVEL and POSITION
+# because the data file uses the 2-level encoding.
+set parquet_fallback_schema_resolution=position;
+set parquet_array_resolution=three_level;
+select f11, f12, s2.f21, s2.f22 from ambig_legacy.ambigarray;
+---- RESULTS
+22,NULL,NULL,NULL
+220,NULL,NULL,NULL
+---- TYPES
+int,int,int,int
+====
+---- QUERY
+# All fields are interpreted as missing with THREE_LEVEL and NAME.
+set parquet_fallback_schema_resolution=name;
+set parquet_array_resolution=three_level;
+select f11, f12, s2.f21, s2.f22 from ambig_legacy.ambigarray;
+---- RESULTS
+NULL,NULL,NULL,NULL
+NULL,NULL,NULL,NULL
+---- TYPES
+int,int,int,int
+====

@@ -1,0 +1,19 @@
+{"type": "record",
+"namespace": "org.apache.impala",
+"name": "nested",
+"fields": [
+  {"name": "ambigArray", "type": {
+    "type": "array", "items": {
+      "name": "r1", "type": "record", "fields": [
+        {"name": "s2", "type":
+          {"name": "r1s2", "type": "record", "fields": [
+            {"name": "f21", "type": ["int", "null"]},
+            {"name": "f22", "type": ["int", "null"]}
+          ]}
+        },
+        {"name": "F11", "type": ["int", "null"]},
+        {"name": "F12", "type": ["int", "null"]}
+      ]
+    }
+  }}
+]}
