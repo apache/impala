@@ -40,8 +40,6 @@ import com.google.common.collect.Sets;
  * Statistics for a single column.
  */
 public class ColumnStats {
-  private final static Logger LOG = LoggerFactory.getLogger(ColumnStats.class);
-
   // Set of the currently supported column stats column types.
   private final static Set<PrimitiveType> SUPPORTED_COL_TYPES = Sets.newHashSet(
       PrimitiveType.BIGINT, PrimitiveType.BINARY, PrimitiveType.BOOLEAN,
@@ -157,9 +155,6 @@ public class ColumnStats {
     return this;
   }
 
-  public void setAvgSize(float avgSize) { avgSize_ = avgSize; }
-  public void setAvgSerializedSize(float avgSize) { avgSerializedSize_ = avgSize; }
-  public void setMaxSize(long maxSize) { maxSize_ = maxSize; }
   public long getNumDistinctValues() { return numDistinctValues_; }
   public void setNumDistinctValues(long numDistinctValues) {
     this.numDistinctValues_ = numDistinctValues;
@@ -171,7 +166,6 @@ public class ColumnStats {
   public boolean hasNulls() { return numNulls_ > 0; }
   public long getNumNulls() { return numNulls_; }
   public boolean hasAvgSerializedSize() { return avgSerializedSize_ >= 0; }
-  public boolean hasMaxSize() { return maxSize_ >= 0; }
   public boolean hasNumDistinctValues() { return numDistinctValues_ >= 0; }
   public boolean hasStats() { return numNulls_ != -1 || numDistinctValues_ != -1; }
 

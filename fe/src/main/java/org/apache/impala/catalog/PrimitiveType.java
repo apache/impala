@@ -101,5 +101,4 @@ public enum PrimitiveType {
   }
 
   public int getSlotSize() { return slotSize_; }
-  public static int getMaxSlotSize() { return DECIMAL.slotSize_; }
 }

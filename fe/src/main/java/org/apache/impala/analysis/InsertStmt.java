@@ -51,8 +51,6 @@ import com.google.common.collect.Sets;
  * whose results are to be inserted.
  */
 public class InsertStmt extends StatementBase {
-  private final static Logger LOG = LoggerFactory.getLogger(InsertStmt.class);
-
   // Target table name as seen by the parser
   private final TableName originalTableName_;
 
@@ -838,7 +836,6 @@ public class InsertStmt extends StatementBase {
    * Only valid after analysis
    */
   public QueryStmt getQueryStmt() { return queryStmt_; }
-  public void setQueryStmt(QueryStmt stmt) { queryStmt_ = stmt; }
   public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs_; }
   public boolean hasShuffleHint() { return hasShuffleHint_; }
   public boolean hasNoShuffleHint() { return hasNoShuffleHint_; }

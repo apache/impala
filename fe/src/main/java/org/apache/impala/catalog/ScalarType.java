@@ -242,14 +242,6 @@ public class ScalarType extends Type {
     }
   }
 
-  public static Type[] toColumnType(PrimitiveType[] types) {
-    Type result[] = new Type[types.length];
-    for (int i = 0; i < types.length; ++i) {
-      result[i] = createType(types[i]);
-    }
-    return result;
-  }
-
   public int decimalPrecision() {
     Preconditions.checkState(type_ == PrimitiveType.DECIMAL);
     return precision_;

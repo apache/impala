@@ -236,20 +236,6 @@ public class ScalarFunction extends Function {
   }
 
   /**
-   * Create a function that is used to search the catalog for a matching builtin. Only
-   * the fields necessary for matching function prototypes are specified.
-   */
-  public static ScalarFunction createBuiltinSearchDesc(String name, Type[] argTypes,
-      boolean hasVarArgs) {
-    ArrayList<Type> fnArgs =
-        (argTypes == null) ? new ArrayList<Type>() : Lists.newArrayList(argTypes);
-    ScalarFunction fn = new ScalarFunction(
-        new FunctionName(Catalog.BUILTINS_DB, name), fnArgs, Type.INVALID, hasVarArgs);
-    fn.setBinaryType(TFunctionBinaryType.BUILTIN);
-    return fn;
-  }
-
-  /**
    * Static helper method to create a scalar function of given
    * TFunctionBinaryType.
    */
@@ -269,8 +255,6 @@ public class ScalarFunction extends Function {
   public void setCloseFnSymbol(String s) { closeFnSymbol_ = s; }
 
   public String getSymbolName() { return symbolName_; }
-  public String getPrepareFnSymbol() { return prepareFnSymbol_; }
-  public String getCloseFnSymbol() { return closeFnSymbol_; }
 
   @Override
   public String toSql(boolean ifNotExists) {

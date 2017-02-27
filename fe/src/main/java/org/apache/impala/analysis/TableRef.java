@@ -263,7 +263,6 @@ public class TableRef implements ParseNode {
   public List<PlanHint> getJoinHints() { return joinHints_; }
   public List<PlanHint> getTableHints() { return tableHints_; }
   public Expr getOnClause() { return onClause_; }
-  public List<String> getUsingClause() { return usingColNames_; }
   public void setJoinOp(JoinOperator op) { this.joinOp_ = op; }
   public void setOnClause(Expr e) { this.onClause_ = e; }
   public void setUsingClause(List<String> colNames) { this.usingColNames_ = colNames; }
@@ -570,30 +569,6 @@ public class TableRef implements ParseNode {
    */
   @Override
   protected TableRef clone() { return new TableRef(this); }
-
-  /**
-   * Deep copies the given list of table refs and returns the clones in a new list.
-   * The linking structure in the original table refs is preserved in the clones,
-   * i.e., if the table refs were originally linked, then the corresponding clones
-   * are linked in the same way. Similarly, if the original table refs were not linked
-   * then the clones are also not linked.
-   * Assumes that the given table refs are self-contained with respect to linking, i.e.,
-   * that no table ref links to another table ref not in the list.
-   */
-  public static List<TableRef> cloneTableRefList(List<TableRef> tblRefs) {
-    List<TableRef> clonedTblRefs = Lists.newArrayListWithCapacity(tblRefs.size());
-    TableRef leftTblRef = null;
-    for (TableRef tblRef: tblRefs) {
-      TableRef tblRefClone = tblRef.clone();
-      clonedTblRefs.add(tblRefClone);
-      if (tblRef.leftTblRef_ != null) {
-        Preconditions.checkState(tblRefs.contains(tblRef.leftTblRef_));
-        tblRefClone.leftTblRef_ = leftTblRef;
-      }
-      leftTblRef = tblRefClone;
-    }
-    return clonedTblRefs;
-  }
 
   public void reset() {
     isAnalyzed_ = false;

@@ -164,8 +164,6 @@ public class View extends Table {
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.VIEW; }
   public QueryStmt getQueryStmt() { return queryStmt_; }
-  public String getOriginalViewDef() { return originalViewDef_; }
-  public String getInlineViewDef() { return inlineViewDef_; }
   public boolean isLocalView() { return isLocalView_; }
 
   /**

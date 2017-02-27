@@ -42,7 +42,6 @@ public class HdfsStorageDescriptor {
 
   // Serde parameters that are recognized by table writers.
   private static final String BLOCK_SIZE = "blocksize";
-  private static final String COMPRESSION = "compression";
 
   // Important: don't change the ordering of these keys - if e.g. FIELD_DELIM is not
   // found, the value of LINE_DELIM is used, so LINE_DELIM must be found first.
@@ -183,9 +182,6 @@ public class HdfsStorageDescriptor {
     public InvalidStorageDescriptorException(Exception ex) {
       super(ex.getMessage(), ex);
     }
-    public InvalidStorageDescriptorException(String msg, Throwable cause) {
-      super(msg, cause);
-    }
   }
 
   /**
@@ -234,7 +230,6 @@ public class HdfsStorageDescriptor {
   public byte getCollectionDelim() { return collectionDelim_; }
   public byte getMapKeyDelim() { return mapKeyDelim_; }
   public byte getEscapeChar() { return escapeChar_; }
-  public byte getQuoteChar() { return quoteChar_; }
   public HdfsFileFormat getFileFormat() { return fileFormat_; }
   public int getBlockSize() { return blockSize_; }
 }

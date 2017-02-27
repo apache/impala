@@ -37,9 +37,6 @@ public class PlannerContext {
   // used for determining whether a broadcast join is feasible.
   public final static double HASH_TBL_SPACE_OVERHEAD = 1.1;
 
-  // The maximum fraction of remaining memory that a sort node can use during execution.
-  public final static double SORT_MEM_MAX_FRACTION = 0.80;
-
   // Assumed average number of items in a nested collection, since we currently have no
   // statistics on nested fields. The motivation for this constant is to avoid
   // pathological plan choices that could result from a SubplanNode having an unknown

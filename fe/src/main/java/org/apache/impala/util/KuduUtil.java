@@ -308,18 +308,6 @@ public class KuduUtil {
             Type.fromThrift(boundaryVal.getType()).toSql()));
   }
 
-  /**
-   * Parses a string of the form "a, b, c" and returns a set of values split by ',' and
-   * stripped of the whitespace.
-   */
-  public static HashSet<String> parseKeyColumns(String cols) {
-    return Sets.newHashSet(Splitter.on(",").trimResults().split(cols.toLowerCase()));
-  }
-
-  public static List<String> parseKeyColumnsAsList(String cols) {
-    return Lists.newArrayList(Splitter.on(",").trimResults().split(cols.toLowerCase()));
-  }
-
   public static boolean isSupportedKeyType(org.apache.impala.catalog.Type type) {
     return type.isIntegerType() || type.isStringType();
   }

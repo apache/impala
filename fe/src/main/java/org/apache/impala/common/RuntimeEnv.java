@@ -28,8 +28,6 @@ import org.apache.impala.service.FeSupport;
  * can rely on a machine-independent RuntimeEnv.
  */
 public class RuntimeEnv {
-  private final static Logger LOG = LoggerFactory.getLogger(RuntimeEnv.class);
-
   public static RuntimeEnv INSTANCE = new RuntimeEnv();
 
   private int numCores_;

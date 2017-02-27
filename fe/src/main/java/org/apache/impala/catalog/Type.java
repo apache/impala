@@ -154,7 +154,6 @@ public abstract class Type {
   public boolean isBoolean() { return isScalarType(PrimitiveType.BOOLEAN); }
   public boolean isTimestamp() { return isScalarType(PrimitiveType.TIMESTAMP); }
   public boolean isDecimal() { return isScalarType(PrimitiveType.DECIMAL); }
-  public boolean isDecimalOrNull() { return isDecimal() || isNull(); }
   public boolean isFullySpecifiedDecimal() { return false; }
   public boolean isWildcardDecimal() { return false; }
   public boolean isWildcardVarchar() { return false; }
@@ -316,15 +315,6 @@ public abstract class Type {
   }
 
   /**
-   * Checks if types t1 and t2 are assignment compatible, i.e. if both t1 and t2 can be
-   * assigned to a type t without an explicit cast and without any conversions that would
-   * result in loss of precision.
-   */
-  public static boolean areAssignmentCompatibleTypes(Type t1, Type t2) {
-    return getAssignmentCompatibleType(t1, t2, true) != ScalarType.INVALID;
-  }
-
-  /**
    * Returns true if this type exceeds the MAX_NESTING_DEPTH, false otherwise.
    */
   public boolean exceedsMaxNestingDepth() { return exceedsMaxNestingDepth(0); }
@@ -444,16 +434,6 @@ public abstract class Type {
       }
     }
     return new Pair<Type, Integer>(type, nodeIdx);
-  }
-
-  /**
-   * Utility function to get the primitive type of a thrift type that is known
-   * to be scalar.
-   */
-  public TPrimitiveType getTPrimitiveType(TColumnType ttype) {
-    Preconditions.checkState(ttype.getTypesSize() == 1);
-    Preconditions.checkState(ttype.types.get(0).getType() == TTypeNodeType.SCALAR);
-    return ttype.types.get(0).scalar_type.getType();
   }
 
   /**

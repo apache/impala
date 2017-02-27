@@ -295,10 +295,6 @@ public class InlineViewRef extends TableRef {
   }
 
   public QueryStmt getViewStmt() { return queryStmt_; }
-  public void setRewrittenViewStmt(QueryStmt stmt) {
-    Preconditions.checkState(getAnalyzer().containsSubquery());
-    queryStmt_ = stmt;
-  }
 
   public List<String> getExplicitColLabels() { return explicitColLabels_; }
 

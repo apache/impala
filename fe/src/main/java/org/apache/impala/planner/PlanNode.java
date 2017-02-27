@@ -65,9 +65,6 @@ import com.google.common.math.LongMath;
 abstract public class PlanNode extends TreeNode<PlanNode> {
   private final static Logger LOG = LoggerFactory.getLogger(PlanNode.class);
 
-  // TODO: Retrieve from the query options instead of using a default.
-  protected final static int DEFAULT_BATCH_SIZE = 1024;
-
   // String used for this node in getExplainString().
   protected String displayName_;
 

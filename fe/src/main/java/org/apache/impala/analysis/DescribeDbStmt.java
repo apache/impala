@@ -55,7 +55,6 @@ public class DescribeDbStmt extends StatementBase {
   }
 
   public String getDb() { return dbName_; }
-  public TDescribeOutputStyle getOutputStyle() { return outputStyle_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {

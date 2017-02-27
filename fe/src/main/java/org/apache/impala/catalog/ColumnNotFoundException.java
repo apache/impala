@@ -26,6 +26,4 @@ public class ColumnNotFoundException extends CatalogException {
   private static final long serialVersionUID = -2203080667446640542L;
 
   public ColumnNotFoundException(String s) { super(s); }
-
-  public ColumnNotFoundException(String s, Exception cause) { super(s, cause); }
 }

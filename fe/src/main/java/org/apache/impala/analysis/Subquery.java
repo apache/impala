@@ -38,8 +38,6 @@ import com.google.common.collect.Sets;
  * its own Analyzer context.
  */
 public class Subquery extends Expr {
-  private final static Logger LOG = LoggerFactory.getLogger(Subquery.class);
-
   // The QueryStmt of the subquery.
   protected QueryStmt stmt_;
   // A subquery has its own analysis context

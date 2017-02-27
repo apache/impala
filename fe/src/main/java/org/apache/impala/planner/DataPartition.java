@@ -40,8 +40,6 @@ import com.google.common.collect.Lists;
  * DataStreamSender/DataStreamMgr/DataStreamRecvr).
  */
 public class DataPartition {
-  private final static Logger LOG = LoggerFactory.getLogger(DataPartition.class);
-
   private final TPartitionType type_;
 
   // for hash partition: exprs used to compute hash value

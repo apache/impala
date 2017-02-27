@@ -37,9 +37,6 @@ public class S3PlannerTest extends PlannerTestBase {
   // The path that will replace the value of TEST_FS_S3A_NAME in file paths.
   private static final Path S3A_CANONICAL_BUCKET = new Path("s3a://bucket");
 
-  // The Hadoop configuration.
-  private final Configuration CONF = new Configuration();
-
   // The value of the FILESYSTEM_PREFIX environment variable.
   private Path fsName;
 

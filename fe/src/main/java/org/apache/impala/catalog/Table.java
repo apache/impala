@@ -65,7 +65,6 @@ public abstract class Table implements CatalogObject {
   protected final Db db_;
   protected final String name_;
   protected final String owner_;
-  protected TTableDescriptor tableDesc_;
   protected TAccessLevel accessLevel_ = TAccessLevel.READ_WRITE;
   // Lock protecting this table
   private final ReentrantLock tableLock_ = new ReentrantLock();
@@ -88,10 +87,6 @@ public abstract class Table implements CatalogObject {
 
   // The lastDdlTime for this table; -1 if not set
   protected long lastDdlTime_;
-
-  // Set of supported table types.
-  protected static EnumSet<TableType> SUPPORTED_TABLE_TYPES = EnumSet.of(
-      TableType.EXTERNAL_TABLE, TableType.MANAGED_TABLE, TableType.VIRTUAL_VIEW);
 
   protected Table(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
@@ -376,7 +371,6 @@ public abstract class Table implements CatalogObject {
     return new TableName(db_ != null ? db_.getName() : null, name_);
   }
 
-  public String getOwner() { return owner_; }
   public ArrayList<Column> getColumns() { return colsByPos_; }
 
   /**

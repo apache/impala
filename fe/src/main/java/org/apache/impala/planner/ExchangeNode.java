@@ -45,8 +45,6 @@ import com.google.common.base.Preconditions;
  * inputs are also sorted individually on the same SortInfo parameter.
  */
 public class ExchangeNode extends PlanNode {
-  private final static Logger LOG = LoggerFactory.getLogger(ExchangeNode.class);
-
   // The serialization overhead per tuple in bytes when sent over an exchange.
   // Currently it accounts only for the tuple_offset entry per tuple (4B) in a
   // BE TRowBatch. If we modify the RowBatch serialization, then we need to

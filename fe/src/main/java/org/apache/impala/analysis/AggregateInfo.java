@@ -266,7 +266,6 @@ public class AggregateInfo extends AggregateInfoBase {
   public AggregateInfo getSecondPhaseDistinctAggInfo() {
     return secondPhaseDistinctAggInfo_;
   }
-  public AggPhase getAggPhase() { return aggPhase_; }
   public boolean isMerge() { return aggPhase_.isMerge(); }
   public boolean isDistinctAgg() { return secondPhaseDistinctAggInfo_ != null; }
   public ExprSubstitutionMap getIntermediateSmap() { return intermediateTupleSmap_; }
@@ -295,22 +294,6 @@ public class AggregateInfo extends AggregateInfoBase {
       result.add(aggregateExprs_.get(i));
     }
     return result;
-  }
-
-  /**
-   * Append ids of all slots that are being referenced in the process
-   * of performing the aggregate computation described by this AggregateInfo.
-   */
-  public void getRefdSlots(List<SlotId> ids) {
-    Preconditions.checkState(outputTupleDesc_ != null);
-    if (groupingExprs_ != null) {
-      Expr.getIds(groupingExprs_, null, ids);
-    }
-    Expr.getIds(aggregateExprs_, null, ids);
-    // The backend assumes that the entire aggTupleDesc is materialized
-    for (int i = 0; i < outputTupleDesc_.getSlots().size(); ++i) {
-      ids.add(outputTupleDesc_.getSlots().get(i).getId());
-    }
   }
 
   /**
@@ -714,20 +697,6 @@ public class AggregateInfo extends AggregateInfoBase {
         FunctionCallExpr mergeAggExpr = mergeAggInfo_.aggregateExprs_.get(i);
         mergeAggExpr.validateMergeAggFn(aggregateExprs_.get(i));
       }
-    }
-  }
-
-  /**
-   * Returns DataPartition derived from grouping exprs.
-   * Returns unpartitioned spec if no grouping.
-   * TODO: this won't work when we start supporting range partitions,
-   * because we could derive both hash and order-based partitions
-   */
-  public DataPartition getPartition() {
-    if (groupingExprs_.isEmpty()) {
-      return DataPartition.UNPARTITIONED;
-    } else {
-      return DataPartition.hashPartitioned(groupingExprs_);
     }
   }
 

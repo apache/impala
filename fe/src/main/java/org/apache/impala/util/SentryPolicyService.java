@@ -297,14 +297,6 @@ public class SentryPolicyService {
   }
 
   /**
-   * Revokes a privilege from an existing role.
-   */
-  public void revokeRolePrivilege(User requestingUser, String roleName,
-      TPrivilege privilege) throws ImpalaException {
-    revokeRolePrivileges(requestingUser, roleName, Lists.newArrayList(privilege));
-  }
-
-  /**
    * Revokes privileges from an existing role.
    *
    * @param requestingUser - The requesting user.
@@ -387,26 +379,6 @@ public class SentryPolicyService {
       columnNames.add(privileges.get(i).getColumn_name());
     }
     return columnNames;
-  }
-
-  /**
-   * Lists all roles granted to all groups a user belongs to.
-   */
-  public List<TSentryRole> listUserRoles(User requestingUser)
-      throws ImpalaException {
-    SentryServiceClient client = new SentryServiceClient();
-    try {
-      return Lists.newArrayList(client.get().listUserRoles(
-          requestingUser.getShortName()));
-    } catch (SentryAccessDeniedException e) {
-      throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
-          requestingUser.getName(), "LIST_USER_ROLES"));
-    } catch (SentryUserException e) {
-      throw new InternalException(
-          "Error making 'listUserRoles' RPC to Sentry Service: ", e);
-    } finally {
-      client.close();
-    }
   }
 
   /**

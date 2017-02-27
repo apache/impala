@@ -37,8 +37,6 @@ public class ImpalaTextWritable extends Text {
   @Override
   public int getLength() { return string_.getLength(); }
 
-  public ImpalaStringWritable getStringWritable() { return string_; }
-
   @Override
   public void set(byte[] v, int offset, int len) {
     string_.set(v, offset, len);

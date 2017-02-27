@@ -70,14 +70,6 @@ public class PrivilegeRequestBuilder {
   }
 
   /**
-   * Sets the authorizeable object to be a URI.
-   */
-  public PrivilegeRequestBuilder onURI(String uriName) {
-    authorizeable_ = new AuthorizeableUri(uriName);
-    return this;
-  }
-
-  /**
    * Specifies that permissions on any table in the given database.
    */
   public PrivilegeRequestBuilder onAnyTable(String dbName) {

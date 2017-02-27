@@ -200,10 +200,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     return owner_;
   }
 
-  public List<ColumnDef> getColumnDescs() {return columnDefs_; }
-  public String getComment() { return comment_; }
   public boolean getIfNotExists() { return ifNotExists_; }
-  public String getOriginalViewDef() { return originalViewDef_; }
   public String getInlineViewDef() { return inlineViewDef_; }
   public String getTbl() { return tableName_.getTbl(); }
 }

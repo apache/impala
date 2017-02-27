@@ -163,7 +163,6 @@ public class Function implements CatalogObject {
     return argTypes_[argTypes_.length - 1];
   }
 
-  public void setName(FunctionName name) { name_ = name; }
   public void setLocation(HdfsUri loc) { location_ = loc; }
   public void setBinaryType(TFunctionBinaryType type) { binaryType_ = type; }
   public void setHasVarArgs(boolean v) { hasVarArgs_ = v; }
@@ -238,24 +237,6 @@ public class Function implements CatalogObject {
       if (promoted[i].isScalarType(PrimitiveType.CHAR)) promoted[i] = ScalarType.STRING;
     }
     return new Function(name_, promoted, retType_, hasVarArgs_);
-  }
-
-  /**
-   * Given a list of functions which are a super type of this function, select the best
-   * match. This is the one which requires the fewest type promotions.
-   */
-  public Function selectClosestSuperType(List<Function> candidates) {
-    Preconditions.checkArgument(candidates.size() > 0);
-    if (candidates.size() == 1) return candidates.get(0);
-
-    // Always promote CHAR to STRING before attempting any other promotions.
-    Function withStrs = promoteCharsToStrings();
-    for (Function f: candidates) {
-      if (withStrs.isIndistinguishable(f)) return f;
-    }
-    // Otherwise, we use the previous rules of resolution which are to take the first
-    // one in the list.
-    return candidates.get(0);
   }
 
   private boolean isIdentical(Function o) {

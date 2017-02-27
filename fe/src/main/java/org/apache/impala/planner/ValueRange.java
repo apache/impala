@@ -36,7 +36,6 @@ import com.google.common.base.Preconditions;
  * value, both bounds are set.
  */
 public class ValueRange {
-  private final static Logger LOG = LoggerFactory.getLogger(ValueRange.class);
 
   private Expr lowerBound_;
   private boolean lowerBoundInclusive_;

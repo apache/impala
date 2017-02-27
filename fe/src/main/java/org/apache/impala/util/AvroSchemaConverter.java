@@ -82,10 +82,6 @@ public class AvroSchemaConverter {
     return converter.convertFieldSchemasImpl(fieldSchemas, schemaName);
   }
 
-  public static Schema convertTable(Table impalaTable) {
-    return convertColumns(impalaTable.getColumns(), impalaTable.getFullName());
-  }
-
   private Schema convertColumnsImpl(List<Column> columns, String schemaName) {
     List<Schema.Field> avroFields = Lists.newArrayList();
     for (Column column: columns) {

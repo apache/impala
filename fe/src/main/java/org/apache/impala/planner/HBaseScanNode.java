@@ -100,9 +100,6 @@ public class HBaseScanNode extends ScanNode {
   private final static int DEFAULT_SUGGESTED_CACHING = 1024;
   private int suggestedCaching_ = DEFAULT_SUGGESTED_CACHING;
 
-  // HBase config; Common across all object instance.
-  private static Configuration hbaseConf_ = HBaseConfiguration.create();
-
   public HBaseScanNode(PlanNodeId id, TupleDescriptor desc) {
     super(id, desc, "SCAN HBASE");
     desc_ = desc;

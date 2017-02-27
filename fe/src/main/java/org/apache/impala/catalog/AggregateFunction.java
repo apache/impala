@@ -44,8 +44,6 @@ public class AggregateFunction extends Function {
   private String removeFnSymbol_;
   private String finalizeFnSymbol_;
 
-  private static String BE_BUILTINS_CLASS = "AggregateFunctions";
-
   // If true, this aggregate function should ignore distinct.
   // e.g. min(distinct col) == min(col).
   // TODO: currently it is not possible for user functions to specify this. We should
@@ -174,8 +172,6 @@ public class AggregateFunction extends Function {
   public String getInitFnSymbol() { return initFnSymbol_; }
   public String getSerializeFnSymbol() { return serializeFnSymbol_; }
   public String getMergeFnSymbol() { return mergeFnSymbol_; }
-  public String getGetValueFnSymbol() { return getValueFnSymbol_; }
-  public String getRemoveFnSymbol() { return removeFnSymbol_; }
   public String getFinalizeFnSymbol() { return finalizeFnSymbol_; }
   public boolean ignoresDistinct() { return ignoresDistinct_; }
   public boolean isAnalyticFn() { return isAnalyticFn_; }
@@ -191,8 +187,6 @@ public class AggregateFunction extends Function {
   public void setInitFnSymbol(String fn) { initFnSymbol_ = fn; }
   public void setSerializeFnSymbol(String fn) { serializeFnSymbol_ = fn; }
   public void setMergeFnSymbol(String fn) { mergeFnSymbol_ = fn; }
-  public void setGetValueFnSymbol(String fn) { getValueFnSymbol_ = fn; }
-  public void setRemoveFnSymbol(String fn) { removeFnSymbol_ = fn; }
   public void setFinalizeFnSymbol(String fn) { finalizeFnSymbol_ = fn; }
   public void setIntermediateType(Type t) { intermediateType_ = t; }
 

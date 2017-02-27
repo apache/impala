@@ -37,8 +37,6 @@ public abstract class PartitionSpecBase implements ParseNode {
   // Set during analysis.
   protected String nullPartitionKeyValue_;
 
-  public String getTbl() { return tableName_.getTbl(); }
-
   public void setTableName(TableName tableName) {this.tableName_ = tableName; }
   public TableName getTableName() { return tableName_; }
 
@@ -59,10 +57,6 @@ public abstract class PartitionSpecBase implements ParseNode {
 
   public boolean getPartitionShouldExist() {
     return partitionShouldExist_ != null && partitionShouldExist_;
-  }
-
-  public boolean getPartitionShouldNotExist() {
-    return partitionShouldExist_ != null && !partitionShouldExist_;
   }
 
   // Set the privilege requirement for this partition spec. Must be set prior to

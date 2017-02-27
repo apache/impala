@@ -75,5 +75,4 @@ public class CollectionStructType extends StructType {
 
   public StructField getOptionalField() { return optionalField_; }
   public boolean isMapStruct() { return isMapStruct_; }
-  public boolean isArrayStruct() { return !isMapStruct_; }
 }

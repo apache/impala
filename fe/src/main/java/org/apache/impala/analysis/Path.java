@@ -282,11 +282,6 @@ public class Path {
     return matchedTypes_;
   }
 
-  public List<Integer> getMatchedPositions() {
-    Preconditions.checkState(isResolved_);
-    return matchedPositions_;
-  }
-
   public boolean hasNonDestCollection() {
     Preconditions.checkState(isResolved_);
     return firstCollectionPathIdx_ != -1 &&

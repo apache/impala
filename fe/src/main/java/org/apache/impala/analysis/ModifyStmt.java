@@ -60,8 +60,6 @@ import com.google.common.collect.Sets;
  */
 public abstract class ModifyStmt extends StatementBase {
 
-  private final static org.slf4j.Logger LOG = LoggerFactory.getLogger(ModifyStmt.class);
-
   // List of explicitly mentioned assignment expressions in the UPDATE's SET clause
   protected final List<Pair<SlotRef, Expr>> assignments_;
 

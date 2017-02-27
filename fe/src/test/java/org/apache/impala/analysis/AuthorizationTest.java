@@ -80,10 +80,6 @@ import com.google.common.collect.Maps;
 
 @RunWith(Parameterized.class)
 public class AuthorizationTest {
-
-  private final static Logger LOG =
-      LoggerFactory.getLogger(AuthorizationTest.class);
-
   // Policy file has defined current user and 'test_user' have:
   //   ALL permission on 'tpch' database and 'newdb' database
   //   ALL permission on 'functional_seq_snap' database

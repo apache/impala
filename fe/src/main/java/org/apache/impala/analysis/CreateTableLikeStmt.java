@@ -76,7 +76,6 @@ public class CreateTableLikeStmt extends StatementBase {
   public String getSrcTbl() { return srcTableName_.getTbl(); }
   public boolean isExternal() { return isExternal_; }
   public boolean getIfNotExists() { return ifNotExists_; }
-  public String getComment() { return comment_; }
   public THdfsFileFormat getFileFormat() { return fileFormat_; }
   public HdfsUri getLocation() { return location_; }
 

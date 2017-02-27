@@ -209,8 +209,6 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
 
     public long getOffset() { return fileBlock_.getOffset(); }
     public long getLength() { return fileBlock_.getLength(); }
-    // Returns true if at there at least one cached replica.
-    public boolean isCached() { return isCached_; }
     public List<Integer> getReplicaHostIdxs() {
       return fileBlock_.getReplica_host_idxs();
     }
@@ -441,16 +439,9 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    */
   public TAccessLevel getAccessLevel() { return accessLevel_; }
 
-  /**
-   * Returns the HMS parameter with key 'key' if it exists, otherwise returns null.
-   */
-   public String getParameter(String key) {
-     return hmsParameters_.get(key);
-   }
+  public Map<String, String> getParameters() { return hmsParameters_; }
 
-   public Map<String, String> getParameters() { return hmsParameters_; }
-
-   public void putToParameters(String k, String v) { hmsParameters_.put(k, v); }
+  public void putToParameters(String k, String v) { hmsParameters_.put(k, v); }
 
   /**
    * Marks this partition's metadata as "dirty" indicating that changes have been

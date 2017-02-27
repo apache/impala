@@ -26,6 +26,4 @@ public class PartitionNotFoundException extends CatalogException {
   private static final long serialVersionUID = -2203080667446640542L;
 
   public PartitionNotFoundException(String s) { super(s); }
-
-  public PartitionNotFoundException(String s, Exception cause) { super(s, cause); }
 }

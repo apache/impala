@@ -41,8 +41,6 @@ import com.google.common.collect.Lists;
  * Sink to materialize the build side of a join.
  */
 public class JoinBuildSink extends DataSink {
-  private final static Logger LOG = LoggerFactory.getLogger(JoinBuildSink.class);
-
   // id of join's build-side table assigned during planning
   private final JoinTableId joinTableId_;
 

@@ -159,23 +159,6 @@ public class CompoundPredicate extends Predicate {
   }
 
   /**
-   * Retrieve the slots bound by BinaryPredicate, InPredicate and
-   * CompoundPredicates in the subtree rooted at 'this'.
-   */
-  public ArrayList<SlotRef> getBoundSlots() {
-    ArrayList<SlotRef> slots = Lists.newArrayList();
-    for (int i = 0; i < getChildren().size(); ++i) {
-      if (getChild(i) instanceof BinaryPredicate ||
-          getChild(i) instanceof InPredicate) {
-        slots.add(((Predicate)getChild(i)).getBoundSlot());
-      } else if (getChild(i) instanceof CompoundPredicate) {
-        slots.addAll(((CompoundPredicate)getChild(i)).getBoundSlots());
-      }
-    }
-    return slots;
-  }
-
-  /**
    * Negates a CompoundPredicate.
    */
   @Override

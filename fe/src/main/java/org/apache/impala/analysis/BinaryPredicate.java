@@ -44,8 +44,6 @@ import com.google.common.collect.Lists;
  *
  */
 public class BinaryPredicate extends Predicate {
-  private final static Logger LOG = LoggerFactory.getLogger(BinaryPredicate.class);
-
   // true if this BinaryPredicate is inferred from slot equivalences, false otherwise.
   private boolean isInferred_ = false;
 

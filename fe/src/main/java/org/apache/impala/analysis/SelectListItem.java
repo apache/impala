@@ -55,7 +55,6 @@ class SelectListItem {
   public void setExpr(Expr expr) { expr_ = expr; }
   public boolean isStar() { return isStar_; }
   public String getAlias() { return alias_; }
-  public void setAlias(String alias) { alias_ = alias; }
   public List<String> getRawPath() { return rawPath_; }
 
   @Override

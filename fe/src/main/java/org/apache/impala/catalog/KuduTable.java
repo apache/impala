@@ -67,8 +67,6 @@ import com.google.common.collect.Lists;
  */
 public class KuduTable extends Table {
 
-  private static final Logger LOG = Logger.getLogger(KuduTable.class);
-
   // Alias to the string key that identifies the storage handler for Kudu tables.
   public static final String KEY_STORAGE_HANDLER =
       hive_metastoreConstants.META_TABLE_STORAGE;

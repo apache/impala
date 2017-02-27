@@ -26,6 +26,4 @@ public class TableNotFoundException extends CatalogException {
   private static final long serialVersionUID = -2203080667446640542L;
 
   public TableNotFoundException(String s) { super(s); }
-
-  public TableNotFoundException(String s, Exception cause) { super(s, cause); }
 }

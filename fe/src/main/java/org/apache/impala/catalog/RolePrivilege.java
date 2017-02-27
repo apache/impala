@@ -134,5 +134,4 @@ public class RolePrivilege implements CatalogObject {
   public long getCreateTimeMs() {
     return privilege_.isSetCreate_time_ms() ? privilege_.getCreate_time_ms() : -1L;
   }
-  public TPrivilegeScope getScope() { return privilege_.getScope(); }
 }

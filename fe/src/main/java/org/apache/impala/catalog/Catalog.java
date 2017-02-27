@@ -55,8 +55,6 @@ import org.apache.log4j.Logger;
  * Builtins are populated on startup in initBuiltins().
  */
 public abstract class Catalog {
-  private static final Logger LOG = Logger.getLogger(Catalog.class);
-
   // Initial catalog version.
   public final static long INITIAL_CATALOG_VERSION = 0L;
   public static final String DEFAULT_DB = "default";

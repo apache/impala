@@ -37,8 +37,6 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class SlotRef extends Expr {
-  private final static Logger LOG = LoggerFactory.getLogger(SlotRef.class);
-
   private final List<String> rawPath_;
   private final String label_;  // printed in toSql()
 

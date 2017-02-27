@@ -112,11 +112,6 @@ public class JniFrontend {
       new TBinaryProtocol.Factory();
   private final Frontend frontend_;
 
-  // Required minimum value (in milliseconds) for the HDFS config
-  // 'dfs.client.file-block-storage-locations.timeout.millis'
-  private static final long MIN_DFS_CLIENT_FILE_BLOCK_STORAGE_LOCATIONS_TIMEOUT_MS =
-      10 * 1000;
-
   /**
    * Create a new instance of the Jni Frontend.
    */

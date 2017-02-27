@@ -107,9 +107,6 @@ public class RequestPoolService {
   // llama-site.xml but is Impala-specific and Llama does not use this.
   final static String QUEUE_TIMEOUT_KEY = "impala.admission-control.pool-queue-timeout-ms";
 
-  // Default value of the pool queue timeout (ms).
-  final static int QUEUE_TIMEOUT_MS_DEFAULT = 60 * 1000;
-
   // Key for the pool default query options. Query options are specified as a
   // comma delimited string of 'key=value' pairs, e.g. 'key1=val1,key2=val2'.
   // This is specified in the llama-site.xml but is Impala-specific and Llama does not

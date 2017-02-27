@@ -62,8 +62,6 @@ import com.google.common.collect.Lists;
  * and need to be substituted as such; example: COUNT(COUNT(..)) OVER (..)
  */
 public class AnalyticExpr extends Expr {
-  private final static Logger LOG = LoggerFactory.getLogger(AnalyticExpr.class);
-
   private FunctionCallExpr fnCall_;
   private final List<Expr> partitionExprs_;
   // These elements are modified to point to the corresponding child exprs to keep them

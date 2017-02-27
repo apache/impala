@@ -47,8 +47,6 @@ import com.google.common.collect.Lists;
  * inversion (for outer/semi/cross joins) it could also be the left child.
  */
 public class HashJoinNode extends JoinNode {
-  private final static Logger LOG = LoggerFactory.getLogger(HashJoinNode.class);
-
   public HashJoinNode(PlanNode outer, PlanNode inner, boolean isStraightJoin,
       DistributionMode distrMode, JoinOperator joinOp,
       List<BinaryPredicate> eqJoinConjuncts, List<Expr> otherJoinConjuncts) {

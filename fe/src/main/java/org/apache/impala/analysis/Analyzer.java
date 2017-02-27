@@ -165,7 +165,6 @@ public class Analyzer {
     isSubquery_ = true;
     globalState_.containsSubquery = true;
   }
-  public boolean isSubquery() { return isSubquery_; }
   public boolean setHasPlanHints() { return globalState_.hasPlanHints = true; }
   public boolean hasPlanHints() { return globalState_.hasPlanHints; }
   public void setIsWithClause() { isWithClause_ = true; }
@@ -315,12 +314,6 @@ public class Analyzer {
   private final GlobalState globalState_;
 
   public boolean containsSubquery() { return globalState_.containsSubquery; }
-
-  /**
-   * Helper function to reset the global state information about the existence of
-   * subqueries.
-   */
-  public void resetSubquery() { globalState_.containsSubquery = false; }
 
   // An analyzer stores analysis state for a single select block. A select block can be
   // a top level select statement, or an inline view select block.
@@ -1588,35 +1581,6 @@ public class Analyzer {
   }
 
   /**
-   * Modifies the analysis state associated with the rhs table ref of an outer join
-   * to accomodate a join inversion that changes the rhs table ref of the join from
-   * oldRhsTbl to newRhsTbl.
-   * TODO: Revisit this function and how outer joins are inverted. This function
-   * should not be necessary because the semantics of an inverted outer join do
-   * not change. This function will naturally become obsolete when we can transform
-   * outer joins with otherPredicates into inner joins.
-   */
-  public void invertOuterJoinState(TableRef oldRhsTbl, TableRef newRhsTbl) {
-    Preconditions.checkState(oldRhsTbl.getJoinOp().isOuterJoin());
-    // Invert analysis state for an outer join.
-    List<ExprId> conjunctIds =
-        globalState_.conjunctsByOjClause.remove(oldRhsTbl.getId());
-    if (conjunctIds != null) {
-      globalState_.conjunctsByOjClause.put(newRhsTbl.getId(), conjunctIds);
-      for (ExprId eid: conjunctIds) {
-        globalState_.ojClauseByConjunct.put(eid, newRhsTbl);
-      }
-    } else {
-      // An outer join is allowed not to have an On-clause if the rhs table ref is
-      // correlated or relative.
-      Preconditions.checkState(oldRhsTbl.isCorrelated() || oldRhsTbl.isRelative());
-    }
-    for (Map.Entry<TupleId, TableRef> e: globalState_.outerJoinedTupleIds.entrySet()) {
-      if (e.getValue() == oldRhsTbl) e.setValue(newRhsTbl);
-    }
-  }
-
-  /**
    * For each equivalence class, adds/removes predicates from conjuncts such that it
    * contains a minimum set of <lhsSlot> = <rhsSlot> predicates that establish the known
    * equivalences between slots in lhsTids and rhsTids which must be disjoint.
@@ -2086,11 +2050,6 @@ public class Analyzer {
     return globalState_.equivClassBySlotId.get(slotId);
   }
 
-  public Collection<SlotId> getEquivSlots(SlotId slotId) {
-    EquivalenceClassId classId = globalState_.equivClassBySlotId.get(slotId);
-    return globalState_.equivClassMembers.get(classId);
-  }
-
   public ExprSubstitutionMap getEquivClassSmap() { return globalState_.equivClassSmap; }
 
   /**
@@ -2118,27 +2077,6 @@ public class Analyzer {
   }
 
   /**
-   * Removes redundant expressions from exprs based on equivalence classes, as follows:
-   * First, normalizes the exprs using the canonical SlotRef representative of each
-   * equivalence class. Then retains the first original element of exprs that is
-   * non-redundant in the normalized exprs. Returns a new list with the unique exprs.
-   */
-  public List<Expr> removeRedundantExprs(List<Expr> exprs) {
-    List<Expr> result = Lists.newArrayList();
-    List<Expr> normalizedExprs =
-        Expr.substituteList(exprs, globalState_.equivClassSmap, this, false);
-    Preconditions.checkState(exprs.size() == normalizedExprs.size());
-    List<Expr> uniqueExprs = Lists.newArrayList();
-    for (int i = 0; i < normalizedExprs.size(); ++i) {
-      if (!uniqueExprs.contains(normalizedExprs.get(i))) {
-        uniqueExprs.add(normalizedExprs.get(i));
-        result.add(exprs.get(i).clone());
-      }
-    }
-    return result;
-  }
-
-  /**
    * Mark predicates as assigned.
    */
   public void markConjunctsAssigned(List<Expr> conjuncts) {
@@ -2155,29 +2093,12 @@ public class Analyzer {
     globalState_.assignedConjuncts.add(conjunct.getId());
   }
 
-  public boolean isConjunctAssigned(Expr conjunct) {
-    return globalState_.assignedConjuncts.contains(conjunct.getId());
-  }
-
   public Set<ExprId> getAssignedConjuncts() {
     return Sets.newHashSet(globalState_.assignedConjuncts);
   }
 
   public void setAssignedConjuncts(Set<ExprId> assigned) {
     globalState_.assignedConjuncts = Sets.newHashSet(assigned);
-  }
-
-  /**
-   * Return true if there's at least one unassigned non-auxiliary conjunct.
-   */
-  public boolean hasUnassignedConjuncts() {
-    for (ExprId id: globalState_.conjuncts.keySet()) {
-      if (globalState_.assignedConjuncts.contains(id)) continue;
-      Expr e = globalState_.conjuncts.get(id);
-      if (e.isAuxExpr()) continue;
-      return true;
-    }
-    return false;
   }
 
   /**
@@ -2486,10 +2407,6 @@ public class Analyzer {
     return tableName.isFullyQualified() ? tableName.getDb() : getDefaultDb();
   }
 
-  public String getTargetDbName(FunctionName fnName) {
-    return fnName.isFullyQualified() ? fnName.getDb() : getDefaultDb();
-  }
-
   /**
    * Returns the fully-qualified table name of tableName. If tableName
    * is already fully qualified, returns tableName.
@@ -2518,12 +2435,6 @@ public class Analyzer {
 
   public List<Expr> getConjuncts() {
     return new ArrayList<Expr>(globalState_.conjuncts.values());
-  }
-  public Expr getConjunct(ExprId exprId) {
-    return globalState_.conjuncts.get(exprId);
-  }
-  public Map<TupleId, List<ExprId>> getEqJoinConjuncts() {
-    return globalState_.eqJoinConjuncts;
   }
 
   public int incrementCallDepth() { return ++callDepth_; }

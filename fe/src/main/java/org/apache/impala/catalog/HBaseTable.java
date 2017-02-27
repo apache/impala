@@ -99,10 +99,6 @@ public class HBaseTable extends Table {
   // Minimum number of regions that are checked to estimate the row count
   private static final int MIN_NUM_REGIONS_TO_CHECK = 5;
 
-  // Column referring to HBase row key.
-  // Hive (including metastore) currently doesn't support composite HBase keys.
-  protected HBaseColumn rowKey_;
-
   // Name of table in HBase.
   // 'this.name' is the alias of the HBase table in Hive.
   protected String hbaseTableName_;
@@ -672,10 +668,6 @@ public class HBaseTable extends Table {
 
   public String getHBaseTableName() {
     return hbaseTableName_;
-  }
-
-  public static Configuration getHBaseConf() {
-    return hbaseConf_;
   }
 
   public int getNumNodes() {

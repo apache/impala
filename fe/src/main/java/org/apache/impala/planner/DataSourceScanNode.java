@@ -336,15 +336,6 @@ public class DataSourceScanNode extends ScanNode {
     perHostMemCost_ = 1024L * 1024L * 1024L;
   }
 
-  /**
-   * Returns the per-host upper bound of memory that any number of concurrent scan nodes
-   * will use. Used for estimating the per-host memory requirement of queries.
-   */
-  public static long getPerHostMemUpperBound() {
-    // TODO: What's a good estimate of memory consumption?
-    return 1024L * 1024L * 1024L;
-  }
-
   @Override
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {

@@ -408,15 +408,6 @@ public class HdfsCachingUtil {
   }
 
   /**
-   * Check if the poolName matches the pool of the cache directive
-   * identified by directiveId
-   */
-  public static boolean isSamePool(String poolName, Long directiveId)
-      throws ImpalaRuntimeException {
-    return poolName.equals(getCachePool(directiveId));
-  }
-
-  /**
    * Helper method for frequent lookup of replication factor in the thrift caching
    * structure.
    */

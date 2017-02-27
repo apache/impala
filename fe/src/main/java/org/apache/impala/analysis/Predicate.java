@@ -38,7 +38,6 @@ public abstract class Predicate extends Expr {
     isEqJoinConjunct_ = other.isEqJoinConjunct_;
   }
 
-  public boolean isEqJoinConjunct() { return isEqJoinConjunct_; }
   public void setIsEqJoinConjunct(boolean v) { isEqJoinConjunct_ = v; }
 
   @Override

@@ -50,7 +50,6 @@ public class ResetMetadataStmt extends StatementBase {
   }
 
   public TableName getTableName() { return tableName_; }
-  public boolean isRefresh() { return isRefresh_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {

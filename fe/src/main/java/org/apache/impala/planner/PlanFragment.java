@@ -74,8 +74,6 @@ import com.google.common.collect.Sets;
  *   fix that
  */
 public class PlanFragment extends TreeNode<PlanFragment> {
-  private final static Logger LOG = LoggerFactory.getLogger(PlanFragment.class);
-
   private final PlanFragmentId fragmentId_;
   private PlanId planId_;
   private CohortId cohortId_;

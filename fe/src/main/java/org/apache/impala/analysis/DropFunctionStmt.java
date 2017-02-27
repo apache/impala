@@ -51,7 +51,6 @@ public class DropFunctionStmt extends StatementBase {
     ifExists_ = ifExists;
   }
 
-  public FunctionName getFunction() { return desc_.getFunctionName(); }
   public boolean getIfExists() { return ifExists_; }
   private boolean hasSignature() { return fnArgs_ != null; }
 

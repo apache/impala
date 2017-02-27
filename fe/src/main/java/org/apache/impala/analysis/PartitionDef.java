@@ -53,6 +53,7 @@ public class PartitionDef implements ParseNode {
   }
 
   public HdfsUri getLocation() { return location_; }
+
   public PartitionSpec getPartitionSpec() { return partitionSpec_; }
 
   @Override

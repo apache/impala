@@ -493,7 +493,6 @@ public class Db implements CatalogObject {
   public long getCatalogVersion() { return catalogVersion_; }
   @Override
   public void setCatalogVersion(long newVersion) { catalogVersion_ = newVersion; }
-  public Catalog getParentCatalog() { return parentCatalog_; }
 
   @Override
   public boolean isLoaded() { return true; }

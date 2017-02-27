@@ -83,7 +83,6 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
     optArgs_ = optArgs;
   }
 
-  public String getComment() { return optArgs_.get(OptArg.COMMENT); }
   public boolean getIfNotExists() { return ifNotExists_; }
   public boolean hasSignature() { return args_ != null; }
 

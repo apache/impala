@@ -221,7 +221,4 @@ public class RangePartition implements ParseNode {
         || tRangePartition.isSetUpper_bound_values());
     return tRangePartition;
   }
-
-  public List<Expr> getLowerBound() { return ImmutableList.copyOf(lowerBound_); }
-  public List<Expr> getUpperBound() { return ImmutableList.copyOf(upperBound_); }
 }

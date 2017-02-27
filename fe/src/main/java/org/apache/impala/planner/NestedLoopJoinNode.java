@@ -50,8 +50,6 @@ import com.google.common.base.Preconditions;
  * right input.
  */
 public class NestedLoopJoinNode extends JoinNode {
-  private final static Logger LOG = LoggerFactory.getLogger(NestedLoopJoinNode.class);
-
   public NestedLoopJoinNode(PlanNode outer, PlanNode inner, boolean isStraightJoin,
       DistributionMode distrMode, JoinOperator joinOp, List<Expr> otherJoinConjuncts) {
     super(outer, inner, isStraightJoin, distrMode, joinOp,

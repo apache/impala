@@ -101,12 +101,9 @@ public class DescriptorTable {
 
   public TupleDescriptor getTupleDesc(TupleId id) { return tupleDescs_.get(id); }
   public SlotDescriptor getSlotDesc(SlotId id) { return slotDescs_.get(id); }
-  public Collection<TupleDescriptor> getTupleDescs() { return tupleDescs_.values(); }
   public Collection<SlotDescriptor> getSlotDescs() { return slotDescs_.values(); }
-  public TupleId getMaxTupleId() { return tupleIdGenerator_.getMaxId(); }
   public SlotId getMaxSlotId() { return slotIdGenerator_.getMaxId(); }
 
-  public Table getTargetTable() { return targetTable_; }
   public void setTargetTable(Table table) { targetTable_ = table; }
 
   /**
@@ -137,17 +134,6 @@ public class DescriptorTable {
     for (SlotId id: ids) {
       getSlotDesc(id).setIsMaterialized(true);
     }
-  }
-
-  /**
-   * Return all ids in slotIds that belong to tupleId.
-   */
-  public List<SlotId> getTupleSlotIds(List<SlotId> slotIds, TupleId tupleId) {
-    List<SlotId> result = Lists.newArrayList();
-    for (SlotId id: slotIds) {
-      if (getSlotDesc(id).getParent().getId().equals(tupleId)) result.add(id);
-    }
-    return result;
   }
 
   /**

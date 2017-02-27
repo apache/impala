@@ -49,11 +49,6 @@ public class PartitionSpec extends PartitionSpecBase {
 
   public List<PartitionKeyValue> getPartitionSpecKeyValues() { return partitionSpec_; }
 
-  public boolean partitionExists() {
-    Preconditions.checkNotNull(partitionExists_);
-    return partitionExists_;
-  }
-
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);

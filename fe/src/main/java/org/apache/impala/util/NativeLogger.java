@@ -25,7 +25,6 @@ import org.slf4j.LoggerFactory;
  * log4j log messages to be logged by glog.
  */
 public class NativeLogger {
-  private final static Logger LOG = LoggerFactory.getLogger(NativeLogger.class);
   private static boolean loaded_ = false;
 
   // Writes a log message to glog

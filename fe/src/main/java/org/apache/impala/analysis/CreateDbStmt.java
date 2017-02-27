@@ -58,7 +58,6 @@ public class CreateDbStmt extends StatementBase {
   public String getComment() { return comment_; }
   public String getDb() { return dbName_; }
   public boolean getIfNotExists() { return ifNotExists_; }
-  public HdfsUri getLocation() { return location_; }
 
   @Override
   public String toSql() {

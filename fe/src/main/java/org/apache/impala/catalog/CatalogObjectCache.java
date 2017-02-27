@@ -32,7 +32,6 @@ import com.google.common.collect.Lists;
  * entries only get applied if the new/updated object has a larger catalog version.
  */
 public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> {
-  private static final Logger LOG = Logger.getLogger(CatalogObjectCache.class);
   private final boolean caseInsensitiveKeys_;
 
   /**
