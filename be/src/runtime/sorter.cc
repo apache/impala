@@ -258,8 +258,10 @@ class Sorter::Run {
   /// The size in bytes of the sort tuple.
   const int sort_tuple_size_;
 
-  /// Number of tuples per block in a run.
-  const int block_capacity_;
+  /// Number of tuples per block in a run. This gets multiplied with
+  /// TupleIterator::block_index_ in various places and to make sure we don't overflow the
+  /// result of that operation we make this int64_t here.
+  const int64_t block_capacity_;
 
   const bool has_var_len_slots_;
 
