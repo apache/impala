@@ -221,7 +221,7 @@ void TopNNode::Close(RuntimeState* state) {
 // Reverse the order of the tuples in the priority queue
 void TopNNode::PrepareForOutput() {
   sorted_top_n_.resize(priority_queue_->size());
-  int index = sorted_top_n_.size() - 1;
+  int64_t index = sorted_top_n_.size() - 1;
 
   while (priority_queue_->size() > 0) {
     Tuple* tuple = priority_queue_->top();
