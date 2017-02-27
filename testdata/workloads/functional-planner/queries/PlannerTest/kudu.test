@@ -225,14 +225,14 @@ select * from functional_kudu.alltypes
 INSERT INTO KUDU [functional_kudu.alltypes]
 |
 01:SORT
-|  order by: id DESC NULLS LAST
+|  order by: id ASC NULLS LAST
 |
 00:SCAN KUDU [functional_kudu.alltypes]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.alltypes]
 |
 01:SORT
-|  order by: id DESC NULLS LAST
+|  order by: id ASC NULLS LAST
 |
 00:SCAN KUDU [functional_kudu.alltypes]
 ====
@@ -247,7 +247,7 @@ from functional_kudu.testtbl group by id, name
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
 02:SORT
-|  order by: id DESC NULLS LAST
+|  order by: id ASC NULLS LAST
 |
 01:AGGREGATE [FINALIZE]
 |  output: max(zip)
@@ -258,7 +258,7 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
 04:SORT
-|  order by: id DESC NULLS LAST
+|  order by: id ASC NULLS LAST
 |
 03:AGGREGATE [FINALIZE]
 |  output: max:merge(zip)

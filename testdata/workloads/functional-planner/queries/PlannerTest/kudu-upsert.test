@@ -86,7 +86,7 @@ select * from functional_kudu.testtbl
 UPSERT INTO KUDU [functional_kudu.testtbl]
 |
 01:SORT
-|  order by: id DESC NULLS LAST
+|  order by: id ASC NULLS LAST
 |
 00:SCAN KUDU [functional_kudu.testtbl]
 ====

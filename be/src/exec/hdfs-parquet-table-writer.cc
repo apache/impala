@@ -998,7 +998,7 @@ Status HdfsParquetTableWriter::Finalize() {
   file_metadata_.num_rows = row_count_;
   RETURN_IF_ERROR(FlushCurrentRowGroup());
   RETURN_IF_ERROR(WriteFileFooter());
-  stats_.__set_parquet_stats(parquet_stats_);
+  stats_.__set_parquet_stats(parquet_insert_stats_);
   COUNTER_ADD(parent_->rows_inserted_counter(), row_count_);
   return Status::OK();
 }
@@ -1046,7 +1046,8 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
     current_row_group_->num_rows = col_writer->num_values();
     current_row_group_->columns[i].file_offset = file_pos_;
     const string& col_name = table_desc_->col_descs()[i + num_clustering_cols].name();
-    parquet_stats_.per_column_size[col_name] += col_writer->total_compressed_size();
+    parquet_insert_stats_.per_column_size[col_name] +=
+        col_writer->total_compressed_size();
 
     // Write encodings and encoding stats for this column
     col_metadata.encodings.clear();
@@ -1093,6 +1094,17 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
 
     col_writer->Reset();
   }
+
+  // Populate RowGroup::sorting_columns with all columns specified by the Frontend.
+  for (int col_idx : parent_->sort_by_columns()) {
+    current_row_group_->sorting_columns.push_back(parquet::SortingColumn());
+    parquet::SortingColumn& sorting_column = current_row_group_->sorting_columns.back();
+    sorting_column.column_idx = col_idx;
+    sorting_column.descending = false;
+    sorting_column.nulls_first = false;
+  }
+  current_row_group_->__isset.sorting_columns =
+      !current_row_group_->sorting_columns.empty();
 
   current_row_group_ = nullptr;
   return Status::OK();

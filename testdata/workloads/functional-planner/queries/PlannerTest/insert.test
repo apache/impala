@@ -578,7 +578,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 01:SORT
-|  order by: year DESC NULLS LAST, month DESC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -587,7 +587,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 02:SORT
-|  order by: year DESC NULLS LAST, month DESC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |
 01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
 |
@@ -602,7 +602,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 01:SORT
-|  order by: year DESC NULLS LAST, month DESC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -611,7 +611,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 01:SORT
-|  order by: year DESC NULLS LAST, month DESC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -626,7 +626,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 04:SORT
-|  order by: year DESC NULLS LAST, month DESC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |
 03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: int_col = max(int_col)
@@ -646,7 +646,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 08:SORT
-|  order by: year DESC NULLS LAST, month DESC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |
 07:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
 |
@@ -714,7 +714,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 01:SORT
-|  order by: int_col DESC NULLS LAST, bool_col DESC NULLS LAST
+|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -723,7 +723,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 02:SORT
-|  order by: int_col DESC NULLS LAST, bool_col DESC NULLS LAST
+|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
 |
 01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
 |
@@ -739,7 +739,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 01:SORT
-|  order by: int_col DESC NULLS LAST, bool_col DESC NULLS LAST
+|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -748,7 +748,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 01:SORT
-|  order by: int_col DESC NULLS LAST, bool_col DESC NULLS LAST
+|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -762,7 +762,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 01:SORT
-|  order by: year DESC NULLS LAST, month DESC NULLS LAST, int_col DESC NULLS LAST, bool_col DESC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -771,7 +771,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 02:SORT
-|  order by: year DESC NULLS LAST, month DESC NULLS LAST, int_col DESC NULLS LAST, bool_col DESC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
 |
 01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
 |

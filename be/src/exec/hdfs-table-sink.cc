@@ -69,6 +69,7 @@ HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
     partition_key_texprs_(tsink.table_sink.hdfs_table_sink.partition_key_exprs),
     overwrite_(tsink.table_sink.hdfs_table_sink.overwrite),
     input_is_clustered_(tsink.table_sink.hdfs_table_sink.input_is_clustered),
+    sort_by_columns_(tsink.table_sink .hdfs_table_sink.sort_by_columns),
     current_clustered_partition_(nullptr) {
   DCHECK(tsink.__isset.table_sink);
 }

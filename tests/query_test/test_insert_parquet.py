@@ -23,6 +23,8 @@ from collections import namedtuple
 from shutil import rmtree
 from subprocess import check_call
 from tempfile import mkdtemp as make_tmp_dir
+from backports.tempfile import TemporaryDirectory
+from parquet.ttypes import SortingColumn
 
 from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -212,6 +214,42 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     finally:
       self.execute_query("drop table %s" % qualified_table_name)
       rmtree(tmp_dir)
+
+  def test_sorting_columns(self, vector, unique_database):
+    """Tests that RowGroup::sorting_columns gets populated when specifying a sortby()
+    insert hint."""
+    source_table = "functional_parquet.alltypessmall"
+    target_table = "test_write_sorting_columns"
+    qualified_target_table = "{0}.{1}".format(unique_database, target_table)
+    hdfs_path = get_fs_path("/test-warehouse/{0}.db/{1}/".format(unique_database,
+        target_table))
+
+    # Create table
+    # TODO: Simplify once IMPALA-4167 (insert hints in CTAS) has been fixed.
+    query = "create table {0} like {1} stored as parquet".format(qualified_target_table,
+        source_table)
+    self.execute_query(query)
+
+    # Insert data
+    query = ("insert into {0} partition(year, month) /* +sortby(int_col, id) */ "
+        "select * from {1}").format(qualified_target_table, source_table)
+    self.execute_query(query)
+
+    # Download hdfs files and extract rowgroup metadata
+    row_groups = []
+    with TemporaryDirectory() as tmp_dir:
+      check_call(['hdfs', 'dfs', '-get', hdfs_path, tmp_dir])
+
+      for root, subdirs, files in os.walk(tmp_dir):
+        for f in files:
+          parquet_file = os.path.join(root, str(f))
+          file_meta_data = get_parquet_metadata(parquet_file)
+          row_groups.extend(file_meta_data.row_groups)
+
+    # Verify that the files have the sorted_columns set
+    expected = [SortingColumn(4, False, False), SortingColumn(0, False, False)]
+    for row_group in row_groups:
+      assert row_group.sorting_columns == expected
 
 
 @SkipIfIsilon.hive

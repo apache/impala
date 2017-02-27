@@ -152,7 +152,7 @@ class HdfsTableSink : public DataSink {
   virtual void Close(RuntimeState* state);
 
   int skip_header_line_count() const { return skip_header_line_count_; }
-
+  const vector<int32_t>& sort_by_columns() const { return sort_by_columns_; }
   const HdfsTableDescriptor& TableDesc() { return *table_desc_; }
 
   RuntimeProfile::Counter* rows_inserted_counter() { return rows_inserted_counter_; }
@@ -269,6 +269,11 @@ class HdfsTableSink : public DataSink {
   /// Indicates whether the input is ordered by the partition keys, meaning partitions can
   /// be opened, written, and closed one by one.
   bool input_is_clustered_;
+
+  // Stores the indices into the list of non-clustering columns of the target table that
+  // are mentioned in the 'sortby()' hint. This is used in the backend to populate the
+  // RowGroup::sorting_columns list in parquet files.
+  const std::vector<int32_t>& sort_by_columns_;
 
   /// Stores the current partition during clustered inserts across subsequent row batches.
   /// Only set if 'input_is_clustered_' is true.

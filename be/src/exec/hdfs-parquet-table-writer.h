@@ -187,7 +187,7 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   std::vector<uint8_t> compression_staging_buffer_;
 
   /// For each column, the on disk size written.
-  TParquetInsertStats parquet_stats_;
+  TParquetInsertStats parquet_insert_stats_;
 };
 
 }

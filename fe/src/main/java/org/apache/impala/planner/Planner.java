@@ -548,7 +548,7 @@ public class Planner {
     if (orderingExprs.isEmpty()) return;
 
     // Build sortinfo to sort by the ordering exprs.
-    List<Boolean> isAscOrder = Collections.nCopies(orderingExprs.size(), false);
+    List<Boolean> isAscOrder = Collections.nCopies(orderingExprs.size(), true);
     List<Boolean> nullsFirstParams = Collections.nCopies(orderingExprs.size(), false);
     SortInfo sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams);
 

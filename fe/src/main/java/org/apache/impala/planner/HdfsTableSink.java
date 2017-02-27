@@ -32,6 +32,7 @@ import org.apache.impala.thrift.THdfsTableSink;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTableSinkType;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Base class for Hdfs data sinks such as HdfsTextTableSink.
@@ -50,13 +51,19 @@ public class HdfsTableSink extends TableSink {
   // be opened, written, and closed one by one.
   protected final boolean inputIsClustered_;
 
+  // Stores the indices into the list of non-clustering columns of the target table that
+  // are mentioned in the 'sortby()' hint. This is sent to the backend to populate the
+  // RowGroup::sorting_columns list in parquet files.
+  private List<Integer> sortByColumns_ = Lists.newArrayList();
+
   public HdfsTableSink(Table targetTable, List<Expr> partitionKeyExprs,
-      boolean overwrite, boolean inputIsClustered) {
+      boolean overwrite, boolean inputIsClustered, List<Integer> sortByColumns) {
     super(targetTable, Op.INSERT);
     Preconditions.checkState(targetTable instanceof HdfsTable);
     partitionKeyExprs_ = partitionKeyExprs;
     overwrite_ = overwrite;
     inputIsClustered_ = inputIsClustered;
+    sortByColumns_ = sortByColumns;
   }
 
   @Override
@@ -154,6 +161,7 @@ public class HdfsTableSink extends TableSink {
     if (skipHeaderLineCount > 0) {
       hdfsTableSink.setSkip_header_line_count(skipHeaderLineCount);
     }
+    hdfsTableSink.setSort_by_columns(sortByColumns_);
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.hdfs_table_sink = hdfsTableSink;

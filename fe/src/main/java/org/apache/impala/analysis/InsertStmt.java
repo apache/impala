@@ -130,6 +130,11 @@ public class InsertStmt extends StatementBase {
   // contain primary key columns.
   private List<Expr> sortByExprs_ = Lists.newArrayList();
 
+  // Stores the indices into the list of non-clustering columns of the target table that
+  // are mentioned in the 'sortby()' hint. This is sent to the backend to populate the
+  // RowGroup::sorting_columns list in parquet files.
+  private List<Integer> sortByColumns_ = Lists.newArrayList();
+
   // Output expressions that produce the final results to write to the target table. May
   // include casts. Set in prepareExpressions().
   // If this is an INSERT on a non-Kudu table, it will contain one Expr for all
@@ -804,6 +809,7 @@ public class InsertStmt extends StatementBase {
       for (int i = 0; i < columns.size(); ++i) {
         if (columns.get(i).getName().equals(columnName)) {
           sortByExprs_.add(resultExprs_.get(i));
+          sortByColumns_.add(i);
           foundColumn = true;
           break;
         }
@@ -854,7 +860,8 @@ public class InsertStmt extends StatementBase {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
     return TableSink.create(table_, isUpsert_ ? TableSink.Op.UPSERT : TableSink.Op.INSERT,
-        partitionKeyExprs_, mentionedColumns_, overwrite_, hasClusteredHint_);
+        partitionKeyExprs_, mentionedColumns_, overwrite_, hasClusteredHint_,
+        sortByColumns_);
   }
 
   /**
