@@ -87,6 +87,19 @@ SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG -gdwarf-2")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
   "${CXX_CLANG_FLAGS} -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
 
+# Set the flags to the undefined behavior sanitizer, also known as "ubsan"
+# Turn on sanitizer and debug symbols to get stack traces:
+SET(CXX_FLAGS_UBSAN "${CXX_CLANG_FLAGS} -ggdb3 -fno-omit-frame-pointer -fsanitize=undefined")
+# Add flags to enable symbol resolution in the stack traces:
+SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -rtlib=compiler-rt -lgcc_s")
+# Ignore a number of noisy errors with too many false positives:
+SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -fno-sanitize=alignment,function,vptr,float-divide-by-zero,float-cast-overflow")
+# Don't enforce wrapped signed integer arithmetic so that the sanitizer actually sees
+# undefined wrapping:
+SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -fno-wrapv")
+# To ease debugging, turn off all optimizations:
+SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -O0")
+
 SET(CXX_FLAGS_TIDY "${CXX_CLANG_FLAGS}")
 # Catching unused variables requires an optimization level greater than 0
 SET(CXX_FLAGS_TIDY "${CXX_FLAGS_TIDY} -O1")
@@ -111,6 +124,8 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_ADDRESS_SANITIZER}")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "TIDY")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_TIDY}")
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
+  SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_UBSAN}")
 else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
 endif()
@@ -133,7 +148,8 @@ if (CCACHE AND NOT DEFINED ENV{DISABLE_CCACHE})
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
   if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"
-      OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY")
+      OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY"
+      OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
     # Need to set CCACHE_CPP so that ccache calls clang with the original source file for
     # both preprocessing and compilation. Otherwise, ccache will use clang to preprocess
     # the file and then call clang with the preprocessed output if not cached. However,
@@ -247,7 +263,8 @@ add_definitions(-fPIC)
 
 # set compile output directory
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG" OR
-    "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
+    "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/debug/")
 else()
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/release/")

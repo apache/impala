@@ -201,7 +201,8 @@ find_package(LlvmBinaries REQUIRED)
 # Find LLVM libraries to link against.
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG"
     OR "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"
-    OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY")
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY"
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
   # Use the LLVM libaries with assertions for debug builds.
   set(LLVM_ROOT ${LLVM_DEBUG_ROOT})
 endif()

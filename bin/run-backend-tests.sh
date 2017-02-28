@@ -34,6 +34,9 @@ fi
 
 cd ${IMPALA_BE_DIR}
 . ${IMPALA_HOME}/bin/set-classpath.sh
+cd ..
 
 export CTEST_OUTPUT_ON_FAILURE=1
+export UBSAN_OPTIONS="print_stacktrace=1"
+export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
 make test ARGS="${BE_TEST_ARGS}"

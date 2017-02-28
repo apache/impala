@@ -103,4 +103,6 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
 fi
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
+export UBSAN_OPTIONS='print_stacktrace=1'
+export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
 exec ${TOOL_PREFIX} ${IMPALA_CMD} ${IMPALAD_ARGS}
