@@ -73,6 +73,7 @@ set_dep_root(BOOST)
 set_dep_root(BREAKPAD)
 set_dep_root(BZIP2)
 set_dep_root(CRCUTIL)
+set_dep_root(FLATBUFFERS)
 set_dep_root(GCC)
 set_dep_root(GFLAGS)
 set_dep_root(GLOG)
@@ -243,6 +244,14 @@ message(STATUS "Thrift contrib dir: ${THRIFT_CONTRIB_DIR}")
 message(STATUS "Thrift library path: ${THRIFT_LIBS}")
 message(STATUS "Thrift static library: ${THRIFT_STATIC_LIB}")
 message(STATUS "Thrift compiler: ${THRIFT_COMPILER}")
+
+# find flatbuffers headers, lib and compiler
+find_package(FlatBuffers REQUIRED)
+include_directories(${FLATBUFFERS_INCLUDE_DIR})
+set(LIBS ${LIBS} ${FLATBUFFERS_LIBS})
+message(STATUS "FlatBuffers include dir: ${FLATBUFFERS_INCLUDE_DIR}")
+message(STATUS "FlatBuffers library path: ${FLATBUFFERS_LIBS}")
+message(STATUS "FlatBuffers compiler: ${FLATBUFFERS_COMPILER}")
 
 # find Snappy headers and libs
 find_package(Snappy REQUIRED)
