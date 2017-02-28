@@ -799,7 +799,7 @@ Status HdfsParquetTableWriter::Init() {
       default:
         DCHECK(false);
     }
-    columns_[i] = state_->obj_pool()->Add(writer);
+    columns_[i].reset(writer);
     columns_[i]->Reset();
   }
   RETURN_IF_ERROR(CreateSchema());

@@ -276,7 +276,7 @@ Status HdfsTableSink::WriteRowsToPartition(
   // set.
   bool new_file;
   while (true) {
-    OutputPartition* output_partition = partition_pair->first;
+    OutputPartition* output_partition = partition_pair->first.get();
     RETURN_IF_ERROR(
         output_partition->writer->AppendRows(batch, partition_pair->second, &new_file));
     if (!new_file) break;
@@ -327,7 +327,8 @@ Status HdfsTableSink::WriteClusteredRowBatch(RuntimeState* state, RowBatch* batc
         RETURN_IF_ERROR(WriteRowsToPartition(state, batch, current_clustered_partition_));
         current_clustered_partition_->second.clear();
       }
-      RETURN_IF_ERROR(FinalizePartitionFile(state, current_clustered_partition_->first));
+      RETURN_IF_ERROR(FinalizePartitionFile(state,
+          current_clustered_partition_->first.get()));
       if (current_clustered_partition_->first->writer.get() != nullptr) {
         current_clustered_partition_->first->writer->Close();
       }
@@ -571,9 +572,10 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state, const Tuple
       partition_descriptor = it->second;
     }
 
-    OutputPartition* partition = state->obj_pool()->Add(new OutputPartition());
+    std::unique_ptr<OutputPartition> partition(new OutputPartition());
     Status status =
-        InitOutputPartition(state, *partition_descriptor, row, partition, no_more_rows);
+        InitOutputPartition(state, *partition_descriptor, row, partition.get(),
+            no_more_rows);
     if (!status.ok()) {
       // We failed to create the output partition successfully. Clean it up now
       // as it is not added to partition_keys_to_output_partitions_ so won't be
@@ -594,12 +596,12 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state, const Tuple
     state->per_partition_status()->insert(
         make_pair(partition->partition_name, partition_status));
 
-    if (!no_more_rows && !ShouldSkipStaging(state, partition)) {
+    if (!no_more_rows && !ShouldSkipStaging(state, partition.get())) {
       // Indicate that temporary directory is to be deleted after execution
       (*state->hdfs_files_to_move())[partition->tmp_hdfs_dir_name] = "";
     }
 
-    partition_keys_to_output_partitions_[key].first = partition;
+    partition_keys_to_output_partitions_[key].first = std::move(partition);
     *partition_pair = &partition_keys_to_output_partitions_[key];
   } else {
     // Use existing output_partition partition.
@@ -701,7 +703,7 @@ Status HdfsTableSink::FlushFinal(RuntimeState* state) {
           partition_keys_to_output_partitions_.begin();
       cur_partition != partition_keys_to_output_partitions_.end();
       ++cur_partition) {
-    RETURN_IF_ERROR(FinalizePartitionFile(state, cur_partition->second.first));
+    RETURN_IF_ERROR(FinalizePartitionFile(state, cur_partition->second.first.get()));
   }
 
   return Status::OK();
@@ -717,7 +719,7 @@ void HdfsTableSink::Close(RuntimeState* state) {
     if (cur_partition->second.first->writer.get() != nullptr) {
       cur_partition->second.first->writer->Close();
     }
-    Status close_status = ClosePartitionFile(state, cur_partition->second.first);
+    Status close_status = ClosePartitionFile(state, cur_partition->second.first.get());
     if (!close_status.ok()) state->LogError(close_status.msg());
   }
   partition_keys_to_output_partitions_.clear();

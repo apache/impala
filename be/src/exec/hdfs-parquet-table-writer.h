@@ -146,8 +146,10 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   /// The current row group being written to.
   parquet::RowGroup* current_row_group_;
 
-  /// array of pointers to column information.
-  std::vector<BaseColumnWriter*> columns_;
+  /// Array of pointers to column information. The column writers are owned by the
+  /// table writer, as there is no reason for the column writers to outlive the table
+  /// writer.
+  std::vector<std::unique_ptr<BaseColumnWriter>> columns_;
 
   /// Number of rows in current file
   int64_t row_count_;

@@ -115,6 +115,9 @@ class HdfsTableWriter {
   RuntimeState* state_;
 
   /// Structure describing partition written to by this writer.
+  /// NOTE: OutputPartition is usually accessed with a unique_ptr. It is safe to use
+  /// a raw pointer here, because the OutputPartition maintains a scoped_ptr to
+  /// the HdfsTableWriter objects. This will never outlive the OutputPartition.
   OutputPartition* output_;
 
   /// Table descriptor of table to be written.
