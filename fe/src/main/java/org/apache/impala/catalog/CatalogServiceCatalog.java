@@ -923,43 +923,17 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Reloads metadata for table 'tbl'. If 'tbl' is an IncompleteTable, it makes an
-   * asynchronous request to the table loading manager to create a proper table instance
-   * and load the metadata from Hive Metastore. Otherwise, it updates table metadata
-   * in-place by calling the load() function on the specified table. Returns the
-   * TCatalogObject representing 'tbl', if it is a fully loaded table (e.g. HdfsTable,
-   * HBaseTable, etc). Otherwise, returns a newly constructed fully loaded TCatalogObject.
-   * Applies proper synchronization to protect the metadata load from concurrent table
-   * modifications and assigns a new catalog version.
+   * Reloads metadata for table 'tbl' which must not be an IncompleteTable. Updates the
+   * table metadata in-place by calling load() on the given table. Returns the
+   * TCatalogObject representing 'tbl'. Applies proper synchronization to protect the
+   * metadata load from concurrent table modifications and assigns a new catalog version.
    * Throws a CatalogException if there is an error loading table metadata.
    */
   public TCatalogObject reloadTable(Table tbl) throws CatalogException {
     LOG.info(String.format("Refreshing table metadata: %s", tbl.getFullName()));
-    TTableName tblName = new TTableName(tbl.getDb().getName().toLowerCase(),
-        tbl.getName().toLowerCase());
-    Db db = tbl.getDb();
-    if (tbl instanceof IncompleteTable) {
-      TableLoadingMgr.LoadRequest loadReq;
-      long previousCatalogVersion;
-      // Return the table if it is already loaded or submit a new load request.
-      catalogLock_.readLock().lock();
-      try {
-        previousCatalogVersion = tbl.getCatalogVersion();
-        loadReq = tableLoadingMgr_.loadAsync(tblName);
-      } finally {
-        catalogLock_.readLock().unlock();
-      }
-      Preconditions.checkNotNull(loadReq);
-      try {
-        // The table may have been dropped/modified while the load was in progress, so
-        // only apply the update if the existing table hasn't changed.
-        Table result = replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion);
-        return result.toTCatalogObject();
-      } finally {
-        loadReq.close();
-        LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));
-      }
-    }
+    Preconditions.checkState(!(tbl instanceof IncompleteTable));
+    String dbName = tbl.getDb().getName();
+    String tblName = tbl.getName();
 
     if (!tryLockTable(tbl)) {
       throw new CatalogException(String.format("Error refreshing metadata for table " +
@@ -971,11 +945,10 @@ public class CatalogServiceCatalog extends Catalog {
       try (MetaStoreClient msClient = getMetaStoreClient()) {
         org.apache.hadoop.hive.metastore.api.Table msTbl = null;
         try {
-          msTbl = msClient.getHiveClient().getTable(db.getName(),
-              tblName.getTable_name());
+          msTbl = msClient.getHiveClient().getTable(dbName, tblName);
         } catch (Exception e) {
           throw new TableLoadingException("Error loading metadata for table: " +
-              db.getName() + "." + tblName.getTable_name(), e);
+              dbName + "." + tblName, e);
         }
         tbl.load(true, msClient.getHiveClient(), msTbl);
       }
@@ -986,15 +959,6 @@ public class CatalogServiceCatalog extends Catalog {
       Preconditions.checkState(!catalogLock_.isWriteLockedByCurrentThread());
       tbl.getLock().unlock();
     }
-  }
-
-  /**
-   * Reloads the metadata of a table with name 'tableName'.
-   */
-  public void reloadTable(TTableName tableName) throws CatalogException {
-    Table table = getTable(tableName.getDb_name(), tableName.getTable_name());
-    if (table == null) return;
-    reloadTable(table);
   }
 
   /**
@@ -1076,7 +1040,12 @@ public class CatalogServiceCatalog extends Catalog {
         Table result = removeTable(dbName, tblName);
         if (result == null) return null;
         tblWasRemoved.setRef(true);
-        return result.toTCatalogObject();
+        result.getLock().lock();
+        try {
+          return result.toTCatalogObject();
+        } finally {
+          result.getLock().unlock();
+        }
       }
 
       db = getDb(dbName);

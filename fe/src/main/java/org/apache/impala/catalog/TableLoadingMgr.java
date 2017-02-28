@@ -305,13 +305,18 @@ public class TableLoadingMgr {
   }
 
   /**
-   * Executes all async refresh work for the specified table name.
+   * Reloads the metadata of the given table to pick up the new cached block location
+   * information. Only reloads the metadata if the table is already loaded. The rationale
+   * is that if the metadata has not been loaded yet, then it needs to be reloaded
+   * anyway, and if the table failed to load, then we do not want to hide errors by
+   * reloading it 'silently' in response to the completion of an HDFS caching request.
    */
   private void execAsyncRefreshWork(TTableName tblName) {
     if (!waitForCacheDirs(tblName)) return;
     try {
-      // Reload the table metadata to pickup the new cached block location information.
-      catalog_.reloadTable(tblName);
+      Table tbl = catalog_.getTable(tblName.getDb_name(), tblName.getTable_name());
+      if (tbl == null || tbl instanceof IncompleteTable || !tbl.isLoaded()) return;
+      catalog_.reloadTable(tbl);
     } catch (CatalogException e) {
       LOG.error("Error reloading cached table: ", e);
     }
