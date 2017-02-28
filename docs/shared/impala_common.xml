@@ -574,20 +574,6 @@ under the License.
             in the <cmdname>impalad</cmdname> and <cmdname>catalogd</cmdname> configuration settings.
           </p>
         </li>
-        <li audience="hidden">
-          <p>
-            For clusters managed by Cloudera Manager, select the 
-            <uicontrol>Use HDFS Rules to Map Kerberos Principals to Short Names</uicontrol>
-            checkbox to enable the service-wide <codeph>load_auth_to_local_rules</codeph> configuration setting.
-            Use the Cloudera Manager setting, <uicontrol>Additional Rules to Map Kerberos Principals to Short Names</uicontrol>,
-            to insert mapping rules.
-            Then restart the Impala service.
-          </p>
-          <p>
-            See <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_auth_to_local_isolate.html" scope="external" format="html">Using Auth-to-Local Rules to Isolate Cluster Users</xref>
-            for general information about this feature.
-          </p>
-        </li>
       </ul>
     </p>
 
@@ -608,12 +594,6 @@ under the License.
       Sentry logs all facts that lead up to authorization decisions at the debug level. If you do not understand
       why Sentry is denying access, the best way to debug is to temporarily turn on debug logging:
       <ul>
-        <li audience="hidden">
-          In Cloudera Manager, add <codeph>log4j.logger.org.apache.sentry=DEBUG</codeph> to the logging settings
-          for your service through the corresponding <uicontrol>Logging Safety Valve</uicontrol> field for the
-          Impala, Hive Server 2, or Solr Server services.
-        </li>
-
         <li>
           Add <codeph>log4j.logger.org.apache.sentry=DEBUG</codeph> to the <filepath>log4j.properties</filepath>
           file on each host in the cluster, in the appropriate configuration directory for each service.
@@ -3366,12 +3346,6 @@ sudo pip-python install ssl</codeblock>
         the load balancer timeout value, or check the connection validity before using it and create a new one if
         the connection has been closed.
       </note>
-
-      <p id="impala_mr">
-        For a detailed information about configuring a cluster to share resources between Impala queries and MapReduce jobs, see
-        <xref audience="integrated" href="../topics/admin_howto_multitenancy.xml#howto_multitenancy"/><xref audience="standalone" href="https://www.cloudera.com/documentation/enterprise/latest/topics/admin_howto_multitenancy.html" format="html" scope="external"/>
-        and <xref href="../topics/impala_howto_rm.xml#howto_impala_rm"/>.
-      </p>
 
       <note id="llama_beta" type="warning">
         In CDH 5.0.0, the Llama component is in beta. It is intended for evaluation of resource management in test

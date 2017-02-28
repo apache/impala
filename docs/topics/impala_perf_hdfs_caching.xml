@@ -469,24 +469,6 @@ Found 122 entries
         </li>
       </ul>
 
-      <p audience="hidden">
-        <b>Cloudera Manager:</b>
-      </p>
-
-      <ul audience="hidden">
-        <li>
-          You can enable or disable HDFS caching through Cloudera Manager, using the configuration setting
-          <uicontrol>Maximum Memory Used for Caching</uicontrol> for the HDFS service. This control sets the HDFS
-          configuration parameter <codeph>dfs_datanode_max_locked_memory</codeph>, which specifies the upper limit
-          of HDFS cache size on each node.
-        </li>
-
-        <li>
-          All the other manipulation of the HDFS caching settings, such as what files are cached, is done through
-          the command line, either Impala DDL statements or the Linux <cmdname>hdfs cacheadmin</cmdname> command.
-        </li>
-      </ul>
-
       <p>
         <b>Impala memory limits:</b>
       </p>

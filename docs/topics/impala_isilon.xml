@@ -102,30 +102,7 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
       for the <cmdname>impalad</cmdname> daemon on clusters not using Cloudera Manager.
     </p>
 
-    <p audience="hidden">
-<!--
-      For information about tasks performed on
-      Isilon OneFS, see the information hub for Cloudera on the EMC Community Network:
-      <xref href="https://community.emc.com/docs/DOC-39522" format="html" scope="external">https://community.emc.com/docs/DOC-39522</xref>.
--->
-      <!-- This is a little bit of a circular loop when this topic is conrefed into the main Isilon page,
-           consider if there's a way to conditionalize it out in that case. -->
-      For information about managing Isilon storage devices through Cloudera Manager, see
-      <xref audience="integrated" href="cm_mc_isilon_service.xml"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_isilon_service.html" scope="external" format="html"/>.
-    </p>
-
     <!-- <p outputclass="toc inpage"/> -->
   </conbody>
-<concept id="isilon_cm_configs" audience="hidden">
-<title>Required Configurations</title>
-<conbody>
-<p>Specify the following configurations in Cloudera Manager on the <menucascade><uicontrol>Clusters</uicontrol><uicontrol><varname>Isilon Service</varname></uicontrol><uicontrol>Configuration</uicontrol></menucascade> tab:<ul id="ul_vpx_bw5_vv">
-<li>In <uicontrol>HDFS Client Advanced Configuration Snippet (Safety Valve) for hdfs-site.xml</uicontrol> <codeph>hdfs-site.xml</codeph> and the <uicontrol>Cluster-wide Advanced Configuration Snippet (Safety Valve) for core-site.xml</uicontrol> properties for the Isilon service, set the value of the <codeph>dfs.client.file-block-storage-locations.timeout.millis</codeph> property to <codeph>10000</codeph>.</li>
-<li>In the Isilon <uicontrol>Cluster-wide Advanced Configuration Snippet (Safety Valve) for core-site.xml</uicontrol> property for the Isilon service, set the value of the <codeph>hadoop.security.token.service.use_ip</codeph> property to <codeph>FALSE</codeph>. </li>
-<li>If you see errors that reference the <codeph>.Trash</codeph> directory, make sure that the <uicontrol>Use Trash</uicontrol> property is selected.</li>
-</ul></p>
-
-</conbody>
-</concept>
 
 </concept>

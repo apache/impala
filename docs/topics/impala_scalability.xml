@@ -169,7 +169,7 @@ Memory Usage: Additional Notes
 
       <p audience="hidden">
         Details to fill in in future: Impact of <q>load catalog in background</q> option.
-        Changing timeouts. Related Cloudera Manager settings.
+        Changing timeouts.
       </p>
 
       <p>
@@ -467,11 +467,6 @@ Memory Usage: Additional Notes
               interpreter. This data shows the memory usage for each host and in total across the cluster. The
               <codeph>BlockMgr.BytesWritten</codeph> counter reports how much data was written to disk during the
               query.
-            </li>
-
-            <li audience="hidden">
-              The <uicontrol>Impala Queries</uicontrol> dialog in Cloudera Manager. You can see the peak memory
-              usage for a query, combined across all nodes in the cluster.
             </li>
 
             <li>

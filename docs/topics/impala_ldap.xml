@@ -185,16 +185,6 @@ under the License.
         </li>
       </ul>
 
-      <p audience="hidden">
-        For clusters managed by Cloudera Manager 5.4.0 and higher,
-        search for the configuration field names <codeph>ldap_domain</codeph>,
-        <codeph>ldap_basedn</codeph>, or <codeph>ldap_bind_pattern</codeph>,
-        fill in and save the appropriate field values, and restart the Impala service.
-        Prior to Cloudera Manager 5.4.0, these values were filled in using the
-        <uicontrol>Impala Daemon Command Line Argument Advanced Configuration Snippet (Safety Valve)</uicontrol>
-        field.
-      </p>
-
       <p>
         These options are mutually exclusive; Impala does not start if more than one of these options is specified.
       </p>
@@ -299,26 +289,6 @@ username, for example <codeph>username@example.com</codeph>.
       </metadata>
     </prolog>
     <conbody>
-      <section id="ldap_impala_hue_cm" audience="hidden">
-        <title>Enabling LDAP for Impala in Hue Using Cloudera Manager</title>
-        <p>
-          <ol>
-            <li>Go to the Hue service.</li>
-            <li>Click the Configuration tab.</li>
-            <li>Select <menucascade><uicontrol>Scope</uicontrol><uicontrol>Hue
-                  Server</uicontrol></menucascade>.</li>
-            <li>Select
-              <menucascade><uicontrol>Category</uicontrol><uicontrol>Advanced</uicontrol></menucascade>.</li>
-            <li>Add the following properties to the <b>Hue Server Advanced
-                Configuration Snippet (Safety Valve) for
-                hue_safety_valve_server.ini</b>
-              property.<codeblock>[impala]
-auth_username=&lt;LDAP username of Hue user to be authenticated>
-auth_password=&lt;LDAP password of Hue user to be authenticated></codeblock></li>
-            <li>Click <b>Save Changes</b>.</li>
-          </ol>
-        </p>
-      </section>
       <section id="ldap_impala_hue_cmdline">
         <title>Enabling LDAP for Impala in Hue Using the Command Line</title>
         <p>LDAP authentication for the Impala app in Hue can be enabled by

@@ -1226,8 +1226,6 @@ select * from `cross`;</codeblock>
         to Impala 1.2.x in general.
       </p>
 
-      <p audience="hidden" conref="../shared/impala_common.xml#common/cm48_upgrade"/>
-
 <!-- <note conref="common.xml#common/cdh4_cdh5_upgrade"/> -->
     </conbody>
   </concept>
@@ -1268,9 +1266,6 @@ select * from `cross`;</codeblock>
         <li/>
       </ul>
 
-      <p audience="hidden" conref="../shared/impala_common.xml#common/cm48_upgrade"/>
-
-<!--  <note conref="common.xml#common/cdh4_cdh5_upgrade"/> -->
     </conbody>
   </concept>
 
@@ -1405,83 +1400,8 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
           <codeph>impala-lzo-cdh4</codeph> to the latest level. See <xref href="impala_txtfile.xml#lzo"/> for
           details.
         </li>
-
-        <li>
-          Cloudera Manager 4.5.2 and higher only supports Impala 1.0 and higher, and vice versa. If you upgrade to
-          Impala 1.0 or higher managed by Cloudera Manager, you must also upgrade Cloudera Manager to version 4.5.2
-          or higher. If you upgrade from an earlier version of Cloudera Manager, and were using Impala, you must
-          also upgrade Impala to version 1.0 or higher. The beta versions of Impala are no longer supported as of
-          the release of Impala 1.0.
-        </li>
       </ul>
     </conbody>
   </concept>
 
-  <concept id="incompatible_changes_07" audience="hidden">
-
-    <title>Incompatible Change Introduced in Version 0.7 of the Impala Beta Release</title>
-
-    <conbody>
-
-      <ul>
-        <li>
-          The defaults for the <codeph>-nn</codeph> and <codeph>-nn_port</codeph> flags have changed and are now
-          read from <codeph>core-site.xml</codeph>. Impala prints the values of <codeph>-nn</codeph> and
-          <codeph>-nn_port</codeph> to the log when it starts. The ability to set <codeph>-nn</codeph> and
-          <codeph>-nn_port</codeph> on the command line is deprecated in 0.7 and may be removed in Impala 0.8.
-        </li>
-      </ul>
-    </conbody>
-  </concept>
-
-  <concept id="incompatible_changes_06" audience="hidden">
-
-    <title>Incompatible Change Introduced in Version 0.6 of the Impala Beta Release</title>
-
-    <conbody>
-
-      <ul>
-        <li>
-          Cloudera Manager 4.5 supports only version 0.6 of the Impala Beta Release. It does not support
-          the earlier beta versions. If you upgrade your Cloudera Manager installation, you must also upgrade
-          Impala to beta version 0.6. If you upgrade Impala to beta version 0.6, you must upgrade Cloudera Manager
-          to 4.5.
-        </li>
-      </ul>
-    </conbody>
-  </concept>
-
-  <concept id="incompatible_changes_04" audience="hidden">
-
-    <title>Incompatible Change Introduced in Version 0.4 of the Impala Beta Release</title>
-
-    <conbody>
-
-      <ul>
-        <li>
-          Cloudera Manager 4.1.3 supports only version 0.4 of the Impala Beta Release. It does not support
-          the earlier beta versions. If you upgrade your Cloudera Manager installation, you must also upgrade
-          Impala to beta version 0.4. If you upgrade Impala to beta version 0.4, you must upgrade Cloudera Manager
-          to 4.1.3.
-        </li>
-      </ul>
-    </conbody>
-  </concept>
-
-  <concept id="incompatible_changes_03" audience="hidden">
-
-    <title>Incompatible Change Introduced in Version 0.3 of the Impala Beta Release</title>
-
-    <conbody>
-
-      <ul>
-        <li>
-          Cloudera Manager 4.1.2 supports only version 0.3 of the Impala Beta Release. It does not support
-          the earlier beta versions. If you upgrade your Cloudera Manager installation, you must also upgrade
-          Impala to beta version 0.3. If you upgrade Impala to beta version 0.3, you must upgrade Cloudera Manager
-          to 4.1.2.
-        </li>
-      </ul>
-    </conbody>
-  </concept>
 </concept>

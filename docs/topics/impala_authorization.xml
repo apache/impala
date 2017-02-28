@@ -223,16 +223,6 @@ under the License.
       </p>
 
       <ul>
-        <li audience="hidden">
-          <p>
-            In an environment managed by Cloudera Manager, the server name is specified through
-            <menucascade><uicontrol>Impala (Service-Wide)</uicontrol><uicontrol>Category</uicontrol><uicontrol>Advanced</uicontrol><uicontrol>Sentry Service</uicontrol></menucascade> and
-            <menucascade><uicontrol>Hive</uicontrol><uicontrol>Service-Wide</uicontrol><uicontrol>Advanced</uicontrol><uicontrol>Sentry Service</uicontrol></menucascade>.
-            The values must be the same for both, so that Impala and Hive can share the privilege rules. Restart
-            the Impala and Hive services after setting or changing this value.
-          </p>
-        </li>
-
         <li>
           <p>
             Specify the <codeph>server1</codeph> value for the <codeph>sentry.hive.server</codeph> property in the
@@ -283,20 +273,6 @@ report_generator = server=server1-&gt;db=reporting_db-&gt;table=*-&gt;action=SEL
         <codeph>REVOKE</codeph> statements in <keyword keyref="impala20_full"/>.)
       </p>
 
-      <p audience="hidden">
-        Hive already had <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements prior to CDH 5.1, but those
-        statements were not production-ready. CDH 5.1 is the first release where those statements use the Sentry
-        framework and are considered GA level. If you used the Hive <codeph>GRANT</codeph> and
-        <codeph>REVOKE</codeph> statements prior to CDH 5.1, you must set up these privileges with the CDH 5.1
-        versions of <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> to take advantage of Sentry authorization.
-      </p>
-
-      <p audience="hidden">
-        For information about using the updated Hive <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements,
-        see
-        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_sentry_service.html" scope="external" format="html">Sentry
-        service</xref> topic in the <cite>CDH 5 Security Guide</cite>.
-      </p>
     </conbody>
   </concept>
 
@@ -1581,37 +1557,6 @@ column-level security was by creating views that referenced particular sets of c
     <conbody>
 
       <p conref="../shared/impala_common.xml#common/sentry_debug"/>
-    </conbody>
-  </concept>
-
-  <concept id="sentry_cm" audience="hidden">
-
-    <title>Managing Sentry for Impala through Cloudera Manager</title>
-
-    <conbody>
-
-      <p>
-        To enable the Sentry service for Impala and Hive, set <uicontrol>Hive/Impala &gt; Service-Wide &gt; Sentry
-        Service</uicontrol> parameter to the Sentry service. Then restart Impala and Hive. Simply adding Sentry
-        service as a dependency and restarting enables Impala and Hive to use the Sentry service.
-      </p>
-
-      <p>
-        To set the server name to use when granting server level privileges, set the <uicontrol>Hive &gt;
-        Service-Wide &gt; Advanced &gt; Server Name for Sentry Authorization</uicontrol> parameter. When using
-        Sentry with the Hive Metastore, you can specify the list of users that are allowed to bypass Sentry
-        Authorization in Hive Metastore using <uicontrol>Hive &gt; Service-Wide &gt; Security &gt; Bypass Sentry
-        Authorization Users</uicontrol>. These are usually service users that already ensure all activity has been
-        authorized.
-      </p>
-
-      <note>
-        The <uicontrol>Hive/Impala &gt; Service-Wide &gt; Policy File Based Sentry</uicontrol> tab contains
-        parameters only relevant to configuring Sentry using policy files. In particular, make sure that
-        <uicontrol>Enable Sentry Authorization using Policy Files</uicontrol> parameter is unchecked when using the
-        Sentry service. Cloudera Manager throws a validation error if you attempt to configure the Sentry service
-        and policy file at the same time.
-      </note>
     </conbody>
   </concept>
 

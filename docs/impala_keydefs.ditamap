@@ -10341,7 +10341,6 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="topics/impala_admin.xml" keys="admin"/>
   <keydef href="topics/impala_admission.xml" keys="admission_control"/>
   <keydef href="topics/impala_resource_management.xml" keys="resource_management"/>
-  <keydef href="topics/impala_howto_rm.xml" keys="howto_impala_rm"/>
   <keydef href="topics/impala_timeouts.xml" keys="timeouts"/>
   <keydef href="topics/impala_proxy.xml" keys="proxy"/>
   <keydef href="topics/impala_disk_space.xml" keys="disk_space"/>

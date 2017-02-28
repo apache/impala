@@ -606,32 +606,6 @@ under the License.
       </section>
     </conbody>
 
-    <concept id="admission_config_cm" audience="hidden">
-
-<!-- TK: Maybe all this stuff overlaps with admin_impala_admission_control and can be delegated there. -->
-
-      <title>Configuring Admission Control Using Cloudera Manager</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Cloudera Manager"/>
-    </metadata>
-  </prolog>
-
-      <conbody>
-
-        <p>
-          In Cloudera Manager, you can configure pools to manage queued Impala queries, and the options for the
-          limit on number of concurrent queries and how to handle queries that exceed the limit. For details, see
-          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_managing_resources.html" scope="external" format="html">Managing Resources with Cloudera Manager</xref>.
-        </p>
-
-        <p audience="hidden"><!-- Hiding link because that subtopic is now hidden. -->
-          See <xref href="#admission_examples"/> for a sample setup for admission control under
-          Cloudera Manager.
-        </p>
-      </conbody>
-    </concept>
-
     <concept id="admission_config_noncm">
 
       <title>Configuring Admission Control Using the Command Line</title>
@@ -694,10 +668,6 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
           <keyword keyref="impala25_full"/> and higher.
         </p>
 
-        <p audience="hidden"><!-- Hiding link because that subtopic is now hidden. -->
-          See <xref href="#admission_examples/section_etq_qgb_rq"/> for sample configuration files
-          for admission control using multiple resource pools, without Cloudera Manager.
-        </p>
       </conbody>
     </concept>
 
@@ -707,17 +677,6 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
       <title>Examples of Admission Control Configurations</title>
 
       <conbody>
-
-        <section id="section_fqn_qgb_rq" audience="hidden">
-
-          <title>Example Admission Control Configurations Using Cloudera Manager</title>
-
-          <p>
-            For full instructions about configuring dynamic resource pools through Cloudera Manager, see
-            <xref audience="integrated" href="cm_mc_resource_pools.xml#xd_583c10bfdbd326ba--43d5fd93-1410993f8c2--7ff2"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_resource_pools.html" scope="external" format="html"/>.
-          </p>
-
-        </section>
 
         <section id="section_etq_qgb_rq">
 

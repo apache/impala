@@ -143,15 +143,6 @@ under the License.
           Run the load-balancing proxy server, pointing it at the configuration file that you set up.
         </li>
 
-        <li audience="hidden">
-          On systems managed by Cloudera Manager, on the page
-          <menucascade><uicontrol>Impala</uicontrol><uicontrol>Configuration</uicontrol><uicontrol>Impala Daemon
-          Default Group</uicontrol></menucascade>, specify a value for the <uicontrol>Impala Daemons Load
-          Balancer</uicontrol> field. Specify the address of the load balancer in
-          <codeph><varname>host</varname>:<varname>port</varname></codeph> format. This setting lets Cloudera
-          Manager route all appropriate Impala-related operations through the proxy server.
-        </li>
-
         <li>
           For any scripts, jobs, or configuration settings for applications that formerly connected to a specific
           datanode to run Impala SQL statements, change the connection information (such as the <codeph>-i</codeph>
@@ -269,13 +260,6 @@ under the License.
           running the <cmdname>impalad</cmdname> daemon.
         </li>
 
-        <li rev="CDH-40363" audience="hidden">
-          For a cluster managed by Cloudera Manager (5.4.2 or higher), fill in the Impala configuration setting
-          <uicontrol>Impala Daemons Load Balancer</uicontrol> with the appropriate host:port combination.
-          Then restart the Impala service.
-          For systems using a recent level of Cloudera Manager, this is all the configuration you need; you can skip the remaining steps in this procedure.
-        </li>
-
         <li>
           On systems not managed by Cloudera Manager, or systems using Cloudera Manager earlier than 5.4.2:
 
@@ -320,24 +304,6 @@ under the License.
                 configuration snippet, add: <codeblock>--principal=impala/<varname>proxy_host</varname>@<varname>realm</varname>
   --be_principal=impala/<varname>actual_host</varname>@<varname>realm</varname>
   --keytab_file=<varname>path_to_merged_keytab</varname></codeblock>
-                <note audience="hidden">
-                  <p>On a cluster managed by Cloudera Manager 5.1 (or higher),
-                    when you set up Kerberos authentication using the wizard, you
-                    can choose to allow Cloudera Manager to deploy the
-                      <systemoutput>krb5.conf</systemoutput> on your cluster. In
-                    such a case, you do not need to explicitly modify safety valve
-                    parameters as directed above. </p>
-                  <p>Every host has a different <codeph>--be_principal</codeph>
-                    because the actual hostname is different on each host. </p>
-                  <p> Specify the fully qualified domain name (FQDN) for the proxy
-                    host, not the IP address. Use the exact FQDN as returned by a
-                    reverse DNS lookup for the associated IP address. </p>
-                </note>
-              </li>
-
-              <li audience="hidden">
-                On a cluster managed by Cloudera Manager, create a role group to set the configuration values from
-                the preceding step on a per-host basis.
               </li>
 
               <li>
@@ -352,10 +318,6 @@ under the License.
             Restart Impala to make the changes take effect. Follow the appropriate steps depending on whether you use
             Cloudera Manager or not:
             <ul>
-              <li audience="hidden">
-                On a cluster managed by Cloudera Manager, restart the Impala service.
-              </li>
-
               <li>
                 On a cluster not managed by Cloudera Manager, restart the <cmdname>impalad</cmdname> daemons on all
                 hosts in the cluster, as well as the <cmdname>statestored</cmdname> and <cmdname>catalogd</cmdname>

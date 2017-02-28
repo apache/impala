@@ -69,28 +69,6 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
-  <concept id="starting_via_cm" audience="hidden">
-
-    <title>Starting Impala through Cloudera Manager</title>
-
-    <conbody>
-
-      <p>
-        If you installed Impala with Cloudera Manager, use Cloudera Manager to start and stop services. The
-        Cloudera Manager GUI is a convenient way to check that all services are running, to set configuration
-        options using form fields in a browser, and to spot potential issues such as low disk space before they
-        become serious. Cloudera Manager automatically starts all the Impala-related services as a group, in the
-        correct order. See
-        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_start_stop_service.html" scope="external" format="html">the
-        Cloudera Manager Documentation</xref> for details.
-      </p>
-
-      <note>
-        <p conref="../shared/impala_common.xml#common/udf_persistence_restriction"/>
-      </note>
-    </conbody>
-  </concept>
-
   <concept id="starting_via_cmdline">
 
     <title>Starting Impala from the Command Line</title>

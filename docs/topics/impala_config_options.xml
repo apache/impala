@@ -66,35 +66,6 @@ under the License.
 
   </conbody>
 
-  <concept id="config_options_cm" audience="hidden">
-
-    <title>Configuring Impala Startup Options through Cloudera Manager</title>
-
-    <conbody>
-
-      <p>
-        If you manage your cluster through Cloudera Manager, configure the settings for all the
-        Impala-related daemons by navigating to this page:
-        <menucascade><uicontrol>Clusters</uicontrol><uicontrol>Impala</uicontrol><uicontrol>Configuration</uicontrol><uicontrol>View
-        and Edit</uicontrol></menucascade>. See the Cloudera Manager documentation for
-        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_impala_service.html" scope="external" format="html">instructions
-        about how to configure Impala through Cloudera Manager</xref>.
-      </p>
-
-      <p>
-        If the Cloudera Manager interface does not yet have a form field for a newly added
-        option, or if you need to use special options for debugging and troubleshooting, the
-        <uicontrol>Advanced</uicontrol> option page for each daemon includes one or more fields
-        where you can enter option names directly.
-        <ph conref="../shared/impala_common.xml#common/safety_valve"/> There is also a free-form
-        field for query options, on the top-level <uicontrol>Impala Daemon</uicontrol> options
-        page.
-      </p>
-
-    </conbody>
-
-  </concept>
-
   <concept id="config_options_noncm">
 
     <title>Configuring Impala Startup Options through the Command Line</title>
@@ -237,10 +208,6 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
             to:
           </p>
 <codeblock>export ENABLE_CORE_DUMPS=${ENABLE_COREDUMPS:-true}</codeblock>
-          <p audience="hidden">
-            On systems managed by Cloudera Manager, enable the <uicontrol>Enable Core
-            Dump</uicontrol> setting for the Impala service.
-          </p>
 
           <note conref="../shared/impala_common.xml#common/core_dump_considerations"/>
         </li>
