@@ -98,7 +98,13 @@ namespace apache { namespace thrift { namespace transport {
     while (!sasl_->isComplete()) {
       uint8_t* message = receiveSaslMessage(&status, &resLength);
       if (status == TSASL_COMPLETE) {
-        if (isClient_) break; // handshake complete
+        if (isClient_) {
+          if (!sasl_->isComplete()) {
+            // Server sent COMPLETE out of order.
+            throw TTransportException("Received COMPLETE but no handshake occurred");
+          }
+          break; // handshake complete
+        }
       } else if (status != TSASL_OK) {
         stringstream ss;
         ss << "Expected COMPLETE or OK, got " << status;
