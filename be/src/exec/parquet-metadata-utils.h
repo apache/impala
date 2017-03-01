@@ -188,7 +188,9 @@ class ParquetSchemaResolver {
       int next_idx, SchemaNode* node, bool* missing_field) const;
 
   /// Returns the index of 'node's child with 'name', or the number of children if not
-  /// found.
+  /// found. The name comparison is case-insensitive because that's how Impala treats
+  /// db/table/column/field names. If there are several matches with different casing,
+  /// then the index of the first match is returned.
   int FindChildWithName(SchemaNode* node, const string& name) const;
 
   /// The ResolvePathHelper() logic for arrays.

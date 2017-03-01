@@ -20,6 +20,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <strings.h>
 
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
@@ -546,7 +547,7 @@ int ParquetSchemaResolver::FindChildWithName(SchemaNode* node,
     const string& name) const {
   int idx;
   for (idx = 0; idx < node->children.size(); ++idx) {
-    if (node->children[idx].element->name == name) break;
+    if (strcasecmp(node->children[idx].element->name.c_str(), name.c_str()) == 0) break;
   }
   return idx;
 }

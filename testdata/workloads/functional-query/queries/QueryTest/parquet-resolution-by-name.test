@@ -1,7 +1,6 @@
 ====
 ---- QUERY
 # Create a table and populate with data file
-drop table if exists resolution_by_name_test;
 create table resolution_by_name_test stored as parquet
 as select * from functional_parquet.tinytable;
 select a, b from resolution_by_name_test;
@@ -69,11 +68,7 @@ string,string
 'eeeeeeee','f'
 ====
 ---- QUERY
-drop table resolution_by_name_test;
-====
----- QUERY
 # Test nested types resolution
-drop table if exists nested_resolution_by_name_test;
 create table nested_resolution_by_name_test like functional_parquet.complextypestbl;
 ====
 ---- SHELL
@@ -191,11 +186,7 @@ string
 'NULL'
 ====
 ---- QUERY
-drop table nested_resolution_by_name_test;
-====
----- QUERY
 # Test switched key/value map fields
-drop table if exists switched_map_fields_resolution_test;
 create table switched_map_fields_resolution_test (int_map map<string,int>)
 stored as parquet;
 ====
@@ -225,9 +216,6 @@ switched_map.parq' has an incompatible Parquet schema for column
  '$DATABASE.switched_map_fields_resolution_test.int_map.key'.
  Column type: STRING, Parquet schema:
 required int32 value [i:0 d:1 r:1]
-====
----- QUERY
-drop table switched_map_fields_resolution_test
 ====
 ---- QUERY
 # Check that we handle bad options gracefully

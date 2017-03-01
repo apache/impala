@@ -1,14 +1,14 @@
 [
-{"id": 8,
- "int_array": [-1],
+{"ID": 8,
+ "Int_Array": [-1],
  "int_array_array": [[-1,-2],[]],
- "int_map": {"k1": -1},
+ "Int_Map": {"k1": -1},
  "int_map_array": [{}, {"k1": 1}, {}, {}],
- "nested_struct": {
+ "nested_Struct": {
    "a": -1,
-   "b": [-1],
+   "B": [-1],
    "c": {
-     "d": [
+     "D": [
        [{"e": -1, "f": "nonnullable"}]]},
-   "g": {}}}
+   "G": {}}}
 ]
