@@ -33,6 +33,10 @@ NUM_TRIES = 3
 
 PYPI_MIRROR = os.environ.get("PYPI_MIRROR", "https://pypi.python.org")
 
+# The requirement files that list all of the required packages and versions.
+REQUIREMENTS_FILES = ['requirements.txt', 'compiled-requirements.txt',
+        'kudu-requirements.txt']
+
 def check_md5sum(filename, expected_md5):
   actual_md5 = md5(open(filename).read()).hexdigest()
   return actual_md5 == expected_md5
@@ -87,10 +91,12 @@ def main():
   if len(sys.argv) > 1:
     _, pkg_name, pkg_version = sys.argv
     download_package(pkg_name, pkg_version)
-  else:
+    return
+
+  for requirements_file in REQUIREMENTS_FILES:
     # If the package name and version are not specified in the command line arguments,
     # download the packages that in requirements.txt.
-    f = open("requirements.txt", 'r')
+    f = open(requirements_file, 'r')
     try:
       # requirements.txt follows the standard pip grammar.
       for line in f:

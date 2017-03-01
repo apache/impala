@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -17,12 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-set -euo pipefail
-
-DIR="$(dirname "$0")"
-
-pushd "$DIR"
-PY26="$(./find_py26.py)"
-# Directly download packages listed in *requirements.txt, but don't install them.
-"$PY26" pip_download.py
-popd
+# kudu-python depends on the Kudu client library and compilers provided by the toolchain,
+# and also depends on Cython being installed into the virtualenv, so it must be installed
+# after the toolchain is bootstrapped and all requirements in requirements.txt and
+# compiled-requirements.txt are installed into the virtualenv.
+kudu-python==1.2.0

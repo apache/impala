@@ -15,9 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# This module will create a python virtual env and install external dependencies. If
-# the virtualenv already exists and the list of dependencies matches the list of
-# installed dependencies, nothing will be done.
+# This module will create a python virtual env and install external dependencies. If the
+# virtualenv already exists and it contains all the expected packages, nothing is done.
+#
+# A multi-step bootstrapping process is required to build and install all of the
+# dependencies:
+# 1. install basic non-C/C++ packages into the virtualenv
+# 2. use the virtualenv Python to bootstrap the toolchain
+# 3. use toolchain gcc to build C/C++ packages
+# 4. build the kudu-python package with toolchain gcc and Cython
+#
+# Every time this script is run, it completes as many of the bootstrapping steps as
+# possible with the available dependencies.
 #
 # This module can be run with python >= 2.4 but python >= 2.6 must be installed on the
 # system. If the default 'python' command refers to < 2.6, python 2.6 will be used
@@ -43,10 +52,13 @@ ENV_DIR = os.path.join(os.path.dirname(__file__), "env")
 # Generated using "pip install --download <DIR> -r requirements.txt"
 REQS_PATH = os.path.join(DEPS_DIR, "requirements.txt")
 
-# After installing, the requirements.txt will be copied into the virtualenv to
-# record what was installed.
-INSTALLED_REQS_PATH = os.path.join(ENV_DIR, "installed-requirements.txt")
+# Requirements for the next bootstrapping step that builds compiled requirements
+# with toolchain gcc.
+COMPILED_REQS_PATH = os.path.join(DEPS_DIR, "compiled-requirements.txt")
 
+# Requirements for the Kudu bootstrapping step, which depends on Cython being installed
+# by the compiled requirements step.
+KUDU_REQS_PATH = os.path.join(DEPS_DIR, "kudu-requirements.txt")
 
 def delete_virtualenv_if_exist():
   if os.path.exists(ENV_DIR):
@@ -80,17 +92,53 @@ def exec_cmd(args, **kwargs):
         % (args, output))
   return output
 
+def use_ccache():
+  '''Returns true if ccache is available and should be used'''
+  if 'DISABLE_CCACHE' in os.environ: return False
+  try:
+    exec_cmd(['ccache', '-V'])
+    return True
+  except:
+    return False
 
-def exec_pip_install(args, **popen_kwargs):
+def select_cc():
+  '''Return the C compiler command that should be used as a string or None if the
+  compiler is not available '''
+  # Use toolchain gcc for ABI compatibility with other toolchain packages, e.g.
+  # Kudu/kudu-python
+  if not have_toolchain(): return None
+  toolchain_gcc_dir = toolchain_pkg_dir("gcc")
+  cc = os.path.join(toolchain_gcc_dir, "bin/gcc")
+  if not os.path.exists(cc): return None
+  if use_ccache(): cc = "ccache %s" % cc
+  return cc
+
+def exec_pip_install(args, cc="no-cc-available", env=None):
+  '''Executes "pip install" with the provided command line arguments. If 'cc' is set,
+  it is used as the C compiler. Otherwise compilation of C/C++ code is disabled by
+  setting the CC environment variable to a bogus value.
+  Other environment vars can optionally be set with the 'env' argument. By default the
+  current process's command line arguments are inherited.'''
+  if not env: env = dict(os.environ)
+  env["CC"] = cc
+
+  # Parallelize the slow numpy build.
+  # Use getconf instead of nproc because it is supported more widely, e.g. on older
+  # linux distributions.
+  env["NPY_NUM_BUILD_JOBS"] = exec_cmd(["getconf", "_NPROCESSORS_ONLN"]).strip()
+
   # Don't call the virtualenv pip directly, it uses a hashbang to to call the python
   # virtualenv using an absolute path. If the path to the virtualenv is very long, the
   # hashbang won't work.
   #
   # Passes --no-binary for IMPALA-3767: without this, Cython (and
   # several other packages) fail download.
+  #
+  # --no-cache-dir is used to prevent caching of compiled artifacts, which may be built
+  # with different compilers or settings.
   exec_cmd([os.path.join(ENV_DIR, "bin", "python"), os.path.join(ENV_DIR, "bin", "pip"),
-    "install", "--no-binary", "--no-index", "--find-links",
-    "file://%s" % urllib.pathname2url(os.path.abspath(DEPS_DIR))] + args, **popen_kwargs)
+    "install", "--no-binary", "--no-index", "--no-cache-dir", "--find-links",
+    "file://%s" % urllib.pathname2url(os.path.abspath(DEPS_DIR))] + args, env=env)
 
 
 def find_file(*paths):
@@ -128,59 +176,61 @@ def detect_python_cmd():
 def install_deps():
   LOG.info("Installing packages into the virtualenv")
   exec_pip_install(["-r", REQS_PATH])
-  shutil.copyfile(REQS_PATH, INSTALLED_REQS_PATH)
+  mark_reqs_installed(REQS_PATH)
 
+def have_toolchain():
+  '''Return true if the Impala toolchain is available'''
+  return "IMPALA_TOOLCHAIN" in os.environ
+
+def toolchain_pkg_dir(pkg_name):
+  '''Return the path to the toolchain package'''
+  pkg_version = os.environ["IMPALA_" + pkg_name.upper() + "_VERSION"]
+  return os.path.join(os.environ["IMPALA_TOOLCHAIN"], pkg_name + "-" + pkg_version)
+
+def install_compiled_deps_if_possible():
+  '''Install dependencies that require compilation with toolchain GCC, if the toolchain
+  is available. Returns true if the deps are installed'''
+  if reqs_are_installed(COMPILED_REQS_PATH):
+    LOG.debug("Skipping compiled deps: matching compiled-installed-requirements.txt found")
+    return True
+  cc = select_cc()
+  if cc is None:
+    LOG.debug("Skipping compiled deps: cc not available yet")
+    return False
+
+  env = dict(os.environ)
+
+  # Compilation of pycrypto fails on CentOS 5 with newer GCC versions because of a
+  # problem with inline declarations in older libc headers. Setting -fgnu89-inline is a
+  # workaround.
+  distro_version = ''.join(exec_cmd(["lsb_release", "-irs"]).lower().split())
+  print distro_version
+  if distro_version.startswith("centos5."):
+    env["CFLAGS"] = "-fgnu89-inline"
+
+  LOG.info("Installing compiled requirements into the virtualenv")
+  exec_pip_install(["-r", COMPILED_REQS_PATH], cc=cc, env=env)
+  mark_reqs_installed(COMPILED_REQS_PATH)
+  return True
 
 def install_kudu_client_if_possible():
-  """Installs the Kudu python module if possible. The Kudu module is the only one that
-     requires the toolchain. If the toolchain isn't in use or hasn't been populated
-     yet, nothing will be done. Also nothing will be done if the Kudu client lib required
-     by the module isn't available (as determined by KUDU_IS_SUPPORTED).
-  """
+  '''Installs the Kudu python module if possible, which depends on the toolchain and
+  the compiled requirements in compiled-requirements.txt. If the toolchain isn't
+  available, nothing will be done. Also nothing will be done if the Kudu client lib
+  required by the module isn't available (as determined by KUDU_IS_SUPPORTED)'''
+  if reqs_are_installed(KUDU_REQS_PATH):
+    LOG.debug("Skipping Kudu: matching kudu-installed-requirements.txt found")
+    return
   if os.environ["KUDU_IS_SUPPORTED"] != "true":
     LOG.debug("Skipping Kudu: Kudu is not supported")
     return
-  impala_toolchain_dir = os.environ.get("IMPALA_TOOLCHAIN")
-  if not impala_toolchain_dir:
+  if not have_toolchain():
     LOG.debug("Skipping Kudu: IMPALA_TOOLCHAIN not set")
     return
-  toolchain_kudu_dir = os.path.join(
-      impala_toolchain_dir, "kudu-" + os.environ["IMPALA_KUDU_VERSION"])
+  toolchain_kudu_dir = toolchain_pkg_dir("kudu")
   if not os.path.exists(toolchain_kudu_dir):
     LOG.debug("Skipping Kudu: %s doesn't exist" % toolchain_kudu_dir)
     return
-
-  # The "pip" command could be used to provide the version of Kudu installed (if any)
-  # but it's a little too slow. Running the virtualenv python to detect the installed
-  # version is faster.
-  actual_version_string = exec_cmd([os.path.join(ENV_DIR, "bin", "python"), "-c",
-      textwrap.dedent("""
-      try:
-        import kudu
-        print kudu.__version__
-      except ImportError:
-        pass""")]).strip()
-  actual_version = [int(v) for v in actual_version_string.split(".") if v]
-
-  reqs_file = open(REQS_PATH)
-  try:
-    for line in reqs_file:
-      if not line.startswith("# kudu-python=="):
-        continue
-      expected_version_string = line.split()[1].split("==")[1]
-      break
-    else:
-      raise Exception("Unable to find kudu-python version in requirements file")
-  finally:
-    reqs_file.close()
-  expected_version = [int(v) for v in expected_version_string.split(".")]
-
-  if actual_version and actual_version == expected_version:
-    LOG.debug("Skipping Kudu: Installed %s == required %s"
-        % (actual_version_string, expected_version_string))
-    return
-  LOG.debug("Kudu installation required. Actual version %s. Required version %s.",
-      actual_version, expected_version)
 
   LOG.info("Installing Kudu into the virtualenv")
   # The installation requires that KUDU_HOME/build/latest exists. An empty directory
@@ -191,14 +241,16 @@ def install_kudu_client_if_possible():
     artifact_dir = os.path.join(fake_kudu_build_dir, "build", "latest")
     if not os.path.exists(artifact_dir):
       os.makedirs(artifact_dir)
+    cc = select_cc()
+    assert cc is not None
     env = dict(os.environ)
     env["KUDU_HOME"] = fake_kudu_build_dir
     kudu_client_dir = find_kudu_client_install_dir()
     env["CPLUS_INCLUDE_PATH"] = os.path.join(kudu_client_dir, "include")
     env["LIBRARY_PATH"] = os.path.pathsep.join([os.path.join(kudu_client_dir, 'lib'),
                                                 os.path.join(kudu_client_dir, 'lib64')])
-
-    exec_pip_install(["kudu-python==" + expected_version_string], env=env)
+    exec_pip_install(["-r", KUDU_REQS_PATH], cc=cc, env=env)
+    mark_reqs_installed(KUDU_REQS_PATH)
   finally:
     try:
       shutil.rmtree(fake_kudu_build_dir)
@@ -238,31 +290,38 @@ def error_if_kudu_client_not_found(install_dir):
         return
   raise Exception("%s not found at %s" % (kudu_client_lib, lib_dir))
 
+def mark_reqs_installed(reqs_path):
+  '''Mark that the requirements from the given file are installed by copying it into the root
+  directory of the virtualenv.'''
+  installed_reqs_path = os.path.join(ENV_DIR, os.path.basename(reqs_path))
+  shutil.copyfile(reqs_path, installed_reqs_path)
 
-def deps_are_installed():
-  if not os.path.exists(INSTALLED_REQS_PATH):
+def reqs_are_installed(reqs_path):
+  '''Check if the requirements from the given file are installed in the virtualenv by
+  looking for a matching requirements file in the root directory of the virtualenv.'''
+  installed_reqs_path = os.path.join(ENV_DIR, os.path.basename(reqs_path))
+  if not os.path.exists(installed_reqs_path):
     return False
-  installed_reqs_file = open(INSTALLED_REQS_PATH)
+  installed_reqs_file = open(installed_reqs_path)
   try:
-    reqs_file = open(REQS_PATH)
+    reqs_file = open(reqs_path)
     try:
       if reqs_file.read() == installed_reqs_file.read():
         return True
       else:
-        LOG.info("Virtualenv upgrade needed")
+        LOG.debug("Virtualenv upgrade needed")
         return False
     finally:
       reqs_file.close()
   finally:
     installed_reqs_file.close()
 
-
 def setup_virtualenv_if_not_exists():
-  if not deps_are_installed():
+  if not reqs_are_installed(REQS_PATH):
     delete_virtualenv_if_exist()
     create_virtualenv()
     install_deps()
-    LOG.info("Virtualenv setup complete")
+    LOG.debug("Virtualenv setup complete")
 
 
 if __name__ == "__main__":
@@ -284,5 +343,8 @@ if __name__ == "__main__":
   logging.basicConfig(level=getattr(logging, options.log_level))
   if options.rebuild:
     delete_virtualenv_if_exist()
+
+  # Complete as many bootstrap steps as possible (see file comment for the steps).
   setup_virtualenv_if_not_exists()
-  install_kudu_client_if_possible()
+  if install_compiled_deps_if_possible():
+    install_kudu_client_if_possible()

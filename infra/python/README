@@ -1,6 +1,7 @@
 To install new packages:
 
-1) Add your package to deps/requirements.txt. You should specify the version number
+1) Add your package to deps/requirements.txt, or deps/compiled-requirements.txt if the
+   the package needs a C/C++ compiler to build . You should specify the version number
    using the "foo == x.y.z" notation so future upgrades can be done automatically.
 2) Run deps/download_requirements, it will download the package to the deps dir.
 3) Run the "impala-python" command, this should detect that requirements.txt changed and
