@@ -162,7 +162,15 @@ public class ColumnDef {
   public boolean hasCompression() { return compressionVal_ != null; }
   public boolean hasBlockSize() { return blockSize_ != null; }
   public boolean isNullabilitySet() { return isNullable_ != null; }
-  public boolean isNullable() { return isNullabilitySet() && isNullable_; }
+
+  // True if the column was explicitly set to be nullable (may differ from the default
+  // behavior if not explicitly set).
+  public boolean isExplicitNullable() { return isNullabilitySet() && isNullable_; }
+
+  // True if the column was explicitly set to be not nullable (may differ from the default
+  // behavior if not explicitly set).
+  public boolean isExplicitNotNullable() { return isNullabilitySet() && !isNullable_; }
+
   public boolean hasDefaultValue() { return defaultValue_ != null; }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {

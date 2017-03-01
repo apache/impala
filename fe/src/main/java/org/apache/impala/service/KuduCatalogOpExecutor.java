@@ -91,6 +91,36 @@ public class KuduCatalogOpExecutor {
     }
   }
 
+  private static ColumnSchema createColumnSchema(TColumn column, boolean isKey)
+      throws ImpalaRuntimeException {
+    Type type = Type.fromThrift(column.getColumnType());
+    Preconditions.checkState(type != null);
+    org.apache.kudu.Type kuduType = KuduUtil.fromImpalaType(type);
+
+    ColumnSchemaBuilder csb = new ColumnSchemaBuilder(column.getColumnName(), kuduType);
+    csb.key(isKey);
+    if (column.isSetIs_nullable()) {
+      Preconditions.checkArgument(!isKey);
+      csb.nullable(column.isIs_nullable());
+    } else {
+      // Non-key columns are by default nullable unless the user explicitly sets its
+      // nullability. Key columns are not nullable.
+      csb.nullable(!isKey);
+    }
+    if (column.isSetDefault_value()) {
+      csb.defaultValue(KuduUtil.getKuduDefaultValue(column.getDefault_value(), kuduType,
+            column.getColumnName()));
+    }
+    if (column.isSetBlock_size()) csb.desiredBlockSize(column.getBlock_size());
+    if (column.isSetEncoding()) {
+      csb.encoding(KuduUtil.fromThrift(column.getEncoding()));
+    }
+    if (column.isSetCompression()) {
+      csb.compressionAlgorithm(KuduUtil.fromThrift(column.getCompression()));
+    }
+    return csb.build();
+  }
+
   /**
    * Creates the schema of a new Kudu table.
    */
@@ -100,33 +130,8 @@ public class KuduCatalogOpExecutor {
     Preconditions.checkState(!keyColNames.isEmpty());
     List<ColumnSchema> colSchemas = new ArrayList<>(params.getColumnsSize());
     for (TColumn column: params.getColumns()) {
-      Type type = Type.fromThrift(column.getColumnType());
-      Preconditions.checkState(type != null);
-      org.apache.kudu.Type kuduType = KuduUtil.fromImpalaType(type);
-      // Create the actual column and check if the column is a key column
-      ColumnSchemaBuilder csb =
-          new ColumnSchemaBuilder(column.getColumnName(), kuduType);
       boolean isKey = keyColNames.contains(column.getColumnName());
-      csb.key(isKey);
-      if (column.isSetIs_nullable()) {
-        csb.nullable(column.isIs_nullable());
-      } else if (!isKey) {
-        // Non-key columns are by default nullable unless the user explicitly sets their
-        // nullability.
-        csb.nullable(true);
-      }
-      if (column.isSetDefault_value()) {
-        csb.defaultValue(KuduUtil.getKuduDefaultValue(column.getDefault_value(), kuduType,
-            column.getColumnName()));
-      }
-      if (column.isSetBlock_size()) csb.desiredBlockSize(column.getBlock_size());
-      if (column.isSetEncoding()) {
-        csb.encoding(KuduUtil.fromThrift(column.getEncoding()));
-      }
-      if (column.isSetCompression()) {
-        csb.compressionAlgorithm(KuduUtil.fromThrift(column.getCompression()));
-      }
-      colSchemas.add(csb.build());
+      colSchemas.add(createColumnSchema(column, isKey));
     }
     return new Schema(colSchemas);
   }
@@ -369,32 +374,7 @@ public class KuduCatalogOpExecutor {
       throws ImpalaRuntimeException {
     AlterTableOptions alterTableOptions = new AlterTableOptions();
     for (TColumn column: columns) {
-      Type type = Type.fromThrift(column.getColumnType());
-      Preconditions.checkState(type != null);
-      org.apache.kudu.Type kuduType = KuduUtil.fromImpalaType(type);
-      boolean isNullable = !column.isSetIs_nullable() ? true : column.isIs_nullable();
-      if (isNullable) {
-        if (column.isSetDefault_value()) {
-          // See KUDU-1747
-          throw new ImpalaRuntimeException(String.format("Error adding nullable " +
-              "column to Kudu table %s. Cannot specify a default value for a nullable " +
-              "column", tbl.getKuduTableName()));
-        }
-        alterTableOptions.addNullableColumn(column.getColumnName(), kuduType);
-      } else {
-        Object defaultValue = null;
-        if (column.isSetDefault_value()) {
-          defaultValue = KuduUtil.getKuduDefaultValue(column.getDefault_value(), kuduType,
-              column.getColumnName());
-        }
-        try {
-          alterTableOptions.addColumn(column.getColumnName(), kuduType, defaultValue);
-        } catch (IllegalArgumentException e) {
-          // TODO: Remove this when KUDU-1747 is fixed
-          throw new ImpalaRuntimeException("Error adding non-nullable column to " +
-              "Kudu table " + tbl.getKuduTableName(), e);
-        }
-      }
+      alterTableOptions.addColumn(createColumnSchema(column, false));
     }
     String errMsg = "Error adding columns to Kudu table " + tbl.getName();
     alterKuduTable(tbl, alterTableOptions, errMsg);

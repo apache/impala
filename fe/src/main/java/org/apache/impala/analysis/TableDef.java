@@ -251,7 +251,7 @@ class TableDef {
         throw new AnalysisException(String.format(
             "PRIMARY KEY column '%s' does not exist in the table", colName));
       }
-      if (colDef.isNullable()) {
+      if (colDef.isExplicitNullable()) {
         throw new AnalysisException("Primary key columns cannot be nullable: " +
             colDef.toString());
       }

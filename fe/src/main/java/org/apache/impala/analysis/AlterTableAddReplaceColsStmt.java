@@ -120,12 +120,9 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
           throw new AnalysisException("Cannot add a primary key using an ALTER TABLE " +
               "ADD COLUMNS statement: " + c.toString());
         }
-        if (c.hasEncoding() || c.hasCompression() || c.hasBlockSize()) {
-          // Kudu API doesn't support specifying encoding, compression and desired
-          // block size on a newly added column (see KUDU-1746).
-          throw new AnalysisException("ENCODING, COMPRESSION and " +
-              "BLOCK_SIZE options cannot be specified in an ALTER TABLE ADD COLUMNS " +
-              "statement: " + c.toString());
+        if (c.isExplicitNotNullable() && !c.hasDefaultValue()) {
+          throw new AnalysisException("A new non-null column must have a default " +
+              "value: " + c.toString());
         }
       } else if (c.hasKuduOptions()) {
         throw new AnalysisException("The specified column options are only supported " +

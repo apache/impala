@@ -258,56 +258,50 @@ ID, NAME, VALI, NEW_COL1, NEW_COL2
 INT,STRING,BIGINT,INT,BIGINT
 ====
 ---- QUERY
-# Add a nullable column
-alter table tbl_to_alter add columns (new_col3 string null)
+# Add nullable columns: with and without a default
+alter table tbl_to_alter add columns (new_col3 string null, new_col4 int null default -1)
 ---- RESULTS
 ====
 ---- QUERY
 # Add a row
-insert into tbl_to_alter values ((4, 'test', 300, 1, 100, null),
-  (5, 'test', 400, 2, 200, 'names'))
+insert into tbl_to_alter values ((4, 'test', 300, 1, 100, null, null),
+  (5, 'test', 400, 2, 200, 'names', 1))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 2
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3
+ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3, NEW_COL4
 ---- DML_RESULTS: tbl_to_alter
-2,'test',100,1,100,'NULL'
-3,'test',200,10,1000,'NULL'
-4,'test',300,1,100,'NULL'
-5,'test',400,2,200,'names'
+2,'test',100,1,100,'NULL',-1
+3,'test',200,10,1000,'NULL',-1
+4,'test',300,1,100,'NULL',NULL
+5,'test',400,2,200,'names',1
 ---- TYPES
-INT,STRING,BIGINT,INT,BIGINT,STRING
+INT,STRING,BIGINT,INT,BIGINT,STRING,INT
 ====
 ---- QUERY
-# Add a row that doesn't have a value for the last added column
+# Add a row that doesn't have a value for the last added columns
 insert into tbl_to_alter (id, name, vali, new_col1, new_col2)
   values (6, 'test', 500, 3, 300)
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3
+ID, NAME, VALI, NEW_COL1, NEW_COL2, NEW_COL3, NEW_COL4
 ---- DML_RESULTS: tbl_to_alter
-2,'test',100,1,100,'NULL'
-3,'test',200,10,1000,'NULL'
-4,'test',300,1,100,'NULL'
-5,'test',400,2,200,'names'
-6,'test',500,3,300,'NULL'
+2,'test',100,1,100,'NULL',-1
+3,'test',200,10,1000,'NULL',-1
+4,'test',300,1,100,'NULL',NULL
+5,'test',400,2,200,'names',1
+6,'test',500,3,300,'NULL',-1
 ---- TYPES
-INT,STRING,BIGINT,INT,BIGINT,STRING
-====
----- QUERY
-# Add a nullable column with a default value
-alter table tbl_to_alter add columns (invalid_col int null default 10)
----- CATCH
-Error adding nullable column to Kudu table
+INT,STRING,BIGINT,INT,BIGINT,STRING,INT
 ====
 ---- QUERY
 # Add a non-nullable column without a default value
 alter table tbl_to_alter add columns (invalid_col int not null)
 ---- CATCH
-Error adding non-nullable column to Kudu table
+A new non-null column must have a default value
 ====
 ---- QUERY
 # Drop a column
@@ -318,13 +312,13 @@ alter table tbl_to_alter drop column vali
 # Retrieve table rows after column got dropped
 select * from tbl_to_alter
 ---- RESULTS
-2,'test',1,100,'NULL'
-3,'test',10,1000,'NULL'
-4,'test',1,100,'NULL'
-5,'test',2,200,'names'
-6,'test',3,300,'NULL'
+2,'test',1,100,'NULL',-1
+3,'test',10,1000,'NULL',-1
+4,'test',1,100,'NULL',NULL
+5,'test',2,200,'names',1
+6,'test',3,300,'NULL',-1
 ---- TYPES
-INT,STRING,INT,BIGINT,STRING
+INT,STRING,INT,BIGINT,STRING,INT
 ====
 ---- QUERY
 # Try to drop a primary key column

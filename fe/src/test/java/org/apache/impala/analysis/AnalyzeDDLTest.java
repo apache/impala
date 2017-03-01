@@ -1896,17 +1896,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional_kudu.testtbl add columns (a int primary key)",
         "Cannot add a primary key using an ALTER TABLE ADD COLUMNS statement: " +
         "a INT PRIMARY KEY");
-    // Non-nullable columns require a default value
+    // Columns requiring a default value
     AnalyzesOk("alter table functional_kudu.testtbl add columns (a1 int not null " +
         "default 10)");
-    // Unsupported column options
-    String[] unsupportedColOptions = {"encoding rle", "compression lz4", "block_size 10"};
-    for (String colOption: unsupportedColOptions) {
-      AnalysisError(String.format("alter table functional_kudu.testtbl add columns " +
-          "(a1 int %s)", colOption), String.format("ENCODING, COMPRESSION and " +
-          "BLOCK_SIZE options cannot be specified in an ALTER TABLE ADD COLUMNS " +
-          "statement: a1 INT %s", colOption.toUpperCase()));
-    }
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (a1 int null " +
+        "default 10)");
+    // Other Kudu column options
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (a int encoding rle)");
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (a int compression lz4)");
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (a int block_size 10)");
+
     // REPLACE columns is not supported for Kudu tables
     AnalysisError("alter table functional_kudu.testtbl replace columns (a int null)",
         "ALTER TABLE REPLACE COLUMNS is not supported on Kudu tables");
