@@ -43,7 +43,7 @@ class TestMtDop(ImpalaTestSuite):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop', vector)
 
-  def test_compute_stats(self, unique_database, vector):
+  def test_compute_stats(self, vector, unique_database):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     file_format = vector.get_value('table_format').file_format
     fq_table_name = "%s.mt_dop" % unique_database
