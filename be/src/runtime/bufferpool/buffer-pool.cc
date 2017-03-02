@@ -601,9 +601,11 @@ void BufferPool::Client::WriteCompleteCallback(Page* page, const Status& write_s
     dirty_unpinned_bytes_ -= page->len;
     in_flight_write_bytes_ -= page->len;
     WriteDirtyPagesAsync(); // Start another asynchronous write if needed.
+
+    // Notify before releasing lock to avoid race with Page and Client destruction.
+    page->write_complete_cv_.NotifyAll();
+    write_complete_cv_.NotifyAll();
   }
-  write_complete_cv_.NotifyAll();
-  page->write_complete_cv_.NotifyAll();
 }
 
 void BufferPool::Client::WaitForWrite(unique_lock<mutex>* client_lock, Page* page) {

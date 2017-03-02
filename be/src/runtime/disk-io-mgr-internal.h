@@ -157,7 +157,7 @@ class DiskIoRequestContext {
     // boost doesn't let us dcheck that the reader lock is taken
     DCHECK_GT(num_disks_with_ranges_, 0);
     if (--num_disks_with_ranges_ == 0) {
-      disks_complete_cond_var_.notify_one();
+      disks_complete_cond_var_.notify_all();
     }
     DCHECK(Validate()) << std::endl << DebugString();
   }
