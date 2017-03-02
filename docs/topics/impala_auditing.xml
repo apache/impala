@@ -49,34 +49,21 @@ under the License.
         in your <cmdname>impalad</cmdname> startup options.
         The log directory must be a local directory on the
         server, not an HDFS directory.
-        <p audience="hidden">
-	  For a cluster managed by Cloudera Manager, see
-          <xref
-          href="cn_iu_audit_log.xml#xd_583c10bfdbd326ba--6eed2fb8-14349d04bee--7d6f/section_v25_lmy_bn"/>.
-        </p>
       </li>
 
       <li>
         Decide how many queries will be represented in each log file. By default,
         Impala starts a new log file every 5000 queries. To specify a different number, <ph
-          audience="standalone">include
+        audience="standalone">include
         the option <codeph>-max_audit_event_log_file_size=<varname>number_of_queries</varname></codeph>
         in the <cmdname>impalad</cmdname> startup options</ph>
-        <xref href="cn_iu_audit_log.xml#xd_583c10bfdbd326ba--6eed2fb8-14349d04bee--7d6f/section_v25_lmy_bn" audience="integrated">
-        configure Impala Daemon logging in Cloudera Manager</xref>.
+        <xref href="cn_iu_audit_log.xml#xd_583c10bfdbd326ba--6eed2fb8-14349d04bee--7d6f/section_v25_lmy_bn" audience="integrated">configure Impala Daemon logging in Cloudera Manager</xref>.
       </li>
 
       <li> 
         Use a cluster manager with governance capabilities to filter, visualize,
         and produce reports based on the audit logs collected
         from all the hosts in the cluster. 
-      </li>
-
-      <li audience="hidden">
-        Use Cloudera Navigator or Cloudera Manager to filter, visualize, and produce reports based on the audit
-        data. (The Impala auditing feature works with Cloudera Manager 4.7 to 5.1 and Cloudera Navigator 2.1 and
-        higher.) Check the audit data to ensure that all activity is authorized and detect attempts at
-        unauthorized access.
       </li>
     </ul>
 
@@ -272,27 +259,6 @@ Here is an excerpt from a sample audit log file:
         <codeph rev="1.4.0">SUMMARY</codeph>, <codeph>PROFILE</codeph>, <codeph>SET</codeph>, and
         <codeph>QUIT</codeph>, do not correspond to actual SQL queries, and these statements are not reflected in
         the audit log.
-      </p>
-    </conbody>
-  </concept>
-
-  <concept id="auditing_reviewing" audience="hidden">
-
-    <title>Reviewing the Audit Logs</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Logs"/>
-    </metadata>
-  </prolog>
-
-    <conbody>
-
-      <p>
-        You typically do not review the audit logs in raw form. The Cloudera Manager Agent periodically transfers
-        the log information into a back-end database where it can be examined in consolidated form. See
-        <ph audience="standalone">the <xref href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Navigator/latest/Cloudera-Navigator-Installation-and-User-Guide/Cloudera-Navigator-Installation-and-User-Guide.html"
-            scope="external" format="html">Cloudera Navigator documentation</xref> for details</ph>
-            <xref href="cn_iu_audits.xml#cn_topic_7" audience="integrated" />.
       </p>
     </conbody>
   </concept>

@@ -56,13 +56,6 @@ under the License.
       not tampered with.
     </p>
 
-    <p audience="hidden">
-      You interact with this feature through <term>lineage diagrams</term> showing relationships between tables and
-      columns. For instructions about interpreting lineage diagrams, see
-      <xref audience="integrated" href="cn_iu_lineage.xml" />
-      <xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cn_iu_lineage.html" scope="external" format="html"/>.
-    </p>
-
     <section id="column_lineage">
 
       <title>Column Lineage</title>
@@ -119,10 +112,7 @@ under the License.
 
       <p>
         To enable or disable this feature, set or remove the <codeph>-lineage_event_log_dir</codeph>
-        configuration option for the <cmdname>impalad</cmdname> daemon. <ph audience="hidden">For
-        information about turning the lineage feature on and off through Cloudera Manager, see
-        <xref audience="integrated" href="datamgmt_impala_lineage_log.xml"/>
-        <xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/datamgmt_impala_lineage_log.html" scope="external" format="html"/>.</ph>
+        configuration option for the <cmdname>impalad</cmdname> daemon.
       </p>
 
     </section>

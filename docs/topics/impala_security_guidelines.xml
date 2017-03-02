@@ -87,8 +87,8 @@ under the License.
       <p>
         The Impala authorization feature makes use of the HDFS file ownership and permissions mechanism; for
         background information, see the
-        <xref href="https://archive.cloudera.com/cdh/3/hadoop/hdfs_permissions_guide.html" scope="external" format="html">CDH
-        HDFS Permissions Guide</xref>. Set up users and assign them to groups at the OS level, corresponding to the
+        <xref href="https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/HdfsPermissionsGuide.html" scope="external" format="html">HDFS Permissions Guide</xref>.
+        Set up users and assign them to groups at the OS level, corresponding to the
         different categories of users with different access levels for various databases, tables, and HDFS
         locations (URIs). Create the associated Linux users using the <cmdname>useradd</cmdname> command if
         necessary, and add them to the appropriate groups with the <cmdname>usermod</cmdname> command.

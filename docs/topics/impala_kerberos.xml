@@ -48,15 +48,6 @@ under the License.
       <cmdname>impalad</cmdname> or <cmdname>statestored</cmdname>.
     </p>
 
-    <p audience="hidden">
-      For more information on enabling Kerberos authentication, see the
-      topic on Configuring Hadoop Security in the
-      <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_sg_cdh5_hadoop_security.html" scope="external" format="html">CDH 5 Security Guide</xref>.
-      When using Impala in a managed environment, Cloudera Manager automatically completes Kerberos configuration.
-      <ph rev="upstream">Cloudera</ph> recommends using a consistent format, such as
-      <codeph>impala/_HOST@Your-Realm</codeph>, but you can use any three-part Kerberos server principal.
-    </p>
-
     <note conref="../shared/impala_common.xml#common/authentication_vs_authorization"/>
 
     <p>
@@ -106,29 +97,6 @@ under the License.
         <codeph>--principal</codeph> and <codeph>--keytab-file</codeph> flags set to the principal and full path
         name of the <codeph>keytab</codeph> file containing the credentials for the principal.
       </p>
-
-      <p audience="hidden">
-        Impala supports the Cloudera ODBC driver and the Kerberos interface provided. To use Kerberos through the
-        ODBC driver, the host type must be set depending on the level of the ODBC driver:
-      </p>
-
-      <ul audience="hidden">
-        <li>
-          <codeph>SecImpala</codeph> for the ODBC 1.0 driver.
-        </li>
-
-        <li>
-          <codeph>SecBeeswax</codeph> for the ODBC 1.2 driver.
-        </li>
-
-        <li>
-          Blank for the ODBC 2.0 driver or higher, when connecting to a secure cluster.
-        </li>
-
-        <li>
-          <codeph>HS2NoSasl</codeph> for the ODBC 2.0 driver or higher, when connecting to a non-secure cluster.
-        </li>
-      </ul>
 
       <p>
         To enable Kerberos in the Impala shell, start the <cmdname>impala-shell</cmdname> command using the
