@@ -23,7 +23,6 @@ from copy import deepcopy
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfOldAggsJoins
 from tests.common.test_vector import ImpalaTestDimension
-from tests.common.test_vector import ImpalaTestVector
 
 # COMPUTE STATS on Parquet tables automatically sets MT_DOP=4, so include
 # the value 0 to cover the non-MT path as well.

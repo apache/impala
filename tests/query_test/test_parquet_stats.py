@@ -17,7 +17,10 @@
 
 import pytest
 
+from tests.common.test_vector import ImpalaTestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
+
+MT_DOP_VALUES = [0, 1, 2, 8]
 
 class TestParquetStats(ImpalaTestSuite):
   """
@@ -31,6 +34,7 @@ class TestParquetStats(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestParquetStats, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
