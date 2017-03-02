@@ -17,7 +17,6 @@
 
 #include "runtime/coordinator.h"
 
-#include <limits>
 #include <map>
 #include <memory>
 #include <thrift/protocol/TDebugProtocol.h>

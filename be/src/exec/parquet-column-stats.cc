@@ -17,6 +17,8 @@
 
 #include "parquet-column-stats.inline.h"
 
+#include <limits>
+
 namespace impala {
 
 bool ColumnStatsBase::ReadFromThrift(const parquet::Statistics& thrift_stats,
@@ -24,10 +26,30 @@ bool ColumnStatsBase::ReadFromThrift(const parquet::Statistics& thrift_stats,
   switch (col_type.type) {
     case TYPE_BOOLEAN:
       return ColumnStats<bool>::ReadFromThrift(thrift_stats, stats_field, slot);
-    case TYPE_TINYINT:
-      return ColumnStats<int32_t>::ReadFromThrift(thrift_stats, stats_field, slot);
-    case TYPE_SMALLINT:
-      return ColumnStats<int32_t>::ReadFromThrift(thrift_stats, stats_field, slot);
+    case TYPE_TINYINT: {
+        // parquet::Statistics encodes INT_8 values using 4 bytes.
+        int32_t col_stats;
+        bool ret = ColumnStats<int32_t>::ReadFromThrift(thrift_stats, stats_field,
+            &col_stats);
+        if (!ret || col_stats < std::numeric_limits<int8_t>::min() ||
+            col_stats > std::numeric_limits<int8_t>::max()) {
+          return false;
+        }
+        *static_cast<int8_t*>(slot) = col_stats;
+        return true;
+      }
+    case TYPE_SMALLINT: {
+        // parquet::Statistics encodes INT_16 values using 4 bytes.
+        int32_t col_stats;
+        bool ret = ColumnStats<int32_t>::ReadFromThrift(thrift_stats, stats_field,
+            &col_stats);
+        if (!ret || col_stats < std::numeric_limits<int16_t>::min() ||
+            col_stats > std::numeric_limits<int16_t>::max()) {
+          return false;
+        }
+        *static_cast<int16_t*>(slot) = col_stats;
+        return true;
+      }
     case TYPE_INT:
       return ColumnStats<int32_t>::ReadFromThrift(thrift_stats, stats_field, slot);
     case TYPE_BIGINT:
