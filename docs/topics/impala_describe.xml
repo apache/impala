@@ -577,7 +577,7 @@ Query finished, fetching results ...
 |                              | NULL                                       | NULL       |
 | # Detailed Table Information | NULL                                       | NULL       |
 | Database:                    | describe_formatted                         | NULL       |
-| Owner:                       | cloudera                                   | NULL       |
+| Owner:                       | doc_demo                                   | NULL       |
 | CreateTime:                  | Mon Jul 22 17:03:16 EDT 2013               | NULL       |
 | LastAccessTime:              | UNKNOWN                                    | NULL       |
 | Protect Mode:                | None                                       | NULL       |
@@ -625,7 +625,7 @@ Query finished, fetching results ...
 |                              | NULL                         | NULL                 |
 | # Detailed Table Information | NULL                         | NULL                 |
 | Database:                    | describe_formatted           | NULL                 |
-| Owner:                       | cloudera                     | NULL                 |
+| Owner:                       | doc_demo                     | NULL                 |
 | CreateTime:                  | Mon Jul 22 16:56:38 EDT 2013 | NULL                 |
 | LastAccessTime:              | UNKNOWN                      | NULL                 |
 | Protect Mode:                | None                         | NULL                 |
@@ -648,7 +648,7 @@ Query finished, fetching results ...
 | View Expanded Text:          | SELECT x, upper(s) FROM t1   | NULL                 |
 +------------------------------+------------------------------+----------------------+
 Returned 28 row(s) in 0.03s
-[localhost:21000] &gt; create external table t2 (x int, y int, s string) stored as parquet location '/user/cloudera/sample_data';
+[localhost:21000] &gt; create external table t2 (x int, y int, s string) stored as parquet location '/user/doc_demo/sample_data';
 [localhost:21000] &gt; describe formatted t2;
 Query: describe formatted t2
 Query finished, fetching results ...
@@ -663,12 +663,12 @@ Query finished, fetching results ...
 |                              | NULL                                               | NULL       |
 | # Detailed Table Information | NULL                                               | NULL       |
 | Database:                    | describe_formatted                                 | NULL       |
-| Owner:                       | cloudera                                           | NULL       |
+| Owner:                       | doc_demo                                           | NULL       |
 | CreateTime:                  | Mon Jul 22 17:01:47 EDT 2013                       | NULL       |
 | LastAccessTime:              | UNKNOWN                                            | NULL       |
 | Protect Mode:                | None                                               | NULL       |
 | Retention:                   | 0                                                  | NULL       |
-| Location:                    | hdfs://127.0.0.1:8020/user/cloudera/sample_data    | NULL       |
+| Location:                    | hdfs://127.0.0.1:8020/user/doc_demo/sample_data    | NULL       |
 | Table Type:                  | EXTERNAL_TABLE                                     | NULL       |
 | Table Parameters:            | NULL                                               | NULL       |
 |                              | EXTERNAL                                           | TRUE       |
@@ -676,8 +676,8 @@ Query finished, fetching results ...
 |                              | NULL                                               | NULL       |
 | # Storage Information        | NULL                                               | NULL       |
 | SerDe Library:               | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe | NULL       |
-| InputFormat:                 | com.cloudera.impala.hive.serde.ParquetInputFormat  | NULL       |
-| OutputFormat:                | com.cloudera.impala.hive.serde.ParquetOutputFormat | NULL       |
+| InputFormat:                 | org.apache.impala.hive.serde.ParquetInputFormat    | NULL       |
+| OutputFormat:                | org.apache.impala.hive.serde.ParquetOutputFormat   | NULL       |
 | Compressed:                  | No                                                 | NULL       |
 | Num Buckets:                 | 0                                                  | NULL       |
 | Bucket Columns:              | []                                                 | NULL       |
@@ -688,7 +688,7 @@ Returned 27 row(s) in 0.17s</codeblock>
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-    <p rev="CDH-19187">
+    <p rev="">
       The user ID that the <cmdname>impalad</cmdname> daemon runs under,
       typically the <codeph>impala</codeph> user, must have read and execute
       permissions for all directories that are part of the table.

@@ -440,7 +440,7 @@ under the License.
           </p>
           <ul>
             <li>
-              <p rev="IMPALA-3206 CDH-43744">
+              <p rev="IMPALA-3206">
                 [<xref href="https://issues.cloudera.org/browse/IMPALA-3206" scope="external" format="html">IMPALA-3206</xref>]
                 Speedup for queries against <codeph>DECIMAL</codeph> columns in Avro tables.
                 The code that parses <codeph>DECIMAL</codeph> values from Avro now uses
@@ -456,7 +456,7 @@ under the License.
             </li>
             <!-- Not actually a new feature, it's more a tip about when to expect remote reads and how to minimize them. To go somewhere in the performance / best practices / Parquet info.
             <li>
-              <p rev="IMPALA-3885 CDH-43793">
+              <p rev="IMPALA-3885">
                 [<xref href="https://issues.cloudera.org/browse/IMPALA-3885" scope="external" format="html">IMPALA-3885</xref>]
                 Parquet files with multiple blocks can now be processed
                 without remote reads.
@@ -464,7 +464,7 @@ under the License.
             </li>
             -->
             <li>
-              <p rev="IMPALA-2979 CDH-43739"> [<xref
+              <p rev="IMPALA-2979"> [<xref
                   href="https://issues.cloudera.org/browse/IMPALA-2979" scope="external"
                   format="html">IMPALA-2979</xref>] Improvements to scheduling on worker nodes,
                 enabled by the <codeph>REPLICA_PREFERENCE</codeph> query option.
@@ -475,7 +475,7 @@ under the License.
           </ul>
         </li>
         <li audience="hidden">
-          <p rev="IMPALA-3210 CDH-43736"><!-- Patch didn't make it into in <keyword keyref="impala27_full"/> -->
+          <p rev="IMPALA-3210"><!-- Patch didn't make it into in <keyword keyref="impala27_full"/> -->
             [<xref href="https://issues.cloudera.org/browse/IMPALA-3210" scope="external" format="html">IMPALA-3210</xref>]
             The analytic functions <codeph>FIRST_VALUE()</codeph> and <codeph>LAST_VALUE()</codeph>
             accept a new clause, <codeph>IGNORE NULLS</codeph>.
@@ -485,7 +485,7 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="IMPALA-1683 CDH-43732">
+          <p rev="IMPALA-1683">
             [<xref href="https://issues.cloudera.org/browse/IMPALA-1683" scope="external" format="html">IMPALA-1683</xref>]
             The <codeph>REFRESH</codeph> statement can be applied to a single partition,
             rather than the entire table. See <xref href="impala_refresh.xml#refresh"/>
@@ -498,21 +498,21 @@ under the License.
           </p>
           <ul>
             <li>
-              <p rev="IMPALA-2767 CDH-43748">
+              <p rev="IMPALA-2767">
                 [<xref href="https://issues.cloudera.org/browse/IMPALA-2767" scope="external" format="html">IMPALA-2767</xref>]
                 You can now force a session to expire by clicking a link in the web UI,
                 on the <uicontrol>/sessions</uicontrol> tab.
               </p>
             </li>
             <li>
-              <p rev="IMPALA-3715 CDH-43743">
+              <p rev="IMPALA-3715">
                 [<xref href="https://issues.cloudera.org/browse/IMPALA-3715" scope="external" format="html">IMPALA-3715</xref>]
                 The <uicontrol>/memz</uicontrol> tab includes more information about
                 Impala memory usage.
               </p>
             </li>
             <li>
-              <p rev="IMPALA-3716 CDH-43741">
+              <p rev="IMPALA-3716">
                 [<xref href="https://issues.cloudera.org/browse/IMPALA-3716" scope="external" format="html">IMPALA-3716</xref>]
                 The <uicontrol>Details</uicontrol> page for a query now includes
                 a <uicontrol>Memory</uicontrol> tab.
@@ -521,7 +521,7 @@ under the License.
           </ul>
         </li>
         <li>
-          <p rev="IMPALA-3499 CDH-43740">
+          <p rev="IMPALA-3499">
             [<xref href="https://issues.cloudera.org/browse/IMPALA-3499" scope="external" format="html">IMPALA-3499</xref>]
             Scalability improvements to the catalog server. Impala handles internal communication
             more efficiently for tables with large numbers of columns and partitions, where the
@@ -529,7 +529,7 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="IMPALA-3677 CDH-43745">
+          <p rev="IMPALA-3677">
             [<xref href="https://issues.cloudera.org/browse/IMPALA-3677" scope="external" format="html">IMPALA-3677</xref>]
             You can send a <codeph>SIGUSR1</codeph> signal to any Impala-related daemon to write a
             Breakpad minidump. For advanced troubleshooting, you can now produce a minidump
@@ -538,7 +538,7 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="IMPALA-3687 CDH-43731">
+          <p rev="IMPALA-3687">
             [<xref href="https://issues.cloudera.org/browse/IMPALA-3687" scope="external" format="html">IMPALA-3687</xref>]
             The schema reconciliation rules for Avro tables have changed slightly
             for <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph> columns. Now, if
@@ -551,7 +551,7 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="IMPALA-3575 CDH-43742"> [<xref
+          <p rev="IMPALA-3575"> [<xref
               href="https://issues.cloudera.org/browse/IMPALA-3575"
               scope="external" format="html">IMPALA-3575</xref>] Some network
             operations now have additional timeout and retry settings. The extra
@@ -572,8 +572,6 @@ under the License.
 
     <conbody>
 
-      <!-- <note conref="../shared/impala_common.xml#common/only_cdh5_260" /> -->
-
       <ul>
         <li>
           <p>
@@ -581,7 +579,7 @@ under the License.
           </p>
           <ul>
             <li>
-              <p rev="IMPALA-1878 CDH-33310">
+              <p rev="IMPALA-1878">
                 Impala can now write to S3 tables through the <codeph>INSERT</codeph>
                 or <codeph>LOAD DATA</codeph> statements.
                 See <xref href="impala_s3.xml#s3"/> for general information about
@@ -589,7 +587,7 @@ under the License.
               </p>
             </li>
             <li>
-              <p rev="IMPALA-3452 CDH-39913">
+              <p rev="IMPALA-3452">
                 A new query option, <codeph>S3_SKIP_INSERT_STAGING</codeph>, lets you
                 trade off between fast <codeph>INSERT</codeph> performance and
                 slower <codeph>INSERT</codeph>s that are more consistent if a
@@ -601,19 +599,19 @@ under the License.
           </ul>
         </li>
         <li>
-          <p rev="CDH-41184">
+          <p rev="">
             Performance improvements for the runtime filtering feature:
           </p>
           <ul>
             <li>
-              <p rev="CDH-41184 IMPALA-3333">
+              <p rev="IMPALA-3333">
                 The default for the <codeph>RUNTIME_FILTER_MODE</codeph>
                 query option is changed to <codeph>GLOBAL</codeph> (the highest setting).
                 See <xref href="impala_runtime_filter_mode.xml#runtime_filter_mode"/> for
                 details about this option.
               </p>
             </li>
-            <li rev="CDH-41184 IMPALA-3007">
+            <li rev="IMPALA-3007">
               <p>
                 The <codeph>RUNTIME_BLOOM_FILTER_SIZE</codeph> setting is now only used
                 as a fallback if statistics are not available; otherwise, Impala
@@ -622,7 +620,7 @@ under the License.
                 details about this option.
               </p>
             </li>
-            <li rev="CDH-41184 IMPALA-3480">
+            <li rev="IMPALA-3480">
               <p>
                 New query options <codeph>RUNTIME_FILTER_MIN_SIZE</codeph> and
                 <codeph>RUNTIME_FILTER_MAX_SIZE</codeph> let you fine-tune
@@ -636,14 +634,14 @@ under the License.
                 for details about these options.
               </p>
             </li>
-            <li rev="CDH-41184 IMPALA-2956">
+            <li rev="IMPALA-2956">
               <p>
                 Runtime filter propagation now applies to all the
                 operands of <codeph>UNION</codeph> and <codeph>UNION ALL</codeph>
                 operators.
               </p>
             </li>
-            <li rev="CDH-41184 IMPALA-3077">
+            <li rev="IMPALA-3077">
               <p>
                 Runtime filters can now be produced during join queries even
                 when the join processing activates the spill-to-disk mechanism.
@@ -673,7 +671,7 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="CDH-40238 CDH-39818 IMPALA-3490 IMPALA-3581 IMPALA-2686">
+          <p rev="IMPALA-3490 IMPALA-3581 IMPALA-2686">
             Impala can now write lightweight <q>minidump</q> files, rather
             than large core files, to save diagnostic information when
             any of the Impala-related daemons crash. This feature uses the
@@ -686,7 +684,7 @@ under the License.
             New query options improve interoperability with Parquet files:
             <ul>
               <li>
-                <p rev="IMPALA-2835 CDH-33330">
+                <p rev="IMPALA-2835">
                   The <codeph>PARQUET_FALLBACK_SCHEMA_RESOLUTION</codeph> query option
                   lets Impala locate columns within Parquet files based on
                   column name rather than ordinal position.
@@ -727,7 +725,7 @@ under the License.
               </p>
             </li>
             <li>
-              <p rev="IMPALA-2660 CDH-40241">
+              <p rev="IMPALA-2660">
                 Impala now recognizes the <codeph>auth_to_local</codeph> setting,
                 specified through the HDFS configuration setting
                 <codeph>hadoop.security.auth_to_local</codeph>.
@@ -765,7 +763,7 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="IMPALA-3397 CDH-40097">
+          <p rev="IMPALA-3397">
             The <cmdname>impala-shell</cmdname> interpreter has a new command,
             <codeph>SOURCE</codeph>, that lets you run a set of SQL statements
             or other <cmdname>impala-shell</cmdname> commands stored in a file.
@@ -778,7 +776,7 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="IMPALA-1772 CDH-38381">
+          <p rev="IMPALA-1772">
             The <codeph>millisecond()</codeph> built-in function lets you extract
             the fractional seconds part of a <codeph>TIMESTAMP</codeph> value.
             See <xref href="impala_datetime_functions.xml#datetime_functions"/> for details.
@@ -905,11 +903,9 @@ under the License.
 
     <conbody>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_250" />
-
       <ul>
         <li><!-- Spec: https://docs.google.com/document/d/1ambtYJ1t05iITCVIrN6N1A-e7PZBSetBPgjy8SLzJrA/edit#heading=h.vcftzwlpn845 -->
-          <p rev="CDH-33292 IMPALA-2552 IMPALA-3054">
+          <p rev="IMPALA-2552 IMPALA-3054">
             Dynamic partition pruning. When a query refers to a partition key column in a <codeph>WHERE</codeph>
             clause, and the exact set of column values are not known until the query is executed,
             Impala evaluates the predicate and skips the I/O for entire partitions that are not needed.
@@ -1033,14 +1029,6 @@ under the License.
             <ph audience="PDF">See <xref href="impala_udf.xml#udfs_hive"/> for details.</ph>
           </p>
         </li>
-        <!-- CDH-33298 is for scoping internationalization / UTF-8 / Unicode support. That work is pushed out to 5.8.
-        <li>
-          <p rev="CDH-33298">
-            Improvements to internationalization support.
-            Now Impala can process data that uses the UTF-8 character encoding.
-          </p>
-        </li>
-        -->
         <li>
           <p rev="IMPALA-1588"><!-- This is from 2015, so perhaps it's really in an earlier release. -->
             Performance improvements for HDFS I/O. Impala now caches HDFS file handles to avoid the
@@ -1058,7 +1046,7 @@ under the License.
         </li>
         
         <li>
-          <p rev="IMPALA-3044 IMPALA-2538 IMPALA-1168 CDH-33289 CDH-34603">
+          <p rev="IMPALA-3044 IMPALA-2538 IMPALA-1168">
             Improvements to the memory reservation mechanism for the Impala
             admission control feature. You can specify more settings, such
             as the timeout period and maximum aggregate memory used, for each
@@ -1186,13 +1174,13 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="CDH-37009 CDH-30378">
+          <p rev="">
             Improvements to Impala integration and usability for Hue. (The code changes
             are actually on the Hue side.)
           </p>
           <ul>
           <li>
-            <p rev="CDH-37009">
+            <p rev="">
               The list of tables now refreshes dynamically.
             </p>
           </li>
@@ -1255,14 +1243,14 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="IMPALA-1748 CDH-38369">
+          <p rev="IMPALA-1748">
             User-defined functions (UDFs and UDAFs) written in C++ now persist automatically
             when the <cmdname>catalogd</cmdname> daemon is restarted. You no longer
             have to run the <codeph>CREATE FUNCTION</codeph> statements again after a restart.
           </p>
         </li>
         <li>
-          <p rev="IMPALA-2843 CDH-39148">
+          <p rev="IMPALA-2843">
             User-defined functions (UDFs) written in Java can now persist
             when the <cmdname>catalogd</cmdname> daemon is restarted, and can be shared
             transparently between Impala and Hive. You must do a one-time operation to recreate these
@@ -1352,13 +1340,11 @@ under the License.
 
     <conbody>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_240" />
-
       <ul>
         <li>
           <p>
             Impala can be used on the DSSD D5 Storage Appliance.
-            From a user perspective, the Impala features are the same as in CDH 5.5 / Impala 2.3.
+            From a user perspective, the Impala features are the same as in <keyword keyref="impala23_full"/>.
           </p>
         </li>
       </ul>
@@ -1378,11 +1364,9 @@ under the License.
 
     <conbody>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_23x" />
-
       <p>
-        The following are the major new features in Impala 2.3.x. This major release, available as part of CDH
-        5.5.x, contains improvements to SQL syntax (particularly new support for complex types), performance,
+        The following are the major new features in Impala 2.3.x. This major release
+        contains improvements to SQL syntax (particularly new support for complex types), performance,
         manageability, security.
       </p>
 
@@ -1425,14 +1409,14 @@ under the License.
           </p>
         </li>
 
-        <li id="CDH-28141">
+        <li>
           <p>
             Reduced memory usage and improved performance and robustness for spill-to-disk feature.
             <ph audience="PDF">See <xref href="impala_scalability.xml#spill_to_disk"/> for details about this feature.</ph>
           </p>
         </li>
 
-        <li rev="IMPALA-1881 CDH-34620">
+        <li rev="IMPALA-1881">
           <p>
             Performance improvements for querying Parquet data files containing multiple row groups
             and multiple data blocks:
@@ -1447,7 +1431,7 @@ under the License.
           <li>
           <p>
             Impala queries benefit from the improved alignment of row groups with HDFS blocks for Parquet
-            files written by Hive, MapReduce, and other components in <ph rev="upstream">CDH 5.5</ph> and higher. (Impala itself never writes
+            files written by Hive, MapReduce, and other components. (Impala itself never writes
             multiblock Parquet files, so the alignment change does not apply to Parquet files produced by Impala.)
             These Parquet writers now add padding to Parquet files that they write to align row groups with HDFS blocks.
             The <codeph>parquet.writer.max-padding</codeph> setting specifies the maximum number of bytes, by default
@@ -1702,7 +1686,7 @@ under the License.
           </p>
         </li>
 
-        <li id="CDH-27547">
+        <li>
           <p>
             Impala can now run a specified command to obtain the password to decrypt a private-key PEM file,
             rather than having the private-key file be unencrypted on disk.
@@ -1735,7 +1719,7 @@ under the License.
       </ul>
 
       <p>
-        In CDH 5.5.2 / Impala 2.3.2, the bug fix for <xref href="https://issues.cloudera.org/browse/IMPALA-2598" scope="external" format="html">IMPALA-2598</xref>
+        In <keyword keyref="impala232"/>, the bug fix for <xref href="https://issues.cloudera.org/browse/IMPALA-2598" scope="external" format="html">IMPALA-2598</xref>
         removes the restriction on using both Kerberos and SSL for internal communication between Impala components.
       </p>
 
@@ -1747,34 +1731,11 @@ under the License.
 
 <!-- All 2.2.x subsections go under here -->
 
-  <concept rev="5.4.3" id="new_features_223">
-
-    <title>New Features in Impala 2.2.x for CDH 5.4.3 and 5.4.4</title>
-
-    <conbody>
-
-      <p>
-        No new features added to the Impala code. The certification of Impala with EMC Isilon under CDH 5.4.4 means
-        that now you can query data stored on Isilon storage devices through Impala. See
-        <xref audience="integrated" href="cm_mc_isilon_service.xml"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_isilon_service.html" scope="external" format="html"/>
-        for details. The same level of Impala is included with both CDH
-        5.4.3 and 5.4.4.
-<!-- This point release is exclusively a bug fix release. -->
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x" />
-
-    </conbody>
-
-  </concept>
-
   <concept rev="2.2.0" id="new_features_220">
 
     <title>New Features in <keyword keyref="impala28_full"/></title>
 
     <conbody>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_220" />
 
       <p>
         The following are the major new features in <keyword keyref="impala22_full"/>. This release
@@ -1968,7 +1929,7 @@ under the License.
           </p>
         </li>
 
-        <li rev="CDH-26073">
+        <li rev="">
           <p>
             The amount of memory required during setup for <q>spill to disk</q> operations is greatly reduced. This
             enhancement reduces the chance of a memory-intensive join or aggregation query failing with an
@@ -2414,7 +2375,7 @@ under the License.
 
         <li>
           <p>
-            On CDH 5, Impala can take advantage of the HDFS caching feature to <q>pin</q> entire tables or
+            Where the underlying HDFS support exists, Impala can take advantage of the HDFS caching feature to <q>pin</q> entire tables or
             individual partitions in memory, to speed up queries on frequently accessed data and reduce the CPU
             overhead of memory-to-memory copying. When HDFS files are cached in memory, Impala can read the cached
             data without any disk reads, and without making an additional copy of the data in memory. Other Hadoop
@@ -2422,8 +2383,7 @@ under the License.
           </p>
 
           <p audience="PDF">
-<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_hdfs_caching.html -->
-            For background information about HDFS caching in CDH, see
+            For background information about HDFS caching, see
             <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hdfs_caching.html" scope="external" format="html">the
             CDH 5 Installation Guide</xref>. For performance information about using this feature with Impala, see
             <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/>. For the <codeph>SET CACHED</codeph> and
@@ -2654,7 +2614,7 @@ under the License.
 
   <concept rev="1.3.2" id="new_features_132">
 
-    <title>New Features in Impala 1.3.2 / CDH 5.0.4</title>
+    <title>New Features in <keyword keyref="impala132"/></title>
 
     <conbody>
 
@@ -2662,8 +2622,6 @@ under the License.
         No new features. This point release is exclusively a bug fix release for the IMPALA-1019 issue related to
         HDFS caching.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_132" />
 
     </conbody>
 
@@ -2679,8 +2637,6 @@ under the License.
         This point release is primarily a vehicle to deliver bug fixes. Any new features are minor changes
         resulting from fixes for performance, reliability, or usability issues.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/impala13_cdh" />
 
       <ul>
         <li>
@@ -2722,8 +2678,6 @@ under the License.
     <title>New Features in <keyword keyref="impala13_full"/></title>
 
     <conbody>
-
-      <note conref="../shared/impala_common.xml#common/impala13_cdh" />
 
       <ul>
         <li>
@@ -2774,7 +2728,7 @@ under the License.
 
         <li>
           <p>
-            Integration with the YARN resource management framework. Only available in combination with CDH 5. This
+            Integration with the YARN resource management framework. This
             feature makes use of the underlying YARN service, plus an additional service (Llama) that coordinates
             requests to YARN for Impala resources, so that the Impala query only proceeds when all requested
             resources are available. See <xref href="impala_resource_management.xml#resource_management"/> for full
@@ -3204,79 +3158,6 @@ under the License.
           </p>
         </li>
 
-        <li audience="hidden">
-          <p>
-            Integration with the YARN resource management framework. Only available in combination with CDH 5. This
-            feature makes use of the underlying YARN service, plus an additional service (Llama) that coordinates
-            requests to YARN for Impala resources, so that the Impala query only proceeds when all requested
-            resources are available. See <xref href="impala_resource_management.xml#resource_management"/> for full
-            details.
-          </p>
-
-          <p>
-            On the Impala side, this feature involves some new startup options for the <cmdname>impalad</cmdname>
-            daemon:
-          </p>
-          <ul>
-            <li>
-              <codeph>-enable_rm</codeph>
-            </li>
-
-            <li>
-              <codeph>-llama_host</codeph>
-            </li>
-
-            <li>
-              <codeph>-llama_port</codeph>
-            </li>
-
-            <li>
-              <codeph>-llama_callback_port</codeph>
-            </li>
-
-            <li>
-              <codeph>-cgroup_hierarchy_path</codeph>
-            </li>
-          </ul>
-          <p>
-            For details of these startup options, see <xref href="impala_config_options.xml#config_options"/>.
-          </p>
-
-          <p>
-            This feature also involves several new or changed query options that you can set through the
-            <cmdname>impala-shell</cmdname> interpreter and apply within a specific session:
-          </p>
-          <ul>
-            <li>
-              <codeph>MEM_LIMIT</codeph>: the function of this existing option changes when Impala resource
-              management is enabled.
-            </li>
-
-            <li>
-              <codeph>YARN_POOL</codeph>: a new option. (Renamed to <codeph>RESOURCE_POOL</codeph> in Impala
-              1.3.0.)
-            </li>
-
-            <li>
-              <codeph>V_CPU_CORES</codeph>: a new option.
-            </li>
-
-            <li>
-              <codeph>RESERVATION_REQUEST_TIMEOUT</codeph>: a new option.
-            </li>
-          </ul>
-          <p>
-            For details of these query options, see <xref href="impala_resource_management.xml#rm_query_options"/>.
-          </p>
-        </li>
-
-        <li>
-          <p>
-            <codeph>CREATE TABLE ... AS SELECT</codeph> syntax, to create a table and copy data into it in a single
-            operation. See <xref href="impala_create_table.xml#create_table"/> for details.
-          </p>
-        </li>
-
         <li>
           <p>
             The <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph> statements have new clauses
@@ -3293,8 +3174,8 @@ under the License.
         <li>
           <p>
             Delegation support lets you authorize certain OS users associated with applications (for example,
-            <codeph>hue</codeph>), to submit requests using the credentials of other users. Only available in
-            combination with CDH 5. See <xref href="impala_delegation.xml#delegation"/> for details.
+            <codeph>hue</codeph>), to submit requests using the credentials of other users.
+            See <xref href="impala_delegation.xml#delegation"/> for details.
           </p>
         </li>
 
@@ -3334,11 +3215,6 @@ under the License.
     <title>New Features in Impala 1.2.0 (Beta)</title>
 
     <conbody>
-
-      <note>
-        The Impala 1.2.0 beta release only works in combination with the beta version of CDH 5. The Impala 1.2.0
-        software is bundled together with the CDH 5 beta 1 download.
-      </note>
 
       <p>
         The Impala 1.2.0 beta includes new features for security, performance, and flexibility.
@@ -3395,7 +3271,7 @@ under the License.
 
         <li>
           <p>
-            Integration with the YARN resource management framework. Only available in combination with CDH 5. This
+            Integration with the YARN resource management framework. This
             feature makes use of the underlying YARN service, plus an additional service (Llama) that coordinates
             requests to YARN for Impala resources, so that the Impala query only proceeds when all requested
             resources are available. See <xref href="impala_resource_management.xml#resource_management"/> for full
@@ -3478,8 +3354,8 @@ under the License.
         <li>
           <p>
             Delegation support lets you authorize certain OS users associated with applications (for example,
-            <codeph>hue</codeph>), to submit requests using the credentials of other users. Only available in
-            combination with CDH 5. See <xref href="impala_delegation.xml#delegation"/> for details.
+            <codeph>hue</codeph>), to submit requests using the credentials of other users.
+            See <xref href="impala_delegation.xml#delegation"/> for details.
           </p>
         </li>
 

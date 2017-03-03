@@ -62,14 +62,6 @@ under the License.
         metastore service if you do not already have Hive configured.
       </li>
 
-      <li audience="hidden">
-        To set up Impala and all its prerequisites at once, in a minimal configuration that you can use for
-        small-scale experiments, set up the Cloudera QuickStart VM, which includes CDH and Impala on CentOS.
-        Use this single-node VM to try out basic SQL functionality, not anything related to
-        performance and scalability. For more information, see
-        <xref href="http://www.cloudera.com/content/support/en/downloads/quickstart_vms.html" scope="external" format="html">the
-        Cloudera QuickStart VM</xref>.
-      </li>
     </ul>
 
     <p outputclass="toc inpage"/>
@@ -460,19 +452,6 @@ Welcome to the Impala shell. Press TAB twice to see a list of available commands
       </conbody>
     </concept>
 
-    <concept audience="hidden" id="tutorial_quickstart_vm">
-
-      <title>Setting Up Impala with the QuickStart VM</title>
-
-      <conbody>
-
-        <p>
-          This tutorial scenario shows how to set up the Cloudera QuickStart VM, load some sample data, and begin
-          experimenting with Impala inside this virtualized environment.
-        </p>
-      </conbody>
-    </concept>
-
     <concept audience="hidden" id="tutorial_hdfs">
 
       <title>Exploring the HDFS Directory Structure</title>
@@ -663,15 +642,6 @@ ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
               Make sure the <codeph>hive.metastore.warehouse.dir</codeph> property points to a directory that
               Impala can write to. The ownership should be <codeph>hive:hive</codeph>, and the
               <codeph>impala</codeph> user should also be a member of the <codeph>hive</codeph> group.
-            </li>
-
-            <li audience="hidden">
-              If the value of <codeph>hive.metastore.warehouse.dir</codeph> is different in the Cloudera Manager
-              dialogs and in the Hive shell, you might need to
-              <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_managing_roles.html" scope="external" format="html">designate
-              the hosts running <cmdname>impalad</cmdname> with the <q>gateway</q> role for Hive</xref>, and
-              <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_client_config.html" scope="external" format="html">deploy
-              the client configuration files</xref> to those hosts.
             </li>
           </ul>
         </note>
@@ -2329,7 +2299,7 @@ It's even possible that by chance (depending on HDFS replication factor and the 
 across the cluster), that multiple year partitions selected by a filter such as
 <codeph>WHERE year BETWEEN 1999 AND 2001</codeph> could all be read and processed by the same data node.
 The more data files each partition has, the more parallelism you can get and the less probability of <q>hotspots</q> occurring
-on particular nodes, therefore a bigger performance boost by having a big CDH cluster.
+on particular nodes, therefore a bigger performance boost by having a big cluster.
 </p>
 
 <p>

@@ -20,7 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept rev="1.2" id="v_cpu_cores">
 
-  <title>V_CPU_CORES Query Option (CDH 5 only)</title>
+  <title>V_CPU_CORES Query Option</title>
   <titlealts audience="PDF"><navtitle>V_CPU_CORES</navtitle></titlealts>
   <prolog>
     <metadata>

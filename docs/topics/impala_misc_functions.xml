@@ -72,7 +72,7 @@ under the License.
             <b>Return type:</b> <codeph>string</codeph>
           </p>
           <p>
-            <b>Added in:</b> CDH 5.4.5
+            <b>Added in:</b> <keyword keyref="impala225"/>
           </p>
         </dd>
 

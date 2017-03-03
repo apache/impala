@@ -52,30 +52,6 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
-  <concept id="product_compatibility_matrix" audience="hidden">
-
-    <title>Product Compatibility Matrix</title>
-
-    <conbody>
-
-      <p> The ultimate source of truth about compatibility between various
-        versions of CDH, Cloudera Manager, and various CDH components is the <ph
-          audience="integrated"><xref
-            href="rn_consolidated_pcm.xml"
-            >Product Compatibility Matrix for CDH and Cloudera
-          Manager</xref></ph><ph audience="standalone">online <xref
-            href="http://www.cloudera.com/documentation/enterprise/latest/topics/rn_consolidated_pcm.html"
-            format="html" scope="external">Product Compatibility
-          Matrix</xref></ph>. </p>
-
-      <p>
-        For Impala, see the
-        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/pcm_impala.html" scope="external" format="html">Impala
-        compatibility matrix page</xref>.
-      </p>
-    </conbody>
-  </concept>
-
   <concept id="prereqs_os">
 
     <title>Supported Operating Systems</title>
@@ -350,15 +326,6 @@ under the License.
         and do not modify the account's or group's permissions and rights. Ensure no existing systems obstruct the
         functioning of these accounts and groups. For example, if you have scripts that delete user accounts not in
         a white-list, add these accounts to the list of permitted accounts.
-      </p>
-
-<!-- Taking out because no longer applicable in CDH 5.5 and up. -->
-      <p id="impala_hdfs_group" rev="1.2" audience="hidden">
-        For the resource management feature to work (in combination with CDH 5 and the YARN and Llama components),
-        the <codeph>impala</codeph> user must be a member of the <codeph>hdfs</codeph> group. This setup is
-        performed automatically during a new install, but not when upgrading from earlier Impala releases to Impala
-        1.2. If you are upgrading a node to CDH 5 that already had Impala 1.1 or 1.0 installed, manually add the
-        <codeph>impala</codeph> user to the <codeph>hdfs</codeph> group.
       </p>
 
       <p>

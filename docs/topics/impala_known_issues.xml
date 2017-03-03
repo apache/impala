@@ -73,7 +73,7 @@ under the License.
 
   </conbody>
 
-<!-- New known issues for CDH 5.5 / Impala 2.3.
+<!-- New known issues for Impala 2.3.
 
 Title: Server-to-server SSL and Kerberos do not work together
 Description: If server<->server SSL is enabled (with ssl_client_ca_certificate), and Kerberos auth is used between servers, the cluster will fail to start.
@@ -204,7 +204,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
           <b>Severity:</b> High
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.9.0 / Impala 2.7.0.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala270"/>.</p>
 
       </conbody>
 
@@ -228,7 +228,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
           <b>Severity:</b> High
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.9.0 / Impala 2.7.0 and CDH 5.8.2 / Impala 2.6.2.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala270"/> and <keyword keyref="impala262"/>.</p>
 
       </conbody>
 
@@ -250,7 +250,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.
+          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.
         </p>
 
       </conbody>
@@ -272,7 +272,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
           <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2365" scope="external" format="html">IMPALA-2365</xref>
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
 
       </conbody>
 
@@ -312,7 +312,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
           <b>Workaround:</b> Run the DDL statement in Hive if the slowness is an issue.
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
 
       </conbody>
 
@@ -353,10 +353,10 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Resolution:</b> Fixes have been issued for some but not all CDH / Impala releases. Check the JIRA for details of fix releases.
+          <b>Resolution:</b> Fixes have been issued for some but not all Impala releases. Check the JIRA for details of fix releases.
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.8.0 / Impala 2.6.0 and CDH 5.7.1 / Impala 2.5.1.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala260"/> and <keyword keyref="impala251"/>.</p>
 
       </conbody>
 
@@ -454,55 +454,6 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
 
     </conbody>
 
-<!-- To do: Hiding for the moment. https://jira.cloudera.com/browse/CDH-38736 reports the issue is fixed. -->
-
-    <concept id="impala-shell_ssl_dependency" audience="hidden" rev="impala-shell_ssl_dependency">
-
-      <title>impala-shell requires Python with ssl module</title>
-
-      <conbody>
-
-        <p>
-          On CentOS 5.10 and Oracle Linux 5.11 using the built-in Python 2.4, invoking the <cmdname>impala-shell</cmdname> with the
-          <codeph>--ssl</codeph> option might fail with the following error:
-        </p>
-
-<codeblock>
-Unable to import the python 'ssl' module. It is required for an SSL-secured connection.
-</codeblock>
-
-<!-- No associated IMPALA-* JIRA... It is the internal JIRA CDH-38736. -->
-
-        <p>
-          <b>Severity:</b> Low, workaround available
-        </p>
-
-        <p>
-          <b>Resolution:</b> Customers are less likely to experience this issue over time, because <codeph>ssl</codeph> module is included
-          in newer Python releases packaged with recent Linux releases.
-        </p>
-
-        <p>
-          <b>Workaround:</b> To use SSL with <cmdname>impala-shell</cmdname> on these platform versions, install the <codeph>ssh</codeph>
-          Python module:
-        </p>
-
-<codeblock>
-yum install python-ssl
-</codeblock>
-
-        <p>
-          Then <cmdname>impala-shell</cmdname> can run when using SSL. For example:
-        </p>
-
-<codeblock>
-impala-shell -s impala --ssl --ca_cert /path_to_truststore/truststore.pem
-</codeblock>
-
-      </conbody>
-
-    </concept>
-
     <concept id="renewable_kerberos_tickets">
 
 <!-- Not part of Alex's spreadsheet. Not associated with a JIRA number AFAIK. -->
@@ -547,7 +498,7 @@ impala-shell -s impala --ssl --ca_cert /path_to_truststore/truststore.pem
           issue is resolved.
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0 and CDH 5.5.2 / Impala 2.3.2.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/> and <keyword keyref="impala232"/>.</p>
 
       </conbody>
 
@@ -586,9 +537,9 @@ impala-shell -s impala --ssl --ca_cert /path_to_truststore/truststore.pem
 
     </conbody>
 
-    <concept id="TSB-168">
+    <concept id="catalogd_heap">
 
-      <title>Impala catalogd heap issues when upgrading to 5.7</title>
+      <title>Impala catalogd heap issues when upgrading to <keyword keyref="impala25"/></title>
 
       <conbody>
 
@@ -599,14 +550,14 @@ impala-shell -s impala --ssl --ca_cert /path_to_truststore/truststore.pem
         <ul>
           <li>
             <p>
-              Before 5.7, by default <cmdname>catalogd</cmdname> was using the JVM's default heap size, which is the smaller of 1/4th of the
+              Previously, by default <cmdname>catalogd</cmdname> was using the JVM's default heap size, which is the smaller of 1/4th of the
               physical memory or 32 GB.
             </p>
           </li>
 
           <li>
             <p>
-              Starting with CDH 5.7.0, the default <cmdname>catalogd</cmdname> heap size is 4 GB.
+              Starting with <keyword keyref="impala250"/>, the default <cmdname>catalogd</cmdname> heap size is 4 GB.
             </p>
           </li>
         </ul>
@@ -614,10 +565,6 @@ impala-shell -s impala --ssl --ca_cert /path_to_truststore/truststore.pem
         <p>
           For example, on a host with 128GB physical memory this will result in catalogd heap decreasing from 32GB to 4GB. This can result
           in out-of-memory errors in catalogd and leading to query failures.
-        </p>
-
-        <p audience="hidden">
-          <b>Bug:</b> <xref href="https://jira.cloudera.com/browse/TSB-168" scope="external" format="html">TSB-168</xref>
         </p>
 
         <p>
@@ -778,7 +725,7 @@ impala-shell -s impala --ssl --ca_cert /path_to_truststore/truststore.pem
           <b>Workaround:</b> Transition away from the <q>old-style</q> join and aggregation mechanism if practical.
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
 
       </conbody>
 
@@ -818,7 +765,7 @@ impala-shell -s impala --ssl --ca_cert /path_to_truststore/truststore.pem
           <b>Severity:</b> High
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.9.0 / Impala 2.7.0.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala270"/>.</p>
 
       </conbody>
 
@@ -1116,7 +1063,7 @@ select
           <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1170" scope="external" format="html"></xref>IMPALA-1170
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0 and CDH 5.5.4 / Impala 2.3.4.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/> and <keyword keyref="impala234"/>.</p>
 
       </conbody>
 
@@ -1179,7 +1126,7 @@ select
           <b>Workaround:</b> Avoid selecting the same column twice within an inline view.
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0, CDH 5.5.2 / Impala 2.3.2, and CDH 5.4.10 / Impala 2.2.10.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>, <keyword keyref="impala232"/>, and <keyword keyref="impala2210"/>.</p>
 
       </conbody>
 
@@ -1202,7 +1149,7 @@ select
           <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1459" scope="external" format="html">IMPALA-1459</xref>
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0, CDH 5.5.2 / Impala 2.3.2, and CDH 5.4.9 / Impala 2.2.9.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>, <keyword keyref="impala232"/>, and <keyword keyref="impala229"/>.</p>
 
       </conbody>
 
@@ -1256,7 +1203,7 @@ select
           <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2665" scope="external" format="html">IMPALA-2665</xref>
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0, CDH 5.5.2 / Impala 2.3.2, and CDH 5.4.9 / Impala 2.2.9.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>, <keyword keyref="impala232"/>, and <keyword keyref="impala229"/>.</p>
 
       </conbody>
 
@@ -1277,7 +1224,7 @@ select
           <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2144" scope="external" format="html">IMPALA-2144</xref>
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
 
       </conbody>
 
@@ -1298,7 +1245,7 @@ select
           <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2093" scope="external" format="html">IMPALA-2093</xref>
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0 and CDH 5.5.4 / Impala 2.3.4.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/> and <keyword keyref="impala234"/>.</p>
 
       </conbody>
 
@@ -1350,7 +1297,7 @@ select
 
 <!-- Not part of Alex's spreadsheet -->
 
-      <title>Can't update stats manually via alter table after upgrading to CDH 5.2</title>
+      <title>Can't update stats manually via alter table after upgrading to <keyword keyref="impala20"/></title>
 
       <conbody>
 
@@ -1361,7 +1308,7 @@ select
         </p>
 
         <p>
-          <b>Workaround:</b> On CDH 5.2, when adjusting table statistics manually by setting the <codeph>numRows</codeph>, you must also
+          <b>Workaround:</b> On <keyword keyref="impala20"/>, when adjusting table statistics manually by setting the <codeph>numRows</codeph>, you must also
           enable the Boolean property <codeph>STATS_GENERATED_VIA_STATS_TASK</codeph>. For example, use a statement like the following to
           set both properties with a single <codeph>ALTER TABLE</codeph> statement:
         </p>
@@ -1371,7 +1318,7 @@ select
         <p>
           <b>Resolution:</b> The underlying cause is the issue
           <xref href="https://issues.apache.org/jira/browse/HIVE-8648" scope="external" format="html">HIVE-8648</xref> that affects the
-          metastore in Hive 0.13. The workaround is only needed until the fix for this issue is incorporated into a CDH release.
+          metastore in Hive 0.13. The workaround is only needed until the fix for this issue is incorporated into release of <keyword keyref="distro"/>.
         </p>
 
       </conbody>
@@ -1393,16 +1340,16 @@ select
 
     </conbody>
 
-<!-- Opened based on CDH-41605. Not part of Alex's spreadsheet AFAIK. -->
+<!-- Opened based on internal JIRA. Not part of Alex's spreadsheet AFAIK. -->
 
-    <concept id="CDH-41605">
+    <concept id="describe_formatted_avro">
 
       <title>DESCRIBE FORMATTED gives error on Avro table</title>
 
       <conbody>
 
         <p>
-          This issue can occur either on old Avro tables (created prior to Hive 1.1 / CDH 5.4) or when changing the Avro schema file by
+          This issue can occur either on old Avro tables (created prior to Hive 1.1) or when changing the Avro schema file by
           adding or removing columns. Columns added to the schema file will not show up in the output of the <codeph>DESCRIBE
           FORMATTED</codeph> command. Removing columns from the schema file will trigger a <codeph>NullPointerException</codeph>.
         </p>
@@ -1420,10 +1367,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
           (The part in parentheses is case sensitive.) Make sure to pick the right choice between internal and external when recreating the
           table. See <xref href="impala_tables.xml#tables"/> for the differences between internal and external tables.
         </note>
-
-        <p audience="hidden">
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/CDH-41605" scope="external" format="html">CDH-41605</xref>
-        </p>
 
         <p>
           <b>Severity:</b> High
@@ -1484,9 +1427,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </concept>
 
-    <concept id="CDH-13199">
+    <concept id="flume_writeformat_text">
 
-<!-- Not part of Alex's spreadsheet. The CDH- prefix makes it an oddball. -->
+<!-- Not part of Alex's spreadsheet. From a non-public JIRA. -->
 
       <title>Configuration needed for Flume to be compatible with Impala</title>
 
@@ -1582,7 +1525,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
           <b>Workaround:</b> Use a different gzip tool to compress file to a single stream file.
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.7.0 / Impala 2.5.0.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
 
       </conbody>
 
@@ -1609,7 +1552,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
           <b>Workaround:</b> Use the Parquet format for large volumes of data where practical.
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.8.0 / Impala 2.6.0.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala260"/>.</p>
 
       </conbody>
 
@@ -1788,7 +1731,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
           <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1619" scope="external" format="html">IMPALA-1619</xref>
         </p>
 
-        <p><b>Resolution:</b> Fixed in CDH 5.9.0 / Impala 2.7.0 and CDH 5.8.3 / Impala 2.6.3.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala2?0"/> and <keyword keyref="impala263"/>.</p>
 
       </conbody>
 

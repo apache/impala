@@ -204,7 +204,6 @@ show column stats parquet_snappy;
           the Impala <codeph>COMPUTE STATS</codeph> statement, both table and column statistics are automatically
           gathered at the same time, for all columns in the table.
         </p>
-        <p conref="../shared/impala_common.xml#common/decimal_no_stats"/>
       </note>
 
       <note conref="../shared/impala_common.xml#common/compute_stats_nulls"/>

@@ -798,10 +798,6 @@ SELECT x+y, ROUND(y,1), z/98.6 FROM t1;
 SELECT CAST(1000.5 AS DECIMAL);
 </codeblock>
 
-    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
-
-    <p conref="../shared/impala_common.xml#common/decimal_no_stats"/>
-
 <!-- <p conref="../shared/impala_common.xml#common/partitioning_good"/> -->
 
     <p conref="../shared/impala_common.xml#common/hbase_ok"/>

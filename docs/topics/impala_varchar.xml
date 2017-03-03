@@ -119,7 +119,7 @@ prefer to use an integer data type with sufficient range (<codeph>INT</codeph>,
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
 
     <p>
-      This type is available on CDH 5.2 or higher.
+      This type is available in <keyword keyref="impala20_full"/> or higher.
     </p>
 
     <p conref="../shared/impala_common.xml#common/internals_min_bytes"/>

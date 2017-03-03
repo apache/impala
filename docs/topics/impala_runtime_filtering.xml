@@ -59,9 +59,9 @@ under the License.
       <!-- and <xref href="impala_joins.xml#joins"/>. -->
     </p>
 
-    <note type="important" rev="2.6.0 CDH-41184">
-      <p rev="2.6.0 CDH-41184">
-        When this feature made its debut in CDH 5.7 / Impala 2.5,
+    <note type="important" rev="2.6.0">
+      <p rev="2.6.0">
+        When this feature made its debut in <keyword keyref="impala25"/>,
         the default setting was <codeph>RUNTIME_FILTER_MODE=LOCAL</codeph>.
         Now the default is <codeph>RUNTIME_FILTER_MODE=GLOBAL</codeph> in <keyword keyref="impala26_full"/> and higher,
         which enables more wide-ranging and ambitious query optimization without requiring you to
@@ -192,7 +192,7 @@ under the License.
         where filters are eligible to be transmitted across the network.
       </p>
 
-      <note rev="2.6.0 CDH-41184 IMPALA-3333">
+      <note rev="2.6.0 IMPALA-3333">
         In <keyword keyref="impala26_full"/> and higher, the default for runtime filtering is the <codeph>GLOBAL</codeph> setting.
       </note>
 
@@ -265,7 +265,7 @@ under the License.
         <li>
           <p>
             The first query option adjusts the <q>sensitivity</q> of this feature.
-            <ph rev="2.6.0 CDH-41184 IMPALA-3333">By default, it is set to the highest level (<codeph>GLOBAL</codeph>).
+            <ph rev="2.6.0 IMPALA-3333">By default, it is set to the highest level (<codeph>GLOBAL</codeph>).
             (This default applies to <keyword keyref="impala26_full"/> and higher.
             In previous releases, the default was <codeph>LOCAL</codeph>.)</ph>
           </p>
@@ -375,7 +375,7 @@ under the License.
         compare against the entries in the hash table.
       </p>
 
-<codeblock rev="2.6.0 CDH-41184">
+<codeblock rev="2.6.0">
 COMPUTE STATS huge_t1;
 COMPUTE STATS tiny_t2;
 SELECT c1, c2, c3 FROM huge_t1 JOIN tiny_t2 WHERE huge_t1.id = tiny_t2.id;
@@ -402,7 +402,7 @@ select c1 from t1 where year > (select min(year) from t2);
         are skipped.
       </p>
 
-<codeblock rev="2.6.0 CDH-41184">
+<codeblock rev="2.6.0">
 select c1 from t1 where year in (select distinct year from t2);
 </codeblock>
 
@@ -423,7 +423,7 @@ select c1 from t1 where year in (select distinct year from t2);
         back to the coordinator node, where they would be eliminated only at the very end of the query.
       </p>
 
-<codeblock rev="2.6.0 CDH-41184">
+<codeblock rev="2.6.0">
 select c1, c2, c3 from t1
   where year in (select distinct year from t2)
     and c2 in (select other_column from t3);
@@ -439,7 +439,7 @@ select c1, c2, c3 from t1
         in optimizing this query.
       </p>
 
-<codeblock rev="2.6.0 CDH-41184">
+<codeblock rev="2.6.0">
 select c1 from huge_t1 join [broadcast] tiny_t2
   on huge_t1.id = tiny_t2.id
   where huge_t1.year in (select distinct year from tiny_t2)
@@ -457,7 +457,7 @@ select c1 from huge_t1 join [broadcast] tiny_t2
         in optimizing this query.
       </p>
 
-<codeblock rev="2.6.0 CDH-41184">
+<codeblock rev="2.6.0">
 select c1 from huge_t1 join [shuffle] huge_t2
   on huge_t1.id = huge_t2.id
   where huge_t1.year in (select distinct year from huge_t2)

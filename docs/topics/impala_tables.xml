@@ -267,7 +267,7 @@ under the License.
       <p>
         The default file format, text, is the most flexible and easy to produce when you are just getting started with
         Impala. The Parquet file format offers the highest query performance and uses compression to reduce storage
-        requirements; therefore, <ph rev="upstream">Cloudera</ph> recommends using Parquet for Impala tables with substantial amounts of data.
+        requirements; therefore, where practical, use Parquet for Impala tables with substantial amounts of data.
         <ph rev="2.3.0">Also, the complex types (<codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>)
         available in <keyword keyref="impala23_full"/> and higher are currently only supported with the Parquet file type.</ph>
         Based on your existing ETL workflow, you might use other file formats such as Avro, possibly doing a final
@@ -324,7 +324,7 @@ describe formatted old_name;
 | Table Type:        | MANAGED_TABLE         | NULL
 | Table Parameters:  | NULL                  | NULL
 |                    | DO_NOT_UPDATE_STATS   | true
-|                    | kudu.master_addresses | vd0342.halxg.cloudera.com
+|                    | kudu.master_addresses | vd0342.example.com
 |                    | kudu.table_name       | impala::user.old_name
 
 -- ALTER TABLE RENAME TO changes the Impala name but not the underlying Kudu name.
@@ -335,7 +335,7 @@ describe formatted new_name;
 | Table Type:        | MANAGED_TABLE         | NULL
 | Table Parameters:  | NULL                  | NULL
 |                    | DO_NOT_UPDATE_STATS   | true
-|                    | kudu.master_addresses | vd0342.halxg.cloudera.com
+|                    | kudu.master_addresses | vd0342.example.com
 |                    | kudu.table_name       | impala::user.old_name
 
 -- Setting TBLPROPERTIES changes the underlying Kudu name.
@@ -347,7 +347,7 @@ describe formatted new_name;
 | Table Type:        | MANAGED_TABLE         | NULL
 | Table Parameters:  | NULL                  | NULL
 |                    | DO_NOT_UPDATE_STATS   | true
-|                    | kudu.master_addresses | vd0342.halxg.cloudera.com
+|                    | kudu.master_addresses | vd0342.example.com
 |                    | kudu.table_name       | impala::user.new_name
 
 -- Put some data in the table to demonstrate how external tables can map to

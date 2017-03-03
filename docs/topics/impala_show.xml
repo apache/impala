@@ -162,7 +162,7 @@ show files in sample_table partition (month like 'J%');
 
 <!-- Extensive round of testing makes me pretty confident of these findings. -->
       <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-      <p rev="CDH-19187">
+      <p rev="">
         The user ID that the <cmdname>impalad</cmdname> daemon runs under,
         typically the <codeph>impala</codeph> user, must have read
         permission for all the table files, read and execute permission for all the directories that make up the table,
@@ -336,7 +336,7 @@ where id between 1 and 1000000;
     <conbody>
 
       <p>
-        The <codeph>SHOW ROLES</codeph> statement displays roles. This syntax is available in CDH 5.2 and later
+        The <codeph>SHOW ROLES</codeph> statement displays roles. This syntax is available in <keyword keyref="impala20_full"/> and later
         only, when you are using the Sentry authorization framework along with the Sentry service, as described in
         <xref href="impala_authorization.xml#sentry_service"/>. It does not apply when you use the Sentry framework
         with privileges defined in a policy file.
@@ -389,7 +389,7 @@ where id between 1 and 1000000;
 
       <p rev="2.0.0">
         The <codeph>SHOW CURRENT ROLE</codeph> statement displays roles assigned to the current user. This syntax
-        is available in CDH 5.2 and later only, when you are using the Sentry authorization framework along with
+        is available in <keyword keyref="impala20_full"/> and later only, when you are using the Sentry authorization framework along with
         the Sentry service, as described in <xref href="impala_authorization.xml#sentry_service"/>. It does not
         apply when you use the Sentry framework with privileges defined in a policy file.
       </p>
@@ -441,7 +441,7 @@ where id between 1 and 1000000;
 <!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
         The <codeph>SHOW ROLE GRANT</codeph> statement lists all the roles assigned to the specified group. This
         statement is only allowed for Sentry administrative users and others users that are part of the specified
-        group. This syntax is available in CDH 5.2 and later only, when you are using the Sentry authorization
+        group. This syntax is available in <keyword keyref="impala20_full"/> and later only, when you are using the Sentry authorization
         framework along with the Sentry service, as described in
         <xref href="impala_authorization.xml#sentry_service"/>. It does not apply when you use the Sentry framework
         with privileges defined in a policy file.
@@ -483,7 +483,7 @@ where id between 1 and 1000000;
 <!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
         The <codeph>SHOW GRANT ROLE</codeph> statement list all the grants for the given role name. This statement
         is only allowed for Sentry administrative users and other users that have been granted the specified role.
-        This syntax is available in CDH 5.2 and later only, when you are using the Sentry authorization framework
+        This syntax is available in <keyword keyref="impala20_full"/> and later only, when you are using the Sentry authorization framework
         along with the Sentry service, as described in <xref href="impala_authorization.xml#sentry_service"/>. It
         does not apply when you use the Sentry framework with privileges defined in a policy file.
       </p>
@@ -614,7 +614,7 @@ Returned 1 row(s) in 0.01s</codeblock>
 
       <p conref="../shared/impala_common.xml#common/show_security"/>
 
-      <p rev="CDH-19187">
+      <p rev="">
         The user ID that the <cmdname>impalad</cmdname> daemon runs under,
         typically the <codeph>impala</codeph> user, must have read and execute
         permissions for all directories that are part of the table.
@@ -1006,7 +1006,7 @@ show table stats store_sales;
 </codeblock>
 
       <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-      <p rev="CDH-19187">
+      <p rev="">
         The user ID that the <cmdname>impalad</cmdname> daemon runs under,
         typically the <codeph>impala</codeph> user, must have read and execute
         permissions for all directories that are part of the table.
@@ -1196,7 +1196,7 @@ show column stats store_sales;
 </codeblock>
 
       <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-      <p rev="CDH-19187">
+      <p rev="">
         The user ID that the <cmdname>impalad</cmdname> daemon runs under,
         typically the <codeph>impala</codeph> user, must have read and execute
         permissions for all directories that are part of the table.
@@ -1332,7 +1332,7 @@ show range partitions million_rows_range;
 </codeblock>
 
       <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-      <p rev="CDH-19187">
+      <p rev="">
         The user ID that the <cmdname>impalad</cmdname> daemon runs under,
         typically the <codeph>impala</codeph> user, must have read and execute
         permissions for all directories that are part of the table.
@@ -1439,7 +1439,7 @@ show functions in _impala_builtins like '*week*';
 
   <concept rev="someday" audience="hidden" id="show_data_sources">
 
-    <title>SHOW DATA SOURCES Statement (CDH x.y and later only)</title>
+    <title>SHOW DATA SOURCES Statement (Impala x.y and later only)</title>
 
     <conbody>
 

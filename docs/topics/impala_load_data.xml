@@ -146,13 +146,13 @@ under the License.
 
     <p>
       First, we use a trivial Python script to write different numbers of strings (one per line) into files stored
-      in the <codeph>cloudera</codeph> HDFS user account. (Substitute the path for your own HDFS user account when
+      in the <codeph>doc_demo</codeph> HDFS user account. (Substitute the path for your own HDFS user account when
       doing <cmdname>hdfs dfs</cmdname> operations like these.)
     </p>
 
-<codeblock>$ random_strings.py 1000 | hdfs dfs -put - /user/cloudera/thousand_strings.txt
-$ random_strings.py 100 | hdfs dfs -put - /user/cloudera/hundred_strings.txt
-$ random_strings.py 10 | hdfs dfs -put - /user/cloudera/ten_strings.txt</codeblock>
+<codeblock>$ random_strings.py 1000 | hdfs dfs -put - /user/doc_demo/thousand_strings.txt
+$ random_strings.py 100 | hdfs dfs -put - /user/doc_demo/hundred_strings.txt
+$ random_strings.py 10 | hdfs dfs -put - /user/doc_demo/ten_strings.txt</codeblock>
 
     <p>
       Next, we create a table and load an initial set of data into it. Remember, unless you specify a
@@ -163,7 +163,7 @@ $ random_strings.py 10 | hdfs dfs -put - /user/cloudera/ten_strings.txt</codeblo
     </p>
 
 <codeblock>[localhost:21000] &gt; create table t1 (s string);
-[localhost:21000] &gt; load data inpath '/user/cloudera/thousand_strings.txt' into table t1;
+[localhost:21000] &gt; load data inpath '/user/doc_demo/thousand_strings.txt' into table t1;
 Query finished, fetching results ...
 +----------------------------------------------------------+
 | summary                                                  |
@@ -179,8 +179,8 @@ Query finished, fetching results ...
 | 1000 |
 +------+
 Returned 1 row(s) in 0.67s
-[localhost:21000] &gt; load data inpath '/user/cloudera/thousand_strings.txt' into table t1;
-ERROR: AnalysisException: INPATH location '/user/cloudera/thousand_strings.txt' does not exist. </codeblock>
+[localhost:21000] &gt; load data inpath '/user/doc_demo/thousand_strings.txt' into table t1;
+ERROR: AnalysisException: INPATH location '/user/doc_demo/thousand_strings.txt' does not exist. </codeblock>
 
     <p>
       As indicated by the message at the end of the previous example, the data file was moved from its original
@@ -190,7 +190,7 @@ ERROR: AnalysisException: INPATH location '/user/cloudera/thousand_strings.txt' 
 
 <codeblock>$ hdfs dfs -ls /user/hive/warehouse/load_data_testing.db/t1
 Found 1 items
--rw-r--r--   1 cloudera cloudera      13926 2013-06-26 15:40 /user/hive/warehouse/load_data_testing.db/t1/thousand_strings.txt</codeblock>
+-rw-r--r--   1 doc_demo doc_demo      13926 2013-06-26 15:40 /user/hive/warehouse/load_data_testing.db/t1/thousand_strings.txt</codeblock>
 
     <p>
       The following example demonstrates the difference between the <codeph>INTO TABLE</codeph> and
@@ -201,7 +201,7 @@ Found 1 items
       the just-loaded data file.
     </p>
 
-<codeblock>[localhost:21000] &gt; load data inpath '/user/cloudera/hundred_strings.txt' into table t1;
+<codeblock>[localhost:21000] &gt; load data inpath '/user/doc_demo/hundred_strings.txt' into table t1;
 Query finished, fetching results ...
 +----------------------------------------------------------+
 | summary                                                  |
@@ -217,7 +217,7 @@ Query finished, fetching results ...
 | 1100 |
 +------+
 Returned 1 row(s) in 0.55s
-[localhost:21000] &gt; load data inpath '/user/cloudera/ten_strings.txt' overwrite into table t1;
+[localhost:21000] &gt; load data inpath '/user/doc_demo/ten_strings.txt' overwrite into table t1;
 Query finished, fetching results ...
 +----------------------------------------------------------+
 | summary                                                  |
@@ -242,7 +242,7 @@ Returned 1 row(s) in 0.62s</codeblock>
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-    <p rev="CDH-19187">
+    <p rev="">
       The user ID that the <cmdname>impalad</cmdname> daemon runs under,
       typically the <codeph>impala</codeph> user, must have read and write
       permissions for the files in the source directory, and write

@@ -51,7 +51,7 @@ under the License.
       multiple functions that compute intermediate results across sets of rows.
     </p>
 
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       In <keyword keyref="impala25_full"/> and higher, the syntax is also different for creating or dropping scalar Java-based UDFs.
       The statements for Java UDFs use a new syntax, without any argument types or return type specified. Java-based UDFs
       created using the new syntax persist across restarts of the Impala catalog server, and can be shared transparently
@@ -67,7 +67,7 @@ under the License.
   LOCATION '<varname>hdfs_path_to_dot_so</varname>'
   SYMBOL='<varname>symbol_name</varname>'</codeblock>
 
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       To create a persistent Java UDF with <codeph>CREATE FUNCTION</codeph>:
 <codeblock>CREATE FUNCTION [IF NOT EXISTS] [<varname>db_name</varname>.]<varname>function_name</varname>
   LOCATION '<varname>hdfs_path_to_jar</varname>'
@@ -96,7 +96,7 @@ DROP FUNCTION IF EXISTS bar;
   [CLOSEFN='<varname>function</varname>]
   <ph rev="2.0.0">[SERIALIZE_FN='<varname>function</varname>]</ph>
   [FINALIZE_FN='<varname>function</varname>]
-  <ph rev="2.3.0 IMPALA-1829 CDH-30572">[INTERMEDIATE <varname>type_spec</varname>]</ph></codeblock>
+  <ph rev="2.3.0 IMPALA-1829">[INTERMEDIATE <varname>type_spec</varname>]</ph></codeblock>
 
     <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
 
@@ -104,8 +104,8 @@ DROP FUNCTION IF EXISTS bar;
       <b>Varargs notation:</b>
     </p>
 
-    <note rev="CDH-39271 CDH-38572">
-      <p rev="CDH-39271 CDH-38572">
+    <note rev="">
+      <p rev="">
         Variable-length argument lists are supported for C++ UDFs, but currently not for Java UDFs.
       </p>
     </note>
@@ -139,7 +139,7 @@ DROP FUNCTION IF EXISTS bar;
       </li>
     </ul>
 
-    <p rev="CDH-39271 CDH-38572">
+    <p rev="">
       See <xref href="impala_udf.xml#udf_varargs"/> for how to code a C++ UDF to accept
       variable-length argument lists.
     </p>
@@ -244,7 +244,7 @@ DROP FUNCTION IF EXISTS bar;
         most suited to reusing existing Hive UDFs. (Impala can run Java-based Hive UDFs but not Hive UDAs.)
       </li>
 
-      <li rev="2.5.0 IMPALA-1748 CDH-38369 IMPALA-2843 CDH-39148">
+      <li rev="2.5.0 IMPALA-1748 IMPALA-2843">
         <keyword keyref="impala25_full"/> introduces UDF improvements to persistence for both C++ and Java UDFs,
         and better compatibility between Impala and Hive for Java UDFs.
         See <xref href="impala_udf.xml#udfs"/> for details.
@@ -343,19 +343,19 @@ DROP FUNCTION IF EXISTS bar;
       For additional examples of all kinds of user-defined functions, see <xref href="impala_udf.xml#udfs"/>.
     </p>
 
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       The following example shows how to take a Java jar file and make all the functions inside one of its classes
       into UDFs under a single (overloaded) function name in Impala. Each <codeph>CREATE FUNCTION</codeph> or
       <codeph>DROP FUNCTION</codeph> statement applies to all the overloaded Java functions with the same name.
       This example uses the signatureless syntax for <codeph>CREATE FUNCTION</codeph> and <codeph>DROP FUNCTION</codeph>,
       which is available in <keyword keyref="impala25_full"/> and higher.
     </p>
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       At the start, the jar file is in the local filesystem. Then it is copied into HDFS, so that it is
       available for Impala to reference through the <codeph>CREATE FUNCTION</codeph> statement and
       queries that refer to the Impala function name.
     </p>
-<codeblock rev="2.5.0 IMPALA-2843 CDH-39148">
+<codeblock rev="2.5.0 IMPALA-2843">
 $ jar -tvf udf-examples-cdh570.jar
      0 Mon Feb 22 04:06:50 PST 2016 META-INF/
    122 Mon Feb 22 04:06:48 PST 2016 META-INF/MANIFEST.MF
@@ -373,13 +373,13 @@ Found 2 items
 -rw-r--r--   3 jrussell supergroup        853 2015-10-09 14:05 /user/impala/udfs/hello_world.jar
 -rw-r--r--   3 jrussell supergroup       7366 2016-06-08 14:25 /user/impala/udfs/udf-examples-cdh570.jar
 </codeblock>
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       In <cmdname>impala-shell</cmdname>, the <codeph>CREATE FUNCTION</codeph> refers to the HDFS path of the jar file
       and the fully qualified class name inside the jar. Each of the functions inside the class becomes an
       Impala function, each one overloaded under the specified Impala function name.
     </p>
-<codeblock rev="2.5.0 IMPALA-2843 CDH-39148">
-[localhost:21000] > create function testudf location '/user/impala/udfs/udf-examples-cdh570.jar' symbol='com.cloudera.impala.TestUdf';
+<codeblock rev="2.5.0 IMPALA-2843">
+[localhost:21000] > create function testudf location '/user/impala/udfs/udf-examples-cdh570.jar' symbol='org.apache.impala.TestUdf';
 [localhost:21000] > show functions;
 +-------------+---------------------------------------+-------------+---------------+
 | return type | signature                             | binary type | is persistent |
@@ -407,12 +407,12 @@ Found 2 items
 | TINYINT     | testudf(TINYINT)                      | JAVA        | true          |
 +-------------+---------------------------------------+-------------+---------------+
 </codeblock>
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       These are all simple functions that return their single arguments, or
       sum, concatenate, and so on their multiple arguments. Impala determines which
       overloaded function to use based on the number and types of the arguments.
     </p>
-<codeblock rev="2.5.0 IMPALA-2843 CDH-39148">
+<codeblock rev="2.5.0 IMPALA-2843">
 insert into bigint_x values (1), (2), (4), (3);
 select testudf(x) from bigint_x;
 +-----------------+
@@ -455,16 +455,16 @@ select testudf(x,x) from string_x;
 +--------------------+
 </codeblock>
 
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       The previous example used the same Impala function name as the name of the class.
       This example shows how the Impala function name is independent of the underlying
       Java class or function names. A second <codeph>CREATE FUNCTION</codeph> statement
       results in a set of overloaded functions all named <codeph>my_func</codeph>,
       to go along with the overloaded functions all named <codeph>testudf</codeph>.
     </p>
-<codeblock rev="2.5.0 IMPALA-2843 CDH-39148">
+<codeblock rev="2.5.0 IMPALA-2843">
 create function my_func location '/user/impala/udfs/udf-examples-cdh570.jar'
-  symbol='com.cloudera.impala.TestUdf';
+  symbol='org.apache.impala.TestUdf';
 
 show functions;
 +-------------+---------------------------------------+-------------+---------------+
@@ -479,11 +479,11 @@ show functions;
 | BOOLEAN     | testudf(BOOLEAN, BOOLEAN)             | JAVA        | true          |
 ...
 </codeblock>
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       The corresponding <codeph>DROP FUNCTION</codeph> statement with no signature
       drops all the overloaded functions with that name.
     </p>
-<codeblock rev="2.5.0 IMPALA-2843 CDH-39148">
+<codeblock rev="2.5.0 IMPALA-2843">
 drop function my_func;
 show functions;
 +-------------+---------------------------------------+-------------+---------------+
@@ -494,7 +494,7 @@ show functions;
 | BOOLEAN     | testudf(BOOLEAN, BOOLEAN)             | JAVA        | true          |
 ...
 </codeblock>
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       The signatureless <codeph>CREATE FUNCTION</codeph> syntax for Java UDFs ensures that
       the functions shown in this example remain available after the Impala service
       (specifically, the Catalog Server) are restarted.

@@ -487,8 +487,6 @@ show table stats item_partitioned;
 
     <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
 
-    <p conref="../shared/impala_common.xml#common/decimal_no_stats"/>
-
     <note conref="../shared/impala_common.xml#common/compute_stats_nulls"/>
 
     <p conref="../shared/impala_common.xml#common/internals_blurb"/>
@@ -507,7 +505,7 @@ show table stats item_partitioned;
     </p>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-    <p rev="CDH-19187">
+    <p rev="">
       The user ID that the <cmdname>impalad</cmdname> daemon runs under,
       typically the <codeph>impala</codeph> user, must have read
       permission for all affected files in the source directory:

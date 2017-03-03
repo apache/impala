@@ -141,7 +141,7 @@ under the License.
     <conbody>
       <ul>
         <li>
-          <p rev="IMPALA-1731 IMPALA-3868 CDH-43734">
+          <p rev="IMPALA-1731 IMPALA-3868">
             Bug fixes related to parsing of floating-point values (IMPALA-1731 and IMPALA-3868) can change
             the results of casting strings that represent invalid floating-point values.
             For example, formerly a string value beginning or ending with <codeph>inf</codeph>,
@@ -165,12 +165,12 @@ under the License.
     <conbody>
       <ul>
         <li>
-          <p rev="CDH-41184">
+          <p rev="">
             The default for the <codeph>RUNTIME_FILTER_MODE</codeph>
             query option is changed to <codeph>GLOBAL</codeph> (the highest setting).
           </p>
         </li>
-        <li rev="CDH-41184 IMPALA-3007">
+        <li rev="IMPALA-3007">
           <p>
             The <codeph>RUNTIME_BLOOM_FILTER_SIZE</codeph> setting is now only used
             as a fallback if statistics are not available; otherwise, Impala
@@ -238,7 +238,7 @@ under the License.
         <li>
           <p conref="../shared/impala_common.xml#common/IMPALA-3662"/>
         </li>
-        <li rev="IMPALA-3452 CDH-39913">
+        <li rev="IMPALA-3452">
           <p>
             The <codeph>S3_SKIP_INSERT_STAGING</codeph> query option, which is enabled by
             default, increases the speed of <codeph>INSERT</codeph> operations for S3 tables.
@@ -255,7 +255,7 @@ under the License.
       </p>
       <ul>
         <li>
-          <p rev="IMPALA-2660 CDH-40241">
+          <p rev="IMPALA-2660">
             Impala now recognizes the <codeph>auth_to_local</codeph> setting,
             specified through the HDFS configuration setting
             <codeph>hadoop.security.auth_to_local</codeph>.
@@ -275,7 +275,7 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="IMPALA-2835 CDH-33330">
+          <p rev="IMPALA-2835">
             A new query option,
             <codeph>PARQUET_FALLBACK_SCHEMA_RESOLUTION</codeph>,
             lets Impala locate columns within Parquet files based on
@@ -318,7 +318,7 @@ under the License.
             reason about.
           </p>
         </li>
-        <li rev="IMPALA-2204 CDH-33139">
+        <li rev="IMPALA-2204">
           <p>
             Previously, the <codeph>_</codeph> and <codeph>%</codeph> wildcard
             characters for the <codeph>LIKE</codeph> operator would not match
@@ -330,7 +330,7 @@ under the License.
             queries on identical data.
           </p>
         </li>
-        <li rev="IMPALA-1748 CDH-38369">
+        <li rev="IMPALA-1748">
           <p>
             Formerly, all Impala UDFs and UDAs required running the
             <codeph>CREATE FUNCTION</codeph> statements to
@@ -384,8 +384,8 @@ under the License.
 
     <conbody>
       <p>
-        Other than support for DSSD storage, the Impala feature set for CDH 5.6 is the same as for CDH 5.5.
-        Therefore, there are no incompatible changes for Impala introduced in CDH 5.6.
+        Other than support for DSSD storage, the Impala feature set for <keyword keyref="impala24"/> is the same as for <keyword keyref="impala23"/>.
+        Therefore, there are no incompatible changes for Impala introduced in <keyword keyref="impala24"/>.
       </p>
     </conbody>
 
@@ -419,7 +419,7 @@ under the License.
             Previously, Impala would attempt to read the file despite the possibility that the file was corrupted.
           </p>
         </li>
-        <li rev="IMPALA-2233 CDH-33145">
+        <li rev="IMPALA-2233">
           <p>
             Previously, calls to overloaded built-in functions could treat parameters as <codeph>DOUBLE</codeph>
             or <codeph>FLOAT</codeph> when no overload had a signature that matched the exact argument types.
@@ -445,7 +445,7 @@ under the License.
             but displays a warning message.
           </p>
         </li>
-        <li rev="CDH-28071">
+        <li rev="">
           <p>
             Formerly, Impala could include snippets of table data in log files by default, for example
             when reporting conversion errors for data values. Now any such log messages are only produced
@@ -465,8 +465,6 @@ under the License.
     <title>Incompatible Changes Introduced in Impala 2.2.x</title>
 
     <conbody>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_220"/>
 
       <section id="files_220">
       <title>
@@ -507,10 +505,10 @@ under the License.
       <title>
         Changes to Prerequisites
       </title>
-        <p rev="CDH-24874">
+        <p rev="">
           Currently, Impala 2.1.x does not function on CPUs without the SSE4.1 instruction set. This minimum CPU
           requirement is higher than in previous versions, which relied on the older SSSE3 instruction set. Check
-          the CPU level of the hosts in your cluster before upgrading to Impala 2.1.x or CDH 5.3.x.
+          the CPU level of the hosts in your cluster before upgrading to <keyword keyref="impala21_full"/>.
         </p>
       </section>
 
@@ -552,8 +550,6 @@ under the License.
         No incompatible changes.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_205"/>
-
     </conbody>
   </concept>
 
@@ -567,8 +563,6 @@ under the License.
         No incompatible changes.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_204"/>
-
     </conbody>
   </concept>
 
@@ -577,8 +571,6 @@ under the License.
     <title>Incompatible Changes Introduced in Impala 2.0.3</title>
 
     <conbody>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_203"/>
 
     </conbody>
   </concept>
@@ -592,8 +584,6 @@ under the License.
       <p>
         No incompatible changes.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_202"/>
 
     </conbody>
   </concept>
@@ -639,10 +629,10 @@ under the License.
       <title>
         Changes to Prerequisites
       </title>
-        <p rev="CDH-24874">
+        <p rev="">
           Currently, Impala 2.0.x does not function on CPUs without the SSE4.1 instruction set. This minimum CPU
           requirement is higher than in previous versions, which relied on the older SSSE3 instruction set. Check
-          the CPU level of the hosts in your cluster before upgrading to Impala 2.0.x or CDH 5.2.x.
+          the CPU level of the hosts in your cluster before upgrading to <keyword keyref="impala20_full"/>.
         </p>
       </section>
 
@@ -829,8 +819,6 @@ under the License.
         No incompatible changes.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_144"/>
-
     </conbody>
   </concept>
 
@@ -845,8 +833,6 @@ under the License.
         Impala.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_143"/>
-
     </conbody>
   </concept>
 
@@ -859,8 +845,6 @@ under the License.
       <p>
         None. Impala 1.4.2 is purely a bug-fix release. It does not include any incompatible changes.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_142"/>
 
     </conbody>
   </concept>
@@ -996,8 +980,6 @@ under the License.
         Impala.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_133"/>
-
     </conbody>
   </concept>
 
@@ -1010,8 +992,6 @@ under the License.
       <p>
         With the fix for IMPALA-1019, you can use HDFS caching for files that are accessed by Impala.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_132"/>
 
     </conbody>
   </concept>
@@ -1071,7 +1051,7 @@ under the License.
 
         <li>
           <p>
-            The query option named <codeph>YARN_POOL</codeph> during the CDH 5 beta period is now named
+            The query option formerly named <codeph>YARN_POOL</codeph> is now named
             <codeph>REQUEST_POOL</codeph> to reflect its broader use with the Impala admission control feature.
             <ph audience="PDF">See <xref href="impala_request_pool.xml#request_pool"/> for information about the
             option, and <xref href="impala_admission.xml#admission_control"/> for details about its use with the
@@ -1279,11 +1259,6 @@ select * from `cross`;</codeblock>
       </p>
 
       <p>
-        Because Impala 1.2.0 is bundled with the CDH 5 beta download and depends on specific levels of Apache
-        Hadoop components supplied with CDH 5, you can only install it in combination with the CDH 5 beta.
-      </p>
-
-      <p>
         The new <cmdname>catalogd</cmdname> service might require changes to any user-written scripts that stop,
         start, or restart Impala services, install or upgrade Impala packages, or issue <codeph>REFRESH</codeph> or
         <codeph>INVALIDATE METADATA</codeph> statements:
@@ -1294,22 +1269,8 @@ select * from `cross`;</codeblock>
       </ul>
       
       <p>
-        The new resource management feature interacts with both YARN and Llama services. <ph audience="PDF">See
-          <xref href="impala_resource_management.xml#resource_management"/> for usage information for Impala resource
-          management.</ph>
-      </p>
-
-      <p audience="hidden">
-        The new resource management feature interacts with both YARN and Llama services, which are available in CDH
-        5. These services are set up for you automatically in a Cloudera Manager (CM) environment. For information
-        about setting up the YARN and Llama services, see the instructions for
-<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_yarn_cluster_deploy.html -->
-        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_yarn_cluster_deploy.html" scope="external" format="html">YARN</xref>
-        and
-<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_llama_installation.html -->
-<!-- Then this, which was removed: http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_llama_installation.html -->
-        <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/admin_llama.html" scope="external" format="html">Llama</xref>
-        in the <cite>CDH 5 Documentation</cite>. <ph audience="PDF">See
+        The new resource management feature interacts with both YARN and Llama services.
+        <ph audience="PDF">See
         <xref href="impala_resource_management.xml#resource_management"/> for usage information for Impala resource
         management.</ph>
       </p>
@@ -1360,7 +1321,7 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
       </p>
 
       <p>
-        As usual, make sure to upgrade the <codeph>impala-lzo-cdh4</codeph> package to the latest level at the same
+        As usual, make sure to upgrade the Impala LZO package to the latest level at the same
         time as you upgrade the Impala server.
       </p>
     </conbody>

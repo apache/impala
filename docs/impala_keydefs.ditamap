@@ -10291,20 +10291,50 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
 
 
 <!-- Short form of mapping from Impala release to vendor-specific releases, for use in headings. -->
+  <keydef keys="impala29"><topicmeta><keywords><keyword>Impala 2.9</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala28"><topicmeta><keywords><keyword>Impala 2.8</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala27"><topicmeta><keywords><keyword>Impala 2.7</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala26"><topicmeta><keywords><keyword>Impala 2.6</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala25"><topicmeta><keywords><keyword>Impala 2.5</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala24"><topicmeta><keywords><keyword>Impala 2.4</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala23"><topicmeta><keywords><keyword>Impala 2.3</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala223"><topicmeta><keywords><keyword>Impala 2.2.3</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala22"><topicmeta><keywords><keyword>Impala 2.2</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala21"><topicmeta><keywords><keyword>Impala 2.1</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala20"><topicmeta><keywords><keyword>Impala 2.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala14"><topicmeta><keywords><keyword>Impala 1.4</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala13"><topicmeta><keywords><keyword>Impala 1.3</keyword></keywords></topicmeta></keydef>
 
+<!-- 3-part forms of version numbers, for use in release notes. -->
+  <keydef keys="impala290"><topicmeta><keywords><keyword>Impala 2.9.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala280"><topicmeta><keywords><keyword>Impala 2.8.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala270"><topicmeta><keywords><keyword>Impala 2.7.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala263"><topicmeta><keywords><keyword>Impala 2.6.3</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala262"><topicmeta><keywords><keyword>Impala 2.6.2</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala260"><topicmeta><keywords><keyword>Impala 2.6.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala254"><topicmeta><keywords><keyword>Impala 2.5.4</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala253"><topicmeta><keywords><keyword>Impala 2.5.3</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala252"><topicmeta><keywords><keyword>Impala 2.5.2</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala251"><topicmeta><keywords><keyword>Impala 2.5.1</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala250"><topicmeta><keywords><keyword>Impala 2.5.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala241"><topicmeta><keywords><keyword>Impala 2.4.1</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala240"><topicmeta><keywords><keyword>Impala 2.4.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala234"><topicmeta><keywords><keyword>Impala 2.3.4</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala232"><topicmeta><keywords><keyword>Impala 2.3.2</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala231"><topicmeta><keywords><keyword>Impala 2.3.1</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala230"><topicmeta><keywords><keyword>Impala 2.3.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala223"><topicmeta><keywords><keyword>Impala 2.2.3</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala2210"><topicmeta><keywords><keyword>Impala 2.2.10</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala229"><topicmeta><keywords><keyword>Impala 2.2.9</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala225"><topicmeta><keywords><keyword>Impala 2.2.5</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala220"><topicmeta><keywords><keyword>Impala 2.2.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala210"><topicmeta><keywords><keyword>Impala 2.1.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala200"><topicmeta><keywords><keyword>Impala 2.0.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala140"><topicmeta><keywords><keyword>Impala 1.4.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala132"><topicmeta><keywords><keyword>Impala 1.3.2</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala130"><topicmeta><keywords><keyword>Impala 1.3.0</keyword></keywords></topicmeta></keydef>
+
 <!-- Long form of mapping from Impala release to vendor-specific releases, for use in running text. -->
+  <keydef keys="impala29_full"><topicmeta><keywords><keyword>Impala 2.9</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala28_full"><topicmeta><keywords><keyword>Impala 2.8</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala27_full"><topicmeta><keywords><keyword>Impala 2.7</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala26_full"><topicmeta><keywords><keyword>Impala 2.6</keyword></keywords></topicmeta></keydef>

@@ -50,7 +50,7 @@ under the License.
 
   <concept rev="2.8.0" id="fixed_issues_280">
 
-    <title>Issues Fixed in <keyword keyref="impala28_full"/></title>
+    <title>Issues Fixed in <keyword keyref="impala280"/></title>
 
     <conbody>
 
@@ -66,7 +66,7 @@ under the License.
 
   <concept rev="2.7.0" id="fixed_issues_270">
 
-    <title>Issues Fixed in Impala for CDH 5.9.0</title>
+    <title>Issues Fixed in <keyword keyref="impala270"/></title>
 
     <conbody>
 
@@ -79,64 +79,35 @@ under the License.
         <xref href="https://issues.cloudera.org/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.7.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.7.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">this report in the Impala JIRA tracker</xref>.
       </p>
 
-      <p> For the full list of fixed issues for all CDH components in CDH 5.9.0, see <xref
-          audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_59.html"
-          format="html" scope="external">the CDH 5.9.x release notes</xref><xref
-          audience="integrated" href="cdh_rn_fixed_in_59.xml"
-         />. </p>
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_59.xml#ui_fixed_in_59/impala_start"
-          conrefend="cdh_rn_fixed_in_59.xml#ui_fixed_in_59/impala_end" />
-      </ul>
-
     </conbody>
   </concept>
 
 <!-- All 2.6.x subsections go under here -->
 
   <concept rev="2.6.3" id="fixed_issues_263">
-    <title>Issues Fixed in Impala for CDH 5.8.3</title>
+    <title>Issues Fixed in <keyword keyref="impala263"/></title>
     <conbody>
-      <p> For the full list of fixed issues for all CDH components, see <xref
-          audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_58.html"
-          format="html" scope="external">the CDH 5.8.x release notes</xref><xref
-          audience="integrated" href="cdh_rn_fixed_in_58.xml#ui_fixed_in_583"
-         />. </p>
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_58.xml#ui_fixed_in_583/impala_start"
-          conrefend="cdh_rn_fixed_in_58.xml#ui_fixed_in_583/impala_end" />
-      </ul>
+      <p></p>
     </conbody>
   </concept>
 
   <concept rev="2.6.2" id="fixed_issues_262">
-    <title>Issues Fixed in Impala for CDH 5.8.2</title>
+    <title>Issues Fixed in <keyword keyref="impala262"/></title>
     <conbody>
-      <p> For the full list of fixed issues for all CDH components, see <xref
-          audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_58.html"
-          format="html" scope="external">the CDH 5.8.x release notes</xref><xref
-          audience="integrated" href="cdh_rn_fixed_in_58.xml#upstream582"
-         />. </p>
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_58.xml#upstream582/impala_start"
-          conrefend="cdh_rn_fixed_in_58.xml#upstream582/impala_end" />
-      </ul>
+      <p></p>
     </conbody>
   </concept>
 
   <concept rev="2.6.0" id="fixed_issues_260">
 
-    <title>Issues Fixed in Impala for CDH 5.8.0</title>
+    <title>Issues Fixed in <keyword keyref="impala260"/></title>
 
     <conbody>
 
       <p>
         The following list contains the most critical fixed issues
         (<codeph>priority='Blocker'</codeph>) from the JIRA system.
-        For the full list of fixed issues in CDH 5.8.0 / Impala 2.6.0, see
+        For the full list of fixed issues in <keyword keyref="impala260"/>, see
         <xref href="https://issues.cloudera.org/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.6.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.6.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">this report in the Impala JIRA tracker</xref>.
       </p>
 
@@ -277,92 +248,38 @@ under the License.
 <!-- All 2.5.x subsections go under here -->
 
   <concept rev="2.5.4" id="fixed_issues_254">
-    <title>Issues Fixed in Impala for CDH 5.7.4</title>
+    <title>Issues Fixed in <keyword keyref="impala254"/></title>
     <conbody>
-      <p> For the full list of fixed issues for all CDH components, see <xref
-          audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_57.html"
-          format="html" scope="external">the CDH 5.7.x release notes</xref><xref
-          audience="integrated" href="cdh_rn_fixed_in_57.xml#ui_fixed_in_574"
-         />. </p>
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_57.xml#ui_fixed_in_574/impala_start"
-          conrefend="cdh_rn_fixed_in_57.xml#ui_fixed_in_574/impala_end" />
-      </ul>
+      <p></p>
     </conbody>
   </concept>
-
-<!--
-  <concept rev="2.5.3" id="fixed_issues_253" audience="pre-release">
-
-    <title>Issues Fixed in Impala for CDH 5.7.3</title>
-
-    <conbody>
-
-      <p>
-        For the full list of fixed issues for all CDH components, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_57.html#ui_fixed_in_573"
-          format="html" scope="external">the CDH 5.7.x release notes</xref><xref
-            audience="integrated" href="cdh_rn_fixed_in_57.xml#ui_fixed_in_573"/>.
-      </p>
-
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_57.xml#ui_fixed_in_573/impala_start" conrefend="cdh_rn_fixed_in_57.xml#ui_fixed_in_573/impala_end"/>
-      </ul>
-
-    </conbody>
-
-  </concept>
--->
 
   <concept rev="2.5.2" id="fixed_issues_252">
-    <title>Issues Fixed in Impala for CDH 5.7.2</title>
+    <title>Issues Fixed in <keyword keyref="impala252"/></title>
     <conbody>
-      <p> For the full list of fixed issues for all CDH components, see <xref
-          audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_57.html#ui_fixed_in_572"
-          format="html" scope="external">the CDH 5.7.x release notes</xref><xref
-          audience="integrated" href="cdh_rn_fixed_in_57.xml#ui_fixed_in_572"
-         />. </p>
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_57.xml#ui_fixed_in_572/impala_start"
-          conrefend="cdh_rn_fixed_in_57.xml#ui_fixed_in_572/impala_end" />
-      </ul>
+      <p></p>
     </conbody>
   </concept>
 
   <concept rev="2.5.1" id="fixed_issues_251">
 
-    <title>Issues Fixed in Impala for CDH 5.7.1</title>
+    <title>Issues Fixed in <keyword keyref="impala251"/></title>
 
     <conbody>
-
-      <p>
-        For the full list of fixed issues for all CDH components, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_57.html#ui_fixed_in_571"
-          format="html" scope="external">the CDH 5.7.x release notes</xref><xref
-            audience="integrated" href="cdh_rn_fixed_in_57.xml#ui_fixed_in_571"/>.
-      </p>
-
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_57.xml#ui_fixed_in_571/impala_start" conrefend="cdh_rn_fixed_in_57.xml#ui_fixed_in_571/impala_end"/>
-      </ul>
-
+      <p></p>
     </conbody>
 
   </concept>
 
   <concept rev="2.5.0" id="fixed_issues_250">
 
-    <title>Issues Fixed in Impala for CDH 5.7.0</title>
+    <title>Issues Fixed in <keyword keyref="impala250"/></title>
 
     <conbody>
 
       <p>
         The following list contains the most critical issues (<codeph>priority='Blocker'</codeph>) from the JIRA system.
-        For the full list of fixed issues in CDH 5.7.0 / Impala 2.5.0, see
+        For the full list of fixed issues in <keyword keyref="impala25_full"/>, see
         <xref href="https://issues.cloudera.org/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.5.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.5.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">this report in the Impala JIRA tracker</xref>.
       </p>
 
@@ -635,46 +552,24 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
 
   <concept rev="2.4.1" id="fixed_issues_241">
 
-    <title>Issues Fixed in Impala for CDH 5.6.1</title>
+    <title>Issues Fixed in <keyword keyref="impala241"/></title>
 
     <conbody>
-
       <p>
-        For the full list of fixed issues for all CDH components, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_56.html#ui_fixed_in_561"
-          format="html" scope="external">the CDH 5.6.x release notes</xref><xref
-            audience="integrated" href="cdh_rn_fixed_in_56.xml#ui_fixed_in_561"/>.
       </p>
-
-      <!-- Maybe time to start dropping the 'CDH 5 only' notes... wasn't included for 5.6.0, so why start for 5.6.1...
-           <note conref="../shared/impala_common.xml#common/only_cdh5_24x"/> -->
-
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_56.xml#ui_fixed_in_561/impala_start" conrefend="cdh_rn_fixed_in_56.xml#ui_fixed_in_561/impala_end"/>
-      </ul>
-
     </conbody>
 
   </concept>
 
   <concept rev="2.4.0" id="fixed_issues_240">
 
-    <title>Issues Fixed in Impala for CDH 5.6.0</title>
+    <title>Issues Fixed in <keyword keyref="impala240"/></title>
 
     <conbody>
 
-      <p> The set of fixes for Impala in CDH 5.6.0 is the same as in CDH 5.5.2.
+      <p> The set of fixes for Impala in <keyword keyref="impala240"/> is the same as in <keyword keyref="impala232"/>.
         See <xref href="impala_fixed_issues.xml#fixed_issues_232"
           audience="integrated"/> for details. </p>
-
-<!--
-      <p>
-        This section lists the most serious or frequently encountered customer issues fixed in CDH 5.6.0 / Impala 2.4.0.
-        For the full list of fixed Impala issues, see
-        <xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_560.html" format="html" scope="external">the CDH 5.6.x release notes</xref><xref audience="integrated" href="cdh_rn_fixed_in_560.xml"/>.
-      </p>
--->
 
     </conbody>
 
@@ -684,72 +579,27 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
 
   <concept rev="2.3.4" id="fixed_issues_234">
 
-    <title>Issues Fixed in Impala for CDH 5.5.4</title>
+    <title>Issues Fixed in <keyword keyref="impala234"/></title>
 
     <conbody>
-
-      <p>
-        For the full list of fixed issues for all CDH components, see
-        <xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_55.html#fixed_issues_554" format="html" scope="external">the CDH 5.5.x release notes</xref><xref audience="integrated" href="cdh_rn_fixed_in_55.xml#fixed_issues_554"/>.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_23x"/>
-
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_55.xml#ui_fixed_in_554/impala_start" conrefend="cdh_rn_fixed_in_55.xml#ui_fixed_in_554/impala_end"/>
-      </ul>
-
+      <p></p>
     </conbody>
 
   </concept>
 
   <concept rev="2.3.2" id="fixed_issues_232">
 
-    <title>Issues Fixed in Impala for CDH 5.5.2</title>
+    <title>Issues Fixed in <keyword keyref="impala232"/></title>
 
     <conbody>
 
       <p>
         This section lists the most serious or frequently encountered customer
-        issues fixed in CDH 5.5.2 / Impala 2.3.2. For the full list of fixed Impala issues,
+        issues fixed in <keyword keyref="impala232"/>. For the full list of fixed Impala issues,
         see <xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_552.html" format="html" scope="external">the CDH 5.5.x release notes</xref><xref href="cdh_rn_fixed_in_55.xml#fixed_issues_552" audience="integrated"/>.
       </p>
 
     </conbody>
-
-<!--
-Fixed issues in 5.5.2 from Juan Yu spreadsheet (https://docs.google.com/spreadsheets/d/1Ia06xOLKQInKfsJzQfQ6Sf1fO3nYLOpZ-0OWfFNgNSc/edit#gid=2094272728):
-
-IMPALA-2747: Thrift-client cleans openSSL state before using it in the case of the catalog
-IMPALA-2829: SEGV in AnalyticEvalNode touching NULL input_stream_
-IMPALA-2722: Free local allocations per row batch in non-partitioned AGG and HJ
-IMPALA-2612: Free local allocations once for every row batch when building hash tables
-IMPALA-2643: Prevent migrating incorrectly inferred identity predicates into inline views
-IMPALA-2695: Fix GRANTs on URIs with uppercase letters
-IMPALA-2664: Avoid sending large partition stats objects over thrift
-IMPALA-2648: Ditto
-IMPALA-2226: Throw AnalysisError if table properties are too large (for the Hive metastore)
-IMPALA-2273: Make MAX_PAGE_HEADER_SIZE configurable
-IMPALA-2473: reduce scanner memory usage
-IMPALA-2113: Handle error when distinct and aggregates are used with a having clause
-IMPALA-2225: Handle error when star based select item and aggregate are incorrectly used
-IMPALA-2731: Refactor MemPool usage in HBase scan node
-IMPALA-1459: Fix migration/assignment of On-clause predicates inside inline views
-IMPALA-2558: DCHECK in parquet scanner after block read error
-IMPALA-2535: PAGG hits mem_limit when switching to I/O buffers
-IMPALA-2559: Fix check failed: sorter_runs_.back()->is_pinned_
-IMPALA-2614: Don't ignore Status returned by DataStreamRecvr::CreateMerger()
-IMPALA-2591: DataStreamSender::Send() does not return an error status if SendBatch() failed
-IMPALA-2598: Re-enable SSL and Kerberos on server-server
-
-These are changes to test cases and so ignored for release note purposes:
-
-IMPALA-2103: Fix flaky test_impersonation test
-IMPALA-2776: Remove escapechartesttable and associated tests.
-IMPALA-2812: Remove additional test referencing escapecharstesttable.
-IMPALA-2630: skip TestParquet.test_continue_on_error when using old aggs/joins
-IMPALA-2624: Increase fs.trash.interval to 24 hours for test suite
--->
 
     <concept id="IMPALA-2829">
       <title>SEGV in AnalyticEvalNode touching NULL input_stream_</title>
@@ -1017,11 +867,11 @@ IMPALA-2624: Increase fs.trash.interval to 24 hours for test suite
 
   <concept rev="2.3.1" id="fixed_issues_231">
 
-    <title>Issues Fixed in Impala for CDH 5.5.1</title>
+    <title>Issues Fixed in <keyword keyref="impala231"/></title>
 
     <conbody>
 
-      <p conref="../shared/impala_common.xml#common/cdh551_noop"/>
+      <p conref="../shared/impala_common.xml#common/impala231_noop"/>
 
     </conbody>
 
@@ -1029,13 +879,13 @@ IMPALA-2624: Increase fs.trash.interval to 24 hours for test suite
 
   <concept rev="2.3.0" id="fixed_issues_230">
 
-    <title>Issues Fixed in Impala for CDH 5.5.0</title>
+    <title>Issues Fixed in <keyword keyref="impala230"/></title>
 
     <conbody>
       <p> This section lists the most serious or frequently encountered customer
-        issues fixed in CDH 5.5.0 / Impala 2.3.0. Any issues already fixed in
-        CDH 5.4 maintenance releases (up through CDH 5.4.8) are also included.
-        Those issues are listed under the respective CDH 5.4 sections and are
+        issues fixed in <keyword keyref="impala23_full"/>. Any issues already fixed in
+        <keyword keyref="impala22"/> maintenance releases (up through <keyword keyref="impala228"/>) are also included.
+        Those issues are listed under the respective <keyword keyref="impala22"/> sections and are
         not repeated here. For the full list of fixed Impala issues, see <xref
           audience="standalone"
           href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_550.html"
@@ -1282,45 +1132,23 @@ IMPALA-1917
 
   <concept rev="2.2.10" id="fixed_issues_2210">
 
-    <title>Issues Fixed in Impala for CDH 5.4.10</title>
+    <title>Issues Fixed in <keyword keyref="impala2210"/></title>
 
     <conbody>
-
-<!--
-      <p>
-        This section lists the most frequently encountered customer issues fixed in Impala for CDH 5.4.10.
-      </p>
--->
-
-      <p>
-        For the full list of fixed issues for all CDH components, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_54.html#fixed_issues_5410"
-          format="html" scope="external">the CDH 5.4.x release notes</xref><xref
-            audience="integrated" href="cdh_rn_fixed_in_54.xml#fixed_issues_5410"/>.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x"/>
-
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_54.xml#ui_fixed_in_5410/impala_start" conrefend="cdh_rn_fixed_in_54.xml#ui_fixed_in_5410/impala_end"/>
-      </ul>
-
+      <p></p>
     </conbody>
 
   </concept>
 
   <concept rev="2.2.9" id="fixed_issues_229">
 
-    <title>Issues Fixed in Impala for CDH 5.4.9</title>
+    <title>Issues Fixed in <keyword keyref="impala229"/></title>
 
     <conbody>
 
       <p>
-        This section lists the most frequently encountered customer issues fixed in Impala for CDH 5.4.9.
+        This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala229"/>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x"/>
 
       <p>
         For the full list of fixed issues, see
@@ -1528,15 +1356,13 @@ d9d2a10 IMPALA-0000: Log backtrace on all MEM_LIMIT_EXCEEDED errors
 
   <concept rev="2.2.8" id="fixed_issues_228">
 
-    <title>Issues Fixed in Impala for CDH 5.4.8</title>
+    <title>Issues Fixed in <keyword keyref="impala228"/></title>
 
     <conbody>
 
       <p>
-        This section lists the most frequently encountered customer issues fixed in Impala for CDH 5.4.8.
+        This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala228"/>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x"/>
 
       <p>
         For the full list of fixed issues, see
@@ -1650,15 +1476,13 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
 
   <concept rev="2.2.7" id="fixed_issues_227">
 
-    <title>Issues Fixed in Impala for CDH 5.4.7</title>
+    <title>Issues Fixed in <keyword keyref="impala227"/></title>
 
     <conbody>
 
       <p>
-        This section lists the most frequently encountered customer issues fixed in Impala for CDH 5.4.7.
+        This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala227"/>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x"/>
 
       <p>
         For the full list of fixed issues, see
@@ -1845,15 +1669,13 @@ ce9fa25 IMPALA-2201: Unconditionally update the partition stats and row count.
 
   <concept rev="2.2.5" id="fixed_issues_225">
 
-    <title>Issues Fixed in Impala for CDH 5.4.5</title>
+    <title>Issues Fixed in Impala <keyword keyref="impala225"/></title>
 
     <conbody>
 
       <p>
-        This section lists the most frequently encountered customer issues fixed in Impala for CDH 5.4.5.
+        This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala225"/>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x"/>
 
       <p>
         For the full list of fixed issues, see
@@ -1881,13 +1703,12 @@ c2b8852 IMPALA-2018: Where clause does not propagate to joins inside nested view
 
     <concept id="IMPALA-2048">
       <title>Impala DML/DDL operations corrupt table metadata leading to Hive query failures</title>
-      <!-- Real JIRA title: Class not found: com.cloudera.impala.hive.serde.ParquetInputFormat error -->
       <conbody>
       <p>
         When the Impala <codeph>COMPUTE STATS</codeph> statement was run on a partitioned Parquet table that was created in Hive, the table subsequently became inaccessible in Hive.
         The table was still accessible to Impala. Regaining access in Hive required a workaround of creating a new table. The error displayed in Hive was:
       </p>
-<codeblock>Error: Error while compiling statement: FAILED: SemanticException Class not found: com.cloudera.impala.hive.serde.ParquetInputFormat (state=42000,code=40000)</codeblock>
+<codeblock>Error: Error while compiling statement: FAILED: SemanticException Class not found: org.apache.impala.hive.serde.ParquetInputFormat (state=42000,code=40000)</codeblock>
       <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2048" scope="external" format="html">IMPALA-2048</xref></p>
       </conbody>
     </concept>
@@ -1976,15 +1797,13 @@ c2b8852 IMPALA-2018: Where clause does not propagate to joins inside nested view
 
   <concept rev="2.2.3" id="fixed_issues_223">
 
-    <title>Issues Fixed in Impala for CDH 5.4.3</title>
+    <title>Issues Fixed in <keyword keyref="impala223"/></title>
 
     <conbody>
 
       <p>
-        This section lists the most frequently encountered customer issues fixed in Impala for CDH 5.4.3.
+        This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala223"/>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x"/>
 
       <p>
         For the full list of fixed issues, see
@@ -2015,11 +1834,10 @@ ce601ec : Enable using isilon as the underlying filesystem.
       <title>Enable using Isilon as the underlying filesystem.</title>
       <conbody>
       <p>
-        The certification of CDH and Impala with the Isilon filesystem involves a number of
+        Enabling Impala to work with the Isilon filesystem involves a number of
         fixes to performance and flexibility for dealing with I/O using remote reads.
         See <xref href="impala_isilon.xml#impala_isilon"/> for details on using Impala and Isilon together.
       </p>
-      <p audience="hidden"><b>Bug:</b> <xref href="https://jira.cloudera.com/browse/CDH-24040" scope="external" format="html">CDH-24040</xref></p>
       <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1968" scope="external" format="html">IMPALA-1968</xref>,
       <xref href="https://issues.cloudera.org/browse/IMPALA-1730" scope="external" format="html">IMPALA-1730</xref></p>
       </conbody>
@@ -2084,7 +1902,7 @@ ce601ec : Enable using isilon as the underlying filesystem.
     </concept>
 
     <concept id="IMPALA-1952">
-    <!-- Fixed in first in earlier release and 'frontported' to 5.4.3. -->
+    <!-- Fixed in first in earlier release and 'frontported' to this one. -->
     <!-- Identical issue farther down in this page, just with a slightly mangled ID. -->
       <title>Expand parsing of decimals to include scientific notation</title>
       <conbody>
@@ -2098,96 +1916,17 @@ ce601ec : Enable using isilon as the underlying filesystem.
       </conbody>
     </concept>
 
-<!-- Not significant.
-    <concept id="IMPALA-2043">
-      <title>skip metadata/testddl.py#test_create_alter_bulk_parition on S3</title>
-      <conbody>
-      <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
-      <p><b>Severity:</b> High</p>
-      </conbody>
-    </concept>
--->
-
-<!-- Not significant.
-    <concept id="CDH-27688">
-      <title>Isilon: fix custom_cluster/test_insert_inherit_permission.py</title>
-      <conbody>
-      <p></p>
-      <p audience="hidden"><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
-      <p><b>Severity:</b> High</p>
-      </conbody>
-    </concept>
--->
-
-<!-- Not significant.
-    <concept id="CDH-26785">
-      <title>Isilon: add remote HDFS disk queue</title>
-      <conbody>
-      <p></p>
-      <p audience="hidden"><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
-      <p><b>Severity:</b> High</p>
-      </conbody>
-    </concept>
--->
-
-<!-- Not significant.
-    <concept id="IMPALA-2002">
-      <title>Provide way to cache ext data source classes</title>
-      <conbody>
-      <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
-      <p><b>Severity:</b> High</p>
-      </conbody>
-    </concept>
--->
-
-<!-- Not significant.
-    <concept id="isilon_warn_multiple_blocks">
-      <title>Isilon: don't warn for multiple remote parquet blocks</title>
-      <conbody>
-      <p></p>
-      <p audience="hidden"><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
-      <p><b>Severity:</b> High</p>
-      </conbody>
-    </concept>
--->
-
-<!-- Not significant.
-    <concept id="isilon_tests">
-      <title>Enable isilon end to end tests for Impala.</title>
-      <conbody>
-      <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
-      <p><b>Severity:</b> High</p>
-      </conbody>
-    </concept>
--->
-
-<!-- Not significant.
-    <concept id="skip_hbase_pytests">
-      <title>Add flag to skip HBase pytests</title>
-      <conbody>
-      <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
-      <p><b>Severity:</b> High</p>
-      </conbody>
-    </concept>
--->
-
   </concept>
 
   <concept rev="2.2.1" id="fixed_issues_221">
 
-    <title>Issues Fixed in Impala for CDH 5.4.1</title>
+    <title>Issues Fixed in <keyword keyref="impala221"/></title>
 
     <conbody>
 
       <p>
-        This section lists the most frequently encountered customer issues fixed in Impala for CDH 5.4.1.
+        This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala221"/>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_22x"/>
 
       <p>
         For the full list of fixed issues, see
@@ -2200,21 +1939,19 @@ ce601ec : Enable using isilon as the underlying filesystem.
 
   <concept rev="2.2.0" id="fixed_issues_220">
 
-    <title>Issues Fixed in <keyword keyref="impala22_full"/></title>
+    <title>Issues Fixed in <keyword keyref="impala220"/></title>
 
     <conbody>
 
       <p>
-        This section lists the most frequently encountered customer issues fixed in Impala 2.2.0.
+        This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala220"/>.
       </p>
 
       <p>
-        For the full list of fixed issues in Impala 2.2.0, including over 40 critical issues, see
+        For the full list of fixed issues in <keyword keyref="impala220"/>, including over 40 critical issues, see
         <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.2%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
         this report in the JIRA system</xref>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_220"/>
 
       <p outputclass="toc inpage"/>
     </conbody>
@@ -2391,36 +2128,22 @@ IMPALA-1607
 
   <concept rev="2.3.10" id="fixed_issues_2310">
 
-    <title>Issues Fixed in Impala for CDH 5.3.10</title>
+    <title>Issues Fixed in <keyword keyref="impala2310"/></title>
 
     <conbody>
-
-      <p>
-        For the full list of fixed issues for all CDH components, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_53.html#fixed_issues_5310"
-          format="html" scope="external">the CDH 5.3.x release notes</xref><xref
-            audience="integrated" href="cdh_rn_fixed_in_53.xml#fixed_issues_5310"/>.
-      </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
-      <ul audience="integrated">
-        <li conref="cdh_rn_fixed_in_53.xml#ui_fixed_in_5310/impala_start" conrefend="cdh_rn_fixed_in_53.xml#ui_fixed_in_5310/impala_end"/>
-      </ul>
-
+      <p></p>
     </conbody>
 
   </concept>
 
   <concept rev="2.1.7" id="fixed_issues_217">
 
-    <title>Issues Fixed in Impala 2.1.7</title>
+    <title>Issues Fixed in <keyword keyref="impala217"/></title>
 
     <conbody>
 
       <p>
-        This section lists the most significant Impala issues fixed in Impala 2.1.7.
+        This section lists the most significant Impala issues fixed in <keyword keyref="impala217"/>.
       </p>
 
       <p> For the full list of Impala fixed issues in this release, see <xref
@@ -2429,8 +2152,6 @@ IMPALA-1607
           format="html" scope="external">the CDH 5.3.9 release notes</xref><xref
           href="cdh_rn_fixed_in_53.xml#fixed_issues_539" audience="integrated"
         />. </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
 
     </conbody>
 <!--
@@ -2528,8 +2249,6 @@ e591cf4 IMPALA-2141: UnionNode::GetNext() doesn't check for query errors
           href="cdh_rn_fixed_in_53.xml#fixed_issues_538" audience="integrated"
         />. </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
     </conbody>
 
 <!--
@@ -2616,8 +2335,6 @@ e591cf4 IMPALA-2141: UnionNode::GetNext() doesn't check for query errors
           href="cdh_rn_fixed_in_53.xml#fixed_issues_536" audience="integrated"
         />. </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
-
     </conbody>
 
 <!--
@@ -2649,7 +2366,6 @@ e591cf4 IMPALA-2141: UnionNode::GetNext() doesn't check for query errors
 
       <p>
         This section lists the most significant Impala issues fixed in Impala 2.1.4.
-        <ph conref="../shared/impala_common.xml#common/impala_214_redux"/>
       </p>
 
       <p> For the full list of Impala fixed issues in Impala 2.1.4,
@@ -2658,8 +2374,6 @@ e591cf4 IMPALA-2141: UnionNode::GetNext() doesn't check for query errors
           format="html" scope="external">the CDH 5.3.4 release notes</xref><xref
           href="cdh_rn_fixed_in_53.xml#fixed_issues_534" audience="integrated"
         />. </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_21x"/>
 
       <p outputclass="toc inpage"/>
     </conbody>
@@ -2807,33 +2521,8 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         this report in the JIRA system</xref>. -->
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_213"/>
-
       <p outputclass="toc inpage"/>
     </conbody>
-
-<!--
-! = identified by Juan as a critical fix, so listing here.
-? = not identified by Juan as a critical fix, so leaving in the big list under CDH fixed issues
-    but removing from the long descriptions here.
-
-! IMPALA-1658 - Add compatibility flag for Hive-Parquet-Timestamps
-! IMPALA-1738 - Use snprintf() instead of lexical_cast() in float-to-string casts
-! IMPALA-1865 - Fix partition spilling cleanup when new stream OOMs
-! IMPALA-1805 - Impala's ACLs check do not consider all group ACLs, only checked first one.
-! IMPALA-1794 - Fix infinite loop opening or closing file with invalid metadata
-! IMPALA-1801 - external-data-source-executor leaking global jni refs
-! IMPALA-1712 - Unexpected remote bytes read counter was not being reset properly
-
-? IMPALA-1820 - Start with small pages for hash tables during repartitioning
-? IMPALA-1897 - Fixes for old hash join and agg
-? IMPALA-1894 - Fix old aggregation node hash table cleanup
-? IMPALA-1863 - Avoid deadlock across fragment instances
-? IMPALA-1915 - Fix query hang in BufferedBlockMgr:FindBlock()
-? IMPALA-1890 - Fixing a race between ~BufferedBlockMgr() and the WriteComplete() call
-? IMPALA-1835 - Keep the fragment alive for TransmitData()
-? IMPALA-1636 - Generalize index-based partition pruning to allow constant expressions
--->
 
     <concept id="IMPALA-1658">
       <title>Add compatibility flag for Hive-Parquet-Timestamps</title>
@@ -2946,8 +2635,6 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.1.2%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
         this report in the JIRA system</xref>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_212"/>
 
       <p outputclass="toc inpage"/>
     </conbody>
@@ -3196,8 +2883,6 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
         this report in the JIRA system</xref>.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_205"/>
-
     </conbody>
   </concept>
 
@@ -3216,8 +2901,6 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
         <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.4%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
         this report in the JIRA system</xref>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_204"/>
 
       <p outputclass="toc inpage"/>
     </conbody>
@@ -3286,16 +2969,8 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
         this report in the JIRA system</xref>.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_203"/>
-
       <p outputclass="toc inpage"/>
     </conbody>
-
-<!--
-IMPALA-1471: Bug in spilling of PHJ that was affecting left anti and outer joins.
-IMPALA-1535: Partition pruning with NULL
-IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix the customer issue in this JIRA https://jira.cloudera.com/browse/CDH-24919  Stats on Avro column names using uppercase letters don't get persisted
--->
 
     <concept id="IMPALA-1471">
       <title>Anti join could produce incorrect results when spilling</title>
@@ -3344,8 +3019,6 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
         <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.2%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
         this report in the JIRA system</xref>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_202"/>
 
       <p outputclass="toc inpage"/>
     </conbody>
@@ -3493,9 +3166,9 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
         </p>
 
         <p>
-          <b>Workaround:</b> Upgrading to CDH 5.2.1, or another level of CDH that includes the fix for HIVE-8627,
+          <b>Workaround:</b> Upgrading to a level of <keyword keyref="distro"/> that includes the fix for HIVE-8627,
           prevents the problem from affecting future <codeph>COMPUTE STATS</codeph> statements. On affected levels
-          of CDH, or for Impala tables that have become inaccessible, the workaround is to disable the
+          of <keyword keyref="distro"/>, or for Impala tables that have become inaccessible, the workaround is to disable the
           <codeph>hive.metastore.try.direct.sql</codeph> setting in the Hive metastore
           <filepath>hive-site.xml</filepath> file and issue the <codeph>INVALIDATE METADATA</codeph> statement for
           the affected table. You do not need to rerun the <codeph>COMPUTE STATS</codeph> statement for the table.
@@ -3843,8 +3516,6 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
         <xref href="http://www.cloudera.com/documentation/enterprise/release-notes/topics/cdh_rn_fixed_in_51.html" scope="external" format="html">Issues Fixed in CDH 5.1.5</xref>.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_144"/>
-
     </conbody>
   </concept>
 
@@ -3858,8 +3529,6 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
         Impala 1.4.3 includes fixes to address what is known as the POODLE vulnerability in SSLv3. SSLv3 access is
         disabled in the Impala debug web UI.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_143"/>
 
     </conbody>
   </concept>
@@ -3879,8 +3548,6 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
         <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.4.2%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
         this report in the JIRA system</xref>.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_143"/>
 
       <p outputclass="toc inpage"/>
     </conbody>
@@ -3902,12 +3569,10 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
         this report in the JIRA system</xref>.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_141"/>
-
       <p outputclass="toc inpage"/>
     </conbody>
 
-    <concept id="CDH-20513">
+    <concept id="impalad_boost_exception">
 
       <title>impalad terminating with Boost exception</title>
 
@@ -3922,15 +3587,13 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
   &lt;boost::exception_detail::error_info_injector&lt;boost::lock_error&gt; &gt;
 </codeblock>
 
-<!--      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/CDH-20513" scope="external" format="html">CDH-20513</xref></p> -->
-
         <p>
           <b>Severity:</b> High
         </p>
       </conbody>
     </concept>
 
-    <concept id="CDH-20478">
+    <concept id="string_format_logs">
 
       <title>Impalad uses wrong string format when writing logs</title>
 
@@ -3944,7 +3607,6 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
 <codeblock>jni-util.cc:177] java.util.MissingFormatArgumentException: Format specifier 's'
 </codeblock>
 
-<!--      <p><b>Bug:</b> <xref href="https://jira.cloudera.com/browse/CDH-20478" scope="external" format="html">CDH-20478</xref></p> -->
       </conbody>
     </concept>
 
@@ -3968,7 +3630,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
 
     <concept id="IMPALA-1093">
 
-      <title>Impalad catalog updates can fail with error: "IllegalArgumentException: fromKey out of range" at com.cloudera.impala.catalog.CatalogDeltaLog</title>
+      <title>Impalad catalog updates can fail with error: "IllegalArgumentException: fromKey out of range"</title>
 
       <conbody>
 
@@ -4114,8 +3776,8 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
 
         <p>
           The issue was due to the use of HDFS caching with data files accessed by Impala. Support for HDFS caching
-          in Impala was introduced in Impala 1.4.0 for CDH 5.1.0. The fix for this issue was backported to Impala
-          1.3.x, and is the only change in Impala 1.3.2 for CDH 5.0.4.
+          in Impala was introduced in <keyword keyref="impala140"/>. The fix for this issue was backported to Impala
+          1.3.x, and is the only change in Impala 1.3.2.
         </p>
 
         <p>
@@ -4124,30 +3786,8 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
         </p>
         
         <p>
-          <b>Workaround:</b> On CDH 5.0.x, upgrade to CDH 5.0.4 with Impala 1.3.2, where this issue is fixed. In
-          Impala 1.3.0 or 1.3.1 on CDH 5.0.x, do not use HDFS caching for Impala data files in Impala internal or
-          external tables. If some of these data files are cached (for example because they are used by other
-          components that take advantage of HDFS caching), set the query option
-          <codeph>DISABLE_CACHED_READS=true</codeph>. To set that option for all Impala queries across all
-          sessions, start <cmdname>impalad</cmdname> with the <codeph>-default_query_options</codeph> option and
-          include this setting in the option argument.
-        </p>
-        
-
-        <p audience="hidden">
-          <b>Workaround:</b> On CDH 5.0.x, upgrade to CDH 5.0.4 with Impala 1.3.2, where this issue is fixed. In
-          Impala 1.3.0 or 1.3.1 on CDH 5.0.x, do not use HDFS caching for Impala data files in Impala internal or
-          external tables. If some of these data files are cached (for example because they are used by other
-          components that take advantage of HDFS caching), set the query option
-          <codeph>DISABLE_CACHED_READS=true</codeph>. To set that option for all Impala queries across all
-          sessions, start <cmdname>impalad</cmdname> with the <codeph>-default_query_options</codeph> option and
-          include this setting in the option argument, or on a cluster managed by Cloudera Manager, fill in this
-          option setting on the <uicontrol>Impala Daemon</uicontrol> options page.
-        </p>
-
-        <p>
-          <b>Resolution:</b> This issue is fixed in Impala 1.3.2 for CDH 5.0.4. The addition of HDFS caching
-          support in Impala 1.4 means that this issue does not apply to any new level of Impala on CDH 5.
+          <b>Resolution:</b> This issue is fixed in Impala 1.3.2. The addition of HDFS caching
+          support in Impala 1.4 means that this issue does not apply to any new level of Impala.
         </p>
       </conbody>
     </concept>
@@ -4338,8 +3978,6 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
         disabled in the Impala debug web UI.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/only_cdh5_133"/>
-
       <p outputclass="toc inpage"/>
     </conbody>
   </concept>
@@ -4353,8 +3991,6 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
       <p>
         This backported bug fix is the only change between Impala 1.3.1 and Impala 1.3.2.
       </p>
-
-      <note conref="../shared/impala_common.xml#common/only_cdh5_133"/>
 
     </conbody>
 
@@ -4374,8 +4010,8 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
 
         <p>
           The issue was due to the use of HDFS caching with data files accessed by Impala. Support for HDFS caching
-          in Impala was introduced in Impala 1.4.0 for CDH 5.1.0. The fix for this issue was backported to Impala
-          1.3.x, and is the only change in Impala 1.3.2 for CDH 5.0.4.
+          in Impala was introduced in <keyword keyref="impala140"/>. The fix for this issue was backported to Impala
+          1.3.x, and is the only change in Impala 1.3.2.
         </p>
 
         <p>
@@ -4383,27 +4019,6 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API    this one fix th
           <xref href="https://issues.cloudera.org/browse/IMPALA-1019" scope="external" format="html">IMPALA-1019</xref>
         </p>
         
-        <p>
-          <b>Workaround:</b> Upgrade to CDH 5.0.4 with Impala 1.3.2, where this issue is fixed. In
-          Impala 1.3.0 or 1.3.1, do not use HDFS caching for Impala data files in Impala internal or
-          external tables. If some of these data files are cached (for example because they are used by other
-          components that take advantage of HDFS caching), set the query option
-          <codeph>DISABLE_CACHED_READS=true</codeph>. To set that option for all Impala queries across all
-          sessions, start <cmdname>impalad</cmdname> with the <codeph>-default_query_options</codeph> option and
-          include this setting in the option argument.
-        </p>
-
-        <p audience="hidden">
-          <b>Workaround:</b> On CDH 5.0.x, upgrade to CDH 5.0.4 with Impala 1.3.2, where this issue is fixed. In
-          Impala 1.3.0 or 1.3.1 on CDH 5.0.x, do not use HDFS caching for Impala data files in Impala internal or
-          external tables. If some of these data files are cached (for example because they are used by other
-          components that take advantage of HDFS caching), set the query option
-          <codeph>DISABLE_CACHED_READS=true</codeph>. To set that option for all Impala queries across all
-          sessions, start <cmdname>impalad</cmdname> with the <codeph>-default_query_options</codeph> option and
-          include this setting in the option argument, or on a cluster managed by Cloudera Manager, fill in this
-          option setting on the <uicontrol>Impala Daemon</uicontrol> options page.
-        </p>
-
         <p>
           <b>Resolution:</b> This issue is fixed in Impala 1.3.2. The addition of HDFS caching
           support in Impala 1.4 means that this issue does not apply to any new level of Impala.
@@ -5200,7 +4815,7 @@ Bad stats:
       <conbody>
 
         <p>
-          The <codeph>parquet-mr</codeph> library included with CDH4.5 writes files that are not readable by
+          An early version of the <codeph>parquet-mr</codeph> library writes files that are not readable by
           Impala, due to the presence of multiple row groups. Queries involving these data files might result in a
           crash or a failure with an error such as <q>Column chunk should not contain two dictionary pages</q>.
         </p>

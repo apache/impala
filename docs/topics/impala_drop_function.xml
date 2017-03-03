@@ -51,8 +51,8 @@ under the License.
 
 <codeblock>DROP [AGGREGATE] FUNCTION [IF EXISTS] [<varname>db_name</varname>.]<varname>function_name</varname>(<varname>type</varname>[, <varname>type</varname>...])</codeblock>
 
-    <note rev="2.5.0 IMPALA-2843 CDH-39148">
-      <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <note rev="2.5.0 IMPALA-2843">
+      <p rev="2.5.0 IMPALA-2843">
         The preceding syntax, which includes the function signature, also applies to Java UDFs that were created
         using the corresponding <codeph>CREATE FUNCTION</codeph> syntax that includes the argument and return types.
         After upgrading to <keyword keyref="impala25_full"/> or higher, consider re-creating all Java UDFs with the
@@ -61,7 +61,7 @@ under the License.
       </p>
     </note>
 
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       To drop Java UDFs (created using the <codeph>CREATE FUNCTION</codeph> syntax with no function signature):
     </p>
 
@@ -91,7 +91,7 @@ DROP FUNCTION IF EXISTS bar;
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-    <p rev="CDH-19187">
+    <p rev="">
       The user ID that the <cmdname>impalad</cmdname> daemon runs under,
       typically the <codeph>impala</codeph> user, does not need any
       particular HDFS permissions to perform this statement.
@@ -100,7 +100,7 @@ DROP FUNCTION IF EXISTS bar;
     </p>
 
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
-    <p rev="2.5.0 IMPALA-2843 CDH-39148">
+    <p rev="2.5.0 IMPALA-2843">
       The following example shows how to drop Java functions created with the signatureless
       <codeph>CREATE FUNCTION</codeph> syntax in <keyword keyref="impala25_full"/> and higher.
       Issuing <codeph>DROP FUNCTION <varname>function_name</varname></codeph> removes all the
@@ -108,9 +108,9 @@ DROP FUNCTION IF EXISTS bar;
       (See <xref href="impala_create_function.xml#create_function"/> for a longer example
       showing how to set up such functions in the first place.)
     </p>
-<codeblock rev="2.5.0 IMPALA-2843 CDH-39148">
-create function my_func location '/user/impala/udfs/udf-examples-cdh570.jar'
-  symbol='com.cloudera.impala.TestUdf';
+<codeblock rev="2.5.0 IMPALA-2843">
+create function my_func location '/user/impala/udfs/udf-examples.jar'
+  symbol='org.apache.impala.TestUdf';
 
 show functions;
 +-------------+---------------------------------------+-------------+---------------+
