@@ -129,11 +129,11 @@ export KUDU_JAVA_VERSION=1.3.0-SNAPSHOT
 # Versions of Hadoop ecosystem dependencies.
 # ------------------------------------------
 export CDH_MAJOR_VERSION=5
-export IMPALA_HADOOP_VERSION=2.6.0-cdh5.11.0-SNAPSHOT
-export IMPALA_HBASE_VERSION=1.2.0-cdh5.11.0-SNAPSHOT
-export IMPALA_HIVE_VERSION=1.1.0-cdh5.11.0-SNAPSHOT
-export IMPALA_SENTRY_VERSION=1.5.1-cdh5.11.0-SNAPSHOT
-export IMPALA_PARQUET_VERSION=1.5.0-cdh5.11.0-SNAPSHOT
+export IMPALA_HADOOP_VERSION=2.6.0-cdh5.12.0-SNAPSHOT
+export IMPALA_HBASE_VERSION=1.2.0-cdh5.12.0-SNAPSHOT
+export IMPALA_HIVE_VERSION=1.1.0-cdh5.12.0-SNAPSHOT
+export IMPALA_SENTRY_VERSION=1.5.1-cdh5.12.0-SNAPSHOT
+export IMPALA_PARQUET_VERSION=1.5.0-cdh5.12.0-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 
 # Source the branch and local config override files here to override any
