@@ -24,6 +24,7 @@
 #include "util/collection-metrics.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
+#include "util/histogram-metric.h"
 #include "util/thread.h"
 
 #include "common/names.h"
@@ -324,6 +325,37 @@ TEST_F(MetricsTest, StatsMetricsJson) {
   EXPECT_EQ(stats_val["max"].GetDouble(), 20.0);
   EXPECT_EQ(stats_val["mean"].GetDouble(), 15.0);
   EXPECT_EQ(stats_val["stddev"].GetDouble(), 5.0);
+}
+
+TEST_F(MetricsTest, HistogramMetrics) {
+  MetricGroup metrics("HistoMetrics");
+  TMetricDef metric_def =
+      MakeTMetricDef("histogram-metric", TMetricKind::HISTOGRAM, TUnit::TIME_MS);
+  constexpr int MAX_VALUE = 10000;
+  HistogramMetric* metric = metrics.RegisterMetric(new HistogramMetric(
+          metric_def, MAX_VALUE, 3));
+
+  // Add value beyond limit to make sure it's recorded accurately.
+  for (int i = 0; i <= MAX_VALUE + 1; ++i) metric->Update(i);
+
+  Document document;
+  Value val;
+  metrics.ToJson(true, &document, &val);
+  const Value& histo_val = val["metrics"][0u];
+  EXPECT_EQ(histo_val["min"].GetInt(), 0);
+  EXPECT_EQ(histo_val["max"].GetInt(), MAX_VALUE + 1);
+  EXPECT_EQ(histo_val["25th %-ile"].GetInt(), 2500);
+  EXPECT_EQ(histo_val["50th %-ile"].GetInt(), 5000);
+  EXPECT_EQ(histo_val["75th %-ile"].GetInt(), 7500);
+  EXPECT_EQ(histo_val["90th %-ile"].GetInt(), 9000);
+  EXPECT_EQ(histo_val["95th %-ile"].GetInt(), 9496);
+  EXPECT_EQ(histo_val["99.9th %-ile"].GetInt(), 9984);
+  EXPECT_EQ(histo_val["min"].GetInt(), 0);
+  EXPECT_EQ(histo_val["max"].GetInt(), MAX_VALUE + 1);
+
+  EXPECT_EQ(metric->ToHumanReadable(), "Count: 10002, min / max: 0 / 10s001ms, "
+      "25th %-ile: 2s500ms, 50th %-ile: 5s000ms, 75th %-ile: 7s500ms, "
+      "90th %-ile: 9s000ms, 95th %-ile: 9s496ms, 99.9th %-ile: 9s984ms");
 }
 
 TEST_F(MetricsTest, UnitsAndDescriptionJson) {

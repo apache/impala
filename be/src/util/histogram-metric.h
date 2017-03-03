@@ -58,6 +58,8 @@ class HistogramMetric : public Metric {
           "95th %-ile", histogram_->ValueAtPercentile(95), document->GetAllocator());
       container.AddMember(
           "99.9th %-ile", histogram_->ValueAtPercentile(99.9), document->GetAllocator());
+      container.AddMember("max", histogram_->MaxValue(), document->GetAllocator());
+      container.AddMember("min", histogram_->MinValue(), document->GetAllocator());
       container.AddMember("count", histogram_->TotalCount(), document->GetAllocator());
     }
     rapidjson::Value type_value(PrintTMetricKind(TMetricKind::HISTOGRAM).c_str(),
@@ -90,6 +92,8 @@ class HistogramMetric : public Metric {
     boost::lock_guard<SpinLock> l(lock_);
     std::stringstream out;
     out << "Count: " << histogram_->TotalCount() << ", "
+        << "min / max: " << PrettyPrinter::Print(histogram_->MinValue(), unit_)
+        << " / " << PrettyPrinter::Print(histogram_->MaxValue(), unit_) << ", "
         << "25th %-ile: "
         << PrettyPrinter::Print(histogram_->ValueAtPercentile(25), unit_) << ", "
         << "50th %-ile: "
