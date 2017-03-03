@@ -19,9 +19,21 @@
 #ifndef IMPALA_UDF_UDF_H
 #define IMPALA_UDF_UDF_H
 
+// THIS FILE IS USED BY THE STANDALONE IMPALA UDF DEVELOPMENT KIT.
+// IT MUST BE BUILDABLE WITH C++98 AND WITHOUT ANY INTERNAL IMPALA HEADERS.
+
 #include <assert.h>
 #include <boost/cstdint.hpp>
 #include <string.h>
+
+// Only use noexcept if the compiler supports C++11 (some system compilers may not
+// or may have it disabled by default).
+#if __cplusplus >= 201103L
+#define NOEXCEPT noexcept
+#define USING_TYPE
+#else
+#define NOEXCEPT
+#endif
 
 /// This is the only Impala header required to develop UDFs and UDAs. This header
 /// contains the types that need to be used and the FunctionContext object. The context
@@ -144,7 +156,7 @@ class FunctionContext {
   /// If Allocate() fails or causes the memory limit to be exceeded, the error will be
   /// set in this object causing the query to fail.
   /// TODO: 'byte_size' should be 64-bit. See IMPALA-2756.
-  uint8_t* Allocate(int byte_size) noexcept;
+  uint8_t* Allocate(int byte_size) NOEXCEPT;
 
   /// Wrapper around Allocate() to allocate a buffer of the given type "T".
   template<typename T>
@@ -160,10 +172,10 @@ class FunctionContext {
   ///
   /// This should be used for buffers that constantly get appended to.
   /// TODO: 'byte_size' should be 64-bit. See IMPALA-2756.
-  uint8_t* Reallocate(uint8_t* ptr, int byte_size) noexcept;
+  uint8_t* Reallocate(uint8_t* ptr, int byte_size) NOEXCEPT;
 
   /// Frees a buffer returned from Allocate() or Reallocate()
-  void Free(uint8_t* buffer) noexcept;
+  void Free(uint8_t* buffer) NOEXCEPT;
 
   /// For allocations that cannot use the Allocate() API provided by this
   /// object, TrackAllocation()/Free() can be used to just keep count of the
@@ -417,7 +429,7 @@ struct BooleanVal : public AnyVal {
 };
 
 struct TinyIntVal : public AnyVal {
-  using underlying_type_t = int8_t;
+  typedef int8_t underlying_type_t;
   underlying_type_t val;
 
   TinyIntVal(underlying_type_t val = 0) : val(val) { }
@@ -437,7 +449,7 @@ struct TinyIntVal : public AnyVal {
 };
 
 struct SmallIntVal : public AnyVal {
-  using underlying_type_t = int16_t;
+  typedef int16_t underlying_type_t;
   underlying_type_t val;
 
   SmallIntVal(underlying_type_t val = 0) : val(val) { }
@@ -457,7 +469,7 @@ struct SmallIntVal : public AnyVal {
 };
 
 struct IntVal : public AnyVal {
-  using underlying_type_t = int32_t;
+  typedef int32_t underlying_type_t;
   underlying_type_t val;
 
   IntVal(underlying_type_t val = 0) : val(val) { }
@@ -477,7 +489,7 @@ struct IntVal : public AnyVal {
 };
 
 struct BigIntVal : public AnyVal {
-  using underlying_type_t = int64_t;
+  typedef int64_t underlying_type_t;
   underlying_type_t val;
 
   BigIntVal(underlying_type_t val = 0) : val(val) { }
@@ -589,7 +601,7 @@ struct StringVal : public AnyVal {
   ///
   /// The memory backing this StringVal is a local allocation, and so doesn't need
   /// to be explicitly freed.
-  StringVal(FunctionContext* context, int len) noexcept;
+  StringVal(FunctionContext* context, int len) NOEXCEPT;
 
   /// Reallocate a StringVal that is backed by a local allocation so that it as
   /// at least as large as len.  May shrink or / expand the string.  If the
@@ -600,7 +612,7 @@ struct StringVal : public AnyVal {
   /// local allocation.
   ///
   /// Returns true on success, false on failure.
-  bool Resize(FunctionContext* context, int len) noexcept;
+  bool Resize(FunctionContext* context, int len) NOEXCEPT;
 
   /// Will create a new StringVal with the given dimension and copy the data from the
   /// parameters. In case of an error will return a NULL string and set an error on the
@@ -609,7 +621,8 @@ struct StringVal : public AnyVal {
   /// Note that the memory for the buffer of the new StringVal is managed by Impala.
   /// Impala will handle freeing it. Callers should not call Free() on the 'ptr' of
   /// the StringVal returned.
-  static StringVal CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len) noexcept;
+  static StringVal CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len)
+      NOEXCEPT;
 
   static StringVal null() {
     StringVal sv;

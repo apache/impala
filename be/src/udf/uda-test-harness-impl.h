@@ -19,9 +19,15 @@
 #ifndef IMPALA_UDA_TEST_HARNESS_IMPL_H
 #define IMPALA_UDA_TEST_HARNESS_IMPL_H
 
+// THIS FILE IS USED BY THE STANDALONE IMPALA UDF DEVELOPMENT KIT.
+// IT MUST BE BUILDABLE WITH C++98 AND WITHOUT ANY INTERNAL IMPALA HEADERS.
+
 #include <string>
 #include <sstream>
 #include <vector>
+
+// Use boost::shared_ptr instead of std::shared_ptr so it can be built with C++98
+#include <boost/shared_ptr.hpp>
 
 namespace impala_udf {
 
@@ -182,7 +188,7 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteSingleNode(
 template<typename RESULT, typename INTERMEDIATE>
 RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteOneLevel(int num_nodes,
     ScopedFunctionContext* result_context) {
-  std::vector<std::shared_ptr<ScopedFunctionContext>> contexts;
+  std::vector<boost::shared_ptr<ScopedFunctionContext> > contexts;
   std::vector<INTERMEDIATE> intermediates;
   contexts.resize(num_nodes);
 
@@ -238,7 +244,7 @@ RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteOneLevel(int num_nodes,
 template<typename RESULT, typename INTERMEDIATE>
 RESULT UdaTestHarnessBase<RESULT, INTERMEDIATE>::ExecuteTwoLevel(
     int num1, int num2, ScopedFunctionContext* result_context) {
-  std::vector<std::shared_ptr<ScopedFunctionContext>> level1_contexts, level2_contexts;
+  std::vector<boost::shared_ptr<ScopedFunctionContext> > level1_contexts, level2_contexts;
   std::vector<INTERMEDIATE> level1_intermediates, level2_intermediates;
   level1_contexts.resize(num1);
   level2_contexts.resize(num2);

@@ -19,16 +19,21 @@
 #ifndef IMPALA_UDF_TEST_HARNESS_H
 #define IMPALA_UDF_TEST_HARNESS_H
 
+// THIS FILE IS USED BY THE STANDALONE IMPALA UDF DEVELOPMENT KIT.
+// IT MUST BE BUILDABLE WITH C++98 AND WITHOUT ANY INTERNAL IMPALA HEADERS.
+
 #include <iostream>
 #include <vector>
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 
-#include "runtime/runtime-state.h"
 #include "udf/udf.h"
 #include "udf/udf-debug.h"
 
-namespace impala { class MemPool; }
+namespace impala {
+  class MemPool;
+  class RuntimeState;
+}
 
 namespace impala_udf {
 
@@ -40,7 +45,7 @@ class UdfTestHarness {
   /// for calling delete on it. This context has additional debugging validation enabled.
   static FunctionContext* CreateTestContext(const FunctionContext::TypeDesc& return_type,
       const std::vector<FunctionContext::TypeDesc>& arg_types,
-      impala::RuntimeState* state = nullptr, impala::MemPool* pool = nullptr);
+      impala::RuntimeState* state = NULL, impala::MemPool* pool = NULL);
 
   /// Use with test contexts to test use of IsArgConstant() and GetConstantArg().
   /// constant_args should contain an AnyVal* for each argument of the UDF not including
