@@ -18,7 +18,6 @@
 package org.apache.impala.catalog;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +31,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -59,6 +59,7 @@ import com.google.common.collect.Maps;
 public abstract class Table implements CatalogObject {
   private static final Logger LOG = Logger.getLogger(Table.class);
 
+  // Catalog version assigned to this table
   private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
   protected org.apache.hadoop.hive.metastore.api.Table msTable_;
 
@@ -88,6 +89,9 @@ public abstract class Table implements CatalogObject {
   // The lastDdlTime for this table; -1 if not set
   protected long lastDdlTime_;
 
+  // True if this object is stored in an Impalad catalog cache.
+  protected boolean storedInImpaladCatalogCache_ = false;
+
   protected Table(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
     msTable_ = msTable;
@@ -102,6 +106,13 @@ public abstract class Table implements CatalogObject {
   public abstract TTableDescriptor toThriftDescriptor(
       int tableId, Set<Long> referencedPartitions);
   public abstract TCatalogObjectType getCatalogObjectType();
+
+  // Returns true if this table reference comes from the impalad catalog cache or if it
+  // is loaded from the testing framework. Returns false if this table reference points
+  // to a table stored in the catalog server.
+  public boolean isStoredInImpaladCatalogCache() {
+    return storedInImpaladCatalogCache_ || RuntimeEnv.INSTANCE.isTestEnv();
+  }
 
   /**
    * Populate members of 'this' from metastore info. If 'reuseMetadata' is true, reuse
@@ -276,6 +287,8 @@ public abstract class Table implements CatalogObject {
     // Default to READ_WRITE access if the field is not set.
     accessLevel_ = thriftTable.isSetAccess_level() ? thriftTable.getAccess_level() :
         TAccessLevel.READ_WRITE;
+
+    storedInImpaladCatalogCache_ = true;
   }
 
   /**

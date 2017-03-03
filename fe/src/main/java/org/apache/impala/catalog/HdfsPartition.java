@@ -17,15 +17,15 @@
 
 package org.apache.impala.catalog;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,27 +37,40 @@ import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.Reference;
+import org.apache.impala.fb.FbCompression;
+import org.apache.impala.fb.FbFileBlock;
+import org.apache.impala.fb.FbFileDesc;
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
-import org.apache.impala.thrift.THdfsCompression;
-import org.apache.impala.thrift.THdfsFileBlock;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.HdfsCachingUtil;
+import org.apache.impala.util.ListMap;
+
+import com.google.flatbuffers.FlatBufferBuilder;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Shorts;
 
 /**
  * Query-relevant information for one table partition. Partitions are comparable
@@ -68,67 +81,155 @@ import com.google.common.collect.Maps;
 public class HdfsPartition implements Comparable<HdfsPartition> {
   /**
    * Metadata for a single file in this partition.
-   * TODO: Do we even need this class? Just get rid of it and use the Thrift version?
    */
   static public class FileDescriptor implements Comparable<FileDescriptor> {
-    private final THdfsFileDesc fileDescriptor_;
+    // An invalid network address, which will always be treated as remote.
+    private final static TNetworkAddress REMOTE_NETWORK_ADDRESS =
+        new TNetworkAddress("remote*addr", 0);
 
-    public String getFileName() { return fileDescriptor_.getFile_name(); }
-    public long getFileLength() { return fileDescriptor_.getLength(); }
-    public THdfsCompression getFileCompression() {
-      return fileDescriptor_.getCompression();
-    }
-    public long getModificationTime() {
-      return fileDescriptor_.getLast_modification_time();
-    }
-    public List<THdfsFileBlock> getFileBlocks() {
-      return fileDescriptor_.getFile_blocks();
-    }
+    // Minimum block size in bytes allowed for synthetic file blocks (other than the last
+    // block, which may be shorter).
+    private final static long MIN_SYNTHETIC_BLOCK_SIZE = 1024 * 1024;
 
-    public THdfsFileDesc toThrift() { return fileDescriptor_; }
+    // Internal representation of a file descriptor using a FlatBuffer.
+    private final FbFileDesc fbFileDescriptor_;
 
-    public FileDescriptor(String fileName, long fileLength, long modificationTime) {
-      Preconditions.checkNotNull(fileName);
-      Preconditions.checkArgument(fileLength >= 0);
-      fileDescriptor_ = new THdfsFileDesc();
-      fileDescriptor_.setFile_name(fileName);
-      fileDescriptor_.setLength(fileLength);
-      fileDescriptor_.setLast_modification_time(modificationTime);
-      fileDescriptor_.setCompression(
-          HdfsCompression.fromFileName(fileName).toThrift());
-      List<THdfsFileBlock> emptyFileBlockList = Lists.newArrayList();
-      fileDescriptor_.setFile_blocks(emptyFileBlockList);
-    }
-
-    private FileDescriptor(THdfsFileDesc fileDesc) {
-      this(fileDesc.getFile_name(), fileDesc.length, fileDesc.last_modification_time);
-      for (THdfsFileBlock block: fileDesc.getFile_blocks()) {
-        fileDescriptor_.addToFile_blocks(block);
-      }
-    }
-
-    public void addFileBlock(FileBlock blockMd) {
-      addThriftFileBlock(blockMd.toThrift());
-    }
-
-    public void addThriftFileBlock(THdfsFileBlock block) {
-      fileDescriptor_.addToFile_blocks(block);
-    }
+    private FileDescriptor(FbFileDesc fileDescData) { fbFileDescriptor_ = fileDescData; }
 
     public static FileDescriptor fromThrift(THdfsFileDesc desc) {
-      return new FileDescriptor(desc);
+      ByteBuffer bb = ByteBuffer.wrap(desc.getFile_desc_data());
+      return new FileDescriptor(FbFileDesc.getRootAsFbFileDesc(bb));
+    }
+
+    /**
+     * Creates the file descriptor of a file represented by 'fileStatus' with blocks
+     * stored in 'blockLocations'. 'fileSystem' is the filesystem where the
+     * file resides and 'hostIndex' stores the network addresses of the hosts that store
+     * blocks of the parent HdfsTable. Populates 'numUnknownDiskIds' with the number of
+     * unknown disk ids.
+     */
+    public static FileDescriptor create(FileStatus fileStatus,
+        BlockLocation[] blockLocations, FileSystem fileSystem,
+        ListMap<TNetworkAddress> hostIndex, Reference<Long> numUnknownDiskIds)
+        throws IOException {
+      Preconditions.checkState(FileSystemUtil.supportsStorageIds(fileSystem));
+      FlatBufferBuilder fbb = new FlatBufferBuilder(1);
+      int[] fbFileBlockOffsets = new int[blockLocations.length];
+      int blockIdx = 0;
+      for (BlockLocation loc: blockLocations) {
+        fbFileBlockOffsets[blockIdx++] = FileBlock.createFbFileBlock(fbb, loc, hostIndex,
+            numUnknownDiskIds);
+      }
+      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, fbFileBlockOffsets));
+    }
+
+    /**
+     * Creates the file descriptor of a file represented by 'fileStatus' that
+     * resides in a filesystem that doesn't support the BlockLocation API (e.g. S3).
+     * fileFormat' is the file format of the partition where this file resides and
+     * 'hostIndex' stores the network addresses of the hosts that store blocks of
+     * the parent HdfsTable.
+     */
+    public static FileDescriptor createWithSynthesizedBlockMd(FileStatus fileStatus,
+        HdfsFileFormat fileFormat, ListMap<TNetworkAddress> hostIndex) {
+      FlatBufferBuilder fbb = new FlatBufferBuilder(1);
+      int[] fbFileBlockOffets =
+          synthesizeFbBlockMd(fbb, fileStatus, fileFormat, hostIndex);
+      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, fbFileBlockOffets));
+    }
+
+    /**
+     * Serializes the metadata of a file descriptor represented by 'fileStatus' into a
+     * FlatBuffer using 'fbb' and returns the associated FbFileDesc object. 'blockOffsets'
+     * are the offsets of the serialized block metadata of this file in the underlying
+     * buffer.
+     */
+    private static FbFileDesc createFbFileDesc(FlatBufferBuilder fbb,
+        FileStatus fileStatus, int[] fbFileBlockOffets) {
+      int fileNameOffset = fbb.createString(fileStatus.getPath().getName());
+      int blockVectorOffset = FbFileDesc.createFileBlocksVector(fbb, fbFileBlockOffets);
+      FbFileDesc.startFbFileDesc(fbb);
+      FbFileDesc.addFileName(fbb, fileNameOffset);
+      FbFileDesc.addLength(fbb, fileStatus.getLen());
+      FbFileDesc.addLastModificationTime(fbb, fileStatus.getModificationTime());
+      HdfsCompression comp = HdfsCompression.fromFileName(fileStatus.getPath().getName());
+      FbFileDesc.addCompression(fbb, comp.toFb());
+      FbFileDesc.addFileBlocks(fbb, blockVectorOffset);
+      fbb.finish(FbFileDesc.endFbFileDesc(fbb));
+      // To eliminate memory fragmentation, copy the contents of the FlatBuffer to the
+      // smallest possible ByteBuffer.
+      ByteBuffer bb = fbb.dataBuffer().slice();
+      ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
+      compressedBb.put(bb);
+      return FbFileDesc.getRootAsFbFileDesc((ByteBuffer)compressedBb.flip());
+    }
+
+    /**
+     * Synthesizes the block metadata of a file represented by 'fileStatus' that resides
+     * in a filesystem that doesn't support the BlockLocation API. The block metadata
+     * consist of the length and offset of each file block. It serializes the
+     * block metadata into a FlatBuffer using 'fbb' and returns their offsets in the
+     * underlying buffer. 'fileFormat' is the file format of the underlying partition and
+     * 'hostIndex' stores the network addresses of the hosts that store the blocks of the
+     * parent HdfsTable.
+     */
+    private static int[] synthesizeFbBlockMd(FlatBufferBuilder fbb, FileStatus fileStatus,
+        HdfsFileFormat fileFormat, ListMap<TNetworkAddress> hostIndex) {
+      long start = 0;
+      long remaining = fileStatus.getLen();
+      long blockSize = fileStatus.getBlockSize();
+      if (blockSize < MIN_SYNTHETIC_BLOCK_SIZE) blockSize = MIN_SYNTHETIC_BLOCK_SIZE;
+      if (!fileFormat.isSplittable(HdfsCompression.fromFileName(
+          fileStatus.getPath().getName()))) {
+        blockSize = remaining;
+      }
+      List<Integer> fbFileBlockOffets = Lists.newArrayList();
+      while (remaining > 0) {
+        long len = Math.min(remaining, blockSize);
+        fbFileBlockOffets.add(FileBlock.createFbFileBlock(fbb, start, len,
+            (short) hostIndex.getIndex(REMOTE_NETWORK_ADDRESS)));
+        remaining -= len;
+        start += len;
+      }
+      return Ints.toArray(fbFileBlockOffets);
+    }
+
+    public String getFileName() { return fbFileDescriptor_.fileName(); }
+    public long getFileLength() { return fbFileDescriptor_.length(); }
+
+    public HdfsCompression getFileCompression() {
+      return HdfsCompression.valueOf(FbCompression.name(fbFileDescriptor_.compression()));
+    }
+
+    public long getModificationTime() { return fbFileDescriptor_.lastModificationTime(); }
+    public int getNumFileBlocks() { return fbFileDescriptor_.fileBlocksLength(); }
+
+    public FbFileBlock getFbFileBlock(int idx) {
+      return fbFileDescriptor_.fileBlocks(idx);
+    }
+
+    public THdfsFileDesc toThrift() {
+      THdfsFileDesc fd = new THdfsFileDesc();
+      ByteBuffer bb = fbFileDescriptor_.getByteBuffer();
+      fd.setFile_desc_data(bb);
+      return fd;
     }
 
     @Override
     public String toString() {
+      int numFileBlocks = getNumFileBlocks();
+      List<String> blocks = Lists.newArrayListWithCapacity(numFileBlocks);
+      for (int i = 0; i < numFileBlocks; ++i) {
+        blocks.add(FileBlock.debugString(getFbFileBlock(i)));
+      }
       return Objects.toStringHelper(this)
           .add("FileName", getFileName())
-          .add("Length", getFileLength()).toString();
+          .add("Length", getFileLength())
+          .add("Compression", getFileCompression())
+          .add("ModificationTime", getModificationTime())
+          .add("Blocks", Joiner.on(", ").join(blocks)).toString();
     }
 
-    /**
-     * Orders file descriptors lexicographically by file name.
-     */
     @Override
     public int compareTo(FileDescriptor otherFd) {
       return getFileName().compareTo(otherFd.getFileName());
@@ -140,14 +241,14 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    */
   public static class BlockReplica {
     private final boolean isCached_;
-    private final int hostIdx_;
+    private final short hostIdx_;
 
     /**
      * Creates a BlockReplica given a host ID/index and a flag specifying whether this
      * replica is cahced. Host IDs are assigned when loading the block metadata in
      * HdfsTable.
      */
-    public BlockReplica(int hostIdx, boolean isCached) {
+    public BlockReplica(short hostIdx, boolean isCached) {
       hostIdx_ = hostIdx;
       isCached_ = isCached;
     }
@@ -168,88 +269,167 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     }
 
     public boolean isCached() { return isCached_; }
-    public int getHostIdx() { return hostIdx_; }
+    public short getHostIdx() { return hostIdx_; }
   }
 
   /**
-   * File Block metadata
+   * Static utility methods to serialize and access file block metadata from FlatBuffers.
    */
   public static class FileBlock {
-    private final THdfsFileBlock fileBlock_;
-    private boolean isCached_; // Set to true if there is at least one cached replica.
+    // Bit mask used to extract the replica host id and cache info of a file block.
+    // Use ~REPLICA_HOST_IDX_MASK to extract the cache info (stored in MSB).
+    private static short REPLICA_HOST_IDX_MASK = (1 << 15) - 1;
 
-    private FileBlock(THdfsFileBlock fileBlock) {
-      fileBlock_ = fileBlock;
-      isCached_ = false;
-      for (boolean isCached: fileBlock.getIs_replica_cached()) {
-        isCached_ |= isCached;
+    /**
+     * Constructs an FbFileBlock object from the block location metadata
+     * 'loc'. Serializes the file block metadata into a FlatBuffer using 'fbb' and
+     * returns the offset in the underlying buffer where the encoded file block starts.
+     * 'hostIndex' stores the network addresses of the datanodes that store the files of
+     * the parent HdfsTable. Populates 'numUnknownDiskIds' with the number of unknown disk
+     * ids.
+     */
+    public static int createFbFileBlock(FlatBufferBuilder fbb, BlockLocation loc,
+        ListMap<TNetworkAddress> hostIndex, Reference<Long> numUnknownDiskIds)
+        throws IOException {
+      Preconditions.checkNotNull(fbb);
+      Preconditions.checkNotNull(loc);
+      Preconditions.checkNotNull(hostIndex);
+      // replica host ids
+      FbFileBlock.startReplicaHostIdxsVector(fbb, loc.getNames().length);
+      Set<String> cachedHosts = Sets.newHashSet(loc.getCachedHosts());
+      // Enumerate all replicas of the block, adding any unknown hosts
+      // to hostIndex. We pick the network address from getNames() and
+      // map it to the corresponding hostname from getHosts().
+      for (int i = 0; i < loc.getNames().length; ++i) {
+        TNetworkAddress networkAddress = BlockReplica.parseLocation(loc.getNames()[i]);
+        short replicaIdx = (short) hostIndex.getIndex(networkAddress);
+        boolean isReplicaCached = cachedHosts.contains(loc.getHosts()[i]);
+        replicaIdx = isReplicaCached ?
+            (short) (replicaIdx | ~REPLICA_HOST_IDX_MASK) : replicaIdx;
+        fbb.addShort(replicaIdx);
       }
+      int fbReplicaHostIdxOffset = fbb.endVector();
+
+      // disk ids
+      short[] diskIds = createDiskIds(loc, numUnknownDiskIds);
+      Preconditions.checkState(diskIds.length != 0);
+      int fbDiskIdsOffset = FbFileBlock.createDiskIdsVector(fbb, diskIds);
+      FbFileBlock.startFbFileBlock(fbb);
+      FbFileBlock.addOffset(fbb, loc.getOffset());
+      FbFileBlock.addLength(fbb, loc.getLength());
+      FbFileBlock.addReplicaHostIdxs(fbb, fbReplicaHostIdxOffset);
+      FbFileBlock.addDiskIds(fbb, fbDiskIdsOffset);
+      return FbFileBlock.endFbFileBlock(fbb);
     }
 
     /**
-     * Construct a FileBlock given the start offset (in bytes) of the file associated
-     * with this block, the length of the block (in bytes), and a list of BlockReplicas.
-     * Does not fill diskIds.
+     * Constructs an FbFileBlock object from the file block metadata that comprise block's
+     * 'offset', 'length' and replica index 'replicaIdx'. Serializes the file block
+     * metadata into a FlatBuffer using 'fbb' and returns the offset in the underlying
+     * buffer where the encoded file block starts.
      */
-    public FileBlock(long offset, long blockLength,
-        List<BlockReplica> replicaHostIdxs) {
-      Preconditions.checkNotNull(replicaHostIdxs);
-      fileBlock_ = new THdfsFileBlock();
-      fileBlock_.setOffset(offset);
-      fileBlock_.setLength(blockLength);
-
-      fileBlock_.setReplica_host_idxs(new ArrayList<Integer>(replicaHostIdxs.size()));
-      fileBlock_.setIs_replica_cached(new ArrayList<Boolean>(replicaHostIdxs.size()));
-      isCached_ = false;
-      for (BlockReplica replica: replicaHostIdxs) {
-        fileBlock_.addToReplica_host_idxs(replica.getHostIdx());
-        fileBlock_.addToIs_replica_cached(replica.isCached());
-        isCached_ |= replica.isCached();
-      }
-    }
-
-    public long getOffset() { return fileBlock_.getOffset(); }
-    public long getLength() { return fileBlock_.getLength(); }
-    public List<Integer> getReplicaHostIdxs() {
-      return fileBlock_.getReplica_host_idxs();
+    public static int createFbFileBlock(FlatBufferBuilder fbb, long offset, long length,
+        short replicaIdx) {
+      Preconditions.checkNotNull(fbb);
+      FbFileBlock.startReplicaHostIdxsVector(fbb, 1);
+      fbb.addShort(replicaIdx);
+      int fbReplicaHostIdxOffset = fbb.endVector();
+      FbFileBlock.startFbFileBlock(fbb);
+      FbFileBlock.addOffset(fbb, offset);
+      FbFileBlock.addLength(fbb, length);
+      FbFileBlock.addReplicaHostIdxs(fbb, fbReplicaHostIdxOffset);
+      return FbFileBlock.endFbFileBlock(fbb);
     }
 
     /**
-     * Populates the given THdfsFileBlock's list of disk ids with the given disk id
-     * values. The number of disk ids must match the number of network addresses
-     * set in the file block.
+     * Creates the disk ids of a block from its BlockLocation 'location'. Returns the
+     * disk ids and populates 'numUnknownDiskIds' with the number of unknown disk ids.
      */
-    public static void setDiskIds(int[] diskIds, THdfsFileBlock fileBlock) {
-      Preconditions.checkArgument(
-          diskIds.length == fileBlock.getReplica_host_idxs().size());
-      fileBlock.setDisk_ids(Arrays.asList(ArrayUtils.toObject(diskIds)));
+    private static short[] createDiskIds(BlockLocation location,
+        Reference<Long> numUnknownDiskIds) {
+      long unknownDiskIdCount = 0;
+      String[] storageIds = location.getStorageIds();
+      String[] hosts;
+      try {
+        hosts = location.getHosts();
+      } catch (IOException e) {
+        LOG.error("Couldn't get hosts for block: " + location.toString(), e);
+        return new short[0];
+      }
+      if (storageIds.length != hosts.length) {
+        LOG.error("Number of storage IDs and number of hosts for block: " + location
+            .toString() + " mismatch. Skipping disk ID loading for this block.");
+        return Shorts.toArray(Collections.<Short>emptyList());
+      }
+      short[] diskIDs = new short[storageIds.length];
+      for (int i = 0; i < storageIds.length; ++i) {
+        if (Strings.isNullOrEmpty(storageIds[i])) {
+          diskIDs[i] = (short) -1;
+          ++unknownDiskIdCount;
+        } else {
+          diskIDs[i] = DiskIdMapper.INSTANCE.getDiskId(hosts[i], storageIds[i]);
+        }
+      }
+      long count = numUnknownDiskIds.getRef() + unknownDiskIdCount;
+      numUnknownDiskIds.setRef(Long.valueOf(count));
+      return diskIDs;
+    }
+
+    public static long getOffset(FbFileBlock fbFileBlock) { return fbFileBlock.offset(); }
+    public static long getLength(FbFileBlock fbFileBlock) { return fbFileBlock.length(); }
+    // Returns true if there is at least one cached replica.
+    public static boolean hasCachedReplica(FbFileBlock fbFileBlock) {
+      boolean hasCachedReplica = false;
+      for (int i = 0; i < fbFileBlock.replicaHostIdxsLength(); ++i) {
+        hasCachedReplica |= isReplicaCached(fbFileBlock, i);
+      }
+      return hasCachedReplica;
+    }
+
+    public static int getNumReplicaHosts(FbFileBlock fbFileBlock) {
+      return fbFileBlock.replicaHostIdxsLength();
+    }
+
+    public static int getReplicaHostIdx(FbFileBlock fbFileBlock, int pos) {
+      int idx = fbFileBlock.replicaHostIdxs(pos);
+      return idx & REPLICA_HOST_IDX_MASK;
+    }
+
+    // Returns true if the block replica 'replicaIdx' is cached.
+    public static boolean isReplicaCached(FbFileBlock fbFileBlock, int replicaIdx) {
+      int idx = fbFileBlock.replicaHostIdxs(replicaIdx);
+      return (idx & ~REPLICA_HOST_IDX_MASK) != 0;
     }
 
     /**
      * Return the disk id of the block in BlockLocation.getNames()[hostIndex]; -1 if
      * disk id is not supported.
      */
-    public int getDiskId(int hostIndex) {
-      if (fileBlock_.disk_ids == null) return -1;
-      return fileBlock_.getDisk_ids().get(hostIndex);
+    public static int getDiskId(FbFileBlock fbFileBlock, int hostIndex) {
+      if (fbFileBlock.diskIdsLength() == 0) return -1;
+      return fbFileBlock.diskIds(hostIndex);
     }
 
-    public boolean isCached(int hostIndex) {
-      return fileBlock_.getIs_replica_cached().get(hostIndex);
-    }
-
-    public THdfsFileBlock toThrift() { return fileBlock_; }
-
-    public static FileBlock fromThrift(THdfsFileBlock thriftFileBlock) {
-      return new FileBlock(thriftFileBlock);
-    }
-
-    @Override
-    public String toString() {
-      return Objects.toStringHelper(this)
-          .add("offset", fileBlock_.offset)
-          .add("length", fileBlock_.length)
-          .add("#disks", fileBlock_.getDisk_idsSize())
+    /**
+     * Returns a string representation of a FbFileBlock.
+     */
+    public static String debugString(FbFileBlock fbFileBlock) {
+      int numReplicaHosts = getNumReplicaHosts(fbFileBlock);
+      List<Integer> diskIds = Lists.newArrayListWithCapacity(numReplicaHosts);
+      List<Integer> replicaHosts = Lists.newArrayListWithCapacity(numReplicaHosts);
+      List<Boolean> isBlockCached = Lists.newArrayListWithCapacity(numReplicaHosts);
+      for (int i = 0; i < numReplicaHosts; ++i) {
+        diskIds.add(getDiskId(fbFileBlock, i));
+        replicaHosts.add(getReplicaHostIdx(fbFileBlock, i));
+        isBlockCached.add(isReplicaCached(fbFileBlock, i));
+      }
+      StringBuilder builder = new StringBuilder();
+      return builder.append("Offset: " + getOffset(fbFileBlock))
+          .append("Length: " + getLength(fbFileBlock))
+          .append("IsCached: " + hasCachedReplica(fbFileBlock))
+          .append("ReplicaHosts: " + Joiner.on(", ").join(replicaHosts))
+          .append("DiskIds: " + Joiner.on(", ").join(diskIds))
+          .append("Caching: " + Joiner.on(", ").join(isBlockCached))
           .toString();
     }
   }

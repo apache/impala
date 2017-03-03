@@ -212,42 +212,12 @@ struct TColumn {
   16: optional i32 block_size
 }
 
-// Represents a block in an HDFS file
-struct THdfsFileBlock {
-  // Offset of this block within the file
-  1: required i64 offset
-
-  // Total length of the block
-  2: required i64 length
-
-  // Hosts that contain replicas of this block. Each value in the list is an index in to
-  // the network_addresses list of THdfsTable.
-  3: required list<i32> replica_host_idxs
-
-  // The list of disk ids for the file block. May not be set if disk ids are not supported
-  4: optional list<i32> disk_ids
-
-  // For each replica, specifies if the block is cached in memory.
-  5: optional list<bool> is_replica_cached
-}
-
 // Represents an HDFS file in a partition.
 struct THdfsFileDesc {
-  // The name of the file (not the full path). The parent path is assumed to be the
-  // 'location' of the THdfsPartition this file resides within.
-  1: required string file_name
-
-  // The total length of the file, in bytes.
-  2: required i64 length
-
-  // The type of compression used for this file.
-  3: required THdfsCompression compression
-
-  // The last modified time of the file.
-  4: required i64 last_modification_time
-
-  // List of THdfsFileBlocks that make up this file.
-  5: required list<THdfsFileBlock> file_blocks
+  // File descriptor metadata serialized into a FlatBuffer
+  // (defined in common/fbs/CatalogObjects.fbs).
+  // TODO: Put this in a KRPC sidecar to avoid serialization cost.
+  1: required binary file_desc_data
 }
 
 // Represents an HDFS partition's location in a compressed format. 'prefix_index'

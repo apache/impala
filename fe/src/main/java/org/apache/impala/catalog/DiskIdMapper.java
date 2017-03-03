@@ -20,6 +20,7 @@ package org.apache.impala.catalog;
 import com.google.common.collect.Maps;
 import com.google.common.base.Strings;
 import com.google.common.base.Preconditions;
+import com.google.common.primitives.Shorts;
 
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,14 +42,14 @@ public class DiskIdMapper {
     private DiskIdMapper() {}
 
     // Maps each storage ID UUID string returned by the BlockLocation API, to a per-node
-    // sequential 0-based integer disk id used by the BE scanners. This assumes that
+    // sequential 0-based disk id used by the BE scanners. This assumes that
     // the storage ID of a particular disk is unique across all the nodes in the cluster.
-    private ConcurrentHashMap<String, Integer> storageUuidToDiskId =
-        new ConcurrentHashMap<String, Integer>();
+    private ConcurrentHashMap<String, Short> storageUuidToDiskId_ =
+        new ConcurrentHashMap<String, Short>();
 
-    // Per-host ID generator for storage UUID to integer ID mapping. This maps each host
-    // to the corresponding latest 0-based integer ID.
-    private HashMap<String, Integer> storageIdGenerator = Maps.newHashMap();
+    // Per-host ID generator for storage UUID to Short ID mapping. This maps each host
+    // to the corresponding latest 0-based ID stored in a short.
+    private HashMap<String, Short> storageIdGenerator_ = Maps.newHashMap();
 
     /**
      * Returns a disk id (0-based) index for storageUuid on host 'host'. Generates a
@@ -58,30 +59,35 @@ public class DiskIdMapper {
      * TODO: It is quite possible that there will be lock contention in this method during
      * the initial metadata load. Figure out ways to fix it using finer locking scheme.
      */
-    public int getDiskId(String host, String storageUuid) {
+    public short getDiskId(String host, String storageUuid) {
       Preconditions.checkState(!Strings.isNullOrEmpty(host));
       // Initialize the diskId as -1 to indicate it is unknown
-      int diskId = -1;
+      short diskId = -1;
       // Check if an existing mapping is already present. This is intentionally kept
       // out of the synchronized block to avoid contention for lookups. Once a reasonable
-      // amount of data loading is done and storageIdtoInt is populated with storage IDs
-      // across the cluster, we expect to have a good hit rate.
-      Integer intId = storageUuidToDiskId.get(storageUuid);
-      if (intId != null) return intId;
-      synchronized (storageIdGenerator) {
+      // amount of data loading is done and storageUuidToDiskId_ is populated with storage
+      // IDs across the cluster, we expect to have a good hit rate.
+      Short shortId = storageUuidToDiskId_.get(storageUuid);
+      if (shortId != null) return shortId;
+      synchronized (storageIdGenerator_) {
         // Mapping might have been added by another thread that entered the synchronized
         // block first.
-        intId = storageUuidToDiskId.get(storageUuid);
-        if (intId != null) return intId;
+        shortId = storageUuidToDiskId_.get(storageUuid);
+        if (shortId != null) return shortId;
         // No mapping exists, create a new disk ID for 'storageUuid'
-        if (storageIdGenerator.containsKey(host)) {
-          diskId = storageIdGenerator.get(host) + 1;
+        if (storageIdGenerator_.containsKey(host)) {
+          try {
+            diskId = Shorts.checkedCast(storageIdGenerator_.get(host) + 1);
+          } catch (IllegalStateException e) {
+            Preconditions.checkState(false,
+                "Number of hosts exceeded " + Short.MAX_VALUE);
+          }
         } else {
           // First diskId of this host.
           diskId = 0;
         }
-        storageIdGenerator.put(host, new Integer(diskId));
-        storageUuidToDiskId.put(storageUuid, new Integer(diskId));
+        storageIdGenerator_.put(host, Short.valueOf(diskId));
+        storageUuidToDiskId_.put(storageUuid, Short.valueOf(diskId));
       }
       return diskId;
     }

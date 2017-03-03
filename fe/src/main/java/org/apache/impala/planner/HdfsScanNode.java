@@ -54,10 +54,10 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
-import org.apache.impala.thrift.THdfsFileBlock;
 import org.apache.impala.thrift.THdfsFileSplit;
 import org.apache.impala.thrift.THdfsScanNode;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -540,47 +540,47 @@ public class HdfsScanNode extends ScanNode {
       boolean partitionMissingDiskIds = false;
       for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
         boolean fileDescMissingDiskIds = false;
-        for (THdfsFileBlock thriftBlock: fileDesc.getFileBlocks()) {
-          HdfsPartition.FileBlock block = FileBlock.fromThrift(thriftBlock);
-          List<Integer> replicaHostIdxs = block.getReplicaHostIdxs();
-          if (replicaHostIdxs.size() == 0) {
+        for (int j = 0; j < fileDesc.getNumFileBlocks(); ++j) {
+          FbFileBlock block = fileDesc.getFbFileBlock(j);
+          int replicaHostCount = FileBlock.getNumReplicaHosts(block);
+          if (replicaHostCount == 0) {
             // we didn't get locations for this block; for now, just ignore the block
             // TODO: do something meaningful with that
             continue;
           }
           // Collect the network address and volume ID of all replicas of this block.
           List<TScanRangeLocation> locations = Lists.newArrayList();
-          for (int i = 0; i < replicaHostIdxs.size(); ++i) {
+          for (int i = 0; i < replicaHostCount; ++i) {
             TScanRangeLocation location = new TScanRangeLocation();
             // Translate from the host index (local to the HdfsTable) to network address.
-            Integer tableHostIdx = replicaHostIdxs.get(i);
+            int replicaHostIdx = FileBlock.getReplicaHostIdx(block, i);
             TNetworkAddress networkAddress =
-                partition.getTable().getHostIndex().getEntry(tableHostIdx);
+                partition.getTable().getHostIndex().getEntry(replicaHostIdx);
             Preconditions.checkNotNull(networkAddress);
             // Translate from network address to the global (to this request) host index.
             Integer globalHostIdx = analyzer.getHostIndex().getIndex(networkAddress);
             location.setHost_idx(globalHostIdx);
-            if (checkMissingDiskIds && block.getDiskId(i) == -1) {
+            if (checkMissingDiskIds && FileBlock.getDiskId(block, i) == -1) {
               ++numScanRangesNoDiskIds_;
               partitionMissingDiskIds = true;
               fileDescMissingDiskIds = true;
             }
-            location.setVolume_id(block.getDiskId(i));
-            location.setIs_cached(block.isCached(i));
+            location.setVolume_id(FileBlock.getDiskId(block, i));
+            location.setIs_cached(FileBlock.isReplicaCached(block, i));
             locations.add(location);
           }
           // create scan ranges, taking into account maxScanRangeLength
-          long currentOffset = block.getOffset();
-          long remainingLength = block.getLength();
+          long currentOffset = FileBlock.getOffset(block);
+          long remainingLength = FileBlock.getLength(block);
           while (remainingLength > 0) {
             long currentLength = remainingLength;
             if (maxScanRangeLength > 0 && remainingLength > maxScanRangeLength) {
               currentLength = maxScanRangeLength;
             }
             TScanRange scanRange = new TScanRange();
-            scanRange.setHdfs_file_split(new THdfsFileSplit(
-                fileDesc.getFileName(), currentOffset, currentLength, partition.getId(),
-                fileDesc.getFileLength(), fileDesc.getFileCompression(),
+            scanRange.setHdfs_file_split(new THdfsFileSplit(fileDesc.getFileName(),
+                currentOffset, currentLength, partition.getId(), fileDesc.getFileLength(),
+                fileDesc.getFileCompression().toThrift(),
                 fileDesc.getModificationTime()));
             TScanRangeLocationList scanRangeLocations = new TScanRangeLocationList();
             scanRangeLocations.scan_range = scanRange;

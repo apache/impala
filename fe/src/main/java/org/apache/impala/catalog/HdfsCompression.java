@@ -17,7 +17,9 @@
 
 package org.apache.impala.catalog;
 
+import org.apache.impala.fb.FbCompression;
 import org.apache.impala.thrift.THdfsCompression;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
@@ -70,6 +72,18 @@ public enum HdfsCompression {
     case SNAPPY: return THdfsCompression.SNAPPY_BLOCKED;
     case LZO: return THdfsCompression.LZO;
     default: throw new IllegalStateException("Unexpected codec: " + this);
+    }
+  }
+
+  public byte toFb() {
+    switch (this) {
+      case NONE: return FbCompression.NONE;
+      case DEFLATE: return FbCompression.DEFLATE;
+      case GZIP: return FbCompression.GZIP;
+      case BZIP2: return FbCompression.BZIP2;
+      case SNAPPY: return FbCompression.SNAPPY;
+      case LZO: return FbCompression.LZO;
+      default: throw new IllegalStateException("Unexpected codec: " + this);
     }
   }
 

@@ -371,6 +371,7 @@ message(STATUS "Breakpad library: " ${BREAKPAD_STATIC_LIB})
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)
+add_subdirectory(common/fbs)
 add_subdirectory(be)
 add_subdirectory(fe)
 add_subdirectory(ext-data-source)

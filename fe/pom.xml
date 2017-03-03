@@ -352,6 +352,12 @@ under the License.
       <version>1.0.2</version>
     </dependency>
 
+    <dependency>
+      <groupId>com.github.davidmoten</groupId>
+      <artifactId>flatbuffers-java</artifactId>
+      <version>1.6.0.1</version>
+    </dependency>
+
   </dependencies>
 
   <reporting>

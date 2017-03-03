@@ -56,6 +56,8 @@ import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -74,6 +76,16 @@ public class FrontendTestBase {
   // Test-local list of test databases and tables. These are cleaned up in @After.
   protected final List<Db> testDbs_ = Lists.newArrayList();
   protected final List<Table> testTables_ = Lists.newArrayList();
+
+  @BeforeClass
+  public static void setUp() throws Exception {
+    RuntimeEnv.INSTANCE.setTestEnv(true);
+  }
+
+  @AfterClass
+  public static void cleanUp() throws Exception {
+    RuntimeEnv.INSTANCE.setTestEnv(false);
+  }
 
   protected Analyzer createAnalyzer(String defaultDb) {
     TQueryCtx queryCtx =

@@ -1,0 +1,75 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+namespace org.apache.impala.fb;
+
+// Supported compression algorithms. This needs to match the values in
+// CatalogObjects.THdfsCompression enum.
+enum FbCompression: byte {
+  NONE,
+  DEFAULT,
+  GZIP,
+  DEFLATE,
+  BZIP2,
+  SNAPPY,
+  SNAPPY_BLOCKED,
+  LZO,
+  LZ4,
+  ZLIB
+}
+
+table FbFileBlock {
+  // Offset of this block within the file
+  // TODO: Remove this field if file blocks are retrieved by offset. Infer offset using
+  // the block length.
+  offset: long = 0 (id: 0);
+
+  // Total length of the block.
+  // TODO: Remove this field and compute the block length using the offsets, block size,
+  // and file length.
+  length: long = -1 (id: 1);
+
+  // Hosts that contain replicas of this block. Each value in the list is an index to
+  // the network_addresses list of THdfsTable. The most significant bit of each
+  // replica host index indicates if the replica is cached.
+  replica_host_idxs: [ushort] (id: 2);
+
+  // The list of disk ids for the file block. May not be set if disk ids are not
+  // supported.
+  disk_ids: [ushort] (id: 3);
+}
+
+table FbFileDesc {
+  // The name of the file (not the full path). The parent path is assumed to be the
+  // 'location' of the Partition this file resides within.
+  // TODO: Investigate the use of prefix-based compression for file names.
+  file_name: string (id: 0);
+
+  // The total length of the file, in bytes.
+  length: long (id: 1);
+
+  // The type of compression used for this file.
+  // TODO: Check if reordering these fields can produce some space savings by eliminating
+  // added padding.
+  compression: FbCompression (id: 2);
+
+  // The last modified time of the file.
+  last_modification_time: long (id: 3);
+
+  // List of FbFileBlocks that make up this file.
+  file_blocks: [FbFileBlock] (id: 4);
+}
