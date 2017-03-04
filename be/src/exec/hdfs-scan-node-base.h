@@ -128,8 +128,6 @@ class HdfsScanNodeBase : public ScanNode {
   /// to a queue, false otherwise.
   virtual bool HasRowBatchQueue() const = 0;
 
-  int limit() const { return limit_; }
-
   const std::vector<SlotDescriptor*>& materialized_slots()
       const { return materialized_slots_; }
 

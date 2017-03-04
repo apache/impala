@@ -1,0 +1,39 @@
+====
+---- QUERY
+# Make sure LIMIT is enforced.
+select * from functional_kudu.dimtbl order by id limit 1;
+---- RESULTS
+1001,'Name1',94611
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+# Make sure that we can list the columns to be scanned in any order, that predicates
+# work and that we can have predicates on columns not referenced elsewhere.
+select zip, id from functional_kudu.dimtbl where id >= 1000 and 1002 >= id and
+94611 = zip and 'Name1' = name order by id;
+---- RESULTS
+94611,1001
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+SELECT a FROM functional_kudu.tinytable UNION ALL SELECT a FROM functional_kudu.tinytable;
+---- RESULTS
+'aaaaaaa'
+'ccccc'
+'eeeeeeee'
+'aaaaaaa'
+'ccccc'
+'eeeeeeee'
+---- TYPES
+STRING
+====
+---- QUERY
+# IMPALA-4408: Test Kudu scans where all materialized slots are non-nullable.
+select count(int_col) from functional_kudu.tinyinttable;
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====

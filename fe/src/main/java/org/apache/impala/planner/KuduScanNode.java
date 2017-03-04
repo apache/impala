@@ -84,6 +84,9 @@ public class KuduScanNode extends ScanNode {
 
   private final KuduTable kuduTable_;
 
+  // True if this scan node should use the MT implementation in the backend.
+  private boolean useMtScanNode_;
+
   // Indexes for the set of hosts that will be used for the query.
   // From analyzer.getHostIndex().getIndex(address)
   private final Set<Integer> hostIndexSet_ = Sets.newHashSet();
@@ -133,6 +136,14 @@ public class KuduScanNode extends ScanNode {
       computeScanRangeLocations(analyzer, client, rpcTable);
     } catch (Exception e) {
       throw new ImpalaRuntimeException("Unable to initialize the Kudu scan node", e);
+    }
+
+    // Determine backend scan node implementation to use.
+    if (analyzer.getQueryOptions().isSetMt_dop() &&
+        analyzer.getQueryOptions().mt_dop > 0) {
+      useMtScanNode_ = true;
+    } else {
+      useMtScanNode_ = false;
     }
 
     computeStats(analyzer);
@@ -293,6 +304,7 @@ public class KuduScanNode extends ScanNode {
   protected void toThrift(TPlanNode node) {
     node.node_type = TPlanNodeType.KUDU_SCAN_NODE;
     node.kudu_scan_node = new TKuduScanNode(desc_.getId().asInt());
+    node.kudu_scan_node.setUse_mt_scan_node(useMtScanNode_);
   }
 
   /**

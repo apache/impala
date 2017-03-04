@@ -19,7 +19,9 @@
 
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/locks.hpp>
+#include <kudu/client/client.h>
 
+#include "exec/kudu-util.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/exec-env.h"
@@ -30,7 +32,12 @@
 
 #include "common/names.h"
 
+using boost::algorithm::join;
 using namespace impala;
+
+struct QueryState::KuduClientPtr {
+  kudu::client::sp::shared_ptr<kudu::client::KuduClient> kudu_client;
+};
 
 QueryState::ScopedRef::ScopedRef(const TUniqueId& query_id) {
   DCHECK(ExecEnv::GetInstance()->query_exec_mgr() != nullptr);
@@ -165,4 +172,22 @@ FragmentInstanceState* QueryState::GetFInstanceState(const TUniqueId& instance_i
   lock_guard<SpinLock> l(fis_map_lock_);
   auto it = fis_map_.find(instance_id);
   return it != fis_map_.end() ? it->second : nullptr;
+}
+
+Status QueryState::GetKuduClient(const std::vector<std::string>& master_addresses,
+                                 kudu::client::KuduClient** client) {
+  std::string master_addr_concat = join(master_addresses, ",");
+  lock_guard<SpinLock> l(kudu_client_map_lock_);
+  auto kudu_client_map_it = kudu_client_map_.find(master_addr_concat);
+  if (kudu_client_map_it == kudu_client_map_.end()) {
+    // KuduClient doesn't exist, create it
+    KuduClientPtr* kudu_client_ptr = new KuduClientPtr;
+    RETURN_IF_ERROR(CreateKuduClient(master_addresses, &kudu_client_ptr->kudu_client));
+    kudu_client_map_[master_addr_concat].reset(kudu_client_ptr);
+    *client = kudu_client_ptr->kudu_client.get();
+  } else {
+    // Return existing KuduClient
+    *client = kudu_client_map_it->second->kudu_client.get();
+  }
+  return Status::OK();
 }

@@ -37,6 +37,7 @@
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/kudu-scan-node.h"
+#include "exec/kudu-scan-node-mt.h"
 #include "exec/kudu-util.h"
 #include "exec/nested-loop-join-node.h"
 #include "exec/partitioned-aggregation-node.h"
@@ -271,7 +272,6 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
   stringstream error_msg;
   switch (tnode.node_type) {
     case TPlanNodeType::HDFS_SCAN_NODE:
-      *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
       if (tnode.hdfs_scan_node.use_mt_scan_node) {
         DCHECK_GT(state->query_options().mt_dop, 0);
         *node = pool->Add(new HdfsScanNodeMt(pool, tnode, descs));
@@ -289,7 +289,14 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       break;
     case TPlanNodeType::KUDU_SCAN_NODE:
       RETURN_IF_ERROR(CheckKuduAvailability());
-      *node = pool->Add(new KuduScanNode(pool, tnode, descs));
+      if (tnode.kudu_scan_node.use_mt_scan_node) {
+        DCHECK_GT(state->query_options().mt_dop, 0);
+        *node = pool->Add(new KuduScanNodeMt(pool, tnode, descs));
+      } else {
+        DCHECK(state->query_options().mt_dop == 0
+            || state->query_options().num_scanner_threads == 1);
+        *node = pool->Add(new KuduScanNode(pool, tnode, descs));
+      }
       break;
     case TPlanNodeType::AGGREGATION_NODE:
       if (FLAGS_enable_partitioned_aggregation) {

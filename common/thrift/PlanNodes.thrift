@@ -254,6 +254,10 @@ struct THBaseScanNode {
 
 struct TKuduScanNode {
   1: required Types.TTupleId tuple_id
+
+  // Indicates whether the MT scan node implementation should be used.
+  // If this is true, then the MT_DOP query option must be > 0.
+  2: optional bool use_mt_scan_node
 }
 
 struct TEqJoinCondition {

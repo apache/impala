@@ -21,7 +21,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <kudu/client/client.h>
 
-#include "exec/kudu-scan-node.h"
+#include "exec/kudu-scan-node-base.h"
 #include "runtime/descriptors.h"
 
 namespace impala {
@@ -36,7 +36,7 @@ class Tuple;
 /// by GetNext() until it reaches eos, and the caller may open another scan token.
 class KuduScanner {
  public:
-  KuduScanner(KuduScanNode* scan_node, RuntimeState* state);
+  KuduScanner(KuduScanNodeBase* scan_node, RuntimeState* state);
 
   /// Prepares this scanner for execution.
   /// Does not actually open a kudu::client::KuduScanner.
@@ -83,7 +83,7 @@ class KuduScanner {
     return reinterpret_cast<Tuple*>(mem + scan_node_->tuple_desc()->byte_size());
   }
 
-  KuduScanNode* scan_node_;
+  KuduScanNodeBase* scan_node_;
   RuntimeState* state_;
 
   /// The kudu::client::KuduScanner for the current scan token. A new KuduScanner is

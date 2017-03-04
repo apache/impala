@@ -21,6 +21,7 @@ import pytest
 
 from copy import deepcopy
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.skip import SkipIfOldAggsJoins
 from tests.common.test_vector import ImpalaTestDimension
 
@@ -102,4 +103,14 @@ class TestMtDopParquet(ImpalaTestSuite):
     """IMPALA-4624: Test that dictionary filtering eliminates row groups correctly."""
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/parquet-filtering', vector)
+
+class TestMtDopKudu(KuduTestSuite):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestMtDopKudu, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
+
+  def test_kudu(self, vector, unique_database):
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    self.run_test_case('QueryTest/mt-dop-kudu', vector, use_db=unique_database)
 

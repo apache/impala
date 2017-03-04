@@ -58,7 +58,7 @@ namespace impala {
 
 const string MODE_READ_AT_SNAPSHOT = "READ_AT_SNAPSHOT";
 
-KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state)
+KuduScanner::KuduScanner(KuduScanNodeBase* scan_node, RuntimeState* state)
   : scan_node_(scan_node),
     state_(state),
     cur_kudu_batch_num_read_(0),
@@ -170,7 +170,7 @@ Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch) {
 
 Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_mem) {
   // Short-circuit the count(*) case.
-  if (scan_node_->tuple_desc_->slots().empty()) {
+  if (scan_node_->tuple_desc()->slots().empty()) {
     return HandleEmptyProjection(row_batch);
   }
 

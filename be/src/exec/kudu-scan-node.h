@@ -22,8 +22,7 @@
 #include <gtest/gtest.h>
 #include <kudu/client/client.h>
 
-#include "exec/scan-node.h"
-#include "runtime/descriptors.h"
+#include "exec/kudu-scan-node-base.h"
 #include "runtime/thread-resource-mgr.h"
 #include "gutil/gscoped_ptr.h"
 #include "util/thread.h"
@@ -37,42 +36,18 @@ class KuduScanner;
 /// This takes a set of serialized Kudu scan tokens which encode the information needed
 /// for this scan. A Kudu client deserializes the tokens into kudu scanners, and those
 /// are used to retrieve the rows for this scan.
-class KuduScanNode : public ScanNode {
+class KuduScanNode : public KuduScanNodeBase {
  public:
   KuduScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
   ~KuduScanNode();
 
-  virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual void Close(RuntimeState* state);
 
- protected:
-  virtual void DebugString(int indentation_level, std::stringstream* out) const;
-
  private:
   friend class KuduScanner;
-
-  kudu::client::KuduClient* kudu_client() { return client_.get(); }
-
-  /// Tuple id resolved in Prepare() to set tuple_desc_.
-  const TupleId tuple_id_;
-
-  RuntimeState* runtime_state_;
-
-  /// Descriptor of tuples read from Kudu table.
-  const TupleDescriptor* tuple_desc_;
-
-  /// The Kudu client and table. Scanners share these instances.
-  kudu::client::sp::shared_ptr<kudu::client::KuduClient> client_;
-  kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
-
-  /// Set of scan tokens to be deserialized into Kudu scanners.
-  std::vector<std::string> scan_tokens_;
-
-  /// The next index in 'scan_tokens_' to be assigned. Protected by lock_.
-  int next_scan_token_idx_;
 
   // Outgoing row batches queue. Row batches are produced asynchronously by the scanner
   // threads and consumed by the main thread.
@@ -102,11 +77,6 @@ class KuduScanNode : public ScanNode {
   /// Thread group for all scanner worker threads
   ThreadGroup scanner_threads_;
 
-  RuntimeProfile::Counter* kudu_round_trips_;
-  RuntimeProfile::Counter* kudu_remote_tokens_;
-  static const std::string KUDU_ROUND_TRIPS;
-  static const std::string KUDU_REMOTE_TOKENS;
-
   /// The id of the callback added to the thread resource manager when a thread
   /// is available. Used to remove the callback before this scan node is destroyed.
   /// -1 if no callback is registered.
@@ -126,18 +96,6 @@ class KuduScanNode : public ScanNode {
   /// in 'materialized_row_batches_' until the scanner reports eos, an error occurs, or
   /// the limit is reached.
   Status ProcessScanToken(KuduScanner* scanner, const std::string& scan_token);
-
-  /// Returns the next scan token. Thread safe. Returns NULL if there are no more scan
-  /// tokens.
-  const std::string* GetNextScanToken();
-
-  const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
-
-  // Returns a cloned copy of the scan node's conjuncts. Requires that the expressions
-  // have been open previously.
-  Status GetConjunctCtxs(vector<ExprContext*>* ctxs);
-
-  RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
 };
 
 }

@@ -82,6 +82,8 @@ add_library(Exec
   plan-root-sink.cc
   kudu-scanner.cc
   kudu-scan-node.cc
+  kudu-scan-node-base.cc
+  kudu-scan-node-mt.cc
   kudu-table-sink.cc
   kudu-util.cc
   read-write-util.cc

@@ -30,6 +30,8 @@
 #include "util/spinlock.h"
 #include "util/uid-util.h"
 
+namespace kudu { namespace client { class KuduClient; } }
+
 namespace impala {
 
 class FragmentInstanceState;
@@ -115,6 +117,13 @@ class QueryState {
   /// Must be called before destroying the QueryState.
   void ReleaseResources();
 
+  /// Gets a KuduClient for this list of master addresses. It will lookup and share
+  /// an existing KuduClient if possible. Otherwise, it will create a new KuduClient
+  /// internally and return a pointer to it. All KuduClients accessed through this
+  /// interface are owned by the QueryState. Thread safe.
+  Status GetKuduClient(const std::vector<std::string>& master_addrs,
+                       kudu::client::KuduClient** client);
+
   ~QueryState();
 
  private:
@@ -158,6 +167,22 @@ class QueryState {
   /// Only non-null in backend tests the explicitly enabled the new buffer pool
   /// TODO: this will always be non-null once IMPALA-3200 is done
   TmpFileMgr::FileGroup* file_group_;
+
+  SpinLock kudu_client_map_lock_; // protects kudu_client_map_
+
+  /// Opaque type for storing the pointer to the KuduClient. This allows us
+  /// to avoid including Kudu header files.
+  struct KuduClientPtr;
+
+  /// Map from the master addresses string for a Kudu table to the KuduClientPtr for
+  /// accessing that table. The master address string is constructed by joining
+  /// the master address list entries with a comma separator.
+  typedef std::unordered_map<std::string, std::unique_ptr<KuduClientPtr>> KuduClientMap;
+
+  /// Map for sharing KuduClients between fragment instances. Each Kudu table has
+  /// a list of master addresses stored in the Hive Metastore. This map requires
+  /// that the master address lists be identical in order to share a KuduClient.
+  KuduClientMap kudu_client_map_;
 
   /// Create QueryState w/ copy of query_ctx and refcnt of 0.
   /// The query is associated with the resource pool named 'pool'
