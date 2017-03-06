@@ -2633,31 +2633,33 @@ public class CatalogOpExecutor {
 
     // Add partitions to metastore.
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      // ifNotExists and needResults are true.
-      hmsPartitions = msClient.getHiveClient().add_partitions(hmsPartitions,
-          true, true);
-      for (Partition partition: hmsPartitions) {
-        // Create and add the HdfsPartition. Return the table object with an updated
-        // catalog version.
-        addHdfsPartition(tbl, partition);
-      }
-
-      // Handle HDFS cache.
-      if (cachePoolName != null) {
-        for (Partition partition: hmsPartitions) {
-          long id = HdfsCachingUtil.submitCachePartitionDirective(partition,
-              cachePoolName, replication);
-          cacheIds.add(id);
+      // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.
+      for (int i = 0; i < hmsPartitions.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
+        int endPartitionIndex =
+            Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, hmsPartitions.size());
+        List<Partition> hmsSublist = hmsPartitions.subList(i, endPartitionIndex);
+        // ifNotExists and needResults are true.
+        List<Partition> hmsAddedPartitions =
+            msClient.getHiveClient().add_partitions(hmsSublist, true, true);
+        for (Partition partition: hmsAddedPartitions) {
+          // Create and add the HdfsPartition. Return the table object with an updated
+          // catalog version.
+          addHdfsPartition(tbl, partition);
         }
-        // Update the partition metadata to include the cache directive id.
-        msClient.getHiveClient().alter_partitions(tableName.getDb(),
-            tableName.getTbl(), hmsPartitions);
+
+        // Handle HDFS cache.
+        if (cachePoolName != null) {
+          for (Partition partition: hmsAddedPartitions) {
+            long id = HdfsCachingUtil.submitCachePartitionDirective(partition,
+                cachePoolName, replication);
+            cacheIds.add(id);
+          }
+          // Update the partition metadata to include the cache directive id.
+          msClient.getHiveClient().alter_partitions(tableName.getDb(),
+              tableName.getTbl(), hmsAddedPartitions);
+        }
+        updateLastDdlTime(msTbl, msClient);
       }
-      updateLastDdlTime(msTbl, msClient);
-    } catch (AlreadyExistsException e) {
-      // This may happen when another client of HMS has added the partitions.
-      LOG.trace(String.format("Ignoring '%s' when adding partition to %s.", e,
-          tableName));
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partition"), e);
@@ -2956,15 +2958,15 @@ public class CatalogOpExecutor {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.
       for (int i = 0; i < hmsPartitions.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
-        int numPartitionsToUpdate =
+        int endPartitionIndex =
             Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, hmsPartitions.size());
         try {
           // Alter partitions in bulk.
           msClient.getHiveClient().alter_partitions(dbName, tableName,
-              hmsPartitions.subList(i, numPartitionsToUpdate));
+              hmsPartitions.subList(i, endPartitionIndex));
           // Mark the corresponding HdfsPartition objects as dirty
           for (org.apache.hadoop.hive.metastore.api.Partition msPartition:
-               hmsPartitions.subList(i, numPartitionsToUpdate)) {
+               hmsPartitions.subList(i, endPartitionIndex)) {
             try {
               catalog_.getHdfsPartition(dbName, tableName, msPartition).markDirty();
             } catch (PartitionNotFoundException e) {

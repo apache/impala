@@ -168,6 +168,37 @@ class TestRecoverPartitions(ImpalaTestSuite):
     assert self.has_value(INSERTED_VALUE, result.data)
 
   @SkipIfLocal.hdfs_client
+  def test_recover_many_partitions(self, vector, unique_database):
+    """Test that RECOVER PARTITIONS correctly discovers new partitions added externally
+    by the hdfs client, recovered in batches"""
+
+    TBL_NAME = "test_recover_partitions"
+    FQ_TBL_NAME = unique_database + "." + TBL_NAME
+    TBL_LOCATION = self.__get_fs_location(unique_database, TBL_NAME)
+
+    self.execute_query_expect_success(self.client,
+        "CREATE TABLE %s (c int) PARTITIONED BY (s string)" % (FQ_TBL_NAME))
+
+    # Create 700 partitions externally
+    for i in xrange(1, 700):
+        PART_DIR = "s=part%d/" % i
+        FILE_PATH = "test"
+        self.filesystem_client.make_dir(TBL_LOCATION + PART_DIR)
+
+    result = self.execute_query_expect_success(self.client,
+        "SHOW PARTITIONS %s" % FQ_TBL_NAME)
+    for i in xrange(1, 700):
+        PART_DIR = "part%d\t" % i
+        assert not self.has_value(PART_DIR, result.data)
+    self.execute_query_expect_success(self.client,
+        "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
+    result = self.execute_query_expect_success(self.client,
+        "SHOW PARTITIONS %s" % FQ_TBL_NAME)
+    for i in xrange(1, 700):
+        PART_DIR = "part%d\t" % i
+        assert self.has_value(PART_DIR, result.data)
+
+  @SkipIfLocal.hdfs_client
   def test_duplicate_partitions(self, vector, unique_database):
     """Test that RECOVER PARTITIONS does not recover equivalent partitions. Two partitions
     are considered equivalent if they correspond to distinct paths but can be converted
