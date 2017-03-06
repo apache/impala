@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -17,27 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
+# This file suppresses UBSAN errors, following
+# http://releases.llvm.org/3.8.0/tools/clang/docs/UndefinedBehaviorSanitizer.html#runtime-suppressions
 
-export GTEST_OUTPUT="xml:$IMPALA_BE_TEST_LOGS_DIR/"
-
-: ${SKIP_BE_TEST_PATTERN:=}
-
-# The backend unit tests currently do not work when HEAPCHECK is enabled.
-export HEAPCHECK=
-
-BE_TEST_ARGS=""
-if [[ -n "$SKIP_BE_TEST_PATTERN" ]]; then
-  BE_TEST_ARGS="-E ${SKIP_BE_TEST_PATTERN}"
-fi
-
-cd ${IMPALA_BE_DIR}
-. ${IMPALA_HOME}/bin/set-classpath.sh
-cd ..
-
-export CTEST_OUTPUT_ON_FAILURE=1
-export UBSAN_OPTIONS="print_stacktrace=1"
-UBSAN_OPTIONS="${UBSAN_OPTIONS} suppressions=${IMPALA_HOME}/bin/ubsan-suppressions.txt"
-export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
-make test ARGS="${BE_TEST_ARGS}"
+# Some methods in ios_base.h (libstdc++ 4.9.2) mask two values a and b of an enum type to
+# create the logical equivalent of (a and (not b)) using the expression 'a & ~b'. When ~b
+# is not a valid enum member (and it usually isn't), this causes a UBSAN error. The line
+# below suppresses that error.
+enum:ios_base.h
