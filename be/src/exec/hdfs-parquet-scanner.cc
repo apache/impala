@@ -427,8 +427,8 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
     }
     assemble_rows_timer_.Start();
     DCHECK_LE(row_group_rows_read_, file_metadata_.num_rows);
-    int rows_remaining = file_metadata_.num_rows - row_group_rows_read_;
-    int max_tuples = min(row_batch->capacity(), rows_remaining);
+    int64_t rows_remaining = file_metadata_.num_rows - row_group_rows_read_;
+    int max_tuples = min<int64_t>(row_batch->capacity(), rows_remaining);
     TupleRow* current_row = row_batch->GetRow(row_batch->AddRow());
     int num_to_commit = WriteTemplateTuples(current_row, max_tuples);
     Status status = CommitRows(row_batch, num_to_commit);
