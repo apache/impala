@@ -30,7 +30,6 @@
 // or may have it disabled by default).
 #if __cplusplus >= 201103L
 #define NOEXCEPT noexcept
-#define USING_TYPE
 #else
 #define NOEXCEPT
 #endif
