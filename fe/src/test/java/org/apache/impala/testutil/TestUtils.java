@@ -85,17 +85,18 @@ public class TestUtils {
     new PathFilter("file: ")
   };
 
-  // File size could vary from run to run. For example, parquet file header size could
-  // change if Impala version changes. That doesn't mean anything wrong with the plan
-  // so we want to filter file size out.
+  // File size could vary from run to run. For example, the parquet file header size
+  // or column metadata size could change if the Impala version changes. That doesn't
+  // mean anything is wrong with the plan, so we want to filter the file size out.
   static class FileSizeFilter implements ResultFilter {
+    private final static String BYTE_FILTER = "[KMGT]?B";
     private final static String NUMBER_FILTER = "\\d+(\\.\\d+)?";
     private final static String FILTER_KEY = "size=";
 
     public boolean matches(String input) { return input.contains(FILTER_KEY); }
 
     public String transform(String input) {
-      return input.replaceAll(FILTER_KEY + NUMBER_FILTER, FILTER_KEY);
+      return input.replaceAll(FILTER_KEY + NUMBER_FILTER + BYTE_FILTER, FILTER_KEY);
     }
   }
 
