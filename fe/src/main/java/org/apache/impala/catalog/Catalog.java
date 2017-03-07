@@ -449,9 +449,14 @@ public abstract class Catalog {
           throw new CatalogException("Table not found: " +
               objectDesc.getTable().getTbl_name());
         }
-        result.setType(table.getCatalogObjectType());
-        result.setCatalog_version(table.getCatalogVersion());
-        result.setTable(table.toThrift());
+        table.getLock().lock();
+        try {
+          result.setType(table.getCatalogObjectType());
+          result.setCatalog_version(table.getCatalogVersion());
+          result.setTable(table.toThrift());
+        } finally {
+          table.getLock().unlock();
+        }
         break;
       }
       case FUNCTION: {

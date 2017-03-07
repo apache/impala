@@ -26,6 +26,8 @@ class TestWebPage(ImpalaTestSuite):
   RESET_JAVA_LOGLEVEL_URL = "http://localhost:{0}/reset_java_loglevel"
   SET_GLOG_LOGLEVEL_URL = "http://localhost:{0}/set_glog_level"
   RESET_GLOG_LOGLEVEL_URL = "http://localhost:{0}/reset_glog_level"
+  CATALOG_URL = "http://localhost:{0}/catalog"
+  CATALOG_OBJECT_URL = "http://localhost:{0}/catalog_object"
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
   # log level endpoints, one without the statestore port and the
@@ -130,3 +132,25 @@ class TestWebPage(ImpalaTestSuite):
     # Try a non-existent endpoint on log_level URL.
     bad_loglevel_url = self.SET_GLOG_LOGLEVEL_URL + "?badurl=foo"
     self.get_and_check_status(bad_loglevel_url, without_ss=False)
+
+  def test_catalog(self):
+    """Tests the /catalog and /catalog_object endpoints."""
+    self.get_and_check_status(self.CATALOG_URL, "functional", without_ss=True)
+    self.get_and_check_status(self.CATALOG_URL, "alltypes", without_ss=True)
+    # IMPALA-5028: Test toThrift() of a partitioned table via the WebUI code path.
+    self.__test_catalog_object("functional", "alltypes")
+    self.__test_catalog_object("functional_parquet", "alltypes")
+    self.__test_catalog_object("functional", "alltypesnopart")
+    self.__test_catalog_object("functional_kudu", "alltypes")
+
+  def __test_catalog_object(self, db_name, tbl_name):
+    """Tests the /catalog_object endpoint for the given db/table. Runs
+    against an unloaded as well as a loaded table."""
+    self.client.execute("invalidate metadata %s.%s" % (db_name, tbl_name))
+    self.get_and_check_status(self.CATALOG_OBJECT_URL +
+      "?object_type=TABLE&object_name=%s.%s" % (db_name, tbl_name), tbl_name,
+      without_ss=True)
+    self.client.execute("select count(*) from %s.%s" % (db_name, tbl_name))
+    self.get_and_check_status(self.CATALOG_OBJECT_URL +
+      "?object_type=TABLE&object_name=%s.%s" % (db_name, tbl_name), tbl_name,
+      without_ss=True)
