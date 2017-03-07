@@ -10,8 +10,8 @@ select count(*) from functional_parquet.alltypes where id < 10000;
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # id: Some values pass
@@ -20,8 +20,8 @@ select count(*) from functional_parquet.alltypes where mod(id, 10000) < 20;
 ---- RESULTS
 20
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 7.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 23
 ====
 ---- QUERY
 # id: No values pass
@@ -30,8 +30,8 @@ select count(*) from functional_parquet.alltypes where mod(id,10000) = 7301;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 8.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 24
 ====
 ---- QUERY
 # tinyint_col: All values pass
@@ -40,8 +40,8 @@ select count(*) from functional_parquet.alltypes where tinyint_col < 10;
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # tinyint_col: No values pass
@@ -50,8 +50,8 @@ select count(*) from functional_parquet.alltypes where mod(tinyint_col,50) > 10;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 8.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 24
 ====
 ---- QUERY
 # smallint_col: All values pass
@@ -60,8 +60,8 @@ select count(*) from functional_parquet.alltypes where smallint_col < 10
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # smallint_col: No values pass
@@ -70,8 +70,8 @@ select count(*) from functional_parquet.alltypes where mod(smallint_col,50) > 10
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 8.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 24
 ====
 ---- QUERY
 # int_col: All values pass
@@ -80,8 +80,8 @@ select count(*) from functional_parquet.alltypes where int_col < 10
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # int_col: No values pass
@@ -90,8 +90,8 @@ select count(*) from functional_parquet.alltypes where mod(int_col, 50) > 10;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 8.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 24
 ====
 ---- QUERY
 # bigint_col: All values pass
@@ -100,8 +100,8 @@ select count(*) from functional_parquet.alltypes where bigint_col < 100
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # bigint_col: No values pass
@@ -110,8 +110,8 @@ select count(*) from functional_parquet.alltypes where mod(bigint_col, 500) > 10
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 8.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 24
 ====
 ---- QUERY
 # float_col: All values pass
@@ -120,8 +120,8 @@ select count(*) from functional_parquet.alltypes where float_col < 10
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # float_col: No values pass
@@ -130,8 +130,8 @@ select count(*) from functional_parquet.alltypes where mod(float_col, 100) > 10;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 8.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 24
 ====
 ---- QUERY
 # double_col: All values pass
@@ -140,8 +140,8 @@ select count(*) from functional_parquet.alltypes where double_col < 100
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # double_col: No values pass
@@ -150,8 +150,8 @@ select count(*) from functional_parquet.alltypes where mod(double_col, 100) > 10
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 8.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 24
 ====
 ---- QUERY
 # date_string_col: All values pass
@@ -160,8 +160,8 @@ select count(*) from functional_parquet.alltypes where date_string_col like '%/%
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # date_string_col: Half of the values pass
@@ -170,8 +170,8 @@ select count(*) from functional_parquet.alltypes where date_string_col like '%/1
 ---- RESULTS
 3650
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 4.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 12
 ====
 ---- QUERY
 # date_string_col: No values pass
@@ -180,8 +180,8 @@ select count(*) from functional_parquet.alltypes where date_string_col = '01/01/
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 8.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 24
 ====
 ---- QUERY
 # string_col: All values pass
@@ -190,8 +190,8 @@ select count(*) from functional_parquet.alltypes where length(string_col) = 1 ;
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # string_col: No values pass
@@ -200,8 +200,8 @@ select count(*) from functional_parquet.alltypes where string_col = '10';
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 8.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 24
 ====
 ---- QUERY
 # timestamp_col: All values pass
@@ -210,8 +210,8 @@ select count(*) from functional_parquet.alltypes where timestamp_col >= '2009-01
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # timestamp_col: No values pass
@@ -221,8 +221,8 @@ select count(*) from functional_parquet.alltypes where timestamp_col = '2009-01-
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 8.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # TPC-H lineitem.l_orderkey has high cardinality (1500000)
@@ -233,8 +233,8 @@ select count(*) from tpch_parquet.lineitem where l_orderkey = 50;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 1.*
-row_regex: .*NumDictFilteredRowGroups: 0.*
+aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
 ---- QUERY
 # Verify dictionary filtering on top level of a schema with nested
@@ -243,6 +243,6 @@ select count(*) from tpch_nested_parquet.customer where c_mktsegment = 'COMEDY';
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 1.*
-row_regex: .*NumDictFilteredRowGroups: 1.*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 4
 ====
