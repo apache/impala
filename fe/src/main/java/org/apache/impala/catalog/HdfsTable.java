@@ -718,7 +718,7 @@ public class HdfsTable extends Table {
     // separately.
     // TODO: We can still do some advanced optimization by grouping all the partition
     // directories under the same ancestor path up the tree.
-    List<Path> dirsToLoad = Lists.newArrayList(tblLocation);
+    Set<Path> dirsToLoad = Sets.newHashSet(tblLocation);
 
     if (msTbl.getPartitionKeysSize() == 0) {
       Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
@@ -839,7 +839,7 @@ public class HdfsTable extends Table {
    * and filtering only the paths from 'partsByPath'. Also loads the disk IDs
    * corresponding to these block locations.
    */
-  private void loadMetadataAndDiskIds(List<Path> locations,
+  private void loadMetadataAndDiskIds(Set<Path> locations,
       HashMap<Path, List<HdfsPartition>> partsByPath) {
     LOG.info(String.format(
         "Loading file and block metadata for %s partitions from %s paths: %s",
