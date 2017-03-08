@@ -404,6 +404,9 @@ typedef ResultType (*UdaFinalize)(FunctionContext* context, const IntermediateTy
 //-------------Implementation of the *Val structs ----------------------------
 //----------------------------------------------------------------------------
 struct AnyVal {
+  // Whether this value is NULL. If true, all other fields contain arbitrary values.
+  // UDF code should *not* assume that other fields of a NULL *Val struct have any
+  // particular value (e.g. 0 or -1).
   bool is_null;
   AnyVal(bool is_null = false) : is_null(is_null) {}
 };
