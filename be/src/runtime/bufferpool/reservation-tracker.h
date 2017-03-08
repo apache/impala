@@ -108,6 +108,8 @@ class ReservationTracker {
   /// If the tracker is initialized, deregister the ReservationTracker from its parent,
   /// relinquishing all this tracker's reservation. All of the reservation must be unused
   /// and all the tracker's children must be closed before calling this method.
+  /// TODO: decide on and implement policy for how far to release the reservation up
+  /// the tree. Currently the reservation is released all the way to the root.
   void Close();
 
   /// Request to increase reservation by 'bytes'. The request is either granted in

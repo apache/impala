@@ -16,6 +16,7 @@
 // under the License.
 
 #include <cstdlib>
+#include <limits>
 #include <string>
 #include <vector>
 #include <boost/bind.hpp>
@@ -123,7 +124,6 @@ void BufferPoolTest::RegisterQueriesAndClients(BufferPool* pool, int query_id_hi
 
   int clients_per_query = 32;
   BufferPool::ClientHandle* clients[num_queries];
-  ReservationTracker* client_reservations[num_queries];
 
   for (int i = 0; i < num_queries; ++i) {
     int64_t query_id = QueryId(query_id_hi, i);
@@ -140,7 +140,6 @@ void BufferPoolTest::RegisterQueriesAndClients(BufferPool* pool, int query_id_hi
     EXPECT_TRUE(query_reservation->IncreaseReservationToFit(initial_query_reservation));
 
     clients[i] = new BufferPool::ClientHandle[clients_per_query];
-    client_reservations[i] = new ReservationTracker[clients_per_query];
 
     for (int j = 0; j < clients_per_query; ++j) {
       int64_t initial_client_reservation =
@@ -148,13 +147,10 @@ void BufferPoolTest::RegisterQueriesAndClients(BufferPool* pool, int query_id_hi
           < initial_query_reservation % clients_per_query;
       // Reservation limit can be anything greater or equal to the initial reservation.
       int64_t client_reservation_limit = initial_client_reservation + rand() % 100000;
-      client_reservations[i][j].InitChildTracker(
-          NULL, query_reservation, NULL, client_reservation_limit);
-      EXPECT_TRUE(
-          client_reservations[i][j].IncreaseReservationToFit(initial_client_reservation));
       string name = Substitute("Client $0 for query $1", j, query_id);
-      EXPECT_OK(pool->RegisterClient(
-          name, &client_reservations[i][j], NULL, NewProfile(), &clients[i][j]));
+      EXPECT_OK(pool->RegisterClient(name, NULL, query_reservation, NULL,
+          client_reservation_limit, NewProfile(), &clients[i][j]));
+      EXPECT_TRUE(clients[i][j].IncreaseReservationToFit(initial_client_reservation));
     }
 
     for (int j = 0; j < clients_per_query; ++j) {
@@ -167,11 +163,9 @@ void BufferPoolTest::RegisterQueriesAndClients(BufferPool* pool, int query_id_hi
     for (int j = 0; j < clients_per_query; ++j) {
       pool->DeregisterClient(&clients[i][j]);
       ASSERT_FALSE(clients[i][j].is_registered());
-      client_reservations[i][j].Close();
     }
 
     delete[] clients[i];
-    delete[] client_reservations[i];
 
     GetQueryReservationTracker(QueryId(query_id_hi, i))->Close();
   }
@@ -234,12 +228,10 @@ TEST_F(BufferPoolTest, PageCreation) {
   int64_t total_mem = 2 * 2 * max_page_len;
   global_reservations_.InitRootTracker(NULL, total_mem);
   BufferPool pool(TEST_BUFFER_LEN, total_mem);
-  ReservationTracker* client_tracker = obj_pool_.Add(new ReservationTracker());
-  client_tracker->InitChildTracker(NewProfile(), &global_reservations_, NULL, total_mem);
-  ASSERT_TRUE(client_tracker->IncreaseReservation(total_mem));
   BufferPool::ClientHandle client;
-  ASSERT_OK(
-      pool.RegisterClient("test client", client_tracker, NULL, NewProfile(), &client));
+  ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
+      total_mem, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservation(total_mem));
 
   vector<BufferPool::PageHandle> handles(num_pages);
 
@@ -247,7 +239,7 @@ TEST_F(BufferPoolTest, PageCreation) {
   for (int i = 0; i < num_pages; ++i) {
     int size_multiple = 1 << i;
     int64_t page_len = TEST_BUFFER_LEN * size_multiple;
-    int64_t used_before = client_tracker->GetUsedReservation();
+    int64_t used_before = client.GetUsedReservation();
     ASSERT_OK(pool.CreatePage(&client, page_len, &handles[i]));
     ASSERT_TRUE(handles[i].is_open());
     ASSERT_TRUE(handles[i].is_pinned());
@@ -256,19 +248,18 @@ TEST_F(BufferPoolTest, PageCreation) {
     ASSERT_EQ(handles[i].buffer_handle()->data(), handles[i].data());
     ASSERT_EQ(handles[i].len(), page_len);
     ASSERT_EQ(handles[i].buffer_handle()->len(), page_len);
-    ASSERT_EQ(client_tracker->GetUsedReservation(), used_before + page_len);
+    ASSERT_EQ(client.GetUsedReservation(), used_before + page_len);
   }
 
   // Close the handles and check memory consumption.
   for (int i = 0; i < num_pages; ++i) {
-    int64_t used_before = client_tracker->GetUsedReservation();
+    int64_t used_before = client.GetUsedReservation();
     int page_len = handles[i].len();
     pool.DestroyPage(&client, &handles[i]);
-    ASSERT_EQ(client_tracker->GetUsedReservation(), used_before - page_len);
+    ASSERT_EQ(client.GetUsedReservation(), used_before - page_len);
   }
 
   pool.DeregisterClient(&client);
-  client_tracker->Close();
 
   // All the reservations should be released at this point.
   ASSERT_EQ(global_reservations_.GetReservation(), 0);
@@ -282,12 +273,10 @@ TEST_F(BufferPoolTest, BufferAllocation) {
   int64_t total_mem = 2 * 2 * max_buffer_len;
   global_reservations_.InitRootTracker(NULL, total_mem);
   BufferPool pool(TEST_BUFFER_LEN, total_mem);
-  ReservationTracker* client_tracker = obj_pool_.Add(new ReservationTracker());
-  client_tracker->InitChildTracker(NewProfile(), &global_reservations_, NULL, total_mem);
-  ASSERT_TRUE(client_tracker->IncreaseReservationToFit(total_mem));
   BufferPool::ClientHandle client;
-  ASSERT_OK(
-      pool.RegisterClient("test client", client_tracker, NULL, NewProfile(), &client));
+  ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
+      total_mem, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservationToFit(total_mem));
 
   vector<BufferPool::BufferHandle> handles(num_buffers);
 
@@ -295,24 +284,23 @@ TEST_F(BufferPoolTest, BufferAllocation) {
   for (int i = 0; i < num_buffers; ++i) {
     int size_multiple = 1 << i;
     int64_t buffer_len = TEST_BUFFER_LEN * size_multiple;
-    int64_t used_before = client_tracker->GetUsedReservation();
+    int64_t used_before = client.GetUsedReservation();
     ASSERT_OK(pool.AllocateBuffer(&client, buffer_len, &handles[i]));
     ASSERT_TRUE(handles[i].is_open());
     ASSERT_TRUE(handles[i].data() != NULL);
     ASSERT_EQ(handles[i].len(), buffer_len);
-    ASSERT_EQ(client_tracker->GetUsedReservation(), used_before + buffer_len);
+    ASSERT_EQ(client.GetUsedReservation(), used_before + buffer_len);
   }
 
   // Close the handles and check memory consumption.
   for (int i = 0; i < num_buffers; ++i) {
-    int64_t used_before = client_tracker->GetUsedReservation();
+    int64_t used_before = client.GetUsedReservation();
     int buffer_len = handles[i].len();
     pool.FreeBuffer(&client, &handles[i]);
-    ASSERT_EQ(client_tracker->GetUsedReservation(), used_before - buffer_len);
+    ASSERT_EQ(client.GetUsedReservation(), used_before - buffer_len);
   }
 
   pool.DeregisterClient(&client);
-  client_tracker->Close();
 
   // All the reservations should be released at this point.
   ASSERT_EQ(global_reservations_.GetReservation(), 0);
@@ -326,15 +314,12 @@ TEST_F(BufferPoolTest, BufferTransfer) {
   int64_t total_mem = num_clients * TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NULL, total_mem);
   BufferPool pool(TEST_BUFFER_LEN, total_mem);
-  ReservationTracker client_trackers[num_clients];
   BufferPool::ClientHandle clients[num_clients];
   BufferPool::BufferHandle handles[num_clients];
   for (int i = 0; i < num_clients; ++i) {
-    client_trackers[i].InitChildTracker(
-        NewProfile(), &global_reservations_, NULL, TEST_BUFFER_LEN);
-    ASSERT_TRUE(client_trackers[i].IncreaseReservationToFit(TEST_BUFFER_LEN));
-    ASSERT_OK(pool.RegisterClient(
-        "test client", &client_trackers[i], NULL, NewProfile(), &clients[i]));
+    ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
+        TEST_BUFFER_LEN, NewProfile(), &clients[i]));
+    ASSERT_TRUE(clients[i].IncreaseReservationToFit(TEST_BUFFER_LEN));
   }
 
   // Transfer the page around between the clients repeatedly in a circle.
@@ -347,19 +332,16 @@ TEST_F(BufferPoolTest, BufferTransfer) {
           &clients[next_client], &handles[next_client]));
       // Check that the transfer left things in a consistent state.
       ASSERT_FALSE(handles[client].is_open());
-      ASSERT_EQ(0, client_trackers[client].GetUsedReservation());
+      ASSERT_EQ(0, clients[client].GetUsedReservation());
       ASSERT_TRUE(handles[next_client].is_open());
-      ASSERT_EQ(TEST_BUFFER_LEN, client_trackers[next_client].GetUsedReservation());
+      ASSERT_EQ(TEST_BUFFER_LEN, clients[next_client].GetUsedReservation());
       // The same underlying buffer should be used.
       ASSERT_EQ(data, handles[next_client].data());
     }
   }
 
   pool.FreeBuffer(&clients[0], &handles[0]);
-  for (int i = 0; i < num_clients; ++i) {
-    pool.DeregisterClient(&clients[i]);
-    client_trackers[i].Close();
-  }
+  for (BufferPool::ClientHandle& client : clients) pool.DeregisterClient(&client);
   ASSERT_EQ(global_reservations_.GetReservation(), 0);
   global_reservations_.Close();
 }
@@ -371,13 +353,10 @@ TEST_F(BufferPoolTest, Pin) {
   int64_t child_reservation = TEST_BUFFER_LEN * 2;
   BufferPool pool(TEST_BUFFER_LEN, total_mem);
   global_reservations_.InitRootTracker(NULL, total_mem);
-  ReservationTracker* client_tracker = obj_pool_.Add(new ReservationTracker());
-  client_tracker->InitChildTracker(
-      NewProfile(), &global_reservations_, NULL, child_reservation);
-  ASSERT_TRUE(client_tracker->IncreaseReservationToFit(child_reservation));
   BufferPool::ClientHandle client;
-  ASSERT_OK(pool.RegisterClient(
-      "test client", client_tracker, NewFileGroup(), NewProfile(), &client));
+  ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
+      NULL, child_reservation, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservationToFit(child_reservation));
 
   BufferPool::PageHandle handle1, handle2;
 
@@ -416,7 +395,6 @@ TEST_F(BufferPoolTest, Pin) {
   pool.DestroyPage(&client, &double_handle);
 
   pool.DeregisterClient(&client);
-  client_tracker->Close();
 }
 
 /// Creating a page or pinning without sufficient reservation should DCHECK.
@@ -424,18 +402,15 @@ TEST_F(BufferPoolTest, PinWithoutReservation) {
   int64_t total_mem = TEST_BUFFER_LEN * 1024;
   BufferPool pool(TEST_BUFFER_LEN, total_mem);
   global_reservations_.InitRootTracker(NULL, total_mem);
-  ReservationTracker* client_tracker = obj_pool_.Add(new ReservationTracker());
-  client_tracker->InitChildTracker(
-      NewProfile(), &global_reservations_, NULL, TEST_BUFFER_LEN);
   BufferPool::ClientHandle client;
-  ASSERT_OK(
-      pool.RegisterClient("test client", client_tracker, NULL, NewProfile(), &client));
+  ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
+      TEST_BUFFER_LEN, NewProfile(), &client));
 
   BufferPool::PageHandle handle;
   IMPALA_ASSERT_DEBUG_DEATH(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle), "");
 
   // Should succeed after increasing reservation.
-  ASSERT_TRUE(client_tracker->IncreaseReservationToFit(TEST_BUFFER_LEN));
+  ASSERT_TRUE(client.IncreaseReservationToFit(TEST_BUFFER_LEN));
   ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle));
 
   // But we can't pin again.
@@ -443,7 +418,6 @@ TEST_F(BufferPoolTest, PinWithoutReservation) {
 
   pool.DestroyPage(&client, &handle);
   pool.DeregisterClient(&client);
-  client_tracker->Close();
 }
 
 TEST_F(BufferPoolTest, ExtractBuffer) {
@@ -452,13 +426,10 @@ TEST_F(BufferPoolTest, ExtractBuffer) {
   int64_t child_reservation = TEST_BUFFER_LEN * 2;
   BufferPool pool(TEST_BUFFER_LEN, total_mem);
   global_reservations_.InitRootTracker(NULL, total_mem);
-  ReservationTracker* client_tracker = obj_pool_.Add(new ReservationTracker());
-  client_tracker->InitChildTracker(
-      NewProfile(), &global_reservations_, NULL, child_reservation);
-  ASSERT_TRUE(client_tracker->IncreaseReservationToFit(child_reservation));
   BufferPool::ClientHandle client;
-  ASSERT_OK(pool.RegisterClient(
-      "test client", client_tracker, NewFileGroup(), NewProfile(), &client));
+  ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
+      NULL, child_reservation, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservationToFit(child_reservation));
 
   BufferPool::PageHandle page;
   BufferPool::BufferHandle buffer;
@@ -472,24 +443,24 @@ TEST_F(BufferPoolTest, ExtractBuffer) {
     ASSERT_TRUE(buffer.is_open());
     ASSERT_EQ(len, buffer.len());
     ASSERT_EQ(page_data, buffer.data());
-    ASSERT_EQ(len, client_tracker->GetUsedReservation());
+    ASSERT_EQ(len, client.GetUsedReservation());
     pool.FreeBuffer(&client, &buffer);
-    ASSERT_EQ(0, client_tracker->GetUsedReservation());
+    ASSERT_EQ(0, client.GetUsedReservation());
   }
 
   // Test that ExtractBuffer() accounts correctly for pin count > 1.
   ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &page));
   uint8_t* page_data = page.data();
   ASSERT_OK(pool.Pin(&client, &page));
-  ASSERT_EQ(TEST_BUFFER_LEN * 2, client_tracker->GetUsedReservation());
+  ASSERT_EQ(TEST_BUFFER_LEN * 2, client.GetUsedReservation());
   pool.ExtractBuffer(&client, &page, &buffer);
-  ASSERT_EQ(TEST_BUFFER_LEN, client_tracker->GetUsedReservation());
+  ASSERT_EQ(TEST_BUFFER_LEN, client.GetUsedReservation());
   ASSERT_FALSE(page.is_open());
   ASSERT_TRUE(buffer.is_open());
   ASSERT_EQ(TEST_BUFFER_LEN, buffer.len());
   ASSERT_EQ(page_data, buffer.data());
   pool.FreeBuffer(&client, &buffer);
-  ASSERT_EQ(0, client_tracker->GetUsedReservation());
+  ASSERT_EQ(0, client.GetUsedReservation());
 
   // Test that ExtractBuffer() DCHECKs for unpinned pages.
   ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &page));
@@ -498,7 +469,6 @@ TEST_F(BufferPoolTest, ExtractBuffer) {
   pool.DestroyPage(&client, &page);
 
   pool.DeregisterClient(&client);
-  client_tracker->Close();
 }
 
 // Test concurrent creation and destruction of pages.
@@ -534,22 +504,18 @@ TEST_F(BufferPoolTest, ConcurrentPageCreation) {
 
 void BufferPoolTest::CreatePageLoop(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
     ReservationTracker* parent_tracker, int num_ops) {
-  ReservationTracker client_tracker;
-  client_tracker.InitChildTracker(NewProfile(), parent_tracker, NULL, TEST_BUFFER_LEN);
   BufferPool::ClientHandle client;
-  ASSERT_OK(pool->RegisterClient(
-      "test client", &client_tracker, file_group, NewProfile(), &client));
+  ASSERT_OK(pool->RegisterClient("test client", file_group, parent_tracker, NULL,
+      TEST_BUFFER_LEN, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservation(TEST_BUFFER_LEN));
   for (int i = 0; i < num_ops; ++i) {
     BufferPool::PageHandle handle;
-    ASSERT_TRUE(client_tracker.IncreaseReservation(TEST_BUFFER_LEN));
     ASSERT_OK(pool->CreatePage(&client, TEST_BUFFER_LEN, &handle));
     pool->Unpin(&client, &handle);
     ASSERT_OK(pool->Pin(&client, &handle));
     pool->DestroyPage(&client, &handle);
-    client_tracker.DecreaseReservation(TEST_BUFFER_LEN);
   }
   pool->DeregisterClient(&client);
-  client_tracker.Close();
 }
 
 /// Test that DCHECK fires when trying to unpin a page with spilling disabled.
@@ -559,9 +525,9 @@ TEST_F(BufferPoolTest, SpillingDisabledDcheck) {
   BufferPool::PageHandle handle;
 
   BufferPool::ClientHandle client;
-  ASSERT_OK(pool.RegisterClient(
-      "test client", &global_reservations_, NULL, NewProfile(), &client));
-  ASSERT_TRUE(global_reservations_.IncreaseReservation(2 * TEST_BUFFER_LEN));
+  ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
+      numeric_limits<int64_t>::max(), NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservation(2 * TEST_BUFFER_LEN));
   ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle));
 
   ASSERT_OK(pool.Pin(&client, &handle));
@@ -582,9 +548,9 @@ TEST_F(BufferPoolTest, EvictPageSameClient) {
   BufferPool::PageHandle handle1, handle2;
 
   BufferPool::ClientHandle client;
-  ASSERT_OK(pool.RegisterClient(
-      "test client", &global_reservations_, NewFileGroup(), NewProfile(), &client));
-  ASSERT_TRUE(global_reservations_.IncreaseReservation(TEST_BUFFER_LEN));
+  ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
+      NULL, TEST_BUFFER_LEN, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservation(TEST_BUFFER_LEN));
   ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle1));
 
   // Do not have enough reservations because we pinned the page.
@@ -607,9 +573,9 @@ TEST_F(BufferPoolTest, EvictPageDifferentSizes) {
   BufferPool::PageHandle handle1, handle2;
 
   BufferPool::ClientHandle client;
-  ASSERT_OK(pool.RegisterClient(
-      "test client", &global_reservations_, NewFileGroup(), NewProfile(), &client));
-  ASSERT_TRUE(global_reservations_.IncreaseReservation(2 * TEST_BUFFER_LEN));
+  ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
+      NULL, TOTAL_BYTES, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservation(2 * TEST_BUFFER_LEN));
   ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle1));
   pool.Unpin(&client, &handle1);
 
@@ -635,14 +601,11 @@ TEST_F(BufferPoolTest, EvictPageDifferentClient) {
   global_reservations_.InitRootTracker(NULL, TOTAL_BYTES);
   BufferPool pool(TEST_BUFFER_LEN, TOTAL_BYTES);
 
-  ReservationTracker client_reservations[NUM_CLIENTS];
   BufferPool::ClientHandle clients[NUM_CLIENTS];
   for (int i = 0; i < NUM_CLIENTS; ++i) {
-    client_reservations[i].InitChildTracker(
-        NewProfile(), &global_reservations_, NULL, TEST_BUFFER_LEN);
-    ASSERT_TRUE(client_reservations[i].IncreaseReservation(TEST_BUFFER_LEN));
-    ASSERT_OK(pool.RegisterClient(Substitute("test client $0", i),
-        &client_reservations[i], NewFileGroup(), NewProfile(), &clients[i]));
+    ASSERT_OK(pool.RegisterClient(Substitute("test client $0", i), NewFileGroup(),
+        &global_reservations_, NULL, TEST_BUFFER_LEN, NewProfile(), &clients[i]));
+    ASSERT_TRUE(clients[i].IncreaseReservation(TEST_BUFFER_LEN));
   }
 
   // Create a pinned and unpinned page for the first client.
@@ -668,10 +631,7 @@ TEST_F(BufferPoolTest, EvictPageDifferentClient) {
   pool.DestroyPage(&clients[0], &handle1);
   pool.DestroyPage(&clients[0], &handle2);
   pool.FreeBuffer(&clients[1], &buffer);
-  for (int i = 0; i < NUM_CLIENTS; ++i) {
-    pool.DeregisterClient(&clients[i]);
-    client_reservations[i].Close();
-  }
+  for (BufferPool::ClientHandle& client : clients) pool.DeregisterClient(&client);
 }
 }
 

@@ -89,7 +89,7 @@ int Suballocator::ComputeListIndex(int64_t bytes) const {
 Status Suballocator::AllocateBuffer(int64_t bytes, unique_ptr<Suballocation>* result) {
   DCHECK_LE(bytes, MAX_ALLOCATION_BYTES);
   const int64_t buffer_len = max(min_buffer_len_, BitUtil::RoundUpToPowerOfTwo(bytes));
-  if (!client_->reservation()->IncreaseReservationToFit(buffer_len)) {
+  if (!client_->IncreaseReservationToFit(buffer_len)) {
     *result = nullptr;
     return Status::OK();
   }

@@ -76,6 +76,7 @@
 
 #include "runtime/bufferpool/buffer-pool-counters.h"
 #include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "util/condition-variable.h"
 
 namespace impala {
@@ -84,7 +85,8 @@ namespace impala {
 class BufferPool::Client {
  public:
   Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group, const string& name,
-      RuntimeProfile* profile);
+      ReservationTracker* parent_reservation, MemTracker* mem_tracker,
+      int64_t reservation_limit, RuntimeProfile* profile);
 
   ~Client() {
     DCHECK_EQ(0, num_pages_);
@@ -92,6 +94,9 @@ class BufferPool::Client {
     DCHECK_EQ(0, dirty_unpinned_pages_.size());
     DCHECK_EQ(0, in_flight_write_pages_.size());
   }
+
+  /// Release reservation for this client.
+  void Close() { reservation_.Close(); }
 
   /// Add a new pinned page 'page' to the pinned pages list. 'page' must not be in any
   /// other lists. Neither the client's lock nor page->buffer_lock should be held by the
@@ -144,6 +149,7 @@ class BufferPool::Client {
     DCHECK(client_lock.mutex() == &lock_ && client_lock.owns_lock());
   }
 
+  ReservationTracker* reservation() { return &reservation_; }
   const BufferPoolClientCounters& counters() const { return counters_; }
   bool spilling_enabled() const { return file_group_ != NULL; }
 
@@ -182,6 +188,10 @@ class BufferPool::Client {
 
   /// A name identifying the client.
   const std::string name_;
+
+  /// The reservation tracker for the client. All pages pinned by the client count as
+  /// usage against 'reservation_'.
+  ReservationTracker reservation_;
 
   /// The RuntimeProfile counters for this client, owned by the client's RuntimeProfile.
   /// All non-NULL.

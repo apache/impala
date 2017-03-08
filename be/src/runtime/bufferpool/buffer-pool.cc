@@ -24,7 +24,6 @@
 #include "common/names.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/bufferpool/buffer-allocator.h"
-#include "runtime/bufferpool/reservation-tracker.h"
 #include "util/bit-util.h"
 #include "util/runtime-profile-counters.h"
 #include "util/uid-util.h"
@@ -129,19 +128,19 @@ BufferPool::~BufferPool() {
   DCHECK_EQ(0, clean_pages_.size());
 }
 
-Status BufferPool::RegisterClient(const string& name, ReservationTracker* reservation,
-    TmpFileMgr::FileGroup* file_group, RuntimeProfile* profile, ClientHandle* client) {
+Status BufferPool::RegisterClient(const string& name, TmpFileMgr::FileGroup* file_group,
+    ReservationTracker* parent_reservation, MemTracker* mem_tracker,
+    int64_t reservation_limit, RuntimeProfile* profile, ClientHandle* client) {
   DCHECK(!client->is_registered());
-  DCHECK(reservation != NULL);
-  client->reservation_ = reservation;
-  client->impl_ = new Client(this, file_group, name, profile);
+  DCHECK(parent_reservation != NULL);
+  client->impl_ = new Client(this, file_group, name, parent_reservation, mem_tracker,
+      reservation_limit, profile);
   return Status::OK();
 }
 
 void BufferPool::DeregisterClient(ClientHandle* client) {
   if (!client->is_registered()) return;
-  client->reservation_->Close(); // Will DCHECK if any remaining buffers or pinned pages.
-  client->reservation_ = NULL;
+  client->impl_->Close(); // Will DCHECK if any remaining buffers or pinned pages.
   delete client->impl_; // Will DCHECK if there are any remaining pages.
   client->impl_ = NULL;
 }
@@ -190,7 +189,7 @@ Status BufferPool::Pin(ClientHandle* client, PageHandle* handle) {
   }
   // Update accounting last to avoid complicating the error return path above.
   ++page->pin_count;
-  client->reservation_->AllocateFrom(page->len);
+  client->impl_->reservation()->AllocateFrom(page->len);
   return Status::OK();
 }
 
@@ -201,10 +200,11 @@ void BufferPool::Unpin(ClientHandle* client, PageHandle* handle) {
   // If handle is pinned, we can assume that the page itself is pinned.
   DCHECK(handle->is_pinned());
   Page* page = handle->page_;
-  client->reservation_->ReleaseTo(page->len);
+  ReservationTracker* reservation = client->impl_->reservation();
+  reservation->ReleaseTo(page->len);
 
   if (--page->pin_count > 0) return;
-  client->impl_->MoveToDirtyUnpinned(client->reservation_->GetUnusedReservation(), page);
+  client->impl_->MoveToDirtyUnpinned(reservation->GetUnusedReservation(), page);
   COUNTER_ADD(client->impl_->counters().total_unpinned_bytes, handle->len());
   COUNTER_ADD(client->impl_->counters().peak_unpinned_bytes, handle->len());
 }
@@ -225,8 +225,9 @@ void BufferPool::ExtractBuffer(
 
 Status BufferPool::AllocateBuffer(
     ClientHandle* client, int64_t len, BufferHandle* handle) {
-  RETURN_IF_ERROR(client->impl_->CleanPagesBeforeAllocation(client->reservation_, len));
-  client->reservation_->AllocateFrom(len);
+  ReservationTracker* reservation = client->impl_->reservation();
+  RETURN_IF_ERROR(client->impl_->CleanPagesBeforeAllocation(reservation, len));
+  reservation->AllocateFrom(len);
   return AllocateBufferInternal(client, len, handle);
 }
 
@@ -258,7 +259,7 @@ Status BufferPool::AllocateBufferInternal(
 void BufferPool::FreeBuffer(ClientHandle* client, BufferHandle* handle) {
   if (!handle->is_open()) return; // Should be idempotent.
   DCHECK_EQ(client, handle->client_);
-  client->reservation_->ReleaseTo(handle->len_);
+  client->impl_->reservation()->ReleaseTo(handle->len_);
   FreeBufferInternal(handle);
 }
 
@@ -277,8 +278,8 @@ Status BufferPool::TransferBuffer(ClientHandle* src_client, BufferHandle* src,
   DCHECK_NE(src, dst);
   DCHECK_NE(src_client, dst_client);
 
-  dst_client->reservation_->AllocateFrom(src->len());
-  src_client->reservation_->ReleaseTo(src->len());
+  dst_client->impl_->reservation()->AllocateFrom(src->len());
+  src_client->impl_->reservation()->ReleaseTo(src->len());
   *dst = std::move(*src);
   dst->client_ = dst_client;
   return Status::OK();
@@ -348,14 +349,37 @@ Status BufferPool::EvictCleanPages(int64_t bytes_to_evict) {
   return Status::OK();
 }
 
+bool BufferPool::ClientHandle::IncreaseReservation(int64_t bytes) {
+  return impl_->reservation()->IncreaseReservation(bytes);
+}
+
+bool BufferPool::ClientHandle::IncreaseReservationToFit(int64_t bytes) {
+  return impl_->reservation()->IncreaseReservationToFit(bytes);
+}
+
+int64_t BufferPool::ClientHandle::GetReservation() const {
+  return impl_->reservation()->GetReservation();
+}
+
+int64_t BufferPool::ClientHandle::GetUsedReservation() const {
+  return impl_->reservation()->GetUsedReservation();
+}
+
+int64_t BufferPool::ClientHandle::GetUnusedReservation() const {
+  return impl_->reservation()->GetUnusedReservation();
+}
+
 BufferPool::Client::Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
-    const string& name, RuntimeProfile* profile)
+    const string& name, ReservationTracker* parent_reservation, MemTracker* mem_tracker,
+    int64_t reservation_limit, RuntimeProfile* profile)
   : pool_(pool),
     file_group_(file_group),
     name_(name),
     num_pages_(0),
     dirty_unpinned_bytes_(0),
     in_flight_write_bytes_(0) {
+  reservation_.InitChildTracker(
+      profile, parent_reservation, mem_tracker, reservation_limit);
   counters_.get_buffer_time = ADD_TIMER(profile, "BufferPoolGetBufferTime");
   counters_.read_wait_time = ADD_TIMER(profile, "BufferPoolReadIoWaitTime");
   counters_.read_io_ops = ADD_COUNTER(profile, "BufferPoolReadIoOps", TUnit::UNIT);
@@ -476,8 +500,8 @@ Status BufferPool::Client::MoveEvictedToPinned(
     unique_lock<mutex>* client_lock, ClientHandle* client, PageHandle* handle) {
   Page* page = handle->page_;
   DCHECK(!page->buffer.is_open());
-  RETURN_IF_ERROR(
-      CleanPagesBeforeAllocationLocked(client_lock, client->reservation_, page->len));
+  RETURN_IF_ERROR(CleanPagesBeforeAllocationLocked(
+      client_lock, client->impl_->reservation(), page->len));
 
   // Don't hold any locks while allocating or reading back the data. It is safe to modify
   // the page's buffer handle without holding any locks because no concurrent operations
@@ -620,9 +644,9 @@ string BufferPool::Client::DebugString() {
   lock_guard<mutex> lock(lock_);
   stringstream ss;
   ss << Substitute("<BufferPool::Client> $0 name: $1 write_status: $2 num_pages: $3 "
-                   "dirty_unpinned_bytes: $4 in_flight_write_bytes: $5",
+                   "dirty_unpinned_bytes: $4 in_flight_write_bytes: $5 reservation: {$6}",
       this, name_, write_status_.GetDetail(), num_pages_, dirty_unpinned_bytes_,
-      in_flight_write_bytes_);
+      in_flight_write_bytes_, reservation_.DebugString());
   ss << "\n  " << pinned_pages_.size() << " pinned pages: ";
   pinned_pages_.Iterate(bind<bool>(Page::DebugStringCallback, &ss, _1));
   ss << "\n  " << dirty_unpinned_pages_.size() << " dirty unpinned pages: ";
@@ -634,9 +658,8 @@ string BufferPool::Client::DebugString() {
 
 string BufferPool::ClientHandle::DebugString() const {
   if (is_registered()) {
-    return Substitute("<BufferPool::Client> $0 reservation: {$1} "
-                      "internal state: {$2}",
-        this, reservation_->DebugString(), impl_->DebugString());
+    return Substitute(
+        "<BufferPool::Client> $0 internal state: {$1}", this, impl_->DebugString());
   } else {
     return Substitute("<BufferPool::ClientHandle> $0 UNREGISTERED", this);
   }

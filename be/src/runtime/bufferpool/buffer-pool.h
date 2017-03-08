@@ -161,17 +161,23 @@ class BufferPool : public CacheLineAligned {
 
   /// Register a client. Returns an error status and does not register the client if the
   /// arguments are invalid. 'name' is an arbitrary name used to identify the client in
-  /// any errors messages or logging. Counters for this client are added to the (non-NULL)
+  /// any errors messages or logging. If 'file_group' is non-NULL, it is used to allocate
+  /// scratch space to write unpinned pages to disk. If it is NULL, unpinning of pages is
+  /// not allowed for this client. Counters for this client are added to the (non-NULL)
   /// 'profile'. 'client' is the client to register. 'client' should not already be
-  /// registered. If 'file_group' is non-NULL, it is used to allocate scratch space to
-  /// write unpinned pages to disk. If it is NULL, unpinning of pages is not allowed for
-  /// this client.
-  Status RegisterClient(const std::string& name, ReservationTracker* reservation,
-      TmpFileMgr::FileGroup* file_group, RuntimeProfile* profile,
+  /// registered.
+  ///
+  /// The client's reservation is created as a child of 'parent_reservation' with limit
+  /// 'reservation_limit' and associated with MemTracker 'mem_tracker'. The initial
+  /// reservation is 0 bytes.
+  Status RegisterClient(const std::string& name, TmpFileMgr::FileGroup* file_group,
+      ReservationTracker* parent_reservation, MemTracker* mem_tracker,
+      int64_t reservation_limit, RuntimeProfile* profile,
       ClientHandle* client) WARN_UNUSED_RESULT;
 
   /// Deregister 'client' if it is registered. All pages must be destroyed and buffers
-  /// must be freed for the client before calling this. Idempotent.
+  /// must be freed for the client before calling this. Releases any reservation that
+  /// belongs to the client. Idempotent.
   void DeregisterClient(ClientHandle* client);
 
   /// Create a new page of 'len' bytes with pin count 1. 'len' must be a page length
@@ -316,12 +322,27 @@ class BufferPool : public CacheLineAligned {
 /// Client methods or BufferPool methods with the Client as an argument is not supported.
 class BufferPool::ClientHandle {
  public:
-  ClientHandle() : reservation_(NULL) {}
+  ClientHandle() : impl_(NULL) {}
   /// Client must be deregistered.
   ~ClientHandle() { DCHECK(!is_registered()); }
 
-  bool is_registered() const { return reservation_ != NULL; }
-  ReservationTracker* reservation() { return reservation_; }
+  /// Request to increase reservation for this client by 'bytes' by calling
+  /// ReservationTracker::IncreaseReservation(). Returns true if the reservation was
+  /// successfully increased.
+  bool IncreaseReservation(int64_t bytes) WARN_UNUSED_RESULT;
+
+  /// Tries to ensure that 'bytes' of unused reservation is available for this client
+  /// to use by calling ReservationTracker::IncreaseReservationToFit(). Returns true
+  /// if successful, after which 'bytes' can be used.
+  bool IncreaseReservationToFit(int64_t bytes) WARN_UNUSED_RESULT;
+
+  /// Accessors for this client's reservation corresponding to the identically-named
+  /// methods in ReservationTracker.
+  int64_t GetReservation() const;
+  int64_t GetUsedReservation() const;
+  int64_t GetUnusedReservation() const;
+
+  bool is_registered() const { return impl_ != NULL; }
 
   std::string DebugString() const;
 
@@ -329,11 +350,8 @@ class BufferPool::ClientHandle {
   friend class BufferPool;
   DISALLOW_COPY_AND_ASSIGN(ClientHandle);
 
-  /// The reservation tracker for the client. NULL means the client isn't registered.
-  /// All pages pinned by the client count as usage against 'reservation_'.
-  ReservationTracker* reservation_;
-
-  /// Internal state for the client. Owned by BufferPool.
+  /// Internal state for the client. NULL means the client isn't registered.
+  /// Owned by BufferPool.
   Client* impl_;
 };
 

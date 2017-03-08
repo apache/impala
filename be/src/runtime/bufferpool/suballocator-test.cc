@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <limits>
 #include <random>
 #include <string>
 #include <vector>
@@ -85,11 +86,11 @@ class SuballocatorTest : public ::testing::Test {
   /// Register a client with 'buffer_pool_'. The client is automatically deregistered
   /// and freed at the end of the test.
   void RegisterClient(
-      ReservationTracker* reservation, BufferPool::ClientHandle** client) {
+      ReservationTracker* parent_reservation, BufferPool::ClientHandle** client) {
     clients_.push_back(make_unique<BufferPool::ClientHandle>());
     *client = clients_.back().get();
-    ASSERT_OK(buffer_pool_->RegisterClient(
-        "test client", reservation, NULL, profile(), *client));
+    ASSERT_OK(buffer_pool_->RegisterClient("test client", NULL, parent_reservation, NULL,
+        numeric_limits<int64_t>::max(), profile(), *client));
   }
 
   /// Assert that the memory for all of the suballocations is writable and disjoint by
@@ -104,8 +105,8 @@ class SuballocatorTest : public ::testing::Test {
     allocs->clear();
   }
 
-  static void ExpectReservationUnused(ReservationTracker& reservation) {
-    EXPECT_EQ(reservation.GetUsedReservation(), 0) << reservation.DebugString();
+  static void ExpectReservationUnused(BufferPool::ClientHandle* client) {
+    EXPECT_EQ(client->GetUsedReservation(), 0) << client->DebugString();
   }
 
   RuntimeProfile* profile() { return profile_.get(); }
@@ -165,10 +166,10 @@ TEST_F(SuballocatorTest, SameSizeAllocations) {
   AssertMemoryValid(allocs);
 
   // Check that reservation usage matches the amount allocated.
-  EXPECT_EQ(global_reservation_.GetUsedReservation(), allocated_mem)
+  EXPECT_EQ(client->GetUsedReservation(), allocated_mem)
       << global_reservation_.DebugString();
   FreeAllocations(&allocator, &allocs);
-  ExpectReservationUnused(global_reservation_);
+  ExpectReservationUnused(client);
 }
 
 /// Check behaviour of zero-length allocation.
@@ -185,7 +186,7 @@ TEST_F(SuballocatorTest, ZeroLengthAllocation) {
   ASSERT_TRUE(alloc != nullptr) << global_reservation_.DebugString();
   EXPECT_EQ(alloc->len(), Suballocator::MIN_ALLOCATION_BYTES);
   allocator.Free(move(alloc));
-  ExpectReservationUnused(global_reservation_);
+  ExpectReservationUnused(client);
 }
 
 /// Check behaviour of out-of-range allocation.
@@ -203,7 +204,7 @@ TEST_F(SuballocatorTest, OutOfRangeAllocations) {
   // Too-large allocations fail gracefully.
   ASSERT_FALSE(allocator.Allocate(Suballocator::MAX_ALLOCATION_BYTES + 1, &alloc).ok())
       << global_reservation_.DebugString();
-  ExpectReservationUnused(global_reservation_);
+  ExpectReservationUnused(client);
 }
 
 /// Basic test to make sure that non-power-of-two suballocations are handled as expected
@@ -235,14 +236,13 @@ TEST_F(SuballocatorTest, NonPowerOfTwoAllocations) {
     // Check that it was rounded up to a power-of-two.
     EXPECT_EQ(alloc->len(), max(Suballocator::MIN_ALLOCATION_BYTES,
                                 BitUtil::RoundUpToPowerOfTwo(alloc_size)));
-    EXPECT_EQ(
-        max(TEST_BUFFER_LEN, alloc->len()), global_reservation_.GetUsedReservation())
+    EXPECT_EQ(max(TEST_BUFFER_LEN, alloc->len()), client->GetUsedReservation())
         << global_reservation_.DebugString();
     memset(alloc->data(), 0, alloc->len()); // Check memory is writable.
 
     allocator.Free(move(alloc));
   }
-  ExpectReservationUnused(global_reservation_);
+  ExpectReservationUnused(client);
 }
 
 /// Test that simulates hash table's patterns of doubling suballocations and validates
@@ -292,12 +292,12 @@ TEST_F(SuballocatorTest, DoublingAllocations) {
     // coalesced two buddies of curr_alloc_size / 2) and one buffer with only
     // 'curr_alloc_size' bytes in use (if an Allocate() call couldn't recycle memory and
     // had to allocate a new buffer).
-    EXPECT_LE(global_reservation_.GetUsedReservation(),
+    EXPECT_LE(client->GetUsedReservation(),
         TEST_BUFFER_LEN + max(TEST_BUFFER_LEN, curr_alloc_size * NUM_ALLOCS));
   }
   // Check that reservation usage behaves as expected.
   FreeAllocations(&allocator, &allocs);
-  ExpectReservationUnused(global_reservation_);
+  ExpectReservationUnused(client);
 }
 
 /// Do some randomised testing of the allocator. Simulate some interesting patterns with
@@ -352,7 +352,7 @@ TEST_F(SuballocatorTest, RandomAllocations) {
   }
   // Check that memory is released when suballocations are freed.
   FreeAllocations(&allocator, &allocs);
-  ExpectReservationUnused(global_reservation_);
+  ExpectReservationUnused(client);
 }
 
 void SuballocatorTest::AssertMemoryValid(
