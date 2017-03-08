@@ -291,28 +291,41 @@ Function* OldHashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
   LlvmBuilder builder(context);
   Value* args[2];
   Function* fn = prototype.GeneratePrototype(&builder, args);
-
+  Value* this_ptr = args[0];
   Value* row = args[1];
   Value* has_null = codegen->false_value();
 
   // Aggregation with no grouping exprs also use the hash table interface for
   // code simplicity.  In that case, there are no build exprs.
   if (!build_expr_ctxs_.empty()) {
-    const vector<ExprContext*>& ctxs = build ? build_expr_ctxs_ : probe_expr_ctxs_;
-    for (int i = 0; i < ctxs.size(); ++i) {
-      // TODO: refactor this to somewhere else?  This is not hash table specific
-      // except for the null handling bit and would be used for anyone that needs
-      // to materialize a vector of exprs
-      // Convert result buffer to llvm ptr type
-      void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
-      Value* llvm_loc = codegen->CastPtrToLlvmPtr(
-          codegen->GetPtrType(ctxs[i]->root()->type()), loc);
+    // Load &build_expr_ctxs_[0] / &probe_expr_ctxs_[0]
+    Value* ctx_array = codegen->CodegenCallFunction(&builder, build ?
+        IRFunction::OLD_HASH_TABLE_GET_BUILD_EXPR_CTXS :
+        IRFunction::OLD_HASH_TABLE_GET_PROBE_EXPR_CTXS,
+        this_ptr, "ctx_array");
 
+    // Load expr_values_buffer_
+    Value* expr_values_buffer = codegen->CodegenCallFunction(&builder,
+        IRFunction::OLD_HASH_TABLE_GET_EXPR_VALUES_BUFFER,
+        this_ptr, "expr_values_buffer");
+
+    // Load expr_values_null_bits_
+    Value* expr_value_null_bits = codegen->CodegenCallFunction(&builder,
+        IRFunction::OLD_HASH_TABLE_GET_EXPR_VALUE_NULL_BITS,
+        this_ptr, "expr_value_null_bits");
+
+    for (int i = 0; i < ctxs.size(); ++i) {
       BasicBlock* null_block = BasicBlock::Create(context, "null", fn);
       BasicBlock* not_null_block = BasicBlock::Create(context, "not_null", fn);
       BasicBlock* continue_block = BasicBlock::Create(context, "continue", fn);
 
-      // Call expr
+      // loc_addr = expr_values_buffer_ + expr_values_buffer_offsets_[i]
+      Value* llvm_loc = builder.CreateInBoundsGEP(NULL, expr_values_buffer,
+          codegen->GetIntConstant(TYPE_INT, expr_values_buffer_offsets_[i]), "loc_addr");
+      llvm_loc = builder.CreatePointerCast(llvm_loc,
+          codegen->GetPtrType(ctxs[i]->root()->type()), "loc");
+
+      // Codegen GetValue() for ctxs[i]
       Function* expr_fn;
       Status status = ctxs[i]->root()->GetCodegendComputeFn(codegen, &expr_fn);
       if (!status.ok()) {
@@ -321,20 +334,18 @@ Function* OldHashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
         return NULL;
       }
 
-      Value* ctx_arg = codegen->CastPtrToLlvmPtr(
-          codegen->GetPtrType(ExprContext::LLVM_CLASS_NAME), ctxs[i]);
-      Value* expr_fn_args[] = { ctx_arg, row };
+      // Load ctxs[i] and call GetValue()
+      Value* expr_ctx = codegen->CodegenArrayAt(&builder, ctx_array, i, "expr_ctx");
+      DCHECK(expr_ctx->getType()->isPointerTy());
       CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(
-          codegen, &builder, ctxs[i]->root()->type(), expr_fn, expr_fn_args, "result");
+          codegen, &builder, ctxs[i]->root()->type(), expr_fn, {expr_ctx, row}, "result");
       Value* is_null = result.GetIsNull();
 
       // Set null-byte result
-      Value* null_byte = builder.CreateZExt(is_null, codegen->GetType(TYPE_TINYINT));
-      uint8_t* null_byte_loc = &expr_value_null_bits_[i];
-      Value* llvm_null_byte_loc =
-          codegen->CastPtrToLlvmPtr(codegen->ptr_type(), null_byte_loc);
-      builder.CreateStore(null_byte, llvm_null_byte_loc);
-
+      Value* null_bits = builder.CreateZExt(is_null, codegen->GetType(TYPE_TINYINT));
+      Value* llvm_null_bits_loc = builder.CreateInBoundsGEP(NULL, expr_value_null_bits,
+          codegen->GetIntConstant(TYPE_INT, i), "null_bits_loc");
+      builder.CreateStore(null_bits, llvm_null_bits_loc);
       builder.CreateCondBr(is_null, null_block, not_null_block);
 
       // Null block
@@ -430,38 +441,47 @@ Function* OldHashTable::CodegenHashCurrentRow(LlvmCodeGen* codegen) {
 
   LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
-  Value* this_arg;
-  Function* fn = prototype.GeneratePrototype(&builder, &this_arg);
+  Value* this_ptr;
+  Function* fn = prototype.GeneratePrototype(&builder, &this_ptr);
+
+  // Load expr_values_buffer_
+  Value* expr_values_buffer = codegen->CodegenCallFunction(&builder,
+      IRFunction::OLD_HASH_TABLE_GET_EXPR_VALUES_BUFFER, this_ptr, "expr_values_buffer");
 
   Value* hash_result = codegen->GetIntConstant(TYPE_INT, initial_seed_);
-  Value* data = codegen->CastPtrToLlvmPtr(codegen->ptr_type(), expr_values_buffer_);
   if (var_result_begin_ == -1) {
     // No variable length slots, just hash what is in 'expr_values_buffer_'
     if (results_buffer_size_ > 0) {
       Function* hash_fn = codegen->GetHashFunction(results_buffer_size_);
       Value* len = codegen->GetIntConstant(TYPE_INT, results_buffer_size_);
-      hash_result =
-          builder.CreateCall(hash_fn, ArrayRef<Value*>({data, len, hash_result}));
+      hash_result = builder.CreateCall(hash_fn, {expr_values_buffer, len, hash_result});
     }
   } else {
     if (var_result_begin_ > 0) {
       Function* hash_fn = codegen->GetHashFunction(var_result_begin_);
       Value* len = codegen->GetIntConstant(TYPE_INT, var_result_begin_);
-      hash_result =
-          builder.CreateCall(hash_fn, ArrayRef<Value*>({data, len, hash_result}));
+      hash_result = builder.CreateCall(hash_fn, {expr_values_buffer, len, hash_result});
     }
+
+    // Load expr_value_null_bits_
+    Value* expr_value_null_bits = codegen->CodegenCallFunction(&builder,
+        IRFunction::OLD_HASH_TABLE_GET_EXPR_VALUE_NULL_BITS,
+        this_ptr, "expr_value_null_bits");
 
     // Hash string slots
     for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
-      if (build_expr_ctxs_[i]->root()->type().type != TYPE_STRING
-          && build_expr_ctxs_[i]->root()->type().type != TYPE_VARCHAR) continue;
+      if (build_expr_ctxs_[i]->root()->type().type != TYPE_STRING &&
+          build_expr_ctxs_[i]->root()->type().type != TYPE_VARCHAR) {
+        continue;
+      }
 
       BasicBlock* null_block = NULL;
       BasicBlock* not_null_block = NULL;
       BasicBlock* continue_block = NULL;
       Value* str_null_result = NULL;
 
-      void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
+      Value* llvm_buffer_loc = builder.CreateInBoundsGEP(NULL, expr_values_buffer,
+          codegen->GetIntConstant(TYPE_INT, expr_values_buffer_offsets_[i]), "buffer_loc");
 
       // If the hash table stores nulls, we need to check if the stringval
       // evaluated to NULL
@@ -470,29 +490,28 @@ Function* OldHashTable::CodegenHashCurrentRow(LlvmCodeGen* codegen) {
         not_null_block = BasicBlock::Create(context, "not_null", fn);
         continue_block = BasicBlock::Create(context, "continue", fn);
 
-        uint8_t* null_byte_loc = &expr_value_null_bits_[i];
-        Value* llvm_null_byte_loc =
-            codegen->CastPtrToLlvmPtr(codegen->ptr_type(), null_byte_loc);
-        Value* null_byte = builder.CreateLoad(llvm_null_byte_loc);
-        Value* is_null = builder.CreateICmpNE(null_byte,
+        // Load expr_values_null_bits_[i] and check if it's set.
+        Value* llvm_null_bits_loc = builder.CreateInBoundsGEP(NULL, expr_value_null_bits,
+            codegen->GetIntConstant(TYPE_INT, i), "null_bits_loc");
+        Value* null_bits = builder.CreateLoad(llvm_null_bits_loc);
+        Value* is_null = builder.CreateICmpNE(null_bits,
             codegen->GetIntConstant(TYPE_TINYINT, 0));
         builder.CreateCondBr(is_null, null_block, not_null_block);
 
-        // For null, we just want to call the hash function on the portion of
-        // the data
+        // For null, we just want to call the hash function on a portion of the data.
         builder.SetInsertPoint(null_block);
         Function* null_hash_fn = codegen->GetHashFunction(sizeof(StringValue));
-        Value* llvm_loc = codegen->CastPtrToLlvmPtr(codegen->ptr_type(), loc);
         Value* len = codegen->GetIntConstant(TYPE_INT, sizeof(StringValue));
         str_null_result = builder.CreateCall(null_hash_fn,
-            ArrayRef<Value*>({llvm_loc, len, hash_result}));
+            ArrayRef<Value*>({llvm_buffer_loc, len, hash_result}));
         builder.CreateBr(continue_block);
 
         builder.SetInsertPoint(not_null_block);
       }
 
       // Convert expr_values_buffer_ loc to llvm value
-      Value* str_val = codegen->CastPtrToLlvmPtr(codegen->GetPtrType(TYPE_STRING), loc);
+      Value* str_val = builder.CreatePointerCast(llvm_buffer_loc,
+          codegen->GetPtrType(TYPE_STRING), "str_val");
 
       Value* ptr = builder.CreateStructGEP(NULL, str_val, 0, "ptr");
       Value* len = builder.CreateStructGEP(NULL, str_val, 1, "len");
@@ -615,17 +634,32 @@ Function* OldHashTable::CodegenEquals(LlvmCodeGen* codegen) {
   LlvmBuilder builder(context);
   Value* args[2];
   Function* fn = prototype.GeneratePrototype(&builder, args);
+  Value* this_ptr = args[0];
   Value* row = args[1];
 
   if (!build_expr_ctxs_.empty()) {
     BasicBlock* false_block = BasicBlock::Create(context, "false_block", fn);
+
+    // Load &build_expr_ctxs_[0]
+    Value* ctx_vector = codegen->CodegenCallFunction(&builder,
+        IRFunction::OLD_HASH_TABLE_GET_BUILD_EXPR_CTXS, this_ptr, "ctx_vector");
+
+    // Load expr_values_buffer_
+    Value* expr_values_buffer = codegen->CodegenCallFunction(&builder,
+        IRFunction::OLD_HASH_TABLE_GET_EXPR_VALUES_BUFFER,
+        this_ptr, "expr_values_buffer");
+
+    // Load expr_value_null_bits_
+    Value* expr_value_null_bits = codegen->CodegenCallFunction(&builder,
+        IRFunction::OLD_HASH_TABLE_GET_EXPR_VALUE_NULL_BITS,
+        this_ptr, "expr_value_null_bits");
 
     for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
       BasicBlock* null_block = BasicBlock::Create(context, "null", fn);
       BasicBlock* not_null_block = BasicBlock::Create(context, "not_null", fn);
       BasicBlock* continue_block = BasicBlock::Create(context, "continue", fn);
 
-      // call GetValue on build_exprs[i]
+      // Generate GetValue() of build_expr_ctxs_[i]
       Function* expr_fn;
       Status status =
           build_expr_ctxs_[i]->root()->GetCodegendComputeFn(codegen, &expr_fn);
@@ -635,29 +669,28 @@ Function* OldHashTable::CodegenEquals(LlvmCodeGen* codegen) {
         return NULL;
       }
 
-      Value* ctx_arg = codegen->CastPtrToLlvmPtr(
-          codegen->GetPtrType(ExprContext::LLVM_CLASS_NAME), build_expr_ctxs_[i]);
-      Value* expr_fn_args[] = { ctx_arg, row };
+      // Call GetValue() on build_expr_ctxs_[i]
+      Value* expr_ctx = codegen->CodegenArrayAt(&builder, ctx_vector, i, "expr_ctx");
       CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
-          build_expr_ctxs_[i]->root()->type(), expr_fn, expr_fn_args, "result");
+          build_expr_ctxs_[i]->root()->type(), expr_fn, {expr_ctx, row}, "result");
       Value* is_null = result.GetIsNull();
 
       // Determine if probe is null (i.e. expr_value_null_bits_[i] == true). In
       // the case where the hash table does not store nulls, this is always false.
       Value* probe_is_null = codegen->false_value();
-      uint8_t* null_byte_loc = &expr_value_null_bits_[i];
       if (stores_nulls_ && finds_nulls_[i]) {
-        Value* llvm_null_byte_loc =
-            codegen->CastPtrToLlvmPtr(codegen->ptr_type(), null_byte_loc);
-        Value* null_byte = builder.CreateLoad(llvm_null_byte_loc);
-        probe_is_null = builder.CreateICmpNE(null_byte,
+        Value* llvm_null_bits_loc = builder.CreateInBoundsGEP(NULL, expr_value_null_bits,
+            codegen->GetIntConstant(TYPE_INT, i), "null_bits_loc");
+        Value* null_bits = builder.CreateLoad(llvm_null_bits_loc, "null_bits");
+        probe_is_null = builder.CreateICmpNE(null_bits,
             codegen->GetIntConstant(TYPE_TINYINT, 0));
       }
 
       // Get llvm value for probe_val from 'expr_values_buffer_'
-      void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
-      Value* probe_val = codegen->CastPtrToLlvmPtr(
-          codegen->GetPtrType(build_expr_ctxs_[i]->root()->type()), loc);
+      Value* probe_val = builder.CreateInBoundsGEP(NULL, expr_values_buffer,
+          codegen->GetIntConstant(TYPE_INT, expr_values_buffer_offsets_[i]), "probe_val");
+      probe_val = builder.CreatePointerCast(
+          probe_val, codegen->GetPtrType(build_expr_ctxs_[i]->root()->type()));
 
       // Branch for GetValue() returning NULL
       builder.CreateCondBr(is_null, null_block, not_null_block);

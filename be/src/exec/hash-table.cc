@@ -728,11 +728,11 @@ Status HashTableCtx::CodegenEvalRow(LlvmCodeGen* codegen, bool build, Function**
   Value* expr_values_null = args[3];
   Value* has_null = codegen->false_value();
 
-  IRFunction::Type get_expr_ctx_fn_name = build ?
+  // ctx_vector = &build_expr_ctxs_[0] / ctx_vector = &probe_expr_ctxs_[0]
+  Value* ctx_vector = codegen->CodegenCallFunction(&builder, build ?
       IRFunction::HASH_TABLE_GET_BUILD_EXPR_CTX :
-      IRFunction::HASH_TABLE_GET_PROBE_EXPR_CTX;
-  Function* get_expr_ctx_fn = codegen->GetFunction(get_expr_ctx_fn_name, false);
-  DCHECK(get_expr_ctx_fn != NULL);
+      IRFunction::HASH_TABLE_GET_PROBE_EXPR_CTX,
+      this_ptr, "ctx_vector");
 
   for (int i = 0; i < ctxs.size(); ++i) {
     // TODO: refactor this to somewhere else?  This is not hash table specific except for
@@ -764,11 +764,9 @@ Status HashTableCtx::CodegenEvalRow(LlvmCodeGen* codegen, bool build, Function**
       codegen->SetNoInline(expr_fn);
     }
 
-    Value* get_expr_ctx_args[] = {this_ptr, codegen->GetIntConstant(TYPE_INT, i)};
-    Value* ctx_arg = builder.CreateCall(get_expr_ctx_fn, get_expr_ctx_args, "expr_ctx");
-    Value* expr_fn_args[] = {ctx_arg, row};
+    Value* expr_ctx = codegen->CodegenArrayAt(&builder, ctx_vector, i, "expr_ctx");
     CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(
-        codegen, &builder, ctxs[i]->root()->type(), expr_fn, expr_fn_args, "result");
+        codegen, &builder, ctxs[i]->root()->type(), expr_fn, {expr_ctx, row}, "result");
     Value* is_null = result.GetIsNull();
 
     // Set null-byte result
@@ -881,10 +879,8 @@ Status HashTableCtx::CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur, Funct
   Value* expr_values_null = args[2];
 
   // Call GetHashSeed() to get seeds_[level_]
-  Function* get_hash_seed_fn =
-      codegen->GetFunction(IRFunction::HASH_TABLE_GET_HASH_SEED, false);
-  Value* seed = builder.CreateCall(get_hash_seed_fn, ArrayRef<Value*>({this_arg}),
-      "seed");
+  Value* seed = codegen->CodegenCallFunction(&builder,
+      IRFunction::HASH_TABLE_GET_HASH_SEED, this_arg, "seed");
 
   Value* hash_result = seed;
   const int var_result_offset = expr_values_cache_.var_result_offset();
@@ -1094,9 +1090,9 @@ Status HashTableCtx::CodegenEquals(LlvmCodeGen* codegen, bool force_null_equalit
   Value* expr_values = args[2];
   Value* expr_values_null = args[3];
 
-  Function* get_expr_ctx_fn =
-      codegen->GetFunction(IRFunction::HASH_TABLE_GET_BUILD_EXPR_CTX, false);
-  DCHECK(get_expr_ctx_fn != NULL);
+  // ctx_vector = &build_expr_ctxs_[0]
+  Value* ctx_vector = codegen->CodegenCallFunction(&builder,
+      IRFunction::HASH_TABLE_GET_BUILD_EXPR_CTX, this_ptr, "ctx_vector");
 
   BasicBlock* false_block = BasicBlock::Create(context, "false_block", *fn);
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
@@ -1118,14 +1114,12 @@ Status HashTableCtx::CodegenEquals(LlvmCodeGen* codegen, bool force_null_equalit
       codegen->SetNoInline(expr_fn);
     }
 
-    // Load ExprContext* from 'build_expr_ctxs_'.
-    Value* get_expr_ctx_args[] = {this_ptr, codegen->GetIntConstant(TYPE_INT, i)};
-    Value* ctx_arg = builder.CreateCall(get_expr_ctx_fn, get_expr_ctx_args, "expr_ctx");
+    // Load ExprContext*: expr_ctx = ctx_vector[i];
+    Value* expr_ctx = codegen->CodegenArrayAt(&builder, ctx_vector, i, "expr_ctx");
 
     // Evaluate the expression.
-    Value* expr_fn_args[] = { ctx_arg, row };
     CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
-        build_expr_ctxs_[i]->root()->type(), expr_fn, expr_fn_args, "result");
+        build_expr_ctxs_[i]->root()->type(), expr_fn, {expr_ctx, row}, "result");
     Value* is_null = result.GetIsNull();
 
     // Determine if row is null (i.e. expr_values_null[i] == true). In

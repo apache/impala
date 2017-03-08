@@ -351,6 +351,14 @@ class OldHashTable {
     Bucket() : node(NULL) { }
   };
 
+  /// Simple wrappers to return various fields in this class. They are done to avoid
+  /// the need to make assumption about the order of declaration of these fields when
+  /// generating the handcrafted IR.
+  uint8_t* IR_ALWAYS_INLINE expr_values_buffer() const;
+  uint8_t* IR_ALWAYS_INLINE expr_value_null_bits() const;
+  ExprContext* const* IR_ALWAYS_INLINE build_expr_ctxs() const;
+  ExprContext* const* IR_ALWAYS_INLINE probe_expr_ctxs() const;
+
   /// Returns the next non-empty bucket and updates idx to be the index of that bucket.
   /// If there are no more buckets, returns NULL and sets idx to -1
   Bucket* NextBucket(int64_t* bucket_idx);

@@ -463,8 +463,9 @@ class HashTableCtx {
   bool IR_NO_INLINE finds_some_nulls() const { return finds_some_nulls_; }
 
   /// Cross-compiled function to access the build/probe expression context.
-  ExprContext* IR_ALWAYS_INLINE GetBuildExprCtx(int i) const;
-  ExprContext* IR_ALWAYS_INLINE GetProbeExprCtx(int i) const;
+  /// Called by generated LLVM IR functions such as Equals() and EvalRow().
+  ExprContext* const* IR_ALWAYS_INLINE GetBuildExprCtxs() const;
+  ExprContext* const* IR_ALWAYS_INLINE GetProbeExprCtxs() const;
 
   const std::vector<ExprContext*>& build_expr_ctxs_;
   const std::vector<ExprContext*>& probe_expr_ctxs_;

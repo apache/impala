@@ -17,18 +17,26 @@
 
 #ifdef IR_COMPILE
 
-#include "exec/hash-table.h"
+#include "exec/old-hash-table.h"
 
-using namespace impala;
+namespace impala {
 
-uint32_t HashTableCtx::GetHashSeed() const { return seeds_[level_]; }
-
-ExprContext* const* HashTableCtx::GetBuildExprCtxs() const {
-  return build_expr_ctxs_.data();
+uint8_t* OldHashTable::expr_values_buffer() const {
+  return expr_values_buffer_;
 }
 
-ExprContext* const* HashTableCtx::GetProbeExprCtxs() const {
-  return probe_expr_ctxs_.data();
+uint8_t* OldHashTable::expr_value_null_bits() const {
+  return expr_value_null_bits_;
+}
+
+ExprContext* const* OldHashTable::build_expr_ctxs() const {
+  return &build_expr_ctxs_[0];
+}
+
+ExprContext* const* OldHashTable::probe_expr_ctxs() const {
+  return &probe_expr_ctxs_[0];
+}
+
 }
 
 #endif

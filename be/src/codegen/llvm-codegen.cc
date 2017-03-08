@@ -1406,6 +1406,13 @@ Value* LlvmCodeGen::CodegenArrayAt(LlvmBuilder* builder, Value* array, int idx,
   return builder->CreateLoad(ptr, name);
 }
 
+Value* LlvmCodeGen::CodegenCallFunction(LlvmBuilder* builder,
+    IRFunction::Type ir_type, ArrayRef<Value*> args, const char* name) {
+  Function* fn = GetFunction(ir_type, false);
+  DCHECK(fn != nullptr);
+  return builder->CreateCall(fn, args, name);
+}
+
 void LlvmCodeGen::ClearHashFns() {
   hash_fns_.clear();
 }

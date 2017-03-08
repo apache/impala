@@ -42,6 +42,7 @@ add_library(Exec
   hash-join-node.cc
   hash-join-node-ir.cc
   old-hash-table.cc
+  old-hash-table-ir.cc
   hash-table.cc
   hbase-table-sink.cc
   hbase-table-writer.cc
