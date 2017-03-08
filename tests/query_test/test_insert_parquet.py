@@ -23,7 +23,6 @@ from collections import namedtuple
 from shutil import rmtree
 from subprocess import check_call
 from tempfile import mkdtemp as make_tmp_dir
-from backports.tempfile import TemporaryDirectory
 from parquet.ttypes import SortingColumn
 
 from tests.common.environ import impalad_basedir
@@ -215,7 +214,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
       self.execute_query("drop table %s" % qualified_table_name)
       rmtree(tmp_dir)
 
-  def test_sorting_columns(self, vector, unique_database):
+  def test_sorting_columns(self, vector, unique_database, tmpdir):
     """Tests that RowGroup::sorting_columns gets populated when specifying a sortby()
     insert hint."""
     source_table = "functional_parquet.alltypessmall"
@@ -237,14 +236,13 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
 
     # Download hdfs files and extract rowgroup metadata
     row_groups = []
-    with TemporaryDirectory() as tmp_dir:
-      check_call(['hdfs', 'dfs', '-get', hdfs_path, tmp_dir])
+    check_call(['hdfs', 'dfs', '-get', hdfs_path, tmpdir.strpath])
 
-      for root, subdirs, files in os.walk(tmp_dir):
-        for f in files:
-          parquet_file = os.path.join(root, str(f))
-          file_meta_data = get_parquet_metadata(parquet_file)
-          row_groups.extend(file_meta_data.row_groups)
+    for root, subdirs, files in os.walk(tmpdir.strpath):
+      for f in files:
+        parquet_file = os.path.join(root, str(f))
+        file_meta_data = get_parquet_metadata(parquet_file)
+        row_groups.extend(file_meta_data.row_groups)
 
     # Verify that the files have the sorted_columns set
     expected = [SortingColumn(4, False, False), SortingColumn(0, False, False)]
