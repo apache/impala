@@ -134,7 +134,6 @@ static const string LDAPS_URI_PREFIX = "ldaps://";
 // to log messages about the start of authentication. This is that plugin's name.
 static const string IMPALA_AUXPROP_PLUGIN = "impala-auxprop";
 
-bool SaslAuthProvider::env_setup_complete_ = false;
 AuthManager* AuthManager::auth_manager_ = new AuthManager();
 
 // This Sasl callback is called when the underlying cyrus-sasl layer has
@@ -720,9 +719,6 @@ Status SaslAuthProvider::InitKerberos(const string& principal,
   hostname_ = names[1];
   realm_ = names[2];
 
-  RETURN_IF_ERROR(CheckReplayCacheDirPermissions());
-  RETURN_IF_ERROR(InitKerberosEnv());
-
   LOG(INFO) << "Using " << (is_internal_ ? "internal" : "external")
             << " kerberos principal \"" << service_name_ << "/"
             << hostname_ << "@" << realm_ << "\"";
@@ -763,20 +759,19 @@ static Status EnvAppend(const string& attr, const string& thing, const string& t
   return Status::OK();
 }
 
-Status SaslAuthProvider::InitKerberosEnv() {
-  DCHECK(!principal_.empty());
+Status AuthManager::InitKerberosEnv() {
+  DCHECK(!FLAGS_principal.empty());
 
-  // Called only during setup; no locking required.
-  if (env_setup_complete_) return Status::OK();
+  RETURN_IF_ERROR(CheckReplayCacheDirPermissions());
 
-  if (!is_regular(keytab_file_)) {
+  if (!is_regular(FLAGS_keytab_file)) {
     return Status(Substitute("Bad --keytab_file value: The file $0 is not a "
-        "regular file", keytab_file_));
+        "regular file", FLAGS_keytab_file));
   }
 
   // Set the keytab name in the environment so that Sasl Kerberos and kinit can
   // find and use it.
-  if (setenv("KRB5_KTNAME", keytab_file_.c_str(), 1)) {
+  if (setenv("KRB5_KTNAME", FLAGS_keytab_file.c_str(), 1)) {
     return Status(Substitute("Kerberos could not set KRB5_KTNAME: $0",
         GetStrErrMsg()));
   }
@@ -829,7 +824,6 @@ Status SaslAuthProvider::InitKerberosEnv() {
     }
   }
 
-  env_setup_complete_ = true;
   return Status::OK();
 }
 
@@ -1038,6 +1032,7 @@ Status AuthManager::Init() {
     } else {
       kerberos_internal_principal = FLAGS_be_principal;
     }
+    RETURN_IF_ERROR(InitKerberosEnv());
   }
   // This is written from the perspective of the daemons - thus "internal"
   // means "I am used for communication with other daemons, both as a client

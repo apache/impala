@@ -39,6 +39,9 @@ namespace impala {
 /// System-wide authentication manager responsible for initialising authentication systems,
 /// including SSL, Sasl and Kerberos, and for providing auth-enabled Thrift structures to
 /// servers and clients.
+/// There should only be one AuthManager instantiated at a time.
+/// If Init() is called more than once, all the setup state will be overwritten (Currently
+/// only used for testing purposes to validate different security configurations)
 class AuthManager {
  public:
   static AuthManager* GetInstance() { return AuthManager::auth_manager_; }
@@ -59,6 +62,10 @@ class AuthManager {
   AuthProvider* GetInternalAuthProvider();
 
  private:
+  /// One-time kerberos-specific environment variable setup. Called by Init() if Kerberos
+  /// is enabled.
+  Status InitKerberosEnv();
+
   static AuthManager* auth_manager_;
 
   /// These are provided for convenience, so that demon<->demon and client<->demon services

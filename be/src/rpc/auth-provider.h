@@ -150,9 +150,6 @@ class SaslAuthProvider : public AuthProvider {
   /// Additionally, if the first attempt fails, this method will return.
   void RunKinit(Promise<Status>* first_kinit);
 
-  /// We use this to ensure that we only set up environment variables one time.
-  static bool env_setup_complete_;
-
   /// One-time kerberos-specific environment variable setup.  Called by InitKerberos().
   Status InitKerberosEnv();
 };
