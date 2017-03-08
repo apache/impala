@@ -15,6 +15,9 @@
 -- specific language governing permissions and limitations
 -- under the License.
 
+-- NOTE: Queries in this file have to be executed against Hive and some won't work with
+-- Impala due to different type compatibility rules.
+
 USE functional_avro_snap;
 
 DROP TABLE IF EXISTS schema_resolution_test;
@@ -158,6 +161,10 @@ TBLPROPERTIES ('avro.schema.literal'='{
   {"name":"timestamp_col",  "type": "long"}
 ]}');
 
+-- Reload existing partitions from HDFS. Without this, the overwrite will fail to remove
+-- any preexisting data files, which in turn will fail the query.
+MSCK REPAIR TABLE avro_coldef;
+
 INSERT OVERWRITE TABLE avro_coldef PARTITION(year=2014, month=1)
 SELECT bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
@@ -196,11 +203,16 @@ TBLPROPERTIES ('avro.schema.literal'='{
   {"name":"extra_col",  "type": "string", "default": "null"}
 ]}');
 
+-- Reload existing partitions from HDFS. Without this, the overwrite will fail to remove
+-- any preexisting data files, which in turn will fail the query.
+MSCK REPAIR TABLE avro_extra_coldef;
+
 INSERT OVERWRITE TABLE avro_extra_coldef PARTITION(year=2014, month=2)
 SELECT bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col,
 timestamp_col, "avro" AS extra_col FROM
 (select * from functional.alltypes order by id limit 5) a;
 
+-- Reload the partitions for the first table once again. This will make sure that the new
+-- partition from the second insert shows up in the first table, too.
 MSCK REPAIR TABLE avro_coldef;
-MSCK REPAIR TABLE avro_extra_coldef;
