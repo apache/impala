@@ -26,6 +26,7 @@
 #
 
 import ConfigParser
+import sys
 from impala_shell_config_defaults import impala_shell_defaults
 from optparse import OptionParser
 
@@ -44,6 +45,11 @@ def get_config_from_file(config_filename):
     loaded_options = config.items(section_title);
 
     for i, (option, value) in enumerate(loaded_options):
+      if option not in impala_shell_defaults:
+        print >> sys.stderr, "WARNING: Unable to read configuration file correctly. " \
+          "Check formatting: '%s'\n" % option;
+        continue
+
       if impala_shell_defaults[option] in [True, False]:
         # validate the option if it can only be a boolean value
         # the only choice for these options is true or false

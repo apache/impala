@@ -46,7 +46,6 @@ from thrift.Thrift import TException
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
 VERSION_STRING = "build version not available"
-HISTORY_LENGTH = 100
 
 # Tarball / packaging build makes impala_build_version available
 try:
@@ -181,7 +180,12 @@ class ImpalaShell(cmd.Cmd):
       self.interactive = True
       try:
         self.readline = __import__('readline')
-        self.readline.set_history_length(HISTORY_LENGTH)
+        try:
+          self.readline.set_history_length(int(options.history_max))
+        except ValueError:
+          print_to_stderr("WARNING: history_max option malformed %s\n"
+            % options.history_max)
+          self.readline.set_history_length(1000)
       except ImportError:
         self._disable_readline()
 

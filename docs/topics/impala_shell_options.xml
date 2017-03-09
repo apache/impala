@@ -198,6 +198,23 @@ under the License.
             <row>
               <entry>
                 <p>
+                  N/A
+                </p>
+              </entry>
+              <entry rev="2.9.0 IMPALA-5127">
+                <p>
+                  history_max=1000
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Sets the maximum number of queries to store in the history file.
+                </p>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <p>
                   -i <varname>hostname</varname> or
                   --impalad=<varname>hostname</varname>[:<varname>portnum</varname>]
                 </p>
