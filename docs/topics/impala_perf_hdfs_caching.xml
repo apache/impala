@@ -81,9 +81,7 @@ under the License.
 
     <p>
       For background information about how to set up and manage HDFS caching for a CDH cluster, see
-<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_hdfs_caching.html -->
-      <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hdfs_caching.html" scope="external" format="html">the
-      CDH documentation</xref>.
+      <xref keyref="cdh_ig_hdfs_caching"/>.
     </p>
   </conbody>
 
@@ -150,9 +148,7 @@ under the License.
 <codeblock>hdfs cacheadmin -addPool four_gig_pool -owner impala -limit 4000000000
 </codeblock>
           For details about the <cmdname>hdfs cacheadmin</cmdname> command, see
-<!-- Original URL: http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH5-Installation-Guide/cdh_ig_hdfs_caching.html -->
-          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hdfs_caching.html" scope="external" format="html">the
-          CDH documentation</xref>.
+          <xref keyref="cdh_ig_hdfs_caching"/>.
           </p>
         </li>
       </ul>

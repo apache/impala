@@ -45,11 +45,11 @@ under the License.
     <topicmeta><linktext>Authentication in Hadoop</linktext></topicmeta>
   </keydef>
 
-  <keydef keys="upstream_hbase_docs" href="https://hbase.apache.org/book.html" scope="external" format="html">
+  <keydef href="https://hbase.apache.org/book.html" scope="external" format="html" keys="upstream_hbase_docs">
     <topicmeta><linktext>the Apache HBase documentation</linktext></topicmeta>
   </keydef>
 
-  <keydef keys="upstream_hbase_security_docs" href="https://hbase.apache.org/book.html#security" scope="external" format="html">
+  <keydef href="https://hbase.apache.org/book.html#security" scope="external" format="html" keys="upstream_hbase_security_docs">
     <topicmeta><linktext>the Security chapter in the Apache HBase documentation</linktext></topicmeta>
   </keydef>
 
@@ -81,9 +81,9 @@ under the License.
     <topicmeta><linktext>udf_samples</linktext></topicmeta>
   </keydef>
 
-  <keydef href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH-Version-and-Packaging-Information/CDH-Version-and-Packaging-Information.html" scope="external" format="html" keys="CDH-Version-and-Packaging-Information.html"/>
-  <keydef href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Navigator/latest/Cloudera-Navigator-Installation-and-User-Guide/Cloudera-Navigator-Installation-and-User-Guide.html" scope="external" format="html" keys="Cloudera-Navigator-Installation-and-User-Guide.html"/>
-  <keydef href="http://www.cloudera.com/content/support/en/downloads/quickstart_vms.html" scope="external" format="html" keys="quickstart_vms.html"/>
+  <keydef href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH-Version-and-Packaging-Information/CDH-Version-and-Packaging-Information.html" scope="external" format="html" keys="CDH-Version-and-Packaging-Information"/>
+  <keydef href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Navigator/latest/Cloudera-Navigator-Installation-and-User-Guide/Cloudera-Navigator-Installation-and-User-Guide.html" scope="external" format="html" keys="Cloudera-Navigator-Installation-and-User-Guide"/>
+  <keydef href="http://www.cloudera.com/content/support/en/downloads/quickstart_vms.html" scope="external" format="html" keys="quickstart_vms"/>
 
   <keydef href="https://chromium.googlesource.com/breakpad/breakpad/" scope="external" format="html" keys="breakpad_project"/>
 
@@ -91,9 +91,9 @@ under the License.
     <topicmeta><linktext>Hue</linktext></topicmeta>
   </keydef>
 
-  <keydef href="http://radar.oreilly.com/2013/10/cloudera-impala-bringing-the-sql-and-hadoop-worlds-together.html" scope="external" format="html" keys="cloudera-impala-bringing-the-sql-and-hadoop-worlds-together.html"/>
+  <keydef href="http://radar.oreilly.com/2013/10/cloudera-impala-bringing-the-sql-and-hadoop-worlds-together.html" scope="external" format="html" keys="cloudera-impala-bringing-the-sql-and-hadoop-worlds-together"/>
   <keydef href="http://shop.oreilly.com/product/0636920033936.do" scope="external" format="html" keys="0636920033936.do"/>
-  <keydef href="http://www.cloudera.com/content/cloudera/en/resources/library/recordedwebinar/impala-real-time-queries-in-hadoop-webinar-slides.html" scope="external" format="html" keys="impala-real-time-queries-in-hadoop-webinar-slides.html"/>
+  <keydef href="http://www.cloudera.com/content/cloudera/en/resources/library/recordedwebinar/impala-real-time-queries-in-hadoop-webinar-slides.html" scope="external" format="html" keys="impala-real-time-queries-in-hadoop-webinar-slides"/>
 
   <keydef href="http://www.cloudera.com/content/cloudera/en/products-and-services/cdh/impala.html" scope="external" format="html" keys="impala-product"/>
   <!-- <keydef href="https://groups.google.com/a/cloudera.org/forum/?fromgroups#!forum/impala-user" scope="external" format="html" keys="impala-user"/> -->
@@ -101,15 +101,15 @@ under the License.
   <keydef href="https://issues.cloudera.org/browse/IMPALA" scope="external" format="html" keys="impala-jira"/>
   <keydef href="http://www.cloudera.com/content/dam/cloudera/Resources/PDF/whitepaper/AWS_Reference_Architecture_Whitepaper.pdf" scope="external" format="html" keys="AWS_Reference_Architecture_Whitepaper.pdf"/>
 
-  <keydef href="https://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html" scope="external" format="html" keys="HdfsDesign.html"/>
-  <keydef href="https://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-project-dist/hadoop-common/FileSystemShell.html" scope="external" format="html" keys="FileSystemShell.html"/>
-  <keydef href="http://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-project-dist/hadoop-hdfs/HdfsPermissionsGuide.html" scope="external" format="html" keys="HdfsPermissionsGuide.html"/>
-  <keydef href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" scope="external" format="html" keys="FairScheduler.html"/>
+  <keydef href="https://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html" scope="external" format="html" keys="HdfsDesign"/>
+  <keydef href="https://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-project-dist/hadoop-common/FileSystemShell.html" scope="external" format="html" keys="FileSystemShell"/>
+  <keydef href="http://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-project-dist/hadoop-hdfs/HdfsPermissionsGuide.html" scope="external" format="html" keys="HdfsPermissionsGuide"/>
+  <keydef href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" scope="external" format="html" keys="FairScheduler"/>
   <keydef href="https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/" scope="external" format="html" keys="gplextras"/>
 
   <keydef href="https://code.google.com/p/re2/" scope="external" format="html" keys="re2"/>
-  <keydef href="http://goog-perftools.sourceforge.net/doc/tcmalloc.html" scope="external" format="html" keys="tcmalloc.html"/>
-  <keydef href="http://google-glog.googlecode.com/svn/trunk/doc/glog.html" scope="external" format="html" keys="glog.html"/>
+  <keydef href="http://goog-perftools.sourceforge.net/doc/tcmalloc.html" scope="external" format="html" keys="tcmalloc"/>
+  <keydef href="http://google-glog.googlecode.com/svn/trunk/doc/glog.html" scope="external" format="html" keys="glog"/>
 
   <keydef href="https://issues.apache.org/jira/browse/HIVE-656" scope="external" format="html" keys="HIVE-656"/>
 
@@ -117,12 +117,12 @@ under the License.
 
   <!-- Download page that leads to ODBC drivers. -->
   <keydef href="http://www.cloudera.com/content/support/en/downloads/download-components/download-products.html?productID=3mDesWddUS" scope="external" format="html" keys="3mDesWddUS"/>
-  <keydef href="http://www.cloudera.com/content/support/en/documentation/cloudera-connectors-documentation/connector-documentation-latest.html" scope="external" format="html" keys="connector-documentation-latest.html"/>
+  <keydef href="http://www.cloudera.com/content/support/en/documentation/cloudera-connectors-documentation/connector-documentation-latest.html" scope="external" format="html" keys="connector-documentation-latest"/>
   <keydef href="http://www.iodbc.org/dataspace/iodbc/wiki/iODBC/Downloads" scope="external" format="html" keys="iODBC_Downloads"/>
-  <keydef href="http://go.cloudera.com/odbc-driver-hive-impala.html" scope="external" format="html" keys="odbc-driver-hive-impala.html"/>
+  <keydef href="http://go.cloudera.com/odbc-driver-hive-impala.html" scope="external" format="html" keys="odbc-driver-hive-impala"/>
   <keydef href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Connectors/PDF/Cloudera-ODBC-Driver-for-Impala-Install-Guide.pdf" scope="external" format="html" keys="Cloudera-ODBC-Driver-for-Impala-Install-Guide.pdf"/>
 
-  <keydef href="http://www.cloudera.com/content/cloudera/en/downloads/connectors/impala/jdbc/impala-jdbc-v2-5-5.html" scope="external" format="html" keys="impala-jdbc-v2-5-5.html"/>
+  <keydef href="http://www.cloudera.com/content/cloudera/en/downloads/connectors/impala/jdbc/impala-jdbc-v2-5-5.html" scope="external" format="html" keys="impala-jdbc-v2-5-5"/>
   <keydef href="https://github.com/onefoursix/Cloudera-Impala-JDBC-Example" scope="external" format="html" keys="Cloudera-Impala-JDBC-Example"/>
 
   <keydef href="https://issues.apache.org/jira/browse/HIVE-8648" scope="external" format="html" keys="HIVE-8648"/>
@@ -144,61 +144,6 @@ under the License.
   <keydef href="http://stat-computing.org/dataexpo/2009/the-data.html" scope="external" format="html" keys="dataexpo-2009-the-data"/>
 
   <keydef href="http://www.lzop.org/" scope="external" format="html" keys="lzop.org"/>
-
-<!--
-http://github.sf.cloudera.com/CDH/Impala/blob/master/testdata/workloads/functional-query/queries/QueryTest/load-hive-udfs.test
-http://hadoop.apache.org/docs/r0.19.0/distcp.html
-http://web.mit.edu/Kerberos/krb5-1.8/
-http://www.akadia.com/services/ssh_test_certificate.html
-http://www.askapache.com/online-tools/htpasswd-generator/
-http://www.cloudera.com/content/cloudera/en/documentation/impala/latest.html
-http://www.cloudera.com/content/www/en-us/documentation/enterprise/latest/topics/cdh_admin_performance.html
-https://archive.cloudera.com/cdh/3/hadoop/hdfs_permissions_guide.html
-https://archive.cloudera.com/cdh5/
-https://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration
-https://archive.cloudera.com/gplextras/debian/squeeze/amd64/gplextras/cloudera.list
-https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/cloudera-gplextras4.repo
-https://archive.cloudera.com/gplextras/redhat/6/x86_64/gplextras/cloudera-gplextras4.repo
-https://archive.cloudera.com/gplextras/sles/11/x86_64/gplextras/cloudera-gplextras4.repo
-https://archive.cloudera.com/gplextras/ubuntu/lucid/amd64/gplextras/cloudera.list
-https://archive.cloudera.com/gplextras/ubuntu/precise/amd64/gplextras/cloudera.list
-https://archive.cloudera.com/impala/
-https://archive.cloudera.com/impala/redhat/6/x86_64/impala/cloudera-impala.repo
-https://community.emc.com/docs/DOC-39522
-https://downloads.cloudera.com/impala-jdbc/impala-jdbc-0.5-2.zip
-https://issues.apache.org/jira/browse/HIVE-3596
-https://issues.apache.org/jira/browse/HIVE-9866
-https://issues.cloudera.org/browse/
-https://issues.cloudera.org/browse/CDH-20513
-https://issues.cloudera.org/browse/CDH-41605
-https://issues.cloudera.org/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.5.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.5.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc
-https://issues.cloudera.org/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.6.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.6.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc
-https://issues.cloudera.org/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.7.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.7.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.0.1%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.1%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.1.1%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.2%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.1%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.2%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.3%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.4%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.3%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.3.1%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.4%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.4.1%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.4.2%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.1%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.2%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.3%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.4%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.5%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.1%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.1.1%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.1.2%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.2%22+and+resolution%3D%22Fixed%22
-https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project+%3D+impala+AND+resolution+%3D+Fixed+AND+fixVersion+%3D+%22Impala+1.0%22+ORDER+BY+key+ASC%2C+assignee+ASC%2C+priority+DESC
--->
 
 <!-- Links to discussion forums. -->
   <keydef href="http://community.cloudera.com/t5/Interactive-Short-cycle-SQL/bd-p/Impala" scope="external" format="html" keys="interactive_sql_forum"/>
@@ -224,50 +169,137 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="https://en.wikipedia.org/wiki/Two%27s_complement" scope="external" format="html" keys="Twos_complement"/>
   <keydef href="https://en.wikipedia.org/wiki/Universally_unique_identifier" scope="external" format="html" keys="Universally_unique_identifier"/>
 
-<!-- Links to Cloudera doc pages. -->
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/admin_llama.html" scope="external" format="html" keys="admin_llama"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_hag_cdh_other_ha.html" scope="external" format="html" keys="cdh_hag_cdh_other_ha.html"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hbase_installation.html" scope="external" format="html" keys="cdh_ig_hbase_installation"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hdfs_caching.html" scope="external" format="html" keys="cdh_ig_hdfs_caching"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hive_installation.html" scope="external" format="html" keys="cdh_ig_hive_installation"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_hive_jdbc_install.html" scope="external" format="html" keys="cdh_ig_hive_jdbc_install"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_llama_installation.html" scope="external" format="html" keys="cdh_ig_llama_installation"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_parquet.html" scope="external" format="html" keys="cdh_ig_parquet"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_yarn_cluster_deploy.html" scope="external" format="html" keys="cdh_ig_yarn_cluster_deploy"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_55.html#fixed_issues_554" scope="external" format="html" keys="cdh_rn_fixed_in_55"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_552.html" scope="external" format="html" keys="cdh_rn_fixed_in_552"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_560.html" scope="external" format="html" keys="cdh_rn_fixed_in_560"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_sg_cdh5_hadoop_security.html" scope="external" format="html" keys="cdh_sg_cdh5_hadoop_security"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_sg_hive_security.html" scope="external" format="html" keys="cdh_sg_hive_security"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_sg_kerberos_prin_keytab_deploy.html" scope="external" format="html" keys="cdh_sg_kerberos_prin_keytab_deploy"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_dg_logs.html" scope="external" format="html" keys="cm_dg_logs.html"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_dg_service_monitoring.html" scope="external" format="html" keys="cm_dg_service_monitoring.html"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_ig_install_gpl_extras.html" scope="external" format="html" keys="cm_ig_install_gpl_extras"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_ig_install_impala.html" scope="external" format="html" keys="cm_ig_install_impala"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_client_config.html" scope="external" format="html" keys="cm_mc_client_config"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_impala_service.html" scope="external" format="html" keys="cm_mc_impala_service"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_isilon_service.html" scope="external" format="html" keys="cm_mc_isilon_service"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_managing_resources.html" scope="external" format="html" keys="cm_mc_managing_resources"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_managing_roles.html" scope="external" format="html" keys="cm_mc_managing_roles"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_resource_pools.html" scope="external" format="html" keys="cm_mc_resource_pools.html"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_service_pools.html" scope="external" format="html" keys="cm_mc_service_pools"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_start_stop_service.html" scope="external" format="html" keys="cm_mc_start_stop_service"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_upgrading_cdh.html" scope="external" format="html" keys="cm_mc_upgrading_cdh"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_yarn_service.html" scope="external" format="html" keys="cm_mc_yarn_service"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_metrics_impala.html" scope="external" format="html" keys="cm_metrics_impala"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_openssl_jks.html" scope="external" format="html" keys="cm_sg_openssl_jks"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_sg_sentry_service.html" scope="external" format="html" keys="cm_sg_sentry_service"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cn_iu_lineage.html" scope="external" format="html" keys="cn_iu_lineage"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/cn_iu_service_audit.html" scope="external" format="html" keys="cn_iu_service_audit.html"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/datamgmt_impala_lineage_log.html" scope="external" format="html" keys="datamgmt_impala_lineage_log"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/impala.html" scope="external" format="html" keys="impala"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/installation.html" scope="external" format="html" keys="installation"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/pcm_impala.html" scope="external" format="html" keys="pcm_impala.html"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/rg_vd.html" scope="external" format="html" keys="rg_vd.html"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_authentication.html" scope="external" format="html" keys="sg_authentication"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_redaction.html" scope="external" format="html" keys="sg_redaction"/>
-  <keydef href="http://www.cloudera.com/documentation/enterprise/release-notes/topics/cdh_rn_fixed_in_51.html" scope="external" format="html" keys="cdh_rn_fixed_in_51"/>
-  <keydef href="https://www.cloudera.com/documentation/enterprise/latest/topics/sg_hive_sql.html" scope="external" format="html" keys="sg_hive_sql"/>
+<!-- Originally links to external doc pages, turned into plain text for Apache Impala docs. -->
+  <keydef href="" scope="external" format="html" keys="admin_llama">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_hag_cdh_other_ha">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_ig_hbase_installation">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_ig_hdfs_caching">
+    <topicmeta><linktext>the documentation for HDFS caching</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_ig_hive_installation">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_ig_hive_jdbc_install">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_ig_llama_installation">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_ig_parquet">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_ig_yarn_cluster_deploy">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_rn_fixed_in_55">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_rn_fixed_in_552">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_rn_fixed_in_560">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_sg_cdh5_hadoop_security">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_sg_hive_security">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_sg_kerberos_prin_keytab_deploy">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_dg_logs">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_dg_service_monitoring">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_ig_install_gpl_extras">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="impala_hdfs_encryption">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_ig_install_impala">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_mc_client_config">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_mc_impala_service">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_mc_isilon_service">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_mc_managing_resources">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_mc_managing_roles">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_mc_resource_pools">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_mc_service_pools">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_mc_start_stop_service">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_mc_upgrading_cdh">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_mc_yarn_service">
+    <topicmeta><linktext>the YARN instructions for your cluster management tool</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_metrics_impala">
+    <topicmeta><linktext>the instructions for your cluster management tool</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cm_sg_openssl_jks"/>
+  <keydef href="" scope="external" format="html" keys="cm_sg_sentry_service">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cn_iu_lineage">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cn_iu_service_audit">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="datamgmt_impala_lineage_log">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="impala">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="installation">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="pcm_impala">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="rg_vd">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="sg_authentication">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="sg_redaction">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_rn_fixed_in_51">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="https://www.cloudera.com/documentation/enterprise/latest/topics/sg_hive_sql.html" scope="external" format="html" keys="sg_hive_sql">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
 
 <!-- Links to pages on Hive wiki. -->
   <keydef href="https://cwiki.apache.org/confluence/display/Hive/AvroSerDe" scope="external" format="html" keys="AvroSerDe"/>
@@ -10351,6 +10383,9 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
 <!-- Indirect addresses for all the impala*.xml files. The key is the ID of the first topic within each file. -->
   <keydef href="topics/impala_concepts.xml" keys="concepts"/>
   <keydef href="topics/impala_components.xml" keys="intro_components"/>
+  <keydef href="topics/impala_components.xml#intro_impalad" keys="intro_impalad"/>
+  <keydef href="topics/impala_components.xml#intro_statestore" keys="intro_statestore"/>
+  <keydef href="topics/impala_components.xml#intro_catalogd" keys="intro_catalogd"/>
   <keydef href="topics/impala_development.xml" keys="intro_dev"/>
   <keydef href="topics/impala_hadoop.xml" keys="intro_hadoop"/>
   <keydef href="topics/impala_planning.xml" keys="planning"/>
@@ -10368,9 +10403,26 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="topics/impala_processes.xml" keys="processes"/>
   <keydef href="topics/impala_config_options.xml" keys="config_options"/>
   <keydef href="topics/impala_tutorial.xml" keys="tutorial"/>
+  <keydef href="topics/impala_tutorial.xml#tut_beginner" keys="tut_beginner"/>
+  <keydef href="topics/impala_tutorial.xml#tutorial_explore" keys="tutorial_explore"/>
+  <keydef href="topics/impala_tutorial.xml#tutorial_csv_setup" keys="tutorial_csv_setup"/>
+  <keydef href="topics/impala_tutorial.xml#tutorial_create_table" keys="tutorial_create_table"/>
+  <keydef href="topics/impala_tutorial.xml#tutorial_describe_impala" keys="tutorial_describe_impala"/>
+  <keydef href="topics/impala_tutorial.xml#tutorial_query_impala" keys="tutorial_query_impala"/>
+  <keydef href="topics/impala_tutorial.xml#tutorial_etl" keys="tutorial_etl"/>
+  <keydef href="topics/impala_tutorial.xml#tutorial_loading" keys="tutorial_loading"/>
+  <keydef href="topics/impala_tutorial.xml#tutorial_queries" keys="tutorial_queries"/>
+  <keydef href="topics/impala_tutorial.xml#tut_advanced" keys="tut_advanced"/>
+  <keydef href="topics/impala_tutorial.xml#tut_external_partition_data" keys="tut_external_partition_data"/>
+  <keydef href="topics/impala_tutorial.xml#tutorial_impala_hive" keys="tutorial_impala_hive"/>
+  <keydef href="topics/impala_tutorial.xml#tut_cross_join" keys="tut_cross_join"/>
+  <keydef href="topics/impala_tutorial.xml#tut_parquet_schemaless" keys="tut_parquet_schemaless"/>
   <keydef href="topics/impala_admin.xml" keys="admin"/>
   <keydef href="topics/impala_admission.xml" keys="admission_control"/>
   <keydef href="topics/impala_resource_management.xml" keys="resource_management"/>
+  <keydef href="topics/impala_resource_management.xml#rm_enforcement" keys="rm_enforcement"/>
+  <keydef href="topics/impala_resource_management.xml#rm_query_options" keys="rm_query_options"/>
+  <keydef href="topics/impala_resource_management.xml#rm_limitations" keys="rm_limitations"/>
 <!--<keydef href="topics/impala_howto_rm.xml" keys="howto_impala_rm"/>-->
   <keydef href="topics/impala_timeouts.xml" keys="timeouts"/>
   <keydef href="topics/impala_proxy.xml" keys="proxy"/>
@@ -10384,9 +10436,18 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="topics/impala_security_metastore.xml" keys="security_metastore"/>
   <keydef href="topics/impala_security_webui.xml" keys="security_webui"/>
   <keydef href="topics/impala_ssl.xml" keys="ssl"/>
-  <keydef href="topics/impala_authorization.xml" keys="authorization"/>
+  <keydef href="topics/impala_authorization.xml" keys="authorization">
+    <topicmeta><linktext>Enabling Sentry Authorization for Impala</linktext></topicmeta>
+  </keydef>
   <keydef href="topics/impala_authentication.xml" keys="authentication"/>
   <keydef href="topics/impala_kerberos.xml" keys="kerberos"/>
+  <keydef href="topics/impala_kerberos.xml#kerberos_prereqs" keys="kerberos_prereqs"/>
+  <keydef href="topics/impala_kerberos.xml#kerberos_config" keys="kerberos_config"/>
+  <keydef href="topics/impala_kerberos.xml#kerberos_setup" keys="kerberos_setup"/>
+  <keydef href="topics/impala_kerberos.xml#kerberos_proxy" keys="kerberos_proxy"/>
+  <keydef href="topics/impala_kerberos.xml#kerberos_delegation" keys="kerberos_delegation"/>
+  <keydef href="topics/impala_kerberos.xml#whitelisting_internal_apis" keys="whitelisting_internal_apis"/>
+  <keydef href="topics/impala_kerberos.xml#auth_to_local" keys="auth_to_local"/>
   <keydef href="topics/impala_ldap.xml" keys="ldap"/>
   <keydef href="topics/impala_mixed_security.xml" keys="mixed_security"/>
   <keydef href="topics/impala_delegation.xml" keys="delegation"/>
@@ -10411,15 +10472,33 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="topics/impala_varchar.xml" keys="varchar"/>
   <keydef href="topics/impala_complex_types.xml" keys="complex_types"/>
   <keydef href="topics/impala_literals.xml" keys="literals"/>
+
   <keydef href="topics/impala_operators.xml" keys="operators"/>
+  <keydef href="topics/impala_operators.xml#arithmetic_operators" keys="arithmetic_operators"/>
+  <keydef href="topics/impala_operators.xml#between" keys="between"/>
+  <keydef href="topics/impala_operators.xml#comparison_operators" keys="comparison_operators"/>
+  <keydef audience="hidden" href="topics/impala_operators.xml#except" keys="except"/>
+  <keydef href="topics/impala_operators.xml#exists" keys="exists"/>
+  <keydef href="topics/impala_operators.xml#ilike" keys="ilike"/>
+  <keydef href="topics/impala_operators.xml#in" keys="in"/>
+  <keydef audience="hidden" href="topics/impala_operators.xml#intersect" keys="intersect">
+    <topicmeta><linktext>INTERSECT</linktext></topicmeta>
+  </keydef>
+  <keydef href="topics/impala_operators.xml#iregexp" keys="iregexp"/>
+  <keydef href="topics/impala_operators.xml#is_distinct_from" keys="is_distinct_from"/>
+  <keydef href="topics/impala_operators.xml#is_null" keys="is_null"/>
+  <keydef href="topics/impala_operators.xml#like" keys="like"/>
+  <keydef href="topics/impala_operators.xml#logical_operators" keys="logical_operators"/>
+  <keydef href="topics/impala_operators.xml#regexp" keys="regexp"/>
+  <keydef href="topics/impala_operators.xml#rlike" keys="rlike"/>
+
   <keydef href="topics/impala_schema_objects.xml" keys="schema_objects"/>
   <keydef href="topics/impala_aliases.xml" keys="aliases"/>
   <keydef href="topics/impala_databases.xml" keys="databases"/>
   <keydef href="topics/impala_functions_overview.xml" keys="functions"/>
   <keydef href="topics/impala_identifiers.xml" keys="identifiers"/>
   <keydef href="topics/impala_tables.xml" keys="tables"/>
-<!-- Restore (uncomment) this when the main Kudu review (gerrit # 5649) lands in master -->
-<!--  <keydef href="topics/impala_tables.xml#kudu_tables" keys="kudu_tables"/> -->
+  <keydef href="topics/impala_tables.xml#kudu_tables" keys="kudu_tables"/>
   <keydef href="topics/impala_views.xml" keys="views"/>
   <keydef href="topics/impala_langref_sql.xml" keys="langref_sql"/>
   <keydef href="topics/impala_ddl.xml" keys="ddl"/>
@@ -10442,7 +10521,10 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="topics/impala_drop_view.xml" keys="drop_view"/>
   <keydef href="topics/impala_explain.xml" keys="explain"/>
   <keydef href="topics/impala_grant.xml" keys="grant"/>
+
   <keydef href="topics/impala_insert.xml" keys="insert"/>
+  <keydef href="topics/impala_insert.xml#values" keys="values"/>
+
   <keydef href="topics/impala_invalidate_metadata.xml" keys="invalidate_metadata"/>
   <keydef href="topics/impala_load_data.xml" keys="load_data"/>
   <keydef href="topics/impala_refresh.xml" keys="refresh"/>
@@ -10512,7 +10594,22 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="topics/impala_support_start_over.xml" keys="support_start_over"/>
   <keydef href="topics/impala_sync_ddl.xml" keys="sync_ddl"/>
   <keydef href="topics/impala_v_cpu_cores.xml" keys="v_cpu_cores"/>
+
   <keydef href="topics/impala_show.xml" keys="show"/>
+  <keydef href="topics/impala_show.xml#show_files" keys="show_files"/>
+  <keydef href="topics/impala_show.xml#show_roles" keys="show_roles"/>
+  <keydef href="topics/impala_show.xml#show_current_role" keys="show_current_role"/>
+  <keydef href="topics/impala_show.xml#show_role_grant" keys="show_role_grant"/>
+  <keydef href="topics/impala_show.xml#show_grant_role" keys="show_grant_role"/>
+  <keydef href="topics/impala_show.xml#show_databases" keys="show_databases"/>
+  <keydef href="topics/impala_show.xml#show_tables" keys="show_tables"/>
+  <keydef href="topics/impala_show.xml#show_create_table" keys="show_create_table"/>
+  <keydef href="topics/impala_show.xml#show_table_stats" keys="show_table_stats"/>
+  <keydef href="topics/impala_show.xml#show_column_stats" keys="show_column_stats"/>
+  <keydef href="topics/impala_show.xml#show_partitions" keys="show_partitions"/>
+  <keydef href="topics/impala_show.xml#show_functions" keys="show_functions"/>
+  <keydef audience="hidden" href="topics/impala_show.xml#show_data_sources" keys="show_data_sources"/>
+
   <keydef href="topics/impala_truncate_table.xml" keys="truncate_table"/>
   <keydef href="topics/impala_update.xml" keys="update"/>
   <keydef href="topics/impala_upsert.xml" keys="upsert"/>
@@ -10536,40 +10633,195 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="topics/impala_stddev.xml" keys="stddev"/>
   <keydef href="topics/impala_sum.xml" keys="sum"/>
   <keydef href="topics/impala_variance.xml" keys="variance"/>
+
   <keydef href="topics/impala_analytic_functions.xml" keys="analytic_functions"/>
+  <keydef href="topics/impala_analytic_functions.xml#over" keys="over"/>
+  <keydef href="topics/impala_analytic_functions.xml#window_clause" keys="window_clause"/>
+  <keydef href="topics/impala_analytic_functions.xml#avg_analytic" keys="avg_analytic"/>
+  <keydef href="topics/impala_analytic_functions.xml#count_analytic" keys="count_analytic"/>
+  <keydef href="topics/impala_analytic_functions.xml#cume_dist" keys="cume_dist"/>
+  <keydef href="topics/impala_analytic_functions.xml#dense_rank" keys="dense_rank"/>
+  <keydef href="topics/impala_analytic_functions.xml#first_value" keys="first_value"/>
+  <keydef href="topics/impala_analytic_functions.xml#lag" keys="lag"/>
+  <keydef href="topics/impala_analytic_functions.xml#last_value" keys="last_value"/>
+  <keydef href="topics/impala_analytic_functions.xml#lead" keys="lead"/>
+  <keydef href="topics/impala_analytic_functions.xml#max_analytic" keys="max_analytic"/>
+  <keydef href="topics/impala_analytic_functions.xml#min_analytic" keys="min_analytic"/>
+  <keydef audience="hidden" href="topics/impala_analytic_functions.xml#nth_value" keys="nth_value"/>
+  <keydef href="topics/impala_analytic_functions.xml#ntile" keys="ntile"/>
+  <keydef href="topics/impala_analytic_functions.xml#percent_rank" keys="percent_rank"/>
+  <keydef href="topics/impala_analytic_functions.xml#rank" keys="rank"/>
+  <keydef href="topics/impala_analytic_functions.xml#row_number" keys="row_number"/>
+  <keydef href="topics/impala_analytic_functions.xml#sum_analytic" keys="sum_analytic"/>
+
   <keydef href="topics/impala_udf.xml" keys="udfs"/>
+  <keydef href="topics/impala_udf.xml#udf_concepts" keys="udf_concepts"/>
+  <keydef href="topics/impala_udf.xml#udfs_udafs" keys="udfs_udafs"/>
+  <keydef href="topics/impala_udf.xml#native_udfs" keys="native_udfs"/>
+  <keydef href="topics/impala_udf.xml#udfs_hive" keys="udfs_hive"/>
+  <keydef href="topics/impala_udf.xml#udf_runtime" keys="udf_runtime"/>
+  <keydef href="topics/impala_udf.xml#udf_demo_env" keys="udf_demo_env"/>
+  <keydef href="topics/impala_udf.xml#udf_coding" keys="udf_coding"/>
+  <keydef href="topics/impala_udf.xml#udf_exploring" keys="udf_exploring"/>
+  <keydef href="topics/impala_udf.xml#udfs_args" keys="udfs_args"/>
+  <keydef href="topics/impala_udf.xml#udf_varargs" keys="udf_varargs"/>
+  <keydef href="topics/impala_udf.xml#udf_null" keys="udf_null"/>
+  <keydef href="topics/impala_udf.xml#udf_malloc" keys="udf_malloc"/>
+  <keydef href="topics/impala_udf.xml#udf_threads" keys="udf_threads"/>
+  <keydef href="topics/impala_udf.xml#udf_error_handling" keys="udf_error_handling"/>
+  <keydef href="topics/impala_udf.xml#udafs" keys="udafs"/>
+  <keydef href="topics/impala_udf.xml#uda_functions" keys="uda_functions"/>
+  <keydef href="topics/impala_udf.xml#udf_intermediate" keys="udf_intermediate"/>
+  <keydef href="topics/impala_udf.xml#udf_building" keys="udf_building"/>
+  <keydef href="topics/impala_udf.xml#udf_performance" keys="udf_performance"/>
+  <keydef href="topics/impala_udf.xml#udf_tutorial" keys="udf_tutorial"/>
+  <keydef href="topics/impala_udf.xml#udf_security" keys="udf_security"/>
+  <keydef href="topics/impala_udf.xml#udf_limits" keys="udf_limits"/>
+
   <keydef href="topics/impala_langref_unsupported.xml" keys="langref_hiveql_delta"/>
   <keydef href="topics/impala_porting.xml" keys="porting"/>
   <keydef href="topics/impala_impala_shell.xml" keys="impala_shell"/>
   <keydef href="topics/impala_shell_options.xml" keys="shell_options"/>
+  <keydef href="topics/impala_shell_options.xml#shell_option_summary" keys="shell_option_summary"/>
+  <keydef href="topics/impala_shell_options.xml#shell_config_file" keys="shell_config_file"/>
   <keydef href="topics/impala_connecting.xml" keys="connecting"/>
   <keydef href="topics/impala_shell_running_commands.xml" keys="shell_running_commands"/>
   <keydef href="topics/impala_shell_commands.xml" keys="shell_commands"/>
+
   <keydef href="topics/impala_performance.xml" keys="performance"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_network" keys="perf_network"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_partition_schema" keys="perf_partition_schema"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_partition_query" keys="perf_partition_query"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_monitoring" keys="perf_monitoring"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_query_coord" keys="perf_query_coord"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_bottlenecks" keys="perf_bottlenecks"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_long_queries" keys="perf_long_queries"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_load" keys="perf_load"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_file_formats" keys="perf_file_formats"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_compression" keys="perf_compression"/>
+  <keydef audience="hidden" href="topics/impala_performance.xml#perf_codegen" keys="perf_codegen"/>
+
   <keydef href="topics/impala_perf_cookbook.xml" keys="perf_cookbook"/>
+
   <keydef href="topics/impala_perf_joins.xml" keys="perf_joins"/>
+  <keydef href="topics/impala_perf_joins.xml#joins_no_stats" keys="joins_no_stats"/>
+  <keydef href="topics/impala_perf_joins.xml#straight_join" keys="straight_join"/>
+  <keydef href="topics/impala_perf_joins.xml#perf_joins_examples" keys="perf_joins_examples"/>
   <keydef href="topics/impala_perf_stats.xml" keys="perf_stats"/>
+  <keydef href="topics/impala_perf_stats.xml#perf_column_stats_manual" keys="perf_column_stats_manual"/>
+
   <keydef href="topics/impala_perf_benchmarking.xml" keys="perf_benchmarks"/>
   <keydef href="topics/impala_perf_resources.xml" keys="mem_limits"/>
   <keydef href="topics/impala_runtime_filtering.xml" keys="runtime_filtering"/>
   <keydef href="topics/impala_perf_hdfs_caching.xml" keys="hdfs_caching"/>
   <keydef href="topics/impala_perf_testing.xml" keys="performance_testing"/>
+
   <keydef href="topics/impala_explain_plan.xml" keys="explain_plan"/>
+  <keydef href="topics/impala_explain_plan.xml#perf_explain" keys="perf_explain"/>
+  <keydef href="topics/impala_explain_plan.xml#perf_summary" keys="perf_summary"/>
+  <keydef href="topics/impala_explain_plan.xml#perf_profile" keys="perf_profile"/>
+
   <keydef href="topics/impala_perf_skew.xml" keys="perf_skew"/>
   <keydef audience="hidden" href="topics/impala_perf_ddl.xml" keys="perf_ddl"/>
+
   <keydef href="topics/impala_scalability.xml" keys="scalability"/>
+  <keydef audience="hidden" href="topics/impala_scalability.xml#scalability_memory" keys="scalability_memory"/>
+  <keydef href="topics/impala_scalability.xml#scalability_catalog" keys="scalability_catalog"/>
+  <keydef href="topics/impala_scalability.xml#statestore_scalability" keys="statestore_scalability"/>
+  <keydef audience="hidden" href="topics/impala_scalability.xml#scalability_cluster_size" keys="scalability_cluster_size"/>
+  <keydef audience="hidden" href="topics/impala_scalability.xml#concurrent_connections" keys="concurrent_connections"/>
+  <keydef href="topics/impala_scalability.xml#spill_to_disk" keys="spill_to_disk"/>
+  <keydef href="topics/impala_scalability.xml#complex_query" keys="complex_query"/>
+  <keydef href="topics/impala_scalability.xml#scalability_io" keys="scalability_io"/>
+  <keydef href="topics/impala_scalability.xml#big_tables" keys="big_tables"/>
+  <keydef href="topics/impala_scalability.xml#kerberos_overhead_cluster_size" keys="kerberos_overhead_cluster_size"/>
+  <keydef href="topics/impala_scalability.xml#scalability_hotspots" keys="scalability_hotspots"/>
+
   <keydef href="topics/impala_partitioning.xml" keys="partitioning"/>
+  <keydef href="topics/impala_partitioning.xml#partitioning_choosing" keys="partitioning_choosing"/>
+  <keydef href="topics/impala_partitioning.xml#partition_sql" keys="partition_sql"/>
+  <keydef href="topics/impala_partitioning.xml#partition_static_dynamic" keys="partition_static_dynamic"/>
+  <keydef href="topics/impala_partitioning.xml#partition_refresh" keys="partition_refresh"/>
+  <keydef href="topics/impala_partitioning.xml#partition_permissions" keys="partition_permissions"/>
+  <keydef href="topics/impala_partitioning.xml#partition_pruning" keys="partition_pruning"/>
+  <keydef href="topics/impala_partitioning.xml#partition_pruning_checking" keys="partition_pruning_checking"/>
+  <keydef href="topics/impala_partitioning.xml#partition_pruning_sql" keys="partition_pruning_sql"/>
+  <keydef href="topics/impala_partitioning.xml#dynamic_partition_pruning" keys="dynamic_partition_pruning"/>
+  <keydef href="topics/impala_partitioning.xml#partition_key_columns" keys="partition_key_columns"/>
+  <keydef href="topics/impala_partitioning.xml#mixed_format_partitions" keys="mixed_format_partitions"/>
+  <keydef href="topics/impala_partitioning.xml#partition_management" keys="partition_management"/>
+  <keydef href="topics/impala_partitioning.xml#partition_kudu" keys="partition_kudu"/>
+
   <keydef href="topics/impala_file_formats.xml" keys="file_formats"/>
+
   <keydef href="topics/impala_txtfile.xml" keys="txtfile"/>
+  <keydef href="topics/impala_txtfile.xml#text_performance" keys="text_performance"/>
+  <keydef href="topics/impala_txtfile.xml#text_ddl" keys="text_ddl"/>
+  <keydef href="topics/impala_txtfile.xml#text_data_files" keys="text_data_files"/>
+  <keydef href="topics/impala_txtfile.xml#text_etl" keys="text_etl"/>
+  <keydef href="topics/impala_txtfile.xml#lzo" keys="lzo"/>
+  <keydef href="topics/impala_txtfile.xml#gzip" keys="gzip"/>
+  <keydef audience="hidden" href="topics/impala_txtfile.xml#txtfile_data_types" keys="txtfile_data_types"/>
+
   <keydef href="topics/impala_parquet.xml" keys="parquet"/>
+  <keydef href="topics/impala_parquet.xml#parquet_ddl" keys="parquet_ddl"/>
+  <keydef href="topics/impala_parquet.xml#parquet_etl" keys="parquet_etl"/>
+  <keydef href="topics/impala_parquet.xml#parquet_performance" keys="parquet_performance"/>
+  <keydef href="topics/impala_parquet.xml#parquet_partitioning" keys="parquet_partitioning"/>
+  <keydef href="topics/impala_parquet.xml#parquet_compression" keys="parquet_compression"/>
+  <keydef href="topics/impala_parquet.xml#parquet_snappy" keys="parquet_snappy"/>
+  <keydef href="topics/impala_parquet.xml#parquet_gzip" keys="parquet_gzip"/>
+  <keydef href="topics/impala_parquet.xml#parquet_none" keys="parquet_none"/>
+  <keydef href="topics/impala_parquet.xml#parquet_compression_examples" keys="parquet_compression_examples"/>
+  <keydef href="topics/impala_parquet.xml#parquet_compression_multiple" keys="parquet_compression_multiple"/>
+  <keydef href="topics/impala_parquet.xml#parquet_complex_types" keys="parquet_complex_types"/>
+  <keydef href="topics/impala_parquet.xml#parquet_interop" keys="parquet_interop"/>
+  <keydef href="topics/impala_parquet.xml#parquet_data_files" keys="parquet_data_files"/>
+  <keydef href="topics/impala_parquet.xml#parquet_encoding" keys="parquet_encoding"/>
+  <keydef href="topics/impala_parquet.xml#parquet_compacting" keys="parquet_compacting"/>
+  <keydef href="topics/impala_parquet.xml#parquet_schema_evolution" keys="parquet_schema_evolution"/>
+  <keydef href="topics/impala_parquet.xml#parquet_data_types" keys="parquet_data_types"/>
+
   <keydef href="topics/impala_avro.xml" keys="avro"/>
+  <keydef href="topics/impala_avro.xml#avro_create_table" keys="avro_create_table"/>
+  <keydef href="topics/impala_avro.xml#avro_map_table" keys="avro_map_table"/>
+  <keydef href="topics/impala_avro.xml#avro_json" keys="avro_json"/>
+  <keydef href="topics/impala_avro.xml#avro_load_data" keys="avro_load_data"/>
+  <keydef href="topics/impala_avro.xml#avro_compression" keys="avro_compression"/>
+  <keydef href="topics/impala_avro.xml#avro_schema_evolution" keys="avro_schema_evolution"/>
+  <keydef href="topics/impala_avro.xml#avro_data_types" keys="avro_data_types"/>
+  <keydef href="topics/impala_avro.xml#avro_performance" keys="avro_performance"/>
+  <keydef href="topics/impala_avro.xml#avro_performance" keys="avro_performance"/>
+
   <keydef href="topics/impala_rcfile.xml" keys="rcfile"/>
   <keydef href="topics/impala_seqfile.xml" keys="seqfile"/>
   <keydef href="topics/impala_kudu.xml" keys="impala_kudu"/>
+
   <keydef href="topics/impala_hbase.xml" keys="impala_hbase"/>
+  <keydef href="topics/impala_hbase.xml#hbase_using" keys="hbase_using"/>
+  <keydef href="topics/impala_hbase.xml#hbase_config" keys="hbase_config"/>
+  <keydef href="topics/impala_hbase.xml#hbase_types" keys="hbase_types"/>
+  <keydef href="topics/impala_hbase.xml#hbase_performance" keys="hbase_performance"/>
+  <keydef href="topics/impala_hbase.xml#hbase_scenarios" keys="hbase_scenarios"/>
+  <keydef audience="hidden" href="topics/impala_hbase.xml#hbase_create_new" keys="hbase_create_new"/>
+  <keydef audience="hidden" href="topics/impala_hbase.xml#hbase_reuse_existing" keys="hbase_reuse_existing"/>
+  <keydef audience="hidden" href="topics/impala_hbase.xml#hbase_column_families" keys="hbase_column_families"/>
+  <keydef href="topics/impala_hbase.xml#hbase_loading" keys="hbase_loading"/>
+  <keydef href="topics/impala_hbase.xml#hbase_limitations" keys="hbase_limitations"/>
+  <keydef href="topics/impala_hbase.xml#hbase_queries" keys="hbase_queries"/>
+
   <keydef href="topics/impala_s3.xml" keys="s3"/>
   <keydef href="topics/impala_isilon.xml" keys="impala_isilon"/>
+
   <keydef href="topics/impala_logging.xml" keys="logging"/>
+  <keydef href="topics/impala_logging.xml#logs_details" keys="logs_details"/>
+  <keydef href="topics/impala_logging.xml#logs_cm_noncm" keys="logs_cm_noncm"/>
+  <keydef href="topics/impala_logging.xml#logs_rotate" keys="logs_rotate"/>
+  <keydef href="topics/impala_logging.xml#logs_debug" keys="logs_debug"/>
+  <keydef href="topics/impala_logging.xml#log_format" keys="log_format"/>
+  <keydef href="topics/impala_logging.xml#log_levels" keys="log_levels"/>
+  <keydef href="topics/impala_logging.xml#redaction" keys="redaction"/>
+
   <keydef href="topics/impala_troubleshooting.xml" keys="troubleshooting"/>
   <keydef href="topics/impala_webui.xml" keys="webui"/>
   <keydef href="topics/impala_breakpad.xml" keys="breakpad"/>
@@ -10577,5 +10829,9 @@ https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=p
   <keydef href="topics/impala_reserved_words.xml" keys="reserved_words"/>
   <keydef href="topics/impala_faq.xml" keys="faq"/>
   <keydef audience="hidden" href="topics/impala_release_notes.xml" keys="impala_release_notes"/>
+  <keydef href="topics/impala_fixed_issues.xml" keys="fixed_issues"/>
+  <keydef href="topics/impala_incompatible_changes.xml" keys="incompatible_changes"/>
+  <keydef href="topics/impala_known_issues.xml" keys="known_issues"/>
+  <keydef href="topics/impala_new_features.xml" keys="new_features"/>
   <keydef audience="hidden" href="topics/impala_errata.xml" keys="errata"/>
 </map>
