@@ -687,8 +687,7 @@ Status HdfsScanNodeBase::CreateAndOpenScanner(HdfsPartitionDescriptor* partition
   if (status.ok()) {
     status = scanner->get()->Open(context);
     if (!status.ok()) {
-      RowBatch* batch = (HasRowBatchQueue()) ? scanner->get()->batch() : NULL;
-      scanner->get()->Close(batch);
+      scanner->get()->Close(nullptr);
       scanner->reset();
     }
   } else {
@@ -807,6 +806,10 @@ void HdfsScanNodeBase::ComputeSlotMaterializationOrder(vector<int>* order) const
       }
     }
   }
+}
+
+void HdfsScanNodeBase::TransferToScanNodePool(MemPool* pool) {
+  scan_node_pool_->AcquireData(pool, false);
 }
 
 void HdfsScanNodeBase::UpdateHdfsSplitStats(

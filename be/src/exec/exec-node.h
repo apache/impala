@@ -19,6 +19,7 @@
 #ifndef IMPALA_EXEC_EXEC_NODE_H
 #define IMPALA_EXEC_EXEC_NODE_H
 
+#include <memory>
 #include <sstream>
 #include <vector>
 
@@ -225,7 +226,7 @@ class ExecNode {
   /// Row batches that are added after Shutdown() are queued in another queue, which can
   /// be cleaned up during Close().
   /// All functions are thread safe.
-  class RowBatchQueue : public BlockingQueue<RowBatch*> {
+  class RowBatchQueue : public BlockingQueue<std::unique_ptr<RowBatch>> {
    public:
     /// max_batches is the maximum number of row batches that can be queued.
     /// When the queue is full, producers will block.
@@ -233,19 +234,12 @@ class ExecNode {
     ~RowBatchQueue();
 
     /// Adds a batch to the queue. This is blocking if the queue is full.
-    void AddBatch(RowBatch* batch);
-
-    /// Adds a batch to the queue. If the queue is full, this blocks until space becomes
-    /// available or 'timeout_micros' has elapsed.
-    /// Returns true if the element was added to the queue, false if it wasn't. If this
-    /// method returns false, the queue didn't take ownership of the batch and it must be
-    /// managed externally.
-    bool AddBatchWithTimeout(RowBatch* batch, int64_t timeout_micros) WARN_UNUSED_RESULT;
+    void AddBatch(std::unique_ptr<RowBatch> batch);
 
     /// Gets a row batch from the queue. Returns NULL if there are no more.
     /// This function blocks.
     /// Returns NULL after Shutdown().
-    RowBatch* GetBatch();
+    std::unique_ptr<RowBatch> GetBatch();
 
     /// Deletes all row batches in cleanup_queue_. Not valid to call AddBatch()
     /// after this is called.
@@ -257,7 +251,7 @@ class ExecNode {
     SpinLock lock_;
 
     /// Queue of orphaned row batches
-    std::list<RowBatch*> cleanup_queue_;
+    std::list<std::unique_ptr<RowBatch>> cleanup_queue_;
   };
 
   /// Unique within a single plan tree.

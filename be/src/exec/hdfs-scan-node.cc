@@ -17,6 +17,7 @@
 
 #include "exec/hdfs-scan-node.h"
 
+#include <memory>
 #include <sstream>
 
 #include "common/logging.h"
@@ -111,10 +112,10 @@ Status HdfsScanNode::GetNextInternal(
     return Status::OK();
   }
   *eos = false;
-  RowBatch* materialized_batch = materialized_row_batches_->GetBatch();
+  unique_ptr<RowBatch> materialized_batch = materialized_row_batches_->GetBatch();
   if (materialized_batch != NULL) {
     num_owned_io_buffers_.Add(-materialized_batch->num_io_buffers());
-    row_batch->AcquireState(materialized_batch);
+    row_batch->AcquireState(materialized_batch.get());
     // Update the number of materialized rows now instead of when they are materialized.
     // This means that scanners might process and queue up more rows than are necessary
     // for the limit case but we want to avoid the synchronized writes to
@@ -132,7 +133,7 @@ Status HdfsScanNode::GetNextInternal(
       SetDone();
     }
     DCHECK_EQ(materialized_batch->num_io_buffers(), 0);
-    delete materialized_batch;
+    materialized_batch.reset();
     return Status::OK();
   }
   // The RowBatchQueue was shutdown either because all scan ranges are complete or a
@@ -248,12 +249,12 @@ void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type,
 
 void HdfsScanNode::TransferToScanNodePool(MemPool* pool) {
   unique_lock<mutex> l(lock_);
-  scan_node_pool_->AcquireData(pool, false);
+  HdfsScanNodeBase::TransferToScanNodePool(pool);
 }
 
-void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
-  InitNullCollectionValues(row_batch);
-  materialized_row_batches_->AddBatch(row_batch);
+void HdfsScanNode::AddMaterializedRowBatch(unique_ptr<RowBatch> row_batch) {
+  InitNullCollectionValues(row_batch.get());
+  materialized_row_batches_->AddBatch(move(row_batch));
 }
 
 Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges,
@@ -541,9 +542,8 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     VLOG_QUERY << ss.str();
   }
 
-  // Transfer the remaining resources to the final row batch (if any) and add it to
-  // the row batch queue.
-  scanner->Close(scanner->batch());
+  // Transfer remaining resources to a final batch and add it to the row batch queue.
+  scanner->Close();
   return status;
 }
 

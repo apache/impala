@@ -18,6 +18,7 @@
 #include "exec/hdfs-parquet-scanner.h"
 
 #include <limits> // for std::numeric_limits
+#include <memory>
 #include <queue>
 
 #include <gflags/gflags.h>
@@ -48,6 +49,7 @@
 #include "common/names.h"
 
 using llvm::Function;
+using std::move;
 using namespace impala;
 using namespace llvm;
 
@@ -168,6 +170,7 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
     process_footer_timer_stats_(NULL),
     num_cols_counter_(NULL),
+    num_stats_filtered_row_groups_counter_(NULL),
     num_row_groups_counter_(NULL),
     num_scanners_with_no_reads_counter_(NULL),
     num_dict_filtered_row_groups_counter_(NULL),
@@ -272,10 +275,11 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
     FlushRowGroupResources(row_batch);
     row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
     if (scan_node_->HasRowBatchQueue()) {
-      static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(row_batch);
+      static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(
+          unique_ptr<RowBatch>(row_batch));
     }
   } else {
-    if (template_tuple_pool_ != nullptr) template_tuple_pool_->FreeAll();
+    template_tuple_pool_->FreeAll();
     dictionary_pool_.get()->FreeAll();
     context_->ReleaseCompletedResources(nullptr, true);
     for (ParquetColumnReader* col_reader : column_readers_) col_reader->Close(nullptr);
@@ -327,7 +331,7 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
         local.considered, local.rejected);
   }
 
-  HdfsScanner::Close(row_batch);
+  CloseInternal();
 }
 
 // Get the start of the column.
@@ -404,19 +408,19 @@ Status HdfsParquetScanner::ProcessSplit() {
   DCHECK(scan_node_->HasRowBatchQueue());
   HdfsScanNode* scan_node = static_cast<HdfsScanNode*>(scan_node_);
   do {
-    batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
-        scan_node_->mem_tracker());
-    RETURN_IF_ERROR(GetNextInternal(batch_));
-    scan_node->AddMaterializedRowBatch(batch_);
+    unique_ptr<RowBatch> batch = unique_ptr<RowBatch>(
+        new RowBatch(scan_node_->row_desc(), state_->batch_size(),
+        scan_node_->mem_tracker()));
+    Status status = GetNextInternal(batch.get());
+    // Always add batch to the queue because it may contain data referenced by previously
+    // appended batches.
+    scan_node->AddMaterializedRowBatch(move(batch));
+    RETURN_IF_ERROR(status);
     ++row_batches_produced_;
     if ((row_batches_produced_ & (BATCHES_PER_FILTER_SELECTIVITY_CHECK - 1)) == 0) {
       CheckFiltersEffectiveness();
     }
   } while (!eos_ && !scan_node_->ReachedLimit());
-
-  // Transfer the remaining resources to this new batch in Close().
-  batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
-      scan_node_->mem_tracker());
   return Status::OK();
 }
 

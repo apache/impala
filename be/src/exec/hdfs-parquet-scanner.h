@@ -328,17 +328,19 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Issue just the footer range for each file.  We'll then parse the footer and pick
   /// out the columns we want.
   static Status IssueInitialRanges(HdfsScanNodeBase* scan_node,
-                                   const std::vector<HdfsFileDesc*>& files);
+                                   const std::vector<HdfsFileDesc*>& files)
+                                   WARN_UNUSED_RESULT;
 
-  virtual Status Open(ScannerContext* context);
-  virtual Status ProcessSplit();
+  virtual Status Open(ScannerContext* context) WARN_UNUSED_RESULT;
+  virtual Status ProcessSplit() WARN_UNUSED_RESULT;
   virtual void Close(RowBatch* row_batch);
 
   /// Codegen ProcessScratchBatch(). Stores the resulting function in
   /// 'process_scratch_batch_fn' if codegen was successful or NULL otherwise.
   static Status Codegen(HdfsScanNodeBase* node,
       const std::vector<ScalarExpr*>& conjuncts,
-      llvm::Function** process_scratch_batch_fn);
+      llvm::Function** process_scratch_batch_fn)
+      WARN_UNUSED_RESULT;
 
   /// The repetition level is set to this value to indicate the end of a row group.
   static const int16_t ROW_GROUP_END = numeric_limits<int16_t>::min();
@@ -478,14 +480,14 @@ class HdfsParquetScanner : public HdfsScanner {
 
   const char* filename() const { return metadata_range_->file(); }
 
-  virtual Status GetNextInternal(RowBatch* row_batch);
+  virtual Status GetNextInternal(RowBatch* row_batch) WARN_UNUSED_RESULT;
 
   /// Evaluates the min/max predicates of the 'scan_node_' using the parquet::Statistics
   /// of 'row_group'. 'file_metadata' is used to determine the ordering that was used to
   /// compute the statistics. Sets 'skip_row_group' to true if the row group can be
   /// skipped, 'false' otherwise.
   Status EvaluateStatsConjuncts(const parquet::FileMetaData& file_metadata,
-      const parquet::RowGroup& row_group, bool* skip_row_group);
+      const parquet::RowGroup& row_group, bool* skip_row_group) WARN_UNUSED_RESULT;
 
   /// Check runtime filters' effectiveness every BATCHES_PER_FILTER_SELECTIVITY_CHECK
   /// row batches. Will update 'filter_stats_'.
@@ -496,7 +498,7 @@ class HdfsParquetScanner : public HdfsScanner {
   /// state. Only returns a non-OK status if a non-recoverable error is encountered
   /// (or abort_on_error is true). If OK is returned, 'parse_status_' is guaranteed
   /// to be OK as well.
-  Status NextRowGroup();
+  Status NextRowGroup() WARN_UNUSED_RESULT;
 
   /// Reads data using 'column_readers' to materialize top-level tuples into 'row_batch'.
   /// Returns a non-OK status if a non-recoverable error was encountered and execution
@@ -504,13 +506,13 @@ class HdfsParquetScanner : public HdfsScanner {
   /// May set *skip_row_group to indicate that the current row group should be skipped,
   /// e.g., due to a parse error, but execution should continue.
   Status AssembleRows(const std::vector<ParquetColumnReader*>& column_readers,
-      RowBatch* row_batch, bool* skip_row_group);
+      RowBatch* row_batch, bool* skip_row_group) WARN_UNUSED_RESULT;
 
   /// Commit num_rows to the given row batch.
   /// Returns OK if the query is not cancelled and hasn't exceeded any mem limits.
   /// Scanner can call this with 0 rows to flush any pending resources (attached pools
   /// and io buffers) to minimize memory consumption.
-  Status CommitRows(RowBatch* dst_batch, int num_rows);
+  Status CommitRows(RowBatch* dst_batch, int num_rows) WARN_UNUSED_RESULT;
 
   /// Evaluates runtime filters and conjuncts (if any) against the tuples in
   /// 'scratch_batch_', and adds the surviving tuples to the given batch.
@@ -539,7 +541,8 @@ class HdfsParquetScanner : public HdfsScanner {
   /// 'filter_ctxs'. Return error status on failure. The generated function is returned
   /// via 'fn'.
   static Status CodegenEvalRuntimeFilters(LlvmCodeGen* codegen,
-      const std::vector<ScalarExpr*>& filter_exprs, llvm::Function** fn);
+      const std::vector<ScalarExpr*>& filter_exprs, llvm::Function** fn)
+      WARN_UNUSED_RESULT;
 
   /// Reads data using 'column_readers' to materialize the tuples of a CollectionValue
   /// allocated from 'coll_value_builder'.
@@ -572,7 +575,7 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Process the file footer and parse file_metadata_.  This should be called with the
   /// last FOOTER_SIZE bytes in context_.
-  Status ProcessFooter();
+  Status ProcessFooter() WARN_UNUSED_RESULT;
 
   /// Populates 'column_readers' for the slots in 'tuple_desc', including creating child
   /// readers for any collections. Schema resolution is handled in this function as
@@ -580,7 +583,7 @@ class HdfsParquetScanner : public HdfsScanner {
   /// fields missing in the file.
   Status CreateColumnReaders(const TupleDescriptor& tuple_desc,
       const ParquetSchemaResolver& schema_resolver,
-      std::vector<ParquetColumnReader*>* column_readers);
+      std::vector<ParquetColumnReader*>* column_readers) WARN_UNUSED_RESULT;
 
   /// Returns the total number of scalar column readers in 'column_readers', including
   /// the children of collection readers.
@@ -597,25 +600,28 @@ class HdfsParquetScanner : public HdfsScanner {
   /// still need to iterate over every item in the collection to count them.
   Status CreateCountingReader(const SchemaPath& parent_path,
       const ParquetSchemaResolver& schema_resolver,
-      ParquetColumnReader** reader);
+      ParquetColumnReader** reader)
+      WARN_UNUSED_RESULT;
 
   /// Walks file_metadata_ and initiates reading the materialized columns.  This
   /// initializes 'column_readers' and issues the reads for the columns. 'column_readers'
   /// should be the readers used to materialize a single tuple (i.e., column_readers_ or
   /// the children of a collection node).
   Status InitColumns(
-      int row_group_idx, const std::vector<ParquetColumnReader*>& column_readers);
+      int row_group_idx, const std::vector<ParquetColumnReader*>& column_readers)
+      WARN_UNUSED_RESULT;
 
   /// Initialize dictionaries for all column readers
-  Status InitDictionaries(const std::vector<ParquetColumnReader*>& column_readers);
+  Status InitDictionaries(const std::vector<ParquetColumnReader*>& column_readers)
+      WARN_UNUSED_RESULT;
 
   /// Performs some validation once we've reached the end of a row group to help detect
   /// bugs or bad input files.
   Status ValidateEndOfRowGroup(const std::vector<ParquetColumnReader*>& column_readers,
-      int row_group_idx, int64_t rows_read);
+      int row_group_idx, int64_t rows_read) WARN_UNUSED_RESULT;
 
   /// Part of the HdfsScanner interface, not used in Parquet.
-  Status InitNewRange() { return Status::OK(); }
+  Status InitNewRange() WARN_UNUSED_RESULT { return Status::OK(); }
 
   /// Transfers the remaining resources backing tuples such as IO buffers and memory
   /// from mem pools to the given row batch. Closes all column readers.
@@ -627,7 +633,7 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Divides the column readers into dict_filterable_readers_ and
   /// non_dict_filterable_readers_. Allocates memory for dict_filter_tuple_backing_.
-  Status InitDictFilterStructures();
+  Status InitDictFilterStructures() WARN_UNUSED_RESULT;
 
   /// Returns true if all of the data pages in the column chunk are dictionary encoded
   bool IsDictionaryEncoded(const parquet::ColumnMetaData& col_metadata);
@@ -636,7 +642,7 @@ class HdfsParquetScanner : public HdfsScanner {
   /// to the dictionary values. Specifically, if any dictionary-encoded column has
   /// no values that pass the relevant conjuncts, then the row group can be skipped.
   Status EvalDictionaryFilters(const parquet::RowGroup& row_group,
-      bool* skip_row_group);
+      bool* skip_row_group) WARN_UNUSED_RESULT;
 };
 
 } // namespace impala

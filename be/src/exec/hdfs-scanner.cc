@@ -60,44 +60,16 @@ const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
 HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
     : scan_node_(scan_node),
       state_(state),
-      context_(NULL),
-      stream_(NULL),
-      eos_(false),
-      is_closed_(false),
       expr_mem_pool_(new MemPool(scan_node->expr_mem_tracker())),
-      conjunct_evals_(NULL),
       template_tuple_pool_(new MemPool(scan_node->mem_tracker())),
-      template_tuple_(NULL),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
-      tuple_(NULL),
-      batch_(NULL),
-      tuple_mem_(NULL),
-      parse_status_(Status::OK()),
-      decompression_type_(THdfsCompression::NONE),
-      data_buffer_pool_(new MemPool(scan_node->mem_tracker())),
-      decompress_timer_(NULL),
-      write_tuples_fn_(NULL) {
+      data_buffer_pool_(new MemPool(scan_node->mem_tracker())) {
 }
 
 HdfsScanner::HdfsScanner()
-    : scan_node_(NULL),
-      state_(NULL),
-      context_(NULL),
-      stream_(NULL),
-      eos_(false),
-      is_closed_(false),
-      conjunct_evals_(NULL),
-      template_tuple_pool_(NULL),
-      template_tuple_(NULL),
-      tuple_byte_size_(-1),
-      tuple_(NULL),
-      batch_(NULL),
-      tuple_mem_(NULL),
-      parse_status_(Status::OK()),
-      decompression_type_(THdfsCompression::NONE),
-      data_buffer_pool_(NULL),
-      decompress_timer_(NULL),
-      write_tuples_fn_(NULL) {
+    : scan_node_(nullptr),
+      state_(nullptr),
+      tuple_byte_size_(0) {
   DCHECK(TestInfo::is_test());
 }
 
@@ -142,9 +114,31 @@ Status HdfsScanner::Open(ScannerContext* context) {
   return Status::OK();
 }
 
-void HdfsScanner::Close(RowBatch* row_batch) {
+Status HdfsScanner::ProcessSplit() {
+  DCHECK(scan_node_->HasRowBatchQueue());
+  HdfsScanNode* scan_node = static_cast<HdfsScanNode*>(scan_node_);
+  do {
+    unique_ptr<RowBatch> batch = std::make_unique<RowBatch>(scan_node_->row_desc(),
+        state_->batch_size(), scan_node_->mem_tracker());
+    Status status = GetNextInternal(batch.get());
+    // Always add batch to the queue because it may contain data referenced by previously
+    // appended batches.
+    scan_node->AddMaterializedRowBatch(move(batch));
+    RETURN_IF_ERROR(status);
+  } while (!eos_ && !scan_node_->ReachedLimit());
+  return Status::OK();
+}
+
+void HdfsScanner::Close() {
+  DCHECK(scan_node_->HasRowBatchQueue());
+  RowBatch* final_batch = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
+      scan_node_->mem_tracker());
+  Close(final_batch);
+}
+
+void HdfsScanner::CloseInternal() {
   DCHECK(!is_closed_);
-  if (decompressor_.get() != NULL) {
+  if (decompressor_.get() != nullptr) {
     decompressor_->Close();
     decompressor_.reset();
   }
@@ -153,7 +147,7 @@ void HdfsScanner::Close(RowBatch* row_batch) {
   }
   expr_mem_pool_->FreeAll();
   obj_pool_.Clear();
-  stream_ = NULL;
+  stream_ = nullptr;
   context_->ClearStreams();
   is_closed_ = true;
 }
@@ -179,26 +173,6 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
   return Status::OK();
 }
 
-Status HdfsScanner::StartNewRowBatch() {
-  DCHECK(scan_node_->HasRowBatchQueue());
-  batch_ = new RowBatch(scan_node_->row_desc(), state_->batch_size(),
-      scan_node_->mem_tracker());
-  int64_t tuple_buffer_size;
-  RETURN_IF_ERROR(
-      batch_->ResizeAndAllocateTupleBuffer(state_, &tuple_buffer_size, &tuple_mem_));
-  return Status::OK();
-}
-
-int HdfsScanner::GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem) {
-  DCHECK(scan_node_->HasRowBatchQueue());
-  DCHECK(batch_ != NULL);
-  DCHECK_GT(batch_->capacity(), batch_->num_rows());
-  *pool = batch_->tuple_data_pool();
-  *tuple_mem = reinterpret_cast<Tuple*>(tuple_mem_);
-  *tuple_row_mem = batch_->GetRow(batch_->AddRow());
-  return batch_->capacity() - batch_->num_rows();
-}
-
 Status HdfsScanner::GetCollectionMemory(CollectionValueBuilder* builder, MemPool** pool,
     Tuple** tuple_mem, TupleRow** tuple_row_mem, int64_t* num_rows) {
   int num_tuples;
@@ -210,10 +184,7 @@ Status HdfsScanner::GetCollectionMemory(CollectionValueBuilder* builder, MemPool
   return Status::OK();
 }
 
-Status HdfsScanner::CommitRows(int num_rows, bool enqueue_if_full, RowBatch* row_batch) {
-  DCHECK(batch_ != NULL || !scan_node_->HasRowBatchQueue());
-  DCHECK(batch_ == row_batch || !scan_node_->HasRowBatchQueue());
-  DCHECK(!enqueue_if_full || scan_node_->HasRowBatchQueue());
+Status HdfsScanner::CommitRows(int num_rows, RowBatch* row_batch) {
   DCHECK_LE(num_rows, row_batch->capacity() - row_batch->num_rows());
   row_batch->CommitRows(num_rows);
   tuple_mem_ += static_cast<int64_t>(scan_node_->tuple_desc()->byte_size()) * num_rows;
@@ -224,10 +195,6 @@ Status HdfsScanner::CommitRows(int num_rows, bool enqueue_if_full, RowBatch* row
   // if no rows passed predicates.
   if (row_batch->AtCapacity() || context_->num_completed_io_buffers() > 0) {
     context_->ReleaseCompletedResources(row_batch, /* done */ false);
-    if (enqueue_if_full) {
-      static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(row_batch);
-      RETURN_IF_ERROR(StartNewRowBatch());
-    }
   }
   if (context_->cancelled()) return Status::CANCELLED;
   // Check for UDF errors.

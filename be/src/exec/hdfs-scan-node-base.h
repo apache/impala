@@ -231,15 +231,15 @@ class HdfsScanNodeBase : public ScanNode {
   Tuple* InitTemplateTuple(const std::vector<ScalarExprEvaluator*>& value_evals,
       MemPool* pool, RuntimeState* state) const;
 
-  /// Returns the file desc for 'filename'.  Returns NULL if filename is invalid.
+  /// Returns the file desc for 'filename'.  Returns nullptr if filename is invalid.
   HdfsFileDesc* GetFileDesc(const std::string& filename);
 
   /// Sets the scanner specific metadata for 'filename'. Scanners can use this to store
   /// file header information. Thread safe.
   void SetFileMetadata(const std::string& filename, void* metadata);
 
-  /// Returns the scanner specific metadata for 'filename'. Returns NULL if there is no
-  /// metadata. Thread safe.
+  /// Returns the scanner specific metadata for 'filename'. Returns nullptr if there is
+  /// no metadata. Thread safe.
   void* GetFileMetadata(const std::string& filename);
 
   /// Called by scanners when a range is complete. Used to record progress.
@@ -266,6 +266,9 @@ class HdfsScanNodeBase : public ScanNode {
   inline bool IsZeroSlotTableScan() const {
     return materialized_slots().empty() && tuple_desc()->tuple_path().empty();
   }
+
+  /// Transfers all memory from 'pool' to 'scan_node_pool_'.
+  virtual void TransferToScanNodePool(MemPool* pool);
 
   /// map from volume id to <number of split, per volume split lengths>
   /// TODO: move this into some global .h, no need to include this file just for this
@@ -329,7 +332,7 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Map from partition ID to a template tuple (owned by scan_node_pool_) which has only
   /// the partition columns for that partition materialized. Used to filter files and scan
-  /// ranges on partition-column filters. Populated in Prepare().
+  /// ranges on partition-column filters. Populated in Open().
   boost::unordered_map<int64_t, Tuple*> partition_template_tuple_map_;
 
   /// Descriptor for the hdfs table, including partition and format metadata.

@@ -68,7 +68,7 @@ Status HdfsRCFileScanner::Open(ScannerContext* context) {
 }
 
 Status HdfsRCFileScanner::InitNewRange() {
-  DCHECK(header_ != NULL);
+  DCHECK(header_ != nullptr);
 
   only_parsing_header_ = false;
   row_group_buffer_size_ = 0;
@@ -82,7 +82,7 @@ Status HdfsRCFileScanner::InitNewRange() {
   stream_->set_contains_tuple_data(false);
 
   if (header_->is_compressed) {
-    RETURN_IF_ERROR(Codec::CreateDecompressor(NULL,
+    RETURN_IF_ERROR(Codec::CreateDecompressor(nullptr,
         reuse_row_group_buffer_, header_->codec, &decompressor_));
   }
 
@@ -95,7 +95,7 @@ Status HdfsRCFileScanner::InitNewRange() {
     if (i < num_table_cols) {
       int col_idx = i + scan_node_->num_partition_keys();
       columns_[i].materialize_column = scan_node_->GetMaterializedSlotIdx(
-          vector<int>(1, col_idx)) != HdfsScanNode::SKIP_COLUMN;
+          vector<int>(1, col_idx)) != HdfsScanNodeBase::SKIP_COLUMN;
     } else {
       // Treat columns not found in table metadata as extra unmaterialized columns
       columns_[i].materialize_column = false;
@@ -107,10 +107,10 @@ Status HdfsRCFileScanner::InitNewRange() {
 }
 
 Status HdfsRCFileScanner::ReadFileHeader() {
-  uint8_t* header;
-
   RcFileHeader* rc_header = reinterpret_cast<RcFileHeader*>(header_);
+
   // Validate file version
+  uint8_t* header;
   RETURN_IF_FALSE(stream_->ReadBytes(
       sizeof(RCFILE_VERSION_HEADER), &header, &parse_status_));
   if (!memcmp(header, HdfsSequenceScanner::SEQFILE_VERSION_HEADER,
@@ -230,7 +230,7 @@ BaseSequenceScanner::FileHeader* HdfsRCFileScanner::AllocateFileHeader() {
   return new RcFileHeader;
 }
 
-Status HdfsRCFileScanner::ResetRowGroup() {
+Status HdfsRCFileScanner::StartRowGroup() {
   num_rows_ = 0;
   row_pos_ = 0;
   key_length_ = 0;
@@ -246,17 +246,6 @@ Status HdfsRCFileScanner::ResetRowGroup() {
     columns_[i].current_field_len_rep = 0;
   }
 
-  // We are done with this row group, pass along external buffers if necessary.
-  if (!reuse_row_group_buffer_) {
-    RETURN_IF_ERROR(AttachPool(data_buffer_pool_.get(), true));
-    row_group_buffer_size_ = 0;
-  }
-  return Status::OK();
-}
-
-Status HdfsRCFileScanner::ReadRowGroup() {
-  RETURN_IF_ERROR(ResetRowGroup());
-
   while (num_rows_ == 0) {
     RETURN_IF_ERROR(ReadRowGroupHeader());
     RETURN_IF_ERROR(ReadKeyBuffers());
@@ -267,7 +256,7 @@ Status HdfsRCFileScanner::ReadRowGroup() {
       // The row group length depends on the user data and can be very big. This
       // can cause us to go way over the mem limit so use TryAllocate instead.
       row_group_buffer_ = data_buffer_pool_->TryAllocate(row_group_length_);
-      if (UNLIKELY(row_group_buffer_ == NULL)) {
+      if (UNLIKELY(row_group_buffer_ == nullptr)) {
         string details("RC file scanner failed to allocate row group buffer.");
         return scan_node_->mem_tracker()->MemLimitExceeded(state_, details,
             row_group_length_);
@@ -452,100 +441,104 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
   return Status::OK();
 }
 
-Status HdfsRCFileScanner::ProcessRange() {
-  RETURN_IF_ERROR(ResetRowGroup());
-
+Status HdfsRCFileScanner::ProcessRange(RowBatch* row_batch) {
   // HdfsRCFileScanner effectively does buffered IO, in that it reads all the
   // materialized columns into a row group buffer.
   // It will then materialize tuples from the row group buffer.  When the row
   // group is complete, it will move onto the next row group.
-  while (!finished()) {
-    DCHECK_EQ(num_rows_, row_pos_);
-    // Finished materializing this row group, read the next one.
-    RETURN_IF_ERROR(ReadRowGroup());
-    if (num_rows_ == 0) break;
+  if (row_pos_ == num_rows_) {
+    // Finished materializing the current row group, read the next one.
+    RETURN_IF_ERROR(StartRowGroup());
+    if (num_rows_ == 0) {
+      eos_ = true;
+      return Status::OK();
+    }
+  }
 
-    while (num_rows_ != row_pos_) {
-      SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+  while (row_pos_ != num_rows_) {
+    SCOPED_TIMER(scan_node_->materialize_tuple_timer());
 
-      // Indicates whether the current row has errors.
-      bool error_in_row = false;
-      const vector<SlotDescriptor*>& materialized_slots =
-          scan_node_->materialized_slots();
-      vector<SlotDescriptor*>::const_iterator it;
+    // Materialize rows from this row group in row batch sizes
+    Tuple* tuple = tuple_;
+    TupleRow* current_row = row_batch->GetRow(row_batch->AddRow());
+    int max_tuples = row_batch->capacity() - row_batch->num_rows();
+    max_tuples = min(max_tuples, num_rows_ - row_pos_);
 
-      // Materialize rows from this row group in row batch sizes
-      MemPool* pool;
-      Tuple* tuple;
-      TupleRow* current_row;
-      int max_tuples = GetMemory(&pool, &tuple, &current_row);
-      max_tuples = min(max_tuples, num_rows_ - row_pos_);
-
-      if (materialized_slots.empty()) {
-        // If there are no materialized slots (e.g. count(*) or just partition cols)
-        // we can shortcircuit the parse loop
-        row_pos_ += max_tuples;
-        int num_to_commit = WriteTemplateTuples(current_row, max_tuples);
-        COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
-        RETURN_IF_ERROR(CommitRows(num_to_commit));
-        continue;
-      }
-
-      int num_to_commit = 0;
-      for (int i = 0; i < max_tuples; ++i) {
-        RETURN_IF_ERROR(NextRow());
-
-        // Initialize tuple from the partition key template tuple before writing the
-        // slots
-        InitTuple(template_tuple_, tuple);
-
-        for (it = materialized_slots.begin(); it != materialized_slots.end(); ++it) {
-          const SlotDescriptor* slot_desc = *it;
-          int file_column_idx = slot_desc->col_pos() - scan_node_->num_partition_keys();
-
-          // Set columns missing in this file to NULL
-          if (file_column_idx >= columns_.size()) {
-            tuple->SetNull(slot_desc->null_indicator_offset());
-            continue;
-          }
-
-          ColumnInfo& column = columns_[file_column_idx];
-          DCHECK(column.materialize_column);
-
-          const char* col_start = reinterpret_cast<const char*>(
-              row_group_buffer_ + column.start_offset + column.buffer_pos);
-          int field_len = column.current_field_len;
-          DCHECK_LE(col_start + field_len,
-              reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_));
-
-          if (!text_converter_->WriteSlot(slot_desc, tuple, col_start, field_len,
-              false, false, pool)) {
-            ReportColumnParseError(slot_desc, col_start, field_len);
-            error_in_row = true;
-          }
-        }
-
-        if (error_in_row) {
-          error_in_row = false;
-          ErrorMsg msg(TErrorCode::GENERAL, Substitute("file: $0", stream_->filename()));
-          RETURN_IF_ERROR(state_->LogOrReturnError(msg));
-        }
-
-        current_row->SetTuple(scan_node_->tuple_idx(), tuple);
-        // Evaluate the conjuncts and add the row to the batch
-        if (EvalConjuncts(current_row)) {
-          ++num_to_commit;
-          current_row = next_row(current_row);
-          tuple = next_tuple(tuple_byte_size_, tuple);
-        }
-      }
+    const vector<SlotDescriptor*>& materialized_slots =
+        scan_node_->materialized_slots();
+    if (materialized_slots.empty()) {
+      // If there are no materialized slots (e.g. count(*) or just partition cols)
+      // we can shortcircuit the parse loop
+      row_pos_ += max_tuples;
+      int num_to_commit = WriteTemplateTuples(current_row, max_tuples);
       COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
-      RETURN_IF_ERROR(CommitRows(num_to_commit));
-      if (scan_node_->ReachedLimit()) return Status::OK();
+      RETURN_IF_ERROR(CommitRows(num_to_commit, row_batch));
+      if (row_batch->AtCapacity()) break;
+      continue;
+    }
+
+    int num_to_commit = 0;
+    for (int i = 0; i < max_tuples; ++i) {
+      RETURN_IF_ERROR(NextRow());
+      InitTuple(template_tuple_, tuple);
+
+      bool error_in_row = false;
+      for (const SlotDescriptor* slot_desc: materialized_slots) {
+        int file_column_idx = slot_desc->col_pos() - scan_node_->num_partition_keys();
+
+        // Set columns missing in this file to NULL
+        if (file_column_idx >= columns_.size()) {
+          tuple->SetNull(slot_desc->null_indicator_offset());
+          continue;
+        }
+
+        const ColumnInfo& column = columns_[file_column_idx];
+        DCHECK(column.materialize_column);
+
+        const char* col_start = reinterpret_cast<const char*>(
+            row_group_buffer_ + column.start_offset + column.buffer_pos);
+        const int field_len = column.current_field_len;
+        DCHECK_LE(col_start + field_len,
+            reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_));
+
+        if (!text_converter_->WriteSlot(slot_desc, tuple, col_start, field_len,
+            false, false, row_batch->tuple_data_pool())) {
+          ReportColumnParseError(slot_desc, col_start, field_len);
+          error_in_row = true;
+        }
+      }
+
+      if (error_in_row) {
+        error_in_row = false;
+        ErrorMsg msg(TErrorCode::GENERAL, Substitute("file: $0", stream_->filename()));
+        RETURN_IF_ERROR(state_->LogOrReturnError(msg));
+      }
+
+      current_row->SetTuple(scan_node_->tuple_idx(), tuple);
+      // Evaluate the conjuncts and add the row to the batch
+      if (EvalConjuncts(current_row)) {
+        ++num_to_commit;
+        current_row = next_row(current_row);
+        tuple = next_tuple(tuple_byte_size_, tuple);
+      }
+    }
+    COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
+    RETURN_IF_ERROR(CommitRows(num_to_commit, row_batch));
+    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
+  }
+
+  if (row_pos_ == num_rows_) {
+    // We are done with this row group, pass along external buffers if necessary.
+    if (!reuse_row_group_buffer_) {
+      row_batch->tuple_data_pool()->AcquireData(data_buffer_pool_.get(), false);
+      row_group_buffer_size_ = 0;
     }
 
     // RCFiles don't end with syncs
-    if (stream_->eof()) return Status::OK();
+    if (stream_->eof()) {
+      eos_ = true;
+      return Status::OK();
+    }
 
     // Check for sync by looking for the marker that precedes syncs.
     int marker;

@@ -19,15 +19,15 @@
 #ifndef IMPALA_EXEC_HDFS_AVRO_SCANNER_H
 #define IMPALA_EXEC_HDFS_AVRO_SCANNER_H
 
-/// This scanner reads Avro object container files (i.e., Avro data files)
-/// located in HDFS and writes the content as tuples in the Impala in-memory
-/// representation of data (e.g. tuples, rows, row batches).
-//
+/// This scanner reads Avro object container files (i.e., Avro data files) and writes the
+/// content as tuples in the Impala in-memory representation of data (tuples, rows,
+/// row batches).
+///
 /// The specification for Avro files can be found at
 /// http://avro.apache.org/docs/current/spec.html (the current Avro version is
 /// 1.7.4 as of the time of this writing). At a high level, an Avro data file has
 /// the following structure:
-//
+///
 /// - Avro data file
 ///   - file header
 ///     - file version header
@@ -40,20 +40,20 @@
 ///     - size of objects in block (post-compression)
 ///     - serialized objects
 ///     - sync marker
-//
-//
+///
+///
 /// This implementation reads one data block at a time, using the schema from the file
 /// header to decode the serialized objects. If possible, non-materialized columns are
 /// skipped without being read. If codegen is enabled, we codegen a function based on the
 /// table schema that parses records, materializes them to tuples, and evaluates the
 /// conjuncts.
-//
+///
 /// The Avro C library is used to parse the file's schema and the table's schema, which are
 /// then resolved according to the Avro spec and transformed into our own schema
 /// representation (i.e. a list of SchemaElements). Schema resolution allows users to
 /// evolve the table schema and file schema(s) independently. The spec goes over all the
 /// rules for schema resolution, but in summary:
-//
+///
 /// - Record fields are matched by name (and thus can be reordered; the table schema
 ///   determines the order of the columns)
 /// - Fields in the file schema not present in the table schema are ignored
@@ -61,7 +61,7 @@
 ///   specified
 /// - Types can be "promoted" as follows:
 ///   int -> long -> float -> double
-//
+///
 /// TODO:
 /// - implement SkipComplex()
 /// - codegen a function per unique file schema, rather than just the table schema
@@ -91,25 +91,24 @@ class HdfsAvroScanner : public BaseSequenceScanner {
 
   HdfsAvroScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
 
-  virtual Status Open(ScannerContext* context);
+  virtual Status Open(ScannerContext* context) WARN_UNUSED_RESULT;
 
   /// Codegen DecodeAvroData(). Stores the resulting function in 'decode_avro_data_fn' if
-  /// codegen was successful or NULL otherwise.
+  /// codegen was successful or nullptr otherwise.
   static Status Codegen(HdfsScanNodeBase* node,
       const std::vector<ScalarExpr*>& conjuncts,
-      llvm::Function** decode_avro_data_fn);
+      llvm::Function** decode_avro_data_fn)
+      WARN_UNUSED_RESULT;
 
  protected:
   /// Implementation of BaseSeqeunceScanner super class methods
   virtual FileHeader* AllocateFileHeader();
   /// TODO: check that file schema matches metadata schema
-  virtual Status ReadFileHeader();
-  virtual Status InitNewRange();
-  virtual Status ProcessRange();
+  virtual Status ReadFileHeader() WARN_UNUSED_RESULT;
+  virtual Status InitNewRange() WARN_UNUSED_RESULT;
+  virtual Status ProcessRange(RowBatch* row_batch) WARN_UNUSED_RESULT;
 
-  virtual THdfsFileFormat::type file_format() const {
-    return THdfsFileFormat::AVRO;
-  }
+  virtual THdfsFileFormat::type file_format() const { return THdfsFileFormat::AVRO; }
 
  private:
   friend class HdfsAvroScannerTest;
@@ -119,9 +118,11 @@ class HdfsAvroScanner : public BaseSequenceScanner {
     ScopedAvroSchemaElement schema;
 
     /// Template tuple for this file containing partition key values and default values.
-    /// NULL if there are no materialized partition keys and no default values are
-    /// necessary (i.e., all materialized fields are present in the file schema).
-    /// template_tuple_ is set to this value.
+    /// Set to nullptr if there are no materialized partition keys and no default values
+    /// are necessary (i.e., all materialized fields are present in the file schema).
+    /// This tuple is created by the scanner processing the initial scan range with
+    /// the header. The ownership of memory is transferred to the scan-node pool,
+    /// such that it remains live when subsequent scanners process data ranges.
     Tuple* template_tuple;
 
     /// True if this file can use the codegen'd version of DecodeAvroData() (i.e. its
@@ -129,7 +130,16 @@ class HdfsAvroScanner : public BaseSequenceScanner {
     bool use_codegend_decode_avro_data;
   };
 
-  AvroFileHeader* avro_header_;
+  AvroFileHeader* avro_header_ = nullptr;
+
+  /// Current data block after decompression with its end and length.
+  uint8_t* data_block_ = nullptr;
+  uint8_t* data_block_end_ = nullptr;
+  int64_t data_block_len_ = 0;
+
+  /// Number of records in the current data block and the current record position.
+  int64_t num_records_in_block_ = 0;
+  int64_t record_pos_ = 0;
 
   /// Metadata keys
   static const std::string AVRO_SCHEMA_KEY;
@@ -143,28 +153,29 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   typedef int (*DecodeAvroDataFn)(HdfsAvroScanner*, int, MemPool*, uint8_t**, uint8_t*,
                                   Tuple*, TupleRow*);
 
-  /// The codegen'd version of DecodeAvroData() if available, NULL otherwise.
-  DecodeAvroDataFn codegend_decode_avro_data_;
+  /// The codegen'd version of DecodeAvroData() if available, nullptr otherwise.
+  DecodeAvroDataFn codegend_decode_avro_data_ = nullptr;
 
   /// Utility function for decoding and parsing file header metadata
-  Status ParseMetadata();
+  Status ParseMetadata() WARN_UNUSED_RESULT;
 
   /// Resolves the table schema (i.e. the reader schema) against the file schema (i.e. the
   /// writer schema), and sets the 'slot_desc' fields of the nodes of the file schema
   /// corresponding to materialized slots. Calls WriteDefaultValue() as
   /// appropriate. Returns a non-OK status if the schemas could not be resolved.
   Status ResolveSchemas(const AvroSchemaElement& table_root,
-                        AvroSchemaElement* file_root);
+      AvroSchemaElement* file_root) WARN_UNUSED_RESULT;
 
   // Returns Status::OK iff table_schema (the reader schema) can be resolved against
   // file_schema (the writer schema). field_name is used for error messages.
   Status VerifyTypesMatch(const AvroSchemaElement& table_schema,
-      const AvroSchemaElement& file_schema, const string& field_name);
+      const AvroSchemaElement& file_schema, const string& field_name) WARN_UNUSED_RESULT;
 
   /// Returns Status::OK iff a value with the given schema can be used to populate
   /// 'slot_desc', as if 'schema' were the writer schema and 'slot_desc' the reader
   /// schema. 'schema' can be either a avro_schema_t or avro_datum_t.
-  Status VerifyTypesMatch(SlotDescriptor* slot_desc, avro_obj_t* schema);
+  Status VerifyTypesMatch(SlotDescriptor* slot_desc, avro_obj_t* schema)
+      WARN_UNUSED_RESULT;
 
   /// Return true if reader_type can be used to read writer_type according to the Avro
   /// type promotion rules. Note that this does not handle nullability or TYPE_NULL.
@@ -175,7 +186,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// and default_value's types are incompatible or unsupported. field_name is used for
   /// error messages.
   Status WriteDefaultValue(SlotDescriptor* slot_desc, avro_datum_t default_value,
-      const char* field_name);
+      const char* field_name) WARN_UNUSED_RESULT;
 
   /// Decodes records and copies the data into tuples.
   /// Returns the number of tuples to be committed.
@@ -200,14 +211,15 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   static Status CodegenDecodeAvroData(LlvmCodeGen* codegen,
       llvm::Function* materialize_tuple_fn,
       const std::vector<ScalarExpr*>& conjuncts,
-      llvm::Function** decode_avro_data_fn);
+      llvm::Function** decode_avro_data_fn)
+      WARN_UNUSED_RESULT;
 
   /// Codegens a version of MaterializeTuple() that reads records based on the table
   /// schema. Stores the resulting function in 'materialize_tuple_fn' if codegen was
   /// successful or returns an error.
   /// TODO: Codegen a function for each unique file schema.
   static Status CodegenMaterializeTuple(HdfsScanNodeBase* node, LlvmCodeGen* codegen,
-      llvm::Function** materialize_tuple_fn);
+      llvm::Function** materialize_tuple_fn) WARN_UNUSED_RESULT;
 
   /// Used by CodegenMaterializeTuple to recursively create the IR for reading an Avro
   /// record.
@@ -228,13 +240,14 @@ class HdfsAvroScanner : public BaseSequenceScanner {
       LlvmCodeGen* codegen, void* builder, llvm::Function* fn,
       llvm::BasicBlock* insert_before, llvm::BasicBlock* bail_out, llvm::Value* this_val,
       llvm::Value* pool_val, llvm::Value* tuple_val, llvm::Value* data_val,
-      llvm::Value* data_end_val);
+      llvm::Value* data_end_val) WARN_UNUSED_RESULT;
 
   /// Creates the IR for reading an Avro scalar at builder's current insert point.
   static Status CodegenReadScalar(const AvroSchemaElement& element,
       SlotDescriptor* slot_desc, LlvmCodeGen* codegen, void* void_builder,
       llvm::Value* this_val, llvm::Value* pool_val, llvm::Value* tuple_val,
-      llvm::Value* data_val, llvm::Value* data_end_val, llvm::Value** ret_val);
+      llvm::Value* data_val, llvm::Value* data_end_val, llvm::Value** ret_val)
+      WARN_UNUSED_RESULT;
 
   /// The following are cross-compiled functions for parsing a serialized Avro primitive
   /// type and writing it to a slot. They can also be used for skipping a field without

@@ -17,6 +17,7 @@
 
 #include "exec/exec-node.h"
 
+#include <memory>
 #include <sstream>
 #include <unistd.h>  // for sleep()
 
@@ -75,45 +76,38 @@ int ExecNode::GetNodeIdFromProfile(RuntimeProfile* p) {
 }
 
 ExecNode::RowBatchQueue::RowBatchQueue(int max_batches)
-  : BlockingQueue<RowBatch*>(max_batches) {
+  : BlockingQueue<unique_ptr<RowBatch>>(max_batches) {
 }
 
 ExecNode::RowBatchQueue::~RowBatchQueue() {
   DCHECK(cleanup_queue_.empty());
 }
 
-void ExecNode::RowBatchQueue::AddBatch(RowBatch* batch) {
-  if (!BlockingPut(batch)) {
+void ExecNode::RowBatchQueue::AddBatch(unique_ptr<RowBatch> batch) {
+  if (!BlockingPut(move(batch))) {
     lock_guard<SpinLock> l(lock_);
-    cleanup_queue_.push_back(batch);
+    cleanup_queue_.push_back(move(batch));
   }
 }
 
-bool ExecNode::RowBatchQueue::AddBatchWithTimeout(RowBatch* batch,
-    int64_t timeout_micros) {
-  return BlockingPutWithTimeout(batch, timeout_micros);
-}
-
-RowBatch* ExecNode::RowBatchQueue::GetBatch() {
-  RowBatch* result = NULL;
+unique_ptr<RowBatch> ExecNode::RowBatchQueue::GetBatch() {
+  unique_ptr<RowBatch> result;
   if (BlockingGet(&result)) return result;
-  return NULL;
+  return unique_ptr<RowBatch>();
 }
 
 int ExecNode::RowBatchQueue::Cleanup() {
   int num_io_buffers = 0;
 
-  RowBatch* batch = NULL;
+  unique_ptr<RowBatch> batch = NULL;
   while ((batch = GetBatch()) != NULL) {
     num_io_buffers += batch->num_io_buffers();
-    delete batch;
+    batch.reset();
   }
 
   lock_guard<SpinLock> l(lock_);
-  for (list<RowBatch*>::iterator it = cleanup_queue_.begin();
-      it != cleanup_queue_.end(); ++it) {
-    num_io_buffers += (*it)->num_io_buffers();
-    delete *it;
+  for (const unique_ptr<RowBatch>& row_batch: cleanup_queue_) {
+    num_io_buffers += row_batch->num_io_buffers();
   }
   cleanup_queue_.clear();
   return num_io_buffers;

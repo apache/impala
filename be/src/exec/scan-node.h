@@ -85,7 +85,7 @@ class ScanNode : public ExecNode {
       active_scanner_thread_counter_(TUnit::UNIT, 0),
       active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {}
 
-  virtual Status Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
 
   /// This should be called before Prepare(), and the argument must be not destroyed until
   /// after Prepare().

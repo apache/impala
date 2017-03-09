@@ -15,10 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <memory>
 #include <boost/bind.hpp>
 
 #include "exec/base-sequence-scanner.h"
 
+#include "exec/hdfs-scan-node-base.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/scanner-context.inline.h"
 #include "runtime/runtime-state.h"
@@ -60,28 +62,17 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
         DiskIoMgr::BufferOpts::Uncached());
     header_ranges.push_back(header_range);
   }
-  // Issue the header ranges only.  ProcessSplit() will issue the files' scan ranges
+  // Issue the header ranges only. GetNextInternal() will issue the files' scan ranges
   // and those ranges will need scanner threads, so no files are marked completed yet.
   RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges, 0));
   return Status::OK();
 }
 
 BaseSequenceScanner::BaseSequenceScanner(HdfsScanNodeBase* node, RuntimeState* state)
-  : HdfsScanner(node, state),
-    header_(NULL),
-    only_parsing_header_(false),
-    block_start_(0),
-    total_block_size_(0),
-    num_syncs_(0) {
+  : HdfsScanner(node, state) {
 }
 
-BaseSequenceScanner::BaseSequenceScanner()
-  : HdfsScanner(),
-    header_(NULL),
-    only_parsing_header_(false),
-    block_start_(0),
-    total_block_size_(0),
-    num_syncs_(0) {
+BaseSequenceScanner::BaseSequenceScanner() : HdfsScanner() {
   DCHECK(TestInfo::is_test());
 }
 
@@ -93,8 +84,26 @@ Status BaseSequenceScanner::Open(ScannerContext* context) {
   stream_->set_read_past_size_cb(bind(&BaseSequenceScanner::ReadPastSize, this, _1));
   bytes_skipped_counter_ = ADD_COUNTER(
       scan_node_->runtime_profile(), "BytesSkipped", TUnit::BYTES);
-  // Allocate a new row batch. May fail if mem limit is exceeded.
-  RETURN_IF_ERROR(StartNewRowBatch());
+
+  header_ = reinterpret_cast<FileHeader*>(
+      scan_node_->GetFileMetadata(stream_->filename()));
+  if (header_ == nullptr) {
+    only_parsing_header_ = true;
+    return Status::OK();
+  }
+
+  // If the file is compressed, the buffers in the stream_ are not used directly.
+  if (header_->is_compressed) stream_->set_contains_tuple_data(false);
+  RETURN_IF_ERROR(InitNewRange());
+
+  // Skip to the first record
+  if (stream_->file_offset() < header_->header_size) {
+    // If the scan range starts within the header, skip to the end of the header so we
+    // don't accidentally skip to an extra sync within the header
+    RETURN_IF_FALSE(stream_->SkipBytes(
+        header_->header_size - stream_->file_offset(), &parse_status_));
+  }
+  RETURN_IF_ERROR(SkipToSync(header_->sync, SYNC_HASH_SIZE));
   return Status::OK();
 }
 
@@ -105,43 +114,39 @@ void BaseSequenceScanner::Close(RowBatch* row_batch) {
             << (num_syncs_ > 1 ? total_block_size_ / (num_syncs_ - 1) : 0);
   // Need to close the decompressor before releasing the resources at AddFinalRowBatch(),
   // because in some cases there is memory allocated in decompressor_'s temp_memory_pool_.
-  if (decompressor_.get() != NULL) {
+  if (decompressor_.get() != nullptr) {
     decompressor_->Close();
-    decompressor_.reset(NULL);
+    decompressor_.reset();
   }
-  if (row_batch != NULL) {
+  if (row_batch != nullptr) {
     row_batch->tuple_data_pool()->AcquireData(data_buffer_pool_.get(), false);
+    row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
     context_->ReleaseCompletedResources(row_batch, true);
     if (scan_node_->HasRowBatchQueue()) {
-      static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(row_batch);
+      static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(
+        unique_ptr<RowBatch>(row_batch));
     }
-  }
-  // Transfer template tuple pool to scan node pool. The scanner may be closed and
-  // subsequently re-used for another range, so we need to ensure that the template
-  // tuples are backed by live memory.
-  if (template_tuple_pool_.get() != NULL) {
-    static_cast<HdfsScanNode*>(scan_node_)->TransferToScanNodePool(
-        template_tuple_pool_.get());
+  } else {
+    data_buffer_pool_->FreeAll();
+    template_tuple_pool_->FreeAll();
+    context_->ReleaseCompletedResources(nullptr, true);
   }
 
   // Verify all resources (if any) have been transferred.
   DCHECK_EQ(template_tuple_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(data_buffer_pool_.get()->total_allocated_bytes(), 0);
   DCHECK_EQ(context_->num_completed_io_buffers(), 0);
-  // 'header_' can be NULL if HdfsScanNodeBase::CreateAndOpenScanner() failed.
-  if (!only_parsing_header_ && header_ != NULL) {
+  // 'header_' can be nullptr if HdfsScanNodeBase::CreateAndOpenScanner() failed.
+  if (!only_parsing_header_ && header_ != nullptr) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
   }
-  HdfsScanner::Close(row_batch);
+  CloseInternal();
 }
 
-Status BaseSequenceScanner::ProcessSplit() {
-  DCHECK(scan_node_->HasRowBatchQueue());
-  header_ = reinterpret_cast<FileHeader*>(
-      static_cast<HdfsScanNode*>(scan_node_)->GetFileMetadata(stream_->filename()));
-  if (header_ == NULL) {
-    // This is the initial scan range just to parse the header
-    only_parsing_header_ = true;
+Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
+  if (only_parsing_header_) {
+    DCHECK(header_ == nullptr);
+    eos_ = true;
     header_ = state_->obj_pool()->Add(AllocateFileHeader());
     Status status = ReadFileHeader();
     if (!status.ok()) {
@@ -150,36 +155,23 @@ Status BaseSequenceScanner::ProcessSplit() {
       CloseFileRanges(stream_->filename());
       return Status::OK();
     }
-
-    // Header is parsed, set the metadata in the scan node and issue more ranges
-    static_cast<HdfsScanNode*>(scan_node_)->SetFileMetadata(
+    // Header is parsed, set the metadata in the scan node and issue more ranges.
+    static_cast<HdfsScanNodeBase*>(scan_node_)->SetFileMetadata(
         stream_->filename(), header_);
     HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
     RETURN_IF_ERROR(scan_node_->AddDiskIoRanges(desc));
     return Status::OK();
   }
+  if (eos_) return Status::OK();
 
-  // Initialize state for new scan range
-  finished_ = false;
-  // If the file is compressed, the buffers in the stream_ are not used directly.
-  if (header_->is_compressed) stream_->set_contains_tuple_data(false);
-  RETURN_IF_ERROR(InitNewRange());
+  int64_t tuple_buffer_size;
+  RETURN_IF_ERROR(
+      row_batch->ResizeAndAllocateTupleBuffer(state_, &tuple_buffer_size, &tuple_mem_));
+  tuple_ = reinterpret_cast<Tuple*>(tuple_mem_);
+  DCHECK_GT(row_batch->capacity(), 0);
 
-  Status status = Status::OK();
-
-  // Skip to the first record
-  if (stream_->file_offset() < header_->header_size) {
-    // If the scan range starts within the header, skip to the end of the header so we
-    // don't accidentally skip to an extra sync within the header
-    RETURN_IF_FALSE(stream_->SkipBytes(
-        header_->header_size - stream_->file_offset(), &parse_status_));
-  }
-  RETURN_IF_ERROR(SkipToSync(header_->sync, SYNC_HASH_SIZE));
-
-  // Process Range.
-  while (!finished_) {
-    status = ProcessRange();
-    if (status.ok()) break;
+  Status status = ProcessRange(row_batch);
+  if (!status.ok()) {
     if (status.IsCancelled() || status.IsMemLimitExceeded()) return status;
 
     // Log error from file format parsing.
@@ -201,19 +193,16 @@ Status BaseSequenceScanner::ProcessSplit() {
     RETURN_IF_ERROR(status);
     DCHECK(parse_status_.ok());
   }
-
-  // All done with this scan range.
   return Status::OK();
 }
 
 Status BaseSequenceScanner::ReadSync() {
-  // We are finished when we read a sync marker occurring completely in the next
-  // scan range
-  finished_ = stream_->eosr();
-
   uint8_t* hash;
   int64_t out_len;
-  RETURN_IF_FALSE(stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &parse_status_));
+  bool success = stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &parse_status_);
+  // We are done when we read a sync marker occurring completely in the next scan range.
+  eos_ = stream_->eosr() || stream_->eof();
+  if (!success) return parse_status_;
   if (out_len != SYNC_HASH_SIZE) {
     return Status(Substitute("Hit end of stream after reading $0 bytes of $1-byte "
         "synchronization marker", out_len, SYNC_HASH_SIZE));
@@ -226,7 +215,6 @@ Status BaseSequenceScanner::ReadSync() {
         << ReadWriteUtil::HexDump(hash, SYNC_HASH_SIZE) << "'";
     return Status(ss.str());
   }
-  finished_ |= stream_->eof();
   total_block_size_ += stream_->file_offset() - block_start_;
   block_start_ = stream_->file_offset();
   ++num_syncs_;
@@ -293,21 +281,21 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
   if (offset == -1) {
     // No more syncs in this scan range
     DCHECK(stream_->eosr());
-    finished_ = true;
+    eos_ = true;
     return Status::OK();
   }
   DCHECK_GE(offset, sync_size);
 
   // Make sure sync starts in our scan range
   if (offset - sync_size >= stream_->bytes_left()) {
-    finished_ = true;
+    eos_ = true;
     return Status::OK();
   }
 
   RETURN_IF_FALSE(stream_->SkipBytes(offset, &parse_status_));
   VLOG_FILE << "Found sync for: " << stream_->filename()
             << " at " << stream_->file_offset() - sync_size;
-  if (stream_->eof()) finished_ = true;
+  if (stream_->eof()) eos_ = true;
   block_start_ = stream_->file_offset();
   ++num_syncs_;
   return Status::OK();

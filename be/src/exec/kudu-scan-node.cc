@@ -97,9 +97,9 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   }
 
   *eos = false;
-  RowBatch* materialized_batch = materialized_row_batches_->GetBatch();
+  unique_ptr<RowBatch> materialized_batch = materialized_row_batches_->GetBatch();
   if (materialized_batch != NULL) {
-    row_batch->AcquireState(materialized_batch);
+    row_batch->AcquireState(materialized_batch.get());
     num_rows_returned_ += row_batch->num_rows();
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
@@ -114,7 +114,7 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
       done_ = true;
       materialized_row_batches_->Shutdown();
     }
-    delete materialized_batch;
+    materialized_batch.reset();
   } else {
     *eos = true;
   }
@@ -172,15 +172,16 @@ Status KuduScanNode::ProcessScanToken(KuduScanner* scanner, const string& scan_t
   RETURN_IF_ERROR(scanner->OpenNextScanToken(scan_token));
   bool eos = false;
   while (!eos && !done_) {
-    gscoped_ptr<RowBatch> row_batch(new RowBatch(
-        row_desc(), runtime_state_->batch_size(), mem_tracker()));
+    unique_ptr<RowBatch> row_batch = std::make_unique<RowBatch>(row_desc(),
+        runtime_state_->batch_size(), mem_tracker());
     RETURN_IF_ERROR(scanner->GetNext(row_batch.get(), &eos));
     while (!done_) {
       scanner->KeepKuduScannerAlive();
-      if (materialized_row_batches_->AddBatchWithTimeout(row_batch.get(), 1000000)) {
-        ignore_result(row_batch.release());
+      if (materialized_row_batches_->BlockingPutWithTimeout(move(row_batch), 1000000)) {
         break;
       }
+      // Make sure that we still own the RowBatch if BlockingPutWithTimeout() timed out.
+      DCHECK(row_batch != nullptr);
     }
   }
   if (eos) scan_ranges_complete_counter()->Add(1);

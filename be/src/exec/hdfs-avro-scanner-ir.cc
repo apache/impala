@@ -213,7 +213,7 @@ bool HdfsAvroScanner::ReadAvroChar(PrimitiveType type, int max_len, uint8_t** da
     if (ctype.IsVarLenStringType()) {
       StringValue* sv = reinterpret_cast<StringValue*>(slot);
       sv->ptr = reinterpret_cast<char*>(pool->TryAllocate(max_len));
-      if (UNLIKELY(sv->ptr == NULL)) {
+      if (UNLIKELY(sv->ptr == nullptr)) {
         string details = Substitute("HdfsAvroScanner::ReadAvroChar() failed to allocate"
             "$0 bytes for char slot.", max_len);
         parse_status_ = pool->mem_tracker()->MemLimitExceeded(state_, details, max_len);

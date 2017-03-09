@@ -226,7 +226,7 @@
 namespace impala {
 
 struct HdfsFileDesc;
-class HdfsScanNode;
+class HdfsScanNodeBase;
 class TupleDescriptor;
 class Tuple;
 
@@ -236,7 +236,7 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   HdfsRCFileScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
   virtual ~HdfsRCFileScanner();
 
-  virtual Status Open(ScannerContext* context);
+  virtual Status Open(ScannerContext* context) WARN_UNUSED_RESULT;
 
   void DebugString(int indentation_level, std::stringstream* out) const;
 
@@ -259,30 +259,28 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
 
   /// Implementation of superclass functions.
   virtual FileHeader* AllocateFileHeader();
-  virtual Status ReadFileHeader();
-  virtual Status InitNewRange();
-  virtual Status ProcessRange();
+  virtual Status ReadFileHeader() WARN_UNUSED_RESULT;
+  virtual Status InitNewRange() WARN_UNUSED_RESULT;
+  virtual Status ProcessRange(RowBatch* row_batch) WARN_UNUSED_RESULT;
 
-  virtual THdfsFileFormat::type file_format() const {
-    return THdfsFileFormat::RC_FILE;
-  }
+  virtual THdfsFileFormat::type file_format() const { return THdfsFileFormat::RC_FILE; }
 
   /// Reads the RCFile Header Metadata section in the current file to determine the number
   /// of columns.  Other pieces of the metadata are ignored.
-  Status ReadNumColumnsMetadata();
+  Status ReadNumColumnsMetadata() WARN_UNUSED_RESULT;
 
   /// Reads the rowgroup header starting after the sync.
   /// Sets:
   ///   key_length_
   ///   compressed_key_length_
   ///   num_rows_
-  Status ReadRowGroupHeader();
+  Status ReadRowGroupHeader() WARN_UNUSED_RESULT;
 
   /// Read the rowgroup key buffers, decompress if necessary.
   /// The "keys" are really the lengths for the column values.  They
   /// are read here and then used to decode the values in the column buffer.
   /// Calls GetCurrentKeyBuffer for each column to process the key data.
-  Status ReadKeyBuffers();
+  Status ReadKeyBuffers() WARN_UNUSED_RESULT;
 
   /// Process the current key buffer.
   /// Inputs:
@@ -301,7 +299,7 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   /// Read the rowgroup column buffers
   /// Sets:
   ///   column_buffer_: Fills the buffer with either file data or decompressed data.
-  Status ReadColumnBuffers();
+  Status ReadColumnBuffers() WARN_UNUSED_RESULT;
 
   /// Look at the next field in the specified column buffer
   /// Input:
@@ -311,22 +309,19 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   ///   key_buf_pos_[col_idx]
   ///   cur_field_length_rep_[col_idx]
   ///   cur_field_length_[col_idx]
-  Status NextField(int col_idx);
+  Status NextField(int col_idx) WARN_UNUSED_RESULT;
 
   /// Read a row group (except for the sync marker and sync) into buffers.
   /// Calls:
-  ///   ReadRowGroupHeader
-  ///   ReadKeyBuffers
-  ///   ReadColumnBuffers
-  Status ReadRowGroup();
-
-  /// Reset state for a new row group. Can fail if allocating the next row batch fails.
-  Status ResetRowGroup();
+  ///   ReadRowGroupHeader()
+  ///   ReadKeyBuffers()
+  ///   ReadColumnBuffers()
+  Status StartRowGroup() WARN_UNUSED_RESULT;
 
   /// Move to next row. Calls NextField on each column that we are reading.
   /// Modifies:
   ///   row_pos_
-  Status NextRow();
+  Status NextRow() WARN_UNUSED_RESULT;
 
   enum Version {
     SEQ6,     // Version for sequence file and pre hive-0.9 rc files
@@ -382,36 +377,36 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   std::vector<uint8_t> key_buffer_;
 
   /// number of rows in this rowgroup object
-  int num_rows_;
+  int num_rows_ = 0;
 
   /// Current row position in this rowgroup.
   /// This value is incremented each time NextRow() is called.
-  int row_pos_;
+  int row_pos_ = 0;
 
   /// Size of the row group's key buffers.
   /// Read from the row group header.
-  int key_length_;
+  int key_length_ = -1;
 
   /// Compressed size of the row group's key buffers.
   /// Read from the row group header.
-  int compressed_key_length_;
+  int compressed_key_length_ = -1;
 
   /// If true, the row_group_buffer_ can be reused across row groups, otherwise,
   /// it (more specifically the data_buffer_pool_ that allocated the row_group_buffer_)
   /// must be attached to the row batch.
-  bool reuse_row_group_buffer_;
+  bool reuse_row_group_buffer_ = false;
 
   /// Buffer containing the entire row group.  We allocate a buffer for the entire
   /// row group, skipping non-materialized columns.
-  uint8_t* row_group_buffer_;
+  uint8_t* row_group_buffer_ = nullptr;
 
   /// Sum of the bytes lengths of the materialized columns in the current row group.  This
   /// is the number of valid bytes in row_group_buffer_.
-  int row_group_length_;
+  int64_t row_group_length_ = 0;
 
   /// This is the allocated size of 'row_group_buffer_'.  'row_group_buffer_' is reused
   /// across row groups and will grow as necessary.
-  int row_group_buffer_size_;
+  int64_t row_group_buffer_size_ = 0;
 };
 
 }

@@ -22,33 +22,27 @@
 #include <vector>
 #include <memory>
 #include <stdint.h>
-#include <boost/regex.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "codegen/impala-ir.h"
 #include "common/object-pool.h"
+#include "common/status.h"
 #include "exec/hdfs-scan-node-base.h"
-#include "exec/scan-node.h"
 #include "exec/scanner-context.h"
-#include "runtime/disk-io-mgr.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple.h"
 
 namespace impala {
 
+class Codec;
 class CollectionValueBuilder;
 class Compression;
-class DescriptorTbl;
 class Expr;
 class HdfsPartitionDescriptor;
 class MemPool;
-class SlotDescriptor;
-class Status;
 class TextConverter;
 class TupleDescriptor;
-class TPlanNode;
-class TScanRange;
-class Codec;
+class SlotDescriptor;
 
 /// Intermediate structure used for two pass parsing approach. In the first pass,
 /// the FieldLocation structs are filled out and contain where all the fields start and
@@ -118,7 +112,7 @@ class HdfsScanner {
   virtual ~HdfsScanner();
 
   /// One-time initialisation of state that is constant across scan ranges.
-  virtual Status Open(ScannerContext* context);
+  virtual Status Open(ScannerContext* context) WARN_UNUSED_RESULT;
 
   /// Returns the next row batch from this scanner's split.
   /// Recoverable errors are logged to the runtime state. Only returns a non-OK status
@@ -127,7 +121,7 @@ class HdfsScanner {
   /// The memory referenced by the tuples is valid until this or any subsequently
   /// returned batch is reset or destroyed.
   /// Only valid to call if the parent scan node is single-threaded.
-  Status GetNext(RowBatch* row_batch) {
+  Status GetNext(RowBatch* row_batch) WARN_UNUSED_RESULT {
     DCHECK(!scan_node_->HasRowBatchQueue());
     return GetNextInternal(row_batch);
   }
@@ -136,25 +130,31 @@ class HdfsScanner {
   /// initialized with the split data (e.g. template tuple, partition descriptor, etc).
   /// This function should only return on error or end of scan range.
   /// Only valid to call if the parent scan node is multi-threaded.
-  virtual Status ProcessSplit() = 0;
+  virtual Status ProcessSplit() WARN_UNUSED_RESULT;
+
+  /// Creates a new row batch and transfers the ownership of memory backing returned
+  /// tuples to it by calling Close(RowBatch). That last batch is added to the row batch
+  /// queue. Only valid to call if HasRowBatchQueue().
+  void Close();
 
   /// Transfers the ownership of memory backing returned tuples such as IO buffers
   /// and memory in mem pools to the given row batch. If the row batch is NULL,
   /// those resources are released instead. In any case, releases all other resources
   /// that are not backing returned rows (e.g. temporary decompression buffers).
   /// This function is not idempotent and must only be called once.
-  virtual void Close(RowBatch* row_batch);
+  virtual void Close(RowBatch* row_batch) = 0;
+
+  /// Helper function that frees resources common to all scanner subclasses like the
+  /// 'decompressor_', 'context_', 'obj_pool_', etc. Should only be called once the last
+  /// row batch has been attached to the row batch queue (if applicable) to avoid freeing
+  /// memory that might be referenced by the last batch.
+  /// Only valid to call if 'is_closed_' is false. Sets 'is_closed_' to true.
+  void CloseInternal();
 
   /// Only valid to call if the parent scan node is single-threaded.
   bool eos() const {
     DCHECK(!scan_node_->HasRowBatchQueue());
     return eos_;
-  }
-
-  /// Only valid to call if the parent scan node is multi-threaded.
-  RowBatch* batch() const {
-    DCHECK(scan_node_->HasRowBatchQueue());
-    return batch_;
   }
 
   /// Scanner subclasses must implement these static functions as well.  Unfortunately,
@@ -173,7 +173,7 @@ class HdfsScanner {
   /// should be issued to the io mgr.  This is one range for the metadata and one
   /// range for each column, for each split.
   /// This function is how scanners can pick their strategy.
-  /// void IssueInitialRanges(HdfsScanNode* scan_node,
+  /// void IssueInitialRanges(HdfsScanNodeBase* scan_node,
   ///                         const std::vector<HdfsFileDesc*>& files);
 
   /// Codegen all functions for this scanner.  The codegen'd function is specific to
@@ -191,20 +191,19 @@ class HdfsScanner {
   RuntimeState* state_;
 
   /// Context for this scanner
-  ScannerContext* context_;
+  ScannerContext* context_ = nullptr;
 
   /// Object pool for objects with same lifetime as scanner.
   ObjectPool obj_pool_;
 
   /// The first stream for context_
-  ScannerContext::Stream* stream_;
+  ScannerContext::Stream* stream_ = nullptr;
 
   /// Set if this scanner has processed all ranges and will not produce more rows.
-  /// Only relevant when calling the GetNext() interface.
-  bool eos_;
+  bool eos_ = false;
 
   /// Starts as false and is set to true in Close().
-  bool is_closed_;
+  bool is_closed_ = false;
 
   /// MemPool used for expression evaluators in this scanner. Need to be local
   /// to each scanner as MemPool is not thread safe.
@@ -217,7 +216,7 @@ class HdfsScanner {
 
   // Convenience reference to conjuncts_evals_map_[scan_node_->tuple_idx()] for
   // scanners that do not support nested types.
-  const std::vector<ScalarExprEvaluator*>* conjunct_evals_;
+  const std::vector<ScalarExprEvaluator*>* conjunct_evals_ = nullptr;
 
   // Clones of the conjuncts' evaluators in scan_node_->dict_filter_conjuncts_map().
   typedef std::map<SlotId, std::vector<ScalarExprEvaluator*>> DictFilterConjunctsMap;
@@ -242,23 +241,16 @@ class HdfsScanner {
 
   /// Convenience variable set to the top-level template tuple
   /// (i.e. template_tuple_map_[scan_node_->tuple_desc()]).
-  Tuple* template_tuple_;
+  Tuple* template_tuple_ = nullptr;
 
   /// Fixed size of each top-level tuple, in bytes
   const int32_t tuple_byte_size_;
 
-  /// Current tuple pointer into tuple_mem_.
-  Tuple* tuple_;
+  /// Current tuple pointer into 'tuple_mem_'.
+  Tuple* tuple_ = nullptr;
 
-  /// The current row batch being populated. Creating new row batches, attaching context
-  /// resources, and handing off to the scan node is handled by this class in CommitRows(),
-  /// but AttachPool() must be called by scanner subclasses to attach any memory allocated
-  /// by that subclass. All row batches created by this class are transferred to the scan
-  /// node (i.e., all batches are ultimately owned by the scan node).
-  RowBatch* batch_;
-
-  /// The tuple memory of batch_.
-  uint8_t* tuple_mem_;
+  /// The tuple memory backing 'tuple_'.
+  uint8_t* tuple_mem_ = nullptr;
 
   /// Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
@@ -267,31 +259,31 @@ class HdfsScanner {
   /// This significantly minimizes the cross compile dependencies for llvm since status
   /// objects inline a bunch of string functions.  Also, status objects aren't extremely
   /// cheap to create and destroy.
-  Status parse_status_;
+  Status parse_status_ = Status::OK();
 
   /// Decompressor class to use, if any.
   boost::scoped_ptr<Codec> decompressor_;
 
   /// The most recently used decompression type.
-  THdfsCompression::type decompression_type_;
+  THdfsCompression::type decompression_type_ = THdfsCompression::NONE;
 
   /// Pool to allocate per data block memory.  This should be used with the
   /// decompressor and any other per data block allocations.
   boost::scoped_ptr<MemPool> data_buffer_pool_;
 
   /// Time spent decompressing bytes.
-  RuntimeProfile::Counter* decompress_timer_;
+  RuntimeProfile::Counter* decompress_timer_ = nullptr;
 
   /// Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
   /// that function.
   typedef int (*WriteTuplesFn)(HdfsScanner*, MemPool*, TupleRow*, int, FieldLocation*,
       int, int, int, int);
   /// Jitted write tuples function pointer.  Null if codegen is disabled.
-  WriteTuplesFn write_tuples_fn_;
+  WriteTuplesFn write_tuples_fn_ = nullptr;
 
   /// Implements GetNext(). Should be overridden by subclasses.
   /// Only valid to call if the parent scan node is multi-threaded.
-  virtual Status GetNextInternal(RowBatch* row_batch) {
+  virtual Status GetNextInternal(RowBatch* row_batch) WARN_UNUSED_RESULT {
     DCHECK(false) << "GetNextInternal() not implemented for this scanner type.";
     return Status::OK();
   }
@@ -301,25 +293,10 @@ class HdfsScanner {
   /// - type - type for this scanner
   /// - scanner_name - debug string name for this scanner (e.g. HdfsTextScanner)
   Status InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
-      THdfsFileFormat::type type, const std::string& scanner_name);
-
-  /// Set 'batch_' to a new row batch and update 'tuple_mem_' accordingly.
-  /// Only valid to call if the parent scan node is multi-threaded.
-  Status StartNewRowBatch();
+      THdfsFileFormat::type type, const std::string& scanner_name) WARN_UNUSED_RESULT;
 
   /// Reset internal state for a new scan range.
-  virtual Status InitNewRange() = 0;
-
-  /// Gets memory for outputting tuples into batch_.
-  ///  *pool is the mem pool that should be used for memory allocated for those tuples.
-  ///  *tuple_mem should be the location to output tuples, and
-  ///  *tuple_row_mem for outputting tuple rows.
-  /// Returns the maximum number of tuples/tuple rows that can be output (before the
-  /// current row batch is complete and a new one is allocated).
-  /// Memory returned from this call is invalidated after calling CommitRows().
-  /// Callers must call GetMemory() again after calling this function.
-  /// Only valid to call if the parent scan node is multi-threaded.
-  int GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem);
+  virtual Status InitNewRange() WARN_UNUSED_RESULT = 0;
 
   /// Gets memory for outputting tuples into the CollectionValue being constructed via
   /// 'builder'. If memory limit is exceeded, an error status is returned. Otherwise,
@@ -330,40 +307,13 @@ class HdfsScanner {
   /// the next tuple. This also means its unnecessary to call
   /// (*tuple_row_mem)->SetTuple().
   Status GetCollectionMemory(CollectionValueBuilder* builder, MemPool** pool,
-      Tuple** tuple_mem, TupleRow** tuple_row_mem, int64_t* num_rows);
+      Tuple** tuple_mem, TupleRow** tuple_row_mem, int64_t* num_rows) WARN_UNUSED_RESULT;
 
   /// Commits 'num_rows' to 'row_batch'. Advances 'tuple_mem_' and 'tuple_' accordingly.
   /// Attaches completed resources from 'context_' to 'row_batch' if necessary.
-  /// Frees local expr allocations.
-  /// If 'enqueue_if_full' is true and 'row_batch' is at capacity after committing the
-  /// rows, then 'row_batch' is added to the queue, and a new batch is created with
-  /// StartNewRowBatch(). It is only valid to pass true for 'enqueue_if_full' if the
-  /// parent parent scan node is multi-threaded.
-  /// Returns non-OK if 'context_' is cancelled or the query status in 'state_' is
-  /// non-OK.
-  Status CommitRows(int num_rows, bool enqueue_if_full, RowBatch* row_batch);
-
-  /// Calls the above CommitRows() passing true for 'queue_if_full', and 'batch_' as the
-  /// row batch. Only valid to call if the parent scan node is multi-threaded.
-  Status CommitRows(int num_rows) {
-    DCHECK(scan_node_->HasRowBatchQueue());
-    return CommitRows(num_rows, true, batch_);
-  }
-
-  /// Release all memory in 'pool' to batch_. If 'commit_batch' is true, the row batch
-  /// will be committed. 'commit_batch' should be true if the attached pool is expected
-  /// to be non-trivial (i.e. a decompression buffer) to minimize scanner mem usage.
-  /// Can return an error status if 'commit_batch' is true and allocating the next
-  /// batch fails, or if the query hit an error or is cancelled. Only valid to call if
-  /// the parent scan node is multi-threaded.
-  Status AttachPool(MemPool* pool, bool commit_batch) {
-    DCHECK(scan_node_->HasRowBatchQueue());
-    DCHECK(batch_ != NULL);
-    DCHECK(pool != NULL);
-    batch_->tuple_data_pool()->AcquireData(pool, false);
-    if (commit_batch) RETURN_IF_ERROR(CommitRows(0));
-    return Status::OK();
-  }
+  /// Frees local expr allocations. Returns non-OK if 'context_' is cancelled or the
+  /// query status in 'state_' is non-OK.
+  Status CommitRows(int num_rows, RowBatch* row_batch) WARN_UNUSED_RESULT;
 
   /// Convenience function for evaluating conjuncts using this scanner's ScalarExprEvaluators.
   /// This must always be inlined so we can correctly replace the call to
@@ -395,8 +345,8 @@ class HdfsScanner {
   /// Update the decompressor_ object given a compression type or codec name. Depending on
   /// the old compression type and the new one, it may close the old decompressor and/or
   /// create a new one of different type.
-  Status UpdateDecompressor(const THdfsCompression::type& compression);
-  Status UpdateDecompressor(const std::string& codec);
+  Status UpdateDecompressor(const THdfsCompression::type& compression) WARN_UNUSED_RESULT;
+  Status UpdateDecompressor(const std::string& codec) WARN_UNUSED_RESULT;
 
   /// Utility function to report parse errors for each field.
   /// If errors[i] is nonzero, fields[i] had a parse error.
@@ -405,10 +355,10 @@ class HdfsScanner {
   /// This is called from WriteAlignedTuples.
   bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors);
 
-  /// Triggers debug action of the scan node. This is currently used by parquet column
-  /// readers to exercise various failure paths in parquet scanner. Returns the status
+  /// Triggers debug action of the scan node. This is currently used by Parquet column
+  /// readers to exercise various failure paths in Parquet scanner. Returns the status
   /// returned by the scan node's TriggerDebugAction().
-  Status ScannerDebugAction() {
+  Status ScannerDebugAction() WARN_UNUSED_RESULT {
     return scan_node_->ScanNodeDebugAction(TExecNodePhase::GETNEXT_SCANNER);
   }
 
@@ -435,21 +385,23 @@ class HdfsScanner {
   /// TODO: revisit this
   bool WriteCompleteTuple(MemPool* pool, FieldLocation* fields, Tuple* tuple,
       TupleRow* tuple_row, Tuple* template_tuple, uint8_t* error_fields,
-      uint8_t* error_in_row);
+      uint8_t* error_in_row) WARN_UNUSED_RESULT;
 
   /// Codegen function to replace WriteCompleteTuple. Should behave identically
   /// to WriteCompleteTuple. Stores the resulting function in 'write_complete_tuple_fn'
   /// if codegen was successful or NULL otherwise.
   static Status CodegenWriteCompleteTuple(HdfsScanNodeBase* node, LlvmCodeGen* codegen,
       const std::vector<ScalarExpr*>& conjuncts,
-      llvm::Function** write_complete_tuple_fn);
+      llvm::Function** write_complete_tuple_fn)
+      WARN_UNUSED_RESULT;
 
   /// Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross
   /// compiled to IR.  This function loads the precompiled IR function, modifies it,
   /// and stores the resulting function in 'write_aligned_tuples_fn' if codegen was
   /// successful or NULL otherwise.
   static Status CodegenWriteAlignedTuples(HdfsScanNodeBase*, LlvmCodeGen*,
-      llvm::Function* write_tuple_fn, llvm::Function** write_aligned_tuples_fn);
+      llvm::Function* write_tuple_fn, llvm::Function** write_aligned_tuples_fn)
+      WARN_UNUSED_RESULT;
 
   /// Report parse error for column @ desc.   If abort_on_error is true, sets
   /// parse_status_ to the error message.

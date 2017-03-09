@@ -23,6 +23,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <deque>
+#include <memory>
 #include <unistd.h>
 
 #include "common/atomic.h"
@@ -92,7 +93,7 @@ class BlockingQueue : public CacheLineAligned {
     }
 
     DCHECK(!get_list_.empty());
-    *out = get_list_.front();
+    *out = std::move(get_list_.front());
     get_list_.pop_front();
     get_list_size_.Store(get_list_.size());
     read_lock.unlock();

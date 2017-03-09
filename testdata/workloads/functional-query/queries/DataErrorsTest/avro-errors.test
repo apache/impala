@@ -10,8 +10,7 @@ string
 row_regex: .*Problem parsing file $NAMENODE/.*
 File '$NAMENODE/test-warehouse/bad_avro_snap_strings_avro_snap/truncated_string.avro' is corrupt: truncated data block at offset 155
 File '$NAMENODE/test-warehouse/bad_avro_snap_strings_avro_snap/negative_string_len.avro' is corrupt: invalid length -7 at offset 164
-File '$NAMENODE/test-warehouse/bad_avro_snap_strings_avro_snap/invalid_union.avro' is corrupt: invalid union value 4 at offset 174
-File '$NAMENODE/test-warehouse/bad_avro_snap_strings_avro_snap/invalid_union.avro' is corrupt: invalid encoded integer at offset 191
+File '$NAMENODE/test-warehouse/bad_avro_snap_strings_avro_snap/invalid_union.avro' is corrupt: invalid union value 4 at offset 174 (1 of 2 similar)
 ====
 ---- QUERY
 # Read from the corrupt files. We may get partial results.
