@@ -199,9 +199,11 @@ string AdmissionController::PoolStats::DebugString() const {
 
 // TODO: do we need host_id_ to come from host_addr or can it just take the same id
 // the Scheduler has (coming from the StatestoreSubscriber)?
-AdmissionController::AdmissionController(RequestPoolService* request_pool_service,
-    MetricGroup* metrics, const TNetworkAddress& host_addr)
-    : request_pool_service_(request_pool_service),
+AdmissionController::AdmissionController(StatestoreSubscriber* subscriber,
+    RequestPoolService* request_pool_service, MetricGroup* metrics,
+    const TNetworkAddress& host_addr)
+    : subscriber_(subscriber),
+      request_pool_service_(request_pool_service),
       metrics_group_(metrics),
       host_id_(TNetworkAddressToString(host_addr)),
       thrift_serializer_(false),
@@ -224,10 +226,10 @@ AdmissionController::~AdmissionController() {
   dequeue_thread_->Join();
 }
 
-Status AdmissionController::Init(StatestoreSubscriber* subscriber) {
+Status AdmissionController::Init() {
   StatestoreSubscriber::UpdateCallback cb =
     bind<void>(mem_fn(&AdmissionController::UpdatePoolStats), this, _1, _2);
-  Status status = subscriber->AddTopic(IMPALA_REQUEST_QUEUE_TOPIC, true, cb);
+  Status status = subscriber_->AddTopic(IMPALA_REQUEST_QUEUE_TOPIC, true, cb);
   if (!status.ok()) {
     status.AddDetail("AdmissionController failed to register request queue topic");
   }
@@ -578,12 +580,12 @@ void AdmissionController::PoolStats::UpdateRemoteStats(const string& host_id,
   if (VLOG_ROW_IS_ON) {
     stringstream ss;
     ss << "Stats update for pool=" << name_ << " backend=" << host_id;
-    if (host_stats == NULL) ss << " topic deletion";
+    if (host_stats == nullptr) ss << " topic deletion";
     if (it != remote_stats_.end()) ss << " previous: " << DebugPoolStats(it->second);
-    if (host_stats != NULL) ss << " new: " << DebugPoolStats(*host_stats);
+    if (host_stats != nullptr) ss << " new: " << DebugPoolStats(*host_stats);
     VLOG_ROW << ss.str();
   }
-  if (host_stats == NULL) {
+  if (host_stats == nullptr) {
     if (it != remote_stats_.end()) {
       remote_stats_.erase(it);
     } else {
@@ -620,7 +622,7 @@ void AdmissionController::HandleTopicDeletions(const vector<string>& topic_delet
     string topic_backend_id;
     if (!ParsePoolTopicKey(topic_key, &pool_name, &topic_backend_id)) continue;
     if (topic_backend_id == host_id_) continue;
-    GetPoolStats(pool_name)->UpdateRemoteStats(topic_backend_id, NULL);
+    GetPoolStats(pool_name)->UpdateRemoteStats(topic_backend_id, nullptr);
   }
 }
 
@@ -705,7 +707,7 @@ void AdmissionController::PoolStats::UpdateMemTrackerStats() {
       ExecEnv::GetInstance()->pool_mem_trackers()->GetRequestPoolMemTracker(name_, false);
 
   const int64_t current_reserved =
-      tracker == NULL ? static_cast<int64_t>(0) : tracker->GetPoolMemReserved();
+      tracker == nullptr ? static_cast<int64_t>(0) : tracker->GetPoolMemReserved();
   if (current_reserved != local_stats_.backend_mem_reserved) {
     parent_->pools_for_updates_.insert(name_);
     local_stats_.backend_mem_reserved = current_reserved;
@@ -713,7 +715,7 @@ void AdmissionController::PoolStats::UpdateMemTrackerStats() {
   }
 
   const int64_t current_usage =
-      tracker == NULL ? static_cast<int64_t>(0) : tracker->consumption();
+      tracker == nullptr ? static_cast<int64_t>(0) : tracker->consumption();
   metrics_.local_backend_mem_usage->set_value(current_usage);
 }
 
@@ -797,7 +799,7 @@ void AdmissionController::DequeueLoop() {
 
       while (max_to_dequeue > 0 && !queue.empty()) {
         QueueNode* queue_node = queue.head();
-        DCHECK(queue_node != NULL);
+        DCHECK(queue_node != nullptr);
         DCHECK(!queue_node->is_admitted.IsSet());
         const QuerySchedule& schedule = queue_node->schedule;
         string not_admitted_reason;

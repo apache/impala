@@ -30,6 +30,7 @@
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/Types_types.h"
 #include "rapidjson/rapidjson.h"
+#include "runtime/exec-env.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/container-util.h"
 #include "util/metrics.h"
@@ -45,8 +46,6 @@ using namespace strings;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
-
-DEFINE_bool(disable_admission_control, false, "Disables admission control.");
 
 namespace impala {
 
@@ -69,17 +68,11 @@ Scheduler::Scheduler(StatestoreSubscriber* subscriber, const string& backend_id,
     statestore_subscriber_(subscriber),
     local_backend_id_(backend_id),
     thrift_serializer_(false),
-    total_assignments_(NULL),
-    total_local_assignments_(NULL),
-    initialized_(NULL),
+    total_assignments_(nullptr),
+    total_local_assignments_(nullptr),
+    initialized_(nullptr),
     request_pool_service_(request_pool_service) {
   local_backend_descriptor_.address = backend_address;
-
-  if (FLAGS_disable_admission_control) LOG(INFO) << "Admission control is disabled.";
-  if (!FLAGS_disable_admission_control) {
-    admission_controller_.reset(
-        new AdmissionController(request_pool_service_, metrics, backend_address));
-  }
 }
 
 Scheduler::Scheduler(const vector<TNetworkAddress>& backends, MetricGroup* metrics,
@@ -87,20 +80,14 @@ Scheduler::Scheduler(const vector<TNetworkAddress>& backends, MetricGroup* metri
   : backend_config_(std::make_shared<const BackendConfig>(backends)),
     metrics_(metrics),
     webserver_(webserver),
-    statestore_subscriber_(NULL),
+    statestore_subscriber_(nullptr),
     thrift_serializer_(false),
-    total_assignments_(NULL),
-    total_local_assignments_(NULL),
-    initialized_(NULL),
+    total_assignments_(nullptr),
+    total_local_assignments_(nullptr),
+    initialized_(nullptr),
     request_pool_service_(request_pool_service) {
   DCHECK(backends.size() > 0);
   local_backend_descriptor_.address = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
-  if (FLAGS_disable_admission_control) LOG(INFO) << "Admission control is disabled.";
-  // request_pool_service_ may be null in unit tests
-  if (request_pool_service_ != NULL && !FLAGS_disable_admission_control) {
-    admission_controller_.reset(
-        new AdmissionController(request_pool_service_, metrics, TNetworkAddress()));
-  }
 }
 
 Status Scheduler::Init() {
@@ -122,14 +109,14 @@ Status Scheduler::Init() {
 
   coord_only_backend_config_.AddBackend(local_backend_descriptor_);
 
-  if (webserver_ != NULL) {
+  if (webserver_ != nullptr) {
     Webserver::UrlCallback backends_callback =
         bind<void>(mem_fn(&Scheduler::BackendsUrlCallback), this, _1, _2);
     webserver_->RegisterUrlCallback(
         BACKENDS_WEB_PAGE, BACKENDS_TEMPLATE, backends_callback);
   }
 
-  if (statestore_subscriber_ != NULL) {
+  if (statestore_subscriber_ != nullptr) {
     StatestoreSubscriber::UpdateCallback cb =
         bind<void>(mem_fn(&Scheduler::UpdateMembership), this, _1, _2);
     Status status = statestore_subscriber_->AddTopic(IMPALA_MEMBERSHIP_TOPIC, true, cb);
@@ -137,12 +124,9 @@ Status Scheduler::Init() {
       status.AddDetail("Scheduler failed to register membership topic");
       return status;
     }
-    if (!FLAGS_disable_admission_control) {
-      RETURN_IF_ERROR(admission_controller_->Init(statestore_subscriber_));
-    }
   }
 
-  if (metrics_ != NULL) {
+  if (metrics_ != nullptr) {
     // This is after registering with the statestored, so we already have to synchronize
     // access to the backend_config_ shared_ptr.
     int num_backends = GetBackendConfig()->NumBackends();
@@ -153,8 +137,8 @@ Status Scheduler::Init() {
         metrics_->AddGauge<int64_t>(NUM_BACKENDS_KEY, num_backends);
   }
 
-  if (statestore_subscriber_ != NULL) {
-    if (webserver_ != NULL) {
+  if (statestore_subscriber_ != nullptr) {
+    if (webserver_ != nullptr) {
       const TNetworkAddress& webserver_address = webserver_->http_address();
       if (IsWildcardAddress(webserver_address.hostname)) {
         local_backend_descriptor_.__set_debug_http_address(
@@ -253,31 +237,9 @@ void Scheduler::UpdateMembership(
     }
   }
 
-  // If the local backend is not in our view of the membership list, we should add it
-  // and tell the statestore. We also ensure that it is part of our backend config.
-  if (current_membership_.find(local_backend_id_) == current_membership_.end()) {
-    new_backend_config->AddBackend(local_backend_descriptor_);
-    VLOG(1) << "Registering local backend with statestore";
-    subscriber_topic_updates->push_back(TTopicDelta());
-    TTopicDelta& update = subscriber_topic_updates->back();
-    update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
-    update.topic_entries.push_back(TTopicItem());
-
-    TTopicItem& item = update.topic_entries.back();
-    item.key = local_backend_id_;
-    Status status = thrift_serializer_.Serialize(&local_backend_descriptor_, &item.value);
-    if (!status.ok()) {
-      LOG(WARNING) << "Failed to serialize Impala backend address for statestore topic:"
-                   << " " << status.GetDetail();
-      subscriber_topic_updates->pop_back();
-    }
-  }
-
-  DCHECK(new_backend_config->LookUpBackendIp(
-      local_backend_descriptor_.address.hostname, nullptr));
   SetBackendConfig(new_backend_config);
 
-  if (metrics_ != NULL) {
+  if (metrics_ != nullptr) {
     /// TODO-MT: fix this (do we even need to report it?)
     num_fragment_instances_metric_->set_value(current_membership_.size());
   }
@@ -285,7 +247,7 @@ void Scheduler::UpdateMembership(
 
 Scheduler::BackendConfigPtr Scheduler::GetBackendConfig() const {
   lock_guard<mutex> l(backend_config_lock_);
-  DCHECK(backend_config_.get() != NULL);
+  DCHECK(backend_config_.get() != nullptr);
   BackendConfigPtr backend_config = backend_config_;
   return backend_config;
 }
@@ -660,7 +622,7 @@ Status Scheduler::ComputeScanRangeAssignment(const BackendConfig& backend_config
       //   cache to worry about.
       // Remote reads will always break ties by backend rank.
       bool decide_local_assignment_by_rank = random_replica || cached_replica;
-      const IpAddr* backend_ip = NULL;
+      const IpAddr* backend_ip = nullptr;
       backend_ip = assignment_ctx.SelectLocalBackendHost(
           backend_candidates, decide_local_assignment_by_rank);
       TBackendDescriptor backend;
@@ -771,17 +733,6 @@ Status Scheduler::Schedule(QuerySchedule* schedule) {
     }
   }
   schedule->SetUniqueHosts(unique_hosts);
-
-  if (!FLAGS_disable_admission_control) {
-    RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));
-  }
-  return Status::OK();
-}
-
-Status Scheduler::Release(QuerySchedule* schedule) {
-  if (!FLAGS_disable_admission_control) {
-    RETURN_IF_ERROR(admission_controller_->ReleaseQuery(schedule));
-  }
   return Status::OK();
 }
 
@@ -844,7 +795,7 @@ const IpAddr* Scheduler::AssignmentCtx::SelectRemoteBackendHost() {
     DCHECK_EQ(backend_config_.NumBackends(), assignment_heap_.size());
     candidate_ip = &(assignment_heap_.top().ip);
   }
-  DCHECK(candidate_ip != NULL);
+  DCHECK(candidate_ip != nullptr);
   return candidate_ip;
 }
 
@@ -866,7 +817,7 @@ int Scheduler::AssignmentCtx::GetBackendRank(const IpAddr& ip) const {
 
 void Scheduler::AssignmentCtx::SelectBackendOnHost(
     const IpAddr& backend_ip, TBackendDescriptor* backend) {
-  DCHECK(backend_config_.LookUpBackendIp(backend_ip, NULL));
+  DCHECK(backend_config_.LookUpBackendIp(backend_ip, nullptr));
   const BackendConfig::BackendList& backends_on_host =
       backend_config_.GetBackendListForHost(backend_ip);
   DCHECK(backends_on_host.size() > 0);
@@ -934,8 +885,8 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
     if (is_cached) assignment_byte_counters_.cached_bytes += scan_range_length;
   }
 
-  if (total_assignments_ != NULL) {
-    DCHECK(total_local_assignments_ != NULL);
+  if (total_assignments_ != nullptr) {
+    DCHECK(total_local_assignments_ != nullptr);
     total_assignments_->Increment(1);
     if (!remote_read) total_local_assignments_->Increment(1);
   }

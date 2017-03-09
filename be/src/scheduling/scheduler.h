@@ -33,9 +33,9 @@
 #include "gen-cpp/Types_types.h" // for TNetworkAddress
 #include "rapidjson/document.h"
 #include "rpc/thrift-util.h"
-#include "scheduling/admission-controller.h"
 #include "scheduling/backend-config.h"
 #include "scheduling/query-schedule.h"
+#include "scheduling/request-pool-service.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
@@ -100,9 +100,6 @@ class Scheduler {
   /// ranges in the query exec request. Submits schedule to admission control before
   /// returning.
   Status Schedule(QuerySchedule* schedule);
-
-  /// Releases the reserved resources (if any) from the given schedule.
-  Status Release(QuerySchedule* schedule);
 
  private:
   /// Map from a host's IP address to the next backend to be round-robin scheduled for
@@ -323,9 +320,6 @@ class Scheduler {
   /// Used for user-to-pool resolution and looking up pool configurations. Not owned by
   /// us.
   RequestPoolService* request_pool_service_;
-
-  /// Used to make admission decisions in 'Schedule()'
-  boost::scoped_ptr<AdmissionController> admission_controller_;
 
   /// Helper methods to access backend_config_ (the shared_ptr, not its contents),
   /// protecting the access with backend_config_lock_.

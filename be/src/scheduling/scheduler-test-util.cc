@@ -450,13 +450,13 @@ SchedulerWrapper::SchedulerWrapper(const Plan& plan)
 }
 
 Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
-  DCHECK(scheduler_ != NULL);
+  DCHECK(scheduler_ != nullptr);
 
   // Compute Assignment.
   FragmentScanRangeAssignment* assignment = result->AddAssignment();
-  return scheduler_->ComputeScanRangeAssignment(*scheduler_->GetBackendConfig(), 0, NULL,
-      false, plan_.scan_range_locations(), plan_.referenced_datanodes(), exec_at_coord,
-      plan_.query_options(), NULL, assignment);
+  return scheduler_->ComputeScanRangeAssignment(*scheduler_->GetBackendConfig(), 0,
+      nullptr, false, plan_.scan_range_locations(), plan_.referenced_datanodes(),
+      exec_at_coord, plan_.query_options(), nullptr, assignment);
 }
 
 void SchedulerWrapper::AddBackend(const Host& host) {
@@ -495,7 +495,7 @@ void SchedulerWrapper::SendEmptyUpdate() {
 }
 
 void SchedulerWrapper::InitializeScheduler() {
-  DCHECK(scheduler_ == NULL);
+  DCHECK(scheduler_ == nullptr);
   DCHECK_GT(plan_.cluster().NumHosts(), 0) << "Cannot initialize scheduler with 0 "
                                            << "hosts.";
   const Host& scheduler_host = plan_.cluster().hosts()[0];
@@ -504,8 +504,8 @@ void SchedulerWrapper::InitializeScheduler() {
   scheduler_backend_address.hostname = scheduler_host.ip;
   scheduler_backend_address.port = scheduler_host.be_port;
 
-  scheduler_.reset(new Scheduler(
-      NULL, scheduler_backend_id, scheduler_backend_address, &metrics_, NULL, NULL));
+  scheduler_.reset(new Scheduler(nullptr, scheduler_backend_id, scheduler_backend_address,
+      &metrics_, nullptr, nullptr));
   scheduler_->Init();
   // Initialize the scheduler backend maps.
   SendFullMembershipMap();
@@ -532,7 +532,7 @@ void SchedulerWrapper::AddHostToTopicDelta(const Host& host, TTopicDelta* delta)
 }
 
 void SchedulerWrapper::SendTopicDelta(const TTopicDelta& delta) {
-  DCHECK(scheduler_ != NULL);
+  DCHECK(scheduler_ != nullptr);
   // Wrap in topic delta map.
   StatestoreSubscriber::TopicDeltaMap delta_map;
   delta_map.emplace(Scheduler::IMPALA_MEMBERSHIP_TOPIC, delta);

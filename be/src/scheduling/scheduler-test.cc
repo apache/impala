@@ -362,8 +362,11 @@ TEST_F(SchedulerTest, TestSendUpdates) {
 }
 
 /// IMPALA-4329: Test scheduling with no backends.
-/// With the fix for IMPALA-4494, the scheduler will always register its local backend
-/// with itself, so scheduling with no backends will still succeed.
+/// With the fix for IMPALA-5058, the scheduler is no longer responsible for
+/// registering the local backend with itself. This functionality is moved to
+/// ImpalaServer::MembershipCallback() and the scheduler will receive the local
+/// backend info through the statestore update, so until that happens, scheduling
+/// should fail.
 TEST_F(SchedulerTest, TestEmptyBackendConfig) {
   Cluster cluster;
   cluster.AddHost(false, true);
@@ -377,7 +380,7 @@ TEST_F(SchedulerTest, TestEmptyBackendConfig) {
   Result result(plan);
   SchedulerWrapper scheduler(plan);
   Status status = scheduler.Compute(&result);
-  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(!status.ok());
 }
 
 /// IMPALA-4494: Test scheduling with no backends but exec_at_coord.

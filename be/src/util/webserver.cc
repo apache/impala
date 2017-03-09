@@ -34,6 +34,8 @@
 
 #include "common/logging.h"
 #include "rpc/thrift-util.h"
+#include "runtime/exec-env.h"
+#include "service/impala-server.h"
 #include "thirdparty/mustache/mustache.h"
 #include "util/asan.h"
 #include "util/coding-util.h"
@@ -97,6 +99,8 @@ DEFINE_string(webserver_password_file, "",
 DEFINE_string(webserver_x_frame_options, "DENY",
     "webserver will add X-Frame-Options HTTP header with this value");
 
+DECLARE_bool(is_coordinator);
+
 static const char* DOC_FOLDER = "/www/";
 static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
 
@@ -116,7 +120,7 @@ static const char* ERROR_KEY = "__error_msg__";
 const char* GetDefaultDocumentRoot() {
   stringstream ss;
   char* impala_home = getenv("IMPALA_HOME");
-  if (impala_home == NULL) {
+  if (impala_home == nullptr) {
     return ""; // Empty document root means don't serve static files
   } else {
     ss << impala_home;
@@ -152,7 +156,7 @@ string BuildHeaderString(ResponseCode response, ContentType content_type) {
 }
 
 Webserver::Webserver()
-    : context_(NULL),
+    : context_(nullptr),
       error_handler_(UrlHandler(bind<void>(&Webserver::ErrorHandler, this, _1, _2),
           "error.tmpl", false)) {
   http_address_ = MakeNetworkAddress(
@@ -161,7 +165,7 @@ Webserver::Webserver()
 }
 
 Webserver::Webserver(const int port)
-    : context_(NULL),
+    : context_(nullptr),
       error_handler_(UrlHandler(bind<void>(&Webserver::ErrorHandler, this, _1, _2),
           "error.tmpl", false)) {
   http_address_ = MakeNetworkAddress("0.0.0.0", port);
@@ -186,6 +190,13 @@ void Webserver::RootHandler(const ArgumentMap& args, Document* document) {
     document->GetAllocator());
   document->AddMember("process_state_info", process_state_info,
     document->GetAllocator());
+
+  ExecEnv* env = ExecEnv::GetInstance();
+  if (env == nullptr || env->impala_server() == nullptr) return;
+  string mode = (env->impala_server()->IsCoordinator()) ?
+      "Coordinator + Executor" : "Executor";
+  Value impala_server_mode(mode.c_str(), document->GetAllocator());
+  document->AddMember("impala_server_mode", impala_server_mode, document->GetAllocator());
 }
 
 void Webserver::ErrorHandler(const ArgumentMap& args, Document* document) {
@@ -300,7 +311,7 @@ Status Webserver::Start() {
   options.push_back("no");
 
   // Options must be a NULL-terminated list
-  options.push_back(NULL);
+  options.push_back(nullptr);
 
   // squeasel ignores SIGCHLD and we need it to run kinit. This means that since
   // squeasel does not reap its own children CGI programs must be avoided.
@@ -321,7 +332,7 @@ Status Webserver::Start() {
   // Restore the child signal handler so wait() works properly.
   signal(SIGCHLD, sig_chld);
 
-  if (context_ == NULL) {
+  if (context_ == nullptr) {
     stringstream error_msg;
     error_msg << "Webserver: Could not start on address " << http_address_;
     return Status(error_msg.str());
@@ -337,14 +348,14 @@ Status Webserver::Start() {
 }
 
 void Webserver::Stop() {
-  if (context_ != NULL) {
+  if (context_ != nullptr) {
     sq_stop(context_);
-    context_ = NULL;
+    context_ = nullptr;
   }
 }
 
 void Webserver::GetCommonJson(Document* document) {
-  DCHECK(document != NULL);
+  DCHECK(document != nullptr);
   Value obj(kObjectType);
   obj.AddMember("process-name", google::ProgramInvocationShortName(),
       document->GetAllocator());
@@ -365,7 +376,7 @@ void Webserver::GetCommonJson(Document* document) {
 
 int Webserver::LogMessageCallbackStatic(const struct sq_connection* connection,
     const char* message) {
-  if (message != NULL) {
+  if (message != nullptr) {
     LOG(INFO) << "Webserver: " << message;
   }
   return PROCESSING_COMPLETE;
@@ -389,7 +400,7 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
   }
 
   map<string, string> arguments;
-  if (request_info->query_string != NULL) {
+  if (request_info->query_string != nullptr) {
     BuildArgumentMap(request_info->query_string, &arguments);
   }
 
@@ -397,7 +408,7 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
   UrlHandlerMap::const_iterator it = url_handlers_.find(request_info->uri);
   ResponseCode response = OK;
   ContentType content_type = HTML;
-  const UrlHandler* url_handler = NULL;
+  const UrlHandler* url_handler = nullptr;
   if (it == url_handlers_.end()) {
     response = NOT_FOUND;
     arguments[ERROR_KEY] = Substitute("No URI handler for '$0'", request_info->uri);

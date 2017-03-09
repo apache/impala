@@ -25,6 +25,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/exec-env.h"
+#include "scheduling/admission-controller.h"
 #include "scheduling/scheduler.h"
 #include "service/frontend.h"
 #include "service/impala-server.h"
@@ -456,6 +457,14 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     RETURN_IF_ERROR(UpdateQueryStatus(status));
   }
 
+  if (exec_env_->admission_controller() != nullptr) {
+    status = exec_env_->admission_controller()->AdmitQuery(schedule_.get());
+    {
+      lock_guard<mutex> l(lock_);
+      RETURN_IF_ERROR(UpdateQueryStatus(status));
+    }
+  }
+
   coord_.reset(new Coordinator(*schedule_, exec_env_, query_events_));
   status = coord_->Exec();
   {
@@ -570,10 +579,12 @@ void ImpalaServer::QueryExecState::Done() {
 
   if (coord_.get() != NULL) {
     // Release any reserved resources.
-    Status status = exec_env_->scheduler()->Release(schedule_.get());
-    if (!status.ok()) {
-      LOG(WARNING) << "Failed to release resources of query " << schedule_->query_id()
-                   << " because of error: " << status.GetDetail();
+    if (exec_env_->admission_controller() != nullptr) {
+      Status status = exec_env_->admission_controller()->ReleaseQuery(schedule_.get());
+      if (!status.ok()) {
+        LOG(WARNING) << "Failed to release resources of query " << schedule_->query_id()
+                     << " because of error: " << status.GetDetail();
+      }
     }
     coord_->TearDown();
   }

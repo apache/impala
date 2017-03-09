@@ -69,7 +69,7 @@ class InProcessImpalaServer {
   /// there was an error joining.
   Status Join();
 
-  ImpalaServer* impala_server() { return impala_server_; }
+  ImpalaServer* impala_server() { return impala_server_.get(); }
 
   MetricGroup* metrics() { return exec_env_->metrics(); }
 
@@ -92,10 +92,9 @@ class InProcessImpalaServer {
 
   uint32_t hs2_port_;
 
-  /// The ImpalaServer that handles client and backend requests. Not owned by this class;
-  /// instead it's owned via shared_ptrs in the ThriftServers. See CreateImpalaServer for
-  /// details.
-  ImpalaServer* impala_server_;
+  /// The ImpalaServer that handles client and backend requests. Ownership is shared via
+  /// shared_ptrs with the ThriftServers. See CreateImpalaServer for details.
+  boost::shared_ptr<ImpalaServer> impala_server_;
 
   /// ExecEnv holds much of the per-service state
   boost::scoped_ptr<ExecEnv> exec_env_;

@@ -18,6 +18,10 @@ under the License.
 -->
 {{! Template for / }}
 {{>www/common-header.tmpl}}
+  {{?impala_server_mode}}
+  <h2>Impala Server Mode: {{impala_server_mode}}</h2>
+  {{/impala_server_mode}}
+
   <h2>Vers<span id="v">i</span>on</h2>
   <pre id="version_pre">{{version}}</pre>
 

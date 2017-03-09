@@ -26,6 +26,10 @@ import urllib
 from time import sleep, time
 
 from tests.common.impala_connection import create_connection, create_ldap_connection
+from TCLIService import TCLIService
+from thrift.transport.TSocket import TSocket
+from thrift.transport.TTransport import TBufferedTransport
+from thrift.protocol import TBinaryProtocol
 
 logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('impala_service')
@@ -200,6 +204,16 @@ class ImpaladService(BaseImpalaService):
                                     user=user, password=password, use_ssl=use_ssl)
     client.connect()
     return client
+
+  def create_hs2_client(self):
+    """Creates a new HS2 client connection to the impalad"""
+    host, port = (self.hostname, self.hs2_port)
+    socket = TSocket(host, port)
+    transport = TBufferedTransport(socket)
+    transport.open()
+    protocol = TBinaryProtocol.TBinaryProtocol(transport)
+    hs2_client = TCLIService.Client(protocol)
+    return hs2_client
 
   def get_catalog_object_dump(self, object_type, object_name):
     return self.read_debug_webpage('catalog_objects?object_type=%s&object_name=%s' %\
