@@ -87,7 +87,7 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
       the temporary data for the spill-to-disk feature, that configuration is
       not recommended due to the need to transfer the data both ways using remote I/O.
     </p>
-    
+
     <p>
       When tuning Impala queries on HDFS, you typically try to avoid any remote reads.
       When the data resides on Isilon storage, all the I/O consists of remote reads.

@@ -67,20 +67,11 @@ under the License.
           by a detailed performance analysis.
         </p>
       </li>
-      
+
       <li>
         <p>
           In the Impala debug web UI, click on the <uicontrol>Profile</uicontrol> link associated with the query after it is
           complete. The executive summary information is displayed early in the profile output.
-        </p>
-      </li>
-      
-
-      <li audience="hidden">
-        <p>
-          In the Cloudera Manager interface or the Impala debug web UI, click on the <uicontrol>Profile</uicontrol>
-          link associated with the query after it is complete. The executive summary information is displayed early
-          in the profile output.
         </p>
       </li>
     </ul>

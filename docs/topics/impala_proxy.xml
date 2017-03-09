@@ -161,7 +161,7 @@ under the License.
 
   </concept>
 
-  <concept id="proxy_balancing" rev="CDH-33836 DOCS-349 CDH-39925 CDH-36812" audience="hidden">
+  <concept id="proxy_balancing" rev="" audience="hidden">
     <title>Choosing the Load-Balancing Algorithm</title>
     <conbody>
       <p>
@@ -260,27 +260,19 @@ under the License.
           running the <cmdname>impalad</cmdname> daemon.
         </li>
 
-
-        <li rev="CDH-40363" audience="hidden">
-          For a cluster managed by Cloudera Manager (5.4.2 or higher), fill in the Impala configuration setting
-          <uicontrol>Impala Daemons Load Balancer</uicontrol> with the appropriate host:port combination.
-          Then restart the Impala service.
-          For systems using a recent level of Cloudera Manager, this is all the configuration you need; you can skip the remaining steps in this procedure.
-        </li>
-        
         <li>
           Copy the keytab file from the proxy host to all other hosts in the cluster that run the
           <cmdname>impalad</cmdname> daemon. (For optimal performance, <cmdname>impalad</cmdname> should be running
           on all DataNodes in the cluster.) Put the keytab file in a secure location on each of these other hosts.
         </li>
-        
+
         <li>
           Add an entry <codeph>impala/<varname>actual_hostname</varname>@<varname>realm</varname></codeph> to the keytab on each
           host running the <cmdname>impalad</cmdname> daemon.
         </li>
-        
+
         <li>
-         
+
          For each impalad node, merge the existing keytab with the proxy’s keytab using
           <cmdname>ktutil</cmdname>, producing a new keytab file. For example:
           <codeblock>$ ktutil
@@ -288,11 +280,11 @@ under the License.
   ktutil: read_kt impala.keytab
   ktutil: write_kt proxy_impala.keytab
   ktutil: quit</codeblock>
-          
+
         </li>
-        
+
         <li>
-          
+
           To verify that the keytabs are merged, run the command:
 <codeblock>
 klist -k <varname>keytabfile</varname>
@@ -300,14 +292,14 @@ klist -k <varname>keytabfile</varname>
           which lists the credentials for both <codeph>principal</codeph> and <codeph>be_principal</codeph> on
           all nodes.
         </li>
-        
+
 
         <li>
-          
-          Make sure that the <codeph>impala</codeph> user has permission to read this merged keytab file. 
-          
+
+          Make sure that the <codeph>impala</codeph> user has permission to read this merged keytab file.
+
         </li>
-        
+
         <li>
           Change the following configuration settings for each host in the cluster that participates
           in the load balancing:
@@ -322,98 +314,27 @@ klist -k <varname>keytabfile</varname>
               <note>
                 Every host has different <codeph>--be_principal</codeph> because the actual hostname
                 is different on each host.
-                
+
                 Specify the fully qualified domain name (FQDN) for the proxy host, not the IP
                 address. Use the exact FQDN as returned by a reverse DNS lookup for the associated
                 IP address.
-                
+
               </note>
             </li>
-            
+
             <li>
               Modify the startup options. See <xref href="impala_config_options.xml#config_options"/> for the procedure to modify the startup
               options.
             </li>
           </ul>
         </li>
-        
-        
+
         <li>
-          
           Restart Impala to make the changes take effect. Restart the <cmdname>impalad</cmdname> daemons on all
           hosts in the cluster, as well as the <cmdname>statestored</cmdname> and <cmdname>catalogd</cmdname>
           daemons.
-          
         </li>
-        
 
-        <li audience="hidden">
-          On systems not managed by Cloudera Manager, or systems using Cloudera Manager earlier than 5.4.2:
-
-        <ol>
-          <li>
-            Copy the keytab file from the proxy host to all other hosts in the cluster that run the
-            <cmdname>impalad</cmdname> daemon. (For optimal performance, <cmdname>impalad</cmdname> should be running
-            on all DataNodes in the cluster.) Put the keytab file in a secure location on each of these other hosts.
-          </li>
-
-          <li>
-            Add an entry <codeph>impala/<varname>actual_hostname</varname>@<varname>realm</varname></codeph> to the keytab on each
-            host running the <cmdname>impalad</cmdname> daemon.
-          </li>
-
-          <li>
-            For each impalad node, merge the existing keytab with the proxy’s keytab using
-            <cmdname>ktutil</cmdname>, producing a new keytab file. For example:
-  <codeblock>$ ktutil
-  ktutil: read_kt proxy.keytab
-  ktutil: read_kt impala.keytab
-  ktutil: write_kt proxy_impala.keytab
-  ktutil: quit</codeblock>
-            <note>
-              On systems managed by Cloudera Manager 5.1.0 and later, the keytab merging happens automatically. To
-              verify that Cloudera Manager has merged the keytabs, run the command:
-  <codeblock>klist -k <varname>keytabfile</varname></codeblock>
-              which lists the credentials for both <codeph>principal</codeph> and <codeph>be_principal</codeph> on
-              all nodes.
-            </note>
-          </li>
-
-          <li>
-            Make sure that the <codeph>impala</codeph> user has permission to read this merged keytab file.
-          </li>
-
-          <li>
-            Change some configuration settings for each host in the cluster that participates in the load balancing.
-            Follow the appropriate steps depending on whether you use Cloudera Manager or not:
-            <ul>
-              <li> In the <cmdname>impalad</cmdname> option definition, or the advanced
-                configuration snippet, add: <codeblock>--principal=impala/<varname>proxy_host</varname>@<varname>realm</varname>
-  --be_principal=impala/<varname>actual_host</varname>@<varname>realm</varname>
-  --keytab_file=<varname>path_to_merged_keytab</varname></codeblock>
-              </li>
-
-              <li>
-                On a cluster not managed by Cloudera Manager, see
-                <xref href="impala_config_options.xml#config_options"/> for the procedure to modify the startup
-                options.
-              </li>
-            </ul>
-          </li>
-
-          <li>
-            Restart Impala to make the changes take effect. Follow the appropriate steps depending on whether you use
-            Cloudera Manager or not:
-            <ul>
-              <li>
-                On a cluster not managed by Cloudera Manager, restart the <cmdname>impalad</cmdname> daemons on all
-                hosts in the cluster, as well as the <cmdname>statestored</cmdname> and <cmdname>catalogd</cmdname>
-                daemons.
-              </li>
-            </ul>
-          </li>
-        </ol>
-        </li>
       </ol>
 
 <!--
@@ -570,128 +491,6 @@ listen impalajdbc :21051
 </codeblock>
 
       <note conref="../shared/impala_common.xml#common/proxy_jdbc_caveat"/>
-
-      <p audience="hidden">
-        The following example shows extra steps needed for a cluster using Kerberos authentication:
-      </p>
-
-<codeblock audience="hidden">$ klist
-$ impala-shell -k
-$ kinit -r 1d -kt /systest/keytabs/hdfs.keytab hdfs
-$ impala-shell -i c2104.hal.cloudera.com:21000
-$ impala-shell -i c2104.hal.cloudera.com:25003
-[root@c2104 alan]# ps -ef |grep impalad
-root      6442  6428  0 12:21 pts/0    00:00:00 grep impalad
-impala   30577 22192 99 Nov14 ?        3-16:42:32 /usr/lib/impala/sbin-debug/impalad --flagfile=/var/run/cloudera-scm-agent/process/10342-impala-IMPALAD/impala-conf/impalad_flags
-[root@c2104 alan]# vi /var/run/cloudera-scm-agent/process/10342-impala-IMPALAD/impala-conf/impalad_flags
-$ klist -k /var/run/cloudera-scm-agent/process/10342-impala-IMPALAD/impala.keytab
-Keytab name: FILE:/var/run/cloudera-scm-agent/process/10342-impala-IMPALAD/impala.keytab
-KVNO Principal
----- --------------------------------------------------------------------------
-   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-$ klist
-Ticket cache: FILE:/tmp/krb5cc_4028
-Default principal: hdfs@HAL17.CLOUDERA.COM
-
-Valid starting     Expires            Service principal
-11/15/13 12:17:17  11/15/13 12:32:17  krbtgt/HAL17.CLOUDERA.COM@HAL17.CLOUDERA.COM
-        renew until 11/16/13 12:17:17
-11/15/13 12:17:21  11/15/13 12:32:17  impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-        renew until 11/16/13 12:17:17
-$ kinit -r 1d -kt /systest/keytabs/hdfs.keytab hdfs
-$ kinit -R
-$ impala-shell -k -i c2106.hal.cloudera.com:21000
-Starting Impala Shell using Kerberos authentication
-Using service name 'impala'
-Connected to c2106.hal.cloudera.com:21000
-$ impala-shell -i c2104.hal.cloudera.com:25003
-$ impala-shell -k -i c2104.hal.cloudera.com:25003
-Starting Impala Shell using Kerberos authentication
-Using service name 'impala'
-Connected to c2104.hal.cloudera.com:25003
-[c2104.hal.cloudera.com:25003] &gt; create table alan_tmp(a int);
-Query: create table alan_tmp(a int)
-ERROR: InternalException: Got exception: org.apache.hadoop.ipc.RemoteException User: hive/c2102.hal.cloudera.com@HAL17.CLOUDERA.COM is not allowed to impersonate impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-$ kdestroy
-$ kinit -r 1d -kt /systest/keytabs/hdfs.keytab hdfs
-$ impala-shell -k -i c2104.hal.cloudera.com:25003
-# klist -k c2104.keytab
-Keytab name: FILE:c2104.keytab
-KVNO Principal
----- --------------------------------------------------------------------------
-   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-$ klist -k -t c2106.keytab
-Keytab name: FILE:c2106.keytab
-KVNO Timestamp         Principal
----- ----------------- --------------------------------------------------------
-   2 02/14/13 12:12:22 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 02/14/13 12:12:22 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 02/14/13 12:12:22 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 02/14/13 12:12:22 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 02/14/13 12:12:22 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 02/14/13 12:12:22 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 02/14/13 12:12:22 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 02/14/13 12:12:22 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-$ ktutil
-ktutil:  rkt c2104.keytab
-ktutil:  rkt c2106.keytab
-ktutil:  wkt my_test.keytab
-ktutil:  q
-$ klist -k -t my_test.keytab
-Keytab name: FILE:my_test.keytab
-KVNO Timestamp         Principal
----- ----------------- --------------------------------------------------------
-   2 11/21/13 16:22:40 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:40 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:40 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:40 impala/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:40 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:40 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:40 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:40 HTTP/c2104.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:40 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:41 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:41 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:41 HTTP/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:41 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:41 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:41 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-   2 11/21/13 16:22:41 impala/c2106.hal.cloudera.com@HAL17.CLOUDERA.COM
-$ kdestroy
-$ kinit -r 1d -kt /systest/keytabs/hdfs.keytab hdfs
-$ vi README
-$ kinit -R
-$ impala-shell -k -i c2104.hal.cloudera.com:25003
-Starting Impala Shell using Kerberos authentication
-Using service name 'impala'
-Connected to c2104.hal.cloudera.com:25003
-<ph conref="../shared/ImpalaVariables.xml#impala_vars/ImpaladBanner"/>
-Welcome to the Impala shell. Press TAB twice to see a list of available commands.
-...
-<ph conref="../shared/ImpalaVariables.xml#impala_vars/ShellBanner"/>
-[c2104.hal.cloudera.com:25003] &gt; show tables;
-Query: show tables
-ERROR: AnalysisException: This Impala daemon is not ready to accept user requests. Status: Waiting for catalog update from the StateStore.
-[c2104.hal.cloudera.com:25003] &gt; quit;</codeblock>
-
-      <!--
-        At that point in the walkthrough with Alan Choi, we could never get Impala to accept any requests through the catalog server.
-        So I have not seen a 100% successful proxy setup process to verify all the details.
-      -->
 
     </conbody>
 

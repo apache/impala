@@ -213,17 +213,11 @@ under the License.
         The Impala admission control feature uses the same configuration mechanism as the YARN resource manager to map users to
         pools and authenticate them.
       </p>
-      
+
       <p>
         Although the Impala admission control feature uses a <codeph>fair-scheduler.xml</codeph> configuration file
         behind the scenes, this file does not depend on which scheduler is used for YARN. You still use this file
         even when YARN is using the capacity scheduler.
-      </p>
-
-      <p rev="DOCS-648" audience="hidden">
-        Although the Impala admission control feature uses a <codeph>fair-scheduler.xml</codeph> configuration file
-        behind the scenes, this file does not depend on which scheduler is used for YARN. You still use this file,
-        and Cloudera Manager can generate it for you, even when YARN is using the capacity scheduler.
       </p>
 
     </conbody>
@@ -400,31 +394,6 @@ under the License.
         set of options) to the complex (multiple resource pools with different options, each pool handling queries
         for a different set of users and groups).
       </p>
-      
-      
-      <p audience="hidden">
-        The configuration options for admission control range from the simple (a single resource pool with a single
-        set of options) to the complex (multiple resource pools with different options, each pool handling queries
-        for a different set of users and groups). <ph rev="upstream">Cloudera</ph> recommends configuring the settings through the Cloudera Manager user
-        interface.
-        <!--
-        , or on a system without Cloudera Manager by editing configuration files or through startup
-        options to the <cmdname>impalad</cmdname> daemon.
-        -->
-      </p>
-
-<!-- To do: reconcile the similar notes in impala_admission.xml and admin_impala_admission_control.xml
-     and make into a conref in both places. -->
-      <note type="important" audience="hidden">
-        Although the following options are still present in the Cloudera Manager interface under the
-        <uicontrol>Admission Control</uicontrol> configuration settings dialog,
-        <ph rev="upstream">Cloudera</ph> recommends you not use them in <keyword keyref="impala25_full"/> and higher.
-        These settings only apply if you enable admission control but leave dynamic resource pools disabled.
-        In <keyword keyref="impala25_full"/> and higher, prefer to set up dynamic resource pools and
-        customize the settings for each pool, as described in
-        <ph audience="integrated"><xref href="cm_mc_resource_pools.xml#concept_xkk_l1d_wr/section_p15_mhn_2v"/> and <xref href="cm_mc_resource_pools.xml#concept_xkk_l1d_wr/section_gph_tnk_lm"/></ph>
-        <xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_resource_pools.html" scope="external" format="html"/>.
-      </note>
 
       <section id="admission_flags">
 
@@ -689,7 +658,7 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
       <title>Example of Admission Control Configuration</title>
 
       <conbody>
-        
+
         <p> Here are sample <filepath>fair-scheduler.xml</filepath> and
           <filepath>llama-site.xml</filepath> files that define resource pools
           <codeph>root.default</codeph>, <codeph>root.development</codeph>, and
@@ -697,28 +666,28 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
           deployment they might contain other settings for use with various aspects of the YARN
           component. The settings shown here are the significant ones for the Impala admission
           control feature. </p>
-        
+
         <p>
           <b>fair-scheduler.xml:</b>
         </p>
-        
+
         <p>
           Although Impala does not use the <codeph>vcores</codeph> value, you must still specify it to satisfy
           YARN requirements for the file contents.
         </p>
-        
+
         <p>
           Each <codeph>&lt;aclSubmitApps&gt;</codeph> tag (other than the one for <codeph>root</codeph>) contains
           a comma-separated list of users, then a space, then a comma-separated list of groups; these are the
           users and groups allowed to submit Impala statements to the corresponding resource pool.
         </p>
-        
+
         <p>
           If you leave the <codeph>&lt;aclSubmitApps&gt;</codeph> element empty for a pool, nobody can submit
           directly to that pool; child pools can specify their own <codeph>&lt;aclSubmitApps&gt;</codeph> values
           to authorize users and groups to submit to those pools.
         </p>
-        
+
         <codeblock><![CDATA[<allocations>
 
     <queue name="root">
@@ -743,11 +712,11 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
 </allocations>
 ]]>
 </codeblock>
-        
+
         <p>
           <b>llama-site.xml:</b>
         </p>
-        
+
         <codeblock rev="2.5.0 IMPALA-2538"><![CDATA[
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
@@ -821,21 +790,6 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
 </configuration>
 ]]>
 </codeblock>
-        
-        
-        
-        
-
-        <section id="section_fqn_qgb_rq" audience="hidden">
-
-          <title>Example Admission Control Configurations Using Cloudera Manager</title>
-
-          <p>
-            For full instructions about configuring dynamic resource pools through Cloudera Manager, see
-            <xref audience="integrated" href="cm_mc_resource_pools.xml#xd_583c10bfdbd326ba--43d5fd93-1410993f8c2--7ff2"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_resource_pools.html" scope="external" format="html"/>.
-          </p>
-
-        </section>
 
       </conbody>
     </concept>
@@ -863,11 +817,6 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
         level 2). The profile output contains details about the admission decision, such as whether the query was
         queued or not and which resource pool it was assigned to. It also includes the estimated and actual memory
         usage for the query, so you can fine-tune the configuration for the memory limits of the resource pools.
-      </p>
-
-      <p audience="hidden">
-        Where practical, use Cloudera Manager to configure the admission control parameters. The Cloudera Manager
-        GUI is much simpler than editing the configuration files directly.
       </p>
 
       <p>

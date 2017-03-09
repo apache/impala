@@ -161,7 +161,7 @@ select real_words(letters) from word_games;</codeblock>
 
         <p>
           Impala supports UDFs written in C++, in addition to supporting existing Hive UDFs written in Java.
-          <ph rev="upstream">Cloudera</ph> recommends using C++ UDFs because the compiled native code can yield higher performance, with
+          Where practical, use C++ UDFs because the compiled native code can yield higher performance, with
           UDF execution time often 10x faster for a C++ UDF than the equivalent Java UDF.
         </p>
       </conbody>
@@ -437,21 +437,13 @@ and other examples demonstrating this technique in
           (RHEL-based distributions) or <codeph>impala-udf-dev</codeph> (Ubuntu and Debian).
         </li>
       </ol>
-      
-      
+
+
       <note>
-        
+
         The UDF development code does not rely on Impala being installed on the same machine. You can write and
         compile UDFs on a minimal development system, then deploy them on a different one for use with Impala.
-        
-      </note>
 
-      <note audience="hidden">
-        The UDF development code does not rely on Impala being installed on the same machine. You can write and
-        compile UDFs on a minimal development system, then deploy them on a different one for use with Impala. If
-        you develop UDFs on a server managed by Cloudera Manager through the parcel mechanism, you still install
-        the UDF development kit through the package mechanism; this small standalone package does not interfere
-        with the parcels containing the main Impala code.
       </note>
 
       <p>
@@ -1012,7 +1004,7 @@ BigIntVal CountFinalize(FunctionContext* context, const BigIntVal&amp; val);
 // the StringVal intermediate type. When this UDA is registered, it would specify
 // 16 bytes (8 byte sum + 8 byte count) as the size for this buffer.
 //
-// Usage: &gt; create aggregate function my_avg(double) returns string 
+// Usage: &gt; create aggregate function my_avg(double) returns string
 //          location '/user/cloudera/libudasample.so' update_fn='AvgUpdate';
 //        &gt; select cast(my_avg(col) as double) from tbl;
 

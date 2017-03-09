@@ -148,9 +148,8 @@ under the License.
         </li>
 
         <li>
-          Editing <codeph>/etc/default/impala</codeph> <ph audience="hidden">(in cluster not managed by Cloudera Manager), or editing the
-          <uicontrol>Security</uicontrol> settings in the Cloudera Manager interface,</ph>to accommodate Kerberos
-          authentication.
+          Editing <codeph>/etc/default/impala</codeph>
+          to accommodate Kerberos authentication.
         </li>
       </ul>
     </conbody>

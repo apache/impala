@@ -108,7 +108,7 @@ under the License.
             form of the <codeph>CREATE TABLE</codeph> statement, can copy data from an HDFS table or another S3
             table into an S3 table. The <xref href="impala_s3_skip_insert_staging.xml#s3_skip_insert_staging"/>
             query option chooses whether or not to use a fast code path for these write operations to S3,
-            with the tradeoff of potential inconsistency in the case of a failure during the statement. 
+            with the tradeoff of potential inconsistency in the case of a failure during the statement.
           </p>
         </li>
       </ul>
@@ -152,7 +152,7 @@ under the License.
         Hive services. (Restarting Hive is required because Impala queries, CREATE TABLE statements, and so on go
         through the Hive metastore.)
       </p>
-      
+
       <note type="important">
 <!--
       <ul>

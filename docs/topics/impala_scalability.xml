@@ -294,11 +294,6 @@ Memory Usage: Additional Notes
         </dlentry>
       </dl>
 
-      <p audience="hidden">
-        As of CDH 5.3, not all of these flags are present in the Cloudera Manager user interface. Some must be set
-        using the <uicontrol>Advanced Configuration Snippet</uicontrol> fields for the statestore component.
-      </p>
-
       <p>
         If it takes a very long time for a cluster to start up, and <cmdname>impala-shell</cmdname> consistently
         displays <codeph>This Impala daemon is not ready to accept user requests</codeph>, the statestore might be
@@ -682,32 +677,6 @@ these tables, hint the plan or disable this behavior via query options to enable
         case, you know that any queries that spill will not go overboard with their memory consumption.
       </p>
 
-<!--
-      <p>
-        <b>Turning off the spill-to-disk feature: (<keyword keyref="impala24_full"/> and lower only)</b>
-      </p>
-
-      <p>
-        Prior to <keyword keyref="impala25_full"/> certain conditions...
-      </p>
-
-      <p>
-        You might turn off the spill-to-disk feature if you are in an environment with constraints on disk space,
-        or if you prefer for queries that exceed the memory capacity in your cluster to <q>fail fast</q> so that
-        you can tune and retry them.
-      </p>
-
-      <p>
-        To turn off this feature, set the following configuration options for each <cmdname>impalad</cmdname>
-        daemon, either through the <cmdname>impalad</cmdname> advanced configuration snippet in Cloudera Manager,
-        or during <cmdname>impalad</cmdname> startup on each DataNode on systems not managed by Cloudera Manager:
-      </p>
-
-<codeblock>&minus;&minus;enable_partitioned_aggregation=false
-&minus;&minus;enable_partitioned_hash_join=false
-</codeblock>
--->
-
     </conbody>
   </concept>
 
@@ -795,21 +764,14 @@ While these authentication requests are being processed, any submitted Impala qu
 During this period, the KDC and DNS may be slow to respond to requests from components other than Impala,
 so other secure services might be affected temporarily.
 </p>
-  
+
 <p>
   To reduce the frequency  of the <codeph>kinit</codeph> renewal that initiates
-  a new set of authentication requests, increase the <codeph>kerberos_reinit_interval</codeph> 
-  configuration setting for the <cmdname>impalad</cmdname> daemons. Currently, the default is 60 minutes. 
-  Consider using a higher value such as 360 (6 hours). 
-</p>  
-  
-<p audience="hidden">
-To reduce the frequency of the <codeph>kinit</codeph> renewal that initiates a new set of
-authentication requests, increase the <codeph>kerberos_reinit_interval</codeph> configuration setting
-for the <cmdname>impalad</cmdname> daemons. Currently, the default for a cluster not managed by
-Cloudera Manager is 60 minutes, while the default under Cloudera Manager is 10 minutes.
-Consider using a higher value such as 360 (6 hours).
+  a new set of authentication requests, increase the <codeph>kerberos_reinit_interval</codeph>
+  configuration setting for the <cmdname>impalad</cmdname> daemons. Currently, the default is 60 minutes.
+  Consider using a higher value such as 360 (6 hours).
 </p>
+
 </conbody>
 </concept>
 

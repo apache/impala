@@ -153,8 +153,8 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
         <li rev="1.2">
           <p>
             Catalog server address (including both the hostname and the port number). Update the
-            value of the <codeph>IMPALA_CATALOG_SERVICE_HOST</codeph> variable. Cloudera
-            recommends the catalog server be on the same host as the statestore. In that
+            value of the <codeph>IMPALA_CATALOG_SERVICE_HOST</codeph> variable. Where
+            practical, run the catalog server on the same host as the statestore. In that
             recommended configuration, the <cmdname>impalad</cmdname> daemon cannot refer to the
             catalog server using the loopback address. If the catalog service is hosted on a
             machine with an IP address of 192.168.0.27, add the following line:
@@ -333,8 +333,8 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
           <li rev="1.2">
             <p>
               Catalog server address. Update the <codeph>IMPALA_CATALOG_SERVICE_HOST</codeph>
-              variable, including both the hostname and the port number in the value. Cloudera
-              recommends the catalog server be on the same host as the statestore. In that
+              variable, including both the hostname and the port number in the value. Where
+              practical, run the catalog server on the same host as the statestore. In that
               recommended configuration, the <cmdname>impalad</cmdname> daemon cannot refer to
               the catalog server using the loopback address. If the catalog service is hosted on
               a machine with an IP address of 192.168.0.27, add the following line:

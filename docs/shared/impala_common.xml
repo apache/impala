@@ -574,14 +574,6 @@ under the License.
             in the <cmdname>impalad</cmdname> and <cmdname>catalogd</cmdname> configuration settings.
           </p>
         </li>
-        <li audience="hidden">
-          <p>
-            For clusters managed by Cloudera Manager, select the 
-            <uicontrol>Use HDFS Rules to Map Kerberos Principals to Short Names</uicontrol>
-            checkbox to enable the service-wide <codeph>load_auth_to_local_rules</codeph> configuration setting.
-            Then restart the Impala service.
-          </p>
-        </li>
       </ul>
     </p>
 
@@ -616,46 +608,22 @@ under the License.
       indicating <q>Access Denied</q> .
 <!--
 [1]
-Impala: Impala Daemon -> Advanced -> Impala Daemon Logging Safety Valve 
-Hive: Hive Server 2 -> Advanced -> HiveServer2 Logging Safety Valve 
+Impala: Impala Daemon -> Advanced -> Impala Daemon Logging Safety Valve
+Hive: Hive Server 2 -> Advanced -> HiveServer2 Logging Safety Valve
 Search: Solr Server -> Advanced -> HiveServer2 Logging Safety Valve
 -->
     </p>
 
   </section>
 
-  <section id="cm">
+  <section id="restrictions">
 
-    <title>Cloudera Manager Terminology</title>
-
-    <p>
-      Especially during the transition from CM 4 to CM 5, we'll use some stock phraseology to talk about fields
-      and such. Also there are some task steps etc. to conref under the Impala Service page that are easier
-      to keep track of here instead of in cm_common_elements.xml. (Although as part of Apache work, anything
-      CM might naturally move out of this file.)
-    </p>
+    <title>Restrictions and Limitations</title>
 
     <p>
-      <ph id="safety_valve"> In Cloudera Manager 4, these fields are labelled <uicontrol>Safety
-      Valve</uicontrol>; in Cloudera Manager 5, they are called <uicontrol>Advanced Configuration
-      Snippet</uicontrol>. </ph>
-    </p>
-
-    <ul>
-      <li id="go_impala_service">Go to the Impala service.</li>
-      <li id="restart_impala_service">Restart the Impala service.</li>
-    </ul>
-
-  </section>
-
-  <section id="citi">
-
-    <title>Items from the Citibank Escalation Spreadsheet</title>
-
-    <p>
-      Paragraphs with IDs are intended to be reused both in the FAQ and the User's Guide. They refer to feature
-      requests or misunderstandings encountered by Citibank, captured in the escalation spreadsheet here:
-      <xref href="https://docs.google.com/a/cloudera.com/spreadsheet/ccc?key=0AplfwQJKyyTWdFdhY0E5WHVwNXZSTG9sMEZwQy1QZ1E&amp;usp=drive_web#gid=0" scope="external" format="html"/>.
+      Potential misunderstandings for people familiar with other
+      database systems. Currently not referenced anywhere, because
+      they were only conref'ed from the FAQ page.
     </p>
 
     <p id="string_concatenation">
@@ -835,7 +803,7 @@ set PARQUET_FALLBACK_SCHEMA_RESOLUTION=position;
 PARQUET_FALLBACK_SCHEMA_RESOLUTION set to position
 
 select * from t2;
-WARNINGS: 
+WARNINGS:
 File 'schema_evolution.db/t2/45331705_data.0.parq'
 has an incompatible Parquet schema for column 'schema_evolution.t2.c4'.
 Column type: TIMESTAMP, Parquet schema: optional int32 c1 [i:0 d:1 r:0]
@@ -868,7 +836,7 @@ select * from t2;
       </note>
 
       <p rev="IMPALA-3732" id="avro_2gb_strings">
-        The Avro specification allows string values up to 2**64 bytes in length. 
+        The Avro specification allows string values up to 2**64 bytes in length.
         Impala queries for Avro tables use 32-bit integers to hold string lengths.
         In <keyword keyref="impala25_full"/> and higher, Impala truncates <codeph>CHAR</codeph>
         and <codeph>VARCHAR</codeph> values in Avro tables to (2**31)-1 bytes.
@@ -971,7 +939,7 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
 
       <p id="impala_shell_progress_reports_shell_only_caveat">
         Because the <codeph>LIVE_PROGRESS</codeph> and <codeph>LIVE_SUMMARY</codeph> query options
-        are available only within the <cmdname>impala-shell</cmdname> interpreter: 
+        are available only within the <cmdname>impala-shell</cmdname> interpreter:
         <ul>
           <li>
             <p>
@@ -995,7 +963,7 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
               Likewise, the <cmdname>impala-shell</cmdname> command relies on
               some information only available in <keyword keyref="impala23_full"/> and higher
               to prepare live progress reports and query summaries. The
-              <codeph>LIVE_PROGRESS</codeph> and <codeph>LIVE_SUMMARY</codeph> 
+              <codeph>LIVE_PROGRESS</codeph> and <codeph>LIVE_SUMMARY</codeph>
               query options have no effect when <cmdname>impala-shell</cmdname> connects
               to a cluster running an older version of Impala.
             </p>
@@ -1035,7 +1003,7 @@ use default;
 -- Before dropping a database, first drop all the tables inside it,
 <ph rev="2.3.0">-- or in <keyword keyref="impala23_full"/> and higher use the CASCADE clause.</ph>
 drop database temp;
-ERROR: ImpalaRuntimeException: Error making 'dropDatabase' RPC to Hive Metastore: 
+ERROR: ImpalaRuntimeException: Error making 'dropDatabase' RPC to Hive Metastore:
 CAUSED BY: InvalidOperationException: Database temp is not empty
 show tables in temp;
 +------+
@@ -1462,14 +1430,14 @@ explain select s from yy2 where year in (select year from yy where year between 
         operation finishes. (Multiple concurrent queries can perform operations that use the <q>spill to disk</q>
         technique, without any name conflicts for these temporary files.) You can specify a different location by
         starting the <cmdname>impalad</cmdname> daemon with the
-        <codeph>--scratch_dirs="<varname>path_to_directory</varname>"</codeph> configuration option. 
-        You can specify a single directory, or a comma-separated list of directories. The scratch directories must 
-        be on the local filesystem, not in HDFS. You might specify different directory paths for different hosts, 
+        <codeph>--scratch_dirs="<varname>path_to_directory</varname>"</codeph> configuration option.
+        You can specify a single directory, or a comma-separated list of directories. The scratch directories must
+        be on the local filesystem, not in HDFS. You might specify different directory paths for different hosts,
         depending on the capacity and speed
         of the available storage devices. In <keyword keyref="impala23_full"/> or higher, Impala successfully starts (with a warning
-        Impala successfully starts (with a warning written to the log) if it cannot create or read and write files 
-        in one of the scratch directories. If there is less than 1 GB free on the filesystem where that directory resides, 
-        Impala still runs, but writes a warning message to its log.  If Impala encounters an error reading or writing 
+        Impala successfully starts (with a warning written to the log) if it cannot create or read and write files
+        in one of the scratch directories. If there is less than 1 GB free on the filesystem where that directory resides,
+        Impala still runs, but writes a warning message to its log.  If Impala encounters an error reading or writing
         files in a scratch directory during a query, Impala logs the error and the query fails.
       </p>
 
@@ -1642,7 +1610,7 @@ show functions in _impala_builtins like '*<varname>substring</varname>*';
       </p>
 
       <p rev="" id="hive_column_stats_caveat">
-        If you run the Hive statement <codeph>ANALYZE TABLE COMPUTE STATISTICS FOR COLUMNS</codeph>, 
+        If you run the Hive statement <codeph>ANALYZE TABLE COMPUTE STATISTICS FOR COLUMNS</codeph>,
         Impala can only use the resulting column statistics if the table is unpartitioned.
         Impala cannot use Hive-generated column statistics for a partitioned table.
       </p>
@@ -1727,7 +1695,7 @@ show functions in _impala_builtins like '*<varname>substring</varname>*';
           following technique for queries involving a single table:
         </p>
 <codeblock xml:space="preserve">select v1.c1 result1, v2.c1 result2 from
-  (select count(distinct col1) as c1 from t1) v1 
+  (select count(distinct col1) as c1 from t1) v1
     cross join
   (select count(distinct col2) as c1 from t1) v2;
 </codeblock>
@@ -2211,7 +2179,7 @@ message schema {
 $ parquet-tools meta sample.parq
 creator:             impala version 2.2.0-...
 
-file schema:         schema 
+file schema:         schema
 -------------------------------------------------------------------
 year:                OPTIONAL INT32 R:0 D:1
 month:               OPTIONAL INT32 R:0 D:1
@@ -2225,7 +2193,7 @@ carrier:             OPTIONAL BINARY R:0 D:1
 flight_num:          OPTIONAL INT32 R:0 D:1
 ...
 
-row group 1:         RC:20636601 TS:265103674 
+row group 1:         RC:20636601 TS:265103674
 -------------------------------------------------------------------
 year:                 INT32 SNAPPY DO:4 FPO:35 SZ:10103/49723/4.92 VC:20636601 ENC:PLAIN_DICTIONARY,RLE,PLAIN
 month:                INT32 SNAPPY DO:10147 FPO:10210 SZ:11380/35732/3.14 VC:20636601 ENC:PLAIN_DICTIONARY,RLE,PLAIN
@@ -2265,7 +2233,7 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
 
       <p id="impala_parquet_encodings_caveat">
         Impala can query Parquet files that use the <codeph>PLAIN</codeph>, <codeph>PLAIN_DICTIONARY</codeph>,
-        <codeph>BIT_PACKED</codeph>, and <codeph>RLE</codeph> encodings. 
+        <codeph>BIT_PACKED</codeph>, and <codeph>RLE</codeph> encodings.
         Currently, Impala does not support <codeph>RLE_DICTIONARY</codeph> encoding.
         When creating files outside of Impala for use by Impala, make sure to use one of the supported encodings.
         In particular, for MapReduce jobs, <codeph>parquet.writer.version</codeph> must not be defined
@@ -3124,15 +3092,6 @@ select * from header_line limit 10;
         worked on SSSE3-enabled processors.
       </p>
 
-      <p id="logbuflevel_caveat">
-        Due to a change to the implementation of logging in Impala 1.1.1 and higher, currently you should change
-        the default setting for the <codeph>logbuflevel</codeph> property for the Impala service after installing
-        through Cloudera Manager. In Cloudera Manager, on the log settings page for the Impala service, change the
-        setting <uicontrol>Impala Daemon Log Buffer Level (logbuflevel)</uicontrol> from -1 to 0. You might change
-        this setting to a value higher than 0, if you prefer to reduce the I/O overhead for logging, at the expense
-        of possibly losing some lower-priority log messages in the event of a crash.
-      </p>
-
       <p id="rhel5_kerberos">
         On version 5 of Red Hat Enterprise Linux and comparable distributions, some additional setup is needed for
         the <cmdname>impala-shell</cmdname> interpreter to connect to a Kerberos-enabled Impala cluster:
@@ -3198,7 +3157,7 @@ sudo pip-python install ssl</codeblock>
     <section id="admin_conrefs">
 
       <title>Administration</title>
- 
+
       <p id="statestored_catalogd_ha_blurb" rev="">
         Most considerations for load balancing and high availability apply to the <cmdname>impalad</cmdname> daemon.
         The <cmdname>statestored</cmdname> and <cmdname>catalogd</cmdname> daemons do not have special
@@ -3206,7 +3165,7 @@ sudo pip-python install ssl</codeblock>
         If those daemons become unavailable due to an outage on a particular
         host, you can stop the Impala service, delete the <uicontrol>Impala StateStore</uicontrol> and
         <uicontrol>Impala Catalog Server</uicontrol> roles, add the roles on a different host, and restart the
-        Impala service. 
+        Impala service.
       </p>
 
       <p id="hdfs_caching_encryption_caveat" rev="IMPALA-3679">
@@ -3412,15 +3371,6 @@ sudo pip-python install ssl</codeblock>
   JAVA_TOOL_OPTIONS="-Xmx8g"
   </codeblock>
           </li>
-          <li audience="hidden">
-            <p rev="OPSAPS-26483">
-              On systems managed by Cloudera Manager, include this value in the configuration field
-              <uicontrol>Java Heap Size of Catalog Server in Bytes</uicontrol> (Cloudera Manager 5.7 and higher), or
-              <uicontrol>Impala Catalog Server Environment Advanced Configuration Snippet (Safety Valve)</uicontrol>
-              (prior to Cloudera Manager 5.7).
-              Then restart the Impala service.
-            </p>
-          </li>
           <li>
             <p>
               On systems not using cluster management software, put this environment variable setting into the
@@ -3500,7 +3450,7 @@ sudo pip-python install ssl</codeblock>
         such as adding or dropping a column, by a mechanism other than
         Impala.
       </p>
- 
+
       <p id="kudu_internal_external_tables">
         The distinction between internal and external tables has some special
         details for Kudu tables. Tables created entirely through Impala are

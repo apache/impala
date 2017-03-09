@@ -134,43 +134,14 @@ under the License.
   <concept id="breakpad_minidump_logging">
     <title>Detecting Crash Events</title>
     <conbody>
-      
+
       <p>
-        You can see in the Impala log files when crash events occur that generate 
-        minidump files. Because each restart begins a new log file, the <q>crashed</q> message 
-        is always at or near the bottom of the log file. There might be another later message 
+        You can see in the Impala log files when crash events occur that generate
+        minidump files. Because each restart begins a new log file, the <q>crashed</q> message
+        is always at or near the bottom of the log file. There might be another later message
         if core dumps are also enabled.
       </p>
-      
-      <p audience="hidden">
-        You can see in the Impala log files or in the Cloudera Manager charts for Impala
-        when crash events occur that generate minidump files. Because each restart begins
-        a new log file, the <q>crashed</q> message is always at or near the bottom of the
-        log file. (There might be another later message if core dumps are also enabled.)
-      </p>
-    </conbody>
-  </concept>
 
-  <concept id="breakpad_support_process" rev="CDH-39818" audience="hidden">
-    <title>Using the Minidump Files for Problem Resolution</title>
-    <conbody>
-      <p>
-        Typically, you provide minidump files to <keyword keyref="support_org"/> as part of problem resolution,
-        in the same way that you might provide a core dump. The <uicontrol>Send Diagnostic Data</uicontrol>
-        under the <uicontrol>Support</uicontrol> menu in Cloudera Manager guides you through the
-        process of selecting a time period and volume of diagnostic data, then collects the data
-        from all hosts and transmits the relevant information for you.
-      </p>
-      <fig id="fig_pqw_gvx_pr">
-        <title>Send Diagnostic Data choice under Support menu</title>
-        <image href="../images/support_send_diagnostic_data.png" scalefit="yes" placement="break"/>
-      </fig>
-      <p>
-        You might get additional instructions from <keyword keyref="support_org"/> about collecting minidumps to better isolate a specific problem.
-        Because the information in the minidump files is limited to stack traces and register contents,
-        the possibility of including sensitive information is much lower than with core dump files.
-        If any sensitive information is included in the minidump, <keyword keyref="support_org"/> preserves the confidentiality of that information.
-      </p>
     </conbody>
   </concept>
 
@@ -182,22 +153,17 @@ under the License.
         simulate a <codeph>SIGSEGV</codeph> crash for an <cmdname>impalad</cmdname>
         process on a single DataNode, then examines the relevant log files and minidump file.
       </p>
-      
+
       <p>
         First, as root on a worker node, kill the <cmdname>impalad</cmdname> process with a
         <codeph>SIGSEGV</codeph> error. The original process ID was 23114.
       </p>
-      
-      <p audience="hidden">
-        First, as root on a worker node, we kill the <cmdname>impalad</cmdname> process with a
-        <codeph>SIGSEGV</codeph> error. The original process ID was 23114. (Cloudera Manager
-        restarts the process with a new pid, as shown by the second <cmdname>ps</cmdname> command.)
-      </p>
+
 <codeblock><![CDATA[
 # ps ax | grep impalad
 23114 ?        Sl     0:18 /opt/cloudera/parcels/<parcel_version>/lib/impala/sbin-retail/impalad --flagfile=/var/run/cloudera-scm-agent/process/114-impala-IMPALAD/impala-conf/impalad_flags
 31259 pts/0    S+     0:00 grep impalad
-# 
+#
 # kill -11 23114
 #
 # ps ax | grep impalad
@@ -262,17 +228,12 @@ E0623 14:03:43.911002 23114 logging.cc:118] stderr will be logged to this file.
 Wrote minidump to /var/log/impala-minidumps/impalad/0980da2d-a905-01e1-25ff883a-04ee027a.dmp
 ]]>
 </codeblock>
-      
+
       <p>
         The resulting minidump file is much smaller than the corresponding core file,
-        making it much easier to supply diagnostic information to <keyword keyref="support_org"/>. 
-      </p>
-      
-      <p audience="hidden">
-        The resulting minidump file is much smaller than the corresponding core file,
         making it much easier to supply diagnostic information to <keyword keyref="support_org"/>.
-        The transmission process for the minidump files is automated through Cloudera Manager.
       </p>
+
 <codeblock><![CDATA[
 # pwd
 /var/log/impalad

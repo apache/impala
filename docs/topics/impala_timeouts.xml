@@ -169,28 +169,13 @@ Trying to re-register with state-store</codeblock>
     <title>Cancelling a Query</title>
 
     <conbody>
-      
+
       <p>
         Sometimes, an Impala query might run for an unexpectedly long time, tying up resources
         in the cluster. You can cancel the query explicitly, independent of the timeout period,
         by going into the web UI for the <cmdname>impalad</cmdname> host (on port 25000 by
         default), and using the link on the <codeph>/queries</codeph> tab to cancel the running
         query. For example, press <codeph>^C</codeph> in <cmdname>impala-shell</cmdname>.
-      </p>
-      
-      
-
-      <p audience="hidden">
-        Sometimes, an Impala query might run for an unexpectedly long time, tying up resources
-        in the cluster. You can cancel the query explicitly, independent of the timeout period,
-        by going into the web UI for the <cmdname>impalad</cmdname> host (on port 25000 by
-        default), and using the link on the <codeph>/queries</codeph> tab to cancel the running
-        query. Various client applications let you interactively cancel queries submitted or
-        monitored through those applications. For example, by pressing <codeph>^C</codeph> in
-        <cmdname>impala-shell</cmdname>, clicking the <uicontrol>Cancel</uicontrol> button from
-        the <uicontrol>Watch</uicontrol> page in Hue, clicking <uicontrol>Actions &gt;
-        Cancel</uicontrol> from the <uicontrol>Queries</uicontrol> list in Cloudera Manager, and
-        so on.
       </p>
 
     </conbody>

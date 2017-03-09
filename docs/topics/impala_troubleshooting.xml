@@ -412,8 +412,7 @@ MEM_LIMIT: 0
 
 <codeblock>
 <![CDATA[
-Useful test from beta at Visa.
-SME: Jayant@
+Useful test for I/O throughput of hardware.
 
 Symptoms:
 * Queries running slow

@@ -93,20 +93,9 @@ under the License.
         and edit previous commands.
       </li>
     </ul>
-    
-    <p>
-      
-      For information on installing the Impala shell, see <xref href="impala_install.xml#install"/>.
-      
-    </p>
-    
 
-    <p audience="hidden">
-      For information on installing the Impala shell, see <xref href="impala_install.xml#install"/>. In Cloudera
-      Manager 4.1 and higher, Cloudera Manager installs <cmdname>impala-shell</cmdname> automatically. You might
-      install <cmdname>impala-shell</cmdname> manually on other systems not managed by Cloudera Manager, so that
-      you can issue queries from client systems that are not also running the Impala daemon or other Apache Hadoop
-      components.
+    <p>
+      For information on installing the Impala shell, see <xref href="impala_install.xml#install"/>.
     </p>
 
     <p>

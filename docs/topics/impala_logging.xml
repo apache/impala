@@ -178,7 +178,6 @@ under the License.
   <prolog>
     <metadata>
       <data name="Category" value="Administrators"/>
-      <data name="Category" value="Cloudera Manager"/>
     </metadata>
   </prolog>
 
@@ -358,19 +357,18 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
     <title>Setting Logging Levels</title>
 
     <conbody>
-      
+
       <p>
         Impala uses the GLOG system, which supports three logging levels. You can adjust logging levels
         by exporting variable settings. To change logging settings manually, use a command
         similar to the following on each node before starting <codeph>impalad</codeph>:
       </p>
-      
-    
 
 <codeblock>export GLOG_v=1</codeblock>
 
       <note>
-        For performance reasons, Cloudera highly recommends not enabling the most verbose logging level of 3.
+        For performance reasons, do not enable the most verbose logging level of 3 unless there is
+        no other alternative for troubleshooting.
       </note>
 
       <p>
@@ -390,7 +388,7 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
         </p>
 
         <p>
-          Increasing logging levels imposes performance overhead and increases log size. <ph rev="upstream">Cloudera</ph> recommends using
+          Increasing logging levels imposes performance overhead and increases log size. Where practical, use
           GLOG_v=1 for most cases: this level has minimal performance impact but still captures useful
           troubleshooting information.
         </p>
@@ -443,7 +441,7 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
         system, such as credit card numbers or tax IDs, and literals matching these patterns are obfuscated wherever
         they would normally be recorded in log files or displayed in administration or debugging user interfaces.
       </p>
-      
+
       <p>
         In a security context, the log redaction feature is complementary to the Sentry authorization framework.
         Sentry prevents unauthorized users from being able to directly access table data. Redaction prevents

@@ -173,16 +173,7 @@ $ sudo apt-get install impala-catalog     # Service start/stop script
         <xref href="impala_config_performance.xml#config_performance"/>. Some of these configuration changes are
         mandatory.
       </li>
-      
-      <li audience="hidden">
-        Complete any required or recommended configuration, as described in
-        <xref href="impala_config_performance.xml#config_performance"/>. Some of these configuration changes are
-        mandatory. (They are applied automatically when you install using Cloudera Manager.)
-      </li>
-      
-      
-      
-      
+
     </ol>
 
     <p>

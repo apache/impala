@@ -76,14 +76,14 @@ under the License.
       </li>
       </ul>
     </p>
- 
+
     <note>
       <p>
         The web user interface is primarily for problem diagnosis and troubleshooting. The items listed and their
         formats are subject to change.
       </p>
     </note>
-    
+
     <p outputclass="toc inpage"/>
   </conbody>
 
@@ -191,7 +191,7 @@ under the License.
           <codeph>http://<varname>impala-server-hostname</varname>:25000/logs</codeph> (non-secure cluster) or
           <codeph>https://<varname>impala-server-hostname</varname>:25000/logs</codeph> (secure cluster).
         </p>
-        
+
         <p>
           This page shows the last portion of the <filepath>impalad.INFO</filepath> log file, the most detailed of
           the info, warning, and error logs for the <cmdname>impalad</cmdname> daemon. You can refer here to see
@@ -199,7 +199,7 @@ under the License.
           central page can be more convenient than looking around the filesystem for the log files, which could be
           in different locations on clusters that use cluster management software.
         </p>
-        
+
       </conbody>
     </concept>
 
@@ -234,19 +234,12 @@ under the License.
           <codeph>http://<varname>impala-server-hostname</varname>:25000/metrics</codeph> (non-secure cluster) or
           <codeph>https://<varname>impala-server-hostname</varname>:25000/metrics</codeph> (secure cluster).
         </p>
-        
+
         <p>
           This page displays the current set of metrics: counters and flags representing various aspects of
           <cmdname>impalad</cmdname> internal operation.
         </p>
-        
 
-        <p audience="hidden">
-          This page displays the current set of metrics: counters and flags representing various aspects of
-          <cmdname>impalad</cmdname> internal operation. For the meanings of these metrics, see
-          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_metrics_impala.html" scope="external" format="html">Impala
-          Metrics</xref> in the Cloudera Manager documentation.
-        </p>
       </conbody>
     </concept>
 
@@ -406,7 +399,7 @@ under the License.
           the info, warning, and error logs for the <cmdname>impalad</cmdname> daemon. You can refer here to see
           the details of the most recent operations, whether the operations succeeded or encountered errors. This
           central page can be more convenient than looking around the filesystem for the log files, which could be
-          in different locations on clusters that use Cloudera Manager or not.
+          in different locations on different hosts.
         </p>
       </conbody>
     </concept>
@@ -445,9 +438,7 @@ under the License.
 
         <p>
           This page displays the current set of metrics: counters and flags representing various aspects of
-          <cmdname>impalad</cmdname> internal operation. For the meanings of these metrics, see
-          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_metrics_impala.html" scope="external" format="html">Impala
-          Metrics</xref> in the Cloudera Manager documentation.
+          <cmdname>impalad</cmdname> internal operation.
         </p>
       </conbody>
     </concept>
@@ -612,7 +603,7 @@ under the License.
           the info, warning, and error logs for the <cmdname>impalad</cmdname> daemon. You can refer here to see
           the details of the most recent operations, whether the operations succeeded or encountered errors. This
           central page can be more convenient than looking around the filesystem for the log files, which could be
-          in different locations on clusters that use Cloudera Manager or not.
+          in different locations on different hosts.
         </p>
       </conbody>
     </concept>
@@ -631,9 +622,7 @@ under the License.
 
         <p>
           This page displays the current set of metrics: counters and flags representing various aspects of
-          <cmdname>impalad</cmdname> internal operation. For the meanings of these metrics, see
-          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_metrics_impala.html" scope="external" format="html">Impala
-          Metrics</xref> in the Cloudera Manager documentation.
+          <cmdname>impalad</cmdname> internal operation.
         </p>
       </conbody>
     </concept>

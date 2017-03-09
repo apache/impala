@@ -53,11 +53,10 @@ under the License.
 
       <li>
         Decide how many queries will be represented in each log file. By default,
-        Impala starts a new log file every 5000 queries. To specify a different number, <ph
-        audience="standalone">include
+        Impala starts a new log file every 5000 queries. To specify a different number,
+        <ph audience="standalone">include
         the option <codeph>-max_audit_event_log_file_size=<varname>number_of_queries</varname></codeph>
-        in the <cmdname>impalad</cmdname> startup options</ph>
-        <xref href="cn_iu_audit_log.xml#xd_583c10bfdbd326ba--6eed2fb8-14349d04bee--7d6f/section_v25_lmy_bn" audience="integrated">configure Impala Daemon logging in Cloudera Manager</xref>.
+        in the <cmdname>impalad</cmdname> startup options</ph>.
       </li>
 
       <li> 

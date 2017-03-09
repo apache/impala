@@ -442,8 +442,8 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</codeblock>
         <indexterm audience="hidden">LZO support in Impala</indexterm>
 
         <indexterm audience="hidden">compression</indexterm>
-        Impala supports using text data files that employ LZO compression. <ph rev="upstream">Cloudera</ph> recommends compressing
-        text data files when practical. Impala queries are usually I/O-bound; reducing the amount of data read from
+        Impala supports using text data files that employ LZO compression. Where practical, apply compression to
+        text data files. Impala queries are usually I/O-bound; reducing the amount of data read from
         disk typically speeds up a query, despite the extra CPU work to uncompress the data in memory.
       </p>
 
@@ -479,43 +479,15 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</codeblock>
           you establish, or by using packages. You must do these steps manually, whether or not you
           are using cluster management software.
         </p>
-        
-        
-        <p audience="hidden">
-          Before using LZO-compressed tables in Impala, do the following one-time setup for each machine in the
-          cluster. Install the necessary packages using either the Cloudera public repository, a private repository
-          you establish, or by using packages. You must do these steps manually, whether or not the cluster is
-          managed by the Cloudera Manager product.
-        </p>
 
         <ol>
           <li>
             <b>Prepare your systems to work with LZO by downloading and installing the appropriate libraries:</b>
 
-            <p audience="hidden">
-              <b>On systems managed by Cloudera Manager using parcels:</b>
-            </p>
-
-            <p audience="hidden">
-              See the setup instructions for the LZO parcel in the Cloudera Manager documentation for
-              <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_ig_install_gpl_extras.html" scope="external" format="html">Cloudera
-              Manager 5</xref>.
-            </p>
-            
-
-            <p>
-              <b>On systems using cluster management software or those not using cluster management
-                software:</b>
-            </p>
-
-            <p audience="hidden">
-              <b>On systems managed by Cloudera Manager using packages, or not managed by Cloudera Manager:</b>
-            </p>
-
             <p>
               Download and install the appropriate file to each machine on which you intend to use LZO with Impala.
-              These files all come from the Cloudera
-              <xref href="https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/" scope="external" format="html">GPL
+              These files all come from
+              <xref href="https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/" scope="external" format="html">this GPL
               extras</xref> download site. Install the:
             </p>
             <ul>

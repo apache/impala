@@ -3784,7 +3784,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
           <b>Bug:</b>
           <xref href="https://issues.cloudera.org/browse/IMPALA-1019" scope="external" format="html">IMPALA-1019</xref>
         </p>
-        
+
         <p>
           <b>Resolution:</b> This issue is fixed in Impala 1.3.2. The addition of HDFS caching
           support in Impala 1.4 means that this issue does not apply to any new level of Impala.
@@ -4018,7 +4018,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
           <b>Bug:</b>
           <xref href="https://issues.cloudera.org/browse/IMPALA-1019" scope="external" format="html">IMPALA-1019</xref>
         </p>
-        
+
         <p>
           <b>Resolution:</b> This issue is fixed in Impala 1.3.2. The addition of HDFS caching
           support in Impala 1.4 means that this issue does not apply to any new level of Impala.
@@ -4768,11 +4768,6 @@ Bad stats:
           value rather than a string constant. Also, queries against HBase tables could fail if the
           <codeph>WHERE</codeph> clause contained combinations of comparisons that could not possibly match any row
           key.
-        </p>
-
-        <p audience="hidden">
-          <b>Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-1188" scope="external" format="html">IMP-1188</xref>
         </p>
 
         <p>
@@ -5614,12 +5609,6 @@ hive&gt; NULL</codeblock>
           Insert INTO TABLE SELECT &lt;constant&gt; will not insert any data and may return an error.
         </p>
 
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-231" scope="external" format="html"/> ; KI added 0.1
-          <i>Cloudera internal only</i>
-        </p>
-
         <p>
           <b>Anticipated Resolution</b>: Fixed
         </p>
@@ -6076,12 +6065,6 @@ hive&gt; NULL</codeblock>
 
       <conbody>
 
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-474" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
-        </p>
-
         <p>
           <b>Resolution:</b> Fixed in 0.7
         </p>
@@ -6189,12 +6172,6 @@ hive&gt; NULL</codeblock>
           Impala reads the NameNode address and port as command line parameters rather than reading them from
           <codeph>core-site.xml</codeph>. Updating the NameNode address in the <codeph>core-site.xml</codeph> file
           does not propagate to Impala.
-        </p>
-
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-56" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
         </p>
 
         <p>
@@ -6435,12 +6412,6 @@ hive&gt; NULL</codeblock>
           impala-shell will incorrectly report that the failed metadata refresh completed successfully.
         </p>
 
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-611" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
-        </p>
-
         <p>
           <b>Anticipated Resolution:</b> To be fixed in a future release
         </p>
@@ -6511,12 +6482,6 @@ hive&gt; NULL</codeblock>
 
       <conbody>
 
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-601" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
-        </p>
-
         <p>
           <b>Resolution:</b> Fixed in 0.4
         </p>
@@ -6541,12 +6506,6 @@ hive&gt; NULL</codeblock>
           table will return an <codeph>unknown table</codeph> error message, even if the table is known.
         </p>
 
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-298" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
-        </p>
-
         <p>
           <b>Resolution:</b> Fixed in 0.3
         </p>
@@ -6565,12 +6524,6 @@ hive&gt; NULL</codeblock>
           even if the metadata for that table is fixed.
         </p>
 
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-298" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
-        </p>
-
         <p>
           <b>Resolution:</b> Fixed in 0.3
         </p>
@@ -6585,12 +6538,6 @@ hive&gt; NULL</codeblock>
 
         <p>
           Attempting to select from these tables fails.
-        </p>
-
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-581" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
         </p>
 
         <p>
@@ -6608,12 +6555,6 @@ hive&gt; NULL</codeblock>
         <p>
           Queries that contain OUTER JOINs may not return the correct results if there are predicates referencing
           any of the joined tables in the WHERE clause.
-        </p>
-
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-137" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
         </p>
 
         <p>
@@ -6642,12 +6583,6 @@ hive&gt; NULL</codeblock>
 
 <codeblock>SELECT * FROM (SELECT sum(col1) FROM some_table GROUP BY col1) t1 JOIN other_table ON (...);</codeblock>
 
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-491" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
-        </p>
-
         <p>
           <b>Resolution:</b> Fixed in 0.2
         </p>
@@ -6665,12 +6600,6 @@ hive&gt; NULL</codeblock>
         </p>
 
 <codeblock>INSERT OVERWRITE TABLE test SELECT * FROM test2 LIMIT 1;</codeblock>
-
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-497" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
-        </p>
 
         <p>
           <b>Resolution:</b> Fixed in 0.2
@@ -6690,12 +6619,6 @@ hive&gt; NULL</codeblock>
 
 <codeblock>SELECT * FROM test2 LIMIT 1;</codeblock>
 
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-535" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
-        </p>
-
         <p>
           <b>Resolution:</b> Fixed in 0.2
         </p>
@@ -6710,12 +6633,6 @@ hive&gt; NULL</codeblock>
 
         <p>
           Attempting to read such files does not generate a diagnostic.
-        </p>
-
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-270" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
         </p>
 
         <p>
@@ -6733,12 +6650,6 @@ hive&gt; NULL</codeblock>
         <p>
           When querying an HBase table whose row-key is string type, the Impala server may raise a null pointer
           exception.
-        </p>
-
-        <p audience="hidden">
-          <b>Cloudera Bug:</b>
-          <xref href="https://jira.cloudera.com/browse/IMP-522" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
         </p>
 
         <p>

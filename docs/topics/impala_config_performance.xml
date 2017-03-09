@@ -37,40 +37,15 @@ under the License.
       installed using cluster management software, some of these configurations might be completed automatically; you must still
       configure short-circuit reads manually. If you want to customize your environment, consider making the changes described in this topic.
     </p>
-    
-    <p id="p_twenty-four" audience="hidden">
-      This section describes the mandatory and recommended configuration settings for Impala. If Impala is
-      installed using Cloudera Manager, some of these configurations are completed automatically; you must still
-      configure short-circuit reads manually. If you installed Impala without Cloudera Manager, or if you want to
-      customize your environment, consider making the changes described in this topic.
-    </p>
-
-    <p audience="hidden">
-<!-- Could conref this paragraph from ciiu_install.xml. -->
-      In some cases, depending on the level of Impala, CDH, and Cloudera Manager, you might need to add particular
-      component configuration details in one of the free-form fields on the Impala configuration pages within
-      Cloudera Manager. <ph conref="../shared/impala_common.xml#common/safety_valve"/>
-    </p>
 
     <ul>
       <li>
         You must enable short-circuit reads, whether or not Impala was installed with cluster
         management software. This setting goes in the Impala configuration settings, not the Hadoop-wide settings.
       </li>
-      
+
       <li>
         You must enable block location tracking, and you can optionally enable native checksumming for optimal performance.
-      </li>
-      
-
-      <li audience="hidden">
-        If you installed Impala in an environment that is not managed by Cloudera Manager, you must enable block
-        location tracking, and you can optionally enable native checksumming for optimal performance.
-      </li>
-
-      <li audience="hidden">
-        If you deployed Impala using Cloudera Manager see
-        <xref href="impala_perf_testing.xml#performance_testing"/> to confirm proper configuration.
       </li>
     </ul>
 
@@ -81,19 +56,11 @@ under the License.
         DataNodes, improving performance. This setting also minimizes the number
         of additional copies of data. Short-circuit reads requires
           <codeph>libhadoop.so</codeph>
-        <!-- This link went stale. Not obvious how to keep it in sync with whatever Hadoop CDH is using behind the scenes. So hide the link for now. -->
-        <!--        (the <xref href="http://hadoop.apache.org/docs/r0.19.1/native_libraries.html" scope="external" format="html">Hadoop Native Library</xref>) -->
         (the Hadoop Native Library) to be accessible to both the server and the
         client. <codeph>libhadoop.so</codeph> is not available if you have
         installed from a tarball. You must install from an
         <codeph>.rpm</codeph>, <codeph>.deb</codeph>, or parcel to use
-        short-circuit local reads. 
-        
-        <note audience="hidden"> 
-          If you use Cloudera Manager, you can
-          enable short-circuit reads through a checkbox in the user interface
-          and that setting takes effect for Impala as well. 
-        </note>
+        short-circuit local reads.
       </p>
       <p>
         <b>To configure DataNodes for short-circuit reads:</b>
@@ -105,11 +72,9 @@ under the License.
           Impala configuration directory. The default Impala configuration
           location is <codeph>/etc/impala/conf</codeph>. </li>
         <li>
-          <indexterm audience="hidden"
-            >dfs.client.read.shortcircuit</indexterm>
+          <indexterm audience="hidden">dfs.client.read.shortcircuit</indexterm>
           <indexterm audience="hidden">dfs.domain.socket.path</indexterm>
-          <indexterm audience="hidden"
-            >dfs.client.file-block-storage-locations.timeout.millis</indexterm>
+          <indexterm audience="hidden">dfs.client.file-block-storage-locations.timeout.millis</indexterm>
           On all Impala nodes, configure the following properties in <!-- Exact timing is unclear, since we say farther down to copy /etc/hadoop/conf/hdfs-site.xml to /etc/impala/conf.
      Which wouldn't work if we already modified the Impala version of the file here. Not to mention that this
      doesn't take the CM interface into account, where these /etc files might not exist in those locations. -->

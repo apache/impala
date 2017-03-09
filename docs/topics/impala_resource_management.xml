@@ -61,21 +61,7 @@ under the License.
         can be safely run at the same time. Then the Impala daemon enforces the limit by activating the
         spill-to-disk mechanism when necessary, or cancelling a query altogether if the limit is exceeded at runtime.
       </p>
-      
-      
-      <ul audience="hidden">
-        <li>
-          If Cloudera Manager Static Partitioning is used, it creates a cgroup in which Impala runs.
-          This cgroup limits CPU, network, and IO according to the static partitioning policy.
-        </li>
 
-        <li>
-          Limits on memory usage are enforced by Impala's process memory limit (the <codeph>MEM_LIMIT</codeph>
-          query option setting). The admission control feature checks this setting to decide how many queries
-          can be safely run at the same time. Then the Impala daemon enforces the limit by activating the
-          spill-to-disk mechanism when necessary, or cancelling a query altogether if the limit is exceeded at runtime.
-        </li>
-      </ul>
     </conbody>
   </concept>
 
@@ -110,11 +96,6 @@ under the License.
           cluster.
         </p>
 
-        <p>
-          For information about setting up the YARN service, see the instructions for
-          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_yarn_service.html" scope="external" format="html">Cloudera
-          Manager</xref>.
-        </p>
       </conbody>
     </concept>
 
@@ -144,7 +125,7 @@ under the License.
               <codeph>-rm_always_use_defaults</codeph>: If this Boolean option is enabled, Impala ignores computed
               estimates and always obtains the default memory and CPU allocation settings at the start of the
               query. These default estimates are approximately 2 CPUs and 4 GB of memory, possibly varying slightly
-              depending on cluster size, workload, and so on. <ph rev="upstream">Cloudera</ph> recommends enabling
+              depending on cluster size, workload, and so on. Where practical, enable
               <codeph>-rm_always_use_defaults</codeph> whenever resource management is used, and relying on these
               default values (that is, leaving out the two following options).
             </li>

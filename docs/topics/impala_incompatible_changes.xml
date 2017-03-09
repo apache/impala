@@ -1229,12 +1229,6 @@ select * from `cross`;</codeblock>
         </li>
       </ul>
 
-      <p audience="hidden">
-        Impala 1.2.1 goes along with CDH 4.5 and Cloudera Manager 4.8. If you used the beta version Impala 1.2.0
-        that came with the beta of CDH 5, Impala 1.2.1 includes all the features of Impala 1.2.0 except for
-        resource management, which relies on the YARN framework from CDH 5.
-      </p>
-
       <p>
         The new <cmdname>catalogd</cmdname> service might require changes to any user-written scripts that stop,
         start, or restart Impala services, install or upgrade Impala packages, or issue <codeph>REFRESH</codeph> or
@@ -1267,7 +1261,7 @@ select * from `cross`;</codeblock>
       <ul conref="../shared/impala_common.xml#common/catalogd_xrefs">
         <li/>
       </ul>
-      
+
       <p>
         The new resource management feature interacts with both YARN and Llama services.
         <ph audience="PDF">See
@@ -1366,17 +1360,8 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
           <codeph>impala-lzo-cdh4</codeph> to the latest level. See <xref href="impala_txtfile.xml#lzo"/> for
           details.
         </li>
-
-        <li audience="hidden">
-          Cloudera Manager 4.5.2 and higher only supports Impala 1.0 and higher, and vice versa. If you upgrade to
-          Impala 1.0 or higher managed by Cloudera Manager, you must also upgrade Cloudera Manager to version 4.5.2
-          or higher. If you upgrade from an earlier version of Cloudera Manager, and were using Impala, you must
-          also upgrade Impala to version 1.0 or higher. The beta versions of Impala are no longer supported as of
-          the release of Impala 1.0.
-        </li>
       </ul>
     </conbody>
   </concept>
 
-  
 </concept>

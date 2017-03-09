@@ -39,17 +39,9 @@ under the License.
   <conbody>
 
     <p>
-      Test to ensure that Impala is configured for optimal performance. If you have installed Impala with cluster 
+      Test to ensure that Impala is configured for optimal performance. If you have installed Impala with cluster
       management software, complete the processes described in this topic to help ensure a proper
       configuration. These procedures can be used to verify that Impala is set up correctly.
-    </p>
-    
-    
-    <p audience="hidden">
-      Test to ensure that Impala is configured for optimal performance. If you have installed Impala without
-      Cloudera Manager, complete the processes described in this topic to help ensure a proper configuration. Even
-      if you installed Impala with Cloudera Manager, which automatically applies appropriate configurations, these
-      procedures can be used to verify that Impala is set up correctly.
     </p>
 
     <section id="checking_config_performance">
