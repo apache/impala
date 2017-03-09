@@ -798,6 +798,7 @@ Status BaseScalarColumnReader::ReadPageHeader(bool peek,
 
     // Didn't read entire header, increase buffer size and try again
     int64_t new_buffer_size = max<int64_t>(buffer_size * 2, 1024);
+    status = Status::OK();
     bool success = stream_->GetBytes(
         new_buffer_size, &buffer, &new_buffer_size, &status, /* peek */ true);
     if (!success) {
