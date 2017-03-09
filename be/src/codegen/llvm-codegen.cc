@@ -53,6 +53,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "codegen/codegen-anyval.h"
+#include "codegen/codegen-callgraph.h"
 #include "codegen/codegen-symbol-emitter.h"
 #include "codegen/impala-ir-data.h"
 #include "codegen/instruction-counter.h"
@@ -101,44 +102,13 @@ DECLARE_string(local_library_dir);
 namespace impala {
 
 bool LlvmCodeGen::llvm_initialized_ = false;
-
 string LlvmCodeGen::cpu_name_;
 vector<string> LlvmCodeGen::cpu_attrs_;
-unordered_set<string> LlvmCodeGen::fns_to_always_materialize_;
-FnRefsMap LlvmCodeGen::fn_refs_map_;
+CodegenCallGraph LlvmCodeGen::shared_call_graph_;
 
 [[noreturn]] static void LlvmCodegenHandleError(
     void* user_data, const std::string& reason, bool gen_crash_diag) {
   LOG(FATAL) << "LLVM hit fatal error: " << reason.c_str();
-}
-
-bool LlvmCodeGen::IsDefinedInImpalad(const string& fn_name) {
-  void* fn_ptr = NULL;
-  Status status =
-      LibCache::instance()->GetSoFunctionPtr("", fn_name, &fn_ptr, NULL, true);
-  return status.ok();
-}
-
-void LlvmCodeGen::FindGlobalUsers(User* val, vector<GlobalObject*>* users) {
-  for (Use& u: val->uses()) {
-    User* user = u.getUser();
-    if (isa<Instruction>(user)) {
-      Instruction* inst = dyn_cast<Instruction>(u.getUser());
-      users->push_back(inst->getFunction());
-    } else if (isa<GlobalVariable>(user)) {
-      GlobalVariable* gv = cast<GlobalVariable>(user);
-      string val_name = gv->getName();
-      // We strip global ctors and dtors out of the modules as they are not run.
-      if (val_name.find("llvm.global_ctors") == string::npos &&
-          val_name.find("llvm.global_dtors") == string::npos) {
-        users->push_back(gv);;
-      }
-    } else if (isa<Constant>(user)) {
-      FindGlobalUsers(user, users);
-    } else {
-      DCHECK(false) << "Unknown user's types for " << val->getName().str();
-    }
-  }
 }
 
 Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
@@ -187,28 +157,8 @@ Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
     }
   }
 
-  // Create a mapping of functions to their referenced functions.
-  for (Function& fn: init_codegen->module_->functions()) {
-    if (fn.isIntrinsic() || fn.isDeclaration()) continue;
-    string fn_name = fn.getName();
-    vector<GlobalObject*> users;
-    FindGlobalUsers(&fn, &users);
-    for (GlobalValue* val: users) {
-      string key = val->getName();
-      DCHECK(isa<GlobalVariable>(val) || isa<Function>(val));
-      // 'fn_refs_map_' contains functions which need to be materialized when a certain
-      // IR Function is materialized. We choose to include functions referenced by
-      // another IR function in the map even if it's defined in Impalad binary so it
-      // can be inlined for further optimization. This is not applicable for functions
-      // referenced by global variables only.
-      if (isa<GlobalVariable>(val)) {
-        if (IsDefinedInImpalad(fn_name)) continue;
-        fns_to_always_materialize_.insert(fn_name);
-      } else {
-        fn_refs_map_[key].insert(fn_name);
-      }
-    }
-  }
+  // Initialize the global shared call graph.
+  shared_call_graph_.Init(init_codegen->module_);
   return Status::OK();
 }
 
@@ -336,8 +286,9 @@ Status LlvmCodeGen::LinkModule(const string& file) {
   // are chosen by the linker or referenced by functions in the new module. Note that
   // linkModules() will materialize functions defined only in the new module.
   for (Function& fn: new_module->functions()) {
-    if (fn_refs_map_.find(fn.getName()) != fn_refs_map_.end()) {
-      Function* local_fn = module_->getFunction(fn.getName());
+    const string& fn_name = fn.getName();
+    if (shared_call_graph_.GetCallees(fn_name) != nullptr) {
+      Function* local_fn = module_->getFunction(fn_name);
       RETURN_IF_ERROR(MaterializeFunction(local_fn));
     }
   }
@@ -388,7 +339,7 @@ Status LlvmCodeGen::CreateImpalaCodegen(RuntimeState* state,
   }
 
   // Materialize functions referenced by the global variables.
-  for (const string& fn_name : fns_to_always_materialize_) {
+  for (const string& fn_name : shared_call_graph_.fns_referenced_by_gv()) {
     Function* fn = codegen->module_->getFunction(fn_name);
     DCHECK(fn != nullptr);
     RETURN_IF_ERROR(codegen->MaterializeFunction(fn));
@@ -638,11 +589,13 @@ Status LlvmCodeGen::MaterializeFunctionHelper(Function *fn) {
 
   // Materialized functions are marked as not materializable by LLVM.
   DCHECK(!fn->isMaterializable());
-  const unordered_set<string>& callees = fn_refs_map_[fn->getName().str()];
-  for (const string& callee: callees) {
-    Function* callee_fn = module_->getFunction(callee);
-    DCHECK(callee_fn != nullptr);
-    RETURN_IF_ERROR(MaterializeFunctionHelper(callee_fn));
+  const unordered_set<string>* callees = shared_call_graph_.GetCallees(fn->getName());
+  if (callees != nullptr) {
+    for (const string& callee : *callees) {
+      Function* callee_fn = module_->getFunction(callee);
+      DCHECK(callee_fn != nullptr);
+      RETURN_IF_ERROR(MaterializeFunctionHelper(callee_fn));
+    }
   }
   return Status::OK();
 }
