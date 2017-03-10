@@ -70,7 +70,7 @@ ALTER TABLE <varname>name</varname> DROP [IF EXISTS] PARTITION (<varname>partiti
   <ph rev="2.3.0">[PURGE]</ph>
 <ph rev="kudu">ALTER TABLE <varname>name</varname> DROP [IF EXISTS] RANGE PARTITION <varname>kudu_partition_spec</varname></ph>
 
-<ph rev="2.3.0 IMPALA-1568 CDH-36799">ALTER TABLE <varname>name</varname> RECOVER PARTITIONS</ph>
+<ph rev="2.3.0 IMPALA-1568">ALTER TABLE <varname>name</varname> RECOVER PARTITIONS</ph>
 
 ALTER TABLE <varname>name</varname> [PARTITION (<varname>partition_spec</varname>)]
   SET { FILEFORMAT <varname>file_format</varname>
@@ -219,7 +219,7 @@ alter table fast_growing_data partition (year = 2016, month in (10,11,12)) set f
 
     <p conref="../shared/impala_common.xml#common/s3_blurb"/>
 
-    <p rev="2.6.0 CDH-39913 IMPALA-1878">
+    <p rev="2.6.0 IMPALA-1878">
       You can specify an <codeph>s3a://</codeph> prefix on the <codeph>LOCATION</codeph> attribute of a table or partition
       to make Impala query data from the Amazon S3 filesystem. In <keyword keyref="impala26_full"/> and higher, Impala automatically
       handles creating or removing the associated folders when you issue <codeph>ALTER TABLE</codeph> statements
@@ -315,11 +315,11 @@ alter table p1 partition (month=1, day=1) set location '/usr/external_data/new_y
 
     <note conref="../shared/impala_common.xml#common/add_partition_set_location"/>
 
-    <p rev="2.3.0 IMPALA-1568 CDH-36799">
+    <p rev="2.3.0 IMPALA-1568">
       <b>To automatically detect new partition directories added through Hive or HDFS operations:</b>
     </p>
 
-    <p rev="2.3.0 IMPALA-1568 CDH-36799">
+    <p rev="2.3.0 IMPALA-1568">
       In <keyword keyref="impala23_full"/> and higher, the <codeph>RECOVER PARTITIONS</codeph> clause scans
       a partitioned table to detect if any new partition directories were added outside of Impala,
       such as by Hive <codeph>ALTER TABLE</codeph> statements or by <cmdname>hdfs dfs</cmdname>
@@ -328,17 +328,17 @@ alter table p1 partition (month=1, day=1) set location '/usr/external_data/new_y
       the <codeph>REFRESH</codeph> statement does.
     </p>
 
-    <p rev="2.3.0 IMPALA-1568 CDH-36799">
+    <p rev="2.3.0 IMPALA-1568">
       For example, here is a sequence of examples showing how you might create a partitioned table in Impala,
       create new partitions through Hive, copy data files into the new partitions with the <cmdname>hdfs</cmdname>
       command, and have Impala recognize the new partitions and new data:
     </p>
 
-    <p rev="2.3.0 IMPALA-1568 CDH-36799">
+    <p rev="2.3.0 IMPALA-1568">
       In Impala, create the table, and a single partition for demonstration purposes:
     </p>
 
-<codeblock rev="2.3.0 IMPALA-1568 CDH-36799">
+<codeblock rev="2.3.0 IMPALA-1568">
 <![CDATA[
 create database recover_partitions;
 use recover_partitions;
@@ -354,12 +354,12 @@ quit;
 ]]>
 </codeblock>
 
-    <p rev="2.3.0 IMPALA-1568 CDH-36799">
+    <p rev="2.3.0 IMPALA-1568">
       In Hive, create some new partitions. In a real use case, you might create the
       partitions and populate them with data as the final stages of an ETL pipeline.
     </p>
 
-<codeblock rev="2.3.0 IMPALA-1568 CDH-36799">
+<codeblock rev="2.3.0 IMPALA-1568">
 <![CDATA[
 hive> use recover_partitions;
 OK
@@ -371,12 +371,12 @@ hive> quit;
 ]]>
 </codeblock>
 
-    <p rev="2.3.0 IMPALA-1568 CDH-36799">
+    <p rev="2.3.0 IMPALA-1568">
       For demonstration purposes, manually copy data (a single row) into these
       new partitions, using manual HDFS operations:
     </p>
 
-<codeblock rev="2.3.0 IMPALA-1568 CDH-36799">
+<codeblock rev="2.3.0 IMPALA-1568">
 <![CDATA[
 $ hdfs dfs -ls /user/hive/warehouse/recover_partitions.db/t1/yy=2016/
 Found 3 items
@@ -391,7 +391,7 @@ $ hdfs dfs -cp /user/hive/warehouse/recover_partitions.db/t1/yy=2016/mm=1/data.t
 ]]>
 </codeblock>
 
-<codeblock rev="2.3.0 IMPALA-1568 CDH-36799">
+<codeblock rev="2.3.0 IMPALA-1568">
 <![CDATA[
 hive> select * from t1;
 OK
@@ -402,14 +402,14 @@ hive> quit;
 ]]>
 </codeblock>
 
-    <p rev="2.3.0 IMPALA-1568 CDH-36799">
+    <p rev="2.3.0 IMPALA-1568">
       In Impala, initially the partitions and data are not visible.
       Running <codeph>ALTER TABLE</codeph> with the <codeph>RECOVER PARTITIONS</codeph>
       clause scans the table data directory to find any new partition directories, and
       the data files inside them:
     </p>
 
-<codeblock rev="2.3.0 IMPALA-1568 CDH-36799">
+<codeblock rev="2.3.0 IMPALA-1568">
 <![CDATA[
 select * from t1;
 +------------------+------+----+
@@ -514,7 +514,7 @@ ALTER TABLE <varname>table_name</varname> DROP <varname>column_name</varname>;</
       to replace all the data before issuing any further queries.)
     </p>
 
-    <p rev="CDH-37178">
+    <p rev="">
       For example, here is how you might add columns to an existing table.
       The first <codeph>ALTER TABLE</codeph> adds two new columns, and the second
       <codeph>ALTER TABLE</codeph> adds one new column.
@@ -523,7 +523,7 @@ ALTER TABLE <varname>table_name</varname> DROP <varname>column_name</varname>;</
       considered to be <codeph>NULL</codeph>.
     </p>
 
-<codeblock rev="CDH-37178">
+<codeblock rev="">
 create table t1 (x int);
 insert into t1 values (1), (2);
 
@@ -552,7 +552,7 @@ select * from t1 order by x;
       define the new set of columns with a single <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> statement.
     </p>
 
-    <p rev="CDH-37178">
+    <p rev="">
       The following examples show some safe operations to drop or change columns. Dropping the final column
       in a table lets Impala ignore the data causing any disruption to existing data files. Changing the type
       of a column works if existing data values can be safely converted to the new type. The type conversion
@@ -561,7 +561,7 @@ select * from t1 order by x;
       Parquet, the rules are stricter and type conversions only work between certain sizes of integers.
     </p>
 
-<codeblock rev="CDH-37178">
+<codeblock rev="">
 create table optional_columns (x int, y int, z int, a1 int, a2 int);
 insert into optional_columns values (1,2,3,0,0), (2,3,4,100,100);
 
@@ -580,7 +580,7 @@ select * from optional_columns;
 +---+---+---+
 </codeblock>
 
-<codeblock rev="CDH-37178">
+<codeblock rev="">
 create table int_to_string (s string, x int);
 insert into int_to_string values ('one', 1), ('two', 2);
 
@@ -602,7 +602,7 @@ select s, upper(x) from int_to_string;
 +-------+----------+
 </codeblock>
 
-    <p rev="CDH-37178">
+    <p rev="">
       Remember that Impala does not actually do any conversion for the underlying data files as a result of
       <codeph>ALTER TABLE</codeph> statements. If you use <codeph>ALTER TABLE</codeph> to create a table
       layout that does not agree with the contents of the underlying files, you must replace the files
@@ -610,7 +610,7 @@ select s, upper(x) from int_to_string;
       <codeph>INSERT OVERWRITE</codeph> to copy from another table and replace the original data.
     </p>
 
-    <p rev="CDH-37178">
+    <p rev="">
       The following example shows what happens if you delete the middle column from a Parquet table containing three columns.
       The underlying data files still contain three columns of data. Because the columns are interpreted based on their positions in
       the data file instead of the specific column names, a <codeph>SELECT *</codeph> query now reads the first and second
@@ -620,7 +620,7 @@ select s, upper(x) from int_to_string;
       if you drop or change the type of a column in a way that causes problems with existing data files.
     </p>
 
-<codeblock rev="CDH-37178">
+<codeblock rev="">
 -- Parquet table showing how dropping a column can produce unexpected results.
 create table p1 (s1 string, s2 string, s3 string) stored as parquet;
 
@@ -650,7 +650,7 @@ select * from p1;
 +-------+-------+
 </codeblock>
 
-<codeblock rev="CDH-37178">
+<codeblock rev="">
 -- Parquet table showing how dropping a column can produce conversion errors.
 create table p2 (s1 string, x int, s3 string) stored as parquet;
 
@@ -877,7 +877,7 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-    <p rev="CDH-19187">
+    <p rev="">
       Most <codeph>ALTER TABLE</codeph> clauses do not actually
       read or write any HDFS files, and so do not depend on
       specific HDFS permissions. For example, the <codeph>SET FILEFORMAT</codeph>

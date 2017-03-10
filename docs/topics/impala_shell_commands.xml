@@ -328,7 +328,7 @@ under the License.
               </p>
             </entry>
           </row>
-          <row id="source_cmd" rev="IMPALA-3397 CDH-40097">
+          <row id="source_cmd" rev="IMPALA-3397">
             <entry>
               <p>
                 <codeph>source</codeph> or <codeph>src</codeph>

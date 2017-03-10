@@ -702,7 +702,7 @@ Inserted 2 rows in 0.16s
       <p conref="../shared/impala_common.xml#common/cancel_blurb_yes"/>
 
       <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-      <p rev="CDH-19187">
+      <p rev="">
         The user ID that the <cmdname>impalad</cmdname> daemon runs under,
         typically the <codeph>impala</codeph> user, must have read
         permission for the files in the source directory of an <codeph>INSERT ... SELECT</codeph>

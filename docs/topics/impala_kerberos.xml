@@ -347,7 +347,7 @@ $ chown impala:impala impala-http.keytab</codeblock>
 
   </concept>
 
-  <concept id="auth_to_local" rev="IMPALA-2660 CDH-40241">
+  <concept id="auth_to_local" rev="IMPALA-2660">
     <title>Mapping Kerberos Principals to Short Names for Impala</title>
     <conbody>
       <p conref="../shared/impala_common.xml#common/auth_to_local_instructions"/>

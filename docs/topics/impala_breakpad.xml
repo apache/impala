@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept id="breakpad" rev="2.6.0 IMPALA-2686 CDH-40238">
+<concept id="breakpad" rev="2.6.0 IMPALA-2686">
 
   <title>Breakpad Minidumps for Impala (<keyword keyref="impala26"/> or higher only)</title>
   <titlealts audience="PDF"><navtitle>Breakpad Minidumps</navtitle></titlealts>
@@ -33,7 +33,7 @@ under the License.
 
   <conbody>
 
-    <p rev="2.6.0 IMPALA-2686 CDH-40238">
+    <p rev="2.6.0 IMPALA-2686">
       The <xref href="https://chromium.googlesource.com/breakpad/breakpad/" scope="external" format="html">breakpad</xref>
       project is an open-source framework for crash reporting.
       In <keyword keyref="impala26_full"/> and higher, Impala can use <codeph>breakpad</codeph> to record stack information and
@@ -67,7 +67,7 @@ under the License.
         to the empty string, and restart the corresponding services or daemons.
       </p>
 
-      <p rev="IMPALA-3677 CDH-43745">
+      <p rev="IMPALA-3677">
         In <keyword keyref="impala27_full"/> and higher,
         you can send a <codeph>SIGUSR1</codeph> signal to any Impala-related daemon to write a
         Breakpad minidump. For advanced troubleshooting, you can now produce a minidump

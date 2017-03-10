@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept id="s3_skip_insert_staging" rev="2.6.0 IMPALA-3452 CDH-39913">
+<concept id="s3_skip_insert_staging" rev="2.6.0 IMPALA-3452">
 
   <title>S3_SKIP_INSERT_STAGING Query Option (<keyword keyref="impala26"/> or higher only)</title>
   <titlealts audience="PDF"><navtitle>S3_SKIP_INSERT_STAGING</navtitle></titlealts>
@@ -36,7 +36,7 @@ under the License.
 
   <conbody>
 
-    <p rev="2.6.0 IMPALA-3452 CDH-39913">
+    <p rev="2.6.0 IMPALA-3452">
       <indexterm audience="hidden">IMPALA_S3_SKIP_INSERT_STAGING query option</indexterm>
     </p>
 

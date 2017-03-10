@@ -128,7 +128,7 @@ drop table temporary.trivial;</codeblock>
     <p conref="../shared/impala_common.xml#common/disk_space_blurb"/>
 
     <p conref="../shared/impala_common.xml#common/s3_blurb"/>
-    <p rev="2.6.0 CDH-39913 IMPALA-1878">
+    <p rev="2.6.0 IMPALA-1878">
       The <codeph>DROP TABLE</codeph> statement can remove data files from S3
       if the associated S3 table is an internal table.
       In <keyword keyref="impala26_full"/> and higher, as part of improved support for writing
@@ -144,7 +144,7 @@ drop table temporary.trivial;</codeblock>
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-    <p rev="CDH-19187">
+    <p rev="">
       For an internal table, the user ID that the <cmdname>impalad</cmdname> daemon runs under,
       typically the <codeph>impala</codeph> user, must have write
       permission for all the files and directories that make up the table.

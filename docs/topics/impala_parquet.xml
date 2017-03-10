@@ -1105,7 +1105,7 @@ select * from production_table where c1 = 100 and c2 &lt; 50 and ...;
         </li>
       </ul>
 
-      <p rev="2.6.0 IMPALA-2835 CDH-33330">
+      <p rev="2.6.0 IMPALA-2835">
         You might find that you have Parquet files where the columns do not line up in the same
         order as in your Impala table. For example, you might have a Parquet file that was part of
         a table with columns <codeph>C1,C2,C3,C4</codeph>, and now you want to reuse the same

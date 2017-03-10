@@ -301,7 +301,7 @@ under the License.
 
       </ul>
 
-      <p rev="CDH-27667">
+      <p rev="">
         In Impala 2.0 and higher, you can submit
         a SQL <codeph>SET</codeph> statement from the client application
         to change the <codeph>REQUEST_POOL</codeph> query option.

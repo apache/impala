@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept id="runtime_filter_min_size" rev="2.6.0 IMPALA-3480 CDH-41184">
+<concept id="runtime_filter_min_size" rev="2.6.0 IMPALA-3480">
 
   <title>RUNTIME_FILTER_MIN_SIZE Query Option (<keyword keyref="impala26"/> or higher only)</title>
   <titlealts audience="PDF"><navtitle>RUNTIME_FILTER_MIN_SIZE</navtitle></titlealts>

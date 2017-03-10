@@ -50,7 +50,7 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
-<codeblock rev="IMPALA-1683 CDH-43732">REFRESH [<varname>db_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>key_col1</varname>=<varname>val1</varname> [, <varname>key_col2</varname>=<varname>val2</varname>...])]</codeblock>
+<codeblock rev="IMPALA-1683">REFRESH [<varname>db_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>key_col1</varname>=<varname>val1</varname> [, <varname>key_col2</varname>=<varname>val2</varname>...])]</codeblock>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
@@ -171,23 +171,23 @@ under the License.
       delay later, for example if the next reference to the table is during a benchmark test.
     </p>
 
-    <p rev="IMPALA-1683 CDH-43732">
+    <p rev="IMPALA-1683">
       <b>Refreshing a single partition:</b>
     </p>
 
-    <p rev="IMPALA-1683 CDH-43732">
+    <p rev="IMPALA-1683">
       In <keyword keyref="impala27_full"/> and higher, the <codeph>REFRESH</codeph> statement can apply to a single partition at a time,
       rather than the whole table. Include the optional <codeph>PARTITION (<varname>partition_spec</varname>)</codeph>
       clause and specify values for each of the partition key columns.
     </p>
 
-    <p rev="IMPALA-1683 CDH-43732">
+    <p rev="IMPALA-1683">
       The following examples show how to make Impala aware of data added to a single partition, after data is loaded into
       a partition's data directory using some mechanism outside Impala, such as Hive or Spark. The partition can be one that
       Impala created and is already aware of, or a new partition created through Hive.
     </p>
 
-<codeblock rev="IMPALA-1683 CDH-43732"><![CDATA[
+<codeblock rev="IMPALA-1683"><![CDATA[
 impala> create table p (x int) partitioned by (y int);
 impala> insert into p (x,y) values (1,2), (2,2), (2,1);
 impala> show partitions p;
@@ -213,13 +213,13 @@ impala> select x from p where y=1;
 ]]>
 </codeblock>
 
-    <p rev="IMPALA-1683 CDH-43732">
+    <p rev="IMPALA-1683">
       The same applies for tables with more than one partition key column.
       The <codeph>PARTITION</codeph> clause of the <codeph>REFRESH</codeph>
       statement must include all the partition key columns.
     </p>
 
-<codeblock rev="IMPALA-1683 CDH-43732"><![CDATA[
+<codeblock rev="IMPALA-1683"><![CDATA[
 impala> create table p2 (x int) partitioned by (y int, z int);
 impala> insert into p2 (x,y,z) values (0,0,0), (1,2,3), (2,2,3);
 impala> show partitions p2;
@@ -246,14 +246,14 @@ impala> select x from p where y=2 and z = 3;
 ]]>
 </codeblock>
 
-    <p rev="IMPALA-1683 CDH-43732">
+    <p rev="IMPALA-1683">
       The following examples show how specifying a nonexistent partition does not cause any error,
       and the order of the partition key columns does not have to match the column order in the table.
       The partition spec must include all the partition key columns; specifying an incomplete set of
       columns does cause an error.
     </p>
 
-<codeblock rev="IMPALA-1683 CDH-43732"><![CDATA[
+<codeblock rev="IMPALA-1683"><![CDATA[
 -- Partition doesn't exist.
 refresh p2 partition (y=0, z=3);
 refresh p2 partition (y=0, z=-1)
@@ -299,7 +299,7 @@ ERROR: AnalysisException: Items in partition spec must exactly match the partiti
     </p>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-    <p rev="CDH-19187">
+    <p rev="">
       The user ID that the <cmdname>impalad</cmdname> daemon runs under,
       typically the <codeph>impala</codeph> user, must have execute
       permissions for all the relevant directories holding table data.
@@ -311,7 +311,7 @@ ERROR: AnalysisException: Items in partition spec must exactly match the partiti
       but subsequent statements such as <codeph>SELECT</codeph>
       or <codeph>SHOW TABLE STATS</codeph> could fail.
     </p>
-    <p rev="IMPALA-1683 CDH-43732">
+    <p rev="IMPALA-1683">
       All HDFS and Sentry permissions and privileges are the same whether you refresh the entire table
       or a single partition.
     </p>

@@ -203,7 +203,7 @@ under the License.
         reads are in effect.
       </p>
 
-      <p rev="CDH-29157">
+      <p rev="">
         By default, time values in the profile output reflect the wall-clock time taken by an operation.
         For values denoting system time or user time, the measurement unit is reflected in the metric
         name, such as <codeph>ScannerThreadsSysTime</codeph> or <codeph>ScannerThreadsUserTime</codeph>.

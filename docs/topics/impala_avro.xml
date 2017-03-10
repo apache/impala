@@ -245,7 +245,7 @@ for this information.
           If there is a mismatch in column name or type, Impala uses the column definition from the Avro schema.
           Because a <codeph>CHAR</codeph> or <codeph>VARCHAR</codeph> column in Impala maps to an Avro <codeph>STRING</codeph>,
           this case is not considered a mismatch and the column is preserved as <codeph>CHAR</codeph> or <codeph>VARCHAR</codeph>
-          in the reconciled schema. <ph rev="2.7.0 IMPALA-3687 CDH-43731">Prior to <keyword keyref="impala27_full"/> the column
+          in the reconciled schema. <ph rev="2.7.0 IMPALA-3687">Prior to <keyword keyref="impala27_full"/> the column
           name and comment for such <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph> columns was also taken from the SQL column definition.
           In <keyword keyref="impala27_full"/> and higher, the column name and comment from the Avro schema file take precedence for such columns,
           and only the <codeph>CHAR</codeph> or <codeph>VARCHAR</codeph> type is preserved from the SQL column definition.</ph>

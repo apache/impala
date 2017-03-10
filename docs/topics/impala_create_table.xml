@@ -109,7 +109,7 @@ under the License.
   [COMMENT '<varname>table_comment</varname>']
   [WITH SERDEPROPERTIES ('<varname>key1</varname>'='<varname>value1</varname>', '<varname>key2</varname>'='<varname>value2</varname>', ...)]
   [
-   [ROW FORMAT <varname>row_format</varname>] <ph rev="CDH-41501">[STORED AS <varname>ctas_file_format</varname>]</ph>
+   [ROW FORMAT <varname>row_format</varname>] <ph rev="">[STORED AS <varname>ctas_file_format</varname>]</ph>
   ]
   [LOCATION '<varname>hdfs_path</varname>']
   [TBLPROPERTIES ('<varname>key1</varname>'='<varname>value1</varname>', '<varname>key2</varname>'='<varname>value2</varname>', ...)]
@@ -153,7 +153,7 @@ file_format:
   | SEQUENCEFILE
   | RCFILE
 
-<ph rev="CDH-41501">ctas_file_format:
+<ph rev="">ctas_file_format:
     PARQUET
   | TEXTFILE</ph>
 </codeblock>
@@ -1159,7 +1159,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       the data files in S3.
     </p>
 
-    <p rev="2.6.0 CDH-39913 IMPALA-1878">
+    <p rev="2.6.0 IMPALA-1878">
       In <keyword keyref="impala26_full"/> and higher, you can use this special
       <codeph>LOCATION</codeph> syntax as part of a <codeph>CREATE TABLE AS SELECT</codeph>
       statement.
@@ -1190,7 +1190,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
 
-    <p rev="CDH-19187">
+    <p rev="">
       The user ID that the <cmdname>impalad</cmdname> daemon runs under, typically the
       <codeph>impala</codeph> user, must have both execute and write permission for the database
       directory where the table is being created.

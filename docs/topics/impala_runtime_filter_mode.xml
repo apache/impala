@@ -50,7 +50,7 @@ under the License.
       or corresponding mnemonic strings (<codeph>OFF</codeph>, <codeph>LOCAL</codeph>, <codeph>GLOBAL</codeph>).
     </p>
 
-    <p rev="2.6.0 CDH-41184">
+    <p rev="2.6.0">
       <b>Default:</b> 2 (equivalent to <codeph>GLOBAL</codeph>); formerly was 1 / <codeph>LOCAL</codeph>, in <keyword keyref="impala25_full"/>
     </p>
 
@@ -58,13 +58,13 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
-    <p rev="2.6.0 CDH-41184">
+    <p rev="2.6.0">
       In <keyword keyref="impala26_full"/> and higher, the default is <codeph>GLOBAL</codeph>.
       This setting is recommended for a wide variety of workloads, to provide best
       performance with <q>out of the box</q> settings.
     </p>
 
-    <p rev="2.6.0 CDH-41184">
+    <p rev="2.6.0">
       The lowest setting of <codeph>LOCAL</codeph> does a similar level of optimization
       (such as partition pruning) as in earlier Impala releases.
       This setting was the default in <keyword keyref="impala25_full"/>,

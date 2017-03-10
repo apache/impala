@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept id="parquet_fallback_schema_resolution" rev="2.6.0 IMPALA-2835 CDH-33330">
+<concept id="parquet_fallback_schema_resolution" rev="2.6.0 IMPALA-2835">
 
   <title>PARQUET_FALLBACK_SCHEMA_RESOLUTION Query Option (<keyword keyref="impala26"/> or higher only)</title>
   <titlealts audience="PDF"><navtitle>PARQUET_FALLBACK_SCHEMA_RESOLUTION</navtitle></titlealts>
@@ -35,7 +35,7 @@ under the License.
 
   <conbody>
 
-    <p rev="2.6.0 IMPALA-2835 CDH-33330">
+    <p rev="2.6.0 IMPALA-2835">
       <indexterm audience="hidden">PARQUET_FALLBACK_SCHEMA_RESOLUTION query option</indexterm>
       Allows Impala to look up columns within Parquet files by column name, rather than column order,
       when necessary.

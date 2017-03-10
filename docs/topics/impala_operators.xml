@@ -778,7 +778,7 @@ select 'ABCXYZ' not like 'ab_xyz';
         <codeph>WHERE 5 IN (id)</codeph> produce the same results.
       </p>
 
-      <p rev="CDH-40407">
+      <p rev="">
         The set of values to check against can be specified as constants, function calls, column names, or other expressions in the query
         text. The maximum number of expressions in the <codeph>IN</codeph> list is 9999. (The maximum number of elements of
         a single expression is 10,000 items, and the <codeph>IN</codeph> operator itself counts as one.)

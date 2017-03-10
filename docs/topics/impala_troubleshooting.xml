@@ -94,7 +94,7 @@ under the License.
     </conbody>
   </concept>
 
-  <concept id="trouble_io" rev="CDH-19201">
+  <concept id="trouble_io" rev="">
     <title>Troubleshooting I/O Capacity Problems</title>
     <conbody>
       <p>

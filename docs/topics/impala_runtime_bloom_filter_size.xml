@@ -41,13 +41,13 @@ under the License.
     </p>
 
     <note type="important">
-      <p rev="2.6.0 CDH-41184 IMPALA-3007">
+      <p rev="2.6.0 IMPALA-3007">
         In <keyword keyref="impala26_full"/> and higher, this query option only applies as a fallback, when statistics
         are not available. By default, Impala estimates the optimal size of the Bloom filter structure
         regardless of the setting for this option. (This is a change from the original behavior in
         <keyword keyref="impala25_full"/>.)
       </p>
-      <p rev="2.6.0 CDH-41184 IMPALA-3007">
+      <p rev="2.6.0 IMPALA-3007">
         In <keyword keyref="impala26_full"/> and higher, when the value of this query option is used for query planning,
         it is constrained by the minimum and maximum sizes specified by the
         <codeph>RUNTIME_FILTER_MIN_SIZE</codeph> and <codeph>RUNTIME_FILTER_MAX_SIZE</codeph> query options.

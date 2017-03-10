@@ -740,7 +740,7 @@ Returned 1 row(s) in 0.12s</codeblock>
 
       </dlentry>
 
-      <dlentry rev="2.3.0 CDH-35915 IMPALA-2084" id="split_part">
+      <dlentry rev="2.3.0 IMPALA-2084" id="split_part">
 
         <dt>
           <codeph>split_part(string source, string delimiter, bigint n)</codeph>

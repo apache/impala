@@ -79,7 +79,7 @@ under the License.
           Extensibility mechanisms such as <codeph>TRANSFORM</codeph>, custom file formats, or custom SerDes.
         </li>
 
-        <li rev="CDH-41376">
+        <li rev="">
           The <codeph>DATE</codeph> data type.
         </li>
 

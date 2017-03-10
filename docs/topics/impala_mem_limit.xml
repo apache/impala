@@ -42,7 +42,7 @@ under the License.
       Therefore, the total memory that can be used by a query is the <codeph>MEM_LIMIT</codeph> times the number of nodes.
     </p>
 
-    <p rev="CDH-32135">
+    <p rev="">
       There are two levels of memory limit for Impala.
       The <codeph>-mem_limit</codeph> startup option sets an overall limit for the <cmdname>impalad</cmdname> process
       (which handles multiple queries concurrently).
@@ -53,7 +53,7 @@ under the License.
       and must always be less than the <cmdname>impalad</cmdname> memory limit.
     </p>
 
-    <p rev="CDH-32135">
+    <p rev="">
       If query processing exceeds the specified memory limit on any node, either the per-query limit or the
       <cmdname>impalad</cmdname> limit, Impala cancels the query automatically.
       Memory limits are checked periodically during query processing, so the actual memory in use
@@ -79,26 +79,26 @@ under the License.
       <b>Type:</b> numeric
     </p>
 
-    <p rev="CDH-32135">
+    <p rev="">
       <b>Units:</b> A numeric argument represents memory size in bytes; you can also use a suffix of <codeph>m</codeph> or <codeph>mb</codeph>
       for megabytes, or more commonly <codeph>g</codeph> or <codeph>gb</codeph> for gigabytes. If you specify a value with unrecognized
       formats, subsequent queries fail with an error.
     </p>
 
-    <p rev="CDH-32135">
+    <p rev="">
       <b>Default:</b> 0 (unlimited)
     </p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
-    <p rev="CDH-32135">
+    <p rev="">
       The <codeph>MEM_LIMIT</codeph> setting is primarily useful in a high-concurrency setting,
       or on a cluster with a workload shared between Impala and other data processing components.
       You can prevent any query from accidentally using much more memory than expected,
       which could negatively impact other Impala queries.
     </p>
 
-    <p rev="CDH-32135">
+    <p rev="">
       Use the output of the <codeph>SUMMARY</codeph> command in <cmdname>impala-shell</cmdname>
       to get a report of memory used for each phase of your most heavyweight queries on each node,
       and then set a <codeph>MEM_LIMIT</codeph> somewhat higher than that.
@@ -106,14 +106,14 @@ under the License.
       the <codeph>SUMMARY</codeph> command.
     </p>
 
-    <p conref="../shared/impala_common.xml#common/example_blurb" rev="CDH-32135"/>
+    <p conref="../shared/impala_common.xml#common/example_blurb" rev=""/>
 
-    <p rev="CDH-32135">
+    <p rev="">
       The following examples show how to set the <codeph>MEM_LIMIT</codeph> query option
       using a fixed number of bytes, or suffixes representing gigabytes or megabytes.
     </p>
 
-<codeblock rev="CDH-32135">
+<codeblock rev="">
 [localhost:21000] > set mem_limit=3000000000;
 MEM_LIMIT set to 3000000000
 [localhost:21000] > select 5;
@@ -159,12 +159,12 @@ MEM_LIMIT set to 3mb
 +---+
 </codeblock>
 
-    <p rev="CDH-32135">
+    <p rev="">
       The following examples show how unrecognized <codeph>MEM_LIMIT</codeph>
       values lead to errors for subsequent queries.
     </p>
 
-<codeblock rev="CDH-32135">
+<codeblock rev="">
 [localhost:21000] > set mem_limit=3tb;
 MEM_LIMIT set to 3tb
 [localhost:21000] > select 5;
@@ -177,7 +177,7 @@ Query: select 5
 ERROR: Failed to parse query memory limit from 'xyz'.
 </codeblock>
 
-    <p rev="CDH-32135">
+    <p rev="">
       The following examples shows the automatic query cancellation
       when the <codeph>MEM_LIMIT</codeph> value is exceeded
       on any host involved in the Impala query. First it runs a
@@ -187,7 +187,7 @@ ERROR: Failed to parse query memory limit from 'xyz'.
       setting so that the same query cannot run.
     </p>
 
-<codeblock rev="CDH-32135">
+<codeblock rev="">
 [localhost:21000] > select count(*) from customer;
 Query: select count(*) from customer
 +----------+

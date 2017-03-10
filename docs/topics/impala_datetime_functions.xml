@@ -1135,7 +1135,7 @@ select now() as right_now,
 
       </dlentry>
 
-      <dlentry rev="IMPALA-1772 CDH-38381 2.6.0" id="millisecond">
+      <dlentry rev="IMPALA-1772 2.6.0" id="millisecond">
 
         <dt>
           <codeph>millisecond(timestamp)</codeph>

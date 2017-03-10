@@ -75,7 +75,7 @@ under the License.
       which can further reduce the chance of CPU hotspots.
     </p>
 
-    <p rev="CDH-43739 IMPALA-2979">
+    <p rev="IMPALA-2979">
       This query option works in conjunction with the work scheduling improvements
       in <keyword keyref="impala25_full"/> and higher. The scheduling improvements
       distribute the processing for cached HDFS data blocks to minimize hotspots:

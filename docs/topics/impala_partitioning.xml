@@ -212,7 +212,7 @@ insert into weather <b>partition (year=2014, month=04, day)</b> select 'sunny',2
 
   </concept>
 
-  <concept id="partition_refresh" rev="2.7.0 IMPALA-1683 CDH-43732">
+  <concept id="partition_refresh" rev="2.7.0 IMPALA-1683">
 
     <title>Refreshing a Single Partition</title>
 

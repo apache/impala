@@ -60,7 +60,7 @@ under the License.
       <b>Type:</b> numeric
     </p>
 
-    <p rev="IMPALA-3799 CDH-43746">
+    <p rev="IMPALA-3799">
       In <keyword keyref="impala27_full"/> and higher, the argument value can include unit specifiers,
       such as <codeph>100m</codeph> or <codeph>100mb</codeph>. In previous versions,
       Impala interpreted such formatted values as 0, leading to query failures.

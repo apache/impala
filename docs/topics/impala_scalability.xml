@@ -749,7 +749,7 @@ try to limit the number of partitions for any partitioned table to a few tens of
 </conbody>
 </concept>
 
-<concept rev="CDH-38321" id="kerberos_overhead_cluster_size">
+<concept rev="" id="kerberos_overhead_cluster_size">
 <title>Kerberos-Related Network Overhead for Large Clusters</title>
 <conbody>
 <p>

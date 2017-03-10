@@ -189,12 +189,12 @@ Error: Unknown variable TNAME
 +----------+
 </codeblock>
 
-    <p rev="IMPALA-3397 CDH-40097">
+    <p rev="IMPALA-3397">
       The following example shows how the <codeph>SOURCE</codeph> command can execute
       a series of statements from a file:
     </p>
 
-<codeblock rev="IMPALA-3397 CDH-40097">
+<codeblock rev="IMPALA-3397">
 $ cat commands.sql
 show databases;
 show tables in default;
@@ -234,7 +234,7 @@ Query: show functions in _impala_builtins like '*minute*'
 Fetched 5 row(s) in 0.03s
 </codeblock>
 
-    <p rev="IMPALA-3397 CDH-40097">
+    <p rev="IMPALA-3397">
       The following example shows how a file that is run by the <codeph>SOURCE</codeph> command,
       or through the <codeph>-q</codeph> or <codeph>-f</codeph> options of <cmdname>impala-shell</cmdname>,
       can contain additional <codeph>SOURCE</codeph> commands.
@@ -244,7 +244,7 @@ Fetched 5 row(s) in 0.03s
       or test environments.
     </p>
 
-<codeblock rev="IMPALA-3397 CDH-40097">
+<codeblock rev="IMPALA-3397">
 $ cat nested1.sql
 show functions in _impala_builtins like '*minute*';
 source nested2.sql

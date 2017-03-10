@@ -129,8 +129,8 @@ under the License.
           Specify the host and port settings for each Impala node. These are the hosts that the load balancer will
           choose from when relaying each Impala query. See <xref href="impala_ports.xml#ports"/> for when to use
           port 21000, 21050, or another value depending on what type of connections you are load balancing.
-          <note rev="CDH-30399">
-            <p rev="CDH-30399">
+          <note rev="">
+            <p rev="">
               In particular, if you are using Hue or JDBC-based applications,
               you typically set up load balancing for both ports 21000 and 21050, because
               these client applications connect through port 21050 while the <cmdname>impala-shell</cmdname>
