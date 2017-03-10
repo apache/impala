@@ -39,9 +39,8 @@ under the License.
     <p>
       It is important to secure the Hive metastore, so that users cannot access the names or other information
       about databases and tables the through the Hive client or by querying the metastore database. Do this by
-      turning on Hive metastore security, using the instructions in the
-      <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_sg_hive_security.html" scope="external" format="html">CDH 5 Security Guide</xref>
-      for securing different Hive components:
+      turning on Hive metastore security, using the instructions in
+      <xref keyref="cdh_sg_hive_security"/> for securing different Hive components:
     </p>
 
     <ul>

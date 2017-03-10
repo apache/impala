@@ -1376,7 +1376,8 @@ under the License.
             Column-level authorization lets you define access to particular columns within a table,
             rather than the entire table. This feature lets you reduce the reliance on creating views to
             set up authorization schemes for subsets of information.
-            <ph audience="integrated">See <xref href="sg_hive_sql.xml#concept_c2q_4qx_p4/col_level_auth_sentry"/> for background details, and <xref href="impala_grant.xml#grant"/> and <xref href="impala_revoke.xml#revoke"/> for Impala-specific syntax.</ph>
+            See <xref keyref="sg_hive_sql"/> for background details, and
+            <xref href="impala_grant.xml#grant"/> and <xref href="impala_revoke.xml#revoke"/> for Impala-specific syntax.
           </p>
         </li>
 
@@ -1432,10 +1433,7 @@ under the License.
           </ul>
           <p audience="PDF">
             See <xref href="impala_parquet.xml#parquet"/> for instructions about using Parquet data files
-            with Impala, and
-            <xref audience="integrated" href="cdh_ig_parquet.xml#parquet_format"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_parquet.html" scope="external" format="html"/>
-            for instructions for
-            other components that can read and write Parquet files.
+            with Impala.
           </p>
         </li>
 
@@ -1833,9 +1831,7 @@ under the License.
             Redaction of sensitive data from Impala log files. This feature protects details such as credit card
             numbers or tax IDs from administrators who see the text of SQL statements in the course of monitoring
             and troubleshooting a Hadoop cluster. See <xref href="impala_logging.xml#redaction"/> for background
-            information for Impala users, and
-            <xref audience="integrated" href="sg_redaction.xml#log_redact"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_redaction.html" scope="external" format="html">the CDH 5 Security Guide</xref>
-            for usage details.
+            information for Impala users, and <xref keyref="sg_redaction"/> for usage details.
           </p>
         </li>
 
@@ -1844,12 +1840,8 @@ under the License.
             Lineage information is available for data created or queried by Impala. This feature lets you track who
             has accessed data through Impala SQL statements, down to the level of specific columns, and how data
             has been propagated between tables. See <xref href="impala_lineage.xml#lineage"/> for background
-            information for Impala users,
-            <xref audience="integrated" href="datamgmt_impala_lineage_log.xml"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/datamgmt_impala_lineage_log.html" scope="external" format="html"/>
-            for usage details, and
-            <xref audience="integrated" href="cn_iu_lineage.xml" /><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cn_iu_lineage.html" scope="external" format="html"/>.
-            for how to interpret the lineage
-            information.
+            information for Impala users, <xref keyref="datamgmt_impala_lineage_log"/> for usage details and
+            how to interpret the lineage information.
           </p>
         </li>
 
@@ -2159,11 +2151,7 @@ under the License.
 
           <p>
             The new security-related SQL statements work along with the Sentry authorization framework. See
-            <xref
-              href="http://www.cloudera.com/documentation/enterprise/latest/topics/impala_authorization.html#authorization"
-              format="html" scope="external">Enabling
-              Sentry
-              Authorization for Impala</xref> for details.
+            <xref keyref="authorization"/> for details.
           </p>
         </li>
 
@@ -2383,10 +2371,7 @@ under the License.
           <p>
             Impala can now use Sentry-based authorization based either on the original policy file, or on rules
             defined by <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements issued through Hive.
-            <ph audience="PDF">See <xref
-              href="http://www.cloudera.com/documentation/enterprise/latest/topics/impala_authorization.html#authorization"
-              scope="external" format="html">Enabling Sentry Authorization for Impala</xref>
-              for details.</ph>
+            See <xref keyref="authorization"/> for details.
           </p>
         </li>
 

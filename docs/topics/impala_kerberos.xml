@@ -72,9 +72,6 @@ under the License.
 
       <p conref="../shared/impala_common.xml#common/rhel5_kerberos"/>
 
-<!-- This note adapted from the one at http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH4/latest/CDH4-Security-Guide/cdh4sg_topic_3_4.html.
-   Ideally should be conref'ed in both places. -->
-
       <note type="important">
         <p>
           If you plan to use Impala in your cluster, you must configure your KDC to allow tickets to be renewed,

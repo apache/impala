@@ -439,10 +439,6 @@ CREATE TABLE ctas_t1
 ]]>
 </codeblock>
 
-<!-- This clause restriction and other syntax nuances come from this blog post:
-     http://blog.cloudera.com/blog/2015/11/how-to-use-impala-with-kudu/
-     which has some details and examples not found in the actual Kudu docs. -->
-
     <p rev="kudu">
       The following <codeph>CREATE TABLE</codeph> clauses are not supported for Kudu tables:
     </p>

@@ -595,8 +595,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
 
       <p>
         This section lists the most serious or frequently encountered customer
-        issues fixed in <keyword keyref="impala232"/>. For the full list of fixed Impala issues,
-        see <xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_552.html" format="html" scope="external">the CDH 5.5.x release notes</xref><xref href="cdh_rn_fixed_in_55.xml#fixed_issues_552" audience="integrated"/>.
+        issues fixed in <keyword keyref="impala232"/>.
       </p>
 
     </conbody>
@@ -886,12 +885,8 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         issues fixed in <keyword keyref="impala23_full"/>. Any issues already fixed in
         <keyword keyref="impala22"/> maintenance releases (up through <keyword keyref="impala228"/>) are also included.
         Those issues are listed under the respective <keyword keyref="impala22"/> sections and are
-        not repeated here. For the full list of fixed Impala issues, see <xref
-          audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_550.html"
-          format="html" scope="external">the CDH 5.5.x release notes</xref><xref
-          href="cdh_rn_fixed_in_55.xml#concept_hjb_1pf_x5" audience="integrated"
-        />. </p>
+        not repeated here.
+      </p>
 
 <!-- Raw "Fixed Issue" info from Silvius' working doc: https://docs.google.com/document/d/1PCboHo2Em-fySAHr3YF1ZZxMEfK8_vFFpP1rkWzyRZM/edit#
 
@@ -1150,14 +1145,6 @@ IMPALA-1917
         This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala229"/>.
       </p>
 
-      <p>
-        For the full list of fixed issues, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_549.html"
-          format="html" scope="external">the CDH 5.4.x release notes</xref><xref
-            audience="integrated" href="cdh_rn_fixed_in_54.xml#fixed_issues_549"/>.
-      </p>
-
     </conbody>
 
 <!-- List of fixed issues from Juan Yu's spreadsheet: https://docs.google.com/spreadsheets/d/1Ia06xOLKQInKfsJzQfQ6Sf1fO3nYLOpZ-0OWfFNgNSc/edit#gid=1566007471
@@ -1364,12 +1351,6 @@ d9d2a10 IMPALA-0000: Log backtrace on all MEM_LIMIT_EXCEEDED errors
         This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala228"/>.
       </p>
 
-      <p>
-        For the full list of fixed issues, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_548.html" format="html" scope="external">the CDH 5.4.x release notes</xref><xref audience="integrated" href="cdh_rn_fixed_in_54.xml#fixed_issues_548"/>.
-      </p>
-
     </conbody>
 
 <!--
@@ -1482,12 +1463,6 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
 
       <p>
         This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala227"/>.
-      </p>
-
-      <p>
-        For the full list of fixed issues, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_547.html" format="html" scope="external">the CDH 5.4.x release notes</xref><xref audience="integrated" href="cdh_rn_fixed_in_54.xml#fixed_issues_547"/>.
       </p>
 
     </conbody>
@@ -1677,12 +1652,6 @@ ce9fa25 IMPALA-2201: Unconditionally update the partition stats and row count.
         This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala225"/>.
       </p>
 
-      <p>
-        For the full list of fixed issues, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_545.html" format="html" scope="external">the CDH 5.4.x release notes</xref><xref audience="integrated" href="cdh_rn_fixed_in_54.xml#fixed_issues_545"/>.
-      </p>
-
     </conbody>
 
 <!--
@@ -1805,12 +1774,6 @@ c2b8852 IMPALA-2018: Where clause does not propagate to joins inside nested view
         This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala223"/>.
       </p>
 
-      <p>
-        For the full list of fixed issues, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_543.html" format="html" scope="external">the CDH 5.4.1 release notes</xref><xref audience="integrated" href="cdh_rn_fixed_in_54.xml#fixed_issues_543"/>.
-      </p>
-
     </conbody>
 
 <!-- List of fixed issues from Juan's spreadsheet: https://docs.google.com/spreadsheets/d/1Ia06xOLKQInKfsJzQfQ6Sf1fO3nYLOpZ-0OWfFNgNSc/edit#gid=1566007471
@@ -1926,12 +1889,6 @@ ce601ec : Enable using isilon as the underlying filesystem.
 
       <p>
         This section lists the most frequently encountered customer issues fixed in <keyword keyref="impala221"/>.
-      </p>
-
-      <p>
-        For the full list of fixed issues, see
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_541.html" format="html" scope="external">the CDH 5.4.1 release notes</xref><xref audience="integrated" href="cdh_rn_fixed_in_54.xml#fixed_issues_541"/>.
       </p>
 
     </conbody>
@@ -2146,13 +2103,6 @@ IMPALA-1607
         This section lists the most significant Impala issues fixed in <keyword keyref="impala217"/>.
       </p>
 
-      <p> For the full list of Impala fixed issues in this release, see <xref
-          audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_539.html"
-          format="html" scope="external">the CDH 5.3.9 release notes</xref><xref
-          href="cdh_rn_fixed_in_53.xml#fixed_issues_539" audience="integrated"
-        />. </p>
-
     </conbody>
 <!--
 5e7e50d IMPALA-1917: Do not register aux equivalence predicates with NULL on either side.
@@ -2242,13 +2192,6 @@ e591cf4 IMPALA-2141: UnionNode::GetNext() doesn't check for query errors
         This section lists the most significant Impala issues fixed in Impala 2.1.6.
       </p>
 
-      <p> For the full list of Impala fixed issues in this release, see <!-- Don't think we have quite the right combination of conditional options to make this reference be a web link in Impala PDF and a normal xref in Release Notes PDF. -->
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_538.html"
-          format="html" scope="external">the CDH 5.3.8 release notes</xref><xref
-          href="cdh_rn_fixed_in_53.xml#fixed_issues_538" audience="integrated"
-        />. </p>
-
     </conbody>
 
 <!--
@@ -2328,13 +2271,6 @@ e591cf4 IMPALA-2141: UnionNode::GetNext() doesn't check for query errors
         This section lists the most significant Impala issues fixed in Impala 2.1.5.
       </p>
 
-      <p> For the full list of Impala fixed issues in this release, see <!-- Don't think we have quite the right combination of conditional options to make this reference be a web link in Impala PDF and a normal xref in Release Notes PDF. -->
-        <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_536.html"
-          format="html" scope="external">the CDH 5.3.6 release notes</xref><xref
-          href="cdh_rn_fixed_in_53.xml#fixed_issues_536" audience="integrated"
-        />. </p>
-
     </conbody>
 
 <!--
@@ -2367,13 +2303,6 @@ e591cf4 IMPALA-2141: UnionNode::GetNext() doesn't check for query errors
       <p>
         This section lists the most significant Impala issues fixed in Impala 2.1.4.
       </p>
-
-      <p> For the full list of Impala fixed issues in Impala 2.1.4,
-        see <xref audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_534.html"
-          format="html" scope="external">the CDH 5.3.4 release notes</xref><xref
-          href="cdh_rn_fixed_in_53.xml#fixed_issues_534" audience="integrated"
-        />. </p>
 
       <p outputclass="toc inpage"/>
     </conbody>
@@ -2509,16 +2438,6 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
 
       <p>
         This section lists the most significant issues fixed in Impala 2.1.3.
-      </p>
-
-      <p> For the full list of fixed issues in Impala 2.1.3, see <xref
-          audience="standalone"
-          href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_rn_fixed_in_533.html"
-          format="html" scope="external">the CDH 5.3.3 release notes</xref><xref
-          href="cdh_rn_fixed_in_53.xml#fixed_issues_533" audience="integrated"
-        />.
-        <!-- <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.1.3%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>. -->
       </p>
 
       <p outputclass="toc inpage"/>
@@ -3511,9 +3430,8 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
   <concept rev="1.4.4" id="fixed_issues_144">
   <title>Issues Fixed in Impala 1.4.4</title>
     <conbody>
+
       <p>
-        For the list of fixed issues, see
-        <xref href="http://www.cloudera.com/documentation/enterprise/release-notes/topics/cdh_rn_fixed_in_51.html" scope="external" format="html">Issues Fixed in CDH 5.1.5</xref>.
       </p>
 
     </conbody>
@@ -4679,7 +4597,6 @@ Bad stats:
           the query.
         </p>
 
-<!-- <p><b>Bug:</b> <xref href="https://jira.cloudera.com/browse/IMP-1258" scope="external" format="html">IMP-1258</xref></p> -->
       </conbody>
     </concept>
 

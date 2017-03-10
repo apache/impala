@@ -32,12 +32,6 @@ under the License.
 
   <conbody>
 
-<!--
-The original brief explanation with not enough detail comes from the comments at:
-  http://github.sf.cloudera.com/CDH/Impala/raw/master/common/thrift/ImpalaService.thrift
-Removing that wording from here after discussions with dev team. Just recording the URL for posterity.
--->
-
     <p>
       An obsolete query option from early work on support for file formats. Do not use. Might be removed in the
       future.

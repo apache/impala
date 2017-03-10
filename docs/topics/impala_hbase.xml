@@ -535,7 +535,6 @@ explain
           queries by turning off the <codeph>HBASE_CACHE_BLOCKS</codeph> setting
           and specifying a large number for the <codeph>HBASE_CACHING</codeph>
           setting.
-          <!-- That recommendation w.r.t. full-table scans comes from the Cloudera HBase forum: http://community.cloudera.com/t5/Realtime-Random-Access-Apache/How-to-optimise-Full-Table-Scan-FTS-in-HBase/td-p/97 -->
         </p>
 
         <p>

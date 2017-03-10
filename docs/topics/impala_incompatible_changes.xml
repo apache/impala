@@ -813,7 +813,7 @@ under the License.
   </concept>
 
   <concept rev="1.4.4" id="incompatible_changes_144">
-    <title>Incompatible Changes Introduced in Impala 1.4.4 /</title>
+    <title>Incompatible Changes Introduced in Impala 1.4.4</title>
     <conbody>
       <p>
         No incompatible changes.
@@ -878,12 +878,8 @@ under the License.
             There is a slight change to required security privileges in the Sentry framework. To create a new
             object, now you need the <codeph>ALL</codeph> privilege on the parent object. For example, to create a
             new table, view, or function requires having the <codeph>ALL</codeph> privilege on the database
-            containing the new object. <ph audience="PDF">See
-              <xref
-                href="http://www.cloudera.com/documentation/enterprise/latest/topics/impala_authorization.html"
-                scope="external" format="html">Privilege Model and Object Hierarchy</xref>
-              for a full list of operations and
-            associated privileges.</ph>
+            containing the new object. See <xref href="impala_authorization.xml"/> for a full list of operations and
+            associated privileges.
           </p>
         </li>
 

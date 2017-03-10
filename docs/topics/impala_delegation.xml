@@ -73,10 +73,9 @@ under the License.
     <p>
       See <xref href="impala_config_options.xml#config_options"/> for details about adding or changing
       <cmdname>impalad</cmdname> startup options. See
-      <xref href="http://blog.cloudera.com/blog/2013/07/how-hiveserver2-brings-security-and-concurrency-to-apache-hive/" scope="external" format="html">this
-      Cloudera blog post</xref> for background information about the delegation capability in HiveServer2.
+      <xref keyref="how-hiveserver2-brings-security-and-concurrency-to-apache-hive">this
+      blog post</xref> for background information about the delegation capability in HiveServer2.
     </p>
-    <!-- Link to Cloudera blog post -->
     <p>
       To set up authentication for the delegated users:
     </p>

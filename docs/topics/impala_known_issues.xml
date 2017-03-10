@@ -1384,11 +1384,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
       <conbody>
 
-        <p audience="hidden">
-          <b>Cloudera Bug:</b> <xref href="https://jira.cloudera.com/browse/IMP-469" scope="external" format="html"/>; KI added 0.1
-          <i>Cloudera internal only</i>
-        </p>
-
         <p>
           <b>Anticipated Resolution</b>: None
         </p>
@@ -1412,11 +1407,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         <p>
           Impala behavior differs from Hive with respect to out of range float/double values. Out of range values are returned as maximum
           allowed value of type (Hive returns NULL).
-        </p>
-
-        <p audience="hidden">
-          <b>Cloudera Bug:</b> <xref href="https://jira.cloudera.com/browse/IMP-175" scope="external" format="html">IMPALA-175</xref> ; KI
-          added 0.1 <i>Cloudera internal only</i>
         </p>
 
         <p>

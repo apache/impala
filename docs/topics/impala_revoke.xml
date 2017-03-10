@@ -66,8 +66,7 @@ object_type ::= TABLE | DATABASE | SERVER | URI
     <p rev="2.3.0 collevelauth">
       The ability to grant or revoke <codeph>SELECT</codeph> privilege on specific columns is available
       in <keyword keyref="impala23_full"/> and higher. See
-      <xref audience="integrated" href="sg_hive_sql.xml#concept_c2q_4qx_p4/col_level_auth_sentry"/><xref audience="standalone" href="https://www.cloudera.com/documentation/enterprise/latest/topics/sg_hive_sql.html" format="html" scope="external"/>
-      for details.
+      <xref keyref="sg_hive_sql"/> for details.
     </p>
 
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>

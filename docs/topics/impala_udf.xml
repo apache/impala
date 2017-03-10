@@ -382,13 +382,7 @@ Returned 1 row(s) in 0.11s
 Returned 1 row(s) in 0.11s</codeblock>
 
           <p>
-            You can find the sample files mentioned here in
-            <xref href="https://github.com/cloudera/impala/tree/master/be/src/udf_samples" scope="external" format="html">the
-            Impala github repo</xref>.
-<!-- Internal-only repo, don't know an external equivalent.
-and other examples demonstrating this technique in
-<xref href="http://github.sf.cloudera.com/CDH/Impala/blob/master/testdata/workloads/functional-query/queries/QueryTest/load-hive-udfs.test" scope="external" format="html">the Impala test files</xref>.
--->
+            You can find the sample files mentioned here in <xref keyref="udf_samples"/>.
           </p>
 
         </example>
@@ -422,13 +416,11 @@ and other examples demonstrating this technique in
 
       <ol>
         <li>
-          Start at <xref href="https://archive.cloudera.com/cdh5/" scope="external" format="html"/>.
+          Start at <xref keyref="archive_root"/>.
         </li>
 
         <li>
-          Locate the appropriate <codeph>.repo</codeph> or list file for your operating system version, such as
-          <xref href="https://archive.cloudera.com/impala/redhat/6/x86_64/impala/cloudera-impala.repo" scope="external" format="html">the
-          <codeph>.repo</codeph> file for RHEL 6</xref>.
+          Locate the appropriate <codeph>.repo</codeph> or list file for your operating system version.
         </li>
 
         <li>

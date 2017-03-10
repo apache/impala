@@ -44,7 +44,7 @@ under the License.
 
     <p>
       Once you are finished reviewing these release notes, for more information about using Impala, see
-      <xref audience="integrated" href="impala.xml"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/impala.html" scope="external" format="html"/>.
+      <xref href="impala_concepts.xml"/>.
     </p>
 
     <p outputclass="toc"/>

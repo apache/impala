@@ -2627,8 +2627,7 @@ STORED AS PARQUET;
       <conbody>
 
         <p>
-          You can produce Parquet data files through several Hadoop components and APIs, as explained in
-          <xref audience="integrated" href="cdh_ig_parquet.xml#parquet_format"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_ig_parquet.html" scope="external" format="html"/>.
+          You can produce Parquet data files through several Hadoop components and APIs.
         </p>
 
         <p>

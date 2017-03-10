@@ -128,13 +128,6 @@ under the License.
         or the expected memory usage of the concurrent queries is exceeded, subsequent queries
         are queued until the concurrent workload falls below the threshold again.
       </p>
-      <p>
-        See
-        <xref audience="integrated" href="cm_mc_resource_pools.xml#concept_xkk_l1d_wr"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_resource_pools.html" scope="external" format="html"/>
-        for information about all these dynamic resource
-        pool settings, how to use them together, and how to divide different parts of your workload among
-        different pools.
-      </p>
     </conbody>
   </concept>
 
@@ -164,13 +157,6 @@ under the License.
         <xref href="impala_admission.xml#admission_concurrency"/>. If either the maximum number of
         or the expected memory usage of the concurrent queries is exceeded, subsequent queries
         are queued until the concurrent workload falls below the threshold again.
-      </p>
-      <p>
-        See
-        <xref audience="integrated" href="cm_mc_resource_pools.xml#concept_xkk_l1d_wr"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/cm_mc_resource_pools.html" scope="external" format="html"/>
-        for information about all these dynamic resource
-        pool settings, how to use them together, and how to divide different parts of your workload among
-        different pools.
       </p>
     </conbody>
   </concept>
@@ -873,8 +859,7 @@ drop table huge_table;
 
       <p>
         For details about all the Fair Scheduler configuration settings, see
-        <xref href="https://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" scope="external" format="html">Fair
-        Scheduler Configuration</xref>, in particular the tags such as <codeph>&lt;queue&gt;</codeph> and
+        <xref keyref="FairScheduler">Fair Scheduler Configuration</xref>, in particular the tags such as <codeph>&lt;queue&gt;</codeph> and
         <codeph>&lt;aclSubmitApps&gt;</codeph> to map users and groups to particular resource pools (queues).
       </p>
 

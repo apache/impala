@@ -487,38 +487,31 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</codeblock>
             <p>
               Download and install the appropriate file to each machine on which you intend to use LZO with Impala.
               These files all come from
-              <xref href="https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/" scope="external" format="html">this GPL
-              extras</xref> download site. Install the:
+              <xref keyref="gplextras">this GPL extras</xref> download site. Install the:
             </p>
             <ul>
               <li>
-                <xref href="https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/cloudera-gplextras4.repo" scope="external" format="repo">Red
-                Hat 5 repo file</xref> to <filepath>/etc/yum.repos.d/</filepath>.
+                <xref keyref="gplextras_rhel5">Red Hat 5 repo file</xref> to <filepath>/etc/yum.repos.d/</filepath>.
               </li>
 
               <li>
-                <xref href="https://archive.cloudera.com/gplextras/redhat/6/x86_64/gplextras/cloudera-gplextras4.repo" scope="external" format="repo">Red
-                Hat 6 repo file</xref> to <filepath>/etc/yum.repos.d/</filepath>.
+                <xref keyref="gplextras_rhel6">Red Hat 6 repo file</xref> to <filepath>/etc/yum.repos.d/</filepath>.
               </li>
 
               <li>
-                <xref href="https://archive.cloudera.com/gplextras/sles/11/x86_64/gplextras/cloudera-gplextras4.repo" scope="external" format="repo">SUSE
-                repo file</xref> to <filepath>/etc/zypp/repos.d/</filepath>.
+                <xref keyref="gplextras_sles11">SUSE repo file</xref> to <filepath>/etc/zypp/repos.d/</filepath>.
               </li>
 
               <li>
-                <xref href="https://archive.cloudera.com/gplextras/ubuntu/lucid/amd64/gplextras/cloudera.list" scope="external" format="list">Ubuntu
-                10.04 list file</xref> to <filepath>/etc/apt/sources.list.d/</filepath>.
+                <xref keyref="gplextras_ubuntu_lucid">Ubuntu 10.04 list file</xref> to <filepath>/etc/apt/sources.list.d/</filepath>.
               </li>
 
               <li>
-                <xref href="https://archive.cloudera.com/gplextras/ubuntu/precise/amd64/gplextras/cloudera.list" scope="external" format="list">Ubuntu
-                12.04 list file</xref> to <filepath>/etc/apt/sources.list.d/</filepath>.
+                <xref keyref="gplextras_ubuntu_precise">Ubuntu 12.04 list file</xref> to <filepath>/etc/apt/sources.list.d/</filepath>.
               </li>
 
               <li>
-                <xref href="https://archive.cloudera.com/gplextras/debian/squeeze/amd64/gplextras/cloudera.list" scope="external" format="list">Debian
-                list file</xref> to <filepath>/etc/apt/sources.list.d/</filepath>.
+                <xref keyref="gplextras_debian_squeeze">Debian list file</xref> to <filepath>/etc/apt/sources.list.d/</filepath>.
               </li>
             </ul>
           </li>

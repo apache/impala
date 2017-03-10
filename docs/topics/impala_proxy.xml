@@ -153,8 +153,6 @@ under the License.
       <note>
         The following sections use the HAProxy software as a representative example of a load balancer
         that you can use with Impala.
-        For information specifically about using Impala with the F5 BIG-IP load balancer, see
-        <xref href="http://www.cloudera.com/documentation/other/reference-architecture/PDF/Impala-HA-with-F5-BIG-IP.pdf" scope="external" format="html">Impala HA with F5 BIG-IP</xref>.
       </note>
 
     </conbody>
@@ -248,9 +246,8 @@ under the License.
       <ol>
         <li>
           This section assumes you are starting with a Kerberos-enabled cluster. See
-          <xref href="impala_kerberos.xml#kerberos"/> for instructions for setting up Impala with Kerberos. See the
-          <cite>CDH Security Guide</cite> for
-          <xref href="http://www.cloudera.com/documentation/enterprise/latest/topics/cdh_sg_kerberos_prin_keytab_deploy.html" scope="external" format="html">general steps to set up Kerberos</xref>.
+          <xref href="impala_kerberos.xml#kerberos"/> for instructions for setting up Impala with Kerberos. See
+          <xref keyref="cdh_sg_kerberos_prin_keytab_deploy"/> for general steps to set up Kerberos.
         </li>
 
         <li>

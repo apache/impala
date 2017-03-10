@@ -316,7 +316,7 @@ under the License.
               <entry>SELECT<p>-You can grant the SELECT privilege on a view to
                   give users access to specific columns of a table they do not
                   otherwise have access to.</p><p>-See
-                  <xref audience="integrated" href="../topics/sg_hive_sql.xml#concept_c2q_4qx_p4/col_level_auth_sentry"/><xref audience="standalone" href="https://www.cloudera.com/documentation/enterprise/latest/topics/sg_hive_sql.html" format="html" scope="external"/>
+                  <xref keyref="sg_hive_sql"/>
                   for details on allowed column-level
                 operations.</p></entry>
               <entry>VIEW/TABLE; COLUMN</entry>
@@ -1176,9 +1176,7 @@ drop database temp;
       <p id="redaction_yes" rev="2.2.0">
         If these statements in your environment contain sensitive literal values such as credit card numbers or tax
         identifiers, Impala can redact this sensitive information when displaying the statements in log files and
-        other administrative contexts. See
-        <xref audience="integrated" href="../topics/sg_redaction.xml#log_redact"/><xref audience="standalone" href="http://www.cloudera.com/content/cloudera/en/documentation/core/latest/topics/sg_redaction.html" scope="external" format="html"/>
-        for details.
+        other administrative contexts. See <xref keyref="sg_redaction"/> for details.
       </p>
 
       <p id="incremental_partition_spec">
@@ -1868,8 +1866,8 @@ show functions in _impala_builtins like '*<varname>substring</varname>*';
       <p rev="2.3.0" id="jdbc_odbc_complex_types">
         The Impala complex types (<codeph>STRUCT</codeph>, <codeph>ARRAY</codeph>, or <codeph>MAP</codeph>)
         are available in <keyword keyref="impala23_full"/> and higher.
-        To use these types with JDBC requires version 2.5.28 or higher of the Cloudera JDBC Connector for Impala.
-        To use these types with ODBC requires version 2.5.30 or higher of the Cloudera ODBC Connector for Impala.
+        To use these types with JDBC requires version 2.5.28 or higher of the JDBC Connector for Impala.
+        To use these types with ODBC requires version 2.5.30 or higher of the ODBC Connector for Impala.
         Consider upgrading all JDBC and ODBC drivers at the same time you upgrade from <keyword keyref="impala23_full"/> or higher.
       </p>
 
@@ -3110,9 +3108,8 @@ sudo pip-python install ssl</codeblock>
       <p id="hive_jdbc_ssl_kerberos_caveat">
         Prior to <keyword keyref="impala25_full"/>, the Hive JDBC driver did not support connections that use both Kerberos authentication
         and SSL encryption. If your cluster is running an older release that has this restriction,
-        to use both of these security features with Impala through a JDBC application,
-        use the <xref href="http://www.cloudera.com/content/www/en-us/downloads.html.html" scope="external" format="html">Cloudera JDBC Connector</xref>
-        as the JDBC driver.
+        use an alternative JDBC driver that supports
+        both of these security features.
       </p>
 
     </section>

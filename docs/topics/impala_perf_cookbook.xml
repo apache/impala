@@ -275,8 +275,7 @@ under the License.
       <title>Use appropriate operating system settings.</title>
 
       <p>
-        See <xref href="http://www.cloudera.com/content/www/en-us/documentation/enterprise/latest/topics/cdh_admin_performance.html" scope="external" format="html">Optimizing Performance in CDH</xref>
-        for recommendations about operating system
+        See <xref keyref="cdh_admin_performance"/> for recommendations about operating system
         settings that you can change to influence Impala performance. In particular, you might find
         that changing the <codeph>vm.swappiness</codeph> Linux kernel setting to a non-zero value improves
         overall performance.

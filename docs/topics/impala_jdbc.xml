@@ -176,9 +176,8 @@ under the License.
             Download the JAR files listed above to each client machine.
             <note>
               For Maven users, see
-              <xref href="https://github.com/onefoursix/Cloudera-Impala-JDBC-Example" scope="external" format="html">this
-              sample github page</xref> for an example of the dependencies you could add to a <codeph>pom</codeph>
-              file instead of downloading the individual JARs.
+              <xref keyref="Impala-JDBC-Example">this sample github page</xref> for an example of the
+              dependencies you could add to a <codeph>pom</codeph> file instead of downloading the individual JARs.
             </note>
           </li>
 
@@ -187,8 +186,7 @@ under the License.
             <codeph>CLASSPATH</codeph> setting. For example:
             <ul>
               <li>
-                On Linux, you might use a location such as
-                <codeph>/</codeph><codeph>opt</codeph><codeph>/jars/</codeph>.
+                On Linux, you might use a location such as <codeph>/opt/jars/</codeph>.
               </li>
 
               <li>

@@ -66,13 +66,10 @@ under the License.
         <indexterm audience="hidden">SLES</indexterm>
         <indexterm audience="hidden">Ubuntu</indexterm>
         <indexterm audience="hidden">SUSE</indexterm>
-        <indexterm audience="hidden">Debian</indexterm> The relevant supported operating systems
-        and versions for Impala are the same as for the corresponding CDH 5 platforms. For
-        details, see the <cite>Supported Operating Systems</cite> page for
-        <ph audience="integrated"><xref href="rn_consolidated_pcm.xml#cdh_cm_supported_os">CDH
-            5</xref></ph><ph audience="standalone"><xref
-            href="http://www.cloudera.com/documentation/enterprise/latest/topics/rn_consolidated_pcm.html#cdh_cm_supported_os"
-            scope="external" format="html">CDH 5</xref></ph>. </p>
+        <indexterm audience="hidden">Debian</indexterm>
+        Apache Impala runs on Linux systems only. See the <filepath>README.md</filepath>
+        file for more information.
+      </p>
     </conbody>
   </concept>
 

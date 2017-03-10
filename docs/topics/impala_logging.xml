@@ -449,9 +449,7 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
       </p>
 
       <p>
-        See
-        <xref audience="integrated" href="sg_redaction.xml#log_redact"/><xref audience="standalone" href="http://www.cloudera.com/documentation/enterprise/latest/topics/sg_redaction.html" scope="external" format="html"/>
-        for details about how to enable this feature and set
+        See <xref keyref="sg_redaction"/> for details about how to enable this feature and set
         up the regular expressions to detect and redact sensitive information within SQL statement text.
       </p>
 

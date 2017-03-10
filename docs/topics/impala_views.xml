@@ -113,10 +113,7 @@ select * from report;</codeblock>
         Set up fine-grained security where a user can query some columns from a table but not other columns.
         Because <keyword keyref="impala23_full"/> and higher support column-level authorization, this technique is no longer
         required. If you formerly implemented column-level security through views, see
-        <xref audience="integrated" href="sg_hive_sql.xml#concept_c2q_4qx_p4/col_level_auth_sentry"/><xref audience="standalone" href="https://www.cloudera.com/documentation/enterprise/latest/topics/sg_hive_sql.html" format="html" scope="external"/>
-        for details about the
-        column-level authorization feature.
-        <!-- See <xref href="impala_authorization.xml#security_examples/sec_ex_views"/> for details. -->
+        <xref keyref="sg_hive_sql"/> for details about the column-level authorization feature.
       </li>
     </ul>
 

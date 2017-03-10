@@ -59,11 +59,9 @@ under the License.
       </note>
 
         <p>
-          See the
-          <xref href="http://www.cloudera.com/content/support/en/downloads/download-components/download-products.html?productID=3mDesWddUS" scope="external" format="html">downloads
-          page</xref> for a matrix of the certified driver version for different products. See the
-          <xref href="http://www.cloudera.com/content/support/en/documentation/cloudera-connectors-documentation/connector-documentation-latest.html" scope="external" format="html">documentation
-          page</xref> for installation instructions.
+          See <xref keyref="odbc_driver_download">this downloads page</xref> for a matrix of the certified
+          driver version for different products. See
+          <xref keyref="connector-documentation-latest">this documentation page</xref> for installation instructions.
         </p>
 
       </conbody>
@@ -73,14 +71,14 @@ under the License.
       <title>Configuring the ODBC Port</title>
       <conbody>
         <p>
-          Versions 2.5 and 2.0 of the Cloudera ODBC Connector, currently certified for some but not all BI applications,
+          Versions 2.5 and 2.0 of the ODBC Connector, currently certified for some but not all BI applications,
           use the HiveServer2 protocol, corresponding to Impala port 21050. Impala supports Kerberos authentication with
           all the supported versions of the driver, and requires ODBC 2.05.13 for Impala or higher for LDAP username/password
           authentication.
         </p>
 
         <p>
-          Version 1.x of the Cloudera ODBC Connector uses the original HiveServer1 protocol, corresponding to Impala
+          Version 1.x of the ODBC Connector uses the original HiveServer1 protocol, corresponding to Impala
           port 21000.
         </p>
 
@@ -96,7 +94,7 @@ under the License.
           all required drivers and a business intelligence application
           that uses the ODBC driver, under Mac OS X. Each <codeph>.dmg</codeph> file runs a GUI-based
           installer, first for the <xref href="http://www.iodbc.org/dataspace/iodbc/wiki/iODBC/Downloads" scope="external" format="html">underlying IODBC driver</xref> needed for non-Windows systems, then for
-          the Cloudera ODBC Connector, and finally for the BI tool itself.
+          the ODBC Connector, and finally for the BI tool itself.
         </p>
 
 <codeblock>$ ls -1
@@ -107,7 +105,7 @@ ClouderaImpalaODBC.dmg
 $ open iodbc-sdk-3.52.7-macosx-10.dmg
 <varname>Install the IODBC driver using its installer</varname>
 $ open ClouderaImpalaODBC.dmg
-<varname>Install the Cloudera ODBC Connector using its installer</varname>
+<varname>Install the ODBC Connector using its installer</varname>
 $ installer_dir=$(pwd)
 $ cd /opt/cloudera/impalaodbc
 $ ls -1
@@ -134,7 +132,7 @@ Sample Cloudera Impala DSN=Cloudera ODBC Driver for Impala
 
 # Description: DSN Description.
 # This key is not necessary and is only to give a description of the data source.
-Description=Cloudera ODBC Driver for Impala DSN
+Description=ODBC Driver for Impala DSN
 
 # Driver: The location where the ODBC driver is installed to.
 Driver=/opt/cloudera/impalaodbc/lib/universal/libclouderaimpalaodbc.dylib

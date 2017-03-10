@@ -153,7 +153,7 @@ MEM_LIMIT set to 3m
 +---+
 [localhost:21000] > set mem_limit=3mb;
 MEM_LIMIT set to 3mb
-[nightly55-2.vpc.cloudera.com:21000] > select 5;
+[localhost:21000] > select 5;
 +---+
 | 5 |
 +---+

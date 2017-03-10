@@ -78,12 +78,8 @@ under the License.
     <topicmeta><linktext>test-udas.cc</linktext></topicmeta>
   </keydef>
   <keydef href="https://github.com/cloudera/impala/tree/master/be/src/udf_samples" scope="external" format="html" keys="udf_samples">
-    <topicmeta><linktext>udf_samples</linktext></topicmeta>
+    <topicmeta><linktext>the udf_samples github repo</linktext></topicmeta>
   </keydef>
-
-  <keydef href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/CDH-Version-and-Packaging-Information/CDH-Version-and-Packaging-Information.html" scope="external" format="html" keys="CDH-Version-and-Packaging-Information"/>
-  <keydef href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Navigator/latest/Cloudera-Navigator-Installation-and-User-Guide/Cloudera-Navigator-Installation-and-User-Guide.html" scope="external" format="html" keys="Cloudera-Navigator-Installation-and-User-Guide"/>
-  <keydef href="http://www.cloudera.com/content/support/en/downloads/quickstart_vms.html" scope="external" format="html" keys="quickstart_vms"/>
 
   <keydef href="https://chromium.googlesource.com/breakpad/breakpad/" scope="external" format="html" keys="breakpad_project"/>
 
@@ -91,21 +87,24 @@ under the License.
     <topicmeta><linktext>Hue</linktext></topicmeta>
   </keydef>
 
-  <keydef href="http://radar.oreilly.com/2013/10/cloudera-impala-bringing-the-sql-and-hadoop-worlds-together.html" scope="external" format="html" keys="cloudera-impala-bringing-the-sql-and-hadoop-worlds-together"/>
-  <keydef href="http://shop.oreilly.com/product/0636920033936.do" scope="external" format="html" keys="0636920033936.do"/>
-  <keydef href="http://www.cloudera.com/content/cloudera/en/resources/library/recordedwebinar/impala-real-time-queries-in-hadoop-webinar-slides.html" scope="external" format="html" keys="impala-real-time-queries-in-hadoop-webinar-slides"/>
+  <keydef href="http://shop.oreilly.com/product/0636920033936.do" scope="external" format="html" keys="0636920033936.do">
+    <topicmeta><linktext>Getting Started with Impala</linktext></topicmeta>
+  </keydef>
 
-  <keydef href="http://www.cloudera.com/content/cloudera/en/products-and-services/cdh/impala.html" scope="external" format="html" keys="impala-product"/>
-  <!-- <keydef href="https://groups.google.com/a/cloudera.org/forum/?fromgroups#!forum/impala-user" scope="external" format="html" keys="impala-user"/> -->
   <keydef href="https://mail-archives.apache.org/mod_mbox/incubator-impala-user/" scope="external" format="html" keys="impala-user"/>
   <keydef href="https://issues.cloudera.org/browse/IMPALA" scope="external" format="html" keys="impala-jira"/>
-  <keydef href="http://www.cloudera.com/content/dam/cloudera/Resources/PDF/whitepaper/AWS_Reference_Architecture_Whitepaper.pdf" scope="external" format="html" keys="AWS_Reference_Architecture_Whitepaper.pdf"/>
 
-  <keydef href="https://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html" scope="external" format="html" keys="HdfsDesign"/>
-  <keydef href="https://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-project-dist/hadoop-common/FileSystemShell.html" scope="external" format="html" keys="FileSystemShell"/>
-  <keydef href="http://archive.cloudera.com/cdh5/cdh/5/hadoop/hadoop-project-dist/hadoop-hdfs/HdfsPermissionsGuide.html" scope="external" format="html" keys="HdfsPermissionsGuide"/>
   <keydef href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" scope="external" format="html" keys="FairScheduler"/>
+  <keydef href="https://archive.cloudera.com/cdh5/" scope="external" format="html" keys="archive_root">
+    <topicmeta><linktext>the top level of this software archive</linktext></topicmeta>
+  </keydef>
   <keydef href="https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/" scope="external" format="html" keys="gplextras"/>
+  <keydef href="https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/cloudera-gplextras4.repo" scope="external" format="html" keys="gplextras_rhel5"/>
+  <keydef href="https://archive.cloudera.com/gplextras/redhat/6/x86_64/gplextras/cloudera-gplextras4.repo" scope="external" format="html" keys="gplextras_rhel6"/>
+  <keydef href="https://archive.cloudera.com/gplextras/sles/11/x86_64/gplextras/cloudera-gplextras4.repo" scope="external" format="html" keys="gplextras_sles11"/>
+  <keydef href="https://archive.cloudera.com/gplextras/ubuntu/lucid/amd64/gplextras/cloudera.list" scope="external" format="html" keys="gplextras_ubuntu_lucid"/>
+  <keydef href="https://archive.cloudera.com/gplextras/ubuntu/precise/amd64/gplextras/cloudera.list" scope="external" format="html" keys="gplextras_ubuntu_precise"/>
+  <keydef href="https://archive.cloudera.com/gplextras/debian/squeeze/amd64/gplextras/cloudera.list" scope="external" format="html" keys="gplextras_debian_squeeze"/>
 
   <keydef href="https://code.google.com/p/re2/" scope="external" format="html" keys="re2"/>
   <keydef href="http://goog-perftools.sourceforge.net/doc/tcmalloc.html" scope="external" format="html" keys="tcmalloc"/>
@@ -116,14 +115,11 @@ under the License.
   <keydef href="http://sentry.incubator.apache.org/" scope="external" format="html" keys="sentry"/>
 
   <!-- Download page that leads to ODBC drivers. -->
-  <keydef href="http://www.cloudera.com/content/support/en/downloads/download-components/download-products.html?productID=3mDesWddUS" scope="external" format="html" keys="3mDesWddUS"/>
+  <keydef href="https://www.cloudera.com/downloads/connectors/impala/odbc.html" scope="external" format="html" keys="odbc_driver_download"/>
   <keydef href="http://www.cloudera.com/content/support/en/documentation/cloudera-connectors-documentation/connector-documentation-latest.html" scope="external" format="html" keys="connector-documentation-latest"/>
   <keydef href="http://www.iodbc.org/dataspace/iodbc/wiki/iODBC/Downloads" scope="external" format="html" keys="iODBC_Downloads"/>
-  <keydef href="http://go.cloudera.com/odbc-driver-hive-impala.html" scope="external" format="html" keys="odbc-driver-hive-impala"/>
-  <keydef href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/Connectors/PDF/Cloudera-ODBC-Driver-for-Impala-Install-Guide.pdf" scope="external" format="html" keys="Cloudera-ODBC-Driver-for-Impala-Install-Guide.pdf"/>
 
-  <keydef href="http://www.cloudera.com/content/cloudera/en/downloads/connectors/impala/jdbc/impala-jdbc-v2-5-5.html" scope="external" format="html" keys="impala-jdbc-v2-5-5"/>
-  <keydef href="https://github.com/onefoursix/Cloudera-Impala-JDBC-Example" scope="external" format="html" keys="Cloudera-Impala-JDBC-Example"/>
+  <keydef href="https://github.com/onefoursix/Cloudera-Impala-JDBC-Example" scope="external" format="html" keys="Impala-JDBC-Example"/>
 
   <keydef href="https://issues.apache.org/jira/browse/HIVE-8648" scope="external" format="html" keys="HIVE-8648"/>
 
@@ -131,23 +127,16 @@ under the License.
   <keydef href="http://www.mysql.com/products/connector/" scope="external" format="html" keys="mysql-connector"/>
   <keydef href="http://jdbc.postgresql.org/download.html" scope="external" format="html" keys="postgresql-connector"/>
   <keydef href="http://haproxy.1wt.eu/" scope="external" format="html" keys="haproxy"/>
-  <keydef href="http://www.cloudera.com/documentation/other/reference-architecture/PDF/Impala-HA-with-F5-BIG-IP.pdf" scope="external" format="html" keys="Impala-HA-with-F5-BIG-IP.pdf"/>
 
   <keydef href="http://aws.amazon.com/s3/" scope="external" format="html" keys="amazon-s3"/>
   <keydef href="https://console.aws.amazon.com/s3/home" scope="external" format="html" keys="amazon-s3-home"/>
   <keydef href="http://aws.amazon.com/cli/" scope="external" format="html" keys="amazon-aws-cli"/>
   <keydef href="http://s3tools.org/s3cmd" scope="external" format="html" keys="s3cmd"/>
 
-  <keydef href="http://www.cloudera.com/content/support/en/documentation.html" scope="external" format="html" keys="vendor-docs"/>
-
   <keydef href="http://stat-computing.org/dataexpo/2009/" scope="external" format="html" keys="dataexpo-2009"/>
   <keydef href="http://stat-computing.org/dataexpo/2009/the-data.html" scope="external" format="html" keys="dataexpo-2009-the-data"/>
 
   <keydef href="http://www.lzop.org/" scope="external" format="html" keys="lzop.org"/>
-
-<!-- Links to discussion forums. -->
-  <keydef href="http://community.cloudera.com/t5/Interactive-Short-cycle-SQL/bd-p/Impala" scope="external" format="html" keys="interactive_sql_forum"/>
-  <keydef href="http://community.cloudera.com/t5/Release-Announcements/bd-p/RelAnnounce" scope="external" format="html" keys="release_announcements_forum"/>
 
 <!-- Links to Wikipedia pages for background on industry terminology. -->
   <keydef href="http://en.wikipedia.org/wiki/.htpasswd" scope="external" format="html" keys=".htpasswd"/>
@@ -174,6 +163,16 @@ under the License.
     <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
   </keydef>
   <keydef href="" scope="external" format="html" keys="setup_hdfs_caching">
+  <keydef href="" scope="external" format="html" keys="cdh_hag_cdh_other_ha">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_admin_performance">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_ig_hbase_installation">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_ig_hdfs_caching">
     <topicmeta><linktext>the documentation for HDFS caching</linktext></topicmeta>
   </keydef>
   <keydef href="" scope="external" format="html" keys="cdh_ig_hive_installation">
@@ -288,11 +287,8 @@ under the License.
   <keydef href="" scope="external" format="html" keys="sg_redaction">
     <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
   </keydef>
-  <keydef href="" scope="external" format="html" keys="cdh_rn_fixed_in_51">
-    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
-  </keydef>
-  <keydef href="https://www.cloudera.com/documentation/enterprise/latest/topics/sg_hive_sql.html" scope="external" format="html" keys="sg_hive_sql">
-    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  <keydef href="" scope="external" format="html" keys="sg_hive_sql">
+    <topicmeta><linktext>the documentation for Apache Sentry</linktext></topicmeta>
   </keydef>
 
 <!-- Links to pages on Hive wiki. -->
@@ -305,10 +301,7 @@ under the License.
 
 <!-- Pointers to blog posts. -->
   <keydef href="http://blog.cloudera.com/blog/2012/03/hbase-hadoop-xceivers/" scope="external" format="html" keys="hbase-hadoop-xceivers"/>
-  <keydef href="http://blog.cloudera.com/blog/2012/10/cloudera-impala-real-time-queries-in-apache-hadoop-for-real" scope="external" format="html" keys="cloudera-impala-real-time-queries-in-apache-hadoop-for-real"/>
   <keydef href="http://blog.cloudera.com/blog/2013/07/how-hiveserver2-brings-security-and-concurrency-to-apache-hive/" scope="external" format="html" keys="how-hiveserver2-brings-security-and-concurrency-to-apache-hive"/>
-  <keydef href="http://blog.cloudera.com/blog/2013/09/whats-next-for-impala-after-release-1-1/" scope="external" format="html" keys="whats-next-for-impala-after-release-1-1"/>
-  <keydef href="http://blog.cloudera.com/blog/2014/01/impala-performance-dbms-class-speed/" scope="external" format="html" keys="impala-performance-dbms-class-speed"/>
 
 <!-- Pointers to external Impala JIRA URLs.
      All the way up to IMPALA-9999, so even future JIRAs are
@@ -10344,6 +10337,7 @@ under the License.
   <keydef keys="impala250"><topicmeta><keywords><keyword>Impala 2.5.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala241"><topicmeta><keywords><keyword>Impala 2.4.1</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala240"><topicmeta><keywords><keyword>Impala 2.4.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala2310"><topicmeta><keywords><keyword>Impala 2.3.10</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala234"><topicmeta><keywords><keyword>Impala 2.3.4</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala232"><topicmeta><keywords><keyword>Impala 2.3.2</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala231"><topicmeta><keywords><keyword>Impala 2.3.1</keyword></keywords></topicmeta></keydef>
@@ -10352,8 +10346,12 @@ under the License.
   <keydef keys="impala223"><topicmeta><keywords><keyword>Impala 2.2.3</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala2210"><topicmeta><keywords><keyword>Impala 2.2.10</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala229"><topicmeta><keywords><keyword>Impala 2.2.9</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala228"><topicmeta><keywords><keyword>Impala 2.2.8</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala227"><topicmeta><keywords><keyword>Impala 2.2.7</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala225"><topicmeta><keywords><keyword>Impala 2.2.5</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala221"><topicmeta><keywords><keyword>Impala 2.2.1</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala220"><topicmeta><keywords><keyword>Impala 2.2.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala217"><topicmeta><keywords><keyword>Impala 2.1.7</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala210"><topicmeta><keywords><keyword>Impala 2.1.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala200"><topicmeta><keywords><keyword>Impala 2.0.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala140"><topicmeta><keywords><keyword>Impala 1.4.0</keyword></keywords></topicmeta></keydef>
