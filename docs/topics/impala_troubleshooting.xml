@@ -60,7 +60,7 @@ under the License.
       <ul>
         <li>
           If a query fails against both Impala and Hive, it is likely that there is a problem with your query or
-          other elements of your CDH environment:
+          other elements of your <keyword keyref="distro"/> environment:
           <ul>
             <li>
               Review the <xref href="impala_langref.xml#langref">Language Reference</xref> to ensure your query is

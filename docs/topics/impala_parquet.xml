@@ -85,11 +85,6 @@ under the License.
 
     <p outputclass="toc inpage"/>
 
-    <p audience="integrated">
-      For general information about using Parquet with other CDH components,
-      see <xref href="cdh_ig_parquet.xml#parquet_format"/>.
-    </p>
-
   </conbody>
 
 
@@ -714,7 +709,7 @@ Returned 1 row(s) in 13.35s
     <conbody>
 
       <p>
-        You can read and write Parquet data files from other CDH components.
+        You can read and write Parquet data files from other <keyword keyref="distro"/> components.
         <ph audience="integrated">See <xref href="cdh_ig_parquet.xml#parquet_format"/> for details.</ph>
       </p>
 

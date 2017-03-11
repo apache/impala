@@ -2221,7 +2221,7 @@ select now() + interval 2 weeks as 2_weeks_from_now,
             positions of elements and use different separator characters.
           </p>
           <p rev="2.2.3">
-            In <ph rev="upstream">CDH 5.4.3</ph> and higher, you can include a trailing uppercase <codeph>Z</codeph> qualifier
+            In <keyword keyref="impala223"/> and higher, you can include a trailing uppercase <codeph>Z</codeph> qualifier
             to indicate <q>Zulu</q> time, a synonym for UTC.
           </p>
           <p rev="2.3.0">

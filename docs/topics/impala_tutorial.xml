@@ -119,7 +119,7 @@ under the License.
           on their names.
         </p>
 
-<codeblock rev="upstream">$ impala-shell -i localhost --quiet
+<codeblock>$ impala-shell -i localhost --quiet
 Starting Impala Shell without Kerberos authentication
 Welcome to the Impala shell. Press TAB twice to see a list of available commands.
 ...
@@ -1671,7 +1671,7 @@ the <codeph>impala</codeph> user can read the files, which will be sufficient fo
 queries and perform some copy and transform operations into other tables.
 </p>
 
-<codeblock rev="upstream">$ impala-shell -i localhost
+<codeblock>$ impala-shell -i localhost
 Starting Impala Shell without Kerberos authentication
 
 Connected to localhost:21000
@@ -2092,7 +2092,7 @@ to start with, we restart the <cmdname>impala-shell</cmdname> command with the
 <codeph>-B</codeph> option, which turns off the box-drawing behavior.
 </p>
 
-<codeblock rev="upstream">[localhost:21000] > quit;
+<codeblock>[localhost:21000] > quit;
 Goodbye jrussell
 $ impala-shell -i localhost -B -d airline_data;
 Starting Impala Shell without Kerberos authentication

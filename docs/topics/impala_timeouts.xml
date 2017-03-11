@@ -40,7 +40,7 @@ under the License.
   <conbody>
 
     <p>
-      Depending on how busy your CDH cluster is, you might increase or decrease various timeout
+      Depending on how busy your <keyword keyref="distro"/> cluster is, you might increase or decrease various timeout
       values. Increase timeouts if Impala is cancelling operations prematurely, when the system
       is responding slower than usual but the operations are still successful if given extra
       time. Decrease timeouts if operations are idle or hanging for long periods, and the idle

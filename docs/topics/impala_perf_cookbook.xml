@@ -40,7 +40,7 @@ under the License.
 
     <p>
       Here are performance guidelines and best practices that you can use during planning, experimentation, and
-      performance tuning for an Impala-enabled CDH cluster. All of this information is also available in more
+      performance tuning for an Impala-enabled <keyword keyref="distro"/> cluster. All of this information is also available in more
       detail elsewhere in the Impala documentation; it is gathered together here to serve as a cookbook and
       emphasize which performance techniques typically provide the highest return on investment
     </p>

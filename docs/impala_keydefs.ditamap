@@ -173,13 +173,7 @@ under the License.
   <keydef href="" scope="external" format="html" keys="admin_llama">
     <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
   </keydef>
-  <keydef href="" scope="external" format="html" keys="cdh_hag_cdh_other_ha">
-    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
-  </keydef>
-  <keydef href="" scope="external" format="html" keys="cdh_ig_hbase_installation">
-    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
-  </keydef>
-  <keydef href="" scope="external" format="html" keys="cdh_ig_hdfs_caching">
+  <keydef href="" scope="external" format="html" keys="setup_hdfs_caching">
     <topicmeta><linktext>the documentation for HDFS caching</linktext></topicmeta>
   </keydef>
   <keydef href="" scope="external" format="html" keys="cdh_ig_hive_installation">
@@ -10354,6 +10348,7 @@ under the License.
   <keydef keys="impala232"><topicmeta><keywords><keyword>Impala 2.3.2</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala231"><topicmeta><keywords><keyword>Impala 2.3.1</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala230"><topicmeta><keywords><keyword>Impala 2.3.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala224"><topicmeta><keywords><keyword>Impala 2.2.4</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala223"><topicmeta><keywords><keyword>Impala 2.2.3</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala2210"><topicmeta><keywords><keyword>Impala 2.2.10</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala229"><topicmeta><keywords><keyword>Impala 2.2.9</keyword></keywords></topicmeta></keydef>
@@ -10394,7 +10389,6 @@ under the License.
   <keydef href="topics/impala_schema_design.xml" keys="schema_design"/>
   <keydef href="topics/impala_install.xml" keys="install"/>
   <keydef audience="hidden" href="topics/impala_cm_installation.xml" keys="cm_installation"/>
-  <keydef href="topics/impala_noncm_installation.xml" keys="noncm_installation"/>
   <keydef href="topics/impala_config.xml" keys="config"/>
   <keydef href="topics/impala_config_performance.xml" keys="config_performance"/>
   <keydef href="topics/impala_odbc.xml" keys="impala_odbc"/>
@@ -10833,5 +10827,4 @@ under the License.
   <keydef href="topics/impala_incompatible_changes.xml" keys="incompatible_changes"/>
   <keydef href="topics/impala_known_issues.xml" keys="known_issues"/>
   <keydef href="topics/impala_new_features.xml" keys="new_features"/>
-  <keydef audience="hidden" href="topics/impala_errata.xml" keys="errata"/>
 </map>

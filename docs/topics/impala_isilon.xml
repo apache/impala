@@ -40,7 +40,7 @@ under the License.
       You can use Impala to query data files that reside on EMC Isilon storage devices, rather than in HDFS.
       This capability allows convenient query access to a storage system where you might already be
       managing large volumes of data. The combination of the Impala query engine and Isilon storage is
-      certified on CDH 5.4.4 or higher.
+      certified on <keyword keyref="impala224"/> or higher.
     </p>
 
     <p conref="../shared/impala_common.xml#common/isilon_block_size_caveat"/>

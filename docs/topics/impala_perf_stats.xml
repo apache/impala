@@ -550,7 +550,7 @@ show column stats year_month_day;
 
       <p rev="2.0.1">
 <!-- Additional info as a result of IMPALA-1420 -->
-<!-- Keep checking if https://issues.apache.org/jira/browse/HIVE-8648 ever gets fixed and when that fix makes it into a CDH release. -->
+<!-- Keep checking if https://issues.apache.org/jira/browse/HIVE-8648 ever gets fixed and when that fix makes it into an Impala release. -->
         For your very largest tables, you might find that <codeph>COMPUTE STATS</codeph> or even <codeph>COMPUTE INCREMENTAL STATS</codeph>
         take so long to scan the data that it is impractical to use them regularly. In such a case, after adding a partition or inserting new data,
         you can update just the number of rows property through an <codeph>ALTER TABLE</codeph> statement.

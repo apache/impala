@@ -71,7 +71,7 @@ under the License.
     </conbody>
   </concept>
 
-  <concept id="impala_cdh">
+  <concept id="impala_hadoop">
 
     <title>How Impala Works with <keyword keyref="hadoop_distro"/></title>
   <prolog>

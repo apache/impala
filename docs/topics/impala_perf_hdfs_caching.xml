@@ -80,8 +80,8 @@ under the License.
 <!-- Could conref this background link; haven't decided yet the best place or if it's needed twice. -->
 
     <p>
-      For background information about how to set up and manage HDFS caching for a CDH cluster, see
-      <xref keyref="cdh_ig_hdfs_caching"/>.
+      For background information about how to set up and manage HDFS caching for a <keyword keyref="distro"/> cluster, see
+      <xref keyref="setup_hdfs_caching"/>.
     </p>
   </conbody>
 
@@ -97,7 +97,7 @@ under the License.
     <conbody>
 
       <p>
-        On <ph rev="upstream">CDH 5.1</ph> and higher, Impala can use the HDFS caching feature to make more effective use of RAM, so that
+        In <keyword keyref="impala14_full"/> and higher, Impala can use the HDFS caching feature to make more effective use of RAM, so that
         repeated queries can take advantage of data <q>pinned</q> in memory regardless of how much data is
         processed overall. The HDFS caching feature lets you designate a subset of frequently accessed data to be
         pinned permanently in memory, remaining in the cache across multiple queries and never being evicted. This
@@ -126,7 +126,7 @@ under the License.
     <conbody>
 
       <p>
-        To use HDFS caching with Impala, first set up that feature for your CDH cluster:
+        To use HDFS caching with Impala, first set up that feature for your <keyword keyref="distro"/> cluster:
       </p>
 
       <ul>
@@ -148,7 +148,7 @@ under the License.
 <codeblock>hdfs cacheadmin -addPool four_gig_pool -owner impala -limit 4000000000
 </codeblock>
           For details about the <cmdname>hdfs cacheadmin</cmdname> command, see
-          <xref keyref="cdh_ig_hdfs_caching"/>.
+          <xref keyref="setup_hdfs_caching"/>.
           </p>
         </li>
       </ul>

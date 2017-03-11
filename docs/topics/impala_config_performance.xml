@@ -162,7 +162,7 @@ under the License.
       </p>
 
       <p>
-        If you installed CDH from packages, the native checksumming library is installed and setup correctly. In
+        If you installed <keyword keyref="distro"/> from packages, the native checksumming library is installed and setup correctly. In
         such a case, no additional steps are required. Conversely, if you installed by other means, such as with
         tarballs, native checksumming may not be available due to missing shared objects. Finding the message
         "<codeph>Unable to load native-hadoop library for your platform... using builtin-java classes where

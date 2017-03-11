@@ -79,21 +79,21 @@ under the License.
     <conbody>
 
       <p>
-        To enable resource management for Impala, first you <xref href="#rm_cdh_prereqs">set up the YARN
-        service for your CDH cluster</xref>. Then you <xref href="#rm_options">add startup options and customize
+        To enable resource management for Impala, first you <xref href="#rm_prereqs">set up the YARN
+        service for your cluster</xref>. Then you <xref href="#rm_options">add startup options and customize
         resource management settings</xref> for the Impala services.
       </p>
     </conbody>
 
-    <concept id="rm_cdh_prereqs">
+    <concept id="rm_prereqs">
 
-      <title>Required CDH Setup for Resource Management with Impala</title>
+      <title>Required Setup for Resource Management with Impala</title>
 
       <conbody>
 
         <p>
-          YARN is the general-purpose service that manages resources for many Hadoop components within a CDH
-          cluster.
+          YARN is the general-purpose service that manages resources for many Hadoop components within a
+          <keyword keyref="distro"/> cluster.
         </p>
 
       </conbody>

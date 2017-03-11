@@ -2371,7 +2371,7 @@ under the License.
 
           <p audience="PDF">
             For background information about HDFS caching, see
-            <xref keyref="cdh_ig_hdfs_caching"/>. For performance information about using this feature with Impala, see
+            <xref keyref="setup_hdfs_caching"/>. For performance information about using this feature with Impala, see
             <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/>. For the <codeph>SET CACHED</codeph> and
             <codeph>SET UNCACHED</codeph> clauses that let you control cached table data through DDL statements,
             see <xref href="impala_create_table.xml#create_table"/> and

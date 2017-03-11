@@ -41,7 +41,7 @@ under the License.
       <term>Complex types</term> (also referred to as <term>nested types</term>) let you represent multiple data values within a single
       row/column position. They differ from the familiar column types such as <codeph>BIGINT</codeph> and <codeph>STRING</codeph>, known as
       <term>scalar types</term> or <term>primitive types</term>, which represent a single data value within a given row/column position.
-      Impala supports the complex types <codeph>ARRAY</codeph>, <codeph>MAP</codeph>, and <codeph>STRUCT</codeph> in CDH 5.5 / Impala 2.3
+      Impala supports the complex types <codeph>ARRAY</codeph>, <codeph>MAP</codeph>, and <codeph>STRUCT</codeph> in <keyword keyref="impala23_full"/>
       and higher. The Hive <codeph>UNION</codeph> type is not currently supported.
     </p>
 
@@ -2639,7 +2639,7 @@ STORED AS PARQUET;
 
         <p>
           If you have a Parquet data file produced outside of Impala, Impala can automatically deduce the appropriate table structure using
-          the syntax <codeph>CREATE TABLE ... LIKE PARQUET '<varname>hdfs_path_of_parquet_file</varname>'</codeph>. In Impala 2.3 / CDH 5.5
+          the syntax <codeph>CREATE TABLE ... LIKE PARQUET '<varname>hdfs_path_of_parquet_file</varname>'</codeph>. In <keyword keyref="impala23_full"/>
           and higher, this feature works for Parquet files that include <codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, or
           <codeph>MAP</codeph> types.
         </p>

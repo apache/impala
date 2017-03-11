@@ -111,7 +111,7 @@ under the License.
             </li>
             <li>
               <p rev="DOCS-690">
-                Consider enabling <q>sticky sessions</q>. <ph rev="upstream">Cloudera</ph> recommends enabling this setting
+                Consider enabling <q>sticky sessions</q>. Where practical, enable this setting
                 so that stateless client applications such as <cmdname>impalad</cmdname> and Hue
                 are not disconnected from long-running queries. Evaluate whether this setting is
                 appropriate for your combination of workload and client applications.

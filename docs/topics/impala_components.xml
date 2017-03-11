@@ -36,7 +36,7 @@ under the License.
 
     <p>
       The Impala server is a distributed, massively parallel processing (MPP) database engine. It consists of
-      different daemon processes that run on specific hosts within your CDH cluster.
+      different daemon processes that run on specific hosts within your <keyword keyref="distro"/> cluster.
     </p>
 
     <p outputclass="toc inpage"/>

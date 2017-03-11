@@ -61,7 +61,7 @@ under the License.
     </p>
 
     <p>
-      When resource management is enabled in CDH 5, the mechanism for this option changes. If set, it overrides the
+      When resource management is enabled, the mechanism for this option changes. If set, it overrides the
       automatic memory estimate from Impala. Impala requests this amount of memory from YARN on each node, and the
       query does not proceed until that much memory is available. The actual memory used by the query could be
       lower, since some queries use much less memory than others. With resource management, the

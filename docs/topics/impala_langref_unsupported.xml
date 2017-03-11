@@ -210,7 +210,7 @@ under the License.
       </p>
 
       <p>
-        The Hive component included in <ph rev="upstream">CDH 5.1</ph> and higher now includes Sentry-enabled <codeph>GRANT</codeph>,
+        The Hive component now includes Sentry-enabled <codeph>GRANT</codeph>,
         <codeph>REVOKE</codeph>, and <codeph>CREATE/DROP ROLE</codeph> statements. Earlier Hive releases had a
         privilege system with <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements that were primarily
         intended to prevent accidental deletion of data, rather than a security mechanism to protect against

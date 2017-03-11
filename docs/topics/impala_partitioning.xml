@@ -391,7 +391,7 @@ insert into weather <b>partition (year=2014, month=04, day)</b> select 'sunny',2
 
         <p>
           The original mechanism uses to prune partitions is <term>static partition pruning</term>, in which the conditions in the
-          <codeph>WHERE</codeph> clause are analyzed to determine in advance which partitions can be safely skipped. In Impala 2.5 / CDH 5.7
+          <codeph>WHERE</codeph> clause are analyzed to determine in advance which partitions can be safely skipped. In <keyword keyref="impala25_full"/>
           and higher, Impala can perform <term>dynamic partition pruning</term>, where information about the partitions is collected during
           the query, and Impala prunes unnecessary partitions in ways that were impractical to predict in advance.
         </p>

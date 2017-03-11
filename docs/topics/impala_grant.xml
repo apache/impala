@@ -105,12 +105,12 @@ object_type ::= TABLE | DATABASE | SERVER | URI
     <p>
       <ul>
         <li>
-          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements are available in CDH 5.2 and
-          later.
+          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements are available in
+          <keyword keyref="impala20_full"/> and later.
         </li>
 
         <li>
-          In CDH 5.1 and later, Impala can make use of any roles and privileges specified by the
+          In <keyword keyref="impala14_full"/> and later, Impala can make use of any roles and privileges specified by the
           <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Hive, when your system is configured to
           use the Sentry service instead of the file-based policy mechanism.
         </li>

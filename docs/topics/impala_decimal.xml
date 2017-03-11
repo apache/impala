@@ -697,7 +697,7 @@ Expression '1' (type: INT) would need to be cast to DECIMAL(9,0) for column 'x'
 
       <li>
         Impala can query Avro, RCFile, or SequenceFile tables containing <codeph>DECIMAL</codeph> columns, created
-        by other Hadoop components, on CDH 5 only.
+        by other Hadoop components.
       </li>
 
       <li>

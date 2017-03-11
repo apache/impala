@@ -262,7 +262,7 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
           </p>
         </li>
 
-<!-- Removing this reference now that the options are de-emphasized / desupported in CDH 5.5 / Impala 2.3 and up.
+<!-- Removing this reference now that the options are de-emphasized / desupported in Impala 2.3 and up.
         <li rev="1.2">
           <p>
           Options for resource management, in conjunction with the YARN component. These options include
@@ -287,7 +287,7 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
         </li>
       </ul>
 
-<!-- Removing this reference now that the options are de-emphasized / desupported in CDH 5.5 / Impala 2.3 and up.
+<!-- Removing this reference now that the options are de-emphasized / desupported in Impala 2.3 and up.
       <p conref="impala_resource_management.xml#rm_options/resource_management_impalad_options"/>
 -->
 
@@ -433,7 +433,7 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
             <cmdname>impala-shell</cmdname>.
           </li>
 
-<!-- Removing this reference now that the options are de-emphasized / desupported in CDH 5.5 / Impala 2.3 and up.
+<!-- Removing this reference now that the options are de-emphasized / desupported in Impala 2.3 and up.
           <li rev="1.2">
             Options for resource management, in conjunction with the YARN component. These options
             include <codeph>-enable_rm</codeph> and <codeph>-cgroup_hierarchy_path</codeph>.
@@ -454,7 +454,7 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
           </li>
         </ul>
 
-<!-- Removing this reference now that the options are de-emphasized / desupported in CDH 5.5 / Impala 2.3 and up.
+<!-- Removing this reference now that the options are de-emphasized / desupported in Impala 2.3 and up.
         <p conref="impala_resource_management.xml#rm_options/resource_management_impalad_options"/>
 -->
 

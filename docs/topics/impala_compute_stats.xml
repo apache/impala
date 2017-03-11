@@ -459,7 +459,7 @@ show table stats item_partitioned;
     </p>
 
     <p>
-      The <codeph>COMPUTE STATS</codeph> statement works with Avro tables without restriction in CDH 5.4 / Impala 2.2
+      The <codeph>COMPUTE STATS</codeph> statement works with Avro tables without restriction in <keyword keyref="impala22_full"/>
       and higher. In earlier releases, <codeph>COMPUTE STATS</codeph> worked only for Avro tables created through Hive,
       and required the <codeph>CREATE TABLE</codeph> statement to use SQL-style column names and types rather than an
       Avro-style schema specification.

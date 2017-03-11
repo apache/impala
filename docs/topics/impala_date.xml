@@ -93,7 +93,7 @@ under the License.
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
 
     <p>
-      This type is available on CDH 5.2 or higher.
+      This type is available on <keyword keyref="impala20_full"/> or higher.
     </p>
 
     <p conref="../shared/impala_common.xml#common/internals_2_bytes"/>

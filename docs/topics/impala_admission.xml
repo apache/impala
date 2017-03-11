@@ -34,7 +34,7 @@ under the License.
 
     <p id="admission_control_intro">
       Admission control is an Impala feature that imposes limits on concurrent SQL queries, to avoid resource usage
-      spikes and out-of-memory conditions on busy CDH clusters.
+      spikes and out-of-memory conditions on busy clusters.
       It is a form of <q>throttling</q>.
       New queries are accepted and executed until
       certain conditions are met, such as too many queries or too much
@@ -75,7 +75,7 @@ under the License.
     <conbody>
 
       <p>
-        On a busy CDH cluster, you might find there is an optimal number of Impala queries that run concurrently.
+        On a busy cluster, you might find there is an optimal number of Impala queries that run concurrently.
         For example, when the I/O capacity is fully utilized by I/O-intensive queries,
         you might not find any throughput benefit in running more concurrent queries.
         By allowing some queries to run at full speed while others wait, rather than having
@@ -201,7 +201,7 @@ under the License.
 
       <p>
         Because the admission control system does not interact with other Hadoop workloads such as MapReduce jobs, you
-        might use YARN with static service pools on CDH 5 clusters where resources are shared between
+        might use YARN with static service pools on clusters where resources are shared between
         Impala and other Hadoop components. This configuration is recommended when using Impala in a
         <term>multitenant</term> cluster. Devote a percentage of cluster resources to Impala, and allocate another
         percentage for MapReduce and other batch-style workloads. Let admission control handle the concurrency and
@@ -762,7 +762,7 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
   </property>
 <!--
        Default query options for the 'root.production' pool.
-       THIS IS A NEW PARAMETER in CDH 5.7 / Impala 2.5.
+       THIS IS A NEW PARAMETER in Impala 2.5.
        Note that the MEM_LIMIT query option still shows up in here even though it is a
        separate box in the UI. We do that because it is the most important query option
        that people will need (everything else is somewhat advanced).
@@ -781,7 +781,7 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
 <!--
   Default queue timeout (ms) for the pool 'root.production'.
   If this isn’t set, the process-wide flag is used.
-  THIS IS A NEW PARAMETER in CDH 5.7 / Impala 2.5.
+  THIS IS A NEW PARAMETER in Impala 2.5.
 -->
   <property>
     <name>impala.admission-control.pool-queue-timeout-ms.root.production</name>

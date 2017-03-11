@@ -296,17 +296,11 @@ under the License.
   <topicref href="topics/impala_ports.xml"/>
   <topicref href="topics/impala_reserved_words.xml"/>
 <!-- End of former contents of Installing-and-Using-Impala_xi42979.ditamap. -->
-<!-- Need to make this rg_ topic disappear from the Impala PDF. Put audience="standalone"
-       inside the topic itself? -->
-  <!-- Nah, the topic has been obsolete since early in CDH 5 so hide it entirely: <topicref audience="standalone" href="topics/rg_impala_vd.xml"/> -->
   <topicref audience="standalone" href="topics/impala_faq.xml"/>
   <topicref audience="standalone" href="topics/impala_release_notes.xml">
     <mapref href="Cloudera-Impala-Release-Notes.ditamap" format="ditamap"
       audience="standalone"/>
   </topicref>
-  <!-- Release coordinator: don't remove this pre-release tag, it will
-       probably remain in pre-release state for some time. -->
-  <topicref audience="hidden" href="topics/impala_errata.xml"/>
 
 <!-- Substitution variables and link destinations abstracted
      into a .h-like side file. -->
