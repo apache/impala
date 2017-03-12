@@ -796,11 +796,11 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function
   // Replace call sites
   int replaced =
       codegen->ReplaceCallSites(process_build_batch_fn, eval_row_fn, "EvalBuildRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   replaced = codegen->ReplaceCallSites(
       process_build_batch_fn, insert_filters_fn, "InsertRuntimeFilters");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   // Replace some hash table parameters with constants.
   HashTableCtx::HashTableReplacedConstants replaced_constants;
@@ -831,12 +831,12 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function
   // process_build_batch_fn_level0 uses CRC hash if available,
   replaced =
       codegen->ReplaceCallSites(process_build_batch_fn_level0, hash_fn, "HashRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   // process_build_batch_fn uses murmur
   replaced =
       codegen->ReplaceCallSites(process_build_batch_fn, murmur_hash_fn, "HashRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   // Never build filters after repartitioning, as all rows have already been added to the
   // filters during the level0 build. Note that the first argument of this function is the
@@ -883,11 +883,11 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, llvm::Function* hash
 
   // Use codegen'd EvalBuildRow() function
   int replaced = codegen->ReplaceCallSites(insert_batch_fn, eval_row_fn, "EvalBuildRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   // Use codegen'd Equals() function
   replaced = codegen->ReplaceCallSites(insert_batch_fn, build_equals_fn, "Equals");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   // Replace hash-table parameters with constants.
   HashTableCtx::HashTableReplacedConstants replaced_constants;
@@ -905,9 +905,9 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, llvm::Function* hash
 
   // Use codegen'd hash functions
   replaced = codegen->ReplaceCallSites(insert_batch_fn_level0, hash_fn, "HashRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
   replaced = codegen->ReplaceCallSites(insert_batch_fn, murmur_hash_fn, "HashRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);
   if (insert_batch_fn == NULL) {

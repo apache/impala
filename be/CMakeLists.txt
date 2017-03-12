@@ -233,6 +233,13 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   SET(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-DADDRESS_SANITIZER")
 endif()
 
+if (UBSAN_CODEGEN)
+  set(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-DUNDEFINED_SANITIZER"
+    "-fno-omit-frame-pointer" "-fsanitize=undefined" "-fno-wrapv" "-ggdb3"
+    "-fno-sanitize=alignment,function,vptr,float-divide-by-zero,float-cast-overflow"
+    "-DUNDEFINED_SANITIZER_SUPPRESSIONS=\\\"$ENV{IMPALA_HOME}/bin/ubsan-suppressions.txt\\\"")
+endif()
+
 IF($ENV{ENABLE_IMPALA_IR_DEBUG_INFO} STREQUAL "true")
   # -g: emit debug symbols in IR. These increase IR size and memory overhead of LLVM, but
   #     are useful for debugging codegened code and interpreting codegen disassembly

@@ -1451,7 +1451,7 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   // Replace all call sites with codegen version
   int replaced = codegen->ReplaceCallSites(process_probe_batch_fn, eval_row_fn,
       "EvalProbeRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   replaced = codegen->ReplaceCallSites(process_probe_batch_fn, create_output_row_fn,
       "CreateOutputRow");
@@ -1466,16 +1466,16 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
     case TJoinOp::LEFT_SEMI_JOIN:
     case TJoinOp::RIGHT_OUTER_JOIN:
     case TJoinOp::RIGHT_SEMI_JOIN:
-      DCHECK_EQ(replaced, 1);
+      DCHECK_REPLACE_COUNT(replaced, 1);
       break;
     case TJoinOp::LEFT_OUTER_JOIN:
     case TJoinOp::FULL_OUTER_JOIN:
-      DCHECK_EQ(replaced, 2);
+      DCHECK_REPLACE_COUNT(replaced, 2);
       break;
     case TJoinOp::LEFT_ANTI_JOIN:
     case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN:
     case TJoinOp::RIGHT_ANTI_JOIN:
-      DCHECK_EQ(replaced, 0);
+      DCHECK_REPLACE_COUNT(replaced, 0);
       break;
     default:
       DCHECK(false);
@@ -1483,7 +1483,7 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
 
   replaced = codegen->ReplaceCallSites(process_probe_batch_fn, eval_other_conjuncts_fn,
       "EvalOtherJoinConjuncts");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   replaced = codegen->ReplaceCallSites(process_probe_batch_fn, probe_equals_fn, "Equals");
   // Depends on join_op_
@@ -1508,10 +1508,10 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   // process_probe_batch_fn_level0 uses CRC hash if available,
   // process_probe_batch_fn uses murmur
   replaced = codegen->ReplaceCallSites(process_probe_batch_fn_level0, hash_fn, "HashRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   replaced = codegen->ReplaceCallSites(process_probe_batch_fn, murmur_hash_fn, "HashRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   // Finalize ProcessProbeBatch functions
   process_probe_batch_fn = codegen->FinalizeFunction(process_probe_batch_fn);

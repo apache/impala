@@ -70,6 +70,17 @@ namespace llvm {
   class IRBuilderDefaultInserter;
 }
 
+// The number of function calls replaced is not knowable when UBSAN is enabled, since it
+// can double the number of references to a function. To fix, we replaced
+// "DCHECK_EQ(replaced" with "DCHECK_REPLACE_COUNT(replaced":
+//
+// find be/src -type f -execdir sed -i s/DCHECK_EQ\(replaced,\ /DCHECK_REPLACE_COUNT\(replaced,\ /g {} \;
+#if defined(UNDEFINED_SANITIZER)
+#define DCHECK_REPLACE_COUNT(p, q) DCHECK_GE(p, q); DCHECK_LE(p, 2*(q))
+#else
+#define DCHECK_REPLACE_COUNT(p, q) DCHECK_EQ(p, q)
+#endif
+
 namespace impala {
 
 class CodegenCallGraph;

@@ -1033,7 +1033,7 @@ Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
   DCHECK(eval_conjuncts_fn != nullptr);
 
   int replaced = codegen->ReplaceCallSites(fn, eval_conjuncts_fn, "EvalConjuncts");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   llvm::Function* eval_runtime_filters_fn;
   RETURN_IF_ERROR(CodegenEvalRuntimeFilters(
@@ -1041,7 +1041,7 @@ Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
   DCHECK(eval_runtime_filters_fn != nullptr);
 
   replaced = codegen->ReplaceCallSites(fn, eval_runtime_filters_fn, "EvalRuntimeFilters");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   fn->setName("ProcessScratchBatch");
   *process_scratch_batch_fn = codegen->FinalizeFunction(fn);

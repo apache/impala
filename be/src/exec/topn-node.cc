@@ -118,11 +118,11 @@ void TopNNode::Codegen(RuntimeState* state) {
       if (codegen_status.ok()) {
         int replaced = codegen->ReplaceCallSites(insert_batch_fn,
             materialize_exprs_tuple_pool_fn, Tuple::MATERIALIZE_EXPRS_SYMBOL);
-        DCHECK_EQ(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
+        DCHECK_REPLACE_COUNT(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
 
         replaced = codegen->ReplaceCallSites(insert_batch_fn,
             materialize_exprs_no_pool_fn, Tuple::MATERIALIZE_EXPRS_NULL_POOL_SYMBOL);
-        DCHECK_EQ(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
+        DCHECK_REPLACE_COUNT(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
 
         insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);
         DCHECK(insert_batch_fn != NULL);

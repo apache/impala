@@ -123,7 +123,7 @@ void UnionNode::Codegen(RuntimeState* state) {
 
     int replaced = codegen->ReplaceCallSites(union_materialize_batch_fn,
         tuple_materialize_exprs_fn, Tuple::MATERIALIZE_EXPRS_SYMBOL);
-    DCHECK_EQ(replaced, 1) << LlvmCodeGen::Print(union_materialize_batch_fn);
+    DCHECK_REPLACE_COUNT(replaced, 1) << LlvmCodeGen::Print(union_materialize_batch_fn);
 
     union_materialize_batch_fn = codegen->FinalizeFunction(
         union_materialize_batch_fn);

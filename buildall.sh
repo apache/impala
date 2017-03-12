@@ -125,6 +125,10 @@ do
     -ubsan)
       BUILD_UBSAN=1
       ;;
+    -full_ubsan)
+      BUILD_UBSAN=1
+      MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -ubsan_codegen"
+      ;;
     -tsan)
       BUILD_TSAN=1
       ;;
@@ -199,7 +203,10 @@ do
       echo "[-codecoverage] : Build with code coverage [Default: False]"
       echo "[-asan] : Address sanitizer build [Default: False]"
       echo "[-tidy] : clang-tidy build [Default: False]"
-      echo "[-ubsan] : Undefined behavior build [Default: False]"
+      echo "[-ubsan] : Undefined behavior sanitizer build [Default: False]"
+      echo "[-full_ubsan] : Undefined behavior sanitizer build, including code generated"\
+           " by cross-compilation to LLVM IR. Much slower queries than plain -ubsan "\
+           " [Default: False]"
       echo "[-skiptests] : Skips execution of all tests"
       echo "[-notests] : Skips building and execution of all tests"
       echo "[-start_minicluster] : Start test cluster including Impala and all"\

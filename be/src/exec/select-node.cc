@@ -65,7 +65,7 @@ Status SelectNode::CodegenCopyRows(RuntimeState* state) {
 
   int replaced = codegen->ReplaceCallSites(copy_rows_fn, eval_conjuncts_fn,
       "EvalConjuncts");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
   copy_rows_fn = codegen->FinalizeFunction(copy_rows_fn);
   if (copy_rows_fn == nullptr) return Status("Failed to finalize CopyRows().");
   codegen->AddFunctionToJit(copy_rows_fn,

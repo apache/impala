@@ -1000,13 +1000,13 @@ Status GroupingAggregator::CodegenAddBatchImpl(
   // Replace call sites
   replaced =
       codegen->ReplaceCallSites(add_batch_impl_fn, eval_grouping_expr_fn, "EvalProbeRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   replaced = codegen->ReplaceCallSites(add_batch_impl_fn, hash_fn, "HashRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   replaced = codegen->ReplaceCallSites(add_batch_impl_fn, build_equals_fn, "Equals");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = false;
@@ -1065,17 +1065,17 @@ Status GroupingAggregator::CodegenAddBatchStreamingImpl(
   // Replace call sites
   int replaced = codegen->ReplaceCallSites(
       add_batch_streaming_impl_fn, update_tuple_fn, "UpdateTuple");
-  DCHECK_EQ(replaced, 2);
+  DCHECK_REPLACE_COUNT(replaced, 2);
 
   replaced = codegen->ReplaceCallSites(
       add_batch_streaming_impl_fn, eval_grouping_expr_fn, "EvalProbeRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   replaced = codegen->ReplaceCallSites(add_batch_streaming_impl_fn, hash_fn, "HashRow");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   replaced = codegen->ReplaceCallSites(add_batch_streaming_impl_fn, equals_fn, "Equals");
-  DCHECK_EQ(replaced, 1);
+  DCHECK_REPLACE_COUNT(replaced, 1);
 
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = false;
