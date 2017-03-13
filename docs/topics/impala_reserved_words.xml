@@ -62,10 +62,10 @@ under the License.
 <title>List of Current Reserved Words</title>
 <conbody>
 <!-- This list is derived from the source code at:
-     https://github.com/cloudera/Impala/blob/master/fe/src/main/jflex/sql-scanner.flex
+     https://github.com/apache/incubator-impala/blob/master/fe/src/main/jflex/sql-scanner.flex
 
 See the history, any recent changes, here:
-     https://github.com/cloudera/Impala/commits/master/fe/src/main/jflex/sql-scanner.flex
+     https://github.com/apache/incubator-impala/commits/master/fe/src/main/jflex/sql-scanner.flex
 -->
 
 <codeblock rev="ver">add
@@ -266,8 +266,8 @@ have different sets of reserved words.
 </p>
 
 <p>
-The following list contains additional words that Cloudera
-recommends avoiding for table, column, or other object names,
+The following list contains additional words that you should
+avoid for table, column, or other object names,
 even though they are not currently reserved by Impala.
 </p>
 
