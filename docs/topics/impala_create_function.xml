@@ -194,8 +194,7 @@ DROP FUNCTION IF EXISTS bar;
         <b>Serialize:</b> The function you specify with the <codeph>SERIALIZE_FN</codeph> clause frees memory
         allocated to intermediate results. It is required if any memory was allocated by the Allocate function in
         the Init, Update, or Merge functions, or if the intermediate type contains any pointers. See
-        <xref href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.cc" scope="external" format="html">the
-        UDA code samples</xref> for details.
+        <xref keyref="uda-sample.cc">the UDA code samples</xref> for details.
       </li>
 
       <li>
@@ -204,9 +203,7 @@ DROP FUNCTION IF EXISTS bar;
         opened any files, and so on. This function is often a stub for simple UDAs. You can omit this clause and a
         default (no-op) function will be used. It is required in UDAs where the final return type is different than
         the intermediate type. or if any memory was allocated by the Allocate function in the Init, Update, or
-        Merge functions. See
-        <xref href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.cc" scope="external" format="html">the
-        UDA code samples</xref> for details.
+        Merge functions. See <xref keyref="uda-sample.cc">the UDA code samples</xref> for details.
       </li>
     </ul>
 
@@ -295,7 +292,7 @@ DROP FUNCTION IF EXISTS bar;
 
       <li>
         For sample code and build instructions for UDFs,
-        see <xref href="https://github.com/cloudera/impala/tree/master/be/src/udf_samples" scope="external" format="html">the sample UDFs in the Impala github repo</xref>.
+        see <xref keyref="udf_samples">the sample UDFs in the Impala github repo</xref>.
       </li>
 
       <li>
@@ -356,22 +353,22 @@ DROP FUNCTION IF EXISTS bar;
       queries that refer to the Impala function name.
     </p>
 <codeblock rev="2.5.0 IMPALA-2843">
-$ jar -tvf udf-examples-cdh570.jar
+$ jar -tvf udf-examples.jar
      0 Mon Feb 22 04:06:50 PST 2016 META-INF/
    122 Mon Feb 22 04:06:48 PST 2016 META-INF/MANIFEST.MF
-     0 Mon Feb 22 04:06:46 PST 2016 com/
-     0 Mon Feb 22 04:06:46 PST 2016 com/cloudera/
-     0 Mon Feb 22 04:06:46 PST 2016 com/cloudera/impala/
-  2460 Mon Feb 22 04:06:46 PST 2016 com/cloudera/impala/IncompatibleUdfTest.class
-   541 Mon Feb 22 04:06:46 PST 2016 com/cloudera/impala/TestUdfException.class
-  3438 Mon Feb 22 04:06:46 PST 2016 com/cloudera/impala/JavaUdfTest.class
-  5872 Mon Feb 22 04:06:46 PST 2016 com/cloudera/impala/TestUdf.class
+     0 Mon Feb 22 04:06:46 PST 2016 org/
+     0 Mon Feb 22 04:06:46 PST 2016 org/apache/
+     0 Mon Feb 22 04:06:46 PST 2016 org/apache/impala/
+  2460 Mon Feb 22 04:06:46 PST 2016 org/apache/impala/IncompatibleUdfTest.class
+   541 Mon Feb 22 04:06:46 PST 2016 org/apache/impala/TestUdfException.class
+  3438 Mon Feb 22 04:06:46 PST 2016 org/apache/impala/JavaUdfTest.class
+  5872 Mon Feb 22 04:06:46 PST 2016 org/apache/impala/TestUdf.class
 ...
-$ hdfs dfs -put udf-examples-cdh570.jar /user/impala/udfs
+$ hdfs dfs -put udf-examples.jar /user/impala/udfs
 $ hdfs dfs -ls /user/impala/udfs
 Found 2 items
 -rw-r--r--   3 jrussell supergroup        853 2015-10-09 14:05 /user/impala/udfs/hello_world.jar
--rw-r--r--   3 jrussell supergroup       7366 2016-06-08 14:25 /user/impala/udfs/udf-examples-cdh570.jar
+-rw-r--r--   3 jrussell supergroup       7366 2016-06-08 14:25 /user/impala/udfs/udf-examples.jar
 </codeblock>
     <p rev="2.5.0 IMPALA-2843">
       In <cmdname>impala-shell</cmdname>, the <codeph>CREATE FUNCTION</codeph> refers to the HDFS path of the jar file
@@ -379,7 +376,7 @@ Found 2 items
       Impala function, each one overloaded under the specified Impala function name.
     </p>
 <codeblock rev="2.5.0 IMPALA-2843">
-[localhost:21000] > create function testudf location '/user/impala/udfs/udf-examples-cdh570.jar' symbol='org.apache.impala.TestUdf';
+[localhost:21000] > create function testudf location '/user/impala/udfs/udf-examples.jar' symbol='org.apache.impala.TestUdf';
 [localhost:21000] > show functions;
 +-------------+---------------------------------------+-------------+---------------+
 | return type | signature                             | binary type | is persistent |
@@ -463,7 +460,7 @@ select testudf(x,x) from string_x;
       to go along with the overloaded functions all named <codeph>testudf</codeph>.
     </p>
 <codeblock rev="2.5.0 IMPALA-2843">
-create function my_func location '/user/impala/udfs/udf-examples-cdh570.jar'
+create function my_func location '/user/impala/udfs/udf-examples.jar'
   symbol='org.apache.impala.TestUdf';
 
 show functions;
