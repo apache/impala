@@ -374,15 +374,6 @@ MEM_LIMIT: 0
         </p>
 
         <p>
-          From Nong:
-        </p>
-
-        <p>
-          In a CM-managed cluster, search for "core" from the impala configuration page. You should see the "enable
-          core dump" config.
-        </p>
-
-        <p>
           From <xref href="impala_config_options.xml#config_options"/>:
         </p>
 

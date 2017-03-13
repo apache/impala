@@ -83,8 +83,7 @@ under the License.
         might modify includes:
       </p>
 
-<!-- Note: Update the following example for each release with the associated lines from /etc/default/impala
-           from a non-CM-managed system. -->
+<!-- Note: Update the following example for each release with the associated lines from /etc/default/impala. -->
 
 <codeblock rev="ver">IMPALA_STATE_STORE_HOST=127.0.0.1
 IMPALA_STATE_STORE_PORT=24000
