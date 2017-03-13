@@ -10815,7 +10815,7 @@ under the License.
 
   <keydef href="topics/impala_logging.xml" keys="logging"/>
   <keydef href="topics/impala_logging.xml#logs_details" keys="logs_details"/>
-  <keydef href="topics/impala_logging.xml#logs_cm_noncm" keys="logs_cm_noncm"/>
+  <keydef href="topics/impala_logging.xml#logs_managing" keys="logs_managing"/>
   <keydef href="topics/impala_logging.xml#logs_rotate" keys="logs_rotate"/>
   <keydef href="topics/impala_logging.xml#logs_debug" keys="logs_debug"/>
   <keydef href="topics/impala_logging.xml#log_format" keys="log_format"/>

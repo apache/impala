@@ -89,7 +89,6 @@ under the License.
       <ul>
         <li>
           By default, the log files are under the directory <filepath>/var/log/impala</filepath>.
-<!-- TK: split this task out and state CM and non-CM ways. -->
           To change log file locations, modify the defaults file described in
           <xref href="impala_processes.xml#processes"/>.
         </li>
@@ -172,7 +171,7 @@ under the License.
 
   </concept>
 
-  <concept id="logs_cm_noncm">
+  <concept id="logs_managing">
 
     <title>Managing Impala Logs</title>
   <prolog>
