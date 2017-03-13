@@ -52,6 +52,30 @@ describe $DATABASE.like_alltypestiny_file
 STRING, STRING, STRING
 ====
 ---- QUERY
+# Creating a table from a file containing parquet logical types
+# used to annotate string columns (UTF8, ENUM).
+create table $DATABASE.like_enumtype_file like parquet
+'$FILESYSTEM_PREFIX/test-warehouse/schemas/enum/enum.parquet'
+STORED AS PARQUET
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/schemas/enum'
+---- RESULTS
+====
+---- QUERY
+describe $DATABASE.like_enumtype_file
+---- RESULTS
+'species','string','Inferred from Parquet file.'
+'name','string','Inferred from Parquet file.'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select * FROM $DATABASE.like_enumtype_file
+---- RESULTS
+'BEAR','Winnie'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
 # Make sure creating a table with the same name doesn't throw an error when
 # IF NOT EXISTS is specified.
 create table if not exists $DATABASE.like_alltypestiny_file like parquet

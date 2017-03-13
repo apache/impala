@@ -1406,6 +1406,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         + "'/test-warehouse/schemas/zipcode_incomes.parquet'");
     AnalyzesOk("create table if not exists newtbl_DNE like parquet "
         + "'/test-warehouse/schemas/decimal.parquet'");
+    AnalyzesOk("create table if not exists newtbl_DNE like parquet'"
+        + " /test-warehouse/schemas/enum/enum.parquet'");
 
     // check we error in the same situations as standard create table
     AnalysisError("create table functional.zipcode_incomes like parquet "

@@ -1151,6 +1151,7 @@ INT96 -&gt; TIMESTAMP
       </p>
 
 <codeblock>BINARY + OriginalType UTF8 -&gt; STRING
+BINARY + OriginalType ENUM -&gt; STRING
 BINARY + OriginalType DECIMAL -&gt; DECIMAL
 </codeblock>
 
