@@ -100,8 +100,7 @@ under the License.
         <xref href="impala_explain_level.xml#explain_level">EXPLAIN_LEVEL</xref> query option. You typically
         increase this setting from <codeph>normal</codeph> to <codeph>verbose</codeph> (or from <codeph>0</codeph>
         to <codeph>1</codeph>) when doublechecking the presence of table and column statistics during performance
-        tuning, or when estimating query resource usage in conjunction with the resource management features in CDH
-        5.
+        tuning, or when estimating query resource usage in conjunction with the resource management features.
       </p>
 
       <!-- To do:
@@ -167,8 +166,6 @@ under the License.
         Here is an example from a more complicated query, as it would appear in the <codeph>PROFILE</codeph>
         output:
       </p>
-
-<!-- This example taken from: https://github.com/cloudera/Impala/commit/af85d3b518089b8840ddea4356947e40d1aca9bd -->
 
 <codeblock>Operator              #Hosts   Avg Time   Max Time    #Rows  Est. #Rows  Peak Mem  Est. Peak Mem  Detail
 ------------------------------------------------------------------------------------------------------------------------
@@ -243,7 +240,7 @@ Query (id=6540a03d4bee0691:4963d6269b210ebd):
     Query State: FINISHED
     Query Status: OK
     Impala Version: impalad version 1.2.1 RELEASE (build edb5af1bcad63d410bc5d47cc203df3a880e9324)
-    User: cloudera
+    User: doc_demo
     Network Address: 127.0.0.1:49161
     Default Db: stats_testing
     Sql Statement: select t1.s, t2.s from t1 join t2 on (t1.id = t2.parent)
