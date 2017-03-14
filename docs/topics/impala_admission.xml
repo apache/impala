@@ -484,7 +484,6 @@ under the License.
                 <codeph>""</codeph> (empty string, meaning unlimited) </p>
             </dd>
           </dlentry>
-          <!-- Possibly from here on down, command-line controls not applicable to CM. -->
           <dlentry id="disable_admission_control">
             <dt>
               <codeph>disable_admission_control</codeph>
@@ -573,7 +572,7 @@ under the License.
       </section>
     </conbody>
 
-    <concept id="admission_config_noncm">
+    <concept id="admission_config_manual">
 
       <title>Configuring Admission Control Using the Command Line</title>
 
@@ -639,7 +638,6 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
     </concept>
 
     <concept id="admission_examples">
-    <!-- Pruning the CM examples and screenshots because in Impala 2.5 the defaults match up much better with our recommendations. -->
 
       <title>Example of Admission Control Configuration</title>
 
