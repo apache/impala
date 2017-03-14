@@ -178,10 +178,6 @@ under the License.
           The officially supported JVM for Impala is the Oracle JVM. Other JVMs might cause issues, typically
           resulting in a failure at <cmdname>impalad</cmdname> startup. In particular, the JamVM used by default on
           certain levels of Ubuntu systems can cause <cmdname>impalad</cmdname> to fail to start.
-          <!-- To do:
-            Could say something here about JDK 6 vs. JDK 7 in CDH 5. Since we didn't specify the JDK version before,
-            don't know the impact from the user perspective so not calling it out at the moment.
-          -->
         </li>
 
         <li>
