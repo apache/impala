@@ -1147,34 +1147,6 @@ IMPALA-1917
 
     </conbody>
 
-<!-- List of fixed issues from Juan Yu's spreadsheet: https://docs.google.com/spreadsheets/d/1Ia06xOLKQInKfsJzQfQ6Sf1fO3nYLOpZ-0OWfFNgNSc/edit#gid=1566007471
-
-Asterisks indicate the ones that are considered critical and so get a writeup here.
-
-* 5ff1062 IMPALA-1459: Fix migration/assignment of On-clause predicates inside inline views.
-* bcea8cf IMPALA-2446: Fix wrong predicate assignment in outer joins
-* 8e010af IMPALA-2648/IMPALA-2664: Avoid sending large partition stats objects over thrift
-7e3a789 IMPALA-2260: Adding a large hour interval caused an interval overflow
-* 9a86c94 IMPALA-1675: Avoid overflow when adding large intervals to TIMESTAMPs
-1a83dfc IMPALA-2086, IMPALA-2090: Avoid boost year/month interval logic
-* 1d0b017 IMPALA-1949: Analysis exception when a binary operator contain an IN operator with
-0ae066f IMPALA-2141: UnionNode::GetNext() doesn't check for query errors
-* 31824ad IMPALA-2273: Make MAX_PAGE_HEADER_SIZE configurable
-75497ca IMPALA-2559: Fix check failed: sorter_runs_.back()->is_pinned_
-ddfe66f IMPALA-2265: Sorter was not checking the returned Status of PrepareRead
-* a39a2a5 IMPALA-2357: Fix spilling sorts with var-len slots that are NULL or empty.
-04bcfb9 IMPALA-0000: Fix reporting of custom OOM error messages.
-d9d2a10 IMPALA-0000: Log backtrace on all MEM_LIMIT_EXCEEDED errors
-* 4210021 IMPALA-0000: Work-around IMPALA-2344: Fail query with OOM in case block->Pin() fails
-29d7b42 IMPALA-2286: Fix race between ~BufferedBlockMgr() and BufferedBlockMgr::Creat
-* d87a306 IMPALA-2252: Crash (likely race) tearing down BufferedBlockMgr on query failu
-* a1bb4a6 IMPALA-1746: QueryExecState doesn't check for query cancellation or errors
-* e9ff989 IMPALA-2533: Impala throws IllegalStateException when inserting data into a p
-
-* c22683a IMPALA-1917: Do not register aux equivalence predicates with NULL on either side.
-* c0a7393 IMPALA-2731: Refactor MemPool usage in HBase scan node.
--->
-
     <concept id="IMPALA-1917">
       <!-- Title in Juan's spreadsheet. Actual JIRA title more useful for readers IMO. <title>Do not register aux equivalence predicates with NULL on either side.</title> -->
       <title>Query return empty result if it contains NullLiteral in inlineview</title>
@@ -1466,30 +1438,6 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       </p>
 
     </conbody>
-<!--
-8736dba IMPALA-1983: Warn if table stats are potentially corrupt.
-a0911fc IMPALA-2266: Pass correct child node in 2nd phase merge aggregation.
-3183878 IMPALA-2216: Set the output smap of an EmptySetNode produced from an empty inline view.
-a73d008 IMPALA-2203: Set an InsertStmt's result exprs from the source statement's result exprs.
-e641759 IMPALA-2088: Fix planning of empty union operands with analytics.
-752b3bd IMPALA-1756: Constant filter expressions are not checked for errors and state cleanup is not done before throwing exception.
-d703959 IMPALA-2239: update misc.test to match the new .test file format
-8dddd60 IMPALA-2089: Retain eq predicates bound by grouping slots with complex grouping exprs.
-ce9fa25 IMPALA-2201: Unconditionally update the partition stats and row count.
-ff5bc02 IMPALA-2199: Row count not set for empty partition when spec is used with compute incremental stats
-3eb2d80 IMPALA-1898: Explicit aliases + ordinals analysis bug
-ba6a8bf IMPALA-1987: Fix TupleIsNullPredicate to return false if no tuples are nullable.
-932d4f8 IMPALA-2178: fix Expr::ComputeResultsLayout() logic
-4ef0bd8 IMPALA-1737: Substitute an InsertStmt's partition key exprs with the root node's smap.
-
-Per Juan Yu, almost all of those are critical issues related to query correctness.
-The non-critical ones are:
-
-752b3bd IMPALA-1756: Constant filter expressions are not checked for errors and state cleanup is not done before throwing exception.
-d703959 IMPALA-2239: update misc.test to match the new .test file format
-ce9fa25 IMPALA-2201: Unconditionally update the partition stats and row count.
-
--->
 
     <concept id="IMPALA-1983">
       <title>Warn if table stats are potentially corrupt.</title>
@@ -1654,22 +1602,6 @@ ce9fa25 IMPALA-2201: Unconditionally update the partition stats and row count.
 
     </conbody>
 
-<!--
-7c01049 IMPALA-1929: Avoiding a DCHECK of NULL hash table in spilled right joins
-c98a556 IMPALA-2136: Bug in PrintTColumnValue caused wrong stats for TINYINT partition cols
-* 4390a5c Making sure that there are no regressions due to IMPALA-2065
-* 33ee7df IMPALA-2133: Properly unescape string value for HBase filters
-* 562b61a IMPALA-1735: ExpandRmReservation only check parent pools with limit
-* 5b09eaa IMPALA-2101: fix NULL ptr deref in BufferedBlockMgr::PinBlock
-c2b8852 IMPALA-2018: Where clause does not propagate to joins inside nested views
-16b79ce IMPALA-2064: Add effective_user() builtin
-99a282b IMPALA-2125: Make UTC to local TimestampValue conversion faster.
-9198985 IMPALA-2065: Workaround IMPALA-1619 in BufferedBlockMgr::ConsumeMemory()
-9ce94eb IMPALA-2048: Set the correct input format when updating partition metadata
-
-* = non-critical to document according to Juan Yu.
--->
-
     <concept id="IMPALA-2048">
       <title>Impala DML/DDL operations corrupt table metadata leading to Hive query failures</title>
       <conbody>
@@ -1775,23 +1707,6 @@ c2b8852 IMPALA-2018: Where clause does not propagate to joins inside nested view
       </p>
 
     </conbody>
-
-<!-- List of fixed issues from Juan's spreadsheet: https://docs.google.com/spreadsheets/d/1Ia06xOLKQInKfsJzQfQ6Sf1fO3nYLOpZ-0OWfFNgNSc/edit#gid=1566007471
-b782f02 IMPALA-1963: Impala Timestamp ISO-8601 Support.
-a0ce91e IMPALA-2043: skip metadata/testddl.py#test_create_alter_bulk_parition on S3
-191f150 CDH-27688: Isilon: fix custom_cluster/test_insert_inherit_permission.py
-ae39894 IMPALA-1968: Part 1: Improve planner numNodes estimate for remote scans
-0d12492 IMPALA-1730: reduce scanner thread spinning windows
-80c2ee3 CDH-26785: Isilon: add remote HDFS disk queue
-19533f6 IMPALA-2002: Provide way to cache ext data source classes
-f847370 IMPALA-2008: Fix wrong warning when insert overwrite to empty table
-81b6f27 IMPALA-1381: Expand set of supported timezones.
-2dcf1ec IMPALA-1952: Expand parsing of decimals to include scientific notation
-9053970 : Isilon: don't warn for multiple remote parquet blocks
-a94d401 : Enable isilon end to end tests for Impala.
-3062d5d : Add flag to skip HBase pytests
-ce601ec : Enable using isilon as the underlying filesystem.
--->
 
     <concept id="isilon_support">
       <title>Enable using Isilon as the underlying filesystem.</title>
@@ -2104,15 +2019,6 @@ IMPALA-1607
       </p>
 
     </conbody>
-<!--
-5e7e50d IMPALA-1917: Do not register aux equivalence predicates with NULL on either side.
-d8856bd IMPALA-2264: fix edge cases for decimal/integer cast
-c17890e IMPALA-2514: DCHECK on destroying an ExprContext
-2befc12 IMPALA-1746: QueryExecState doesn't check for query cancellation or errors
-e591cf4 IMPALA-2141: UnionNode::GetNext() doesn't check for query errors
-76b5313 IMPALA-1756: Constant filter expressions are not checked for errors and state clea
-* 6a98b7c Don't redirect stdout/stderr from BE tests
--->
 
     <concept id="IMPALA-1917-539">
       <!-- Title in Juan's spreadsheet. Actual JIRA title more useful for readers IMO. <title>Do not register aux equivalence predicates with NULL on either side.</title> -->
@@ -4813,7 +4719,7 @@ Bad stats:
         </p>
 
         <p>
-          <b>Resolution:</b> The underlying issue is being addressed by a fix in the CDH Parquet libraries. Impala
+          <b>Resolution:</b> The underlying issue is being addressed by a fix in the Parquet libraries. Impala
           1.2.2 works around the problem and reads the existing data files.
         </p>
       </conbody>
