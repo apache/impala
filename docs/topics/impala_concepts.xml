@@ -33,8 +33,6 @@ under the License.
   </prolog>
 
   <conbody>
-    <draft-comment author="-dita-use-conref-target" audience="integrated"
-      conref="../shared/cdh_cm_common.xml#id_dgz_rhr_kv/draft-comment-test"/>
 
     <p>
       The following sections provide background information to help you become productive using Impala and
