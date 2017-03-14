@@ -76,8 +76,8 @@ under the License.
           <indexterm audience="hidden">dfs.domain.socket.path</indexterm>
           <indexterm audience="hidden">dfs.client.file-block-storage-locations.timeout.millis</indexterm>
           On all Impala nodes, configure the following properties in <!-- Exact timing is unclear, since we say farther down to copy /etc/hadoop/conf/hdfs-site.xml to /etc/impala/conf.
-     Which wouldn't work if we already modified the Impala version of the file here. Not to mention that this
-     doesn't take the CM interface into account, where these /etc files might not exist in those locations. -->
+     Which wouldn't work if we already modified the Impala version of the file here. Also on a 'managed'
+     cluster, these /etc files might not exist in those locations. -->
           <!--          <codeph>/etc/impala/conf/hdfs-site.xml</codeph> as shown: -->
           Impala's copy of <codeph>hdfs-site.xml</codeph> as shown: <codeblock>&lt;property&gt;
     &lt;name&gt;dfs.client.read.shortcircuit&lt;/name&gt;
