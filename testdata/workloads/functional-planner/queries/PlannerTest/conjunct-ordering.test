@@ -72,13 +72,13 @@ PLAN-ROOT SINK
 # Check that an IN predicate costs more than a single numeric comparison.
 select *
 from functional.alltypes a
-where a.int_col IN (1, 2, 3, 4, 5, 6, 7, 8, 9) and a.int_col = 1
+where a.int_col IN (1, 2, 3, 4, 5, 6, 7, 8, 9) and a.id = 1
 ---- PLAN
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   predicates: a.int_col = 1, a.int_col IN (1, 2, 3, 4, 5, 6, 7, 8, 9)
+   predicates: a.id = 1, a.int_col IN (1, 2, 3, 4, 5, 6, 7, 8, 9)
 ====
 # Check that a timestamp comparison costs more than a numeric comparison.
 select *
@@ -94,15 +94,14 @@ PLAN-ROOT SINK
 # Check that string comparisons are ordered by string length.
 select *
 from functional.alltypes a
-where a.string_col = "looooooooooooooooong string" and
-      a.string_col = "medium string" and
+where a.date_string_col = "looooooooooooooooong string" and
       a.string_col = "a"
 ---- PLAN
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   predicates: a.string_col = 'a', a.string_col = 'medium string', a.string_col = 'looooooooooooooooong string'
+   predicates: a.string_col = 'a', a.date_string_col = 'looooooooooooooooong string'
 ====
 # Check that timestamp arithmetic adds cost.
 select *

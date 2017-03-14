@@ -329,7 +329,6 @@ where a.day >= 6
 and a.tinyint_col = 15
 and b.id = '5'
 and b.tinyint_col = 5
-and b.tinyint_col > 123
 and a.tinyint_col + b.tinyint_col < 15
 ---- PLAN
 PLAN-ROOT SINK
@@ -342,7 +341,7 @@ PLAN-ROOT SINK
 |--01:SCAN HBASE [functional_hbase.stringids b]
 |     start key: 5
 |     stop key: 5\0
-|     predicates: b.tinyint_col > 123, b.tinyint_col = 5
+|     predicates: b.tinyint_col = 5
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=5/11 files=5 size=372.38KB
@@ -372,12 +371,44 @@ PLAN-ROOT SINK
 |  01:SCAN HBASE [functional_hbase.stringids b]
 |     start key: 5
 |     stop key: 5\0
-|     predicates: b.tinyint_col > 123, b.tinyint_col = 5
+|     predicates: b.tinyint_col = 5
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.int_col, RF001 -> a.id
+====
+# hbase-hdfs join with scan filtering (bogus)
+select *
+from functional.alltypesagg a join functional_hbase.stringids b
+       on (a.id = cast(b.id as int) and a.int_col = b.int_col)
+where a.day >= 6
+and a.tinyint_col = 15
+and b.id = '5'
+and b.tinyint_col = 5
+and b.tinyint_col > 123
+and a.tinyint_col + b.tinyint_col < 15
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = b.int_col, a.id = CAST(b.id AS INT)
+|  other predicates: a.tinyint_col + b.tinyint_col < 15
+|  runtime filters: RF000 <- b.int_col, RF001 <- CAST(b.id AS INT)
+|
+|--01:EMPTYSET
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   partitions=5/11 files=5 size=372.38KB
+   predicates: a.tinyint_col = 15
+   runtime filters: RF000 -> a.int_col, RF001 -> a.id
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # left join followed by right join and then aggregate
 select x.tinyint_col, count(x.day)

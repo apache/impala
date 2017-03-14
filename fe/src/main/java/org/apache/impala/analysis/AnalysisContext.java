@@ -35,14 +35,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
-import org.apache.impala.rewrite.BetweenToCompoundRule;
-import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
-import org.apache.impala.rewrite.ExtractCommonConjunctRule;
-import org.apache.impala.rewrite.FoldConstantsRule;
-import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
-import org.apache.impala.rewrite.NormalizeExprsRule;
-import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TQueryCtx;
@@ -62,7 +55,7 @@ public class AnalysisContext {
   private final ImpaladCatalog catalog_;
   private final TQueryCtx queryCtx_;
   private final AuthorizationConfig authzConfig_;
-  private final ExprRewriter rewriter_;
+  private final ExprRewriter customRewriter_;
 
   // Timeline of important events in the planning process, used for debugging
   // and profiling
@@ -76,22 +69,7 @@ public class AnalysisContext {
     catalog_ = catalog;
     queryCtx_ = queryCtx;
     authzConfig_ = authzConfig;
-    List<ExprRewriteRule> rules = Lists.newArrayList();
-    // BetweenPredicates must be rewritten to be executable. Other non-essential
-    // expr rewrites can be disabled via a query option. When rewrites are enabled
-    // BetweenPredicates should be rewritten first to help trigger other rules.
-    rules.add(BetweenToCompoundRule.INSTANCE);
-    // Binary predicates must be rewritten to a canonical form for both Kudu predicate
-    // pushdown and Parquet row group pruning based on min/max statistics.
-    rules.add(NormalizeBinaryPredicatesRule.INSTANCE);
-    if (queryCtx.getClient_request().getQuery_options().enable_expr_rewrites) {
-      rules.add(FoldConstantsRule.INSTANCE);
-      rules.add(NormalizeExprsRule.INSTANCE);
-      rules.add(ExtractCommonConjunctRule.INSTANCE);
-      // Relies on FoldConstantsRule and NormalizeExprsRule.
-      rules.add(SimplifyConditionalsRule.INSTANCE);
-    }
-    rewriter_ = new ExprRewriter(rules);
+    customRewriter_ = null;
   }
 
   /**
@@ -102,7 +80,7 @@ public class AnalysisContext {
     catalog_ = catalog;
     queryCtx_ = queryCtx;
     authzConfig_ = authzConfig;
-    rewriter_ = rewriter;
+    customRewriter_ = rewriter;
   }
 
   static public class AnalysisResult {
@@ -401,10 +379,12 @@ public class AnalysisContext {
 
       // Apply expr and subquery rewrites.
       boolean reAnalyze = false;
+      ExprRewriter rewriter = (customRewriter_ != null) ? customRewriter_ :
+          analyzer.getExprRewriter();
       if (analysisResult_.requiresExprRewrite()) {
-        rewriter_.reset();
-        analysisResult_.stmt_.rewriteExprs(rewriter_);
-        reAnalyze = rewriter_.changed();
+        rewriter.reset();
+        analysisResult_.stmt_.rewriteExprs(rewriter);
+        reAnalyze = rewriter.changed();
       }
       if (analysisResult_.requiresSubqueryRewrite()) {
         StmtRewriter.rewrite(analysisResult_);

@@ -114,6 +114,17 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.testtbl]
    kudu predicates: id <= 20, id >= 10, zip < 50, zip <= 30, zip <= 5, zip > 1, zip >= 0, name = 'foo'
 ====
+# Constant propagation works for Kudu
+select * from functional_kudu.alltypes t
+where t.int_col = 10 and t.bigint_col = t.int_col * 100 and
+      cast(t.tinyint_col as bigint) = t.bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.alltypes t]
+   predicates: CAST(t.tinyint_col AS BIGINT) = 1000
+   kudu predicates: t.bigint_col = 1000, t.int_col = 10
+====
 # Test constant folding.
 select * from functional_kudu.testtbl
 where id < 10 + 30  and cast(sin(id) as boolean) = true and 20 * 3 >= id and 10 * 10 + 3 > id
@@ -182,6 +193,15 @@ PLAN-ROOT SINK
    predicates: CAST(sin(id) AS BOOLEAN) = TRUE
    kudu predicates: name IS NULL
 ====
+# Derived EmptySets for Kudu
+select * from functional_kudu.alltypes t
+where t.int_col = 10 and t.bigint_col = t.int_col * 100 and
+      CAST(t.int_col as BIGINT) = t.bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
+====
 # IMPALA-3856: KuduScanNode crash when pushing predicates including a cast
 select o_orderkey from tpch_kudu.orders where o_orderkey < 10.0 order by 1
 ---- PLAN
@@ -210,7 +230,7 @@ PLAN-ROOT SINK
 # IMPALA-4213: Planner not pushing some predicates with constant exprs to Kudu
 select count(*) from functional_kudu.alltypes
 where id < 1475059765 + 10
-and 1475059765 + 100 < id
+and 1475059765 - 100 < id
 ---- PLAN
 PLAN-ROOT SINK
 |
@@ -218,7 +238,7 @@ PLAN-ROOT SINK
 |  output: count(*)
 |
 00:SCAN KUDU [functional_kudu.alltypes]
-   kudu predicates: id < 1475059775, id > 1475059865
+   kudu predicates: id < 1475059775, id > 1475059665
 ====
 # IMPALA-2521: clustered insert into table adds sort node.
 insert into table functional_kudu.alltypes /*+ clustered */

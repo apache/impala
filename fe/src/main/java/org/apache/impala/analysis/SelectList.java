@@ -29,7 +29,7 @@ import com.google.common.collect.Lists;
  * Select list items plus optional distinct clause and optional plan hints.
  */
 public class SelectList {
-  private List<PlanHint> planHints_ = Lists.newArrayList();;
+  private List<PlanHint> planHints_ = Lists.newArrayList();
   private boolean isDistinct_;
 
   /////////////////////////////////////////

@@ -59,6 +59,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testConstantPropagataion() {
+    runPlannerTestFile("constant-propagation");
+  }
+
+  @Test
   public void testEmpty() {
     runPlannerTestFile("empty");
   }

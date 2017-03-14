@@ -496,16 +496,14 @@ select * from functional.alltypesagg where day is null and day = 10
 ---- PLAN
 PLAN-ROOT SINK
 |
-00:SCAN HDFS [functional.alltypesagg]
-   partitions=0/11 files=0 size=0B
+00:EMPTYSET
 ====
 # partition key predicates which are in conjunctive normal form (case 1)
 select * from functional.alltypesagg where day <=> null and day = 10
 ---- PLAN
 PLAN-ROOT SINK
 |
-00:SCAN HDFS [functional.alltypesagg]
-   partitions=0/11 files=0 size=0B
+00:EMPTYSET
 ====
 # partition key predicates which are in conjunctive normal form (case 2)
 select * from functional.alltypesagg where day is null and month = 1
@@ -916,8 +914,7 @@ select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j = 1 an
 ---- PLAN
 PLAN-ROOT SINK
 |
-00:SCAN HDFS [scale_db.num_partitions_1234_blocks_per_partition_1]
-   partitions=0/1234 files=0 size=0B
+00:EMPTYSET
 ====
 select * from scale_db.num_partitions_1234_blocks_per_partition_1 where j <=> 1 and j <=> 2
 ---- PLAN

@@ -1986,7 +1986,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=1/4 files=1 size=115B
-   predicates: functional.alltypestiny.id = 1, id = tinyint_col, functional.alltypestiny.tinyint_col = 1
+   predicates: functional.alltypestiny.id = 1, functional.alltypestiny.tinyint_col = 1
 ====
 # Don't propagate predicates through an inline view with an analytic
 # function that has a complex (non SlotRef) partition by clause for consistency with

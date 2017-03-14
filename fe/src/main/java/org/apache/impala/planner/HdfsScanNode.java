@@ -414,6 +414,11 @@ public class HdfsScanNode extends ScanNode {
       for (Expr conjunct: collectionConjuncts) {
         if (!analyzer.evalAfterJoin(conjunct)) analyzer.markConjunctAssigned(conjunct);
       }
+
+      if (analyzer.getQueryCtx().client_request.getQuery_options().enable_expr_rewrites) {
+        Expr.optimizeConjuncts(collectionConjuncts, analyzer);
+      }
+
       if (!collectionConjuncts.isEmpty()) {
         analyzer.materializeSlots(collectionConjuncts);
         collectionConjuncts_.put(itemTupleDesc, collectionConjuncts);

@@ -83,10 +83,11 @@ public class DataSourceScanNode extends ScanNode {
   // The number of rows estimate as returned by prepare().
   private long numRowsEstimate_;
 
-  public DataSourceScanNode(PlanNodeId id, TupleDescriptor desc) {
+  public DataSourceScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts) {
     super(id, desc, "SCAN DATA SOURCE");
     desc_ = desc;
     table_ = (DataSourceTable) desc_.getTable();
+    conjuncts_ = conjuncts;
     acceptedPredicates_ = null;
     acceptedConjuncts_ = null;
   }
@@ -94,8 +95,6 @@ public class DataSourceScanNode extends ScanNode {
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {
     checkForSupportedFileFormats();
-    assignConjuncts(analyzer);
-    analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
     prepareDataSource();
     conjuncts_ = orderConjunctsByCost(conjuncts_);
     computeStats(analyzer);

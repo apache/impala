@@ -100,23 +100,14 @@ public class KuduScanNode extends ScanNode {
   // Exprs in kuduConjuncts_ converted to KuduPredicates.
   private final List<KuduPredicate> kuduPredicates_ = Lists.newArrayList();
 
-  public KuduScanNode(PlanNodeId id, TupleDescriptor desc) {
+  public KuduScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts) {
     super(id, desc, "SCAN KUDU");
     kuduTable_ = (KuduTable) desc_.getTable();
+    conjuncts_ = conjuncts;
   }
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaRuntimeException {
-    conjuncts_.clear();
-    // Add bound predicates.
-    conjuncts_.addAll(analyzer.getBoundPredicates(desc_.getId()));
-    // Add unassigned predicates.
-    List<Expr> unassigned = analyzer.getUnassignedConjuncts(this);
-    conjuncts_.addAll(unassigned);
-    analyzer.markConjunctsAssigned(unassigned);
-    // Add equivalence predicates.
-    analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
-    Expr.removeDuplicates(conjuncts_);
     conjuncts_ = orderConjunctsByCost(conjuncts_);
 
     try (KuduClient client = KuduUtil.createKuduClient(kuduTable_.getKuduMasterHosts())) {

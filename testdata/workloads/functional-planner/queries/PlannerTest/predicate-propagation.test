@@ -1235,7 +1235,7 @@ select * from
 functional.alltypes a
 left anti join
   (select id from functional.alltypestiny
-   where id > 20) b
+   where id > -20) b
 on (a.id = b.id)
 where a.id < 10
 ---- PLAN
@@ -1246,7 +1246,7 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
-|     predicates: functional.alltypestiny.id < 10, id > 20
+|     predicates: functional.alltypestiny.id < 10, id > -20
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
@@ -1255,7 +1255,7 @@ PLAN-ROOT SINK
 # Anti-joins have a uni-directional value transfer (IMPALA-1249).
 select * from
   (select id from functional.alltypes
-   where id > 20) a
+   where id > -20) a
 right anti join functional.alltypestiny b
 on (a.id = b.id)
 where b.id < 10
@@ -1271,7 +1271,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   predicates: functional.alltypes.id < 10, id > 20
+   predicates: functional.alltypes.id < 10, id > -20
 ====
 # Test proper predicate assignment with predicate propagation when the
 # generated predicate is bound by an outer joined tuple (IMPALA-2018)

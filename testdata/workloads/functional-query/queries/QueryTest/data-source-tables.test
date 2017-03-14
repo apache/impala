@@ -48,8 +48,8 @@ BIGINT
 ====
 ---- QUERY
 select string_col from alltypes_datasource
-where string_col = 'VALIDATE_PREDICATES##id LT 1 && id GT 1 && id LE 1 && id GE 1 && id EQ 1 && id NE 1'
-      and id < 1 and id > 1 and id <= 1 and id >= 1 and id = 1 and id != 1
+where string_col = 'VALIDATE_PREDICATES##id LT 1 && id GT 1 && id LE 1 && id GE 1 && int_col EQ 1 && id NE 1'
+      and id < 1 and id > 1 and id <= 1 and id >= 1 and int_col = 1 and id != 1
 ---- RESULTS
 'SUCCESS'
 ---- TYPES
@@ -57,8 +57,8 @@ STRING
 ====
 ---- QUERY
 select string_col from alltypes_datasource
-where string_col = 'VALIDATE_PREDICATES##id LT 1 && id GT 1 && id LE 1 && id GE 1 && id EQ 1 && id NE 1'
-      and 1 > id and 1 < id and 1 >= id and 1 <= id and 1 = id and 1 != id
+where string_col = 'VALIDATE_PREDICATES##id LT 1 && id GT 1 && id LE 1 && id GE 1 && int_col EQ 1 && id NE 1'
+      and 1 > id and 1 < id and 1 >= id and 1 <= id and 1 = int_col and 1 != id
 ---- RESULTS
 'SUCCESS'
 ---- TYPES
@@ -66,8 +66,9 @@ STRING
 ====
 ---- QUERY
 # Test that <=>, IS DISTINCT FROM, and IS NOT DISTINCT FROM all can be validated
+# Note the duplicate predicate 1 IS NOT DISTINCT FROM id is removed.
 select string_col from alltypes_datasource
-where string_col = 'VALIDATE_PREDICATES##id NOT_DISTINCT 1 && id DISTINCT_FROM 1 && id NOT_DISTINCT 1'
+where string_col = 'VALIDATE_PREDICATES##id NOT_DISTINCT 1 && id DISTINCT_FROM 1'
       and 1 <=> id and 1 IS DISTINCT FROM id and 1 IS NOT DISTINCT FROM id
 ---- RESULTS
 'SUCCESS'

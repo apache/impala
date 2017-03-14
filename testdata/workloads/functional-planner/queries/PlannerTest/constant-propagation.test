@@ -1,0 +1,361 @@
+# Check that impossible conditions are detected
+select *
+from functional.alltypes a
+where a.string_col = "looooooooooooooooong string" and
+      a.string_col = "mediumstring" and
+      a.string_col = "a"
+---- PLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
+====
+# Test multiple forward propagation
+select * from functional.widetable_250_cols a
+where a.int_col1 = 10 and a.int_col2 = a.int_col1 + 1 and a.int_col3 = a.int_col2 * 5
+      and a.int_col4 = a.int_col3 * 2;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.widetable_250_cols a]
+   partitions=1/1 files=1 size=28.69KB
+   predicates: a.int_col1 = 10, a.int_col2 = 11, a.int_col3 = 55, a.int_col4 = 110
+====
+# Test multiple forward propagation
+select * from functional.widetable_250_cols a
+where a.int_col1 = 10 and a.int_col2 = a.int_col1 + 1 and a.int_col3 = a.int_col2 * 5
+      and a.int_col3 * -7 = a.int_col4
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.widetable_250_cols a]
+   partitions=1/1 files=1 size=28.69KB
+   predicates: a.int_col1 = 10, a.int_col2 = 11, a.int_col3 = 55, a.int_col4 = -385
+====
+# Test multiple forward propagation
+select * from functional.widetable_250_cols a
+where a.int_col1 = 10 and a.int_col2 = a.int_col1 + 1 and a.int_col2 * 5 = a.int_col3
+      and a.int_col3 * -9 = a.int_col4
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.widetable_250_cols a]
+   partitions=1/1 files=1 size=28.69KB
+   predicates: a.int_col1 = 10, a.int_col2 = 11, a.int_col3 = 55, a.int_col4 = -495
+====
+# Test multiple forward propagation, and a reversed propagation
+# (which fails as we can't rewrite 55 = a.int_col4 / 10)
+select * from functional.widetable_250_cols a
+where a.int_col1 = 10 and a.int_col2 = a.int_col1 + 1 and a.int_col3 = a.int_col2 * 5
+      and a.int_col4 / 10 = a.int_col3
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.widetable_250_cols a]
+   partitions=1/1 files=1 size=28.69KB
+   predicates: a.int_col1 = 10, a.int_col2 = 11, a.int_col3 = 55, 55 = a.int_col4 / 10
+====
+# Another impossibility (a.int_col3 = a.int_col2 * 5 = a.int_col2 * -7)
+select * from functional.widetable_250_cols a
+where a.int_col1 = 10 and a.int_col2 = a.int_col1 + 1 and a.int_col3 = a.int_col2 * 5
+      and a.int_col3 * -7 = a.int_col2;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
+====
+# An inline view which takes false conjuncts
+select count(*) from
+  (select id, int_col from functional.alltypes) T
+  where T.int_col = 10 and T.int_col = 12
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:EMPTYSET
+====
+# An inline view which becomes false at the scan node
+select count(*) from
+  (select id, int_col from functional.alltypes where int_col = 10) T
+  where T.int_col = 12
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:EMPTYSET
+====
+# Explicit casts are not considered for propagation
+select * from functional.alltypes a
+where cast(a.int_col as string) = 'abc' and cast(int_col as string) > 'xyz'
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: CAST(a.int_col AS STRING) = 'abc', CAST(int_col AS STRING) > 'xyz'
+====
+# Implicit casts are considered for propagation
+select * from functional.alltypes a
+where a.tinyint_col = 10000 and a.tinyint_col < 10000
+---- PLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
+====
+# Constant predicates always get removed
+select count(*) from
+  (select sum(int_col) over(partition by int_col), int_col
+   from functional.alltypes where int_col = 10 group by int_col limit 10)  T
+where T.int_col = 12 and T.int_col > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+02:SELECT
+|  predicates: int_col = 12, int_col > 1
+|
+01:AGGREGATE [FINALIZE]
+|  group by: int_col
+|  limit: 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: int_col = 10
+====
+# Many constant predicates removed
+select count(*) from
+  (select * from functional.alltypes where int_col = 10) T
+where T.int_col = 10 and T.int_col > 1 and T.int_col = 10 and T.int_col = T.int_col
+  and 2 * T.int_col = 20
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: int_col = 10
+====
+# All true predicates elided
+select count(*) from
+  (select * from functional.alltypes) T
+where 2 * 5 = 10 and 3 - 11 = -8 and 7 * 5 = 35
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Many redundant / duplicate predicates
+ select count(*) from
+  (select * from functional.alltypes where int_col = 10) T
+where T.int_col = 10 and T.int_col > 1 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 1 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 2 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 3 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 4 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 5 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 6 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 7 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 8 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 9 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 1 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 2 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 3 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 4 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 5 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 6 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 7 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 8 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 9 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 1 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 2 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 3 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 4 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 5 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 6 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 7 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 8 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 9 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col and
+ T.int_col = 10 and T.int_col > 0 and T.int_col = 10 and T.int_col = T.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: int_col = 10
+====
+# Non-trivial expr substitution (const false)
+select count(*) from
+  (select * from functional.alltypes where int_col = 10) T
+where T.int_col = 10 and T.int_col > 1 and T.int_col = 10 and T.int_col = T.int_col and
+coalesce(NULL, T.int_col) + T.int_col * T.int_col = 100
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:EMPTYSET
+====
+# Non-trivial expr substitution (const true)
+select count(*) from
+  (select * from functional.alltypes where int_col = 10) T
+where T.int_col = 10 and T.int_col > 1 and T.int_col = 10 and T.int_col = T.int_col and
+  (coalesce(NULL, T.int_col) + T.int_col * T.int_col = 100 OR
+   coalesce(NULL, T.int_col) + T.int_col = 20)
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: int_col = 10
+====
+# Non-trivial expr substitution (non-constant)
+select count(*) from
+  (select * from functional.alltypes where int_col = 10) T
+where T.int_col = 10 and T.int_col > 1 and T.int_col = 10 and T.int_col = T.int_col and
+(coalesce(NULL, T.int_col) + random() * T.tinyint_col = 100 OR
+ coalesce(NULL, T.int_col) + T.int_col = 20)
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: int_col = 10, TRUE OR 10 + random() * functional.alltypes.tinyint_col = 100
+====
+# Collection predicates within HDFS scan nodes get optimized
+select 1
+from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
+where l_partkey < l_suppkey and c.c_nationkey = 10 and o_orderkey = 4 and l_suppkey = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=292.36MB
+   predicates: c.c_nationkey = 10, !empty(c.c_orders)
+   predicates on o: !empty(o.o_lineitems), o_orderkey = 4
+   predicates on o_lineitems: l_partkey < 10, l_suppkey = 10
+====
+# Nested predicates also get propagated
+select 1
+from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
+where l_partkey < l_suppkey and c.c_nationkey = 10 and o_orderkey = o_shippriority
+  and l_suppkey = 10 and o_shippriority = c_nationkey
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [INNER JOIN]
+|  |  join predicates: o_shippriority = c_nationkey
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=292.36MB
+   predicates: c.c_nationkey = 10, !empty(c.c_orders)
+   predicates on o: !empty(o.o_lineitems), o.o_orderkey = 10, o.o_shippriority = 10
+   predicates on o_lineitems: l_partkey < 10, l_suppkey = 10
+====
+# Using IS NULL
+select count(*) from functional.alltypes where id = 10 and bool_col is null
+   and id = bool_col;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:EMPTYSET
+====
+# Using = null
+select count(*) from functional.alltypes where id = 10 and bool_col = null and id = bool_col
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:EMPTYSET
+====
+# IS NULL and >
+select count(*) from functional.alltypes where id > 0 and bool_col is null
+   and id = bool_col;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: bool_col IS NULL, functional.alltypes.id IS NULL, id > 0, functional.alltypes.bool_col > 0, id = bool_col
+====
+# = NULL and >
+select count(*) from functional.alltypes where id > 0 and bool_col = null
+   and id = bool_col
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:EMPTYSET
+====

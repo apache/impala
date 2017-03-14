@@ -19,11 +19,13 @@ package org.apache.impala.analysis;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
+import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
@@ -32,6 +34,7 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.TreeNode;
+import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.slf4j.Logger;
@@ -49,6 +52,8 @@ import com.google.common.collect.Sets;
  *
  */
 abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneable {
+  private final static Logger LOG = LoggerFactory.getLogger(Expr.class);
+
   // Limits on the number of expr children and the depth of an expr tree. These maximum
   // values guard against crashes due to stack overflows (IMPALA-432) and were
   // experimentally determined to be safe.
@@ -148,6 +153,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         @Override
         public boolean apply(Expr arg) {
           return arg instanceof BoolLiteral && ((BoolLiteral)arg).getValue();
+        }
+      };
+
+  public final static com.google.common.base.Predicate<Expr> IS_FALSE_LITERAL =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof BoolLiteral && !((BoolLiteral)arg).getValue();
         }
       };
 
@@ -913,6 +926,102 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       C e = it.next();
       if (e.isConstant()) it.remove();
     }
+  }
+
+  // Arbitrary max exprs considered for constant propagation due to O(n^2) complexity.
+  private final static int CONST_PROPAGATION_EXPR_LIMIT = 200;
+
+  /**
+   * Propagates constant expressions of the form <slot ref> = <constant> to
+   * other uses of slot ref in the given conjuncts; returns a BitSet with
+   * bits set to true in all changed indices.  Only one round of substitution
+   * is performed.  The candidates BitSet is used to determine which members of
+   * conjuncts are considered for propagation.
+   */
+  private static BitSet propagateConstants(List<Expr> conjuncts, BitSet candidates,
+      Analyzer analyzer) {
+    Preconditions.checkState(conjuncts.size() <= candidates.size());
+    BitSet changed = new BitSet(conjuncts.size());
+    for (int i = candidates.nextSetBit(0); i >= 0; i = candidates.nextSetBit(i+1)) {
+      if (!(conjuncts.get(i) instanceof BinaryPredicate)) continue;
+      BinaryPredicate bp = (BinaryPredicate) conjuncts.get(i);
+      if (bp.getOp() != BinaryPredicate.Operator.EQ) continue;
+      SlotRef slotRef = bp.getBoundSlot();
+      if (slotRef == null || !bp.getChild(1).isConstant()) continue;
+      Expr subst = bp.getSlotBinding(slotRef.getSlotId());
+      ExprSubstitutionMap smap = new ExprSubstitutionMap();
+      smap.put(slotRef, subst);
+      for (int j = 0; j < conjuncts.size(); ++j) {
+        // Don't rewrite with our own substitution!
+        if (j == i) continue;
+        Expr toRewrite = conjuncts.get(j);
+        Expr rewritten = toRewrite.substitute(smap, analyzer, true);
+        if (!rewritten.equals(toRewrite)) {
+          conjuncts.set(j, rewritten);
+          changed.set(j, true);
+        }
+      }
+    }
+    return changed;
+  }
+
+  /*
+   * Propagates constants, performs expr rewriting and removes duplicates.
+   * Returns false if a contradiction has been implied, true otherwise.
+   * Catches and logs, but ignores any exceptions thrown during rewrite, which
+   * will leave conjuncts intact and rewritten as far as possible until the
+   * exception.
+   */
+  public static boolean optimizeConjuncts(List<Expr> conjuncts, Analyzer analyzer) {
+    Preconditions.checkNotNull(conjuncts);
+    try {
+      BitSet candidates = new BitSet(conjuncts.size());
+      candidates.set(0, Math.min(conjuncts.size(), CONST_PROPAGATION_EXPR_LIMIT));
+      int transfers = 0;
+
+      // Constant propagation may make other slots constant, so repeat the process
+      // until there are no more changes.
+      while (!candidates.isEmpty()) {
+        BitSet changed = propagateConstants(conjuncts, candidates, analyzer);
+        candidates.clear();
+        int pruned = 0;
+        for (int i = changed.nextSetBit(0); i >= 0; i = changed.nextSetBit(i+1)) {
+          // When propagating constants, we may de-normalize expressions, so we
+          // must normalize binary predicates.  Any additional rules will be
+          // applied by the rewriter.
+          int index = i - pruned;
+          Preconditions.checkState(index >= 0);
+          ExprRewriter rewriter = analyzer.getExprRewriter();
+          Expr rewritten = rewriter.rewrite(conjuncts.get(index), analyzer);
+          // Re-analyze to add implicit casts and update cost
+          rewritten.reset();
+          rewritten.analyze(analyzer);
+          if (!rewritten.isConstant()) {
+            conjuncts.set(index, rewritten);
+            if (++transfers < CONST_PROPAGATION_EXPR_LIMIT) candidates.set(index, true);
+            continue;
+          }
+          // Remove constant boolean literal expressions.  N.B. - we may have
+          // expressions determined to be constant which can not yet be discarded
+          // because they can't be evaluated if expr rewriting is turned off.
+          if (rewritten instanceof NullLiteral ||
+              Expr.IS_FALSE_LITERAL.apply(rewritten)) {
+            conjuncts.clear();
+            conjuncts.add(rewritten);
+            return false;
+          }
+          if (Expr.IS_TRUE_LITERAL.apply(rewritten)) {
+            pruned++;
+            conjuncts.remove(index);
+          }
+        }
+      }
+    } catch (AnalysisException e) {
+      LOG.warn("Not able to analyze after rewrite: " + e.toString() + " conjuncts: " +
+          Expr.debugString(conjuncts));
+    }
+    Expr.removeDuplicates(conjuncts);
+    return true;
   }
 
   /**

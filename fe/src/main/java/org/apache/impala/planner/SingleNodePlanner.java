@@ -1194,20 +1194,8 @@ public class SingleNodePlanner {
    * Otherwise, a HdfsScanNode will be created.
    */
   private PlanNode createHdfsScanPlan(TableRef hdfsTblRef, boolean fastPartitionKeyScans,
-      Analyzer analyzer) throws ImpalaException {
+      List<Expr> conjuncts, Analyzer analyzer) throws ImpalaException {
     TupleDescriptor tupleDesc = hdfsTblRef.getDesc();
-
-    // Get all predicates bound by the tuple.
-    List<Expr> conjuncts = Lists.newArrayList();
-    conjuncts.addAll(analyzer.getBoundPredicates(tupleDesc.getId()));
-
-    // Also add remaining unassigned conjuncts
-    List<Expr> unassigned = analyzer.getUnassignedConjuncts(tupleDesc.getId().asList());
-    conjuncts.addAll(unassigned);
-    analyzer.markConjunctsAssigned(unassigned);
-
-    analyzer.createEquivConjuncts(tupleDesc.getId(), conjuncts);
-    Expr.removeDuplicates(conjuncts);
 
     // Do partition pruning before deciding which slots to materialize,
     // We might end up removing some predicates.
@@ -1270,18 +1258,42 @@ public class SingleNodePlanner {
   private PlanNode createScanNode(TableRef tblRef, boolean fastPartitionKeyScans,
       Analyzer analyzer) throws ImpalaException {
     ScanNode scanNode = null;
+
+    // Get all predicates bound by the tuple.
+    List<Expr> conjuncts = Lists.newArrayList();
+    TupleId tid = tblRef.getId();
+    conjuncts.addAll(analyzer.getBoundPredicates(tid));
+
+    // Also add remaining unassigned conjuncts
+    List<Expr> unassigned = analyzer.getUnassignedConjuncts(tid.asList());
+    conjuncts.addAll(unassigned);
+    analyzer.markConjunctsAssigned(unassigned);
+    analyzer.createEquivConjuncts(tid, conjuncts);
+
+    // Perform constant propagation and optimization if rewriting is enabled
+    if (analyzer.getQueryCtx().client_request.query_options.enable_expr_rewrites) {
+      if (!Expr.optimizeConjuncts(conjuncts, analyzer)) {
+        // Conjuncts implied false; convert to EmptySetNode
+        EmptySetNode node = new EmptySetNode(ctx_.getNextNodeId(), tid.asList());
+        node.init(analyzer);
+        return node;
+      }
+    } else {
+      Expr.removeDuplicates(conjuncts);
+    }
+
     Table table = tblRef.getTable();
     if (table instanceof HdfsTable) {
-      return createHdfsScanPlan(tblRef, fastPartitionKeyScans, analyzer);
+      return createHdfsScanPlan(tblRef, fastPartitionKeyScans, conjuncts, analyzer);
     } else if (table instanceof DataSourceTable) {
-      scanNode = new DataSourceScanNode(ctx_.getNextNodeId(), tblRef.getDesc());
+      scanNode = new DataSourceScanNode(ctx_.getNextNodeId(), tblRef.getDesc(), conjuncts);
       scanNode.init(analyzer);
       return scanNode;
     } else if (table instanceof HBaseTable) {
       // HBase table
       scanNode = new HBaseScanNode(ctx_.getNextNodeId(), tblRef.getDesc());
     } else if (tblRef.getTable() instanceof KuduTable) {
-      scanNode = new KuduScanNode(ctx_.getNextNodeId(), tblRef.getDesc());
+      scanNode = new KuduScanNode(ctx_.getNextNodeId(), tblRef.getDesc(), conjuncts);
       scanNode.init(analyzer);
       return scanNode;
     } else {
@@ -1290,11 +1302,6 @@ public class SingleNodePlanner {
     }
     // TODO: move this to HBaseScanNode.init();
     Preconditions.checkState(scanNode instanceof HBaseScanNode);
-
-    List<Expr> conjuncts = analyzer.getUnassignedConjuncts(scanNode);
-    // mark conjuncts_ assigned here; they will either end up inside a
-    // ValueRange or will be evaluated directly by the node
-    analyzer.markConjunctsAssigned(conjuncts);
     List<ValueRange> keyRanges = Lists.newArrayList();
     // determine scan predicates for clustering cols
     for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
