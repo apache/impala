@@ -233,8 +233,8 @@ select real_words(letters) from word_games;</codeblock>
         <ol>
           <li>
             Take a copy of the Hive JAR file containing the Hive built-in functions. For example, the path might be
-            like <filepath>/usr/lib/hive/lib/hive-exec-0.10.0-cdh4.2.0.jar</filepath>, with different version
-            numbers corresponding to your specific level of CDH.
+            like <filepath>/usr/lib/hive/lib/hive-exec-0.10.0.jar</filepath>, with different version
+            numbers corresponding to your specific level of <keyword keyref="distro"/>.
           </li>
 
           <li>
@@ -440,8 +440,8 @@ Returned 1 row(s) in 0.11s</codeblock>
 
       <p>
         When you are ready to start writing your own UDFs, download the sample code and build scripts from
-        <xref href="https://github.com/cloudera/impala-udf-samples" scope="external" format="html">the Cloudera
-        sample UDF github</xref>. Then see <xref href="impala_udf.xml#udf_coding"/> for how to code UDFs, and
+        <xref keyref="udf-samples">the Impala sample UDF github</xref>.
+        Then see <xref href="impala_udf.xml#udf_coding"/> for how to code UDFs, and
         <xref href="impala_udf.xml#udf_tutorial"/> for how to build and run UDFs.
       </p>
     </conbody>
@@ -501,7 +501,7 @@ Returned 1 row(s) in 0.11s</codeblock>
 
         <p>
           For the basic declarations needed to write a scalar UDF, see the header file
-          <xref href="https://github.com/cloudera/impala-udf-samples/blob/master/udf-sample.h" scope="external" format="html"><filepath>udf-sample.h</filepath></xref>
+          <xref keyref="udf-sample.h"><filepath>udf-sample.h</filepath></xref>
           within the sample build environment, which defines a simple function
           named <codeph>AddUdf()</codeph>:
         </p>
@@ -968,9 +968,7 @@ within UDAs, you can return without specifying a value.
           <filepath>uda-sample.h</filepath>:
         </p>
 
-        <p> See this file online at: <xref
-            href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.h"
-            scope="external" format="html" /></p>
+        <p> See this file online at: <xref keyref="uda-sample.h"/></p>
 
 <codeblock audience="hidden">#ifndef SAMPLES_UDA_H
 #define SAMPLES_UDA_H
@@ -982,7 +980,7 @@ using namespace impala_udf;
 // This is an example of the COUNT aggregate function.
 //
 // Usage: &gt; create aggregate function my_count(int) returns bigint
-//          location '/user/cloudera/libudasample.so' update_fn='CountUpdate';
+//          location '/user/doc_demo/libudasample.so' update_fn='CountUpdate';
 //        &gt; select my_count(col) from tbl;
 
 void CountInit(FunctionContext* context, BigIntVal* val);
@@ -997,7 +995,7 @@ BigIntVal CountFinalize(FunctionContext* context, const BigIntVal&amp; val);
 // 16 bytes (8 byte sum + 8 byte count) as the size for this buffer.
 //
 // Usage: &gt; create aggregate function my_avg(double) returns string
-//          location '/user/cloudera/libudasample.so' update_fn='AvgUpdate';
+//          location '/user/doc_demo/libudasample.so' update_fn='AvgUpdate';
 //        &gt; select cast(my_avg(col) as double) from tbl;
 
 void AvgInit(FunctionContext* context, StringVal* val);
@@ -1010,7 +1008,7 @@ StringVal AvgFinalize(FunctionContext* context, const StringVal&amp; val);
 // This is a sample of implementing the STRING_CONCAT aggregate function.
 //
 // Usage: &gt; create aggregate function string_concat(string, string) returns string
-//          location '/user/cloudera/libudasample.so' update_fn='StringConcatUpdate';
+//          location '/user/doc_demo/libudasample.so' update_fn='StringConcatUpdate';
 //        &gt; select string_concat(string_col, ",") from table;
 
 void StringConcatInit(FunctionContext* context, StringVal* val);
@@ -1024,7 +1022,7 @@ StringVal StringConcatFinalize(FunctionContext* context, const StringVal&amp; va
 // This is a example of the variance aggregate function.
 //
 // Usage: &gt; create aggregate function var(double) returns string
-//          location '/user/cloudera/libudasample.so' update_fn='VarianceUpdate';
+//          location '/user/doc_demo/libudasample.so' update_fn='VarianceUpdate';
 //        &gt; select cast(var(col) as double) from tbl;
 
 void VarianceInit(FunctionContext* context, StringVal* val);
@@ -1038,7 +1036,7 @@ StringVal VarianceFinalize(FunctionContext* context, const StringVal&amp; val);
 // more numerically stable.
 //
 // Usage: &gt; create aggregate function knuth_var(double) returns string
-//          location '/user/cloudera/libudasample.so' update_fn='KnuthVarianceUpdate';
+//          location '/user/doc_demo/libudasample.so' update_fn='KnuthVarianceUpdate';
 //        &gt; select cast(knuth_var(col) as double) from tbl;
 
 void KnuthVarianceInit(FunctionContext* context, StringVal* val);
@@ -1052,7 +1050,7 @@ StringVal KnuthVarianceFinalize(FunctionContext* context, const StringVal&amp; v
 // other steps from the Knuth variance computation.
 //
 // Usage: &gt; create aggregate function stddev(double) returns string
-//          location '/user/cloudera/libudasample.so' update_fn='KnuthVarianceUpdate'
+//          location '/user/doc_demo/libudasample.so' update_fn='KnuthVarianceUpdate'
 //          finalize_fn="StdDevFinalize";
 //        &gt; select cast(stddev(col) as double) from tbl;
 
@@ -1069,9 +1067,7 @@ StringVal ToStringVal(FunctionContext* context, const T&amp; val);
           <filepath>uda-sample.cc</filepath>:
         </p>
 
-        <p> See this file online at: <xref
-            href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.cc"
-            scope="external" format="html" />
+        <p> See this file online at: <xref keyref="uda-sample.cc"/>
         </p>
 
 <codeblock audience="hidden">#include "uda-sample.h"
@@ -1269,9 +1265,9 @@ StringVal StringConcatFinalize(FunctionContext* context, const StringVal&amp; va
           For an example of this technique, see the <codeph>trunc_sum()</codeph> aggregate function, which accumulates
           intermediate results of type <codeph>DOUBLE</codeph> and returns <codeph>BIGINT</codeph> at the end.
           View
-          <xref href="https://github.com/cloudera/Impala/blob/cdh5-trunk/tests/query_test/test_udfs.py" scope="external" format="html">the <codeph>CREATE FUNCTION</codeph> statement</xref>
+          <xref keyref="test_udfs.py">the <codeph>CREATE FUNCTION</codeph> statement</xref>
           and
-          <xref href="http://github.com/Cloudera/Impala/blob/cdh5-trunk/be/src/testutil/test-udas.cc" scope="external" format="html">the implementation of the underlying TruncSum*() functions</xref>
+          <xref keyref="test-udas.cc">the implementation of the underlying TruncSum*() functions</xref>
           on Github.
         </p>
       </conbody>
@@ -1448,8 +1444,8 @@ make</codeblock>
 
       <p>
         For downloadable examples that you can experiment with, adapt, and use as templates for your own functions,
-        see <xref href="https://github.com/cloudera/impala-udf-samples" scope="external" format="html">the Cloudera
-        sample UDF github</xref>. You must have already installed the appropriate header files, as explained in
+        see <xref keyref="udf-samples" scope="external" format="html">the Impala sample UDF github</xref>.
+        You must have already installed the appropriate header files, as explained in
         <xref href="impala_udf.xml#udf_demo_env"/>.
       </p>
 
