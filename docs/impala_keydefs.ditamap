@@ -163,6 +163,8 @@ under the License.
     <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
   </keydef>
   <keydef href="" scope="external" format="html" keys="setup_hdfs_caching">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
   <keydef href="" scope="external" format="html" keys="cdh_hag_cdh_other_ha">
     <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
   </keydef>
