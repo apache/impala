@@ -709,7 +709,7 @@ Returned 1 row(s) in 13.35s
 
       <p>
         You can read and write Parquet data files from other <keyword keyref="distro"/> components.
-        <ph audience="integrated">See <xref href="cdh_ig_parquet.xml#parquet_format"/> for details.</ph>
+        See <xref keyref="cdh_ig_parquet"/> for details.
       </p>
 
 <!-- These couple of paragraphs reused in the release notes 'incompatible changes' section. -->
