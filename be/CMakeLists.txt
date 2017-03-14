@@ -278,6 +278,10 @@ endif()
 EXECUTE_PROCESS(COMMAND ln ${MORE_ARGS} -sf ${BUILD_OUTPUT_ROOT_DIRECTORY}
   ${CMAKE_CURRENT_SOURCE_DIR}/build/latest)
 
+# Determine what functions are available on the current platform.
+INCLUDE(CheckFunctionExists)
+CHECK_FUNCTION_EXISTS(sched_getcpu HAVE_SCHED_GETCPU)
+
 # This is a list of impala library dependencies. Individual libraries
 # must not specify library dependencies in their own CMakeLists.txt file.
 # Enclose the impala libraries in -Wl,--start-group and -Wl,--end-group

@@ -118,7 +118,7 @@ if (CMAKE_DEBUG)
   set(Boost_DEBUG TRUE)
 endif()
 
-find_package(Boost REQUIRED COMPONENTS thread regex system filesystem date_time)
+find_package(Boost REQUIRED COMPONENTS thread regex filesystem system date_time)
 include_directories(${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})

@@ -21,22 +21,29 @@
 #include <sys/sysctl.h>
 #endif
 
-#include <boost/algorithm/string.hpp>
-#include <iostream>
-#include <fstream>
-#include <gutil/strings/substitute.h>
 #include <mmintrin.h>
-#include <sstream>
+#include <sched.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
+#include <sys/sysinfo.h>
 
+#include "common/config.h"
+#include "gutil/strings/substitute.h"
 #include "util/pretty-printer.h"
+#include "util/string-parser.h"
 
 #include "common/names.h"
 
 using boost::algorithm::contains;
 using boost::algorithm::trim;
+namespace fs = boost::filesystem;
 using std::max;
 
 DECLARE_bool(abort_on_config_error);
@@ -66,7 +73,10 @@ int64_t CpuInfo::hardware_flags_ = 0;
 int64_t CpuInfo::original_hardware_flags_;
 int64_t CpuInfo::cycles_per_ms_;
 int CpuInfo::num_cores_ = 1;
+int CpuInfo::max_num_cores_;
 string CpuInfo::model_name_ = "unknown";
+int CpuInfo::max_num_numa_nodes_;
+unique_ptr<int[]> CpuInfo::core_to_numa_node_;
 
 static struct {
   string name;
@@ -143,10 +153,68 @@ void CpuInfo::Init() {
   } else {
     num_cores_ = 1;
   }
-
   if (FLAGS_num_cores > 0) num_cores_ = FLAGS_num_cores;
+  max_num_cores_ = get_nprocs_conf();
 
+  // Print a warning if something is wrong with sched_getcpu().
+#ifdef HAVE_SCHED_GETCPU
+  if (sched_getcpu() == -1) {
+    LOG(WARNING) << "Kernel does not support getcpu(). Performance may be impacted.";
+  }
+#else
+  LOG(WARNING) << "Built on a system without sched_getcpu() support. Performance may"
+               << " be impacted.";
+#endif
+
+  InitNuma();
   initialized_ = true;
+}
+
+void CpuInfo::InitNuma() {
+  // Use the NUMA info in the /sys filesystem. which is part of the Linux ABI:
+  // see https://www.kernel.org/doc/Documentation/ABI/stable/sysfs-devices-node and
+  // https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-system-cpu
+  // The filesystem entries are only present if the kernel was compiled with NUMA support.
+  core_to_numa_node_.reset(new int[max_num_cores_]);
+
+  if (!fs::is_directory("/sys/devices/system/node")) {
+    LOG(WARNING) << "/sys/devices/system/node is not present - no NUMA support";
+    // Assume a single NUMA node.
+    max_num_numa_nodes_ = 1;
+    std::fill_n(core_to_numa_node_.get(), max_num_cores_, 0);
+    return;
+  }
+
+  // Search for node subdirectories - node0, node1, node2, etc to determine possible
+  // NUMA nodes.
+  fs::directory_iterator dir_it("/sys/devices/system/node");
+  max_num_numa_nodes_ = 0;
+  for (; dir_it != fs::directory_iterator(); ++dir_it) {
+    const string filename = dir_it->path().filename().string();
+    if (filename.find("node") == 0) ++max_num_numa_nodes_;
+  }
+  if (max_num_numa_nodes_ == 0) {
+    LOG(WARNING) << "Could not find nodes in /sys/devices/system/node";
+    max_num_numa_nodes_ = 1;
+  }
+
+  // Check which NUMA node each core belongs to based on the existence of a symlink
+  // to the node subdirectory.
+  for (int core = 0; core < max_num_cores_; ++core) {
+    bool found_numa_node = false;
+    for (int node = 0; node < max_num_numa_nodes_; ++node) {
+      if (fs::exists(Substitute("/sys/devices/system/cpu/cpu$0/node$1", core, node))) {
+        core_to_numa_node_[core] = node;
+        found_numa_node = true;
+        break;
+      }
+    }
+    if (!found_numa_node) {
+      LOG(WARNING) << "Could not determine NUMA node for core " << core
+                   << " from /sys/devices/system/cpu/";
+      core_to_numa_node_[core] = 0;
+    }
+  }
 }
 
 void CpuInfo::VerifyCpuRequirements() {
@@ -186,6 +254,19 @@ void CpuInfo::EnableFeature(long flag, bool enable) {
     DCHECK((original_hardware_flags_ & flag) != 0);
     hardware_flags_ |= flag;
   }
+}
+
+int CpuInfo::GetCurrentCore() {
+  // sched_getcpu() is not supported on some old kernels/glibcs (like the versions that
+  // shipped with CentOS 5). In that case just pretend we're always running on CPU 0
+  // so that we can build and run with degraded perf.
+#ifdef HAVE_SCHED_GETCPU
+  int cpu = sched_getcpu();
+  // The syscall may not be supported even if the function exists.
+  return cpu == -1 ? 0 : cpu;
+#else
+  return 0;
+#endif
 }
 
 void CpuInfo::GetCacheInfo(long cache_sizes[NUM_CACHE_LEVELS],
@@ -237,6 +318,7 @@ string CpuInfo::DebugString() {
   stream << "Cpu Info:" << endl
          << "  Model: " << model_name_ << endl
          << "  Cores: " << num_cores_ << endl
+         << "  Max Possible Cores: " << max_num_cores_ << endl
          << "  " << L1 << endl
          << "  " << L2 << endl
          << "  " << L3 << endl
@@ -246,6 +328,12 @@ string CpuInfo::DebugString() {
       stream << "    " << flag_mappings[i].name << endl;
     }
   }
+  stream << "  Numa Nodes: " << max_num_numa_nodes_ << endl;
+  stream << "  Numa Nodes of Cores:";
+  for (int core = 0; core < max_num_cores_; ++core) {
+    stream << " " << core << "->" << core_to_numa_node_[core] << " |";
+  }
+  stream << endl;
   return stream.str();
 }
 

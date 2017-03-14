@@ -19,6 +19,7 @@
 #ifndef IMPALA_UTIL_CPU_INFO_H
 #define IMPALA_UTIL_CPU_INFO_H
 
+#include <memory>
 #include <string>
 #include <boost/cstdint.hpp>
 
@@ -50,8 +51,7 @@ class CpuInfo {
   /// Initialize CpuInfo.
   static void Init();
 
-  /// Determine if the CPU meets the minimum CPU requirements and if not, issue an error
-  /// and terminate.
+  /// Determine if the CPU meets the minimum CPU requirements and if not, log an error.
   static void VerifyCpuRequirements();
 
   /// Determine if the CPU scaling governor is set to 'performance' and if not, issue an
@@ -83,10 +83,34 @@ class CpuInfo {
     return cycles_per_ms_;
   }
 
-  /// Returns the number of cores (including hyper-threaded) on this machine.
+  /// Returns the number of cores (including hyper-threaded) on this machine that are
+  /// available for use by Impala (either the number of online cores or the value of
+  /// the --num_cores command-line flag).
   static int num_cores() {
     DCHECK(initialized_);
     return num_cores_;
+  }
+
+  /// Returns the maximum number of cores that will be online in the system, including
+  /// any offline cores or cores that could be added via hot-plugging.
+  static int GetMaxNumCores() { return max_num_cores_; }
+
+  /// Returns the core that the current thread is running on. Always in range
+  /// [0, GetMaxNumCores()). Note that the thread may be migrated to a different core
+  /// at any time by the scheduler, so the caller should not assume the answer will
+  /// remain stable.
+  static int GetCurrentCore();
+
+  /// Returns the maximum number of NUMA nodes that will be online in the system,
+  /// including any that may be offline or disabled.
+  static int GetMaxNumNumaNodes() { return max_num_numa_nodes_; }
+
+  /// Returns the NUMA node of the core provided. 'core' must be in the range
+  /// [0, GetMaxNumCores()).
+  static int GetNumaNodeOfCore(int core) {
+    DCHECK_LE(0, core);
+    DCHECK_LT(core, max_num_numa_nodes_);
+    return core_to_numa_node_[core];
   }
 
   /// Returns the model name of the cpu (e.g. Intel i7-2600)
@@ -127,6 +151,9 @@ class CpuInfo {
   };
 
  private:
+  /// Initialize NUMA-related state - called from Init();
+  static void InitNuma();
+
   /// Populates the arguments with information about this machine's caches.
   /// The values returned are not reliable in some environments, e.g. RHEL5 on EC2, so
   /// so we will keep this as a private method.
@@ -138,7 +165,14 @@ class CpuInfo {
   static int64_t original_hardware_flags_;
   static int64_t cycles_per_ms_;
   static int num_cores_;
+  static int max_num_cores_;
   static std::string model_name_;
+
+  /// Maximum possible number of NUMA nodes.
+  static int max_num_numa_nodes_;
+
+  /// Array with 'max_num_cores_' entries, each of which is the NUMA node of that core.
+  static std::unique_ptr<int[]> core_to_numa_node_;
 };
 
 }
