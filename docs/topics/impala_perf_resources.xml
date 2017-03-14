@@ -41,7 +41,7 @@ under the License.
       Sometimes, balancing raw query performance against scalability requires limiting the amount of resources,
       such as memory or CPU, used by a single query or group of queries. Impala can use several mechanisms that
       help to smooth out the load during heavy concurrent usage, resulting in faster overall query times and
-      sharing of resources across Impala queries, MapReduce jobs, and other kinds of workloads across a CDH
+      sharing of resources across Impala queries, MapReduce jobs, and other kinds of workloads across a <keyword keyref="distro"/>
       cluster:
     </p>
 
