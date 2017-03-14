@@ -1864,9 +1864,9 @@ under the License.
              integrated build where the topic is available for link resolution. -->
           <p>
             Improved support for HDFS encryption. The <codeph>LOAD DATA</codeph> statement now works when the
-            source directory and destination table are in different encryption zones. <ph audience="integrated"><ph audience="PDF">See
-            <xref href="cdh_sg_component_kms.xml#impala_encryption"/> for details about using HDFS encryption with
-            Impala.</ph></ph>
+            source directory and destination table are in different encryption zones. See
+            <xref keyref="cdh_sg_component_kms"/> for details about using HDFS encryption with
+            Impala.
           </p>
         </li>
 

@@ -204,6 +204,9 @@ under the License.
   <keydef href="" scope="external" format="html" keys="cdh_sg_cdh5_hadoop_security">
     <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
   </keydef>
+  <keydef href="" scope="external" format="html" keys="cdh_sg_component_kms">
+    <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
+  </keydef>
   <keydef href="" scope="external" format="html" keys="cdh_sg_hive_security">
     <topicmeta><linktext>the documentation for your Apache Hadoop distribution</linktext></topicmeta>
   </keydef>
