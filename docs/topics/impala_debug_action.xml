@@ -37,7 +37,7 @@ under the License.
 
     <p>
       <indexterm audience="hidden">DEBUG_ACTION query option</indexterm>
-      Introduces artificial problem conditions within queries. For internal Cloudera debugging and troubleshooting.
+      Introduces artificial problem conditions within queries. For internal debugging and troubleshooting.
     </p>
 
     <p>
