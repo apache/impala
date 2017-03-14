@@ -97,8 +97,8 @@ under the License.
       </p>
       <p>
         To specify a different location, set the
-        <!-- Again, IMPALA-3581 says one thing and IMPALA-2686 / observation of CM interface says another.
-             <codeph>log_dir</codeph> -->
+        <!-- Again, IMPALA-3581 says one thing and IMPALA-2686 says another.
+             log_dir vs. minidump_path -->
         <uicontrol>minidump_path</uicontrol>
         configuration setting of one or more Impala-related daemons, and restart the corresponding services or daemons.
       </p>
@@ -161,13 +161,13 @@ under the License.
 
 <codeblock><![CDATA[
 # ps ax | grep impalad
-23114 ?        Sl     0:18 /opt/cloudera/parcels/<parcel_version>/lib/impala/sbin-retail/impalad --flagfile=/var/run/cloudera-scm-agent/process/114-impala-IMPALAD/impala-conf/impalad_flags
+23114 ?        Sl     0:18 /opt/local/parcels/<parcel_version>/lib/impala/sbin/impalad --flagfile=/var/run/impala/process/114-impala-IMPALAD/impala-conf/impalad_flags
 31259 pts/0    S+     0:00 grep impalad
 #
 # kill -11 23114
 #
 # ps ax | grep impalad
-31374 ?        Rl     0:04 /opt/cloudera/parcels/<parcel_version>/lib/impala/sbin-retail/impalad --flagfile=/var/run/cloudera-scm-agent/process/114-impala-IMPALAD/impala-conf/impalad_flags
+31374 ?        Rl     0:04 /opt/local/parcels/<parcel_version>/lib/impala/sbin/impalad --flagfile=/var/run/impala/process/114-impala-IMPALAD/impala-conf/impalad_flags
 31475 pts/0    S+     0:00 grep impalad
 ]]>
 </codeblock>
