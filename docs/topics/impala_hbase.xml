@@ -784,7 +784,7 @@ set hbase_caching=1000;
 15/02/10 16:07:45
 HBase Shell; enter 'help&lt;RETURN>' for list of supported commands.
 Type "exit&lt;RETURN>" to leave the HBase Shell
-Version 0.94.2-cdh4.2.0, rUnknown, Fri Feb 15 11:51:18 PST 2013
+...
 
 hbase(main):001:0> create 'hbasealltypessmall', 'boolsCF', 'intsCF', 'floatsCF', 'stringsCF'
 0 row(s) in 4.6520 seconds
