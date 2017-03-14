@@ -590,10 +590,6 @@ drwxr-xr-x. 2 root root 4096 Oct 28 15:46 conf.pseudo</codeblock>
           </li>
 
           <li>
-            <!-- To do:
-              Link to CM or other doc where that procedure is explained.
-              Run through the procedure in CM and cite the relevant safety valves to put the XML into.
-            -->
             Restart the MapReduce and Impala services.
           </li>
         </ol>
