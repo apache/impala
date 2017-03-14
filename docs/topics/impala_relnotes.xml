@@ -38,7 +38,7 @@ under the License.
       features</xref> and <xref href="impala_known_issues.xml#known_issues">known issues and limitations</xref> for
       Impala versions up to <ph conref="../shared/ImpalaVariables.xml#impala_vars/ReleaseVersion"/>. For users
       upgrading from earlier Impala releases, or using Impala in combination with specific versions of other
-      Cloudera software, <xref href="impala_incompatible_changes.xml#incompatible_changes"/> lists any changes to
+      software, <xref href="impala_incompatible_changes.xml#incompatible_changes"/> lists any changes to
       file formats, SQL syntax, or software dependencies to take into account.
     </p>
 
