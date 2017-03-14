@@ -2754,7 +2754,7 @@ select max(height), avg(height) from census_data where age &gt; 20;
         When Impala processes a cached data block, where the cache replication factor is greater than 1, Impala randomly
         selects a host that has a cached copy of that data block. This optimization avoids excessive CPU
         usage on a single host when the same cached data block is processed multiple times.
-        <ph rev="upstream">Cloudera</ph> recommends specifying a value greater than or equal to the HDFS block replication factor.
+        Where practical, specify a value greater than or equal to the HDFS block replication factor.
       </p>
 
 <!-- This same text is conref'ed in the #views and the #partition_pruning topics. -->
@@ -2864,7 +2864,7 @@ Query finished, fetching results ...
       </p>
 
       <p id="impala_overview_diagram">
-        The following graphic illustrates how Impala is positioned in the broader <ph rev="upstream">Cloudera</ph> environment:
+        The following graphic illustrates how Impala is positioned in the broader <keyword keyref="distro"/> environment:
         <image href="../images/impala_arch.jpeg" placement="break">
           <alt>Architecture diagram showing how Impala relates to other Hadoop components such as HDFS, the Hive metastore database, and client programs such as JDBC and ODBC applications and the Hue web UI.</alt>
         </image>
@@ -3167,7 +3167,7 @@ sudo pip-python install ssl</codeblock>
 
       <p id="hdfs_caching_encryption_caveat" rev="IMPALA-3679">
         Due to a limitation of HDFS, zero-copy reads are not supported with
-        encryption. <ph rev="upstream">Cloudera</ph> recommends not using HDFS caching for Impala data
+        encryption. Where practical, avoid HDFS caching for Impala data
         files in encryption zones. The queries fall back to the normal read
         path during query execution, which might cause some performance overhead.
       </p>
@@ -3224,14 +3224,6 @@ sudo pip-python install ssl</codeblock>
             concurrently within the resource constraints for the pool. </li>
         </ul>
       </p>
-      <note id="impala_llama_caveat">When using YARN with Impala, Cloudera
-        recommends using the static partitioning technique (through a static
-        service pool) rather than the combination of YARN and Llama. YARN is a
-        central, synchronous scheduler and thus introduces higher latency and
-        variance which is better suited for batch processing than for
-        interactive workloads like Impala (especially with higher concurrency).
-        Currently, YARN allocates memory throughout the query, making it hard to
-        reason about out-of-memory and timeout conditions. </note>
 
       <p id="ignore_file_extensions">
         Impala queries ignore files with extensions commonly used for temporary work files by Hadoop tools. Any
