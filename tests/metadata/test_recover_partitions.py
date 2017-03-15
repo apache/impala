@@ -21,7 +21,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.filesystem_utils import WAREHOUSE, IS_S3
 
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 
@@ -183,7 +183,13 @@ class TestRecoverPartitions(ImpalaTestSuite):
     for i in xrange(1, 700):
         PART_DIR = "s=part%d/" % i
         FILE_PATH = "test"
+        INSERTED_VALUE = "666"
         self.filesystem_client.make_dir(TBL_LOCATION + PART_DIR)
+        if IS_S3:
+            # S3 is a key/value store and directory creation is a NOP; actually
+            # create the file.
+            self.filesystem_client.create_file(TBL_LOCATION + PART_DIR + FILE_PATH,
+                                               INSERTED_VALUE)
 
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
