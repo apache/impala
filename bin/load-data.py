@@ -181,6 +181,8 @@ def run_dataset_preload(dataset):
   dataset_preload_script = os.path.join(DATASET_DIR, dataset, "preload")
   if os.path.exists(dataset_preload_script):
     print("Running preload script for " + dataset)
+    if options.scale_factor > 1:
+      dataset_preload_script += " " + str(options.scale_factor)
     exec_cmd(dataset_preload_script, "Error executing preload script for " + dataset,
         exit_on_error=True)
 

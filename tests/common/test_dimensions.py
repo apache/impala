@@ -85,6 +85,18 @@ class TableFormatInfo(object):
       compression_str = 'none'
     return '%s/%s' % (self.file_format, compression_str)
 
+  def db_suffix(self):
+    if self.file_format == 'text' and self.compression_codec == 'none':
+      return ''
+    elif self.compression_codec == 'none':
+      return '_%s' % (self.file_format)
+    elif self.compression_type == 'record':
+      return '_%s_record_%s' % (self.file_format, self.compression_codec)
+    else:
+      return '_%s_%s' % (self.file_format, self.compression_codec)
+
+
+
 def create_uncompressed_text_dimension(workload):
   dataset = get_dataset_from_workload(workload)
   return ImpalaTestDimension('table_format',

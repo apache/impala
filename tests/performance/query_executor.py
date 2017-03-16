@@ -32,6 +32,8 @@
 import logging
 import os
 
+from tests.performance.query import Query
+
 # Setup logging for this module.
 logging.basicConfig(level=logging.INFO, format='[%(name)s] %(threadName)s: %(message)s')
 LOG = logging.getLogger('query_executor')
@@ -175,7 +177,7 @@ class QueryExecutor(object):
 
   Args:
     name (str): eg. "hive"
-    query (str): string containing SQL query to be executed
+    query (Query): SQL query to be executed
     func (function): Function that accepts a QueryExecOption parameter and returns a
       ImpalaQueryResult. Eg. execute_using_impala_beeswax
     config (QueryExecOption)
@@ -185,7 +187,7 @@ class QueryExecutor(object):
     exec_func (function): Function that accepts a QueryExecOption parameter and returns a
       ImpalaQueryResult.
     exec_config (QueryExecOption)
-    query (str): string containing SQL query to be executed
+    query (Query): SQL query to be executed
     exit_on_error (boolean): Exit right after an error encountered.
     executor_name (str): eg. "hive"
     result (ImpalaQueryResult): Contains the result after execute method is called.
@@ -208,8 +210,20 @@ class QueryExecutor(object):
     if 'hive' not in self.executor_name:
       self.exec_config.impalad = impalad
 
-  def execute(self):
-    """Execute the query using the given execution function"""
+  def execute(self, plan_first=False):
+    """Execute the query using the given execution function.
+
+    If plan_first is true, EXPLAIN the query first so timing does not include the initial
+    metadata loading required for planning.
+    """
+    if plan_first:
+      LOG.debug('Planning %s' % self.query)
+      assert isinstance(self.query, Query)
+      self.query.query_str = 'EXPLAIN ' + self.query.query_str
+      try:
+        self.exec_func(self.query, self.exec_config)
+      finally:
+        self.query.query_str = self.query.query_str[len('EXPLAIN '):]
     LOG.debug('Executing %s' % self.query)
     self._result = self.exec_func(self.query, self.exec_config)
     if not self._result.success:

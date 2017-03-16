@@ -429,16 +429,6 @@ def build_hbase_create_stmt(db_name, table_name, column_families):
   create_stmt.append("create '%s', %s" % (hbase_table_name, column_families))
   return create_stmt
 
-def build_db_suffix(file_format, codec, compression_type):
-  if file_format == 'text' and codec == 'none':
-    return ''
-  elif codec == 'none':
-    return '_%s' % (file_format)
-  elif compression_type == 'record':
-    return '_%s_record_%s' % (file_format, codec)
-  else:
-    return '_%s_%s' % (file_format, codec)
-
 # Does a hdfs directory listing and returns array with all the subdir names.
 def get_hdfs_subdirs_with_data(path):
   tmp_file = tempfile.TemporaryFile("w+")
@@ -505,7 +495,7 @@ def generate_statements(output_name, test_vectors, sections,
     table_format = '%s/%s/%s' % (file_format, codec, compression_type)
     for section in sections:
       table_name = section['BASE_TABLE_NAME'].strip()
-      db_suffix = build_db_suffix(file_format, codec, compression_type)
+      db_suffix = row.db_suffix()
       db_name = '{0}{1}'.format(data_set, options.scale_factor)
       db = '{0}{1}'.format(db_name, db_suffix)
 

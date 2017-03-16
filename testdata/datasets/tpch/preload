@@ -21,6 +21,14 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 
 IMPALA_DATA=${IMPALA_HOME}/testdata/impala-data
 TPC_H_DATA=${IMPALA_DATA}/tpch
+
+SCALE_FACTOR=1
+if [[ $# == 1 && $1 -gt 1 ]]
+then
+  SCALE_FACTOR=$1
+  TPC_H_DATA=${TPC_H_DATA}${SCALE_FACTOR}
+fi
+
 TPC_H_HOME=${IMPALA_TOOLCHAIN}/tpc-h-${IMPALA_TPC_H_VERSION}
 TPC_H_DBGEN=${TPC_H_HOME}/bin/dbgen
 
@@ -38,7 +46,16 @@ rm -rf ${TPC_H_DATA}
 mkdir -p ${TPC_H_DATA}
 cd ${TPC_H_DATA}
 
-${TPC_H_DBGEN} -v -f
+if [ -t 1 ]
+then
+  # Output is terminal, show progress verbosely
+  VERBOSITY='-v'
+else
+  VERBOSITY=''
+fi
+
+${TPC_H_DBGEN} ${VERBOSITY} -f -s ${SCALE_FACTOR}
+
 # Impala expects each table to be in its own subdirectory.
 for FILE in *.tbl; do
   FILE_DIR=${FILE%.tbl}

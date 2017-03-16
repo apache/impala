@@ -140,7 +140,8 @@ class WorkloadRunner(object):
         iterations=self.config.workload_iterations,
         query_iterations=self.config.query_iterations,
         impalads=self.config.impalads,
-        num_clients=self.config.num_clients)
+        num_clients=self.config.num_clients,
+        plan_first=getattr(self.config, 'plan_first', False))
 
     scheduler.run()
     self._results.extend(scheduler.results)

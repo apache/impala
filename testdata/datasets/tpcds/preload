@@ -21,6 +21,14 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 
 IMPALA_DATA=${IMPALA_HOME}/testdata/impala-data
 TPC_DS_DATA=${IMPALA_DATA}/tpcds
+
+SCALE_FACTOR=1
+if [[ $# == 1 && $1 -gt 1 ]]
+then
+  SCALE_FACTOR=$1
+  TPC_DS_DATA=${TPC_DS_DATA}${SCALE_FACTOR}
+fi
+
 TPC_DS_DIRNAME=tpc-ds-${IMPALA_TPC_DS_VERSION}
 TPC_DS_HOME=${IMPALA_TOOLCHAIN}/${TPC_DS_DIRNAME}
 
@@ -40,7 +48,16 @@ if [ ! -x ${TPC_DS_DSDGEN} ]; then
   echo "Could not find TPC-DS data generator executable: ${TPC_DS_DSDGEN}"
   exit 1
 fi
-${TPC_DS_DSDGEN} -force -verbose
+
+if [ -t 1 ]
+then
+  # Output is terminal, show progress verbosely
+  VERBOSITY='-verbose'
+else
+  VERBOSITY=''
+fi
+
+${TPC_DS_DSDGEN} -force ${VERBOSITY} -scale ${SCALE_FACTOR}
 # Impala expects each table to be in its own subdirectory.
 for FILE in *.dat; do
   FILE_DIR=${FILE%.dat}

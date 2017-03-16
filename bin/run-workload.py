@@ -75,7 +75,8 @@ parser.add_option("-x", "--workload_iterations", type="int", dest="workload_iter
 parser.add_option("--num_clients", type="int", dest="num_clients", default=1,
                   help="Number of clients (threads) to use when executing each query.")
 parser.add_option("--query_names", dest="query_names", default=str(),
-                  help="A comma-separated list of query names to execute.")
+                  help="A comma-separated list of regular expressions. A query is"
+                    " executed if it matches any of the expressions.")
 parser.add_option("--table_formats", dest="table_formats", default=str(),
                   help=("Override the default test vectors and run using only the"
                         " specified table formats. Ex. --table_formats=seq/snap/block"
@@ -83,6 +84,9 @@ parser.add_option("--table_formats", dest="table_formats", default=str(),
 parser.add_option("--shuffle_query_exec_order", dest="shuffle_queries",
                   action="store_true", default=False, help=("Randomizes the order "
                     "of query execution. Useful when the execution scope is a workload"))
+parser.add_option("--plan_first", dest="plan_first", action="store_true", default=False,
+                  help=("Runs EXPLAIN before running the query so that metadata loading"
+                        " is excluded from the timing"))
 
 parser.add_option("--use_kerberos", dest="use_kerberos", action="store_true",
                   default=False, help="If set, enables talking to a kerberized impalad")

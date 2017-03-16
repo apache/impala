@@ -43,6 +43,7 @@ class Scheduler(object):
     num_clients (int): Number of concurrent clients.
     impalads (list of str): A list of impalads to connect to. Ignored when the executor
       is hive.
+    plan_first (boolean): EXPLAIN queries before executing them
 
   Attributes:
     query_executors (list of QueryExecutor): initialized query executors
@@ -51,6 +52,7 @@ class Scheduler(object):
     query_iterations (int): number of times each query executor will execute
     impalads (list of str?): list of impalads for execution. It is rotated after each execution.
     num_clients (int): Number of concurrent clients
+    plan_first (boolean): EXPLAIN queries before executing them
   """
   def __init__(self, **kwargs):
     self.query_executors = kwargs.get('query_executors')
@@ -59,6 +61,7 @@ class Scheduler(object):
     self.query_iterations = kwargs.get('query_iterations', 1)
     self.impalads = kwargs.get('impalads')
     self.num_clients = kwargs.get('num_clients', 1)
+    self.plan_first = kwargs.get('plan_first', False)
     self._exit = Event()
     self._results = list()
     self._result_dict_lock = Lock()
@@ -110,7 +113,7 @@ class Scheduler(object):
             exit(1)
           try:
             query_executor.prepare(self._get_next_impalad())
-            query_executor.execute()
+            query_executor.execute(plan_first=self.plan_first)
           # QueryExecutor only throws an exception if the query fails and abort_on_error
           # is set to True. If abort_on_error is False, then the exception is logged on
           # the console and execution moves on to the next query.
