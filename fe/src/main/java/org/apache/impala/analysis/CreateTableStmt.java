@@ -94,6 +94,7 @@ public class CreateTableStmt extends StatementBase {
   public List<KuduPartitionParam> getKuduPartitionParams() {
     return tableDef_.getKuduPartitionParams();
   }
+  public List<String> getSortColumns() { return tableDef_.getSortColumns(); }
   public String getComment() { return tableDef_.getComment(); }
   Map<String, String> getTblProperties() { return tableDef_.getTblProperties(); }
   private HdfsCachingOp getCachingOp() { return tableDef_.getCachingOp(); }
@@ -147,6 +148,7 @@ public class CreateTableStmt extends StatementBase {
     if (getRowFormat() != null) params.setRow_format(getRowFormat().toThrift());
     params.setFile_format(getFileFormat());
     params.setIf_not_exists(getIfNotExists());
+    params.setSort_columns(getSortColumns());
     params.setTable_properties(getTblProperties());
     params.setSerde_properties(getSerdeProperties());
     for (KuduPartitionParam d: getKuduPartitionParams()) {

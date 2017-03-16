@@ -24,7 +24,10 @@ import java.util.Map;
 import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.service.FeSupport;
@@ -37,7 +40,9 @@ import org.apache.impala.util.AvroSchemaUtils;
 import org.apache.impala.util.MetaStoreUtil;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
@@ -103,6 +108,9 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
 
     // Analyze 'parquet.mr.int96.write.zone'
     analyzeParquetMrWriteZone(getTargetTable(), tblProperties_);
+
+    // Analyze 'sort.columns' property.
+    analyzeSortColumns(getTargetTable(), tblProperties_);
   }
 
   /**
@@ -181,5 +189,37 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
             HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE, timezone));
       }
     }
+  }
+
+  /**
+   * Analyzes the 'sort.columns' property in 'tblProperties' against the columns of
+   * 'table'. The property must store a list of column names separated by commas, and each
+   * column in the property must occur in 'table' as a non-partitioning column. If there
+   * are errors during the analysis, this function will throw an AnalysisException.
+   * Returns a list of positions of the sort columns within the table's list of
+   * columns.
+   */
+  public static List<Integer> analyzeSortColumns(Table table,
+      Map<String, String> tblProperties) throws AnalysisException {
+    if (!tblProperties.containsKey(
+        AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS)) {
+      return ImmutableList.of();
+    }
+
+    // ALTER TABLE SET is not supported on HBase tables at all, see
+    // AlterTableSetStmt::analyze().
+    Preconditions.checkState(!(table instanceof HBaseTable));
+
+    if (table instanceof KuduTable) {
+      throw new AnalysisException(String.format("'%s' table property is not supported " +
+          "for Kudu tables.", AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS));
+    }
+
+    List<String> sortCols = Lists.newArrayList(
+        Splitter.on(",").trimResults().omitEmptyStrings().split(
+        tblProperties.get(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS)));
+    return TableDef.analyzeSortColumns(sortCols,
+        Column.toColumnNames(table.getNonClusteringColumns()),
+        Column.toColumnNames(table.getClusteringColumns()));
   }
 }

@@ -158,3 +158,110 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
 ====
+# CTAS with sort columns
+create table t sort by (int_col, bool_col) as
+select * from functional.alltypes
+---- PLAN
+WRITE TO HDFS [default.t, OVERWRITE=false]
+|  partitions=1
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [default.t, OVERWRITE=false]
+|  partitions=1
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# CTAS with partitions and sort columns
+create table t partitioned by (year, month) sort by (int_col, bool_col) as
+select * from functional.alltypes
+---- PLAN
+WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# CTAS with more complex select query
+create table t partitioned by (c_nationkey) sort by (c_custkey) as
+select c_custkey, max(o_totalprice) as maxprice, c_nationkey
+  from tpch.orders join tpch.customer on c_custkey = o_custkey
+ where c_nationkey < 10
+ group by c_custkey, c_nationkey
+---- PLAN
+WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(c_nationkey)]
+|  partitions=25
+|
+04:SORT
+|  order by: c_nationkey ASC NULLS LAST, c_custkey ASC NULLS LAST
+|
+03:AGGREGATE [FINALIZE]
+|  output: max(o_totalprice)
+|  group by: c_custkey, c_nationkey
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|
+|--01:SCAN HDFS [tpch.customer]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c_nationkey < 10
+|
+00:SCAN HDFS [tpch.orders]
+   partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o_custkey
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(c_nationkey)]
+|  partitions=25
+|
+08:SORT
+|  order by: c_nationkey ASC NULLS LAST, c_custkey ASC NULLS LAST
+|
+07:EXCHANGE [HASH(c_nationkey)]
+|
+06:AGGREGATE [FINALIZE]
+|  output: max:merge(o_totalprice)
+|  group by: c_custkey, c_nationkey
+|
+05:EXCHANGE [HASH(c_custkey,c_nationkey)]
+|
+03:AGGREGATE [STREAMING]
+|  output: max(o_totalprice)
+|  group by: c_custkey, c_nationkey
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpch.customer]
+|     partitions=1/1 files=1 size=23.08MB
+|     predicates: c_nationkey < 10
+|
+00:SCAN HDFS [tpch.orders]
+   partitions=1/1 files=1 size=162.56MB
+   runtime filters: RF000 -> o_custkey
+====

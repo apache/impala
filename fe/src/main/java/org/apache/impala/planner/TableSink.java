@@ -87,22 +87,22 @@ public abstract class TableSink extends DataSink {
    * Not all Ops are supported for all tables.
    * All parameters must be non-null, the lists in particular need to be empty if they
    * don't make sense for a certain table type.
-   * For HDFS tables 'sortByColumns' specifies the indices into the list of non-clustering
+   * For HDFS tables 'sortColumns' specifies the indices into the list of non-clustering
    * columns of the target table that are mentioned in the 'sortby()' hint.
    */
   public static TableSink create(Table table, Op sinkAction,
       List<Expr> partitionKeyExprs,  List<Integer> referencedColumns,
-      boolean overwrite, boolean inputIsClustered, List<Integer> sortByColumns) {
+      boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns) {
     Preconditions.checkNotNull(partitionKeyExprs);
     Preconditions.checkNotNull(referencedColumns);
-    Preconditions.checkNotNull(sortByColumns);
+    Preconditions.checkNotNull(sortColumns);
     if (table instanceof HdfsTable) {
       // Hdfs only supports inserts.
       Preconditions.checkState(sinkAction == Op.INSERT);
       // Referenced columns don't make sense for an Hdfs table.
       Preconditions.checkState(referencedColumns.isEmpty());
       return new HdfsTableSink(table, partitionKeyExprs, overwrite, inputIsClustered,
-          sortByColumns);
+          sortColumns);
     } else if (table instanceof HBaseTable) {
       // HBase only supports inserts.
       Preconditions.checkState(sinkAction == Op.INSERT);
@@ -113,14 +113,14 @@ public abstract class TableSink extends DataSink {
       // Referenced columns don't make sense for an HBase table.
       Preconditions.checkState(referencedColumns.isEmpty());
       // sortby() hint is not supported for HBase tables.
-      Preconditions.checkState(sortByColumns.isEmpty());
+      Preconditions.checkState(sortColumns.isEmpty());
       // Create the HBaseTableSink and return it.
       return new HBaseTableSink(table);
     } else if (table instanceof KuduTable) {
       // Kudu doesn't have a way to perform INSERT OVERWRITE.
       Preconditions.checkState(overwrite == false);
       // sortby() hint is not supported for Kudu tables.
-      Preconditions.checkState(sortByColumns.isEmpty());
+      Preconditions.checkState(sortColumns.isEmpty());
       return new KuduTableSink(table, sinkAction, referencedColumns);
     } else {
       throw new UnsupportedOperationException(

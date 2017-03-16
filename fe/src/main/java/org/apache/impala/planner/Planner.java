@@ -485,12 +485,13 @@ public class Planner {
 
   /**
    * Insert a sort node on top of the plan, depending on the clustered/noclustered/sortby
-   * plan hint. If clustering is enabled in insertStmt, then the ordering columns will
-   * start with the clustering columns (key columns for Kudu tables), so that partitions
-   * can be written sequentially in the table sink. Any additional non-clustering columns
-   * specified by the sortby hint will be added to the ordering columns and after any
-   * clustering columns. If neither clustering nor a sortby hint are specified, then no
-   * sort node will be added to the plan.
+   * plan hint. If clustering is enabled in insertStmt or additional columns are specified
+   * in the 'sort.columns' table property, then the ordering columns will start with the
+   * clustering columns (key columns for Kudu tables), so that partitions can be written
+   * sequentially in the table sink. Any additional non-clustering columns specified by
+   * the 'sort.columns' property will be added to the ordering columns and after any
+   * clustering columns. If no clustering is requested and the table does not contain
+   * columns in the 'sort.columns' property, then no sort node will be added to the plan.
    */
   public void createPreInsertSort(InsertStmt insertStmt, PlanFragment inputFragment,
        Analyzer analyzer) throws ImpalaException {
@@ -505,10 +506,13 @@ public class Planner {
         orderingExprs.add(inputFragment.getDataPartition().getPartitionExprs().get(0));
         orderingExprs.addAll(insertStmt.getPrimaryKeyExprs());
       }
-    } else if (insertStmt.hasClusteredHint()) {
+    } else if (insertStmt.hasClusteredHint() || !insertStmt.getSortExprs().isEmpty()) {
+      // NOTE: If the table has a 'sort.columns' property and the query has a
+      // 'noclustered' hint, we issue a warning during analysis and ignore the
+      // 'noclustered' hint.
       orderingExprs.addAll(insertStmt.getPartitionKeyExprs());
     }
-    orderingExprs.addAll(insertStmt.getSortByExprs());
+    orderingExprs.addAll(insertStmt.getSortExprs());
     // Ignore constants for the sake of clustering.
     Expr.removeConstants(orderingExprs);
 

@@ -2266,6 +2266,13 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterTableSortBy() {
+    ParsesOk("ALTER TABLE TEST SORT BY (int_col, id)");
+    ParsesOk("ALTER TABLE TEST SORT BY ()");
+    ParserError("ALTER TABLE TEST PARTITION (year=2009, month=4) SORT BY (int_col, id)");
+  }
+
+  @Test
   public void TestAlterTableOrViewRename() {
     for (String entity: Lists.newArrayList("TABLE", "VIEW")) {
       ParsesOk(String.format("ALTER %s TestDb.Foo RENAME TO TestDb.Foo2", entity));
@@ -2309,6 +2316,7 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("CREATE TABLE Foo2 LIKE Foo COMMENT 'tbl' " +
         "STORED AS PARQUETFILE LOCATION '/a/b'");
     ParsesOk("CREATE TABLE Foo2 LIKE Foo STORED AS TEXTFILE LOCATION '/a/b'");
+    ParsesOk("CREATE TABLE Foo LIKE PARQUET '/user/foo'");
 
     // Table and column names starting with digits.
     ParsesOk("CREATE TABLE 01_Foo (01_i int, 02_j string)");
@@ -2335,6 +2343,45 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY (int)");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY ()");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY");
+
+    // Sort by clause
+    ParsesOk("CREATE TABLE Foo (i int, j int) SORT BY ()");
+    ParsesOk("CREATE TABLE Foo (i int) SORT BY (i)");
+    ParsesOk("CREATE TABLE Foo (i int) SORT BY (j)");
+    ParsesOk("CREATE TABLE Foo (i int, j int) SORT BY (i,j)");
+    ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) SORT BY (s) " +
+        "LOCATION '/test-warehouse/'");
+    ParsesOk("CREATE TABLE Foo (i int, s string) SORT BY (s) COMMENT 'hello' " +
+        "LOCATION '/a/b/' TBLPROPERTIES ('123'='1234')");
+
+    // SORT BY must be the first table option
+    ParserError("CREATE TABLE Foo (i int, s string) COMMENT 'hello' SORT BY (s) " +
+        "LOCATION '/a/b/' TBLPROPERTIES ('123'='1234')");
+    ParserError("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/' " +
+        "SORT BY (s) TBLPROPERTIES ('123'='1234')");
+    ParserError("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/' " +
+        "TBLPROPERTIES ('123'='1234') SORT BY (s)");
+
+    // Malformed SORT BY clauses
+    ParserError("CREATE TABLE Foo (i int, j int) SORT BY");
+    ParserError("CREATE TABLE Foo (i int, j int) SORT BY (i,)");
+    ParserError("CREATE TABLE Foo (i int, j int) SORT BY (int)");
+
+    // Create table like other table with sort columns
+    ParsesOk("CREATE TABLE Foo SORT BY(bar) LIKE Baz STORED AS TEXTFILE LOCATION '/a/b'");
+    ParserError("CREATE TABLE SORT BY(bar) Foo LIKE Baz STORED AS TEXTFILE " +
+        "LOCATION '/a/b'");
+    // SORT BY must be the first table option
+    ParserError("CREATE TABLE Foo LIKE Baz STORED AS TEXTFILE LOCATION '/a/b' " +
+        "SORT BY(bar)");
+
+    // CTAS with sort columns
+    ParsesOk("CREATE TABLE Foo SORT BY(bar) AS SELECT * FROM BAR");
+    ParserError("CREATE TABLE Foo AS SELECT * FROM BAR SORT BY(bar)");
+
+    // Create table like file with sort columns
+    ParsesOk("CREATE TABLE Foo LIKE PARQUET '/user/foo' SORT BY (id)");
+    ParserError("CREATE TABLE Foo SORT BY (id) LIKE PARQUET '/user/foo'");
 
     // Column comments
     ParsesOk("CREATE TABLE Foo (i int COMMENT 'hello', s string)");

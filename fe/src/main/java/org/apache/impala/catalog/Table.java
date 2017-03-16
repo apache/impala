@@ -389,13 +389,7 @@ public abstract class Table implements CatalogObject {
   /**
    * Returns a list of the column names ordered by position.
    */
-  public List<String> getColumnNames() {
-    List<String> colNames = Lists.<String>newArrayList();
-    for (Column col: colsByPos_) {
-      colNames.add(col.getName());
-    }
-    return colNames;
-  }
+  public List<String> getColumnNames() { return Column.toColumnNames(colsByPos_); }
 
   /**
    * Returns a list of thrift column descriptors ordered by position.
@@ -468,6 +462,17 @@ public abstract class Table implements CatalogObject {
   }
 
   public int getNumClusteringCols() { return numClusteringCols_; }
+
+  /**
+   * Sets the number of clustering columns. This method should only be used for tests and
+   * the caller must make sure that the value matches any columns that were added to the
+   * table.
+   */
+  public void setNumClusteringCols(int n) {
+    Preconditions.checkState(RuntimeEnv.INSTANCE.isTestEnv());
+    numClusteringCols_ = n;
+  }
+
   public long getNumRows() { return numRows_; }
   public ArrayType getType() { return type_; }
 

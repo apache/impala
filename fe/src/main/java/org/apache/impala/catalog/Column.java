@@ -129,4 +129,10 @@ public class Column {
       }
     });
   }
+
+  public static List<String> toColumnNames(List<Column> columns) {
+    List<String> colNames = Lists.newArrayList();
+    for (Column col: columns) colNames.add(col.getName());
+    return colNames;
+  }
 }

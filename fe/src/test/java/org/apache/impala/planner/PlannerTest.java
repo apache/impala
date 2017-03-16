@@ -94,6 +94,19 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testInsertSortBy() {
+    // Add a test table with a SORT BY clause to test that the corresponding sort nodes
+    // are added by the insert statements in insert-sort-by.test.
+    addTestDb("test_sort_by", "Test DB for SORT BY clause.");
+    addTestTable("create table test_sort_by.t (id int, int_col int, " +
+        "bool_col boolean) partitioned by (year int, month int) " +
+        "sort by (int_col, bool_col) location '/'");
+    addTestTable("create table test_sort_by.t_nopart (id int, int_col int, " +
+        "bool_col boolean) sort by (int_col, bool_col) location '/'");
+    runPlannerTestFile("insert-sort-by", "test_sort_by");
+  }
+
+  @Test
   public void testHdfs() {
     runPlannerTestFile("hdfs");
   }

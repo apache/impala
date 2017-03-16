@@ -168,3 +168,14 @@ STRING, STRING, STRING
 drop table if exists $DATABASE.temp_modern_table
 ---- RESULTS
 ====
+---- QUERY
+# Test adding sort.columns when creating a table like a parquet file.
+create table $DATABASE.sorted_zipcodes_file like parquet
+'$FILESYSTEM_PREFIX/test-warehouse/schemas/zipcode_incomes.parquet'
+sort by (id, zip) stored as textfile;
+describe formatted $DATABASE.sorted_zipcodes_file;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','id,zip              '
+---- TYPES
+STRING,STRING,STRING
+====

@@ -189,3 +189,13 @@ create table if not exists cast_null_as_int as (select cast(null as int) c);
 ---- RESULTS
 'Inserted 1 row(s)'
 ====
+---- QUERY
+# Test adding sort.columns when creating a table from a select query.
+create table sortbytest sort by (int_col, bool_col) as
+select * from functional.alltypessmall;
+describe formatted sortbytest;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','int_col,bool_col    '
+---- TYPES
+STRING,STRING,STRING
+====

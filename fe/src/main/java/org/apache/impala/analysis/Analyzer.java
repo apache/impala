@@ -274,6 +274,11 @@ public class Analyzer {
     public final LinkedHashMap<String, Integer> warnings =
         new LinkedHashMap<String, Integer>();
 
+    // Tracks whether the warnings have been retrieved from this analyzer. If set to true,
+    // adding new warnings will result in an error. This helps to make sure that no
+    // warnings are added which will not be displayed.
+    public boolean warningsRetrieved = false;
+
     public final IdGenerator<EquivalenceClassId> equivClassIdGenerator =
         EquivalenceClassId.createGenerator();
 
@@ -448,8 +453,10 @@ public class Analyzer {
 
   /**
    * Returns a list of each warning logged, indicating if it was logged more than once.
+   * After this function has been called, no warning may be added to the Analyzer anymore.
    */
   public List<String> getWarnings() {
+    globalState_.warningsRetrieved = true;
     List<String> result = new ArrayList<String>();
     for (Map.Entry<String, Integer> e : globalState_.warnings.entrySet()) {
       String error = e.getKey();
@@ -2499,9 +2506,11 @@ public class Analyzer {
   public Map<String, View> getLocalViews() { return localViews_; }
 
   /**
-   * Add a warning that will be displayed to the user. Ignores null messages.
+   * Add a warning that will be displayed to the user. Ignores null messages. Once
+   * getWarnings() has been called, no warning may be added to the Analyzer anymore.
    */
   public void addWarning(String msg) {
+    Preconditions.checkState(!globalState_.warningsRetrieved);
     if (msg == null) return;
     Integer count = globalState_.warnings.get(msg);
     if (count == null) count = 0;

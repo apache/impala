@@ -296,22 +296,62 @@ public class ToSqlTest extends FrontendTestBase {
 
   @Test
   public void TestCreateTable() throws AnalysisException {
-    testToSql("create table p (a int) partitioned by (day string) " +
+    testToSql("create table p (a int) partitioned by (day string) sort by (a) " +
         "comment 'This is a test'",
         "default",
         "CREATE TABLE default.p ( a INT ) PARTITIONED BY ( day STRING ) " +
-        "COMMENT 'This is a test' STORED AS TEXTFILE", true);
+        "SORT BY ( a ) COMMENT 'This is a test' STORED AS TEXTFILE" , true);
+    // Table with SORT BY clause.
+    testToSql("create table p (a int, b int) partitioned by (day string) sort by (a ,b) ",
+        "default",
+        "CREATE TABLE default.p ( a INT, b INT ) PARTITIONED BY ( day STRING ) " +
+        "SORT BY ( a, b ) STORED AS TEXTFILE" , true);
   }
 
   @Test
   public void TestCreateTableAsSelect() throws AnalysisException {
     // Partitioned table.
     testToSql("create table p partitioned by (int_col) as " +
-        "select double_col, int_col from functional.alltypes",
-        "default",
+        "select double_col, int_col from functional.alltypes", "default",
         "CREATE TABLE default.p PARTITIONED BY ( int_col ) STORED AS " +
         "TEXTFILE AS SELECT double_col, int_col FROM functional.alltypes",
         true);
+    // Table with a comment.
+    testToSql("create table p partitioned by (int_col) comment 'This is a test' as " +
+        "select double_col, int_col from functional.alltypes", "default",
+        "CREATE TABLE default.p PARTITIONED BY ( int_col ) COMMENT 'This is a test' " +
+        "STORED AS TEXTFILE AS SELECT double_col, int_col FROM functional.alltypes",
+        true);
+    // Table with SORT BY clause.
+    testToSql("create table p partitioned by (int_col) sort by (string_col) as " +
+        "select double_col, string_col, int_col from functional.alltypes", "default",
+        "CREATE TABLE default.p PARTITIONED BY ( int_col ) SORT BY ( string_col ) " +
+        "STORED AS TEXTFILE AS SELECT double_col, string_col, int_col FROM " +
+        "functional.alltypes", true);
+  }
+
+  @Test
+  public void TestCreateTableLike() throws AnalysisException {
+    testToSql("create table p like functional.alltypes", "default",
+        "CREATE TABLE p LIKE functional.alltypes");
+    // Table with sort columns.
+    testToSql("create table p sort by (id) like functional.alltypes", "default",
+        "CREATE TABLE p SORT BY (id) LIKE functional.alltypes");
+  }
+
+  @Test
+  public void TestCreateTableLikeFile() throws AnalysisException {
+    testToSql("create table if not exists p like parquet " +
+        "'/test-warehouse/schemas/alltypestiny.parquet'", "default",
+        "CREATE TABLE IF NOT EXISTS default.p LIKE PARQUET " +
+        "'hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet' " +
+        "STORED AS TEXTFILE", true);
+    // Table with sort columns.
+    testToSql("create table if not exists p like parquet " +
+        "'/test-warehouse/schemas/alltypestiny.parquet' sort by (int_col, id)", "default",
+        "CREATE TABLE IF NOT EXISTS default.p LIKE PARQUET " +
+        "'hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet' " +
+        "SORT BY ( int_col, id ) STORED AS TEXTFILE", true);
   }
 
   @Test

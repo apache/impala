@@ -1055,3 +1055,216 @@ select x, a from i1670A_alter_1 order by x, a;
 ---- TYPES
 INT, INT
 ====
+---- QUERY
+create table insert_data (i int, d double, f float, b boolean);
+insert into insert_data values (1, 2, 3, false), (4, 5, 6, true);
+====
+---- QUERY
+create table insert_sorted (i int, d double, f float, b boolean);
+====
+---- QUERY
+# Test setting the sort.columns property
+alter table insert_sorted sort by(i, d);
+describe formatted insert_sorted;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','i,d                 '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test inserting after alter table
+insert into table insert_sorted select i, d, f, b from insert_data;
+---- RUNTIME_PROFILE
+row_regex: .*order by: i ASC NULLS LAST, d ASC NULLS LAST
+====
+---- QUERY
+# Test selection after alter table
+select count(*) from insert_sorted;
+---- RESULTS
+2
+====
+---- QUERY
+# Test altering the sort.columns property
+alter table insert_sorted sort by(b, d, f);
+describe formatted insert_sorted;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','b,d,f               '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test inserting after alter table
+insert into table insert_sorted select i, d, f, b from insert_data;
+---- RUNTIME_PROFILE
+row_regex: .*order by: b ASC NULLS LAST, d ASC NULLS LAST, f ASC NULLS LAST
+====
+---- QUERY
+# Test selection after alter table
+select count(*) from insert_sorted;
+---- RESULTS
+4
+====
+---- QUERY
+# Test renaming a column in the sort by list.
+alter table insert_sorted change d e double;
+describe formatted insert_sorted;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','b,e,f               '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test inserting after alter table
+insert into table insert_sorted select i, d, f, b from insert_data;
+---- RUNTIME_PROFILE
+row_regex: .*order by: b ASC NULLS LAST, d ASC NULLS LAST, f ASC NULLS LAST
+====
+---- QUERY
+# Test selection after alter table
+select count(*) from insert_sorted;
+---- RESULTS
+6
+====
+---- QUERY
+# Test replacing the column list, including a column in the sort by list.
+alter table insert_sorted replace columns (i bigint, e decimal(12,2), f boolean);
+describe formatted insert_sorted;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','e,f                 '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test inserting after alter table
+insert into table insert_sorted select i, cast(d as decimal(12,2)), b from insert_data;
+---- RUNTIME_PROFILE
+row_regex: .*order by: CAST\(d AS DECIMAL\(12,2\)\) ASC NULLS LAST, b ASC NULLS LAST
+====
+---- QUERY
+# Test selection after alter table
+select count(*) from insert_sorted;
+---- RESULTS
+8
+====
+---- QUERY
+# Test dropping a column in the sort by list
+alter table insert_sorted drop column f;
+describe formatted insert_sorted;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','e                   '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test that a dropped column cannot be added as a sort column
+alter table insert_sorted sort by(f);
+---- CATCH
+AnalysisException: Could not find SORT BY column 'f' in table.
+====
+---- QUERY
+# Test that erroneous query didn't change sort columns
+describe formatted insert_sorted;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','e                   '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test inserting after alter table
+insert into table insert_sorted select i, cast(d as decimal(12,2)) from insert_data;
+---- RUNTIME_PROFILE
+row_regex: .*order by: CAST\(d AS DECIMAL\(12,2\)\) ASC NULLS LAST
+====
+---- QUERY
+# Test selection after alter table
+select count(*) from insert_sorted;
+---- RESULTS
+10
+====
+---- QUERY
+# Test removing the sort.columns property
+alter table insert_sorted sort by();
+describe formatted insert_sorted;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','                    '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test inserting after alter table
+insert into table insert_sorted select i, cast(d as decimal(12,2)) from insert_data;
+---- RUNTIME_PROFILE
+aggregation(SUM, InitialRunsCreated): 0
+====
+---- QUERY
+# Test selection after alter table
+select count(*) from insert_sorted;
+---- RESULTS
+12
+====
+---- QUERY
+create table insert_sorted_partitioned (i int, d double, f float, b boolean) partitioned by (p int) sort by (i);
+====
+---- QUERY
+# Test removing all sort columns.
+alter table insert_sorted_partitioned sort by();
+describe formatted insert_sorted_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','                    '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test inserting after alter table
+insert into table insert_sorted_partitioned partition (p=1) select i, d, f, b from insert_data;
+---- RUNTIME_PROFILE
+aggregation(SUM, InitialRunsCreated): 0
+====
+---- QUERY
+# Test selection after alter table
+select count(*) from insert_sorted_partitioned;
+---- RESULTS
+2
+====
+---- QUERY
+# Re-add a sort column.
+alter table insert_sorted_partitioned sort by(i);
+describe formatted insert_sorted_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','i                   '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test inserting after alter table
+insert into table insert_sorted_partitioned partition (p=1) select i, d, f, b from insert_data;
+---- RUNTIME_PROFILE
+row_regex: .*order by: i ASC NULLS LAST
+====
+---- QUERY
+# Test selection after alter table
+select count(*) from insert_sorted_partitioned;
+---- RESULTS
+4
+====
+---- QUERY
+# Test dropping the sort column
+alter table insert_sorted_partitioned drop column i;
+describe formatted insert_sorted_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','                    '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test inserting after alter table
+insert into table insert_sorted_partitioned partition (p=1) select d, f, b from insert_data;
+---- RUNTIME_PROFILE
+aggregation(SUM, InitialRunsCreated): 0
+====
+---- QUERY
+# Test selection after alter table
+select count(*) from insert_sorted_partitioned;
+---- RESULTS
+6
+====

@@ -1116,7 +1116,7 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
   }
 
   // Populate RowGroup::sorting_columns with all columns specified by the Frontend.
-  for (int col_idx : parent_->sort_by_columns()) {
+  for (int col_idx : parent_->sort_columns()) {
     current_row_group_->sorting_columns.push_back(parquet::SortingColumn());
     parquet::SortingColumn& sorting_column = current_row_group_->sorting_columns.back();
     sorting_column.column_idx = col_idx;

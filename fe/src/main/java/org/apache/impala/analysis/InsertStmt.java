@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
@@ -42,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -124,24 +126,30 @@ public class InsertStmt extends StatementBase {
   private boolean hasShuffleHint_ = false;
   private boolean hasNoShuffleHint_ = false;
 
-  // Indicates whether this insert stmt has a clustered or noclustered hint. If clustering
-  // is requested, we add a clustering phase before the data sink, so that partitions can
-  // be written sequentially. The default behavior is to not perform an additional
-  // clustering step.
+  // Indicates whether this insert stmt has a clustered or noclustered hint. Only one of
+  // them may be true, not both. If clustering is requested, we add a clustering phase
+  // before the data sink, so that partitions can be written sequentially. The default
+  // behavior is to not perform an additional clustering step.
+  // TODO: hasClusteredHint_ can be removed once we enable clustering by default
+  // (IMPALA-5293).
   private boolean hasClusteredHint_ = false;
+  private boolean hasNoClusteredHint_ = false;
 
-  // For every column of the target table that is referenced in the optional 'sortby()'
-  // hint, this list will contain the corresponding result expr from 'resultExprs_'.
-  // Before insertion, all rows will be sorted by these exprs. If the list is empty, no
-  // additional sorting by non-partitioning columns will be performed. For Hdfs tables,
-  // the 'sortby()' hint must not contain partition columns. For Kudu tables, it must not
-  // contain primary key columns.
-  private List<Expr> sortByExprs_ = Lists.newArrayList();
+  // For every column of the target table that is referenced in the optional
+  // 'sort.columns' table property or in the optional 'sortby()' hint, this list will
+  // contain the corresponding result expr from 'resultExprs_'. Before insertion, all rows
+  // will be sorted by these exprs. If the list is empty, no additional sorting by
+  // non-partitioning columns will be performed. The column list must not contain
+  // partition columns and must be empty for non-Hdfs tables.
+  private List<Expr> sortExprs_ = Lists.newArrayList();
 
   // Stores the indices into the list of non-clustering columns of the target table that
-  // are mentioned in the 'sortby()' hint. This is sent to the backend to populate the
-  // RowGroup::sorting_columns list in parquet files.
-  private List<Integer> sortByColumns_ = Lists.newArrayList();
+  // are mentioned in the 'sort.columns' table property or the 'sortby()' hint. This is
+  // sent to the backend to populate the RowGroup::sorting_columns list in parquet files.
+  // Sort columns supersede the sortby() hint, which we will remove in a subsequent change
+  // (IMPALA-5144). Until then, it is possible to specify sort columns using both ways at
+  // the same time and the column lists will be concatenated.
+  private List<Integer> sortColumns_ = Lists.newArrayList();
 
   // Output expressions that produce the final results to write to the target table. May
   // include casts. Set in prepareExpressions().
@@ -230,7 +238,8 @@ public class InsertStmt extends StatementBase {
     hasShuffleHint_ = false;
     hasNoShuffleHint_ = false;
     hasClusteredHint_ = false;
-    sortByExprs_.clear();
+    hasNoClusteredHint_ = false;
+    sortExprs_.clear();
     resultExprs_.clear();
     mentionedColumns_.clear();
     primaryKeyExprs_.clear();
@@ -374,9 +383,19 @@ public class InsertStmt extends StatementBase {
 
     // Populate partitionKeyExprs from partitionKeyValues and selectExprTargetColumns
     prepareExpressions(selectExprTargetColumns, selectListExprs, table_, analyzer);
+
+    // Analyze 'sort.columns' table property and populate sortColumns_ and sortExprs_.
+    analyzeSortColumns();
+
     // Analyze plan hints at the end to prefer reporting other error messages first
     // (e.g., the PARTITION clause is not applicable to unpartitioned and HBase tables).
     analyzePlanHints(analyzer);
+
+    if (hasNoClusteredHint_ && !sortExprs_.isEmpty()) {
+      analyzer.addWarning(String.format("Insert statement has 'noclustered' hint, but " +
+          "table has '%s' property. The 'noclustered' hint will be ignored.",
+          AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS));
+    }
   }
 
   /**
@@ -498,6 +517,9 @@ public class InsertStmt extends StatementBase {
             "Partition specifications are not supported for Kudu tables.");
       }
     }
+
+    // Assign sortExprs_ based on sortColumns_.
+    for (Integer colIdx: sortColumns_) sortExprs_.add(resultExprs_.get(colIdx));
 
     if (isHBaseTable && overwrite_) {
       throw new AnalysisException("HBase doesn't have a way to perform INSERT OVERWRITE");
@@ -763,6 +785,21 @@ public class InsertStmt extends StatementBase {
     }
   }
 
+  /**
+   * Analyzes the 'sort.columns' table property if it is set, and populates
+   * sortColumns_ and sortExprs_. If there are errors during the analysis, this will throw
+   * an AnalysisException.
+   */
+  private void analyzeSortColumns() throws AnalysisException {
+    if (!(table_ instanceof HdfsTable)) return;
+
+    sortColumns_ = AlterTableSetTblProperties.analyzeSortColumns(table_,
+        table_.getMetaStoreTable().getParameters());
+
+    // Assign sortExprs_ based on sortColumns_.
+    for (Integer colIdx: sortColumns_) sortExprs_.add(resultExprs_.get(colIdx));
+  }
+
   private void analyzePlanHints(Analyzer analyzer) throws AnalysisException {
     if (planHints_.isEmpty()) return;
     if (isUpsert_) {
@@ -772,7 +809,6 @@ public class InsertStmt extends StatementBase {
       throw new AnalysisException(String.format("INSERT hints are only supported for " +
           "inserting into Hdfs tables: %s", getTargetTableName()));
     }
-    boolean hasNoClusteredHint = false;
     for (PlanHint hint: planHints_) {
       if (hint.is("SHUFFLE")) {
         hasShuffleHint_ = true;
@@ -784,7 +820,7 @@ public class InsertStmt extends StatementBase {
         hasClusteredHint_ = true;
         analyzer.setHasPlanHints();
       } else if (hint.is("NOCLUSTERED")) {
-        hasNoClusteredHint = true;
+        hasNoClusteredHint_ = true;
         analyzer.setHasPlanHints();
       } else if (hint.is("SORTBY")) {
         analyzeSortByHint(hint);
@@ -797,7 +833,7 @@ public class InsertStmt extends StatementBase {
     if (hasShuffleHint_ && hasNoShuffleHint_) {
       throw new AnalysisException("Conflicting INSERT hints: shuffle and noshuffle");
     }
-    if (hasClusteredHint_ && hasNoClusteredHint) {
+    if (hasClusteredHint_ && hasNoClusteredHint_) {
       throw new AnalysisException("Conflicting INSERT hints: clustered and noclustered");
     }
   }
@@ -818,13 +854,18 @@ public class InsertStmt extends StatementBase {
       }
 
       // Find the matching column in the target table's column list (by name) and store
-      // the corresponding result expr in sortByExprs_.
+      // the corresponding result expr in sortExprs_.
       boolean foundColumn = false;
       List<Column> columns = table_.getNonClusteringColumns();
+      if (!columns.isEmpty()) {
+        // We need to make a copy to make the sortColumns_ list mutable.
+        // TODO: Remove this when removing the sortby() hint (IMPALA-5157).
+        sortColumns_ = Lists.newArrayList(sortColumns_);
+      }
       for (int i = 0; i < columns.size(); ++i) {
         if (columns.get(i).getName().equals(columnName)) {
-          sortByExprs_.add(resultExprs_.get(i));
-          sortByColumns_.add(i);
+          sortExprs_.add(resultExprs_.get(i));
+          sortColumns_.add(i);
           foundColumn = true;
           break;
         }
@@ -862,8 +903,9 @@ public class InsertStmt extends StatementBase {
   public boolean hasShuffleHint() { return hasShuffleHint_; }
   public boolean hasNoShuffleHint() { return hasNoShuffleHint_; }
   public boolean hasClusteredHint() { return hasClusteredHint_; }
+  public boolean hasNoClusteredHint() { return hasNoClusteredHint_; }
   public ArrayList<Expr> getPrimaryKeyExprs() { return primaryKeyExprs_; }
-  public List<Expr> getSortByExprs() { return sortByExprs_; }
+  public List<Expr> getSortExprs() { return sortExprs_; }
 
   public List<String> getMentionedColumns() {
     List<String> result = Lists.newArrayList();
@@ -877,7 +919,7 @@ public class InsertStmt extends StatementBase {
     Preconditions.checkState(table_ != null);
     return TableSink.create(table_, isUpsert_ ? TableSink.Op.UPSERT : TableSink.Op.INSERT,
         partitionKeyExprs_, mentionedColumns_, overwrite_, hasClusteredHint_,
-        sortByColumns_);
+        sortColumns_);
   }
 
   /**
@@ -889,7 +931,7 @@ public class InsertStmt extends StatementBase {
     resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
     partitionKeyExprs_ = Expr.substituteList(partitionKeyExprs_, smap, analyzer, true);
     primaryKeyExprs_ = Expr.substituteList(primaryKeyExprs_, smap, analyzer, true);
-    sortByExprs_ = Expr.substituteList(sortByExprs_, smap, analyzer, true);
+    sortExprs_ = Expr.substituteList(sortExprs_, smap, analyzer, true);
   }
 
   @Override

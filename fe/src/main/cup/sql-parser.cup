@@ -242,7 +242,7 @@ parser code {:
 :};
 
 // List of keywords. Please keep them sorted alphabetically.
-// ALL KEYWORDS ALSO NEED TO BE ADDED TO THE ident_or_kw PRODUCTION.
+// ALL KEYWORDS ALSO NEED TO BE ADDED TO THE ident_or_keyword PRODUCTION.
 terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_ANALYTIC, KW_AND, KW_ANTI, KW_API_VERSION,
   KW_ARRAY, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BLOCKSIZE,
@@ -264,7 +264,7 @@ terminal
   KW_PURGE, KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE,
   KW_REPLICATION, KW_RESTRICT, KW_RETURNS, KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE,
   KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE,
-  KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED,
+  KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_SORT, KW_STORED,
   KW_STRAIGHT_JOIN, KW_STRING, KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES,
   KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT,
   KW_TRUNCATE, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UPDATE,
@@ -333,7 +333,7 @@ nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr
 nonterminal ArrayList<Expr> expr_list;
 nonterminal String alias_clause;
 nonterminal ArrayList<String> ident_list, primary_keys;
-nonterminal ArrayList<String> opt_ident_list;
+nonterminal ArrayList<String> opt_ident_list, opt_sort_cols;
 nonterminal TableName table_name;
 nonterminal FunctionName function_name;
 nonterminal Expr where_clause;
@@ -979,6 +979,9 @@ alter_tbl_stmt ::=
   | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET
     table_property_type:target LPAREN properties_map:properties RPAREN
   {: RESULT = new AlterTableSetTblProperties(table, partitions, target, properties); :}
+  | KW_ALTER KW_TABLE table_name:table KW_SORT KW_BY LPAREN opt_ident_list:col_names
+    RPAREN
+  {: RESULT = new AlterTableSortByStmt(table, col_names); :}
   | KW_ALTER KW_TABLE table_name:table opt_partition_set:partition KW_SET
     KW_COLUMN KW_STATS ident_or_default:col LPAREN properties_map:map RPAREN
   {:
@@ -1123,7 +1126,18 @@ create_tbl_like_stmt ::=
   opt_comment_val:comment
   file_format_create_table_val:file_format location_val:location
   {:
-    RESULT = new CreateTableLikeStmt(tbl_def.getTblName(), other_table,
+    RESULT = new CreateTableLikeStmt(tbl_def.getTblName(), null, other_table,
+        tbl_def.isExternal(), comment, file_format, location, tbl_def.getIfNotExists());
+  :}
+  // This extra production is necessary since without it the parser will not be able to
+  // parse "CREATE TABLE A LIKE B".
+  | tbl_def_without_col_defs:tbl_def
+    opt_sort_cols:sort_cols
+    KW_LIKE table_name:other_table
+    opt_comment_val:comment
+    file_format_create_table_val:file_format location_val:location
+  {:
+    RESULT = new CreateTableLikeStmt(tbl_def.getTblName(), sort_cols, other_table,
         tbl_def.isExternal(), comment, file_format, location, tbl_def.getIfNotExists());
   :}
   ;
@@ -1157,15 +1171,23 @@ primary_keys ::=
   ;
 
 tbl_options ::=
-  opt_comment_val:comment row_format_val:row_format serde_properties:serde_props
-  file_format_create_table_val:file_format location_val:location cache_op_val:cache_op
+  opt_sort_cols:sort_cols opt_comment_val:comment row_format_val:row_format
+  serde_properties:serde_props file_format_create_table_val:file_format
+  location_val:location cache_op_val:cache_op
   tbl_properties:tbl_props
   {:
     CreateTableStmt.unescapeProperties(serde_props);
     CreateTableStmt.unescapeProperties(tbl_props);
-    RESULT = new TableDef.Options(comment, row_format, serde_props, file_format,
-        location, cache_op, tbl_props);
+    RESULT = new TableDef.Options(sort_cols, comment, row_format, serde_props,
+        file_format, location, cache_op, tbl_props);
   :}
+  ;
+
+opt_sort_cols ::=
+  KW_SORT KW_BY LPAREN opt_ident_list:col_names RPAREN
+  {: RESULT = col_names; :}
+  | /* empty */
+  {: RESULT = null; :}
   ;
 
 opt_tbl_data_layout ::=
@@ -3371,6 +3393,8 @@ ident_or_keyword ::=
   | KW_SHOW:r
   {: RESULT = r.toString(); :}
   | KW_SMALLINT:r
+  {: RESULT = r.toString(); :}
+  | KW_SORT:r
   {: RESULT = r.toString(); :}
   | KW_STORED:r
   {: RESULT = r.toString(); :}

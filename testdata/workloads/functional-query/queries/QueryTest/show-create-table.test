@@ -348,3 +348,27 @@ CREATE VIEW show_create_table_test_db.view_with_subquery
 AS SELECT * FROM functional.alltypestiny
 WHERE id IN (SELECT id FROM functional.alltypesagg)
 ====
+---- CREATE_TABLE
+# Simple table with sort columns.
+CREATE TABLE test1 (id INT)
+SORT BY (id)
+STORED AS TEXTFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test1 (id INT)
+SORT BY (id)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====
+---- CREATE_TABLE
+# Simple partitioned table with sort columns.
+CREATE TABLE test1 (id INT)
+PARTITIONED BY (x INT, y INT)
+SORT BY (id)
+STORED AS TEXTFILE
+---- RESULTS
+CREATE TABLE show_create_table_test_db.test1 (id INT)
+PARTITIONED BY (x INT, y INT)
+SORT BY (id)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====

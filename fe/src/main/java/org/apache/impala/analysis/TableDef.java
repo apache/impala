@@ -17,13 +17,17 @@
 
 package org.apache.impala.analysis;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.RowFormat;
+import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TAccessEvent;
@@ -31,7 +35,9 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.util.MetaStoreUtil;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -52,9 +58,9 @@ import org.apache.hadoop.fs.permission.FsAction;
  * - TBLPROPERTIES
  * - LOCATION
  * - CACHED IN
+ * - SORT BY
  */
 class TableDef {
-
   // Name of the new table
   private final TableName tableName_;
 
@@ -86,6 +92,9 @@ class TableDef {
    * TABLE statements.
    */
   static class Options {
+    // Optional list of columns to sort data by when inserting into this table.
+    final List<String> sortCols;
+
     // Comment to attach to the table
     final String comment;
 
@@ -107,9 +116,10 @@ class TableDef {
     // Key/values to persist with table metadata.
     final Map<String, String> tblProperties;
 
-    Options(String comment, RowFormat rowFormat,
+    Options(List<String> sortCols, String comment, RowFormat rowFormat,
         Map<String, String> serdeProperties, THdfsFileFormat fileFormat, HdfsUri location,
         HdfsCachingOp cachingOp, Map<String, String> tblProperties) {
+      this.sortCols = sortCols;
       this.comment = comment;
       this.rowFormat = rowFormat;
       Preconditions.checkNotNull(serdeProperties);
@@ -122,8 +132,9 @@ class TableDef {
     }
 
     public Options(String comment) {
-      this(comment, RowFormat.DEFAULT_ROW_FORMAT, Maps.<String, String>newHashMap(),
-          THdfsFileFormat.TEXT, null, null, Maps.<String, String>newHashMap());
+      this(ImmutableList.<String>of(), comment, RowFormat.DEFAULT_ROW_FORMAT,
+          Maps.<String, String>newHashMap(), THdfsFileFormat.TEXT, null, null,
+          Maps.<String, String>newHashMap());
     }
   }
 
@@ -145,9 +156,17 @@ class TableDef {
   public String getTbl() { return tableName_.getTbl(); }
   public boolean isAnalyzed() { return isAnalyzed_; }
   List<ColumnDef> getColumnDefs() { return columnDefs_; }
+  List<String> getColumnNames() { return ColumnDef.toColumnNames(columnDefs_); }
+
+  List<String> getPartitionColumnNames() {
+    return ColumnDef.toColumnNames(getPartitionColumnDefs());
+  }
+
   List<ColumnDef> getPartitionColumnDefs() {
     return dataLayout_.getPartitionColumnDefs();
   }
+
+  boolean isKuduTable() { return options_.fileFormat == THdfsFileFormat.KUDU; }
   List<String> getPrimaryKeyColumnNames() { return primaryKeyColNames_; }
   List<ColumnDef> getPrimaryKeyColumnDefs() { return primaryKeyColDefs_; }
   boolean isExternal() { return isExternal_; }
@@ -159,6 +178,7 @@ class TableDef {
     Preconditions.checkNotNull(options);
     options_ = options;
   }
+  List<String> getSortColumns() { return options_.sortCols; }
   String getComment() { return options_.comment; }
   Map<String, String> getTblProperties() { return options_.tblProperties; }
   HdfsCachingOp getCachingOp() { return options_.cachingOp; }
@@ -201,7 +221,7 @@ class TableDef {
       if (!colNames.add(colDef.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }
-      if (getFileFormat() != THdfsFileFormat.KUDU && colDef.hasKuduOptions()) {
+      if (!isKuduTable() && colDef.hasKuduOptions()) {
         throw new AnalysisException(String.format("Unsupported column options for " +
             "file format '%s': '%s'", getFileFormat().name(), colDef.toString()));
       }
@@ -259,6 +279,62 @@ class TableDef {
     }
   }
 
+  /**
+   * Analyzes the list of columns in 'sortCols' against the columns of 'table'. Each
+   * column of 'sortCols' must occur in 'table' as a non-partitioning column. 'table'
+   * must be an HDFS table. If there are errors during the analysis, this will throw an
+   * AnalysisException.
+   */
+  public static void analyzeSortColumns(List<String> sortCols, Table table)
+      throws AnalysisException {
+    Preconditions.checkState(table instanceof HdfsTable);
+    analyzeSortColumns(sortCols, Column.toColumnNames(table.getNonClusteringColumns()),
+        Column.toColumnNames(table.getClusteringColumns()));
+  }
+
+  /**
+   * Analyzes the list of columns in 'sortCols' and returns their matching positions in
+   * 'tableCols'. Each column must occur in 'tableCols' and must not occur in
+   * 'partitionCols'. If there are errors during the analysis, this will throw an
+   * AnalysisException.
+   */
+  public static List<Integer> analyzeSortColumns(List<String> sortCols,
+      List<String> tableCols, List<String> partitionCols)
+      throws AnalysisException {
+    // The index of each sort column in the list of table columns.
+    LinkedHashSet<Integer> colIdxs = new LinkedHashSet<Integer>();
+
+    int numColumns = 0;
+    for (String sortColName: sortCols) {
+      ++numColumns;
+      // Make sure it's not a partition column.
+      if (partitionCols.contains(sortColName)) {
+        throw new AnalysisException(String.format("SORT BY column list must not " +
+            "contain partition column: '%s'", sortColName));
+      }
+
+      // Determine the index of each sort column in the list of table columns.
+      boolean foundColumn = false;
+      for (int j = 0; j < tableCols.size(); ++j) {
+        if (tableCols.get(j).equalsIgnoreCase(sortColName)) {
+          if (colIdxs.contains(j)) {
+            throw new AnalysisException(String.format("Duplicate column in SORT BY " +
+                "list: %s", sortColName));
+          }
+          colIdxs.add(j);
+          foundColumn = true;
+          break;
+        }
+      }
+      if (!foundColumn) {
+        throw new AnalysisException(String.format("Could not find SORT BY column '%s' " +
+            "in table.", sortColName));
+      }
+    }
+    Preconditions.checkState(numColumns == colIdxs.size());
+    return ImmutableList.copyOf(colIdxs);
+  }
+
   private void analyzeOptions(Analyzer analyzer) throws AnalysisException {
     MetaStoreUtil.checkShortPropertyMap("Property", options_.tblProperties);
     MetaStoreUtil.checkShortPropertyMap("Serde property", options_.serdeProperties);
@@ -280,11 +356,25 @@ class TableDef {
     // Analyze 'skip.header.line.format' property.
     AlterTableSetTblProperties.analyzeSkipHeaderLineCount(options_.tblProperties);
     analyzeRowFormat(analyzer);
+
+    String sortByKey = AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS;
+    if (options_.tblProperties.containsKey(sortByKey)) {
+      throw new AnalysisException(String.format("Table definition must not contain the " +
+          "%s table property. Use SORT BY (...) instead.", sortByKey));
+    }
+
+    // Analyze sort columns.
+    if (options_.sortCols == null) return;
+    if (isKuduTable()) {
+      throw new AnalysisException("SORT BY is not supported for Kudu tables.");
+    }
+    analyzeSortColumns(options_.sortCols, getColumnNames(),
+        getPartitionColumnNames());
   }
 
   private void analyzeRowFormat(Analyzer analyzer) throws AnalysisException {
     if (options_.rowFormat == null) return;
-    if (options_.fileFormat == THdfsFileFormat.KUDU) {
+    if (isKuduTable()) {
       throw new AnalysisException(String.format(
           "ROW FORMAT cannot be specified for file format %s.", options_.fileFormat));
     }

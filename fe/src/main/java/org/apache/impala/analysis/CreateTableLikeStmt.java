@@ -17,9 +17,13 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.permission.FsAction;
 
+import org.apache.impala.analysis.TableDef;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
@@ -36,6 +40,7 @@ import org.apache.impala.thrift.TTableName;
  */
 public class CreateTableLikeStmt extends StatementBase {
   private final TableName tableName_;
+  private final List<String> sortColumns_;
   private final TableName srcTableName_;
   private final boolean isExternal_;
   private final String comment_;
@@ -51,6 +56,7 @@ public class CreateTableLikeStmt extends StatementBase {
   /**
    * Builds a CREATE TABLE LIKE statement
    * @param tableName - Name of the new table
+   * @param sortColumns - List of columns to sort by during inserts
    * @param srcTableName - Name of the source table (table to copy)
    * @param isExternal - If true, the table's data will be preserved if dropped.
    * @param comment - Comment to attach to the table
@@ -58,12 +64,13 @@ public class CreateTableLikeStmt extends StatementBase {
    * @param location - The HDFS location of where the table data will stored.
    * @param ifNotExists - If true, no errors are thrown if the table already exists
    */
-  public CreateTableLikeStmt(TableName tableName, TableName srcTableName,
-      boolean isExternal, String comment, THdfsFileFormat fileFormat, HdfsUri location,
-      boolean ifNotExists) {
+  public CreateTableLikeStmt(TableName tableName, List<String> sortColumns,
+      TableName srcTableName, boolean isExternal, String comment,
+      THdfsFileFormat fileFormat, HdfsUri location, boolean ifNotExists) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(srcTableName);
     this.tableName_ = tableName;
+    this.sortColumns_ = sortColumns;
     this.srcTableName_ = srcTableName;
     this.isExternal_ = isExternal;
     this.comment_ = comment;
@@ -109,7 +116,11 @@ public class CreateTableLikeStmt extends StatementBase {
     sb.append("TABLE ");
     if (ifNotExists_) sb.append("IF NOT EXISTS ");
     if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
-    sb.append(tableName_.getTbl() + " LIKE ");
+    sb.append(tableName_.getTbl() + " ");
+    if (sortColumns_ != null && !sortColumns_.isEmpty()) {
+      sb.append("SORT BY (" + Joiner.on(",").join(sortColumns_) + ") ");
+    }
+    sb.append("LIKE ");
     if (srcTableName_.getDb() != null) sb.append(srcTableName_.getDb() + ".");
     sb.append(srcTableName_.getTbl());
     if (comment_ != null) sb.append(" COMMENT '" + comment_ + "'");
@@ -128,6 +139,7 @@ public class CreateTableLikeStmt extends StatementBase {
     if (fileFormat_ != null) params.setFile_format(fileFormat_);
     params.setLocation(location_ == null ? null : location_.toString());
     params.setIf_not_exists(getIfNotExists());
+    params.setSort_columns(sortColumns_);
     return params;
   }
 
@@ -162,6 +174,10 @@ public class CreateTableLikeStmt extends StatementBase {
 
     if (location_ != null) {
       location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
+    }
+
+    if (sortColumns_ != null) {
+      TableDef.analyzeSortColumns(sortColumns_, srcTable);
     }
   }
 }

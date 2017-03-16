@@ -17,6 +17,7 @@
 
 package org.apache.impala.util;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -30,8 +31,14 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.thrift.TColumn;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Utility methods for interacting with the Hive Metastore.
@@ -168,5 +175,55 @@ public class MetaStoreUtil {
             mapName + " value", property.getValue(), MAX_PROPERTY_VALUE_LENGTH);
       }
     }
+  }
+
+  /**
+   * Returns a copy of the comma-separated list of values 'inputCsv', with all occurences
+   * of 'toReplace' replaced with value 'replaceWith'.
+   */
+  public static String replaceValueInCsvList(String input, String toReplace,
+      String replaceWith) {
+    Iterable<String> inputList =
+        Splitter.on(",").trimResults().omitEmptyStrings().split(input);
+    List<String> outputList = Lists.newArrayList();
+    for (String elem : inputList) {
+      if (elem.equalsIgnoreCase(toReplace)) {
+        outputList.add(replaceWith);
+      } else {
+        outputList.add(elem);
+      }
+    }
+    return Joiner.on(",").join(outputList);
+  }
+
+  /**
+   * Returns a copy of the comma-separated list of values 'inputCsv', with all occurences
+   * of 'toRemove' removed.
+   */
+  public static String removeValueFromCsvList(String inputCsv, String toRemove) {
+    Iterable<String> inputList =
+        Splitter.on(",").trimResults().omitEmptyStrings().split(inputCsv);
+    List<String> outputList = Lists.newArrayList();
+    for (String elem : inputList) {
+      if (!elem.equalsIgnoreCase(toRemove)) outputList.add(elem);
+    }
+    return Joiner.on(",").join(outputList);
+  }
+
+  /**
+   * Returns the intersection of the comma-separated list of values 'leftCsv' with the
+   * names of the columns in 'rightCols'. The return value is a comma-separated list.
+   */
+  public static String intersectCsvListWithColumNames(String leftCsv,
+      List<TColumn> rightCols) {
+    Iterable<String> leftCols =
+        Splitter.on(",").trimResults().omitEmptyStrings().split(leftCsv);
+    HashSet<String> rightColNames = Sets.newHashSet();
+    for (TColumn c : rightCols) rightColNames.add(c.getColumnName().toLowerCase());
+    List<String> outputList = Lists.newArrayList();
+    for (String leftCol : leftCols) {
+      if (rightColNames.contains(leftCol.toLowerCase())) outputList.add(leftCol);
+    }
+    return Joiner.on(",").join(outputList);
   }
 }

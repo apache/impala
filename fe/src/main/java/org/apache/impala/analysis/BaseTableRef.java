@@ -55,7 +55,8 @@ public class BaseTableRef extends TableRef {
   }
 
   /**
-   * Register this table ref and then analyze the Join clause.
+   * Register this table ref and then analyze any table hints, the Join clause, and the
+   * 'skip.header.line.count' table property.
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {

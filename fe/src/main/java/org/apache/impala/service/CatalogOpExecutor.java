@@ -57,6 +57,7 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
+import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
@@ -154,6 +155,7 @@ import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.util.HdfsCachingUtil;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
@@ -1598,7 +1600,10 @@ public class CatalogOpExecutor {
     } else {
       tbl.setParameters(new HashMap<String, String>());
     }
-
+    if (params.isSetSort_columns() && !params.sort_columns.isEmpty()) {
+      tbl.getParameters().put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
+          Joiner.on(",").join(params.sort_columns));
+    }
     if (params.getComment() != null) {
       tbl.getParameters().put("comment", params.getComment());
     }
@@ -1789,6 +1794,10 @@ public class CatalogOpExecutor {
     if (tbl.getParameters() == null) {
       tbl.setParameters(new HashMap<String, String>());
     }
+    if (params.isSetSort_columns() && !params.sort_columns.isEmpty()) {
+      tbl.getParameters().put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
+          Joiner.on(",").join(params.sort_columns));
+    }
     if (comment != null) {
       tbl.getParameters().put("comment", comment);
     }
@@ -1867,6 +1876,13 @@ public class CatalogOpExecutor {
     List<FieldSchema> newColumns = buildFieldSchemaList(columns);
     if (replaceExistingCols) {
       msTbl.getSd().setCols(newColumns);
+      String sortByKey = AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS;
+      if (msTbl.getParameters().containsKey(sortByKey)) {
+        String oldColumns = msTbl.getParameters().get(sortByKey);
+        String alteredColumns = MetaStoreUtil.intersectCsvListWithColumNames(oldColumns,
+            columns);
+        msTbl.getParameters().put(sortByKey, alteredColumns);
+      }
     } else {
       // Append the new column to the existing list of columns.
       for (FieldSchema fs: buildFieldSchemaList(columns)) {
@@ -1895,6 +1911,13 @@ public class CatalogOpExecutor {
         // Don't overwrite the existing comment unless a new comment is given
         if (newCol.getComment() != null) {
           fs.setComment(newCol.getComment());
+        }
+        String sortByKey = AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS;
+        if (msTbl.getParameters().containsKey(sortByKey)) {
+          String oldColumns = msTbl.getParameters().get(sortByKey);
+          String alteredColumns = MetaStoreUtil.replaceValueInCsvList(oldColumns, colName,
+              newCol.getColumnName());
+          msTbl.getParameters().put(sortByKey, alteredColumns);
         }
         break;
       }
@@ -2173,6 +2196,12 @@ public class CatalogOpExecutor {
         throw new ColumnNotFoundException(String.format(
             "Column name %s not found in table %s.", colName, tbl.getFullName()));
       }
+    }
+    String sortByKey = AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS;
+    if (msTbl.getParameters().containsKey(sortByKey)) {
+      String oldColumns = msTbl.getParameters().get(sortByKey);
+      String alteredColumns = MetaStoreUtil.removeValueFromCsvList(oldColumns, colName);
+      msTbl.getParameters().put(sortByKey, alteredColumns);
     }
     applyAlterTable(msTbl);
   }

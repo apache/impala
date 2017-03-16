@@ -207,6 +207,7 @@ import org.apache.impala.analysis.SqlParserSymbols;
     keywordMap.put("set", new Integer(SqlParserSymbols.KW_SET));
     keywordMap.put("show", new Integer(SqlParserSymbols.KW_SHOW));
     keywordMap.put("smallint", new Integer(SqlParserSymbols.KW_SMALLINT));
+    keywordMap.put("sort", new Integer(SqlParserSymbols.KW_SORT));
     keywordMap.put("stats", new Integer(SqlParserSymbols.KW_STATS));
     keywordMap.put("stored", new Integer(SqlParserSymbols.KW_STORED));
     keywordMap.put("straight_join", new Integer(SqlParserSymbols.KW_STRAIGHT_JOIN));

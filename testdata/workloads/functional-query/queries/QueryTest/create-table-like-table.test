@@ -213,3 +213,30 @@ drop table like_no_avro_schema
 drop table no_avro_schema
 ---- RESULTS
 ====
+---- QUERY
+# Test setting sort.columns when using create table like.
+create table sortbytest sort by (int_col, bool_col) like functional.alltypes;
+describe formatted sortbytest;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','int_col,bool_col    '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test that sort.columns will be inherited from the source table.
+create table sortbytest_clone like sortbytest;
+describe formatted sortbytest_clone;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','int_col,bool_col    '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test that sort.columns can be overridden in the query.
+create table sortbytest_override sort by (id, string_col) like sortbytest;
+describe formatted sortbytest_override;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','id,string_col       '
+---- TYPES
+STRING,STRING,STRING
+====

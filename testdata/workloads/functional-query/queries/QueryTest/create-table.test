@@ -274,3 +274,12 @@ from $DATABASE.struct_keywords t, t.a, t.m
 ---- TYPES
 INT, STRING, DECIMAL, BOOLEAN, STRING, STRING, INT, TIMESTAMP, INT, INT
 ====
+---- QUERY
+# Make sure that specifying sort columns sets the 'sort.columns' property correctly.
+create table sortbytest (i int, d double, b boolean) sort by (d, i);
+describe formatted sortbytest;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','d,i                 '
+---- TYPES
+STRING,STRING,STRING
+====

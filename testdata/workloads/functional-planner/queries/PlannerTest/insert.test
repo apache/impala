@@ -714,7 +714,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 01:SORT
-|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -723,7 +723,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 02:SORT
-|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
 |
 01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
 |
@@ -739,7 +739,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 01:SORT
-|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -748,7 +748,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)
 |  partitions=24
 |
 01:SORT
-|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB

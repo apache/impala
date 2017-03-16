@@ -1713,6 +1713,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestInsertHints() throws AnalysisException {
+    // Test table to make sure that conflicting hints and table properties result in a
+    // warning.
+    addTestDb("test_sort_by", "Test DB for SORT BY clause.");
+    addTestTable("create table test_sort_by.alltypes (id int, int_col int, " +
+        "bool_col boolean) partitioned by (year int, month int) " +
+        "sort by (int_col, bool_col) location '/'");
     for (String[] hintStyle: getHintStyles()) {
       String prefix = hintStyle[0];
       String suffix = hintStyle[1];
@@ -1765,6 +1771,15 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "insert into table functional.alltypessmall partition (year, month) " +
           "/* +clustered,noclustered */ select * from functional.alltypes", prefix,
           suffix), "Conflicting INSERT hints: clustered and noclustered");
+
+      // noclustered hint on a table with sort.columns issues a warning.
+      AnalyzesOk(String.format(
+          "insert into test_sort_by.alltypes partition (year, month) " +
+          "%snoclustered%s select id, int_col, bool_col, year, month from " +
+          "functional.alltypes", prefix, suffix),
+          "Insert statement has 'noclustered' hint, but table has 'sort.columns' " +
+          "property. The 'noclustered' hint will be ignored.");
+
 
       // Below are tests for hints that are not supported by the legacy syntax.
       if (prefix == "[") continue;

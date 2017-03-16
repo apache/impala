@@ -506,6 +506,19 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypes PARTITION (year<=2010, month=11) " +
                "set serdeproperties ('a'='2')");
 
+    AnalyzesOk("alter table functional.alltypes set tblproperties('sort.columns'='id')");
+    AnalyzesOk("alter table functional.alltypes set tblproperties(" +
+               "'sort.columns'='INT_COL,id')");
+    AnalyzesOk("alter table functional.alltypes set tblproperties(" +
+               "'sort.columns'='bool_col,int_col,id')");
+    AnalyzesOk("alter table functional.alltypes set tblproperties('sort.columns'='')");
+    AnalysisError("alter table functional.alltypes set tblproperties(" +
+               "'sort.columns'='id,int_col,id')",
+               "Duplicate column in SORT BY list: id");
+    AnalysisError("alter table functional.alltypes set tblproperties(" +
+               "'sort.columns'='ID, foo')",
+               "Could not find SORT BY column 'foo' in table.");
+
     {
       // Check that long_properties fail at the analysis layer
       String long_property_key = "";
@@ -1076,6 +1089,20 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterTableSortBy() {
+    AnalyzesOk("alter table functional.alltypes sort by (id)");
+    AnalyzesOk("alter table functional.alltypes sort by (int_col,id)");
+    AnalyzesOk("alter table functional.alltypes sort by (bool_col,int_col,id)");
+    AnalyzesOk("alter table functional.alltypes sort by ()");
+    AnalysisError("alter table functional.alltypes sort by (id,int_col,id)",
+        "Duplicate column in SORT BY list: id");
+    AnalysisError("alter table functional.alltypes sort by (id, foo)", "Could not find " +
+        "SORT BY column 'foo' in table.");
+    AnalysisError("alter table functional_hbase.alltypes sort by (id, foo)",
+        "ALTER TABLE SORT BY not supported on HBase tables.");
+  }
+
+  @Test
   public void TestAlterView() {
     // View-definition references a table.
     AnalyzesOk("alter view functional.alltypes_view as " +
@@ -1419,9 +1446,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create table default.newtbl_DNE like parquet "
         + "'/test-warehouse/schemas/zipcode_incomes.parquet'");
     AnalyzesOk("create table newtbl_DNE like parquet "
-        + "'/test-warehouse/schemas/zipcode_incomes.parquet' STORED AS PARQUET");
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet' stored as parquet");
     AnalyzesOk("create external table newtbl_DNE like parquet "
-        + "'/test-warehouse/schemas/zipcode_incomes.parquet' STORED AS PARQUET");
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet' sort by (id,zip) "
+        + "stored as parquet");
+    AnalyzesOk("create table newtbl_DNE like parquet "
+        + "'/test-warehouse/schemas/zipcode_incomes.parquet' sort by (id,zip)");
     AnalyzesOk("create table if not exists functional.zipcode_incomes like parquet "
         + "'/test-warehouse/schemas/zipcode_incomes.parquet'");
     AnalyzesOk("create table if not exists newtbl_DNE like parquet "
@@ -1658,6 +1688,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "CREATE TABLE LIKE is not supported for Kudu tables");
     AnalysisError("create table tbl like functional_kudu.dimtbl", "Cloning a Kudu " +
         "table using CREATE TABLE LIKE is not supported.");
+
+    // Test sort columns.
+    AnalyzesOk("create table tbl sort by (int_col,id) like functional.alltypes");
+    AnalysisError("create table tbl sort by (int_col,foo) like functional.alltypes",
+        "Could not find SORT BY column 'foo' in table.");
   }
 
   @Test
@@ -1906,6 +1941,27 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "Tables produced by an external data source do not support the column type: " +
           type.name());
     }
+
+    // Tables with sort columns
+    AnalyzesOk("create table functional.new_table (i int, j int) sort by (i)");
+    AnalyzesOk("create table functional.new_table (i int, j int) sort by (i, j)");
+    AnalyzesOk("create table functional.new_table (i int, j int) sort by (j, i)");
+
+    // 'sort.columns' property not supported in table definition.
+    AnalysisError("create table Foo (i int) sort by (i) " +
+        "tblproperties ('sort.columns'='i')", "Table definition must not contain the " +
+        "sort.columns table property. Use SORT BY (...) instead.");
+
+    // Column in sortby hint must exist.
+    AnalysisError("create table functional.new_table (i int) sort by (j)", "Could not " +
+        "find SORT BY column 'j' in table.");
+
+    // Partitioned HDFS table
+    AnalyzesOk("create table functional.new_table (i int) PARTITIONED BY (d decimal)" +
+        "SORT BY (i)");
+    // Column in sortby hint must not be a Hdfs partition column.
+    AnalysisError("create table functional.new_table (i int) PARTITIONED BY (d decimal)" +
+        "SORT BY (d)", "SORT BY column list must not contain partition column: 'd'");
   }
 
   @Test
@@ -1988,6 +2044,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // ALTER TABLE RENAME TO
     AnalyzesOk("ALTER TABLE functional_kudu.testtbl RENAME TO new_testtbl");
+
+    // ALTER TABLE SORT BY
+    AnalysisError("alter table functional_kudu.alltypes sort by (int_col)",
+        "ALTER TABLE SORT BY not supported on Kudu tables.");
+
+    // ALTER TABLE SET TBLPROPERTIES for sort.columns
+    AnalysisError("alter table functional_kudu.alltypes set tblproperties(" +
+        "'sort.columns'='int_col')",
+        "'sort.columns' table property is not supported for Kudu tables.");
   }
 
   @Test
@@ -2296,6 +2361,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (i int primary key block_size 'val') " +
         "partition by hash (i) partitions 3 stored as kudu", "Invalid value " +
         "for BLOCK_SIZE: 'val'. A positive INTEGER value is expected.");
+
+    // Sort columns are not supported for Kudu tables.
+    AnalysisError("create table tab (i int, x int primary key) partition by hash(x) " +
+        "partitions 8 sort by(i) stored as kudu", "SORT BY is not supported for Kudu " +
+        "tables.");
   }
 
   @Test

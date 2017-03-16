@@ -344,11 +344,11 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
         schemaLocation_.toString());
     String s = ToSqlUtils.getCreateTableSql(getDb(),
         getTbl() + " __LIKE_FILEFORMAT__ ",  getComment(), colsSql, partitionColsSql,
-        null, null, getTblProperties(), getSerdeProperties(), isExternal(),
-        getIfNotExists(), getRowFormat(), HdfsFileFormat.fromThrift(getFileFormat()),
-        compression, null, getLocation());
-    s = s.replace("__LIKE_FILEFORMAT__", "LIKE " + schemaFileFormat_ + " " +
-        schemaLocation_.toString());
+        null, null, getSortColumns(), getTblProperties(), getSerdeProperties(),
+        isExternal(), getIfNotExists(), getRowFormat(),
+        HdfsFileFormat.fromThrift(getFileFormat()), compression, null, getLocation());
+    s = s.replace("__LIKE_FILEFORMAT__", String.format("LIKE %s '%s'",
+        schemaFileFormat_, schemaLocation_.toString()));
     return s;
   }
 
