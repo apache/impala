@@ -23,3 +23,7 @@
 # is not a valid enum member (and it usually isn't), this causes a UBSAN error. The line
 # below suppresses that error.
 enum:ios_base.h
+
+# In Thrift 0.9.0 and 0.10.0 there is undefined behavior in TCompactProtocol in which
+# negative values are left-shifted. See https://issues.apache.org/jira/browse/THRIFT-2026
+shift-base:TCompactProtocol.tcc
