@@ -45,6 +45,11 @@ class TestKuduOperations(KuduTestSuite):
   This suite tests the different modification operations when using a kudu table.
   """
 
+  @classmethod
+  def get_conn_timeout(cls):
+    # For IMPALA-5079
+    return 60 * 5 # 5 minutes
+
   def test_kudu_scan_node(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database)
 
