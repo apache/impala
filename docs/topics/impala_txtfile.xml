@@ -486,34 +486,7 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</codeblock>
 
             <p>
               Download and install the appropriate file to each machine on which you intend to use LZO with Impala.
-              These files all come from
-              <xref keyref="gplextras">this GPL extras</xref> download site. Install the:
             </p>
-            <ul>
-              <li>
-                <xref keyref="gplextras_rhel5">Red Hat 5 repo file</xref> to <filepath>/etc/yum.repos.d/</filepath>.
-              </li>
-
-              <li>
-                <xref keyref="gplextras_rhel6">Red Hat 6 repo file</xref> to <filepath>/etc/yum.repos.d/</filepath>.
-              </li>
-
-              <li>
-                <xref keyref="gplextras_sles11">SUSE repo file</xref> to <filepath>/etc/zypp/repos.d/</filepath>.
-              </li>
-
-              <li>
-                <xref keyref="gplextras_ubuntu_lucid">Ubuntu 10.04 list file</xref> to <filepath>/etc/apt/sources.list.d/</filepath>.
-              </li>
-
-              <li>
-                <xref keyref="gplextras_ubuntu_precise">Ubuntu 12.04 list file</xref> to <filepath>/etc/apt/sources.list.d/</filepath>.
-              </li>
-
-              <li>
-                <xref keyref="gplextras_debian_squeeze">Debian list file</xref> to <filepath>/etc/apt/sources.list.d/</filepath>.
-              </li>
-            </ul>
           </li>
 
           <li>
@@ -551,7 +524,7 @@ $ sudo apt-get install hadoop-lzo
 $ sudo apt-get install impala-lzo</codeblock>
             <note>
               <p>
-                The level of the <codeph>impala-lzo-cdh4</codeph> package is closely tied to the version of Impala
+                The level of the <codeph>impala-lzo</codeph> package is closely tied to the version of Impala
                 you use. Any time you upgrade Impala, re-do the installation command for
                 <codeph>impala-lzo</codeph> on each applicable machine to make sure you have the appropriate
                 version of that package.
@@ -652,8 +625,8 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
           Run the indexer using a command like the following:
         </p>
 
-<codeblock>$ hadoop jar /usr/lib/hadoop/lib/hadoop-lzo-cdh4-0.4.15-gplextras.jar
-  com.hadoop.compression.lzo.DistributedLzoIndexer /hdfs_location_of_table/</codeblock>
+<codeblock>$ hadoop jar /usr/lib/hadoop/lib/hadoop-lzo-<varname>version</varname>-gplextras.jar
+  com.hadoop.compression.lzo.DistributedLzoIndexer /<varname>hdfs_location_of_table</varname>/</codeblock>
 
         <note>
           If the path of the JAR file in the preceding example is not recognized, do a <cmdname>find</cmdname>

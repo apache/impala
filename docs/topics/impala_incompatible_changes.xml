@@ -1353,7 +1353,7 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
       <ul>
         <li>
           If you use LZO-compressed text files, when you upgrade Impala to version 1.0, also update the
-          <codeph>impala-lzo-cdh4</codeph> to the latest level. See <xref href="impala_txtfile.xml#lzo"/> for
+          Impala LZO package to the latest level. See <xref href="impala_txtfile.xml#lzo"/> for
           details.
         </li>
       </ul>
