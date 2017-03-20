@@ -75,8 +75,9 @@ class ThreadPool : public CacheLineAligned {
   //
   /// Returns true if the work item was successfully added to the queue, false otherwise
   /// (which typically means that the thread pool has already been shut down).
-  bool Offer(const T& work) {
-    return work_queue_.BlockingPut(work);
+  template <typename V>
+  bool Offer(V&& work) {
+    return work_queue_.BlockingPut(std::forward<V>(work));
   }
 
   /// Shuts the thread pool down, causing the work queue to cease accepting offered work

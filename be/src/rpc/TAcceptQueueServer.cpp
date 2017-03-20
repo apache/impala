@@ -224,7 +224,7 @@ void TAcceptQueueServer::serve() {
       shared_ptr<TTransport> client = serverTransport_->accept();
 
       // New - the work done to setup the connection has been moved to SetupConnection.
-      if (!connection_setup_pool.Offer(client)) {
+      if (!connection_setup_pool.Offer(std::move(client))) {
         string errStr = string("TAcceptQueueServer: thread pool unexpectedly shut down.");
         GlobalOutput(errStr.c_str());
         stop_ = true;
