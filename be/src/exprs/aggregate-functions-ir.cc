@@ -1066,10 +1066,13 @@ class ReservoirSampleState {
 
     size_t buffer_len = sizeof(ReservoirSampleState<T>) +
         sizeof(ReservoirSample<T>) * num_samples_;
-    StringVal dst = StringVal::CopyFrom(
-        ctx, reinterpret_cast<uint8_t*>(this), buffer_len);
-    memcpy(dst.ptr + sizeof(ReservoirSampleState<T>),
-        reinterpret_cast<uint8_t*>(samples_), sizeof(ReservoirSample<T>) * num_samples_);
+    StringVal dst(ctx, buffer_len);
+    if (LIKELY(!dst.is_null)) {
+      memcpy(dst.ptr, reinterpret_cast<uint8_t*>(this), sizeof(ReservoirSampleState<T>));
+      memcpy(dst.ptr + sizeof(ReservoirSampleState<T>),
+          reinterpret_cast<uint8_t*>(samples_),
+          sizeof(ReservoirSample<T>) * num_samples_);
+    }
     ctx->Free(reinterpret_cast<uint8_t*>(samples_));
     ctx->Free(reinterpret_cast<uint8_t*>(this));
     return dst;
