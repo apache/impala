@@ -1750,7 +1750,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         The set of timezones recognized by Impala was expanded.
         You can always find the latest list of supported timezones in the
         Impala source code, in the file
-        <xref href="https://github.com/cloudera/Impala/blob/master/be/src/exprs/timezone_db.cc" scope="external" format="html">timezone_db.cc</xref>.
+        <xref keyref="timezone_db.cc">timezone_db.cc</xref>.
       </p>
       <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1381" scope="external" format="html">IMPALA-1381</xref></p>
       </conbody>

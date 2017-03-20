@@ -56,7 +56,7 @@ under the License.
   <keydef href="https://github.com/cloudera/Impala/blob/cdh5-trunk/tests/query_test/test_udfs.py" scope="external" format="html" keys="test_udfs.py">
     <topicmeta><linktext>test_udfs.py</linktext></topicmeta>
   </keydef>
-  <keydef href="https://github.com/cloudera/Impala/blob/master/be/src/exprs/timezone_db.cc" scope="external" format="html" keys="timezone_db.cc">
+  <keydef href="https://github.com/apache/incubator-impala/blob/master/be/src/exprs/timezone_db.cc" scope="external" format="html" keys="timezone_db.cc">
     <topicmeta><linktext>timezone_db.cc</linktext></topicmeta>
   </keydef>
   <keydef href="https://github.com/cloudera/impala-tpcds-kit" scope="external" format="html" keys="impala-tpcds-kit">
