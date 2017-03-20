@@ -91,7 +91,7 @@ under the License.
             <entry>
               <p>
                 Used to transmit commands and receive results by <codeph>impala-shell</codeph> and
-                version 1.2 of the Cloudera ODBC driver.
+                some ODBC drivers.
               </p>
             </entry>
           </row>
@@ -119,7 +119,7 @@ under the License.
             <entry>
               <p>
                 Used to transmit commands and receive results by applications, such as Business Intelligence tools,
-                using JDBC, the Beeswax query editor in Hue, and version 2.0 or higher of the Cloudera ODBC driver.
+                using JDBC, the Beeswax query editor in Hue, and some ODBC drivers.
               </p>
             </entry>
           </row>
