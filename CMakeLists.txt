@@ -387,7 +387,8 @@ add_custom_target(cscope ALL
 
 if (DEFINED ENV{IMPALA_LZO} AND EXISTS $ENV{IMPALA_LZO})
   add_custom_target(impala-lzo ALL DEPENDS thrift-deps
-    COMMAND $ENV{IMPALA_LZO}/build.sh ${CMAKE_SOURCE_DIR} $ENV{IMPALA_TOOLCHAIN}
+    COMMAND $ENV{IMPALA_LZO}/build.sh ${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}
+    $ENV{IMPALA_TOOLCHAIN}
   )
 endif()
 
