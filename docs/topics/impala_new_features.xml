@@ -441,7 +441,7 @@ under the License.
           <ul>
             <li>
               <p rev="IMPALA-3206">
-                [<xref href="https://issues.cloudera.org/browse/IMPALA-3206" scope="external" format="html">IMPALA-3206</xref>]
+                [<xref keyref="IMPALA-3206">IMPALA-3206</xref>]
                 Speedup for queries against <codeph>DECIMAL</codeph> columns in Avro tables.
                 The code that parses <codeph>DECIMAL</codeph> values from Avro now uses
                 native code generation.
@@ -449,7 +449,7 @@ under the License.
             </li>
             <li>
               <p rev="IMPALA-3674">
-                [<xref href="https://issues.cloudera.org/browse/IMPALA-3674" scope="external" format="html">IMPALA-3674</xref>]
+                [<xref keyref="IMPALA-3674">IMPALA-3674</xref>]
                 Improved efficiency in LLVM code generation can reduce codegen time, especially
                 for short queries.
               </p>
@@ -457,16 +457,16 @@ under the License.
             <!-- Not actually a new feature, it's more a tip about when to expect remote reads and how to minimize them. To go somewhere in the performance / best practices / Parquet info.
             <li>
               <p rev="IMPALA-3885">
-                [<xref href="https://issues.cloudera.org/browse/IMPALA-3885" scope="external" format="html">IMPALA-3885</xref>]
+                [<xref keyref="IMPALA-3885">IMPALA-3885</xref>]
                 Parquet files with multiple blocks can now be processed
                 without remote reads.
               </p>
             </li>
             -->
             <li>
-              <p rev="IMPALA-2979"> [<xref
-                  href="https://issues.cloudera.org/browse/IMPALA-2979" scope="external"
-                  format="html">IMPALA-2979</xref>] Improvements to scheduling on worker nodes,
+              <p rev="IMPALA-2979">
+                [<xref keyref="IMPALA-2979">IMPALA-2979</xref>]
+                Improvements to scheduling on worker nodes,
                 enabled by the <codeph>REPLICA_PREFERENCE</codeph> query option.
                 See <xref
                   href="impala_replica_preference.xml#replica_preference"/> for details.
@@ -476,7 +476,7 @@ under the License.
         </li>
         <li audience="hidden">
           <p rev="IMPALA-3210"><!-- Patch didn't make it into in <keyword keyref="impala27_full"/> -->
-            [<xref href="https://issues.cloudera.org/browse/IMPALA-3210" scope="external" format="html">IMPALA-3210</xref>]
+            [<xref keyref="IMPALA-3210">IMPALA-3210</xref>]
             The analytic functions <codeph>FIRST_VALUE()</codeph> and <codeph>LAST_VALUE()</codeph>
             accept a new clause, <codeph>IGNORE NULLS</codeph>.
             See <xref href="impala_analytic_functions.xml#first_value"/>
@@ -486,7 +486,7 @@ under the License.
         </li>
         <li>
           <p rev="IMPALA-1683">
-            [<xref href="https://issues.cloudera.org/browse/IMPALA-1683" scope="external" format="html">IMPALA-1683</xref>]
+            [<xref keyref="IMPALA-1683">IMPALA-1683</xref>]
             The <codeph>REFRESH</codeph> statement can be applied to a single partition,
             rather than the entire table. See <xref href="impala_refresh.xml#refresh"/>
             and <xref href="impala_partitioning.xml#partition_refresh"/> for details.
@@ -499,21 +499,21 @@ under the License.
           <ul>
             <li>
               <p rev="IMPALA-2767">
-                [<xref href="https://issues.cloudera.org/browse/IMPALA-2767" scope="external" format="html">IMPALA-2767</xref>]
+                [<xref keyref="IMPALA-2767">IMPALA-2767</xref>]
                 You can now force a session to expire by clicking a link in the web UI,
                 on the <uicontrol>/sessions</uicontrol> tab.
               </p>
             </li>
             <li>
               <p rev="IMPALA-3715">
-                [<xref href="https://issues.cloudera.org/browse/IMPALA-3715" scope="external" format="html">IMPALA-3715</xref>]
+                [<xref keyref="IMPALA-3715">IMPALA-3715</xref>]
                 The <uicontrol>/memz</uicontrol> tab includes more information about
                 Impala memory usage.
               </p>
             </li>
             <li>
               <p rev="IMPALA-3716">
-                [<xref href="https://issues.cloudera.org/browse/IMPALA-3716" scope="external" format="html">IMPALA-3716</xref>]
+                [<xref keyref="IMPALA-3716">IMPALA-3716</xref>]
                 The <uicontrol>Details</uicontrol> page for a query now includes
                 a <uicontrol>Memory</uicontrol> tab.
               </p>
@@ -522,7 +522,7 @@ under the License.
         </li>
         <li>
           <p rev="IMPALA-3499">
-            [<xref href="https://issues.cloudera.org/browse/IMPALA-3499" scope="external" format="html">IMPALA-3499</xref>]
+            [<xref keyref="IMPALA-3499">IMPALA-3499</xref>]
             Scalability improvements to the catalog server. Impala handles internal communication
             more efficiently for tables with large numbers of columns and partitions, where the
             size of the metadata exceeds 2 GiB.
@@ -530,7 +530,7 @@ under the License.
         </li>
         <li>
           <p rev="IMPALA-3677">
-            [<xref href="https://issues.cloudera.org/browse/IMPALA-3677" scope="external" format="html">IMPALA-3677</xref>]
+            [<xref keyref="IMPALA-3677">IMPALA-3677</xref>]
             You can send a <codeph>SIGUSR1</codeph> signal to any Impala-related daemon to write a
             Breakpad minidump. For advanced troubleshooting, you can now produce a minidump
             without triggering a crash. See <xref href="impala_breakpad.xml#breakpad"/> for
@@ -539,7 +539,7 @@ under the License.
         </li>
         <li>
           <p rev="IMPALA-3687">
-            [<xref href="https://issues.cloudera.org/browse/IMPALA-3687" scope="external" format="html">IMPALA-3687</xref>]
+            [<xref keyref="IMPALA-3687">IMPALA-3687</xref>]
             The schema reconciliation rules for Avro tables have changed slightly
             for <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph> columns. Now, if
             the definition of such a column is changed in the Avro schema file,
@@ -551,9 +551,9 @@ under the License.
           </p>
         </li>
         <li>
-          <p rev="IMPALA-3575"> [<xref
-              href="https://issues.cloudera.org/browse/IMPALA-3575"
-              scope="external" format="html">IMPALA-3575</xref>] Some network
+          <p rev="IMPALA-3575">
+            [<xref keyref="IMPALA-3575">IMPALA-3575</xref>]
+            Some network
             operations now have additional timeout and retry settings. The extra
             configuration helps avoid failed queries for transient network
             problems, to avoid hangs when a sender or receiver fails in the
@@ -1690,7 +1690,7 @@ under the License.
           <p>
             Currently, you can only use one of server-to-server TLS/SSL encryption or Kerberos authentication.
             This limitation is tracked by the issue
-            <xref href="https://issues.cloudera.org/browse/IMPALA-2598" scope="external" format="html">IMPALA-2598</xref>.
+            <xref keyref="IMPALA-2598">IMPALA-2598</xref>.
           </p>
         </li>
 
@@ -1704,7 +1704,7 @@ under the License.
       </ul>
 
       <p>
-        In <keyword keyref="impala232"/>, the bug fix for <xref href="https://issues.cloudera.org/browse/IMPALA-2598" scope="external" format="html">IMPALA-2598</xref>
+        In <keyword keyref="impala232"/>, the bug fix for <xref keyref="IMPALA-2598">IMPALA-2598</xref>
         removes the restriction on using both Kerberos and SSL for internal communication between Impala components.
       </p>
 

@@ -47,7 +47,7 @@ under the License.
     <note>
       The online issue tracking system for Impala contains comprehensive information and is updated in real time. To verify whether an issue
       you are experiencing has already been reported, or which release an issue is fixed in, search on the
-      <xref href="https://issues.cloudera.org/" scope="external" format="html">issues.cloudera.org JIRA tracker</xref>.
+      <xref href="https://issues.apache.org/jira/" scope="external" format="html">issues.apache.org JIRA tracker</xref>.
     </note>
 
     <p outputclass="toc inpage"/>
@@ -77,19 +77,19 @@ under the License.
 
 Title: Server-to-server SSL and Kerberos do not work together
 Description: If server<->server SSL is enabled (with ssl_client_ca_certificate), and Kerberos auth is used between servers, the cluster will fail to start.
-Upstream & Internal JIRAs: https://issues.cloudera.org/browse/IMPALA-2598
+Upstream & Internal JIRAs: https://issues.apache.org/jira/browse/IMPALA-2598
 Severity: Medium.  Server-to-server SSL is practically unusable but this is a new feature.
 Workaround: No known workaround.
 
 Title: Queries may hang on server-to-server exchange errors
 Description: The DataStreamSender::Channel::CloseInternal() does not close the channel on an error. This will cause the node on the other side of the channel to wait indefinitely causing a hang.
-Upstream & Internal JIRAs: https://issues.cloudera.org/browse/IMPALA-2592
+Upstream & Internal JIRAs: https://issues.apache.org/jira/browse/IMPALA-2592
 Severity: Low.  This does not occur frequently.
 Workaround: No known workaround.
 
 Title: Catalogd may crash when loading metadata for tables with many partitions, many columns and with incremental stats
 Description: Incremental stats use up about 400 bytes per partition X column.  So for a table with 20K partitions and 100 columns this is about 800 MB.  When serialized this goes past the 2 GB Java array size limit and leads to a catalog crash.
-Upstream & Internal JIRAs: https://issues.cloudera.org/browse/IMPALA-2648, IMPALA-2647, IMPALA-2649.
+Upstream & Internal JIRAs: https://issues.apache.org/jira/browse/IMPALA-2648, IMPALA-2647, IMPALA-2649.
 Severity: Low.  This does not occur frequently.
 Workaround:  Reduce the number of partitions.
 
@@ -122,10 +122,10 @@ Casting scenarios with invalid/inconsistent results
 
 Another list from Alex, of correctness problems with predicates; might overlap with ones I already have:
 
-https://issues.cloudera.org/browse/IMPALA-2665 - Already have
-https://issues.cloudera.org/browse/IMPALA-2643 - Already have
-https://issues.cloudera.org/browse/IMPALA-1459 - Already have
-https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
+https://issues.apache.org/jira/browse/IMPALA-2665 - Already have
+https://issues.apache.org/jira/browse/IMPALA-2643 - Already have
+https://issues.apache.org/jira/browse/IMPALA-1459 - Already have
+https://issues.apache.org/jira/browse/IMPALA-2144 - Don't have
 
 -->
 
@@ -197,7 +197,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3069" scope="external" format="html">IMPALA-3069</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-3069">IMPALA-3069</xref>
         </p>
 
         <p>
@@ -221,7 +221,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3441" scope="external" format="html">IMPALA-3441</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-3441">IMPALA-3441</xref>
         </p>
 
         <p>
@@ -246,7 +246,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2592" scope="external" format="html">IMPALA-2592</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2592">IMPALA-2592</xref>
         </p>
 
         <p>
@@ -269,7 +269,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2365" scope="external" format="html">IMPALA-2365</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2365">IMPALA-2365</xref>
         </p>
 
         <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
@@ -305,7 +305,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1480" scope="external" format="html">IMPALA-1480</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1480">IMPALA-1480</xref>
         </p>
 
         <p>
@@ -345,7 +345,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3133" scope="external" format="html">IMPALA-3133</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-3133">IMPALA-3133</xref>
         </p>
 
         <p>
@@ -373,7 +373,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1776" scope="external" format="html">IMPALA-1776</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1776">IMPALA-1776</xref>
         </p>
 
       </conbody>
@@ -390,8 +390,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-3123"
-            scope="external" format="html">IMPALA-3123</xref>
+          <xref keyref="IMPALA-3123">IMPALA-3123</xref>
         </p>
 
       </conbody>
@@ -428,7 +427,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1792" scope="external" format="html">IMPALA-1792</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1792">IMPALA-1792</xref>
         </p>
 
         <p>
@@ -477,7 +476,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
 
 <!-- To do: Fixed in 2.5.0, 2.3.2. Commenting out until I see how it can fix into "known issues now fixed" convention.
      That set of fix releases looks incomplete so probably have to do some detective work with the JIRA.
-     https://issues.cloudera.org/browse/IMPALA-2598
+     https://issues.apache.org/jira/browse/IMPALA-2598
     <concept id="IMPALA-2598" rev="IMPALA-2598">
 
       <title>Server-to-server SSL and Kerberos do not work together</title>
@@ -490,7 +489,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2598" scope="external" format="html">IMPALA-2598</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2598">IMPALA-2598</xref>
         </p>
 
         <p>
@@ -596,7 +595,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3509" scope="external" format="html">IMPALA-3509</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-3509">IMPALA-3509</xref>
         </p>
 
         <p>
@@ -653,7 +652,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3662" scope="external" format="html">IMPALA-3662</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-3662">IMPALA-3662</xref>
         </p>
 
         <p>
@@ -695,7 +694,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-691" scope="external" format="html">IMPALA-691</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-691">IMPALA-691</xref>
         </p>
 
         <p>
@@ -718,7 +717,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         <p></p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2375" scope="external" format="html">IMPALA-2375</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2375">IMPALA-2375</xref>
         </p>
 
         <p>
@@ -758,7 +757,7 @@ https://issues.cloudera.org/browse/IMPALA-2144 - Don't have
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3084" scope="external" format="html">IMPALA-3084</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-3084">IMPALA-3084</xref>
         </p>
 
         <p>
@@ -797,7 +796,7 @@ explain SELECT 1 FROM alltypestiny a1
 </codeblock>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3094" scope="external" format="html">IMPALA-3094</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-3094">IMPALA-3094</xref>
         </p>
 
         <p>
@@ -911,7 +910,7 @@ on b.int_col = c.int_col;
 </codeblock>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3126" scope="external" format="html">IMPALA-3126</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-3126">IMPALA-3126</xref>
         </p>
 
         <p>
@@ -1005,7 +1004,7 @@ where b.int_col = c.int_col
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3006" scope="external" format="html">IMPALA-3006</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-3006">IMPALA-3006</xref>
         </p>
 
         <p>
@@ -1037,7 +1036,7 @@ select
 </codeblock>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3082" scope="external" format="html">IMPALA-3082</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-3082">IMPALA-3082</xref>
         </p>
 
         <p>
@@ -1060,7 +1059,7 @@ select
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1170" scope="external" format="html"></xref>IMPALA-1170
+          <b>Bug:</b> <xref keyref="IMPALA-1170"></xref>IMPALA-1170
         </p>
 
         <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/> and <keyword keyref="impala234"/>.</p>
@@ -1081,7 +1080,7 @@ select
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2422" scope="external" format="html">IMPALA-2422</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2422">IMPALA-2422</xref>
         </p>
 
       </conbody>
@@ -1100,7 +1099,7 @@ select
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-397" scope="external" format="html">IMPALA-397</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-397">IMPALA-397</xref>
         </p>
 
       </conbody>
@@ -1119,7 +1118,7 @@ select
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2643" scope="external" format="html">IMPALA-2643</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2643">IMPALA-2643</xref>
         </p>
 
         <p>
@@ -1146,7 +1145,7 @@ select
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1459" scope="external" format="html">IMPALA-1459</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1459">IMPALA-1459</xref>
         </p>
 
         <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>, <keyword keyref="impala232"/>, and <keyword keyref="impala229"/>.</p>
@@ -1167,7 +1166,7 @@ select
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2603" scope="external" format="html">IMPALA-2603</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2603">IMPALA-2603</xref>
         </p>
 
       </conbody>
@@ -1200,7 +1199,7 @@ select
         </ol>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2665" scope="external" format="html">IMPALA-2665</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2665">IMPALA-2665</xref>
         </p>
 
         <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>, <keyword keyref="impala232"/>, and <keyword keyref="impala229"/>.</p>
@@ -1221,7 +1220,7 @@ select
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2144" scope="external" format="html">IMPALA-2144</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2144">IMPALA-2144</xref>
         </p>
 
         <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
@@ -1242,7 +1241,7 @@ select
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2093" scope="external" format="html">IMPALA-2093</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2093">IMPALA-2093</xref>
         </p>
 
         <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/> and <keyword keyref="impala234"/>.</p>
@@ -1279,9 +1278,9 @@ select
         </p>
 
         <p>
-          <b>Bugs:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2647" scope="external" format="html">IMPALA-2647</xref>,
-          <xref href="https://issues.cloudera.org/browse/IMPALA-2648" scope="external" format="html">IMPALA-2648</xref>,
-          <xref href="https://issues.cloudera.org/browse/IMPALA-2649" scope="external" format="html">IMPALA-2649</xref>
+          <b>Bugs:</b> <xref keyref="IMPALA-2647">IMPALA-2647</xref>,
+          <xref keyref="IMPALA-2648">IMPALA-2648</xref>,
+          <xref keyref="IMPALA-2649">IMPALA-2649</xref>
         </p>
 
         <p>
@@ -1304,7 +1303,7 @@ select
         <p></p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1420" scope="external" format="html">IMPALA-1420</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1420">IMPALA-1420</xref>
         </p>
 
         <p>
@@ -1453,7 +1452,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-635" scope="external" format="html">IMPALA-635</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-635">IMPALA-635</xref>
         </p>
 
         <p>
@@ -1483,7 +1482,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1024" scope="external" format="html">IMPALA-1024</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1024">IMPALA-1024</xref>
         </p>
 
         <p>
@@ -1508,7 +1507,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2154" scope="external" format="html">IMPALA-2154</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2154">IMPALA-2154</xref>
         </p>
 
         <p>
@@ -1535,7 +1534,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1578" scope="external" format="html">IMPALA-1578</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1578">IMPALA-1578</xref>
         </p>
 
         <p>
@@ -1563,7 +1562,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1862" scope="external" format="html">IMPALA-1862</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1862">IMPALA-1862</xref>
         </p>
 
       </conbody>
@@ -1584,7 +1583,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1652" scope="external" format="html">IMPALA-1652</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1652">IMPALA-1652</xref>
         </p>
 
         <p>
@@ -1625,7 +1624,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-77" scope="external" format="html">IMPALA-77</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-77">IMPALA-77</xref>
         </p>
 
         <p>
@@ -1668,7 +1667,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2005" scope="external" format="html">IMPALA-2005</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-2005">IMPALA-2005</xref>
         </p>
 
         <p>
@@ -1694,7 +1693,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1821" scope="external" format="html">IMPALA-1821</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1821">IMPALA-1821</xref>
         </p>
 
 <!-- <p><b>Workaround:</b> Doublecheck that <codeph>CAST()</codeph> operations work as expect. The issue applies to expressions involving literals, not values read from table columns.</p> -->
@@ -1718,7 +1717,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1619" scope="external" format="html">IMPALA-1619</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-1619">IMPALA-1619</xref>
         </p>
 
         <p><b>Resolution:</b> Fixed in <keyword keyref="impala2?0"/> and <keyword keyref="impala263"/>.</p>
@@ -1741,7 +1740,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-941" scope="external" format="html">IMPALA-941</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-941">IMPALA-941</xref>
         </p>
 
         <p>
@@ -1765,7 +1764,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-532" scope="external" format="html">IMPALA-532</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-532">IMPALA-532</xref>
         </p>
 
         <p>

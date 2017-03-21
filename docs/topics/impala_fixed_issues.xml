@@ -119,7 +119,7 @@ under the License.
       <p>
         A crash could occur, with stack trace pointing to <codeph>impala::RuntimeState::ErrorLog</codeph>.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3385">IMPALA-3385</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3385">IMPALA-3385</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -130,7 +130,7 @@ under the License.
       <p>
         A crash could occur because of contention between multiple calls to Java UDFs.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3378">IMPALA-3378</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3378">IMPALA-3378</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -141,7 +141,7 @@ under the License.
       <p>
         A crash could occur because of contention between multiple concurrent statements writing to HBase.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3379">IMPALA-3379</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3379">IMPALA-3379</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -153,7 +153,7 @@ under the License.
         A crash or wrong results could occur if the spill-to-disk mechanism encountered a zero-length string at
         the very end of a data block.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3317">IMPALA-3317</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3317">IMPALA-3317</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -166,7 +166,7 @@ under the License.
         (that is,if in the SQL statement, the aggregate function appears within an inline view over a collection column),
         the results of the aggregation may be incorrect.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3311">IMPALA-3311</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3311">IMPALA-3311</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -178,7 +178,7 @@ under the License.
         A <codeph>CREATE TABLE AS SELECT</codeph> operation could fail with an authorization error,
         due to a slight difference in the privilege checking for the CTAS operation.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3269">IMPALA-3269</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3269">IMPALA-3269</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -190,7 +190,7 @@ under the License.
         Impala incorrectly allowed <codeph>BINARY</codeph> to be specified as a column type,
         resulting in a crash during a write to a Parquet table with a column of that type.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3237">IMPALA-3237</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3237">IMPALA-3237</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -203,7 +203,7 @@ under the License.
         columns or very large string values. This problem was identified in Impala 2.3, but had low
         reproducibility in subsequent releases. The fix ensures the memory allocation size is correct.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3105">IMPALA-3105</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3105">IMPALA-3105</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -215,7 +215,7 @@ under the License.
         A very large memory allocation within the <cmdname>catalogd</cmdname> daemon could exceed an internal Thrift limit,
         causing a crash.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3494">IMPALA-3494</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3494">IMPALA-3494</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -227,7 +227,7 @@ under the License.
         If a partitioned table used a file format other than Avro, and the file format of an individual partition
         was changed to Avro, subsequent queries could encounter a crash.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3314">IMPALA-3314</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3314">IMPALA-3314</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -239,7 +239,7 @@ under the License.
         A timing problem during runtime filter processing could cause queries against Avro or SequenceFile tables
         to hang.
       </p>
-      <p><b>Bug:</b> <xref scope="external" format="html" href="https://issues.cloudera.org/browse/IMPALA-3798">IMPALA-3798</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-3798">IMPALA-3798</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -288,7 +288,7 @@ under the License.
     <concept id="IMPALA-2683">
       <title>Stress test hit assert in LLVM: external function could not be resolved</title>
       <conbody>
-<p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2683" scope="external" format="html">IMPALA-2683</xref></p>
+<p><b>Bug:</b> <xref keyref="IMPALA-2683">IMPALA-2683</xref></p>
 <p>The stress test was running a build with the TPC-H, TPC-DS, and TPC-H nested queries with scale factor 3.</p>
       </conbody>
     </concept>
@@ -296,7 +296,7 @@ under the License.
     <concept id="IMPALA-2365">
       <title>Impalad is crashing if udf jar is not available in hdfs location for first time</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2365" scope="external" format="html">IMPALA-2365</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2365">IMPALA-2365</xref></p>
         <p>
           If a UDF JAR was not available in the HDFS location specified in the <codeph>CREATE FUNCTION</codeph> statement,
           the <cmdname>impalad</cmdname> daemon could crash.
@@ -307,7 +307,7 @@ under the License.
     <concept id="IMPALA-2535-570">
       <title>PAGG hits mem_limit when switching to I/O buffers</title>
       <conbody>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2535" scope="external" format="html">IMPALA-2535</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2535">IMPALA-2535</xref></p>
       <p>
         A join query could fail with an out-of-memory error despite the apparent presence of sufficient memory.
         The cause was the internal ordering of operations that could cause a later phase of the query to
@@ -321,7 +321,7 @@ under the License.
     <concept id="IMPALA-2643-570">
       <title>Prevent migrating incorrectly inferred identity predicates into inline views</title>
       <conbody>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2643" scope="external" format="html">IMPALA-2643</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2643">IMPALA-2643</xref></p>
       <p>
         Referring to the same column twice in a view definition could cause the view to omit
         rows where that column contained a <codeph>NULL</codeph> value. This could cause
@@ -334,7 +334,7 @@ under the License.
     <concept id="IMPALA-1459-570">
       <title>Fix migration/assignment of On-clause predicates inside inline views</title>
       <conbody>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1459" scope="external" format="html">IMPALA-1459</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1459">IMPALA-1459</xref></p>
       <p>
         Some combinations of <codeph>ON</codeph> clauses in join queries could result in comparisons
         being applied at the wrong stage of query processing, leading to incorrect results.
@@ -358,7 +358,7 @@ under the License.
     <concept id="IMPALA-2093">
       <title>Wrong plan of NOT IN aggregate subquery when a constant is used in subquery predicate</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2093" scope="external" format="html">IMPALA-2093</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2093">IMPALA-2093</xref></p>
         <p>
           <codeph>IN</codeph> subqueries might return wrong results if the left-hand side of the <codeph>IN</codeph> is a constant.
           For example:
@@ -373,7 +373,7 @@ select * from alltypestiny t1
     <concept id="IMPALA-2940">
       <title>Parquet DictDecoders accumulate throughout query</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2940" scope="external" format="html">IMPALA-2940</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2940">IMPALA-2940</xref></p>
         <p>
           Parquet dictionary decoders can accumulate throughout query execution, leading to excessive memory usage. One decoder is created per-column per-split.
         </p>
@@ -383,7 +383,7 @@ select * from alltypestiny t1
     <concept id="IMPALA-3056">
       <title>Planner doesn't set the has_local_target field correctly</title>
       <conbody>
-<p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3056" scope="external" format="html">IMPALA-3056</xref></p>
+<p><b>Bug:</b> <xref keyref="IMPALA-3056">IMPALA-3056</xref></p>
 
       </conbody>
     </concept>
@@ -391,7 +391,7 @@ select * from alltypestiny t1
     <concept id="IMPALA-2742">
       <title>MemPool allocation growth behavior</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2742" scope="external" format="html">IMPALA-2742</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2742">IMPALA-2742</xref></p>
         <p>
           Currently, the MemPool would always double the size of the last allocation.
           This can lead to bad behavior if the MemPool transferred the ownership of all its data
@@ -404,7 +404,7 @@ select * from alltypestiny t1
     <concept id="IMPALA-3035">
       <title>Drop partition operations don't follow the catalog's locking protocol</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3035" scope="external" format="html">IMPALA-3035</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-3035">IMPALA-3035</xref></p>
         <p>
           The <codeph>CatalogOpExecutor.alterTableDropPartition()</codeph> function violates
           the locking protocol used in the catalog that requires <codeph>catalogLock_</codeph>
@@ -417,7 +417,7 @@ select * from alltypestiny t1
     <concept id="IMPALA-2215">
       <title>HAVING clause without aggregation not applied properly</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2215" scope="external" format="html">IMPALA-2215</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2215">IMPALA-2215</xref></p>
         <p>
           A query with a <codeph>HAVING</codeph> clause but no <codeph>GROUP BY</codeph> clause was not being rejected,
           despite being invalid syntax. For example:
@@ -432,7 +432,7 @@ select case when 1=1 then 'didit' end as c1 from (select 1 as one) a having 1!=1
     <concept id="IMPALA-2914">
       <title>Hit DCHECK Check failed: HasDateOrTime()</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2914" scope="external" format="html">IMPALA-2914</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2914">IMPALA-2914</xref></p>
         <p>
           <codeph>TimestampValue::ToTimestampVal()</codeph> requires a valid <codeph>TimestampValue</codeph> as input.
           This requirement was not enforced in some places, leading to serious errors.
@@ -443,7 +443,7 @@ select case when 1=1 then 'didit' end as c1 from (select 1 as one) a having 1!=1
     <concept id="IMPALA-2986">
       <title>Aggregation spill loop gives up too early leading to mem limit exceeded errors</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2986" scope="external" format="html">IMPALA-2986</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2986">IMPALA-2986</xref></p>
         <p>
           An aggregation query could fail with an out-of-memory error, despite sufficient memory being reported as available.
         </p>
@@ -453,7 +453,7 @@ select case when 1=1 then 'didit' end as c1 from (select 1 as one) a having 1!=1
     <concept id="IMPALA-2592">
       <title>DataStreamSender::Channel::CloseInternal() does not close the channel on an error.</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2592" scope="external" format="html">IMPALA-2592</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2592">IMPALA-2592</xref></p>
         <p>
           Some queries do not close an internal communication channel on an error.
           This will cause the node on the other side of the channel to wait indefinitely, causing the query to hang.
@@ -466,7 +466,7 @@ select case when 1=1 then 'didit' end as c1 from (select 1 as one) a having 1!=1
     <concept id="IMPALA-2184">
       <title>Codegen does not catch exceptions in FROM_UNIXTIME()</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2184" scope="external" format="html">IMPALA-2184</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2184">IMPALA-2184</xref></p>
         <p>
           Querying for the min or max value of a timestamp cast from a bigint via <codeph>from_unixtime()</codeph>
           fails silently and crashes instances of <cmdname>impalad</cmdname> when the input includes a value outside of the valid range.
@@ -482,7 +482,7 @@ SET disable_codegen=true;
     <concept id="IMPALA-2788">
       <title>Impala returns wrong result for function 'conv(bigint, from_base, to_base)'</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2788" scope="external" format="html">IMPALA-2788</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2788">IMPALA-2788</xref></p>
         <p>
           Impala returns wrong result for function <codeph>conv()</codeph>.
           Function <codeph>conv(bigint, from_base, to_base)</codeph> returns an correct result,
@@ -534,7 +534,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
     <concept id="IMPALA-3039">
       <title>Restrict the number of runtime filters generated</title>
       <conbody>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-3039" scope="external" format="html">IMPALA-3039</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-3039">IMPALA-3039</xref></p>
         <p>
           Large queries with many runtime filters might fail for various reasons, such as memory for Thrift data structures
           not being accounted for.
@@ -608,7 +608,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         This issue was encountered infrequently, depending upon specific combinations
         of queries and data.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2829" scope="external" format="html">IMPALA-2829</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2829">IMPALA-2829</xref></p>
       </conbody>
     </concept>
 
@@ -619,7 +619,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         An outer join query could fail unexpectedly with an out-of-memory error
         when the <q>spill to disk</q> mechanism was turned off.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2722" scope="external" format="html">IMPALA-2722</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2722">IMPALA-2722</xref></p>
       </conbody>
     </concept>
 
@@ -631,7 +631,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         A join query could encounter a serious error due to an internal failure to allocate memory, which
         resulted in dereferencing a <codeph>NULL</codeph> pointer.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2612" scope="external" format="html">IMPALA-2612</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2612">IMPALA-2612</xref></p>
       </conbody>
     </concept>
 
@@ -644,7 +644,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         incorrect results due to an inaccurate <codeph>COUNT(*)</codeph> value or rows missing
         from the result set.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2643" scope="external" format="html">IMPALA-2643</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2643">IMPALA-2643</xref></p>
       </conbody>
     </concept>
 
@@ -657,7 +657,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         Subsequent statements, such as <codeph>CREATE EXTERNAL TABLE</codeph>
         with a <codeph>LOCATION</codeph> clause, could fail with an authorization exception.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2695" scope="external" format="html">IMPALA-2695</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2695">IMPALA-2695</xref></p>
       </conbody>
     </concept>
 
@@ -673,8 +673,8 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         <codeph>COMPUTE INCREMENTAL STATS</codeph> operation to fail if it
         would produce metadata that exceeded the maximum size.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2664" scope="external" format="html">IMPALA-2664</xref>,
-        <xref href="https://issues.cloudera.org/browse/IMPALA-2648" scope="external" format="html">IMPALA-2648</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2664">IMPALA-2664</xref>,
+        <xref keyref="IMPALA-2648">IMPALA-2648</xref></p>
       </conbody>
     </concept>
 
@@ -687,7 +687,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         (The limit on key size is 256, while the limit on value size is 4000.) The fix makes Impala handle these error conditions
         more cleanly, by detecting too-long values rather than passing them to the metastore database.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2226" scope="external" format="html">IMPALA-2226</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2226">IMPALA-2226</xref></p>
       </conbody>
     </concept>
 
@@ -700,7 +700,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         fix adds a configuration setting <codeph>--max_page_header_size</codeph>, which you can use to
         increase the Impala size limit to a value higher than 8 MB.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2273" scope="external" format="html">IMPALA-2273</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2273">IMPALA-2273</xref></p>
       </conbody>
     </concept>
 
@@ -713,7 +713,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         the <codeph>NUM_SCANNER_THREADS</codeph> query option, the <codeph>BATCH_SIZE</codeph> query option,
         or both.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2473" scope="external" format="html">IMPALA-2473</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2473">IMPALA-2473</xref></p>
       </conbody>
     </concept>
 
@@ -724,7 +724,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         A query that included a <codeph>DISTINCT</codeph> operator and a <codeph>HAVING</codeph> clause, but no
         aggregate functions or <codeph>GROUP BY</codeph>, would fail with an uninformative error message.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2113" scope="external" format="html">IMPALA-2113</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2113">IMPALA-2113</xref></p>
       <!-- Don't think this is really a 'major' issue. Left a comment in the IMPALA JIRA. -->
       </conbody>
     </concept>
@@ -737,7 +737,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         aggregate function call, would fail with an uninformative message if the query had no
         <codeph>GROUP BY</codeph> clause.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2225" scope="external" format="html">IMPALA-2225</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2225">IMPALA-2225</xref></p>
       <!-- Don't think this is really a 'major' issue. Left a comment in the IMPALA JIRA. -->
       </conbody>
     </concept>
@@ -751,7 +751,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         The fix for this issue involves removing a separate memory work area for HBase queries
         and reusing other memory that was already allocated.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2731" scope="external" format="html">IMPALA-2731</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2731">IMPALA-2731</xref></p>
       </conbody>
     </concept>
 
@@ -775,7 +775,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
           only references columns originating from the outer-joined tables inside the inline view.
         </li>
       </ul>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1459" scope="external" format="html">IMPALA-1459</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1459">IMPALA-1459</xref></p>
       </conbody>
     </concept>
 
@@ -786,7 +786,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         A debug build of Impala could encounter a serious error after encountering some kinds of I/O
         errors for Parquet files. This issue only occurred in debug builds, not release builds.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2558" scope="external" format="html">IMPALA-2558</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2558">IMPALA-2558</xref></p>
       </conbody>
     </concept>
 
@@ -800,7 +800,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         or decrease the <codeph>MEM_LIMIT</codeph> query option, because the issue would only occur for a specific
         combination of memory limit and data volume.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2535" scope="external" format="html">IMPALA-2535</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2535">IMPALA-2535</xref></p>
       </conbody>
     </concept>
 
@@ -813,7 +813,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         A query could fail with an internal error while calculating the memory limit.
         This was an infrequent condition uncovered during stress testing.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2559" scope="external" format="html">IMPALA-2559</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2559">IMPALA-2559</xref></p>
       </conbody>
     </concept>
 
@@ -824,8 +824,8 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         A query could fail with an internal error while calculating the memory limit.
         This was an infrequent condition uncovered during stress testing.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2614" scope="external" format="html">IMPALA-2614</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2559" scope="external" format="html">IMPALA-2559</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2614">IMPALA-2614</xref>,
+      <xref keyref="IMPALA-2559">IMPALA-2559</xref></p>
       </conbody>
     </concept>
 
@@ -835,7 +835,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
       <!-- Symptoms listed in the JIRA are very vague. Left a note asking Sailesh for more detail. -->
       <p>
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2591" scope="external" format="html">IMPALA-2591</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2591">IMPALA-2591</xref></p>
       </conbody>
     </concept>
 
@@ -846,8 +846,8 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
         These fixes lift the restriction on using SSL encryption and Kerberos authentication together
         for internal communication between Impala components.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2598" scope="external" format="html">IMPALA-2598</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2747" scope="external" format="html">IMPALA-2747</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2598">IMPALA-2598</xref>,
+      <xref keyref="IMPALA-2747">IMPALA-2747</xref></p>
       </conbody>
     </concept>
 
@@ -856,7 +856,7 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
       <title>Thrift-client cleans openSSL state before using it in the case of the catalog</title>
       <conbody>
       <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2747" scope="external" format="html">IMPALA-2747</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2747">IMPALA-2747</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -1081,13 +1081,13 @@ IMPALA-2314
 IMPALA-2016
 -->
 
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2168" scope="external" format="html">IMPALA-2168</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2378" scope="external" format="html">IMPALA-2378</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2369" scope="external" format="html">IMPALA-2369</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2357" scope="external" format="html">IMPALA-2357</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2319" scope="external" format="html">IMPALA-2319</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2314" scope="external" format="html">IMPALA-2314</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2016" scope="external" format="html">IMPALA-2016</xref>
+      <xref keyref="IMPALA-2168">IMPALA-2168</xref>,
+      <xref keyref="IMPALA-2378">IMPALA-2378</xref>,
+      <xref keyref="IMPALA-2369">IMPALA-2369</xref>,
+      <xref keyref="IMPALA-2357">IMPALA-2357</xref>,
+      <xref keyref="IMPALA-2319">IMPALA-2319</xref>,
+      <xref keyref="IMPALA-2314">IMPALA-2314</xref>,
+      <xref keyref="IMPALA-2016">IMPALA-2016</xref>
       </p>
       </conbody>
     </concept>
@@ -1111,12 +1111,12 @@ IMPALA-1947
 IMPALA-1917
 -->
 
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2192" scope="external" format="html">IMPALA-2192</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2440" scope="external" format="html">IMPALA-2440</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2090" scope="external" format="html">IMPALA-2090</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2086" scope="external" format="html">IMPALA-2086</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-1947" scope="external" format="html">IMPALA-1947</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-1917" scope="external" format="html">IMPALA-1917</xref>
+      <xref keyref="IMPALA-2192">IMPALA-2192</xref>,
+      <xref keyref="IMPALA-2440">IMPALA-2440</xref>,
+      <xref keyref="IMPALA-2090">IMPALA-2090</xref>,
+      <xref keyref="IMPALA-2086">IMPALA-2086</xref>,
+      <xref keyref="IMPALA-1947">IMPALA-1947</xref>,
+      <xref keyref="IMPALA-1917">IMPALA-1917</xref>
       </p>
       </conbody>
     </concept>
@@ -1155,7 +1155,7 @@ IMPALA-1917
         If an inline view in a <codeph>FROM</codeph> clause contained a <codeph>NULL</codeph> literal,
         the result set was empty.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1917" scope="external" format="html">IMPALA-1917</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1917">IMPALA-1917</xref></p>
       </conbody>
     </concept>
 
@@ -1169,7 +1169,7 @@ IMPALA-1917
         The fix for this issue involves removing a separate memory work area for HBase queries
         and reusing other memory that was already allocated.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2731" scope="external" format="html">IMPALA-2731</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2731">IMPALA-2731</xref></p>
       </conbody>
     </concept>
 
@@ -1194,7 +1194,7 @@ IMPALA-1917
           only references columns originating from the outer-joined tables inside the inline view.
         </li>
       </ul>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1459" scope="external" format="html">IMPALA-1459</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1459">IMPALA-1459</xref></p>
       </conbody>
     </concept>
 
@@ -1205,7 +1205,7 @@ IMPALA-1917
         The join predicate for an <codeph>OUTER JOIN</codeph> clause could be applied at the wrong stage
         of query processing, leading to incorrect results.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2446" scope="external" format="html">IMPALA-2446</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2446">IMPALA-2446</xref></p>
       </conbody>
     </concept>
 
@@ -1218,8 +1218,8 @@ IMPALA-1917
           GB, for example in a table with 20K partitions and 77 columns. The fix causes a
             <codeph>COMPUTE INCREMENTAL STATS</codeph> operation to fail if it would produce
           metadata that exceeded the maximum size. </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2648" scope="external" format="html">IMPALA-2648</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2664" scope="external" format="html">IMPALA-2664</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2648">IMPALA-2648</xref>,
+      <xref keyref="IMPALA-2664">IMPALA-2664</xref></p>
       </conbody>
     </concept>
 
@@ -1229,7 +1229,7 @@ IMPALA-1917
       <p> Adding or subtracting a large <codeph>INTERVAL</codeph> value to a
             <codeph>TIMESTAMP</codeph> value could produce an incorrect result, with the value
           wrapping instead of returning an out-of-range error. </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1675" scope="external" format="html">IMPALA-1675</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1675">IMPALA-1675</xref></p>
       </conbody>
     </concept>
 
@@ -1240,7 +1240,7 @@ IMPALA-1917
         An <codeph>IN</codeph> operator with literal values could cause a statement to fail if used
         as the argument to a binary operator, such as an equality test for a <codeph>BOOLEAN</codeph> value.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1949" scope="external" format="html">IMPALA-1949</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1949">IMPALA-1949</xref></p>
       </conbody>
     </concept>
 
@@ -1252,7 +1252,7 @@ IMPALA-1917
           could occur, for example, if the minimum or maximum values for a column were long strings.
           The fix adds a configuration setting <codeph>--max_page_header_size</codeph>, which you
           can use to increase the Impala size limit to a value higher than 8 MB. </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2273" scope="external" format="html">IMPALA-2273</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2273">IMPALA-2273</xref></p>
       </conbody>
     </concept>
 
@@ -1263,7 +1263,7 @@ IMPALA-1917
         A query that activated the spill-to-disk mechanism could fail if it contained a sort expression
         involving certain combinations of fixed-length or variable-length types.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2357" scope="external" format="html">IMPALA-2357</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2357">IMPALA-2357</xref></p>
       </conbody>
     </concept>
 
@@ -1275,7 +1275,7 @@ IMPALA-1917
         if there was insufficient memory to set up internal work areas. Now those queries
         produce normal out-of-memory errors instead.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2344" scope="external" format="html">IMPALA-2344</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2344">IMPALA-2344</xref></p>
       </conbody>
     </concept>
 
@@ -1285,7 +1285,7 @@ IMPALA-1917
       <p>
         A serious error could occur under rare circumstances, due to a race condition while freeing memory during heavily concurrent workloads.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2252" scope="external" format="html">IMPALA-2252</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2252">IMPALA-2252</xref></p>
       </conbody>
     </concept>
 
@@ -1295,7 +1295,7 @@ IMPALA-1917
       <p>
         A call to <codeph>SetError()</codeph> in a user-defined function (UDF) would not cause the query to fail as expected.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1746" scope="external" format="html">IMPALA-1746</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1746">IMPALA-1746</xref></p>
       </conbody>
     </concept>
 
@@ -1307,7 +1307,7 @@ IMPALA-1917
         An <codeph>INSERT ... SELECT</codeph> operation into a partitioned table could fail if the <codeph>SELECT</codeph> query
         included a <codeph>GROUP BY</codeph> clause referring to the partition key columns.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2533" scope="external" format="html">IMPALA-2533</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2533">IMPALA-2533</xref></p>
       </conbody>
     </concept>
 
@@ -1357,8 +1357,8 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <title>Impala is unable to read hive tables created with the "STORED AS AVRO" clause</title>
       <conbody>
       <p>Impala could not read Avro tables created in Hive with the <codeph>STORED AS AVRO</codeph> clause.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1136" scope="external" format="html">IMPALA-1136</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2161" scope="external" format="html">IMPALA-2161</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1136">IMPALA-1136</xref>,
+      <xref keyref="IMPALA-2161">IMPALA-2161</xref></p>
       </conbody>
     </concept>
 
@@ -1369,7 +1369,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       Issuing a <codeph>INVALIDATE METADATA</codeph> statement before a subsequent query would avoid the error.
       The fix allows Impala to handle such inconsistencies in Parquet file length cleanly regardless of whether the
       table metadata is up-to-date.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2213" scope="external" format="html">IMPALA-2213</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2213">IMPALA-2213</xref></p>
       </conbody>
     </concept>
 
@@ -1378,7 +1378,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <conbody>
       <p>Impala could encounter a serious error when reading compressed text files larger than 1 GB. The fix causes Impala
       to issue an error message instead in this case.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2249" scope="external" format="html">IMPALA-2249</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2249">IMPALA-2249</xref></p>
       </conbody>
     </concept>
 
@@ -1387,7 +1387,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <conbody>
       <p>A query using the <codeph>group_concat()</codeph> function could encounter a serious error if the returned string value was larger than 1 GB.
       Now the query fails with an error message in this case.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2284" scope="external" format="html">IMPALA-2284</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2284">IMPALA-2284</xref></p>
       </conbody>
     </concept>
 
@@ -1396,7 +1396,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <conbody>
       <p>An edge case in the algorithm used to distribute data among nodes could result in uneven distribution of work for some queries,
       with all data sent to the same node.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2270" scope="external" format="html">IMPALA-2270</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2270">IMPALA-2270</xref></p>
       </conbody>
     </concept>
 
@@ -1405,7 +1405,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <conbody>
       <p>A communication error could occur between Impala and the Hive metastore database, causing Impala operations that update
       table metadata to fail.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2348" scope="external" format="html">IMPALA-2348</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2348">IMPALA-2348</xref></p>
       </conbody>
     </concept>
 
@@ -1413,7 +1413,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <title>Wrong DCHECK in PHJ::ProcessProbeBatch</title>
       <conbody>
       <p>Certain queries could encounter a serious error if the spill-to-disk mechanism was activated.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2364" scope="external" format="html">IMPALA-2364</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2364">IMPALA-2364</xref></p>
       </conbody>
     </concept>
 
@@ -1421,7 +1421,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <title>Avoid cardinality 0 in scan nodes of small tables and low selectivity</title>
       <conbody>
       <p>Impala could generate a suboptimal query plan for some queries involving small tables.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2165" scope="external" format="html">IMPALA-2165</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2165">IMPALA-2165</xref></p>
       </conbody>
     </concept>
 
@@ -1446,7 +1446,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         Impala warns if it detects a discrepancy in table statistics: a table considered to have zero rows even though there are data files present.
         In this case, Impala also skips query optimizations that are normally applied to very small tables.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1983" scope="external" format="html">IMPALA-1983:</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1983">IMPALA-1983:</xref></p>
       </conbody>
     </concept>
 
@@ -1454,7 +1454,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <title>Pass correct child node in 2nd phase merge aggregation.</title>
       <conbody>
       <p>A query could encounter a serious error if it included a particular combination of aggregate functions and inline views.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2266" scope="external" format="html">IMPALA-2266</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2266">IMPALA-2266</xref></p>
       </conbody>
     </concept>
 
@@ -1462,7 +1462,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <title>Set the output smap of an EmptySetNode produced from an empty inline view.</title>
       <conbody>
       <p>A query could encounter a serious error if it included an inline view whose subquery had no <codeph>FROM</codeph> clause.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2216" scope="external" format="html">IMPALA-2216</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2216">IMPALA-2216</xref></p>
       </conbody>
     </concept>
 
@@ -1474,7 +1474,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       different results than a <codeph>SELECT</codeph> statement, for queries including a <codeph>FULL JOIN</codeph> clause
       and including literal values in the select list.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2203" scope="external" format="html">IMPALA-2203</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2203">IMPALA-2203</xref></p>
       </conbody>
     </concept>
 
@@ -1485,7 +1485,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         A query could return incorrect results if it contained a <codeph>UNION</codeph> clause,
         calls to analytic functions, and a constant expression that evaluated to <codeph>FALSE</codeph>.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2088" scope="external" format="html">IMPALA-2088</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2088">IMPALA-2088</xref></p>
       </conbody>
     </concept>
 
@@ -1494,7 +1494,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <title>Constant filter expressions are not checked for errors and state cleanup is not done before throwing exception.</title>
       <conbody>
       <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1756" scope="external" format="html">IMPALA-1756</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1756">IMPALA-1756</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -1505,7 +1505,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <title>update misc.test to match the new .test file format</title>
       <conbody>
       <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2239" scope="external" format="html">IMPALA-2239</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2239">IMPALA-2239</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -1518,7 +1518,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         A query containing an <codeph>INNER JOIN</codeph> clause could return undesired rows.
         Some predicate specified in the <codeph>ON</codeph> clause could be omitted from the filtering operation.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2089" scope="external" format="html">IMPALA-2089</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2089">IMPALA-2089</xref></p>
       </conbody>
     </concept>
 
@@ -1527,7 +1527,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <title>Unconditionally update the partition stats and row count.</title>
       <conbody>
       <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2201" scope="external" format="html">IMPALA-2201</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2201">IMPALA-2201</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -1540,7 +1540,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         A <codeph>COMPUTE INCREMENTAL STATS</codeph> statement could leave the row count for an emptyp partition as -1,
         rather than initializing the row count to 0. The missing statistic value could result in reduced query performance.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2199" scope="external" format="html">IMPALA-2199</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2199">IMPALA-2199</xref></p>
       </conbody>
     </concept>
 
@@ -1551,7 +1551,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         A query could encounter a serious error if it included column aliases with the same names as table columns, and used
         ordinal numbers in an <codeph>ORDER BY</codeph> or <codeph>GROUP BY</codeph> clause.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1898" scope="external" format="html">IMPALA-1898</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1898">IMPALA-1898</xref></p>
       </conbody>
     </concept>
 
@@ -1562,7 +1562,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         A query could return incorrect results if it included an outer join clause, inline views, and calls to functions such as <codeph>coalesce()</codeph>
         that can generate <codeph>NULL</codeph> values.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1987" scope="external" format="html">IMPALA-1987</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1987">IMPALA-1987</xref></p>
       </conbody>
     </concept>
 
@@ -1573,7 +1573,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         A query could return incorrect results if the table contained multiple <codeph>CHAR</codeph> columns with length of 2 or less,
         and the query included a <codeph>GROUP BY</codeph> clause that referred to multiple such columns.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2178" scope="external" format="html">IMPALA-2178</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2178">IMPALA-2178</xref></p>
       </conbody>
     </concept>
 
@@ -1584,7 +1584,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         An <codeph>INSERT</codeph> statement could encounter a serious error if the <codeph>SELECT</codeph>
         portion called an analytic function.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1737" scope="external" format="html">IMPALA-1737</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1737">IMPALA-1737</xref></p>
       </conbody>
     </concept>
 
@@ -1610,7 +1610,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         The table was still accessible to Impala. Regaining access in Hive required a workaround of creating a new table. The error displayed in Hive was:
       </p>
 <codeblock>Error: Error while compiling statement: FAILED: SemanticException Class not found: org.apache.impala.hive.serde.ParquetInputFormat (state=42000,code=40000)</codeblock>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2048" scope="external" format="html">IMPALA-2048</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2048">IMPALA-2048</xref></p>
       </conbody>
     </concept>
 
@@ -1622,7 +1622,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         A query could encounter a serious error if it contained a <codeph>RIGHT OUTER</codeph>, <codeph>RIGHT ANTI</codeph>, or <codeph>FULL OUTER</codeph> join clause
         and approached the memory limit on a host so that the <q>spill to disk</q> mechanism was activated.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1929" scope="external" format="html">IMPALA-1929</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1929">IMPALA-1929</xref></p>
       </conbody>
     </concept>
 
@@ -1634,7 +1634,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         Declaring a partition key column as a <codeph>TINYINT</codeph> caused problems with the <codeph>COMPUTE STATS</codeph> statement.
         The associated partitions would always have zero estimated rows, leading to potential inefficient query plans.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2136" scope="external" format="html">IMPALA-2136</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2136">IMPALA-2136</xref></p>
       </conbody>
     </concept>
 
@@ -1647,7 +1647,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         <codeph>WHERE</codeph> clauses for the outermost query were not always applied, causing the result
         set to include additional rows that should have been filtered out.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2018" scope="external" format="html">IMPALA-2018</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2018">IMPALA-2018</xref></p>
       </conbody>
     </concept>
 
@@ -1659,7 +1659,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         The <codeph>user()</codeph> function returned the name of the logged-in user, which might not be the
         same as the user name being checked for authorization if, for example, delegation was enabled.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2064" scope="external" format="html">IMPALA-2064</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2064">IMPALA-2064</xref></p>
       <p><b>Resolution:</b> Rather than change the behavior of the <codeph>user()</codeph> function,
       the fix introduces an additional function <codeph>effective_user()</codeph> that returns the user name that is checked during authorization.</p>
       </conbody>
@@ -1674,7 +1674,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         data written by Hive, when the <codeph>-convert_legacy_hive_parquet_utc_timestamps=true</codeph> setting
         is in effect.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2125" scope="external" format="html">IMPALA-2125</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2125">IMPALA-2125</xref></p>
       </conbody>
     </concept>
 
@@ -1690,7 +1690,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         into 16 parts during the join query, and the buffer only contains compact bookkeeping data rather than the actual
         join column data.)
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2065" scope="external" format="html">IMPALA-2065</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2065">IMPALA-2065</xref></p>
       </conbody>
     </concept>
 
@@ -1716,8 +1716,8 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         fixes to performance and flexibility for dealing with I/O using remote reads.
         See <xref href="impala_isilon.xml#impala_isilon"/> for details on using Impala and Isilon together.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1968" scope="external" format="html">IMPALA-1968</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-1730" scope="external" format="html">IMPALA-1730</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1968">IMPALA-1968</xref>,
+      <xref keyref="IMPALA-1730">IMPALA-1730</xref></p>
       </conbody>
     </concept>
 
@@ -1726,7 +1726,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <title>Part 1: Improve planner numNodes estimate for remote scans</title>
       <conbody>
       <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1968" scope="external" format="html">IMPALA-1968</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1968">IMPALA-1968</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -1737,7 +1737,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
       <title>reduce scanner thread spinning windows</title>
       <conbody>
       <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1730" scope="external" format="html">IMPALA-1730</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1730">IMPALA-1730</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -1752,7 +1752,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         Impala source code, in the file
         <xref keyref="timezone_db.cc">timezone_db.cc</xref>.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1381" scope="external" format="html">IMPALA-1381</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1381">IMPALA-1381</xref></p>
       </conbody>
     </concept>
 
@@ -1763,7 +1763,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         Impala can now process <codeph>TIMESTAMP</codeph> literals including a trailing <codeph>z</codeph>,
         signifying <q>Zulu</q> time, a synonym for UTC.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1963" scope="external" format="html">IMPALA-1963</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1963">IMPALA-1963</xref></p>
       </conbody>
     </concept>
 
@@ -1775,7 +1775,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         if the <codeph>SELECT</codeph> portion of the statement returned zero
         rows, such as with a <codeph>LIMIT 0</codeph> clause.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2008" scope="external" format="html">IMPALA-2008</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2008">IMPALA-2008</xref></p>
       </conbody>
     </concept>
 
@@ -1790,7 +1790,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
         Formerly it returned <codeph>NULL</codeph>.
         Some scientific expressions might have worked before in <codeph>DECIMAL</codeph> context, but only when the scale was 0.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1952">IMPALA-1952</xref></p>
       </conbody>
     </concept>
 
@@ -1855,7 +1855,7 @@ IMPALA-1607
       that change to the table that contains the column statistics. The statistics (particularly the <codeph>NDV</codeph>) for that column were permanently reset
       and could not be changed by Impala's <codeph>COMPUTE STATS</codeph> command. The underlying cause is a Hive bug (HIVE-9866).
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1607" scope="external" format="html">IMPALA-1607</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1607">IMPALA-1607</xref></p>
       <p><b>Resolution:</b> Resolved by incorporating the fix for <xref href="https://issues.apache.org/jira/browse/HIVE-9866" scope="external" format="html">HIVE-9866</xref>.</p>
       <p><b>Workaround:</b> On systems without the corresponding Hive fix, change the column back to its original type. The stats reappear and you can recompute or drop them.</p>
       </conbody>
@@ -1865,7 +1865,7 @@ IMPALA-1607
       <title>Impala may leak or use too many file descriptors</title>
       <conbody>
       <p>If a file was truncated in HDFS without a corresponding <codeph>REFRESH</codeph> in Impala, Impala could allocate memory for file descriptors and not free that memory.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1854" scope="external" format="html">IMPALA-1854</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1854">IMPALA-1854</xref></p>
       </conbody>
     </concept>
 
@@ -1880,7 +1880,7 @@ IMPALA-1607
         but the spurious error could result in unnecessary debugging work
         and unnecessary use of the <codeph>INVALIDATE METADATA</codeph> statement.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1712" scope="external" format="html">IMPALA-1712</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1712">IMPALA-1712</xref></p>
       </conbody>
     </concept>
 
@@ -1892,7 +1892,7 @@ IMPALA-1607
         This could result in lower performance for queries due to unavailable statistics, and also an inability
         to drop the table.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1711" scope="external" format="html">IMPALA-1711</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1711">IMPALA-1711</xref></p>
       </conbody>
     </concept>
 
@@ -1911,7 +1911,7 @@ IMPALA-1607
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1674" scope="external" format="html">IMPALA-1674</xref>
+          <xref keyref="IMPALA-1674">IMPALA-1674</xref>
         </p>
 
       </conbody>
@@ -1923,7 +1923,7 @@ IMPALA-1607
       <p>
         The <codeph>unix_timestamp()</codeph> function could return an incorrect value (a constant value of 1).
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1623" scope="external" format="html">IMPALA-1623</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1623">IMPALA-1623</xref></p>
       </conbody>
     </concept>
 
@@ -1935,7 +1935,7 @@ IMPALA-1607
         This could lead to inconsistent results, such as a different number of rows for <codeph>SELECT COUNT(*)</codeph>
         as opposed to <codeph>SELECT *</codeph>.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1476" scope="external" format="html">IMPALA-1476</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1476">IMPALA-1476</xref></p>
       </conbody>
     </concept>
 
@@ -1944,7 +1944,7 @@ IMPALA-1607
       <title>Memory leak using zlib on CentOS6 (and possibly other platforms)</title>
       <conbody>
       <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1194" scope="external" format="html">IMPALA-1194</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1194">IMPALA-1194</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -1957,7 +1957,7 @@ IMPALA-1607
         If the HDFS user ID associated with the <cmdname>impalad</cmdname> process had read or write access in HDFS based on group membership,
         Impala statements could still fail with HDFS permission errors if that group was not the first listed group for that user ID.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1805" scope="external" format="html">IMPALA-1805</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1805">IMPALA-1805</xref></p>
       </conbody>
     </concept>
 
@@ -1968,7 +1968,7 @@ IMPALA-1607
         Truncating a file in HDFS, after Impala had cached the file metadata, could produce a hang when Impala
         queried a table containing that file.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1794" scope="external" format="html">IMPALA-1794</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1794">IMPALA-1794</xref></p>
       </conbody>
     </concept>
 
@@ -1979,7 +1979,7 @@ IMPALA-1607
         Impala could sometimes fail to <codeph>INSERT</codeph> into a Parquet table if a column value such as a <codeph>STRING</codeph>
         was larger than 64 KB.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1705" scope="external" format="html">IMPALA-1705</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1705">IMPALA-1705</xref></p>
       </conbody>
     </concept>
 
@@ -1990,7 +1990,7 @@ IMPALA-1607
         This fix relaxes the CPU requirement for Impala. Now only the SSSE3 instruction set is required. Formerly, SSE4.1
         instructions were generated, making Impala refuse to start on some older CPUs.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1646" scope="external" format="html">IMPALA-1646</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1646">IMPALA-1646</xref></p>
       </conbody>
     </concept>
 
@@ -2028,7 +2028,7 @@ IMPALA-1607
         If an inline view in a <codeph>FROM</codeph> clause contained a <codeph>NULL</codeph> literal,
         the result set was empty.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1917" scope="external" format="html">IMPALA-1917</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1917">IMPALA-1917</xref></p>
       </conbody>
     </concept>
 
@@ -2041,7 +2041,7 @@ IMPALA-1607
         for this cast is <codeph>INT</codeph>, and attempting to use <codeph>DECIMAL(3,0)</codeph> in a
         <codeph>TINYINT</codeph> context produces a <q>loss of precision</q> error.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2264" scope="external" format="html">IMPALA-2264</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2264">IMPALA-2264</xref></p>
       </conbody>
     </concept>
 
@@ -2054,8 +2054,8 @@ IMPALA-1607
         Therefore, certain combinations of invalid expressions in a query could cause a crash, or cause a query to continue
         when it should halt with an error.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1756" scope="external" format="html">IMPALA-1756</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2514" scope="external" format="html">IMPALA-2514</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1756">IMPALA-1756</xref>,
+      <xref keyref="IMPALA-2514">IMPALA-2514</xref></p>
       </conbody>
     </concept>
 
@@ -2068,7 +2068,7 @@ IMPALA-1607
         Therefore, certain combinations of invalid expressions in a query could cause a crash, or cause a query to continue
         when it should halt with an error.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2514" scope="external" format="html">IMPALA-2514</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2514">IMPALA-2514</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -2081,8 +2081,8 @@ IMPALA-1607
       <p>
         A call to <codeph>SetError()</codeph> in a user-defined function (UDF) would not cause the query to fail as expected.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1746" scope="external" format="html">IMPALA-1746</xref>,
-      <xref href="https://issues.cloudera.org/browse/IMPALA-2141" scope="external" format="html">IMPALA-2141</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1746">IMPALA-1746</xref>,
+      <xref keyref="IMPALA-2141">IMPALA-2141</xref></p>
       </conbody>
     </concept>
 
@@ -2115,7 +2115,7 @@ IMPALA-1607
       <title>Wrong DCHECK in PHJ::ProcessProbeBatch</title>
       <conbody>
       <p>Certain queries could encounter a serious error if the spill-to-disk mechanism was activated.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2364" scope="external" format="html">IMPALA-2364</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2364">IMPALA-2364</xref></p>
       </conbody>
     </concept>
 
@@ -2123,7 +2123,7 @@ IMPALA-1607
       <title>LargestSpilledPartition was not checking if partition is closed</title>
       <conbody>
       <p>Certain queries could encounter a serious error if the spill-to-disk mechanism was activated.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2314" scope="external" format="html">IMPALA-2314</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2314">IMPALA-2314</xref></p>
       </conbody>
     </concept>
 
@@ -2131,7 +2131,7 @@ IMPALA-1607
       <title>Avoid cardinality 0 in scan nodes of small tables and low selectivity</title>
       <conbody>
       <p>Impala could generate a suboptimal query plan for some queries involving small tables.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2165" scope="external" format="html">IMPALA-2165</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2165">IMPALA-2165</xref></p>
       </conbody>
     </concept>
 
@@ -2140,7 +2140,7 @@ IMPALA-1607
       <conbody>
       <p>Queries using the <codeph>GROUP BY</codeph> operator on multiple <codeph>CHAR</codeph> columns with length less than or equal to 2 characters
       could return incorrect results for some columns.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2178" scope="external" format="html">IMPALA-2178</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2178">IMPALA-2178</xref></p>
       </conbody>
     </concept>
 
@@ -2149,7 +2149,7 @@ IMPALA-1607
       <conbody>
       <p>Queries against HBase tables could return incomplete results if the <codeph>WHERE</codeph> clause included string comparisons using literals
       containing escaped quotation marks.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-2133" scope="external" format="html">IMPALA-2133</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-2133">IMPALA-2133</xref></p>
       </conbody>
     </concept>
 
@@ -2161,7 +2161,7 @@ IMPALA-1607
         A query could encounter a serious error if it contained a <codeph>RIGHT OUTER</codeph>, <codeph>RIGHT ANTI</codeph>, or <codeph>FULL OUTER</codeph> join clause
         and approached the memory limit on a host so that the <q>spill to disk</q> mechanism was activated.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1929" scope="external" format="html">IMPALA-1929</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1929">IMPALA-1929</xref></p>
       </conbody>
     </concept>
 
@@ -2194,7 +2194,7 @@ IMPALA-1607
         Queries including <codeph>RIGHT OUTER JOIN</codeph>, <codeph>RIGHT ANTI JOIN</codeph>, or <codeph>FULL OUTER JOIN</codeph>
         clauses and involving a high volume of data could encounter a serious error.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1919" scope="external" format="html">IMPALA-1919</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1919">IMPALA-1919</xref></p>
       </conbody>
     </concept>
 
@@ -2232,7 +2232,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         When expressions that tested for <codeph>NULL</codeph> were used in combination with analytic functions, an error could occur.
         (The original crash issue was fixed by an earlier patch.)
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1519" scope="external" format="html">IMPALA-1519</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1519">IMPALA-1519</xref></p>
       </conbody>
     </concept>
 
@@ -2245,7 +2245,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         Formerly it returned <codeph>NULL</codeph>.
         Some scientific expressions might have worked before in <codeph>DECIMAL</codeph> context, but only when the scale was 0.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1952" scope="external" format="html">IMPALA-1952</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1952">IMPALA-1952</xref></p>
       </conbody>
     </concept>
 
@@ -2257,7 +2257,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         a constant clause such as <codeph>WHERE 1 = 0</codeph> should have
         prevented it from writing any rows.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1860" scope="external" format="html">IMPALA-1860</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1860">IMPALA-1860</xref></p>
       </conbody>
     </concept>
 
@@ -2268,7 +2268,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         If the <codeph>PARTITION BY</codeph> clause in an analytic function refers to partition key columns in a partitioned table,
         now Impala can perform partition pruning during the analytic query.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1900" scope="external" format="html">IMPALA-1900</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1900">IMPALA-1900</xref></p>
       </conbody>
     </concept>
 
@@ -2279,7 +2279,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
       <conbody>
       <p>
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1376" scope="external" format="html">IMPALA-1376</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1376">IMPALA-1376</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -2293,7 +2293,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         and a window defined with the <codeph>PRECEDING</codeph> keyword
         could produce wrong results.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1888" scope="external" format="html">IMPALA-1888</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1888">IMPALA-1888</xref></p>
       </conbody>
     </concept>
 
@@ -2304,7 +2304,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         A query referencing a <codeph>DECIMAL</codeph> column with the <codeph>FIRST_VALUE</codeph> analytic function
         could encounter an error.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1559" scope="external" format="html">IMPALA-1559</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1559">IMPALA-1559</xref></p>
       </conbody>
     </concept>
 
@@ -2318,7 +2318,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         resulted in a NaN value, for example if the <codeph>ORDER BY</codeph> or <codeph>PARTITION</codeph>
         contained a division operation where both operands were zero.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1808" scope="external" format="html">IMPALA-1808</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1808">IMPALA-1808</xref></p>
       </conbody>
     </concept>
 
@@ -2330,7 +2330,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         encounter an error if another part of the query (specifically an outer join)
         produced all-<codeph>NULL</codeph> tuples.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1562" scope="external" format="html">IMPALA-1562</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1562">IMPALA-1562</xref></p>
       </conbody>
     </concept>
 
@@ -2369,7 +2369,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
       consider enabling it if practical in your environment,
       for maximum interoperability with Hive-created Parquet files.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1658" scope="external" format="html">IMPALA-1658</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1658">IMPALA-1658</xref></p>
       </conbody>
     </concept>
 
@@ -2379,7 +2379,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
       <p>
         Converting a floating-point value to a <codeph>STRING</codeph> could be slower than necessary.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1738" scope="external" format="html">IMPALA-1738</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1738">IMPALA-1738</xref></p>
       </conbody>
     </concept>
 
@@ -2391,7 +2391,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         when the system ran low on memory and attempted to activate the spill-to-disk mechanism.
         The error message referenced the function <codeph>impala::AggregateFunctions::StringValGetValue</codeph>.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1865" scope="external" format="html">IMPALA-1865</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1865">IMPALA-1865</xref></p>
       </conbody>
     </concept>
 
@@ -2402,7 +2402,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         If the HDFS user ID associated with the <cmdname>impalad</cmdname> process had read or write access in HDFS based on group membership,
         Impala statements could still fail with HDFS permission errors if that group was not the first listed group for that user ID.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1805" scope="external" format="html">IMPALA-1805</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1805">IMPALA-1805</xref></p>
       </conbody>
     </concept>
 
@@ -2413,7 +2413,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         Truncating a file in HDFS, after Impala had cached the file metadata, could produce a hang when Impala
         queried a table containing that file.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1794" scope="external" format="html">IMPALA-1794</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1794">IMPALA-1794</xref></p>
       </conbody>
     </concept>
 
@@ -2424,7 +2424,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         Successive calls to the data source API could result in excessive memory consumption,
         with memory allocated but never freed.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1801" scope="external" format="html">IMPALA-1801</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1801">IMPALA-1801</xref></p>
       </conbody>
     </concept>
 
@@ -2439,7 +2439,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
         but the spurious error could result in unnecessary debugging work
         and unnecessary use of the <codeph>INVALIDATE METADATA</codeph> statement.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1712" scope="external" format="html">IMPALA-1712</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1712">IMPALA-1712</xref></p>
       </conbody>
     </concept>
 
@@ -2478,7 +2478,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
         or <codeph>DOUBLE</codeph> value, it could be incorrectly interpreted if it included more than
         19 significant digits.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1622" scope="external" format="html">IMPALA-1622</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1622">IMPALA-1622</xref></p>
       </conbody>
     </concept>
 
@@ -2488,7 +2488,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
       <p>
         The <codeph>unix_timestamp()</codeph> function could return an incorrect value (a constant value of 1).
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1623" scope="external" format="html">IMPALA-1623</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1623">IMPALA-1623</xref></p>
       </conbody>
     </concept>
 
@@ -2499,7 +2499,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
         A query against a partitioned table could return incorrect results if the <codeph>WHERE</codeph> clause
         compared the partition key to <codeph>NULL</codeph> using operators such as <codeph>=</codeph> or <codeph>!=</codeph>.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1535" scope="external" format="html">IMPALA-1535</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1535">IMPALA-1535</xref></p>
       </conbody>
     </concept>
 
@@ -2507,7 +2507,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
       <title>Fetch column stats in bulk using new (Hive .13) HMS APIs</title>
       <conbody>
       <p>The performance of the <codeph>COMPUTE STATS</codeph> statement and queries was improved, particularly for wide tables.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1120" scope="external" format="html">IMPALA-1120</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1120">IMPALA-1120</xref></p>
       </conbody>
     </concept>
 
@@ -2547,7 +2547,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1674" scope="external" format="html"/> IMPALA-1674
+          <xref keyref="IMPALA-1674"/> IMPALA-1674
         </p>
 
 <!--      <p><b>Resolution:</b> Contact <keyword keyref="support_org"/> for a patch.</p> -->
@@ -2568,7 +2568,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1668" scope="external" format="html">IMPALA-1668</xref>
+          <xref keyref="IMPALA-1668">IMPALA-1668</xref>
         </p>
 
 <!--      <p><b>Resolution:</b> Contact <keyword keyref="support_org"/> for a patch.</p> -->
@@ -2607,7 +2607,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1455" scope="external" format="html">IMPALA-1455</xref>
+          <xref keyref="IMPALA-1455">IMPALA-1455</xref>
         </p>
       </conbody>
     </concept>
@@ -2627,7 +2627,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1556" scope="external" format="html">IMPALA-1556</xref>
+          <xref keyref="IMPALA-1556">IMPALA-1556</xref>
         </p>
       </conbody>
     </concept>
@@ -2645,7 +2645,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1611" scope="external" format="html">IMPALA-1611</xref>
+          <xref keyref="IMPALA-1611">IMPALA-1611</xref>
         </p>
       </conbody>
     </concept>
@@ -2663,32 +2663,14 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1553" scope="external" format="html">IMPALA-1553</xref>
-          ,
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1528" scope="external" format="html">IMPALA-1528</xref>
-          ,
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1526" scope="external" format="html">IMPALA-1526</xref>
-          ,
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1524" scope="external" format="html">IMPALA-1524</xref>
-          ,
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1508" scope="external" format="html">IMPALA-1508</xref>
-          ,
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1493" scope="external" format="html">IMPALA-1493</xref>
-          ,
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1501" scope="external" format="html">IMPALA-1501</xref>
-          ,
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1483" scope="external" format="html">IMPALA-1483</xref>
-<!--
-      , <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref>
-      , <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref>
-      , <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref>
-      , <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref>
-      , <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref>
-      , <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref>
-      , <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref>
-      , <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref>
-      , <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref>
-      -->
+          <xref keyref="IMPALA-1553">IMPALA-1553</xref>,
+          <xref keyref="IMPALA-1528">IMPALA-1528</xref>,
+          <xref keyref="IMPALA-1526">IMPALA-1526</xref>,
+          <xref keyref="IMPALA-1524">IMPALA-1524</xref>,
+          <xref keyref="IMPALA-1508">IMPALA-1508</xref>,
+          <xref keyref="IMPALA-1493">IMPALA-1493</xref>,
+          <xref keyref="IMPALA-1501">IMPALA-1501</xref>,
+          <xref keyref="IMPALA-1483">IMPALA-1483</xref>
         </p>
       </conbody>
     </concept>
@@ -2758,7 +2740,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
       consider enabling it if practical in your environment,
       for maximum interoperability with Hive-created Parquet files.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1658" scope="external" format="html">IMPALA-1658</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1658">IMPALA-1658</xref></p>
       </conbody>
     </concept>
 
@@ -2770,7 +2752,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
         such as with <codeph>INSERT OVERWRITE</codeph> in Hive producing an empty
         output file, subsequent Impala queries could hang.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1794" scope="external" format="html">IMPALA-1794</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1794">IMPALA-1794</xref></p>
       </conbody>
     </concept>
 
@@ -2804,7 +2786,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
         An anti-join query (or a <codeph>NOT EXISTS</codeph> operation that was rewritten internally into an anti-join) could produce incorrect results
         if Impala reached its memory limit, causing the query to write temporary results to disk.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1471" scope="external" format="html">IMPALA-1471</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1471">IMPALA-1471</xref></p>
       </conbody>
     </concept>
 
@@ -2815,7 +2797,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
         A query against a partitioned table could return incorrect results if the <codeph>WHERE</codeph> clause
         compared the partition key to <codeph>NULL</codeph> using operators such as <codeph>=</codeph> or <codeph>!=</codeph>.
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1535" scope="external" format="html">IMPALA-1535</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1535">IMPALA-1535</xref></p>
       </conbody>
     </concept>
 
@@ -2823,7 +2805,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
       <title>Fetch column stats in bulk using new (Hive .13) HMS APIs</title>
       <conbody>
       <p>The performance of the <codeph>COMPUTE STATS</codeph> statement and queries was improved, particularly for wide tables.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1120" scope="external" format="html">IMPALA-1120</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1120">IMPALA-1120</xref></p>
       </conbody>
     </concept>
 
@@ -2861,7 +2843,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1453" scope="external" format="html">IMPALA-1453</xref>
+          <xref keyref="IMPALA-1453">IMPALA-1453</xref>
         </p>
       </conbody>
     </concept>
@@ -2893,7 +2875,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1623" scope="external" format="html">IMPALA-1623</xref>
+          <xref keyref="IMPALA-1623">IMPALA-1623</xref>
         </p>
       </conbody>
     </concept>
@@ -2911,7 +2893,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1586" scope="external" format="html">IMPALA-1586</xref>
+          <xref keyref="IMPALA-1586">IMPALA-1586</xref>
         </p>
       </conbody>
     </concept>
@@ -2929,7 +2911,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1606" scope="external" format="html">IMPALA-1606</xref>
+          <xref keyref="IMPALA-1606">IMPALA-1606</xref>
         </p>
       </conbody>
     </concept>
@@ -2948,7 +2930,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1475" scope="external" format="html">IMPALA-1475</xref>
+          <xref keyref="IMPALA-1475">IMPALA-1475</xref>
         </p>
       </conbody>
     </concept>
@@ -2987,7 +2969,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1416" scope="external" format="html"/> IMPALA-1416
+          <xref keyref="IMPALA-1416"/> IMPALA-1416
         </p>
 
         <p>
@@ -3084,7 +3066,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-995" scope="external" format="html">IMPALA-995"</xref>
+          <xref keyref="IMPALA-995">IMPALA-995"</xref>
         </p>
       </conbody>
     </concept>
@@ -3101,7 +3083,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1101" scope="external" format="html">IMPALA-1101"</xref>
+          <xref keyref="IMPALA-1101">IMPALA-1101"</xref>
         </p>
       </conbody>
     </concept>
@@ -3118,7 +3100,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1102" scope="external" format="html">IMPALA-1102"</xref>
+          <xref keyref="IMPALA-1102">IMPALA-1102"</xref>
         </p>
       </conbody>
     </concept>
@@ -3135,7 +3117,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1118" scope="external" format="html">IMPALA-1118"</xref>
+          <xref keyref="IMPALA-1118">IMPALA-1118"</xref>
         </p>
       </conbody>
     </concept>
@@ -3152,7 +3134,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1123" scope="external" format="html">IMPALA-1123"</xref>
+          <xref keyref="IMPALA-1123">IMPALA-1123"</xref>
         </p>
       </conbody>
     </concept>
@@ -3169,7 +3151,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1165" scope="external" format="html">IMPALA-1165"</xref>
+          <xref keyref="IMPALA-1165">IMPALA-1165"</xref>
         </p>
       </conbody>
     </concept>
@@ -3186,7 +3168,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1353" scope="external" format="html">IMPALA-1353"</xref>
+          <xref keyref="IMPALA-1353">IMPALA-1353"</xref>
         </p>
       </conbody>
     </concept>
@@ -3203,7 +3185,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1105" scope="external" format="html">IMPALA-1105"</xref>
+          <xref keyref="IMPALA-1105">IMPALA-1105"</xref>
         </p>
       </conbody>
     </concept>
@@ -3220,7 +3202,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1109" scope="external" format="html">IMPALA-1109"</xref>
+          <xref keyref="IMPALA-1109">IMPALA-1109"</xref>
         </p>
       </conbody>
     </concept>
@@ -3237,7 +3219,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1121" scope="external" format="html">IMPALA-1121"</xref>
+          <xref keyref="IMPALA-1121">IMPALA-1121"</xref>
         </p>
       </conbody>
     </concept>
@@ -3256,7 +3238,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1104" scope="external" format="html">IMPALA-1104"</xref>
+          <xref keyref="IMPALA-1104">IMPALA-1104"</xref>
         </p>
       </conbody>
     </concept>
@@ -3273,7 +3255,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1133" scope="external" format="html">IMPALA-1133"</xref>
+          <xref keyref="IMPALA-1133">IMPALA-1133"</xref>
         </p>
       </conbody>
     </concept>
@@ -3290,7 +3272,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1236" scope="external" format="html">IMPALA-1236"</xref>
+          <xref keyref="IMPALA-1236">IMPALA-1236"</xref>
         </p>
       </conbody>
     </concept>
@@ -3309,7 +3291,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1279" scope="external" format="html">IMPALA-1279"</xref>
+          <xref keyref="IMPALA-1279">IMPALA-1279"</xref>
         </p>
       </conbody>
     </concept>
@@ -3327,7 +3309,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1334" scope="external" format="html">IMPALA-1334"</xref>
+          <xref keyref="IMPALA-1334">IMPALA-1334"</xref>
         </p>
       </conbody>
     </concept>
@@ -3447,7 +3429,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1107" scope="external" format="html">IMPALA-1107</xref>
+          <xref keyref="IMPALA-1107">IMPALA-1107</xref>
         </p>
       </conbody>
     </concept>
@@ -3465,7 +3447,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1093" scope="external" format="html">IMPALA-1093</xref>
+          <xref keyref="IMPALA-1093">IMPALA-1093</xref>
         </p>
       </conbody>
     </concept>
@@ -3483,7 +3465,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1131" scope="external" format="html">IMPALA-1131</xref>
+          <xref keyref="IMPALA-1131">IMPALA-1131</xref>
         </p>
       </conbody>
     </concept>
@@ -3493,7 +3475,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
       <title>Multi-line query with non UTF-8 compatible input throws UnicodeEncodeError</title>
       <conbody>
       <p>Although <cmdname>impala-shell</cmdname> added Unicode support in Impala 1.4.0, queries entered across multiple lines could still encounter errors related to Unicode processing.</p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-1130" scope="external" format="html">IMPALA-1130</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-1130">IMPALA-1130</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -3513,7 +3495,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1149" scope="external" format="html">IMPALA-1149</xref>
+          <xref keyref="IMPALA-1149">IMPALA-1149</xref>
         </p>
       </conbody>
     </concept>
@@ -3533,7 +3515,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1142" scope="external" format="html">IMPALA-1142</xref>
+          <xref keyref="IMPALA-1142">IMPALA-1142</xref>
         </p>
       </conbody>
     </concept>
@@ -3577,7 +3559,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
       <conbody>
       <p>
       </p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/" scope="external" format="html"></xref></p>
+      <p><b>Bug:</b> <xref keyref=""></xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -3606,7 +3588,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1019" scope="external" format="html">IMPALA-1019</xref>
+          <xref keyref="IMPALA-1019">IMPALA-1019</xref>
         </p>
 
         <p>
@@ -3629,7 +3611,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-489" scope="external" format="html">IMPALA-489</xref>
+          <xref keyref="IMPALA-489">IMPALA-489</xref>
         </p>
       </conbody>
     </concept>
@@ -3647,7 +3629,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-962" scope="external" format="html">IMPALA-962</xref>
+          <xref keyref="IMPALA-962">IMPALA-962</xref>
         </p>
       </conbody>
     </concept>
@@ -3665,7 +3647,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-741" scope="external" format="html">IMPALA-741</xref>
+          <xref keyref="IMPALA-741">IMPALA-741</xref>
         </p>
       </conbody>
     </concept>
@@ -3684,7 +3666,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-834" scope="external" format="html">IMPALA-834</xref>
+          <xref keyref="IMPALA-834">IMPALA-834</xref>
         </p>
       </conbody>
     </concept>
@@ -3694,7 +3676,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
       <title>Inserting into table with many cols takes a long time.</title>
       <conbody>
       <p></p>
-      <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-864" scope="external" format="html">IMPALA-864</xref></p>
+      <p><b>Bug:</b> <xref keyref="IMPALA-864">IMPALA-864</xref></p>
       <p><b>Severity:</b> High</p>
       </conbody>
     </concept>
@@ -3713,7 +3695,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-887" scope="external" format="html">IMPALA-887</xref>
+          <xref keyref="IMPALA-887">IMPALA-887</xref>
         </p>
       </conbody>
     </concept>
@@ -3732,7 +3714,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1003" scope="external" format="html">IMPALA-1003</xref>
+          <xref keyref="IMPALA-1003">IMPALA-1003</xref>
         </p>
       </conbody>
     </concept>
@@ -3750,7 +3732,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-185" scope="external" format="html">IMPALA-185</xref>
+          <xref keyref="IMPALA-185">IMPALA-185</xref>
         </p>
       </conbody>
     </concept>
@@ -3767,7 +3749,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1046" scope="external" format="html">IMPALA-1046</xref>
+          <xref keyref="IMPALA-1046">IMPALA-1046</xref>
         </p>
       </conbody>
     </concept>
@@ -3785,7 +3767,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1083" scope="external" format="html">IMPALA-1083</xref>
+          <xref keyref="IMPALA-1083">IMPALA-1083</xref>
         </p>
       </conbody>
     </concept>
@@ -3840,7 +3822,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-1019" scope="external" format="html">IMPALA-1019</xref>
+          <xref keyref="IMPALA-1019">IMPALA-1019</xref>
         </p>
 
         <p>
@@ -3891,7 +3873,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-904" scope="external" format="html">IMPALA-904</xref>
+          <xref keyref="IMPALA-904">IMPALA-904</xref>
         </p>
       </conbody>
     </concept>
@@ -3909,7 +3891,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-901" scope="external" format="html">IMPALA-901</xref>
+          <xref keyref="IMPALA-901">IMPALA-901</xref>
         </p>
       </conbody>
     </concept>
@@ -3928,7 +3910,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-786" scope="external" format="html">IMPALA-786</xref>
+          <xref keyref="IMPALA-786">IMPALA-786</xref>
         </p>
 
         <p>
@@ -3954,7 +3936,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-762" scope="external" format="html">IMPALA-762</xref>
+          <xref keyref="IMPALA-762">IMPALA-762</xref>
         </p>
       </conbody>
     </concept>
@@ -3973,7 +3955,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-624" scope="external" format="html">IMPALA-624</xref>
+          <xref keyref="IMPALA-624">IMPALA-624</xref>
         </p>
       </conbody>
     </concept>
@@ -3991,7 +3973,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-13" scope="external" format="html">IMPALA-13</xref>
+          <xref keyref="IMPALA-13">IMPALA-13</xref>
         </p>
 
         <p>
@@ -4013,7 +3995,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-488" scope="external" format="html">IMPALA-488</xref>
+          <xref keyref="IMPALA-488">IMPALA-488</xref>
         </p>
 
         <p>
@@ -4040,7 +4022,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-827" scope="external" format="html">IMPALA-827</xref>
+          <xref keyref="IMPALA-827">IMPALA-827</xref>
         </p>
 
         <p>
@@ -4064,7 +4046,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-888" scope="external" format="html">IMPALA-888</xref>
+          <xref keyref="IMPALA-888">IMPALA-888</xref>
         </p>
       </conbody>
     </concept>
@@ -4082,7 +4064,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-945" scope="external" format="html">IMPALA-945</xref>
+          <xref keyref="IMPALA-945">IMPALA-945</xref>
         </p>
       </conbody>
     </concept>
@@ -4143,7 +4125,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-860" scope="external" format="html">IMPALA-860</xref>
+          <xref keyref="IMPALA-860">IMPALA-860</xref>
         </p>
 
         <p>
@@ -4168,7 +4150,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-850" scope="external" format="html">IMPALA-850</xref>
+          <xref keyref="IMPALA-850">IMPALA-850</xref>
         </p>
       </conbody>
     </concept>
@@ -4187,7 +4169,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-845" scope="external" format="html">IMPALA-845</xref>
+          <xref keyref="IMPALA-845">IMPALA-845</xref>
         </p>
       </conbody>
     </concept>
@@ -4206,7 +4188,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-831" scope="external" format="html">IMPALA-831</xref>
+          <xref keyref="IMPALA-831">IMPALA-831</xref>
         </p>
       </conbody>
     </concept>
@@ -4224,7 +4206,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-817" scope="external" format="html">IMPALA-817</xref>
+          <xref keyref="IMPALA-817">IMPALA-817</xref>
         </p>
       </conbody>
     </concept>
@@ -4244,7 +4226,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-765" scope="external" format="html">IMPALA-765</xref>
+          <xref keyref="IMPALA-765">IMPALA-765</xref>
         </p>
 
         <p>
@@ -4267,7 +4249,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-723" scope="external" format="html">IMPALA-723</xref>
+          <xref keyref="IMPALA-723">IMPALA-723</xref>
         </p>
       </conbody>
     </concept>
@@ -4285,7 +4267,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-729" scope="external" format="html">IMPALA-729</xref>
+          <xref keyref="IMPALA-729">IMPALA-729</xref>
         </p>
       </conbody>
     </concept>
@@ -4303,7 +4285,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-777" scope="external" format="html">IMPALA-777</xref>
+          <xref keyref="IMPALA-777">IMPALA-777</xref>
         </p>
       </conbody>
     </concept>
@@ -4322,7 +4304,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-903" scope="external" format="html">IMPALA-903</xref>
+          <xref keyref="IMPALA-903">IMPALA-903</xref>
         </p>
       </conbody>
     </concept>
@@ -4340,7 +4322,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-880" scope="external" format="html">IMPALA-880</xref>
+          <xref keyref="IMPALA-880">IMPALA-880</xref>
         </p>
       </conbody>
     </concept>
@@ -4361,7 +4343,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-867" scope="external" format="html">IMPALA-867</xref>
+          <xref keyref="IMPALA-867">IMPALA-867</xref>
         </p>
 
         <p>
@@ -4402,7 +4384,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-818" scope="external" format="html">IMPALA-818</xref>
+          <xref keyref="IMPALA-818">IMPALA-818</xref>
         </p>
 
         <p>
@@ -4425,7 +4407,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-821" scope="external" format="html">IMPALA-821</xref>
+          <xref keyref="IMPALA-821">IMPALA-821</xref>
         </p>
 
         <p>
@@ -4446,7 +4428,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-828" scope="external" format="html">IMPALA-828</xref>
+          <xref keyref="IMPALA-828">IMPALA-828</xref>
         </p>
 
         <p>
@@ -4468,7 +4450,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-809" scope="external" format="html">IMPALA-809</xref>
+          <xref keyref="IMPALA-809">IMPALA-809</xref>
         </p>
       </conbody>
     </concept>
@@ -4486,7 +4468,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-805" scope="external" format="html">IMPALA-805</xref>
+          <xref keyref="IMPALA-805">IMPALA-805</xref>
         </p>
       </conbody>
     </concept>
@@ -4519,7 +4501,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-715" scope="external" format="html">IMPALA-715</xref>
+          <xref keyref="IMPALA-715">IMPALA-715</xref>
         </p>
 
         <p>
@@ -4542,7 +4524,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-735" scope="external" format="html">IMPALA-735</xref>
+          <xref keyref="IMPALA-735">IMPALA-735</xref>
         </p>
 
         <p>
@@ -4556,7 +4538,7 @@ Bad stats:
         <title>INVALIDATE METADATA <varname>table_name</varname> should add the table to the catalog if it doesn't already exist</title>
         <conbody>
         <p/>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-736" scope="external" format="html">IMPALA-736</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-736">IMPALA-736</xref></p>
         <p><b>Severity:</b> High</p>
         </conbody>
       </concept>
@@ -4575,7 +4557,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-749" scope="external" format="html">IMPALA-749</xref>
+          <xref keyref="IMPALA-749">IMPALA-749</xref>
         </p>
       </conbody>
     </concept>
@@ -4645,7 +4627,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-720" scope="external" format="html">IMPALA-720</xref>
+          <xref keyref="IMPALA-720">IMPALA-720</xref>
         </p>
       </conbody>
     </concept>
@@ -4715,7 +4697,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-694" scope="external" format="html">IMPALA-694</xref>
+          <xref keyref="IMPALA-694">IMPALA-694</xref>
         </p>
 
         <p>
@@ -4737,7 +4719,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-699" scope="external" format="html">IMPALA-699</xref>
+          <xref keyref="IMPALA-699">IMPALA-699</xref>
         </p>
       </conbody>
     </concept>
@@ -4755,7 +4737,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-687" scope="external" format="html">IMPALA-687</xref>
+          <xref keyref="IMPALA-687">IMPALA-687</xref>
         </p>
       </conbody>
     </concept>
@@ -4772,7 +4754,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-689" scope="external" format="html">IMPALA-689</xref>
+          <xref keyref="IMPALA-689">IMPALA-689</xref>
         </p>
       </conbody>
     </concept>
@@ -4790,7 +4772,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-695" scope="external" format="html">IMPALA-695</xref>
+          <xref keyref="IMPALA-695">IMPALA-695</xref>
         </p>
       </conbody>
     </concept>
@@ -4826,7 +4808,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-525" scope="external" format="html">IMPALA-525</xref>
+          <xref keyref="IMPALA-525">IMPALA-525</xref>
         </p>
 
         <p>
@@ -4849,7 +4831,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-657" scope="external" format="html">IMPALA-657</xref>
+          <xref keyref="IMPALA-657">IMPALA-657</xref>
         </p>
 
         <p>
@@ -4871,7 +4853,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-652" scope="external" format="html">IMPALA-652</xref>
+          <xref keyref="IMPALA-652">IMPALA-652</xref>
         </p>
 
         <p>
@@ -4885,7 +4867,7 @@ Bad stats:
         <title>Fail early (in analysis) when COMPUTE STATS is run against Avro table with no columns</title>
         <conbody>
         <p></p>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-520" scope="external" format="html">IMPALA-520</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-520">IMPALA-520</xref></p>
         <p><b>Severity:</b> </p>
         <p><b>Resolution:</b> </p>
         </conbody>
@@ -4937,7 +4919,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-477" scope="external" format="html">IMPALA-477</xref>
+          <xref keyref="IMPALA-477">IMPALA-477</xref>
         </p>
       </conbody>
     </concept>
@@ -4955,7 +4937,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-482" scope="external" format="html">IMPALA-482</xref>
+          <xref keyref="IMPALA-482">IMPALA-482</xref>
         </p>
       </conbody>
     </concept>
@@ -4973,7 +4955,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-510" scope="external" format="html">IMPALA-510</xref>
+          <xref keyref="IMPALA-510">IMPALA-510</xref>
         </p>
       </conbody>
     </concept>
@@ -4991,7 +4973,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-495" scope="external" format="html">IMPALA-495</xref>
+          <xref keyref="IMPALA-495">IMPALA-495</xref>
         </p>
       </conbody>
     </concept>
@@ -5010,7 +4992,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-485" scope="external" format="html">IMPALA-485</xref>
+          <xref keyref="IMPALA-485">IMPALA-485</xref>
         </p>
       </conbody>
     </concept>
@@ -5028,7 +5010,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-534" scope="external" format="html">IMPALA-534</xref>
+          <xref keyref="IMPALA-534">IMPALA-534</xref>
         </p>
       </conbody>
     </concept>
@@ -5047,7 +5029,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-538" scope="external" format="html">IMPALA-538</xref>
+          <xref keyref="IMPALA-538">IMPALA-538</xref>
         </p>
       </conbody>
     </concept>
@@ -5066,7 +5048,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-520" scope="external" format="html">IMPALA-520</xref>
+          <xref keyref="IMPALA-520">IMPALA-520</xref>
         </p>
       </conbody>
     </concept>
@@ -5102,7 +5084,7 @@ Bad stats:
 
 <!-- Bug was actually deleted from JIRA system.
         <p>
-          <b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-335" scope="external" format="html">IMPALA-335</xref>
+          <b>Bug:</b> <xref keyref="IMPALA-335">IMPALA-335</xref>
         </p>
 -->
       </conbody>
@@ -5120,7 +5102,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-85" scope="external" format="html">IMPALA-85</xref>
+          <xref keyref="IMPALA-85">IMPALA-85</xref>
         </p>
       </conbody>
     </concept>
@@ -5138,7 +5120,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-257" scope="external" format="html">IMPALA-257</xref>
+          <xref keyref="IMPALA-257">IMPALA-257</xref>
         </p>
       </conbody>
     </concept>
@@ -5156,7 +5138,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-192" scope="external" format="html">IMPALA-192</xref>
+          <xref keyref="IMPALA-192">IMPALA-192</xref>
         </p>
       </conbody>
     </concept>
@@ -5174,7 +5156,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-364" scope="external" format="html">IMPALA-364</xref>
+          <xref keyref="IMPALA-364">IMPALA-364</xref>
         </p>
       </conbody>
     </concept>
@@ -5197,7 +5179,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-396" scope="external" format="html">IMPALA-396</xref>
+          <xref keyref="IMPALA-396">IMPALA-396</xref>
         </p>
       </conbody>
     </concept>
@@ -5224,7 +5206,7 @@ Bad stats:
         <title>Impala may crash when running large number of concurrent queries against a single coordinator</title>
         <conbody>
         <p>This issue occurs when a large number of queries are submitted to the same instance of <codeph>impalad</codeph> and are running simultaneously.</p>
-        <p><b>Bug:</b> <xref href="https://issues.cloudera.org/browse/IMPALA-325" scope="external" format="html">IMPALA-325</xref></p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-325">IMPALA-325</xref></p>
         <p><b>Severity:</b> High</p>
         <p><b>Resolution:</b> To be fixed in a future release</p>
         <p><b>Workaround:</b> Use round-robin scheduling to submit queries to different Impala nodes.</p>
@@ -5246,7 +5228,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-333" scope="external" format="html">IMPALA-333</xref>
+          <xref keyref="IMPALA-333">IMPALA-333</xref>
         </p>
 
         <p>
@@ -5268,7 +5250,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-293" scope="external" format="html">IMPALA-293</xref>
+          <xref keyref="IMPALA-293">IMPALA-293</xref>
         </p>
 
         <p>
@@ -5291,7 +5273,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-351" scope="external" format="html">IMPALA-351</xref>
+          <xref keyref="IMPALA-351">IMPALA-351</xref>
         </p>
 
         <p>
@@ -5312,7 +5294,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-356" scope="external" format="html">IMPALA-356</xref>
+          <xref keyref="IMPALA-356">IMPALA-356</xref>
         </p>
 
         <p>
@@ -5334,7 +5316,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-300" scope="external" format="html">IMPALA-300</xref>
+          <xref keyref="IMPALA-300">IMPALA-300</xref>
         </p>
 
         <p>
@@ -5356,7 +5338,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-349" scope="external" format="html">IMPALA-349</xref>
+          <xref keyref="IMPALA-349">IMPALA-349</xref>
         </p>
 
         <p>
@@ -5378,7 +5360,7 @@ Bad stats:
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-358" scope="external" format="html">IMPALA-358</xref>
+          <xref keyref="IMPALA-358">IMPALA-358</xref>
         </p>
 
         <p>
@@ -5413,7 +5395,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-16" scope="external" format="html">IMPALA-16</xref>
+          <xref keyref="IMPALA-16">IMPALA-16</xref>
         </p>
 
         <p>
@@ -5467,7 +5449,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-183" scope="external" format="html">IMPALA-183</xref>
+          <xref keyref="IMPALA-183">IMPALA-183</xref>
         </p>
 
         <p>
@@ -5489,7 +5471,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-190" scope="external" format="html">IMPALA-190</xref>
+          <xref keyref="IMPALA-190">IMPALA-190</xref>
         </p>
 
         <p>
@@ -5511,7 +5493,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-217" scope="external" format="html">IMPALA-217</xref>
+          <xref keyref="IMPALA-217">IMPALA-217</xref>
         </p>
 
         <p>
@@ -5533,7 +5515,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-231" scope="external" format="html">IMPALA-231</xref>
+          <xref keyref="IMPALA-231">IMPALA-231</xref>
         </p>
 
         <p>
@@ -5555,7 +5537,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-234" scope="external" format="html">IMPALA-234</xref>
+          <xref keyref="IMPALA-234">IMPALA-234</xref>
         </p>
 
         <p>
@@ -5583,7 +5565,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-238" scope="external" format="html">IMPALA-238</xref>
+          <xref keyref="IMPALA-238">IMPALA-238</xref>
         </p>
 
         <p>
@@ -5605,7 +5587,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-243" scope="external" format="html">IMPALA-243</xref>
+          <xref keyref="IMPALA-243">IMPALA-243</xref>
         </p>
 
         <p>
@@ -5627,7 +5609,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-252" scope="external" format="html">IMPALA-252</xref>
+          <xref keyref="IMPALA-252">IMPALA-252</xref>
         </p>
 
         <p>
@@ -5649,7 +5631,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-266" scope="external" format="html">IMPALA-266</xref>
+          <xref keyref="IMPALA-266">IMPALA-266</xref>
         </p>
 
         <p>
@@ -5671,7 +5653,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-267" scope="external" format="html">IMPALA-267</xref>
+          <xref keyref="IMPALA-267">IMPALA-267</xref>
         </p>
 
         <p>
@@ -5692,7 +5674,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-288" scope="external" format="html">IMPALA-288</xref>
+          <xref keyref="IMPALA-288">IMPALA-288</xref>
         </p>
 
         <p>
@@ -5713,7 +5695,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-289" scope="external" format="html">IMPALA-289</xref>
+          <xref keyref="IMPALA-289">IMPALA-289</xref>
         </p>
 
         <p>
@@ -5735,7 +5717,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-292" scope="external" format="html">IMPALA-292</xref>
+          <xref keyref="IMPALA-292">IMPALA-292</xref>
         </p>
 
         <p>
@@ -5757,7 +5739,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-295" scope="external" format="html">IMPALA-295</xref>
+          <xref keyref="IMPALA-295">IMPALA-295</xref>
         </p>
 
         <p>
@@ -5779,7 +5761,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-312" scope="external" format="html">IMPALA-312</xref>
+          <xref keyref="IMPALA-312">IMPALA-312</xref>
         </p>
 
         <p>
@@ -5801,7 +5783,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-67" scope="external" format="html">IMPALA-67</xref>
+          <xref keyref="IMPALA-67">IMPALA-67</xref>
         </p>
 
         <p>
@@ -5823,7 +5805,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-90" scope="external" format="html">IMPALA-90</xref>
+          <xref keyref="IMPALA-90">IMPALA-90</xref>
         </p>
 
         <p>
@@ -5844,7 +5826,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-204" scope="external" format="html">IMPALA-204</xref>
+          <xref keyref="IMPALA-204">IMPALA-204</xref>
         </p>
 
         <p>
@@ -5873,7 +5855,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           Bug:
-          <xref href="https://issues.cloudera.org/browse/IMPALA-167" scope="external" format="html">IMPALA-167</xref>
+          <xref keyref="IMPALA-167">IMPALA-167</xref>
         </p>
 
         <p>
@@ -5942,7 +5924,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-20" scope="external" format="html">IMPALA-20</xref>
+          <xref keyref="IMPALA-20">IMPALA-20</xref>
         </p>
 
         <p>
@@ -5969,7 +5951,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-144" scope="external" format="html">IMPALA-144</xref>
+          <xref keyref="IMPALA-144">IMPALA-144</xref>
         </p>
 
         <p>
@@ -6024,7 +6006,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-64" scope="external" format="html">IMPALA-64</xref>
+          <xref keyref="IMPALA-64">IMPALA-64</xref>
         </p>
 
         <p>
@@ -6048,7 +6030,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-48" scope="external" format="html">IMPALA-48</xref>
+          <xref keyref="IMPALA-48">IMPALA-48</xref>
         </p>
 
         <p>
@@ -6070,7 +6052,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-58" scope="external" format="html">IMPALA-58</xref>
+          <xref keyref="IMPALA-58">IMPALA-58</xref>
         </p>
 
         <p>
@@ -6092,7 +6074,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-44" scope="external" format="html">IMPALA-44</xref>
+          <xref keyref="IMPALA-44">IMPALA-44</xref>
         </p>
 
         <p>
@@ -6114,7 +6096,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-18" scope="external" format="html">IMPALA-18</xref>
+          <xref keyref="IMPALA-18">IMPALA-18</xref>
         </p>
 
         <p id="p_7">
@@ -6161,7 +6143,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-38" scope="external" format="html">IMPALA-38</xref>
+          <xref keyref="IMPALA-38">IMPALA-38</xref>
         </p>
 
         <p>
@@ -6183,7 +6165,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-30" scope="external" format="html">IMPALA-30</xref>
+          <xref keyref="IMPALA-30">IMPALA-30</xref>
         </p>
 
         <p>
@@ -6205,7 +6187,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-15" scope="external" format="html">IMPALA-15</xref>
+          <xref keyref="IMPALA-15">IMPALA-15</xref>
         </p>
 
         <p id="p_10">
@@ -6274,7 +6256,7 @@ hive&gt; NULL</codeblock>
 
         <p>
           <b>Bug:</b>
-          <xref href="https://issues.cloudera.org/browse/IMPALA-14" scope="external" format="html">IMPALA-14</xref>
+          <xref keyref="IMPALA-14">IMPALA-14</xref>
         </p>
 
         <p>

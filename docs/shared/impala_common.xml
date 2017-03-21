@@ -831,7 +831,7 @@ select * from t2;
         In <keyword keyref="impala250"/>, only the value 1 enables the option, and the value
         <codeph>true</codeph> is not recognized. This limitation is
         tracked by the issue
-        <xref href="https://issues.cloudera.org/browse/IMPALA-3334" scope="external" format="html">IMPALA-3334</xref>,
+        <xref keyref="IMPALA-3334">IMPALA-3334</xref>,
         which shows the releases where the problem is fixed.
       </note>
 
@@ -3142,7 +3142,7 @@ sudo pip-python install ssl</codeblock>
 
       <note id="compute_stats_parquet" rev="IMPALA-488">
         Currently, a known issue
-        (<xref href="https://issues.cloudera.org/browse/IMPALA-488" scope="external" format="html">IMPALA-488</xref>)
+        (<xref keyref="IMPALA-488">IMPALA-488</xref>)
         could cause excessive memory usage during a <codeph>COMPUTE STATS</codeph> operation on a Parquet table. As
         a workaround, issue the command <codeph>SET NUM_SCANNER_THREADS=2</codeph> in
         <cmdname>impala-shell</cmdname> before issuing the <codeph>COMPUTE STATS</codeph> statement. Then issue
@@ -3332,7 +3332,7 @@ sudo pip-python install ssl</codeblock>
           </li>
         </ul>
         You can track the status of the fix for this issue at
-        <xref href="https://issues.cloudera.org/browse/IMPALA-3662" scope="external" format="html">IMPALA-3662</xref>.
+        <xref keyref="IMPALA-3662">IMPALA-3662</xref>.
       </p>
 
       <p id="increase_catalogd_heap_size" rev="">

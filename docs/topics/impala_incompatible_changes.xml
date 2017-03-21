@@ -323,7 +323,7 @@ under the License.
             Previously, the <codeph>_</codeph> and <codeph>%</codeph> wildcard
             characters for the <codeph>LIKE</codeph> operator would not match
             characters on the second or subsequent lines of multi-line string values. The fix for issue
-            <xref href="https://issues.cloudera.org/browse/IMPALA-2204" scope="external" format="html">IMPALA-2204</xref> causes
+            <xref keyref="IMPALA-2204">IMPALA-2204</xref> causes
             the wildcard matching to apply to the entire string for values
             containing embedded <codeph>\n</codeph> characters. This could cause
             different results than in previous Impala releases for identical
@@ -415,7 +415,7 @@ under the License.
         <li rev="IMPALA-2130">
           <p>
             If Impala encounters a Parquet file that is invalid because of an incorrect magic number,
-            the query skips the file. This change is caused by the fix for issue <xref href="https://issues.cloudera.org/browse/IMPALA-2130" scope="external" format="html">IMPALA-2130</xref>.
+            the query skips the file. This change is caused by the fix for issue <xref keyref="IMPALA-2130">IMPALA-2130</xref>.
             Previously, Impala would attempt to read the file despite the possibility that the file was corrupted.
           </p>
         </li>
@@ -953,7 +953,7 @@ under the License.
         <li>
           <p>
             The fix for issue
-            <xref href="https://issues.cloudera.org/browse/IMPALA-973" scope="external" format="html">IMPALA-973</xref>
+            <xref keyref="IMPALA-973">IMPALA-973</xref>
             changes the behavior of the <codeph>INVALIDATE METADATA</codeph> statement regarding nonexistent
             tables. In Impala 1.4.0 and higher, the statement returns an error if the specified table is not in the
             metastore database at all. It completes successfully if the specified table is in the metastore

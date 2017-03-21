@@ -183,7 +183,7 @@ show column stats item_partitioned;
     <note>
       (It is possible that the row count might be preserved in future after a <codeph>DROP INCREMENTAL
       STATS</codeph> statement. Check the resolution of the issue
-      <xref href="https://issues.cloudera.org/browse/IMPALA-1615" scope="external" format="html">IMPALA-1615</xref>.)
+      <xref keyref="IMPALA-1615">IMPALA-1615</xref>.)
     </note>
 
 <codeblock>drop incremental stats item_partitioned partition (i_category='Sports');
