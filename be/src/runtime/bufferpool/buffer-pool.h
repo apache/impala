@@ -313,6 +313,7 @@ class BufferPool::ClientHandle {
 
  private:
   friend class BufferPool;
+  friend class BufferPoolTest;
   DISALLOW_COPY_AND_ASSIGN(ClientHandle);
 
   /// Internal state for the client. NULL means the client isn't registered.

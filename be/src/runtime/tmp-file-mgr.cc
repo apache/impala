@@ -271,11 +271,7 @@ Status TmpFileMgr::FileGroup::CreateFiles() {
   }
   DCHECK_EQ(tmp_files_.size(), files_allocated);
   if (tmp_files_.size() == 0) {
-    // TODO: IMPALA-4697: the merged errors do not show up in the query error log,
-    // so we must point users to the impalad error log.
-    Status err_status(
-        "Could not create files in any configured scratch directories (--scratch_dirs). "
-        "See logs for previous errors that may have caused this.");
+    Status err_status(TErrorCode::SCRATCH_ALLOCATION_FAILED);
     for (Status& err : scratch_errors_) err_status.MergeStatus(err);
     return err_status;
   }

@@ -28,6 +28,7 @@
 #include "util/bit-util.h"
 #include "util/cpu-info.h"
 #include "util/runtime-profile-counters.h"
+#include "util/time.h"
 #include "util/uid-util.h"
 
 DEFINE_int32(concurrent_scratch_ios_per_device, 2,
@@ -265,6 +266,7 @@ BufferPool::Client::Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
   : pool_(pool),
     file_group_(file_group),
     name_(name),
+    debug_write_delay_ms_(0),
     num_pages_(0),
     buffers_allocated_bytes_(0) {
   reservation_.InitChildTracker(
@@ -502,6 +504,9 @@ void BufferPool::Client::WriteDirtyPagesAsync(int64_t min_bytes_to_write) {
 }
 
 void BufferPool::Client::WriteCompleteCallback(Page* page, const Status& write_status) {
+#ifndef NDEBUG
+  if (debug_write_delay_ms_ > 0) SleepForMs(debug_write_delay_ms_);
+#endif
   {
     unique_lock<mutex> cl(lock_);
     DCHECK(in_flight_write_pages_.Contains(page));
@@ -526,6 +531,13 @@ void BufferPool::Client::WaitForWrite(unique_lock<mutex>* client_lock, Page* pag
   while (in_flight_write_pages_.Contains(page)) {
     SCOPED_TIMER(counters().write_wait_time);
     page->write_complete_cv_.Wait(*client_lock);
+  }
+}
+
+void BufferPool::Client::WaitForAllWrites() {
+  unique_lock<mutex> cl(lock_);
+  while (in_flight_write_pages_.size() > 0) {
+    write_complete_cv_.Wait(cl);
   }
 }
 

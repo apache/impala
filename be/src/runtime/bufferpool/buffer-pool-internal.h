@@ -237,6 +237,10 @@ class BufferPool::Client {
   /// not be held.
   void WaitForWrite(boost::unique_lock<boost::mutex>* client_lock, Page* page);
 
+  /// Test helper: wait for all in-flight writes to complete.
+  /// 'lock_' must not be held by the caller.
+  void WaitForAllWrites();
+
   /// Asserts that 'client_lock' is holding 'lock_'.
   void DCheckHoldsLock(const boost::unique_lock<boost::mutex>& client_lock) {
     DCHECK(client_lock.mutex() == &lock_ && client_lock.owns_lock());
@@ -245,6 +249,7 @@ class BufferPool::Client {
   ReservationTracker* reservation() { return &reservation_; }
   const BufferPoolClientCounters& counters() const { return counters_; }
   bool spilling_enabled() const { return file_group_ != NULL; }
+  void set_debug_write_delay_ms(int val) { debug_write_delay_ms_ = val; }
 
   std::string DebugString();
 
@@ -304,6 +309,9 @@ class BufferPool::Client {
   /// The RuntimeProfile counters for this client, owned by the client's RuntimeProfile.
   /// All non-NULL.
   BufferPoolClientCounters counters_;
+
+  /// Debug option to delay write completion.
+  int debug_write_delay_ms_;
 
   /// Lock to protect the below member variables;
   boost::mutex lock_;

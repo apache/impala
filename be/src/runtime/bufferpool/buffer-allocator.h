@@ -122,6 +122,11 @@ class BufferPool::BufferAllocator {
   /// Try to release at least 'bytes_to_free' bytes of memory to the system allocator.
   void ReleaseMemory(int64_t bytes_to_free);
 
+  /// Return the amount of memory currently allocated from the system.
+  int64_t GetSystemBytesAllocated() const {
+    return system_bytes_limit_ - system_bytes_remaining_.Load();
+  }
+
   std::string DebugString();
 
  protected:
