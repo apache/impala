@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "codegen/llvm-codegen.h"
 #include "exec/union-node.h"
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
@@ -27,7 +28,8 @@
 
 #include "common/names.h"
 
-namespace impala {
+using namespace llvm;
+using namespace impala;
 
 UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
@@ -35,6 +37,7 @@ UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_id_(tnode.union_node.tuple_id),
       tuple_desc_(nullptr),
       first_materialized_child_idx_(tnode.union_node.first_materialized_child_idx),
+      tuple_pool_(nullptr),
       child_idx_(0),
       child_batch_(nullptr),
       child_row_idx_(0),
@@ -68,6 +71,8 @@ Status UnionNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != nullptr);
+  tuple_pool_.reset(new MemPool(mem_tracker()));
+  codegend_union_materialize_batch_fns_.resize(child_expr_lists_.size());
 
   // Prepare const expr lists.
   for (const vector<ExprContext*>& exprs : const_expr_lists_) {
@@ -84,6 +89,50 @@ Status UnionNode::Prepare(RuntimeState* state) {
     DCHECK_EQ(child_expr_lists_[i].size(), tuple_desc_->slots().size());
   }
   return Status::OK();
+}
+
+void UnionNode::Codegen(RuntimeState* state) {
+  DCHECK(state->ShouldCodegen());
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != nullptr);
+  std::stringstream codegen_message;
+  Status codegen_status;
+  for (int i = 0; i < child_expr_lists_.size(); ++i) {
+    if (IsChildPassthrough(i)) continue;
+
+    llvm::Function* tuple_materialize_exprs_fn;
+    codegen_status = Tuple::CodegenMaterializeExprs(codegen, false, *tuple_desc_,
+        child_expr_lists_[i], tuple_pool_.get(), &tuple_materialize_exprs_fn);
+    if (!codegen_status.ok()) {
+      // Codegen may fail in some corner cases (e.g. we don't handle TYPE_CHAR). If this
+      // happens, abort codegen for this and the remaining children.
+      codegen_message << "Codegen failed for child: " << children_[i]->id();
+      break;
+    }
+
+    // Get a copy of the function. This function will be modified and added to the
+    // vector of functions.
+    Function* union_materialize_batch_fn =
+        codegen->GetFunction(IRFunction::UNION_MATERIALIZE_BATCH, true);
+    DCHECK(union_materialize_batch_fn != nullptr);
+
+    int replaced = codegen->ReplaceCallSites(union_materialize_batch_fn,
+        tuple_materialize_exprs_fn, Tuple::MATERIALIZE_EXPRS_SYMBOL);
+    DCHECK_EQ(replaced, 1) << LlvmCodeGen::Print(union_materialize_batch_fn);
+
+    union_materialize_batch_fn = codegen->FinalizeFunction(
+        union_materialize_batch_fn);
+    DCHECK(union_materialize_batch_fn != nullptr);
+
+    // Add the function to Jit and to the vector of codegened functions.
+    codegen->AddFunctionToJit(union_materialize_batch_fn,
+        reinterpret_cast<void**>(&(codegend_union_materialize_batch_fns_.data()[i])));
+  }
+  runtime_profile()->AddCodegenMsg(
+      codegen_status.ok(), codegen_status, codegen_message.str());
 }
 
 Status UnionNode::Open(RuntimeState* state) {
@@ -114,12 +163,6 @@ Status UnionNode::GetNextPassThrough(RuntimeState* state, RowBatch* row_batch) {
   if (child_eos_) RETURN_IF_ERROR(child(child_idx_)->Open(state));
   DCHECK_EQ(row_batch->num_rows(), 0);
   RETURN_IF_ERROR(child(child_idx_)->GetNext(state, row_batch, &child_eos_));
-  if (limit_ != -1 && num_rows_returned_ + row_batch->num_rows() > limit_) {
-    row_batch->set_num_rows(limit_ - num_rows_returned_);
-  }
-  num_rows_returned_ += row_batch->num_rows();
-  DCHECK(limit_ == -1 || num_rows_returned_ <= limit_);
-  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   if (child_eos_) {
     // Even though the child is at eos, it's not OK to Close() it here. Once we close
     // the child, the row batches that it produced are invalid. Marking the batch as
@@ -143,10 +186,8 @@ Status UnionNode::GetNextMaterialized(RuntimeState* state, RowBatch* row_batch) 
   memset(tuple_buf, 0, tuple_buf_size);
 
   while (HasMoreMaterialized() && !row_batch->AtCapacity()) {
-    // There are only 2 ways of getting out of this loop:
-    // 1. The loop ends normally when we are either done iterating over the children that
-    //    need materialization or the row batch is at capacity.
-    // 2. We return from the function from inside the loop if limit is reached.
+    // The loop runs until we are either done iterating over the children that require
+    // materialization, or the row batch is at capacity.
     DCHECK(!IsChildPassthrough(child_idx_));
     // Child row batch was either never set or we're moving on to a different child.
     if (child_batch_.get() == nullptr) {
@@ -163,12 +204,6 @@ Status UnionNode::GetNextMaterialized(RuntimeState* state, RowBatch* row_batch) 
     }
 
     while (!row_batch->AtCapacity()) {
-      // This loop fetches row batches from a single child and materializes each output
-      // row, until one of these conditions:
-      // 1. The loop ends normally if the row batch is at capacity.
-      // 2. We break out of the loop if all the rows were consumed from the current child
-      //    and we are moving on to the next child.
-      // 3. We return from the function from inside the loop if the limit is reached.
       DCHECK(child_batch_.get() != nullptr);
       DCHECK_LE(child_row_idx_, child_batch_->num_rows());
       if (child_row_idx_ == child_batch_->num_rows()) {
@@ -184,21 +219,17 @@ Status UnionNode::GetNextMaterialized(RuntimeState* state, RowBatch* row_batch) 
         // try again.
         if (child_batch_->num_rows() == 0) continue;
       }
-      DCHECK_LT(child_row_idx_, child_batch_->num_rows());
-      TupleRow* child_row = child_batch_->GetRow(child_row_idx_);
-      MaterializeExprs(child_expr_lists_[child_idx_], child_row, tuple_buf, row_batch);
-      tuple_buf += tuple_desc_->byte_size();
-      ++child_row_idx_;
-      if (ReachedLimit()) {
-        COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-        // It's OK to close the child here even if we are inside a subplan.
-        child_batch_.reset();
-        child(child_idx_)->Close(state);
-        return Status::OK();
+      DCHECK_EQ(codegend_union_materialize_batch_fns_.size(), children_.size());
+      if (codegend_union_materialize_batch_fns_[child_idx_] == nullptr) {
+        MaterializeBatch(row_batch, &tuple_buf);
+      } else {
+        codegend_union_materialize_batch_fns_[child_idx_](this, row_batch, &tuple_buf);
       }
     }
-
+    // It shouldn't be the case that we reached the limit because we shouldn't have
+    // incremented 'num_rows_returned_' yet.
     DCHECK(!ReachedLimit());
+
     if (child_eos_ && child_row_idx_ == child_batch_->num_rows()) {
       // Unless we are inside a subplan expecting to call Open()/GetNext() on the child
       // again, the child can be closed at this point.
@@ -225,15 +256,14 @@ Status UnionNode::GetNextConst(RuntimeState* state, RowBatch* row_batch) {
   RETURN_IF_ERROR(
       row_batch->ResizeAndAllocateTupleBuffer(state, &tuple_buf_size, &tuple_buf));
   memset(tuple_buf, 0, tuple_buf_size);
-  while (const_expr_list_idx_ < const_expr_lists_.size() &&
-      !row_batch->AtCapacity() && !ReachedLimit()) {
+
+  while (const_expr_list_idx_ < const_expr_lists_.size() && !row_batch->AtCapacity()) {
     MaterializeExprs(
         const_expr_lists_[const_expr_list_idx_], nullptr, tuple_buf, row_batch);
     tuple_buf += tuple_desc_->byte_size();
     ++const_expr_list_idx_;
   }
 
-  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK();
 }
 
@@ -242,14 +272,21 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
+  // The tuple pool should be empty between GetNext() calls.
+  DCHECK_EQ(tuple_pool_.get()->GetTotalChunkSizes(), 0);
 
   if (to_close_child_idx_ != -1) {
     // The previous child needs to be closed if passthrough was enabled for it. In the non
     // passthrough case, the child was already closed in the previous call to GetNext().
     DCHECK(IsChildPassthrough(to_close_child_idx_));
+    DCHECK(!IsInSubplan());
     child(to_close_child_idx_)->Close(state);
     to_close_child_idx_ = -1;
   }
+
+  // Save the number of rows in case GetNext() is called with a non-empty batch, which can
+  // happen in a subplan.
+  int num_rows_before = row_batch->num_rows();
 
   if (HasMorePassthrough()) {
     RETURN_IF_ERROR(GetNextPassThrough(state, row_batch));
@@ -259,22 +296,23 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     RETURN_IF_ERROR(GetNextConst(state, row_batch));
   }
 
+  int num_rows_added = row_batch->num_rows() - num_rows_before;
+  DCHECK_GE(num_rows_added, 0);
+  if (limit_ != -1 && num_rows_returned_ + num_rows_added > limit_) {
+    // Truncate the row batch if we went over the limit.
+    num_rows_added = limit_ - num_rows_returned_;
+    row_batch->set_num_rows(num_rows_before + num_rows_added);
+    DCHECK_GE(num_rows_added, 0);
+  }
+  num_rows_returned_ += num_rows_added;
+
   *eos = ReachedLimit() ||
       (!HasMorePassthrough() && !HasMoreMaterialized() && !HasMoreConst(state));
 
+  // Attach the memory in the tuple pool (if any) to the row batch.
+  row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
+  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK();
-}
-
-void UnionNode::MaterializeExprs(const vector<ExprContext*>& exprs,
-    TupleRow* row, uint8_t* tuple_buf, RowBatch* dst_batch) {
-  DCHECK(!dst_batch->AtCapacity());
-  Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buf);
-  TupleRow* dst_row = dst_batch->GetRow(dst_batch->AddRow());
-  dst_tuple->MaterializeExprs<false, false>(row, *tuple_desc_,
-      exprs, dst_batch->tuple_data_pool());
-  dst_row->SetTuple(0, dst_tuple);
-  dst_batch->CommitLastRow();
-  ++num_rows_returned_;
 }
 
 Status UnionNode::Reset(RuntimeState* state) {
@@ -283,8 +321,8 @@ Status UnionNode::Reset(RuntimeState* state) {
   child_row_idx_ = 0;
   child_eos_ = false;
   const_expr_list_idx_ = 0;
-  // Since passthrough is disabled in subplans, verify that there is no passthrough
-  // child that needs to be closed.
+  // Since passthrough is disabled in subplans, verify that there is no passthrough child
+  // that needs to be closed.
   DCHECK_EQ(to_close_child_idx_, -1);
   return ExecNode::Reset(state);
 }
@@ -298,7 +336,6 @@ void UnionNode::Close(RuntimeState* state) {
   for (const vector<ExprContext*>& exprs : child_expr_lists_) {
     Expr::Close(exprs, state);
   }
+  if (tuple_pool_.get() != nullptr) tuple_pool_->FreeAll();
   ExecNode::Close(state);
-}
-
 }

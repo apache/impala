@@ -1121,3 +1121,32 @@ select t1.bigint_col from alltypestiny t1 inner join
 ---- TYPES
 bigint
 =====
+---- QUERY
+# IMPALA-4883: The second union operand references a char column, which causes codegen
+# to fail and be disabled for that operand and all operands that follow it. For this query
+# codegen is enabled only for the first operand.
+select count(s) from (
+  select cast(id as string) as s from alltypestiny
+  union all
+  select cast(cl as string) as s from functional.chars_tiny
+  union all
+  select cast(id as string) as s from alltypestiny
+) t
+---- RESULTS
+24
+---- TYPES
+bigint
+=====
+---- QUERY
+# IMPALA-4883: Verify that the union limit is enforced correctly
+select count(b) from (
+  select bigint_col as b from alltypestiny limit 4
+  union all
+  (select bigint_col as b from alltypestiny limit 4)
+  limit 7
+) t
+---- RESULTS
+7
+---- TYPES
+bigint
+=====

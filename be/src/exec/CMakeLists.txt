@@ -98,6 +98,7 @@ add_library(Exec
   topn-node.cc
   topn-node-ir.cc
   union-node.cc
+  union-node-ir.cc
   unnest-node.cc
 )
 

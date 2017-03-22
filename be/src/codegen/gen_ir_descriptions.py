@@ -214,7 +214,9 @@ ir_functions = [
   ["MEMPOOL_CHECKED_ALLOCATE",
    "_ZN6impala7MemPool8AllocateILb1EEEPhli"],
   ["RUNTIME_FILTER_EVAL",
-   "_ZNK6impala13RuntimeFilter4EvalEPvRKNS_10ColumnTypeE"]
+   "_ZNK6impala13RuntimeFilter4EvalEPvRKNS_10ColumnTypeE"],
+  ["UNION_MATERIALIZE_BATCH",
+  "_ZN6impala9UnionNode16MaterializeBatchEPNS_8RowBatchEPPh"]
 ]
 
 enums_preamble = '\
