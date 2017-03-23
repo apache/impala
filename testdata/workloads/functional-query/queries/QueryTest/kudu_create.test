@@ -80,7 +80,8 @@ INT,INT
 ====
 ---- QUERY
 # Test implicit casting/folding of partition values.
-create table tab (a int primary key) partition by range (a) (partition value = false)
+create table tab (a int not null primary key)
+partition by range (a) (partition value = false)
 stored as kudu
 ---- RESULTS
 ====

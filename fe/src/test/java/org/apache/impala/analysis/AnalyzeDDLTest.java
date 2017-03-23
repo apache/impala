@@ -2155,11 +2155,22 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         for (String nul: nullability) {
           for (String def: defaultVal) {
             for (String block: blockSize) {
+              // Test analysis for a non-key column
               AnalyzesOk(String.format("create table tab (x int primary key " +
                   "not null encoding %s compression %s %s %s, y int encoding %s " +
                   "compression %s %s %s %s) partition by hash (x) " +
                   "partitions 3 stored as kudu", enc, comp, def, block, enc,
                   comp, def, nul, block));
+
+              // For a key column
+              String createTblStr = String.format("create table tab (x int primary key " +
+                  "%s encoding %s compression %s %s %s) partition by hash (x) " +
+                  "partitions 3 stored as kudu", nul, enc, comp, def, block);
+              if (nul.equals("null")) {
+                AnalysisError(createTblStr, "Primary key columns cannot be nullable");
+              } else {
+                AnalyzesOk(createTblStr);
+              }
             }
           }
         }

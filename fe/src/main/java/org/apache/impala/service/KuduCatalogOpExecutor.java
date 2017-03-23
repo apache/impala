@@ -100,7 +100,9 @@ public class KuduCatalogOpExecutor {
     ColumnSchemaBuilder csb = new ColumnSchemaBuilder(column.getColumnName(), kuduType);
     csb.key(isKey);
     if (column.isSetIs_nullable()) {
-      Preconditions.checkArgument(!isKey);
+      // If nullability is explicitly set and the column is a key, it must have been
+      // set as NOT NULL. This is the default, but it is also valid to specify it.
+      Preconditions.checkArgument(!isKey || !column.isIs_nullable());
       csb.nullable(column.isIs_nullable());
     } else {
       // Non-key columns are by default nullable unless the user explicitly sets its
