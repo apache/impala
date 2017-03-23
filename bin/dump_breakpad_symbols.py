@@ -23,10 +23,11 @@
 #  - Scan an Impala build dir for ELF files
 #  - Read files from stdin
 #  - Process a list of one or multiple explicitly specified files
-#  - Extract an Impala rpm and corresponding debuginfo rpm file, scan for ELF files, and
-#    process them together with their respective .debug file.
+#  - Extract an Impala rpm/deb and corresponding debuginfo rpm/deb file, scan for ELF
+#    files, and process them together with their respective .debug file.
 #
 # Dependencies:
+#  - dpkg (sudo apt-get -y install dpkg)
 #  - rpm2cpio (sudo apt-get -y install rpm2cpio)
 #  - cpio (sudo apt-get -y install cpio)
 #  - Google Breakpad, either installed via the Impala toolchain or separately
@@ -67,7 +68,7 @@ from collections import namedtuple
 
 logging.basicConfig(level=logging.INFO)
 
-BinaryDebugInfo = namedtuple('BinaryDebugInfo', 'path, debug_path')
+BinarySymbolInfo = namedtuple('BinarySymbolInfo', 'path, debug_path')
 
 
 def die(msg=''):
@@ -111,18 +112,18 @@ def parse_args():
       help='List of binary files to process')
   parser.add_argument('-i', '--stdin_files', action='store_true', help="""Read the list
       of files to process from stdin""")
-  parser.add_argument('-r', '--rpm', help="""RPM file containing the binaries to process,
-      use with --debuginfo_rpm""")
-  parser.add_argument('-s', '--debuginfo_rpm', help="""RPM file containing the debug
-      symbols matching the binaries in --rpm""")
+  parser.add_argument('-r', '--pkg', '--rpm', help="""RPM/DEB file containing the binaries
+      to process, use with -s""")
+  parser.add_argument('-s', '--symbol_pkg', '--debuginfo_rpm', help="""RPM/DEB file
+      containing the debug symbols matching the binaries in -r""")
   args = parser.parse_args()
 
   # Post processing checks
-  # Check that either both rpm and debuginfo_rpm are specified, or none.
-  if bool(args.rpm) != bool(args.debuginfo_rpm):
+  # Check that either both pkg and debuginfo_rpm/deb are specified, or none.
+  if bool(args.pkg) != bool(args.symbol_pkg):
     parser.print_usage()
-    die('Either both --rpm and --debuginfo_rpm have to be specified, or none')
-  input_flags = [args.build_dir, args.binary_files, args.stdin_files, args.rpm]
+    die('Either both -r and -s have to be specified, or none')
+  input_flags = [args.build_dir, args.binary_files, args.stdin_files, args.pkg]
   if sum(1 for flag in input_flags if flag) != 1:
     die('You need to specify exactly one way to locate input files (-b/-f/-i/-r,-s)')
 
@@ -166,57 +167,75 @@ def extract_rpm(rpm, out_dir):
   subprocess.check_call(cmd, shell=True, cwd=out_dir)
 
 
+def extract_deb(deb, out_dir):
+  """Extract 'deb' into 'out_dir'."""
+  assert os.path.isdir(out_dir)
+  cmd = 'dpkg -x %s %s' % (deb, out_dir)
+  subprocess.check_call(cmd, shell=True)
+
+
+def extract_pkg(pkg, out_dir):
+  """Autodetect type of 'pkg' and extract it to 'out_dir'."""
+  pkg_magic = magic.from_file(pkg)
+  if 'RPM' in pkg_magic:
+    return extract_rpm(pkg, out_dir)
+  elif 'Debian' in pkg_magic:
+    return extract_deb(pkg, out_dir)
+  else:
+    die('Unsupported package type: %s' % pkg_magic)
+
+
 def assert_file_exists(path):
   if not os.path.isfile(path):
     die('File does not exists: %s' % path)
 
 
-def enumerate_rpm_files(rpm, debuginfo_rpm):
-  """Return a generator over BinaryDebugInfo tuples for all ELF files in 'rpm'.
+def enumerate_pkg_files(pkg, symbol_pkg):
+  """Return a generator over BinarySymbolInfo tuples for all ELF files in 'pkg'.
 
-  This function extracts both RPM files, then walks the binary rpm directory to enumerate
-  all ELF files, matches them to the location of their respective .debug file and yields
-  all tuples thereof. We use a generator here to keep the temporary directory and its
-  contents around until the consumer of the generator has finished its processing.
+  This function extracts both RPM/DEB files, then walks the binary pkg directory to
+  enumerate all ELF files, matches them to the location of their respective .debug files
+  and yields all tuples thereof. We use a generator here to keep the temporary directory
+  and its contents around until the consumer of the generator has finished its processing.
   """
   IMPALA_BINARY_BASE = os.path.join('usr', 'lib', 'impala')
-  IMPALA_DEBUGINFO_BASE = os.path.join('usr', 'lib', 'debug', IMPALA_BINARY_BASE)
-  assert_file_exists(rpm)
-  assert_file_exists(debuginfo_rpm)
+  IMPALA_SYMBOL_BASE = os.path.join('usr', 'lib', 'debug', IMPALA_BINARY_BASE)
+  assert_file_exists(pkg)
+  assert_file_exists(symbol_pkg)
   tmp_dir = tempfile.mkdtemp()
   try:
-    # Extract rpm
-    logging.info('Extracting: %s' % rpm)
-    extract_rpm(os.path.abspath(rpm), tmp_dir)
-    # Extract debuginfo_rpm
-    logging.info('Extracting: %s' % debuginfo_rpm)
-    extract_rpm(os.path.abspath(debuginfo_rpm), tmp_dir)
-    # Walk rpm path and find elf files
+    # Extract pkg
+    logging.info('Extracting to %s: %s' % (tmp_dir, pkg))
+    extract_pkg(os.path.abspath(pkg), tmp_dir)
+    # Extract symbol_pkg
+    logging.info('Extracting to %s: %s' % (tmp_dir, symbol_pkg))
+    extract_pkg(os.path.abspath(symbol_pkg), tmp_dir)
+    # Walk pkg path and find elf files
     binary_base = os.path.join(tmp_dir, IMPALA_BINARY_BASE)
-    debuginfo_base = os.path.join(tmp_dir, IMPALA_DEBUGINFO_BASE)
-    # Find folder with .debug file in debuginfo_rpm path
+    symbol_base = os.path.join(tmp_dir, IMPALA_SYMBOL_BASE)
+    # Find folder with .debug file in symbol_pkg path
     for binary_path in find_elf_files(binary_base):
       # Add tuple to output
       rel_dir = os.path.relpath(os.path.dirname(binary_path), binary_base)
-      debug_dir = os.path.join(debuginfo_base, rel_dir)
-      yield BinaryDebugInfo(binary_path, debug_dir)
+      debug_dir = os.path.join(symbol_base, rel_dir)
+      yield BinarySymbolInfo(binary_path, debug_dir)
   finally:
     shutil.rmtree(tmp_dir)
 
 
 def enumerate_binaries(args):
-  """Enumerate all BinaryDebugInfo tuples, from which symbols should be extracted.
+  """Enumerate all BinarySymbolInfo tuples, from which symbols should be extracted.
 
   This function returns iterables, either lists or generators.
   """
   if args.binary_files:
-    return (BinaryDebugInfo(f, None) for f in args.binary_files)
+    return (BinarySymbolInfo(f, None) for f in args.binary_files)
   elif args.stdin_files:
-    return (BinaryDebugInfo(f, None) for f in sys.stdin.read().splitlines())
-  elif args.rpm:
-    return enumerate_rpm_files(args.rpm, args.debuginfo_rpm)
+    return (BinarySymbolInfo(f, None) for f in sys.stdin.read().splitlines())
+  elif args.pkg:
+    return enumerate_pkg_files(args.pkg, args.symbol_pkg)
   elif args.build_dir:
-    return (BinaryDebugInfo(f, None) for f in find_elf_files(args.build_dir))
+    return (BinarySymbolInfo(f, None) for f in find_elf_files(args.build_dir))
   die('No input method provided')
 
 
