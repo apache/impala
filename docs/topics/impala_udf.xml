@@ -381,7 +381,7 @@ Returned 1 row(s) in 0.11s
 +------------------+
 Returned 1 row(s) in 0.11s</codeblock>
 
-          <p>
+          <p audience="hidden">
             You can find the sample files mentioned here in <xref keyref="udf_samples"/>.
           </p>
 
@@ -401,7 +401,6 @@ Returned 1 row(s) in 0.11s</codeblock>
     </conbody>
   </concept>
 
-
   <concept id="udf_demo_env">
 
     <title>Installing the UDF Development Package</title>
@@ -415,7 +414,7 @@ Returned 1 row(s) in 0.11s</codeblock>
       </p>
 
       <ol>
-        <li>
+        <li audience="hidden">
           Start at <xref keyref="archive_root"/>.
         </li>
 
@@ -432,10 +431,8 @@ Returned 1 row(s) in 0.11s</codeblock>
 
 
       <note>
-
         The UDF development code does not rely on Impala being installed on the same machine. You can write and
         compile UDFs on a minimal development system, then deploy them on a different one for use with Impala.
-
       </note>
 
       <p>
@@ -506,7 +503,6 @@ Returned 1 row(s) in 0.11s</codeblock>
           named <codeph>AddUdf()</codeph>:
         </p>
 
-<!-- Downloadable version of this file: https://raw.githubusercontent.com/cloudera/impala-udf-samples/master/udf-sample.h -->
 <codeblock>#ifndef IMPALA_UDF_SAMPLE_UDF_H
 #define IMPALA_UDF_SAMPLE_UDF_H
 
@@ -524,7 +520,6 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
           <filepath>udf-sample.cc</filepath> within the sample build environment:
         </p>
 
-<!-- Downloadable version of this file: https://raw.githubusercontent.com/cloudera/impala-udf-samples/master/udf-sample.cc -->
 <codeblock>#include "udf-sample.h"
 
 // In this sample we are declaring a UDF that adds two ints and returns an int.
@@ -965,10 +960,8 @@ within UDAs, you can return without specifying a value.
 -->
 
         <p>
-          <filepath>uda-sample.h</filepath>:
+          <xref keyref="uda-sample.h"><filepath>uda-sample.h</filepath></xref>:
         </p>
-
-        <p> See this file online at: <xref keyref="uda-sample.h"/></p>
 
 <codeblock audience="hidden">#ifndef SAMPLES_UDA_H
 #define SAMPLES_UDA_H
@@ -1064,10 +1057,7 @@ StringVal ToStringVal(FunctionContext* context, const T&amp; val);
 #endif</codeblock>
 
         <p>
-          <filepath>uda-sample.cc</filepath>:
-        </p>
-
-        <p> See this file online at: <xref keyref="uda-sample.cc"/>
+          <xref keyref="uda-sample.cc"><filepath>uda-sample.cc</filepath></xref>:
         </p>
 
 <codeblock audience="hidden">#include "uda-sample.h"
@@ -1264,10 +1254,8 @@ StringVal StringConcatFinalize(FunctionContext* context, const StringVal&amp; va
         <p>
           For an example of this technique, see the <codeph>trunc_sum()</codeph> aggregate function, which accumulates
           intermediate results of type <codeph>DOUBLE</codeph> and returns <codeph>BIGINT</codeph> at the end.
-          View
-          <xref keyref="test_udfs.py">the <codeph>CREATE FUNCTION</codeph> statement</xref>
-          and
-          <xref keyref="test-udas.cc">the implementation of the underlying TruncSum*() functions</xref>
+          View <xref keyref="test_udfs.py">the <codeph>CREATE FUNCTION</codeph> statement</xref>
+          and <xref keyref="test-udas.cc">the implementation of the underlying TruncSum*() functions</xref>
           on Github.
         </p>
       </conbody>
@@ -1442,7 +1430,7 @@ make</codeblock>
         This section demonstrates how to create and use all kinds of user-defined functions (UDFs).
       </p>
 
-      <p>
+      <p audience="hidden">
         For downloadable examples that you can experiment with, adapt, and use as templates for your own functions,
         see <xref keyref="udf-samples" scope="external" format="html">the Impala sample UDF github</xref>.
         You must have already installed the appropriate header files, as explained in

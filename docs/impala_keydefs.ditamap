@@ -53,7 +53,7 @@ under the License.
     <topicmeta><linktext>the Security chapter in the Apache HBase documentation</linktext></topicmeta>
   </keydef>
 
-  <keydef href="https://github.com/cloudera/Impala/blob/cdh5-trunk/tests/query_test/test_udfs.py" scope="external" format="html" keys="test_udfs.py">
+  <keydef href="https://github.com/apache/incubator-impala/blob/master/tests/query_test/test_udfs.py" scope="external" format="html" keys="test_udfs.py">
     <topicmeta><linktext>test_udfs.py</linktext></topicmeta>
   </keydef>
   <keydef href="https://github.com/apache/incubator-impala/blob/master/be/src/exprs/timezone_db.cc" scope="external" format="html" keys="timezone_db.cc">
@@ -62,22 +62,22 @@ under the License.
   <keydef href="https://github.com/cloudera/impala-tpcds-kit" scope="external" format="html" keys="impala-tpcds-kit">
     <topicmeta><linktext>impala-tpcds-kit</linktext></topicmeta>
   </keydef>
-  <keydef href="https://github.com/cloudera/impala-udf-samples" scope="external" format="html" keys="udf-samples">
+  <keydef href="" scope="external" format="html" keys="udf-samples">
     <topicmeta><linktext>impala-udf-samples</linktext></topicmeta>
   </keydef>
-  <keydef href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.cc" scope="external" format="html" keys="uda-sample.cc">
+  <keydef href="" scope="external" format="html" keys="uda-sample.cc">
     <topicmeta><linktext>uda-sample.cc</linktext></topicmeta>
   </keydef>
-  <keydef href="https://github.com/cloudera/impala-udf-samples/blob/master/udf-sample.h" scope="external" format="html" keys="udf-sample.h">
+  <keydef href="" scope="external" format="html" keys="udf-sample.h">
     <topicmeta><linktext>udf-sample.h</linktext></topicmeta>
   </keydef>
-  <keydef href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.h" scope="external" format="html" keys="uda-sample.h">
+  <keydef href="" scope="external" format="html" keys="uda-sample.h">
     <topicmeta><linktext>uda-sample.h</linktext></topicmeta>
   </keydef>
-  <keydef href="http://github.com/Cloudera/Impala/blob/cdh5-trunk/be/src/testutil/test-udas.cc" scope="external" format="html" keys="test-udas.cc">
+  <keydef href="https://github.com/apache/incubator-impala/blob/master/be/src/testutil/test-udas.cc" scope="external" format="html" keys="test-udas.cc">
     <topicmeta><linktext>test-udas.cc</linktext></topicmeta>
   </keydef>
-  <keydef href="https://github.com/cloudera/impala/tree/master/be/src/udf_samples" scope="external" format="html" keys="udf_samples">
+  <keydef href="" scope="external" format="html" keys="udf_samples">
     <topicmeta><linktext>the udf_samples github repo</linktext></topicmeta>
   </keydef>
 
@@ -95,7 +95,7 @@ under the License.
   <keydef href="https://issues.apache.org/jira/browse/IMPALA" scope="external" format="html" keys="impala-jira"/>
 
   <keydef href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" scope="external" format="html" keys="FairScheduler"/>
-  <keydef href="https://archive.cloudera.com/cdh5/" scope="external" format="html" keys="archive_root">
+  <keydef href="" scope="external" format="html" keys="archive_root">
     <topicmeta><linktext>the top level of this software archive</linktext></topicmeta>
   </keydef>
   <keydef href="https://archive.cloudera.com/gplextras/redhat/5/x86_64/gplextras/" scope="external" format="html" keys="gplextras"/>
