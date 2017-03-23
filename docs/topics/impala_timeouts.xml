@@ -101,22 +101,34 @@ Trying to re-register with state-store</codeblock>
 
       <ul>
         <li>
-          The <codeph>--idle_query_timeout</codeph> option specifies the time in seconds after
-          which an idle query is cancelled. This could be a query whose results were all fetched
-          but was never closed, or one whose results were partially fetched and then the client
-          program stopped requesting further results. This condition is most likely to occur in
-          a client program using the JDBC or ODBC interfaces, rather than in the interactive
-          <cmdname>impala-shell</cmdname> interpreter. Once the query is cancelled, the client
-          program cannot retrieve any further results.
+          <p>
+            The <codeph>--idle_query_timeout</codeph> option specifies the time in seconds after
+            which an idle query is cancelled. This could be a query whose results were all fetched
+            but was never closed, or one whose results were partially fetched and then the client
+            program stopped requesting further results. This condition is most likely to occur in
+            a client program using the JDBC or ODBC interfaces, rather than in the interactive
+            <cmdname>impala-shell</cmdname> interpreter. Once the query is cancelled, the client
+            program cannot retrieve any further results.
+          </p>
+
+          <p rev="2.0.0">
+            You can reduce the idle query timeout by using the <codeph>QUERY_TIMEOUT_S</codeph>
+            query option. Any non-zero value specified for the <codeph>--idle_query_timeout</codeph> startup
+            option serves as an upper limit for the <codeph>QUERY_TIMEOUT_S</codeph> query option.
+            A zero value for <codeph>--idle_query_timeout</codeph> disables query timeouts.
+            See <xref href="impala_query_timeout_s.xml#query_timeout_s"/> for details.
+          </p>
         </li>
 
         <li>
-          The <codeph>--idle_session_timeout</codeph> option specifies the time in seconds after
-          which an idle session is expired. A session is idle when no activity is occurring for
-          any of the queries in that session, and the session has not started any new queries.
-          Once a session is expired, you cannot issue any new query requests to it. The session
-          remains open, but the only operation you can perform is to close it. The default value
-          of 0 means that sessions never expire.
+          <p>
+            The <codeph>--idle_session_timeout</codeph> option specifies the time in seconds after
+            which an idle session is expired. A session is idle when no activity is occurring for
+            any of the queries in that session, and the session has not started any new queries.
+            Once a session is expired, you cannot issue any new query requests to it. The session
+            remains open, but the only operation you can perform is to close it. The default value
+            of 0 means that sessions never expire.
+          </p>
         </li>
       </ul>
 
@@ -125,12 +137,14 @@ Trying to re-register with state-store</codeblock>
         <xref href="impala_config_options.xml#config_options"/>.
       </p>
 
-      <p rev="2.0.0">
-        You can reduce the idle query timeout by using the <codeph>QUERY_TIMEOUT_S</codeph>
-        query option. Any value specified for the <codeph>--idle_query_timeout</codeph> startup
-        option serves as an upper limit for the <codeph>QUERY_TIMEOUT_S</codeph> query option.
-        See <xref href="impala_query_timeout_s.xml#query_timeout_s"/> for details.
-      </p>
+      <note>
+        <p rev="IMPALA-5108">
+          Impala checks periodically for idle sessions and queries
+          to cancel. The actual idle time before cancellation might be up to 50% greater than
+          the specified configuration setting. For example, if the timeout setting was 60, the
+          session or query might be cancelled after being idle between 60 and 90 seconds.
+        </p>
+      </note>
 
     </conbody>
 
