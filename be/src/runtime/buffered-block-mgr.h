@@ -22,6 +22,8 @@
 #include "runtime/tmp-file-mgr.h"
 #include "util/mem-range.h"
 
+#include <boost/unordered_map.hpp>
+
 namespace impala {
 
 class RuntimeState;

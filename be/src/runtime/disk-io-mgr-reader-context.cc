@@ -164,6 +164,8 @@ void DiskIoRequestContext::Reset(MemTracker* tracker) {
   bytes_read_short_circuit_.Store(0);
   bytes_read_dn_cache_.Store(0);
   unexpected_remote_bytes_.Store(0);
+  cached_file_handles_hit_count_.Store(0);
+  cached_file_handles_miss_count_.Store(0);
   initial_queue_capacity_ = DiskIoMgr::DEFAULT_QUEUE_CAPACITY;
 
   DCHECK(ready_to_start_ranges_.empty());

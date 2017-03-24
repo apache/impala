@@ -299,7 +299,7 @@ class HdfsScanNodeBase : public ScanNode {
   friend class ScannerContext;
   friend class HdfsScanner;
 
-  RuntimeState* runtime_state_;
+  RuntimeState* runtime_state_ = nullptr;
 
   /// Tuple id of the tuple used to evaluate conjuncts on parquet::Statistics.
   const int min_max_tuple_id_;
@@ -308,7 +308,7 @@ class HdfsScanNodeBase : public ScanNode {
   vector<ExprContext*> min_max_conjunct_ctxs_;
 
   /// Descriptor for the tuple used to evaluate conjuncts on parquet::Statistics.
-  TupleDescriptor* min_max_tuple_desc_;
+  TupleDescriptor* min_max_tuple_desc_ = nullptr;
 
   // Number of header lines to skip at the beginning of each file of this table. Only set
   // to values > 0 for hdfs text files.
@@ -318,10 +318,10 @@ class HdfsScanNodeBase : public ScanNode {
   const int tuple_id_;
 
   /// RequestContext object to use with the disk-io-mgr for reads.
-  DiskIoRequestContext* reader_context_;
+  DiskIoRequestContext* reader_context_ = nullptr;
 
   /// Descriptor for tuples this scan node constructs
-  const TupleDescriptor* tuple_desc_;
+  const TupleDescriptor* tuple_desc_ = nullptr;
 
   /// Map from partition ID to a template tuple (owned by scan_node_pool_) which has only
   /// the partition columns for that partition materialized. Used to filter files and scan
@@ -330,7 +330,7 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Descriptor for the hdfs table, including partition and format metadata.
   /// Set in Prepare, owned by RuntimeState
-  const HdfsTableDescriptor* hdfs_table_;
+  const HdfsTableDescriptor* hdfs_table_ = nullptr;
 
   /// The root of the table's Avro schema, if we're scanning an Avro table.
   ScopedAvroSchemaElement avro_schema_;
@@ -361,7 +361,7 @@ class HdfsScanNodeBase : public ScanNode {
   /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on
   /// the first call to GetNext(). The token manager, in a different thread, will read
   /// this variable.
-  bool initial_ranges_issued_;
+  bool initial_ranges_issued_ = false;
 
   /// Number of files that have not been issued from the scanners.
   AtomicInt32 num_unqueued_files_;
@@ -409,29 +409,35 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// If true, counters are actively running and need to be reported in the runtime
   /// profile.
-  bool counters_running_;
+  bool counters_running_ = false;
 
   /// The size of the largest compressed text file to be scanned. This is used to
   /// estimate scanner thread memory usage.
-  RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length_;
+  RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length_ = nullptr;
 
   /// Disk accessed bitmap
   RuntimeProfile::Counter disks_accessed_bitmap_;
 
   /// Total number of bytes read locally
-  RuntimeProfile::Counter* bytes_read_local_;
+  RuntimeProfile::Counter* bytes_read_local_ = nullptr;
 
   /// Total number of bytes read via short circuit read
-  RuntimeProfile::Counter* bytes_read_short_circuit_;
+  RuntimeProfile::Counter* bytes_read_short_circuit_ = nullptr;
 
   /// Total number of bytes read from data node cache
-  RuntimeProfile::Counter* bytes_read_dn_cache_;
+  RuntimeProfile::Counter* bytes_read_dn_cache_ = nullptr;
 
   /// Total number of remote scan ranges
-  RuntimeProfile::Counter* num_remote_ranges_;
+  RuntimeProfile::Counter* num_remote_ranges_ = nullptr;
 
   /// Total number of bytes read remotely that were expected to be local
-  RuntimeProfile::Counter* unexpected_remote_bytes_;
+  RuntimeProfile::Counter* unexpected_remote_bytes_ = nullptr;
+
+  /// Total number of file handle opens where the file handle was present in the cache
+  RuntimeProfile::Counter* cached_file_handles_hit_count_ = nullptr;
+
+  /// Total number of file handle opens where the file handle was not in the cache
+  RuntimeProfile::Counter* cached_file_handles_miss_count_ = nullptr;
 
   /// Pool for allocating some amounts of memory that is shared between scanners.
   /// e.g. partition key tuple and their string buffers

@@ -248,6 +248,12 @@ class DiskIoRequestContext {
   /// diagnostics. This is the sum of all unstarted_scan_ranges across all disks.
   AtomicInt32 num_unstarted_scan_ranges_;
 
+  /// Total number of file handle opens where the file handle was present in the cache
+  AtomicInt32 cached_file_handles_hit_count_;
+
+  /// Total number of file handle opens where the file handle was not in the cache
+  AtomicInt32 cached_file_handles_miss_count_;
+
   /// The number of buffers that are being used for this reader. This is the sum
   /// of all buffers in ScanRange queues and buffers currently being read into (i.e. about
   /// to be queued). This includes both IOMgr-allocated buffers and client-provided

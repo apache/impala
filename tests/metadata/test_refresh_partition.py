@@ -144,10 +144,12 @@ class TestRefreshPartition(ImpalaTestSuite):
 
     self.run_stmt_in_hive(
         'alter table %s drop partition (y=333, z=5309)' % table_name)
-        # Query the table and check for expected error.
+
+    # Query the table. With file handle caching, this may not produce an error,
+    # because the file handles are still open in the cache. If the system does
+    # produce an error, it should be the expected error.
     try:
       self.client.execute("select * from %s" % table_name)
-      assert False, "Query was expected to fail"
     except ImpalaBeeswaxException as e:
       assert expected_error in str(e)
 

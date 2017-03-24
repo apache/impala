@@ -82,25 +82,12 @@ const int UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD = 64 * 1024 * 1024;
 HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
-      runtime_state_(NULL),
       min_max_tuple_id_(tnode.hdfs_scan_node.__isset.min_max_tuple_id ?
           tnode.hdfs_scan_node.min_max_tuple_id : -1),
-      min_max_tuple_desc_(nullptr),
       skip_header_line_count_(tnode.hdfs_scan_node.__isset.skip_header_line_count ?
           tnode.hdfs_scan_node.skip_header_line_count : 0),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
-      reader_context_(NULL),
-      tuple_desc_(NULL),
-      hdfs_table_(NULL),
-      initial_ranges_issued_(false),
-      counters_running_(false),
-      max_compressed_text_file_length_(NULL),
-      disks_accessed_bitmap_(TUnit::UNIT, 0),
-      bytes_read_local_(NULL),
-      bytes_read_short_circuit_(NULL),
-      bytes_read_dn_cache_(NULL),
-      num_remote_ranges_(NULL),
-      unexpected_remote_bytes_(NULL) {
+      disks_accessed_bitmap_(TUnit::UNIT, 0){
 }
 
 HdfsScanNodeBase::~HdfsScanNodeBase() {
@@ -439,6 +426,10 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
       TUnit::UNIT);
   unexpected_remote_bytes_ = ADD_COUNTER(runtime_profile(), "BytesReadRemoteUnexpected",
       TUnit::BYTES);
+  cached_file_handles_hit_count_ = ADD_COUNTER(runtime_profile(),
+      "CachedFileHandlesHitCount", TUnit::UNIT);
+  cached_file_handles_miss_count_ = ADD_COUNTER(runtime_profile(),
+      "CachedFileHandlesMissCount", TUnit::UNIT);
 
   max_compressed_text_file_length_ = runtime_profile()->AddHighWaterMarkCounter(
       "MaxCompressedTextFileLength", TUnit::BYTES);
@@ -882,6 +873,10 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
         runtime_state_->io_mgr()->num_remote_ranges(reader_context_)));
     unexpected_remote_bytes_->Set(
         runtime_state_->io_mgr()->unexpected_remote_bytes(reader_context_));
+    cached_file_handles_hit_count_->Set(
+        runtime_state_->io_mgr()->cached_file_handles_hit_count(reader_context_));
+    cached_file_handles_miss_count_->Set(
+        runtime_state_->io_mgr()->cached_file_handles_miss_count(reader_context_));
 
     if (unexpected_remote_bytes_->value() >= UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD) {
       runtime_state_->LogError(ErrorMsg(TErrorCode::GENERAL, Substitute(

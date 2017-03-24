@@ -58,41 +58,41 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--max_cached_file_handles=5",
+      impalad_args="--max_cached_file_handles=16",
       catalogd_args="--load_catalog_in_background=false")
   def test_scan_does_cache_fd(self, vector):
     """Tests that an hdfs scan will lead to caching HDFS file descriptors."""
 
     # Maximum number of file handles cached
-    assert self.max_cached_handles() <= 5
-    # One table, one file, one handle
+    assert self.max_cached_handles() <= 16
+    # The table has one file, so there should be one more handle cached after the
+    # first select.
     num_handles_before = self.cached_handles()
-    self.execute_query("select * from cachefd.simple limit 1", vector=vector)
+    self.execute_query("select * from cachefd.simple", vector=vector)
     num_handles_after = self.cached_handles()
-    assert self.max_cached_handles() <= 5
+    assert self.max_cached_handles() <= 16
 
-    # Should have at least one more handle cached and not more than three more
-    # as there are three Impalads.
-    assert (num_handles_before + 1) <= num_handles_after <= (num_handles_before + 3)
+    # Should have one more file handle
+    assert num_handles_after == (num_handles_before + 1)
 
     # No open handles if scanning is finished
     assert self.outstanding_handles() == 0
 
     # No change when reading the table again
     for x in range(10):
-      self.execute_query("select * from cachefd.simple limit 1", vector=vector)
+      self.execute_query("select * from cachefd.simple", vector=vector)
+      assert self.cached_handles() == num_handles_after
+      assert self.max_cached_handles() <= 16
+      assert self.outstanding_handles() == 0
 
-    assert self.max_cached_handles() <= 5
-    assert num_handles_after == self.cached_handles()
-    assert self.outstanding_handles() == 0
-
-    # Create more files
-    self.create_n_files(10)
+    # Create more files. This means there are more files than the cache size.
+    # The cache size should still be enforced.
+    self.create_n_files(100)
 
     # Read all the files of the table and make sure no FD leak
     for x in range(10):
       self.execute_query("select count(*) from cachefd.simple;", vector=vector)
-      assert self.max_cached_handles() <= 5
+      assert self.max_cached_handles() <= 16
     assert self.outstanding_handles() == 0
 
   def cached_handles(self):
