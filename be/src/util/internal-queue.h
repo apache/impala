@@ -154,11 +154,10 @@ class InternalQueueBase {
   }
 
   /// Removes 'node' from the queue. This is O(1). No-op if node is
-  /// not on the list.
-  void Remove(T* n) {
+  /// not on the list. Returns true if removed
+  bool Remove(T* n) {
     Node* node = (Node*)n;
-    if (node->parent_queue == NULL) return;
-    DCHECK(node->parent_queue == this);
+    if (node->parent_queue != this) return false;
     {
       boost::lock_guard<LockType> lock(lock_);
       if (node->next == NULL && node->prev == NULL) {
@@ -168,7 +167,7 @@ class InternalQueueBase {
         head_ = tail_ = NULL;
         --size_;
         node->parent_queue = NULL;
-        return;
+        return true;
       }
 
       if (head_ == node) {
@@ -189,6 +188,7 @@ class InternalQueueBase {
     }
     node->next = node->prev = NULL;
     node->parent_queue = NULL;
+    return true;
   }
 
   /// Clears all elements in the list.

@@ -248,6 +248,7 @@ class BufferPool : public CacheLineAligned {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferPool);
+  class PageList;
   struct Page;
   /// Allocate a buffer of length 'len'. Assumes that the client's reservation has already
   /// been consumed for the buffer. Returns an error if the pool is unable to fulfill the

@@ -636,6 +636,38 @@ TEST_F(BufferPoolTest, EvictPageDifferentClient) {
   pool.FreeBuffer(&clients[1], &buffer);
   for (BufferPool::ClientHandle& client : clients) pool.DeregisterClient(&client);
 }
+
+/// Regression test for IMPALA-5113 where the page flushing invariant didn't correctly
+/// take multiply pinned pages into account.
+TEST_F(BufferPoolTest, MultiplyPinnedPageAccounting) {
+  const int NUM_BUFFERS = 3;
+  const int64_t TOTAL_BYTES = NUM_BUFFERS * TEST_BUFFER_LEN;
+  global_reservations_.InitRootTracker(NULL, TOTAL_BYTES);
+  BufferPool pool(TEST_BUFFER_LEN, TOTAL_BYTES);
+
+  BufferPool::ClientHandle client;
+  RuntimeProfile* profile = NewProfile();
+  ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
+      NULL, TOTAL_BYTES, profile, &client));
+  ASSERT_TRUE(client.IncreaseReservation(TOTAL_BYTES));
+
+  BufferPool::PageHandle handle1, handle2;
+  BufferPool::BufferHandle buffer;
+  ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle1));
+  ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle2));
+  pool.Unpin(&client, &handle1);
+  ASSERT_OK(pool.Pin(&client, &handle2));
+  ASSERT_OK(pool.AllocateBuffer(&client, TEST_BUFFER_LEN, &buffer));
+
+  // We shouldn't need to flush anything to disk since we have only three pages/buffers in
+  // memory. Rely on DCHECKs to check invariants and check we didn't evict the page.
+  EXPECT_FALSE(IsEvicted(&handle1)) << handle1.DebugString();
+
+  pool.DestroyPage(&client, &handle1);
+  pool.DestroyPage(&client, &handle2);
+  pool.FreeBuffer(&client, &buffer);
+  pool.DeregisterClient(&client);
+}
 }
 
 int main(int argc, char** argv) {

@@ -56,15 +56,14 @@
 /// reservations are not overcommitted (they shouldn't be), this global invariant can be
 /// maintained by enforcing a local invariant for every client:
 ///
-///   unused reservation >= dirty unpinned pages
+///   reservation >= BufferHandles returned to client
+//                   + pinned pages + dirty pages (dirty unpinned or write in flight)
 ///
 /// The local invariant is maintained by writing pages to disk as the first step of any
-/// operation that uses reservation. I.e. the R.H.S. of the invariant must be decreased
-/// before the L.H.S. can be decreased. These operations block waiting for enough writes
-/// to complete to satisfy the invariant.
-/// TODO: this invariant can be broken if a client calls DecreaseReservation() on the
-/// ReservationTracker. We should refactor so that DecreaseReservation() goes through
-/// the client before closing IMPALA-3202.
+/// operation that allocates a new buffer or reclaims buffers from clean pages. I.e.
+/// "dirty pages" must be decreased before one of the other values on the R.H.S. of the
+/// invariant can be increased. Operations block waiting for enough writes to complete
+/// to satisfy the invariant.
 
 #ifndef IMPALA_RUNTIME_BUFFER_POOL_INTERNAL_H
 #define IMPALA_RUNTIME_BUFFER_POOL_INTERNAL_H
@@ -79,7 +78,105 @@
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "util/condition-variable.h"
 
+// Ensure that DCheckConsistency() function calls get removed in release builds.
+#ifndef NDEBUG
+#define DCHECK_CONSISTENCY() DCheckConsistency()
+#else
+#define DCHECK_CONSISTENCY()
+#endif
+
 namespace impala {
+
+/// The internal representation of a page, which can be pinned or unpinned. See the
+/// class comment for explanation of the different page states.
+struct BufferPool::Page : public InternalList<Page>::Node {
+  Page(Client* client, int64_t len) : client(client), len(len), pin_count(0) {}
+
+  std::string DebugString();
+
+  // Helper for BufferPool::DebugString().
+  static bool DebugStringCallback(std::stringstream* ss, BufferPool::Page* page);
+
+  /// The client that the page belongs to.
+  Client* const client;
+
+  /// The length of the page in bytes.
+  const int64_t len;
+
+  /// The pin count of the page. Only accessed in contexts that are passed the associated
+  /// PageHandle, so it cannot be accessed by multiple threads concurrently.
+  int pin_count;
+
+  /// Non-null if there is a write in flight, the page is clean, or the page is evicted.
+  std::unique_ptr<TmpFileMgr::WriteHandle> write_handle;
+
+  /// Condition variable signalled when a write for this page completes. Protected by
+  /// client->lock_.
+  ConditionVariable write_complete_cv_;
+
+  /// This lock must be held when accessing 'buffer' if the page is unpinned and not
+  /// evicted (i.e. it is safe to access 'buffer' if the page is pinned or evicted).
+  SpinLock buffer_lock;
+
+  /// Buffer with the page's contents. Closed only iff page is evicted. Open otherwise.
+  BufferHandle buffer;
+};
+
+/// Wrapper around InternalList<Page> that tracks the # of bytes in the list.
+class BufferPool::PageList {
+ public:
+  PageList() : bytes_(0) {}
+  ~PageList() {
+    // Clients always empty out their list before destruction.
+    DCHECK(list_.empty());
+    DCHECK_EQ(0, bytes_);
+  }
+
+  void Enqueue(Page* page) {
+    list_.Enqueue(page);
+    bytes_ += page->len;
+  }
+
+  bool Remove(Page* page) {
+    if (list_.Remove(page)) {
+      bytes_ -= page->len;
+      return true;
+    }
+    return false;
+  }
+
+  Page* Dequeue() {
+    Page* page = list_.Dequeue();
+    if (page != nullptr) {
+      bytes_ -= page->len;
+    }
+    return page;
+  }
+
+  Page* PopBack() {
+    Page* page = list_.PopBack();
+    if (page != nullptr) {
+      bytes_ -= page->len;
+    }
+    return page;
+  }
+
+  void Iterate(boost::function<bool(Page*)> fn) { list_.Iterate(fn); }
+  bool Contains(Page* page) { return list_.Contains(page); }
+  Page* tail() { return list_.tail(); }
+  bool empty() const { return list_.empty(); }
+  int size() const { return list_.size(); }
+  int64_t bytes() const { return bytes_; }
+
+  void DCheckConsistency() {
+    DCHECK_GE(bytes_, 0);
+    DCHECK_EQ(list_.empty(), bytes_ == 0);
+  }
+
+ private:
+  InternalList<Page> list_;
+  int64_t bytes_;
+};
 
 /// The internal state for the client.
 class BufferPool::Client {
@@ -90,18 +187,15 @@ class BufferPool::Client {
 
   ~Client() {
     DCHECK_EQ(0, num_pages_);
-    DCHECK_EQ(0, pinned_pages_.size());
-    DCHECK_EQ(0, dirty_unpinned_pages_.size());
-    DCHECK_EQ(0, in_flight_write_pages_.size());
+    DCHECK_EQ(0, buffers_allocated_bytes_);
   }
 
   /// Release reservation for this client.
   void Close() { reservation_.Close(); }
 
-  /// Add a new pinned page 'page' to the pinned pages list. 'page' must not be in any
-  /// other lists. Neither the client's lock nor page->buffer_lock should be held by the
-  /// caller.
-  void AddNewPinnedPage(Page* page);
+  /// Create a pinned page using 'buffer', which was allocated using AllocateBuffer().
+  /// No client or page locks should be held by the caller.
+  Page* CreatePinnedPage(BufferHandle&& buffer);
 
   /// Reset 'handle', clean up references to handle->page and release any resources
   /// associated with handle->page. If the page is pinned, 'out_buffer' can be passed in
@@ -113,7 +207,7 @@ class BufferPool::Client {
   /// Updates client state to reflect that 'page' is now a dirty unpinned page. May
   /// initiate writes for this or other dirty unpinned pages.
   /// Neither the client's lock nor page->buffer_lock should be held by the caller.
-  void MoveToDirtyUnpinned(int64_t unused_reservation, Page* page);
+  void MoveToDirtyUnpinned(Page* page);
 
   /// Move an unpinned page to the pinned state, moving between data structures and
   /// reading from disk if necessary. Returns once the page's buffer is allocated
@@ -121,26 +215,24 @@ class BufferPool::Client {
   /// handle->page_->buffer_lock should be held by the caller.
   Status MoveToPinned(ClientHandle* client, PageHandle* handle);
 
-  /// Must be called before allocating a buffer to ensure that the client can allocate
-  /// 'allocation_len' bytes without pinned bytes plus dirty unpinned bytes exceeding the
-  /// client's reservation. No page or client locks should be held by the caller.
-  Status CleanPagesBeforeAllocation(
-      ReservationTracker* reservation, int64_t allocation_len);
+  /// Must be called once before allocating a buffer of 'len' via the AllocateBuffer()
+  /// API to deduct from the client's reservation and update internal accounting. Cleans
+  /// dirty pages if needed to satisfy the buffer pool's internal invariants. No page or
+  /// client locks should be held by the caller.
+  Status PrepareToAllocateBuffer(int64_t len);
 
-  /// Same as CleanPagesBeforeAllocation(), except 'lock_' must be held by 'client_lock'.
-  /// 'client_lock' may be released temporarily while waiting for writes to complete.
-  Status CleanPagesBeforeAllocationLocked(boost::unique_lock<boost::mutex>* client_lock,
-      ReservationTracker* reservation, int64_t allocation_len);
-
-  /// Initiates asynchronous writes of dirty unpinned pages to disk. Ensures that at
-  /// least 'min_bytes_to_write' bytes of writes will be written asynchronously. May
-  /// start writes more aggressively so that I/O and compute can be overlapped. If
-  /// any errors are encountered, 'write_status_' is set. 'write_status_' must therefore
-  /// be checked before reading back any pages. 'lock_' must be held by the caller.
-  void WriteDirtyPagesAsync(int64_t min_bytes_to_write = 0);
+  /// Called after a buffer of 'len' is freed via the FreeBuffer() API to update
+  /// internal accounting and release the buffer to the client's reservation. No page or
+  /// client locks should be held by the caller.
+  void FreedBuffer(int64_t len) {
+    boost::lock_guard<boost::mutex> cl(lock_);
+    reservation_.ReleaseTo(len);
+    buffers_allocated_bytes_ -= len;
+    DCHECK_CONSISTENCY();
+  }
 
   /// Wait for the in-flight write for 'page' to complete.
-  /// 'lock_' must be held by the caller via 'client_lock'. page->bufffer_lock should
+  /// 'lock_' must be held by the caller via 'client_lock'. page->buffer_lock should
   /// not be held.
   void WaitForWrite(boost::unique_lock<boost::mutex>* client_lock, Page* page);
 
@@ -158,16 +250,31 @@ class BufferPool::Client {
  private:
   // Check consistency of client, DCHECK if inconsistent. 'lock_' must be held.
   void DCheckConsistency() {
-    DCHECK_GE(in_flight_write_bytes_, 0);
-    DCHECK_LE(in_flight_write_bytes_, dirty_unpinned_bytes_);
+    DCHECK_GE(buffers_allocated_bytes_, 0);
+    pinned_pages_.DCheckConsistency();
+    dirty_unpinned_pages_.DCheckConsistency();
+    in_flight_write_pages_.DCheckConsistency();
     DCHECK_LE(pinned_pages_.size() + dirty_unpinned_pages_.size()
             + in_flight_write_pages_.size(),
         num_pages_);
-    if (in_flight_write_pages_.empty()) DCHECK_EQ(0, in_flight_write_bytes_);
-    if (in_flight_write_pages_.empty() && dirty_unpinned_pages_.empty()) {
-      DCHECK_EQ(0, dirty_unpinned_bytes_);
-    }
+    // Check that we flushed enough pages to disk given our eviction policy.
+    DCHECK_GE(reservation_.GetReservation(), buffers_allocated_bytes_
+            + pinned_pages_.bytes() + dirty_unpinned_pages_.bytes()
+            + in_flight_write_pages_.bytes());
   }
+
+  /// Must be called once before allocating or reclaiming a buffer of 'len'. Ensures that
+  /// enough dirty pages are flushed to disk to satisfy the buffer pool's internal
+  /// invariants after the allocation. 'lock_' should be held by the caller via
+  /// 'client_lock'
+  Status CleanPages(boost::unique_lock<boost::mutex>* client_lock, int64_t len);
+
+  /// Initiates asynchronous writes of dirty unpinned pages to disk. Ensures that at
+  /// least 'min_bytes_to_write' bytes of writes will be written asynchronously. May
+  /// start writes more aggressively so that I/O and compute can be overlapped. If
+  /// any errors are encountered, 'write_status_' is set. 'write_status_' must therefore
+  /// be checked before reading back any pages. 'lock_' must be held by the caller.
+  void WriteDirtyPagesAsync(int64_t min_bytes_to_write = 0);
 
   /// Called when a write for 'page' completes.
   void WriteCompleteCallback(Page* page, const Status& write_status);
@@ -217,61 +324,20 @@ class BufferPool::Client {
   /// pages are destroyed before the client.
   int64_t num_pages_;
 
-  /// All pinned pages for this client. Only used for debugging.
-  InternalList<Page> pinned_pages_;
+  /// Total bytes of buffers in BufferHandles returned to clients (i.e. obtained from
+  /// AllocateBuffer() or ExtractBuffer()).
+  int64_t buffers_allocated_bytes_;
+
+  /// All pinned pages for this client.
+  PageList pinned_pages_;
 
   /// Dirty unpinned pages for this client for which writes are not in flight. Page
   /// writes are started in LIFO order, because operators typically have sequential access
   /// patterns where the most recently evicted page will be last to be read.
-  InternalList<Page> dirty_unpinned_pages_;
+  PageList dirty_unpinned_pages_;
 
   /// Dirty unpinned pages for this client for which writes are in flight.
-  InternalList<Page> in_flight_write_pages_;
-
-  /// Total bytes of dirty unpinned pages for this client.
-  int64_t dirty_unpinned_bytes_;
-
-  /// Total bytes of in-flight writes for dirty unpinned pages. Bytes accounted here
-  /// are also accounted in 'dirty_unpinned_bytes_'.
-  int64_t in_flight_write_bytes_;
-};
-
-/// The internal representation of a page, which can be pinned or unpinned. See the
-/// class comment for explanation of the different page states.
-///
-/// Code manipulating the page is responsible for acquiring 'lock' when reading or
-/// modifying the page.
-struct BufferPool::Page : public InternalList<Page>::Node {
-  Page(Client* client, int64_t len) : client(client), len(len), pin_count(0) {}
-
-  std::string DebugString();
-
-  // Helper for BufferPool::DebugString().
-  static bool DebugStringCallback(std::stringstream* ss, BufferPool::Page* page);
-
-  /// The client that the page belongs to.
-  Client* const client;
-
-  /// The length of the page in bytes.
-  const int64_t len;
-
-  /// The pin count of the page. Only accessed in contexts that are passed the associated
-  /// PageHandle, so it cannot be accessed by multiple threads concurrently.
-  int pin_count;
-
-  /// Non-null if there is a write in flight, the page is clean, or the page is evicted.
-  std::unique_ptr<TmpFileMgr::WriteHandle> write_handle;
-
-  /// Condition variable signalled when a write for this page completes. Protected by
-  /// client->lock_.
-  ConditionVariable write_complete_cv_;
-
-  /// This lock must be held when accessing 'buffer' if the page is unpinned and not
-  /// evicted (i.e. it is safe to access 'buffer' if the page is pinned or evicted).
-  SpinLock buffer_lock;
-
-  /// Buffer with the page's contents. Closed only iff page is evicted. Open otherwise.
-  BufferHandle buffer;
+  PageList in_flight_write_pages_;
 };
 }
 
