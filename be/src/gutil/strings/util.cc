@@ -5,7 +5,7 @@
 // TODO(user): visit each const_cast.  Some of them are no longer necessary
 // because last Single Unix Spec and grte v2 are more const-y.
 
-#include "kudu/gutil/strings/util.h"
+#include "gutil/strings/util.h"
 
 #include <assert.h>
 #include <stdarg.h>
@@ -24,13 +24,13 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include <glog/logging.h>
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/strings/ascii_ctype.h"
-#include "kudu/gutil/strings/numbers.h"
-#include "kudu/gutil/strings/stringpiece.h"
-#include "kudu/gutil/stl_util.h"  // for string_as_array, STLAppendToString
-#include "kudu/gutil/utf/utf.h"
+#include <common/logging.h>
+#include "gutil/logging-inl.h"
+#include "gutil/strings/ascii_ctype.h"
+#include "gutil/strings/numbers.h"
+#include "gutil/strings/stringpiece.h"
+#include "gutil/stl_util.h"  // for string_as_array, STLAppendToString
+#include "gutil/utf/utf.h"
 
 #ifdef OS_WINDOWS
 #ifdef min  // windows.h defines this to something silly

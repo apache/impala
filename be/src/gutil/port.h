@@ -18,7 +18,7 @@
 #include <malloc.h>         // for memalign()
 #endif
 
-#include "kudu/gutil/integral_types.h"
+#include "gutil/integral_types.h"
 
 // Must happens before inttypes.h inclusion */
 #if defined(__APPLE__)
@@ -936,7 +936,7 @@ inline int isinf(double x) {
   return 0;
 }
 
-// #include "kudu/conflict-signal.h"
+// #include "conflict-signal.h"
 typedef void (*sig_t)(int);
 
 // These actually belong in errno.h but there's a name confilict in errno
@@ -980,7 +980,7 @@ typedef short int16_t;
 #endif  // _MSC_VER
 
 #ifdef STL_MSVC  // not always the same as _MSC_VER
-#include "kudu/base/port_hash.h"
+#include "base/port_hash.h"
 #else
 struct PortableHashBase { };
 #endif

@@ -1,12 +1,12 @@
 // Copyright 2008 and onwards Google Inc.  All rights reserved.
 
-#include "kudu/gutil/strings/join.h"
+#include "gutil/strings/join.h"
 
-#include <glog/logging.h>
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/gscoped_ptr.h"
-#include "kudu/gutil/strings/ascii_ctype.h"
-#include "kudu/gutil/strings/escaping.h"
+#include <common/logging.h>
+#include "gutil/logging-inl.h"
+#include "gutil/gscoped_ptr.h"
+#include "gutil/strings/ascii_ctype.h"
+#include "gutil/strings/escaping.h"
 
 // ----------------------------------------------------------------------
 // JoinUsing()

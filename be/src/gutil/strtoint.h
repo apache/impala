@@ -33,9 +33,9 @@
 #include <stdlib.h> // For strtol* functions.
 #include <string>
 using std::string;
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/macros.h"
-#include "kudu/gutil/port.h"
+#include "gutil/integral_types.h"
+#include "gutil/macros.h"
+#include "gutil/port.h"
 
 // Adapter functions for handling overflow and errno.
 int32 strto32_adapter(const char *nptr, char **endptr, int base);

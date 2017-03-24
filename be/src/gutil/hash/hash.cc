@@ -7,13 +7,13 @@
 // To find the implementation of the core Bob Jenkins lookup2 hash, look in
 // jenkins.cc.
 
-#include "kudu/gutil/hash/hash.h"
+#include "gutil/hash/hash.h"
 
-#include "kudu/gutil/integral_types.h"
-#include <glog/logging.h>
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/hash/jenkins.h"
-#include "kudu/gutil/hash/jenkins_lookup2.h"
+#include "gutil/integral_types.h"
+#include <common/logging.h>
+#include "gutil/logging-inl.h"
+#include "gutil/hash/jenkins.h"
+#include "gutil/hash/jenkins_lookup2.h"
 
 // For components that ship code externally (notably the Google Search
 // Appliance) we want to change the fingerprint function so that

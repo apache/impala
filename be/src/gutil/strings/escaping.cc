@@ -1,7 +1,7 @@
 // Copyright 2008 Google Inc. All Rights Reserved.
 // Authors: Numerous. See the .h for contact people.
 
-#include "kudu/gutil/strings/escaping.h"
+#include "gutil/strings/escaping.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -12,13 +12,13 @@ using std::numeric_limits;
 #include <vector>
 using std::vector;
 
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/port.h"
-#include "kudu/gutil/gscoped_ptr.h"
-#include "kudu/gutil/strings/join.h"
-#include "kudu/gutil/utf/utf.h"  // for runetochar
-#include "kudu/gutil/charmap.h"
-#include "kudu/gutil/stl_util.h"
+#include "gutil/integral_types.h"
+#include "gutil/port.h"
+#include "gutil/gscoped_ptr.h"
+#include "gutil/strings/join.h"
+#include "gutil/utf/utf.h"  // for runetochar
+#include "gutil/charmap.h"
+#include "gutil/stl_util.h"
 
 namespace strings {
 

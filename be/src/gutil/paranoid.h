@@ -6,9 +6,9 @@
 #ifndef BASE_PARANOID_H_
 #define BASE_PARANOID_H_
 
-#include <glog/logging.h>
+#include <common/logging.h>
 
-#include "kudu/gutil/logging-inl.h"
+#include "gutil/logging-inl.h"
 
 // Sanitize a bool value which might be sour.
 //

@@ -91,8 +91,8 @@
 // some of the older compilers we have to support.
 // -------------------------------------------------------------------------
 
-#ifndef KUDU_GUTIL_GSCOPED_PTR_H_
-#define KUDU_GUTIL_GSCOPED_PTR_H_
+#ifndef GUTIL_GSCOPED_PTR_H_
+#define GUTIL_GSCOPED_PTR_H_
 
 // This is an implementation designed to match the anticipated future TR2
 // implementation of the scoped_ptr class, and its closely-related brethren,
@@ -104,10 +104,10 @@
 
 #include <algorithm>  // For std::swap().
 
-#include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/template_util.h"
-#include "kudu/gutil/type_traits.h"
-#include "kudu/gutil/move.h"
+#include "gutil/basictypes.h"
+#include "gutil/template_util.h"
+#include "gutil/type_traits.h"
+#include "gutil/move.h"
 
 namespace kudu {
 
@@ -827,4 +827,4 @@ gscoped_ptr<T> make_gscoped_ptr(T* ptr) {
   return gscoped_ptr<T>(ptr);
 }
 
-#endif  // KUDU_GUTIL_GSCOPED_PTR_H_
+#endif  // GUTIL_GSCOPED_PTR_H_

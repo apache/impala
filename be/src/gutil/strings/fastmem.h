@@ -22,8 +22,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/port.h"
+#include "gutil/integral_types.h"
+#include "gutil/port.h"
 
 namespace strings {
 

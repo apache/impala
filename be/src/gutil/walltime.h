@@ -21,7 +21,7 @@
 
 #include <sys/time.h>
 
-#include <glog/logging.h>
+#include <common/logging.h>
 #include <string>
 using std::string;
 
@@ -30,10 +30,16 @@ using std::string;
 #include <mach/mach.h>
 #include <mach/mach_time.h>
 
-#include "kudu/gutil/once.h"
+#include "gutil/once.h"
 #endif  // defined(__APPLE__)
 
-#include "kudu/gutil/integral_types.h"
+#include "gutil/integral_types.h"
+
+#define NANOS_PER_SEC  1000000000ll
+#define NANOS_PER_MICRO      1000ll
+#define MICROS_PER_SEC    1000000ll
+#define MICROS_PER_MILLI     1000ll
+#define MILLIS_PER_SEC       1000ll
 
 typedef double WallTime;
 
@@ -80,7 +86,7 @@ inline void GetCurrentTime(mach_timespec_t* ts) {
 inline MicrosecondsInt64 GetCurrentTimeMicros() {
   mach_timespec_t ts;
   GetCurrentTime(&ts);
-  return ts.tv_sec * 1e6 + ts.tv_nsec / 1e3;
+  return ts.tv_sec * MICROS_PER_SEC + ts.tv_nsec / NANOS_PER_MICRO;
 }
 
 inline int64_t GetMonoTimeNanos() {
@@ -95,7 +101,7 @@ inline int64_t GetMonoTimeNanos() {
 }
 
 inline MicrosecondsInt64 GetMonoTimeMicros() {
-  return GetMonoTimeNanos() / 1e3;
+  return GetMonoTimeNanos() / NANOS_PER_MICRO;
 }
 
 inline MicrosecondsInt64 GetThreadCpuTimeMicros() {
@@ -121,7 +127,8 @@ inline MicrosecondsInt64 GetThreadCpuTimeMicros() {
     return 0;
   }
 
-  return thread_info_data.user_time.seconds * 1e6 + thread_info_data.user_time.microseconds;
+  return thread_info_data.user_time.seconds * MICROS_PER_SEC +
+      thread_info_data.user_time.microseconds;
 }
 
 #else
@@ -129,7 +136,7 @@ inline MicrosecondsInt64 GetThreadCpuTimeMicros() {
 inline MicrosecondsInt64 GetClockTimeMicros(clockid_t clock) {
   timespec ts;
   clock_gettime(clock, &ts);
-  return ts.tv_sec * 1e6 + ts.tv_nsec / 1e3;
+  return ts.tv_sec * MICROS_PER_SEC + ts.tv_nsec / NANOS_PER_MICRO;
 }
 
 #endif // defined(__APPLE__)
@@ -175,5 +182,5 @@ class CycleClock {
   CycleClock();
 };
 
-#include "kudu/gutil/cycleclock-inl.h"  // inline method bodies
+#include "gutil/cycleclock-inl.h"  // inline method bodies
 #endif  // GUTIL_WALLTIME_H_

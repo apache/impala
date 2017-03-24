@@ -7,11 +7,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef KUDU_GUTIL_BIND_H_
-#define KUDU_GUTIL_BIND_H_
+#ifndef GUTIL_BIND_H_
+#define GUTIL_BIND_H_
 
-#include "kudu/gutil/bind_internal.h"
-#include "kudu/gutil/callback_internal.h"
+#include "gutil/bind_internal.h"
+#include "gutil/callback_internal.h"
 
 // -----------------------------------------------------------------------------
 // Usage documentation
@@ -536,4 +536,4 @@ Bind(Functor functor, const P1& p1, const P2& p2, const P3& p3, const P4& p4,
 
 }  // namespace kudu
 
-#endif  // KUDU_GUTIL_BIND_H_
+#endif  // GUTIL_BIND_H_

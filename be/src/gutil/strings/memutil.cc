@@ -2,11 +2,11 @@
 // Copyright (C) 2001 and onwards Google, Inc.
 //
 
-#include "kudu/gutil/strings/memutil.h"
+#include "gutil/strings/memutil.h"
 
 #include <stdlib.h>        // for malloc, NULL
 
-#include "kudu/gutil/strings/ascii_ctype.h"  // for ascii_tolower
+#include "gutil/strings/ascii_ctype.h"  // for ascii_tolower
 
 int memcasecmp(const char *s1, const char *s2, size_t len) {
   const unsigned char *us1 = reinterpret_cast<const unsigned char *>(s1);

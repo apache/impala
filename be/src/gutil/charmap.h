@@ -18,9 +18,9 @@
 
 #include <string.h>
 
-#include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/type_traits.h"
+#include "gutil/basictypes.h"
+#include "gutil/integral_types.h"
+#include "gutil/type_traits.h"
 
 class Charmap {
  public:

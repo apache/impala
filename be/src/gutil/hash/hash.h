@@ -86,17 +86,17 @@ using __gnu_cxx::hash_set;
 #include <string>
 #include <utility>
 
-#include "kudu/gutil/casts.h"
-#include "kudu/gutil/int128.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/macros.h"
-#include "kudu/gutil/port.h"
-#include "kudu/gutil/hash/city.h"
-#include "kudu/gutil/hash/hash128to64.h"
-#include "kudu/gutil/hash/jenkins.h"
-#include "kudu/gutil/hash/jenkins_lookup2.h"
-#include "kudu/gutil/hash/legacy_hash.h"
-#include "kudu/gutil/hash/string_hash.h"
+#include "gutil/casts.h"
+#include "gutil/int128.h"
+#include "gutil/integral_types.h"
+#include "gutil/macros.h"
+#include "gutil/port.h"
+#include "gutil/hash/city.h"
+#include "gutil/hash/hash128to64.h"
+#include "gutil/hash/jenkins.h"
+#include "gutil/hash/jenkins_lookup2.h"
+#include "gutil/hash/legacy_hash.h"
+#include "gutil/hash/string_hash.h"
 
 #include <ext/hash_set>
 namespace __gnu_cxx {

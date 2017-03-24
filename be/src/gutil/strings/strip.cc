@@ -4,7 +4,7 @@
 // This file contains functions that remove a defined part from the string,
 // i.e., strip the string.
 
-#include "kudu/gutil/strings/strip.h"
+#include "gutil/strings/strip.h"
 
 #include <assert.h>
 #include <string.h>
@@ -18,8 +18,8 @@ using std::swap;
 #include <string>
 using std::string;
 
-#include "kudu/gutil/strings/ascii_ctype.h"
-#include "kudu/gutil/strings/stringpiece.h"
+#include "gutil/strings/ascii_ctype.h"
+#include "gutil/strings/stringpiece.h"
 
 string StripPrefixString(StringPiece str, const StringPiece& prefix) {
   if (str.starts_with(prefix))

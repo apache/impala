@@ -45,7 +45,7 @@
 
 #include <stddef.h>
 
-#include "kudu/gutil/port.h"
+#include "gutil/port.h"
 
 namespace base {
 

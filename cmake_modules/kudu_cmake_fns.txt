@@ -55,8 +55,12 @@ function(ADD_EXPORTABLE_LIBRARY LIB_NAME)
   set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/${LIB_NAME}")
 
   add_library(${LIB_NAME} ${ARG_SRCS})
+  if(ARG_COMPILE_FLAGS)
+    set_target_properties(${LIB_NAME}
+      PROPERTIES COMPILE_FLAGS ${ARG_COMPILE_FLAGS})
+  endif()
   if (ARG_DEPS)
-    add_dependencies(${LIB_NAME} ${ARG_DEPS})
+    target_link_libraries(${LIB_NAME} ${ARG_DEPS})
   endif()
 endfunction()
 

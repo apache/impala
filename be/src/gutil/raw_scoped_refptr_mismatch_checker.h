@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef KUDU_GUTIL_RAW_SCOPED_REFPTR_MISMATCH_CHECKER_H_
-#define KUDU_GUTIL_RAW_SCOPED_REFPTR_MISMATCH_CHECKER_H_
+#ifndef GUTIL_RAW_SCOPED_REFPTR_MISMATCH_CHECKER_H_
+#define GUTIL_RAW_SCOPED_REFPTR_MISMATCH_CHECKER_H_
 
 #include <type_traits>
 
-#include "kudu/gutil/ref_counted.h"
+#include "gutil/ref_counted.h"
 
 // It is dangerous to post a task with a T* argument where T is a subtype of
 // RefCounted(Base|ThreadSafeBase), since by the time the parameter is used, the
@@ -60,4 +60,4 @@ struct ParamsUseScopedRefptrCorrectly<std::tuple<Head, Tail...>> {
 
 }  // namespace kudu
 
-#endif  // KUDU_GUTIL_RAW_SCOPED_REFPTR_MISMATCH_CHECKER_H_
+#endif  // GUTIL_RAW_SCOPED_REFPTR_MISMATCH_CHECKER_H_

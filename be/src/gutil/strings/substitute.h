@@ -4,9 +4,9 @@
 #include <string>
 using std::string;
 
-#include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/strings/numbers.h"
-#include "kudu/gutil/strings/stringpiece.h"
+#include "gutil/basictypes.h"
+#include "gutil/strings/numbers.h"
+#include "gutil/strings/stringpiece.h"
 
 
 #ifndef STRINGS_SUBSTITUTE_H_

@@ -31,7 +31,9 @@ namespace impala {
 /// time. Typically the value corresponds to elapsed time since the system booted. See
 /// UnixMillis() below if you need to send a time to a different host.
 inline int64_t MonotonicNanos() {
-  return GetMonoTimeNanos();
+  timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return ts.tv_sec * NANOS_PER_SEC + ts.tv_nsec;
 }
 
 inline int64_t MonotonicMicros() {  // 63 bits ~= 5K years uptime

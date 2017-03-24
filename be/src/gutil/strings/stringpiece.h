@@ -121,11 +121,11 @@
 #include <string.h>
 #include <string>
 
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/port.h"
-#include "kudu/gutil/type_traits.h"
-#include "kudu/gutil/strings/fastmem.h"
-#include "kudu/gutil/hash/hash.h"
+#include "gutil/integral_types.h"
+#include "gutil/port.h"
+#include "gutil/type_traits.h"
+#include "gutil/strings/fastmem.h"
+#include "gutil/hash/hash.h"
 
 class StringPiece {
  private:

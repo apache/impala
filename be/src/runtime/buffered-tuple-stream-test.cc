@@ -43,7 +43,7 @@
 
 #include "common/names.h"
 
-using base::FreeDeleter;
+using kudu::FreeDeleter;
 
 static const int BATCH_SIZE = 250;
 static const int IO_BLOCK_SIZE = 8 * 1024 * 1024;

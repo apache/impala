@@ -16,12 +16,12 @@
 // to load words from memory a byte at a time.  See gwshash.cc for an
 // implementation that is compatible with Bob Jenkins' lookup2.c.
 
-#include "kudu/gutil/hash/jenkins.h"
+#include "gutil/hash/jenkins.h"
 
-#include "kudu/gutil/integral_types.h"
-#include <glog/logging.h>
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/hash/jenkins_lookup2.h"
+#include "gutil/integral_types.h"
+#include <common/logging.h>
+#include "gutil/logging-inl.h"
+#include "gutil/hash/jenkins_lookup2.h"
 
 static inline uint32 char2unsigned(char c) {
   return static_cast<uint32>(static_cast<unsigned char>(c));

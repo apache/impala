@@ -32,13 +32,13 @@ using std::pair;
 #include <vector>
 using std::vector;
 
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/macros.h"
-#include "kudu/gutil/template_util.h"
-#include "kudu/gutil/strings/numbers.h"
-#include "kudu/gutil/strings/strcat.h"    // For backward compatibility.
-#include "kudu/gutil/strings/stringpiece.h"
-#include "kudu/gutil/hash/hash.h"
+#include "gutil/integral_types.h"
+#include "gutil/macros.h"
+#include "gutil/template_util.h"
+#include "gutil/strings/numbers.h"
+#include "gutil/strings/strcat.h"    // For backward compatibility.
+#include "gutil/strings/stringpiece.h"
+#include "gutil/hash/hash.h"
 
 // ----------------------------------------------------------------------
 // JoinUsing()

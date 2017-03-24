@@ -24,7 +24,7 @@
 #define _GNU_SOURCE   // Linux wants that for strptime in time.h
 #endif
 
-#include "kudu/gutil/walltime.h"
+#include "gutil/walltime.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -182,6 +182,7 @@ WallTime WallTime_Now() {
   return ts.tv_sec + ts.tv_nsec / static_cast<double>(1e9);
 #endif  // defined(__APPLE__)
 }
+
 
 void StringAppendStrftime(string* dst,
                           const char* format,

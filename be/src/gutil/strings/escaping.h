@@ -27,12 +27,12 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include <glog/logging.h>
+#include <common/logging.h>
 
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/strings/ascii_ctype.h"
-#include "kudu/gutil/strings/charset.h"
-#include "kudu/gutil/strings/stringpiece.h"
+#include "gutil/logging-inl.h"
+#include "gutil/strings/ascii_ctype.h"
+#include "gutil/strings/charset.h"
+#include "gutil/strings/stringpiece.h"
 
 namespace strings {
 

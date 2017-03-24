@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef KUDU_GUTIL_REF_COUNTED_MEMORY_H_
-#define KUDU_GUTIL_REF_COUNTED_MEMORY_H_
+#ifndef GUTIL_REF_COUNTED_MEMORY_H_
+#define GUTIL_REF_COUNTED_MEMORY_H_
 
 #include <string>
 #include <vector>
 
-#include "kudu/gutil/macros.h"
-#include "kudu/gutil/ref_counted.h"
-#include "kudu/gutil/port.h"
+#include "gutil/macros.h"
+#include "gutil/ref_counted.h"
+#include "gutil/port.h"
 
 #ifndef BASE_EXPORT
 #define BASE_EXPORT
@@ -147,4 +147,4 @@ class BASE_EXPORT RefCountedMallocedMemory : public RefCountedMemory {
 
 }  // namespace kudu
 
-#endif  // KUDU_GUTIL_REF_COUNTED_MEMORY_H_
+#endif  // GUTIL_REF_COUNTED_MEMORY_H_

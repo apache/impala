@@ -11,8 +11,8 @@
 #include <string>
 using std::string;
 
-#include "kudu/gutil/strings/ascii_ctype.h"
-#include "kudu/gutil/strings/stringpiece.h"
+#include "gutil/strings/ascii_ctype.h"
+#include "gutil/strings/stringpiece.h"
 
 // Given a string and a putative prefix, returns the string minus the
 // prefix string if the prefix matches, otherwise the original

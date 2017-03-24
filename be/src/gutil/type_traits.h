@@ -63,7 +63,7 @@
 using std::make_pair;
 using std::pair;                  // For pair
 
-#include "kudu/gutil/template_util.h"     // For true_type and false_type
+#include "gutil/template_util.h"     // For true_type and false_type
 
 namespace base {
 

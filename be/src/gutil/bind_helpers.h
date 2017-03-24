@@ -140,14 +140,14 @@
 //                        In most cases MessageLoop::DeleteSoon() is a better
 //                        fit.
 
-#ifndef KUDU_GUTIL_BIND_HELPERS_H_
-#define KUDU_GUTIL_BIND_HELPERS_H_
+#ifndef GUTIL_BIND_HELPERS_H_
+#define GUTIL_BIND_HELPERS_H_
 
 #include <assert.h>
 
-#include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/callback.h"
-#include "kudu/gutil/template_util.h"
+#include "gutil/basictypes.h"
+#include "gutil/callback.h"
+#include "gutil/template_util.h"
 
 // Unneeded define from Chromium
 #define BASE_EXPORT

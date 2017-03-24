@@ -4,7 +4,7 @@
 // This file contains string processing functions related to
 // numeric values.
 
-#include "kudu/gutil/strings/numbers.h"
+#include "gutil/strings/numbers.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -19,14 +19,14 @@ using std::numeric_limits;
 #include <string>
 using std::string;
 
-#include "kudu/gutil/int128.h"
-#include "kudu/gutil/integral_types.h"
-#include <glog/logging.h>
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/gscoped_ptr.h"
-#include "kudu/gutil/stringprintf.h"
-#include "kudu/gutil/strtoint.h"
-#include "kudu/gutil/strings/ascii_ctype.h"
+#include "gutil/int128.h"
+#include "gutil/integral_types.h"
+#include <common/logging.h>
+#include "gutil/logging-inl.h"
+#include "gutil/gscoped_ptr.h"
+#include "gutil/stringprintf.h"
+#include "gutil/strtoint.h"
+#include "gutil/strings/ascii_ctype.h"
 
 // Reads a <double> in *text, which may not be whitespace-initiated.
 // *len is the length, or -1 if text is '\0'-terminated, which is more

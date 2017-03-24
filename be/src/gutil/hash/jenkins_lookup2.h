@@ -15,8 +15,8 @@
 #ifndef UTIL_HASH_JENKINS_LOOKUP2_H_
 #define UTIL_HASH_JENKINS_LOOKUP2_H_
 
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/port.h"
+#include "gutil/integral_types.h"
+#include "gutil/port.h"
 
 // ----------------------------------------------------------------------
 // mix()

@@ -1,13 +1,13 @@
 // Copyright 2008 Google Inc.  All rights reserved.
 
-#include "kudu/gutil/strings/substitute.h"
+#include "gutil/strings/substitute.h"
 
-#include <glog/logging.h>
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/macros.h"
-#include "kudu/gutil/strings/ascii_ctype.h"
-#include "kudu/gutil/strings/escaping.h"
-#include "kudu/gutil/stl_util.h"
+#include <common/logging.h>
+#include "gutil/logging-inl.h"
+#include "gutil/macros.h"
+#include "gutil/strings/ascii_ctype.h"
+#include "gutil/strings/escaping.h"
+#include "gutil/stl_util.h"
 
 namespace strings {
 

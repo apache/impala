@@ -35,7 +35,7 @@
 #ifndef BASE_AUXILIARY_SYNCHRONIZATION_PROFILING_H_
 #define BASE_AUXILIARY_SYNCHRONIZATION_PROFILING_H_
 
-#include "kudu/gutil/basictypes.h"
+#include "gutil/basictypes.h"
 
 namespace gutil {
 

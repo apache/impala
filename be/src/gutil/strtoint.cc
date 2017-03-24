@@ -5,8 +5,8 @@
 //
 
 #include <errno.h>
-#include "kudu/gutil/port.h"
-#include "kudu/gutil/strtoint.h"
+#include "gutil/port.h"
+#include "gutil/strtoint.h"
 
 // Replacement strto[u]l functions that have identical overflow and underflow
 // characteristics for both ILP-32 and LP-64 platforms, including errno

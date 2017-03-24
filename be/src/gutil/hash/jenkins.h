@@ -10,7 +10,7 @@
 #ifndef UTIL_HASH_JENKINS_H_
 #define UTIL_HASH_JENKINS_H_
 
-#include "kudu/gutil/integral_types.h"
+#include "gutil/integral_types.h"
 
 // ----------------------------------------------------------------------
 // Hash32StringWithSeed()

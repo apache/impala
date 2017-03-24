@@ -21,9 +21,9 @@
 //
 //
 
-#include "kudu/gutil/mathlimits.h"
+#include "gutil/mathlimits.h"
 
-#include "kudu/gutil/integral_types.h"
+#include "gutil/integral_types.h"
 
 // MSVC++ 2005 thinks the header declaration was a definition, and
 // erroneously flags these as a duplicate definition.

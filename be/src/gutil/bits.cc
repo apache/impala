@@ -2,7 +2,7 @@
 //
 // Derived from code by Moses Charikar
 
-#include "kudu/gutil/bits.h"
+#include "gutil/bits.h"
 
 #include <assert.h>
 

@@ -2,18 +2,18 @@
 //
 //
 
-#include "kudu/gutil/strings/stringpiece.h"
+#include "gutil/strings/stringpiece.h"
 
 #include <algorithm>
 #include <climits>
-#include <glog/logging.h>
+#include <common/logging.h>
 #include <string.h>
 #include <string>
 
-#include "kudu/gutil/hash/hash.h"
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/stl_util.h"
-#include "kudu/gutil/strings/memutil.h"
+#include "gutil/hash/hash.h"
+#include "gutil/logging-inl.h"
+#include "gutil/stl_util.h"
+#include "gutil/strings/memutil.h"
 
 using std::copy;
 using std::max;

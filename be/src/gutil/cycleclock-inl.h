@@ -36,8 +36,8 @@
 
 #include <sys/time.h>
 
-#include "kudu/gutil/port.h"
-#include "kudu/gutil/arm_instruction_set_select.h"
+#include "gutil/port.h"
+#include "gutil/arm_instruction_set_select.h"
 
 // Please do not nest #if directives.  Keep one section, and one #if per
 // platform.
@@ -148,7 +148,7 @@ inline int64 CycleClock::Now() {
 
 // ----------------------------------------------------------------
 #elif defined(ARMV6)  // V6 is the earliest arm that has a standard cyclecount
-#include "kudu/gutil/sysinfo.h"
+#include "gutil/sysinfo.h"
 inline int64 CycleClock::Now() {
   uint32 pmccntr;
   uint32 pmuseren;
@@ -171,7 +171,7 @@ inline int64 CycleClock::Now() {
 
 // ----------------------------------------------------------------
 #elif defined(ARMV3)
-#include "kudu/gutil/sysinfo.h"   // for CyclesPerSecond()
+#include "gutil/sysinfo.h"   // for CyclesPerSecond()
 inline int64 CycleClock::Now() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
@@ -181,7 +181,7 @@ inline int64 CycleClock::Now() {
 
 // ----------------------------------------------------------------
 #elif defined(__mips__)
-#include "kudu/gutil/sysinfo.h"
+#include "gutil/sysinfo.h"
 inline int64 CycleClock::Now() {
   // mips apparently only allows rdtsc for superusers, so we fall
   // back to gettimeofday.  It's possible clock_gettime would be better.

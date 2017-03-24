@@ -32,6 +32,7 @@
 #include <boost/type_traits/make_unsigned.hpp>
 
 #include "common/compiler-util.h"
+#include "gutil/bits.h"
 #include "util/cpu-info.h"
 #include "util/sse-util.h"
 
@@ -284,6 +285,40 @@ class BitUtil {
       unsigned long long v, int otherwise = sizeof(unsigned long long) * CHAR_BIT) {
     if (UNLIKELY(v == 0)) return otherwise;
     return __builtin_ctzll(v);
+  }
+
+  /// More efficient version of similar functions found in gutil/
+  static inline int Log2Ceiling(uint32 n) {
+    int floor = Bits::Log2Floor(n);
+    // Check if zero or a power of two. This pattern is recognised by gcc and optimised
+    // into branch-free code.
+    if (0 == (n & (n - 1))) {
+      return floor;
+    } else {
+      return floor + 1;
+    }
+  }
+
+  static inline int Log2Ceiling64(uint64 n) {
+    int floor = Bits::Log2Floor64(n);
+    // Check if zero or a power of two. This pattern is recognised by gcc and optimised
+    // into branch-free code.
+    if (0 == (n & (n - 1))) {
+      return floor;
+    } else {
+      return floor + 1;
+    }
+  }
+
+  static inline int Log2CeilingNonZero64(uint64 n) {
+    int floor = Bits::Log2FloorNonZero64(n);
+    // Check if zero or a power of two. This pattern is recognised by gcc and optimised
+    // into branch-free code.
+    if (0 == (n & (n - 1))) {
+      return floor;
+    } else {
+      return floor + 1;
+    }
   }
 };
 

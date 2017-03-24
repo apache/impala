@@ -19,15 +19,15 @@ using std::pair;
 #include <vector>
 using std::vector;
 
-#include <glog/logging.h>
+#include <common/logging.h>
 
-#include "kudu/gutil/int128.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/type_traits.h"
-#include "kudu/gutil/strings/stringpiece.h"
-#include "kudu/gutil/endian.h"
-#include "kudu/gutil/stl_util.h"
+#include "gutil/int128.h"
+#include "gutil/integral_types.h"
+#include "gutil/logging-inl.h"
+#include "gutil/type_traits.h"
+#include "gutil/strings/stringpiece.h"
+#include "gutil/endian.h"
+#include "gutil/stl_util.h"
 
 // Converts a 4-byte uint32 to a string such that the string keys sort in
 // the same order as the original uint32 value.

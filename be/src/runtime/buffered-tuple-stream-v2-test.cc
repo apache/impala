@@ -44,7 +44,7 @@
 
 #include "common/names.h"
 
-using base::FreeDeleter;
+using kudu::FreeDeleter;
 using std::numeric_limits;
 
 static const int BATCH_SIZE = 250;

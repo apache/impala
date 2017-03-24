@@ -32,9 +32,9 @@
 
 #include <assert.h>
 
-#include "kudu/gutil/int128.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/port.h"
+#include "gutil/int128.h"
+#include "gutil/integral_types.h"
+#include "gutil/port.h"
 
 inline uint64 gbswap_64(uint64 host_int) {
 #if defined(__GNUC__) && defined(__x86_64__) && !defined(__APPLE__)

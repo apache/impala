@@ -11,8 +11,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "kudu/gutil/macros.h"  // For COMPILE_ASSERT
-#include "kudu/gutil/port.h"  // ATTRIBUTE_WEAK
+#include "gutil/macros.h"  // For COMPILE_ASSERT
+#include "gutil/port.h"  // ATTRIBUTE_WEAK
 
 typedef int32_t Atomic32;
 

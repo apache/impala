@@ -7,9 +7,9 @@
 
 #include <cassert>
 
-#include "kudu/gutil/atomic_refcount.h"
-#include "kudu/gutil/port.h"
-#include "kudu/gutil/threading/thread_collision_warner.h"
+#include "gutil/atomic_refcount.h"
+#include "gutil/port.h"
+#include "gutil/threading/thread_collision_warner.h"
 
 namespace kudu {
 namespace subtle {

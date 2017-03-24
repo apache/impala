@@ -10,9 +10,9 @@
 #include <string>
 using std::string;
 
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/strings/numbers.h"
-#include "kudu/gutil/strings/stringpiece.h"
+#include "gutil/integral_types.h"
+#include "gutil/strings/numbers.h"
+#include "gutil/strings/stringpiece.h"
 
 // The AlphaNum type was designed to be used as the parameter type for StrCat().
 // I suppose that any routine accepting either a string or a number could accept

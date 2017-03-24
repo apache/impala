@@ -13,11 +13,11 @@
 
 #include <stddef.h>
 
-#include "kudu/gutil/port.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/hash/city.h"
-#include "kudu/gutil/hash/jenkins.h"
-#include "kudu/gutil/hash/jenkins_lookup2.h"
+#include "gutil/port.h"
+#include "gutil/integral_types.h"
+#include "gutil/hash/city.h"
+#include "gutil/hash/jenkins.h"
+#include "gutil/hash/jenkins_lookup2.h"
 
 namespace hash_internal {
 

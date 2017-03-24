@@ -37,12 +37,12 @@
 //
 // If you need to do something very different from this, use a Mutex.
 
-#include <glog/logging.h>
+#include <common/logging.h>
 
-#include "kudu/gutil/atomicops.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/dynamic_annotations.h"
+#include "gutil/atomicops.h"
+#include "gutil/integral_types.h"
+#include "gutil/logging-inl.h"
+#include "gutil/dynamic_annotations.h"
 
 namespace base {
 

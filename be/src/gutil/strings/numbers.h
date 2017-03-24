@@ -20,11 +20,11 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include "kudu/gutil/int128.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/macros.h"
-#include "kudu/gutil/port.h"
-#include "kudu/gutil/stringprintf.h"
+#include "gutil/int128.h"
+#include "gutil/integral_types.h"
+#include "gutil/macros.h"
+#include "gutil/port.h"
+#include "gutil/stringprintf.h"
 
 
 // START DOXYGEN NumbersFunctions grouping
@@ -540,36 +540,36 @@ bool ParseDoubleRange(const char* text, int len, const char** end,
 // These functions are deprecated.
 // Do not use in new code.
 
-// DEPRECATED(wadetregaskis).  Just call StringPrintf or SimpleFtoa.
-string FloatToString(float f, const char* format);
+// // DEPRECATED(wadetregaskis).  Just call StringPrintf or SimpleFtoa.
+// string FloatToString(float f, const char* format);
 
-// DEPRECATED(wadetregaskis).  Just call StringPrintf or SimpleItoa.
-string IntToString(int i, const char* format);
+// // DEPRECATED(wadetregaskis).  Just call StringPrintf or SimpleItoa.
+// string IntToString(int i, const char* format);
 
-// DEPRECATED(wadetregaskis).  Just call StringPrintf or SimpleItoa.
-string Int64ToString(int64 i64, const char* format);
+// // DEPRECATED(wadetregaskis).  Just call StringPrintf or SimpleItoa.
+// string Int64ToString(int64 i64, const char* format);
 
-// DEPRECATED(wadetregaskis).  Just call StringPrintf or SimpleItoa.
-string UInt64ToString(uint64 ui64, const char* format);
+// // DEPRECATED(wadetregaskis).  Just call StringPrintf or SimpleItoa.
+// string UInt64ToString(uint64 ui64, const char* format);
 
-// DEPRECATED(wadetregaskis).  Just call StringPrintf.
-inline string FloatToString(float f) {
-  return StringPrintf("%7f", f);
-}
+// // DEPRECATED(wadetregaskis).  Just call StringPrintf.
+// inline string FloatToString(float f) {
+//   return StringPrintf("%7f", f);
+// }
 
-// DEPRECATED(wadetregaskis).  Just call StringPrintf.
-inline string IntToString(int i) {
-  return StringPrintf("%7d", i);
-}
+// // DEPRECATED(wadetregaskis).  Just call StringPrintf.
+// inline string IntToString(int i) {
+//   return StringPrintf("%7d", i);
+// }
 
-// DEPRECATED(wadetregaskis).  Just call StringPrintf.
-inline string Int64ToString(int64 i64) {
-  return StringPrintf("%7" PRId64, i64);
-}
+// // DEPRECATED(wadetregaskis).  Just call StringPrintf.
+// inline string Int64ToString(int64 i64) {
+//   return StringPrintf("%7" PRId64, i64);
+// }
 
-// DEPRECATED(wadetregaskis).  Just call StringPrintf.
-inline string UInt64ToString(uint64 ui64) {
-  return StringPrintf("%7" PRIu64, ui64);
-}
+// // DEPRECATED(wadetregaskis).  Just call StringPrintf.
+// inline string UInt64ToString(uint64 ui64) {
+//   return StringPrintf("%7" PRIu64, ui64);
+// }
 
 #endif  // STRINGS_NUMBERS_H_

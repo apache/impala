@@ -26,8 +26,8 @@ using std::multimap;
 #include <vector>
 using std::vector;
 
-#include "kudu/gutil/port.h"  // for LANG_CXX11
-#include "kudu/gutil/strings/stringpiece.h"
+#include "gutil/port.h"  // for LANG_CXX11
+#include "gutil/strings/stringpiece.h"
 
 #ifdef LANG_CXX11
 // This must be included after "base/port.h", which defines LANG_CXX11.

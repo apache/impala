@@ -52,9 +52,9 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/macros.h"
-#include "kudu/gutil/port.h"
+#include "gutil/integral_types.h"
+#include "gutil/macros.h"
+#include "gutil/port.h"
 
 // Sort and remove duplicates of an STL vector or deque.
 template<class T>

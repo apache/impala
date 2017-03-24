@@ -1,6 +1,6 @@
 // Copyright 2003, Google Inc.  All rights reserved.
 
-#include "kudu/gutil/strings/serialize.h"
+#include "gutil/strings/serialize.h"
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -15,13 +15,13 @@ using std::pair;
 #include <vector>
 using std::vector;
 
-#include "kudu/gutil/casts.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/stringprintf.h"
-#include "kudu/gutil/strtoint.h"
-#include "kudu/gutil/strings/join.h"
-#include "kudu/gutil/strings/split.h"
-#include "kudu/gutil/hash/hash.h"
+#include "gutil/casts.h"
+#include "gutil/integral_types.h"
+#include "gutil/stringprintf.h"
+#include "gutil/strtoint.h"
+#include "gutil/strings/join.h"
+#include "gutil/strings/split.h"
+#include "gutil/hash/hash.h"
 
 // Convert a uint32 to a 4-byte string.
 string Uint32ToKey(uint32 u32) {

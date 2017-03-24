@@ -5,13 +5,13 @@
 // This file contains utility functions and classes that help the
 // implementation, and management of the Callback objects.
 
-#ifndef KUDU_GUTIL_CALLBACK_INTERNAL_H_
-#define KUDU_GUTIL_CALLBACK_INTERNAL_H_
+#ifndef GUTIL_CALLBACK_INTERNAL_H_
+#define GUTIL_CALLBACK_INTERNAL_H_
 
 #include <stddef.h>
 
-#include "kudu/gutil/gscoped_ptr.h"
-#include "kudu/gutil/ref_counted.h"
+#include "gutil/gscoped_ptr.h"
+#include "gutil/ref_counted.h"
 
 template <typename T>
 class ScopedVector;
@@ -174,4 +174,4 @@ typename base::enable_if<IsMoveOnlyType<T>::value, T>::type CallbackForward(T& t
 }  // namespace internal
 }  // namespace kudu
 
-#endif  // KUDU_GUTIL_CALLBACK_INTERNAL_H_
+#endif  // GUTIL_CALLBACK_INTERNAL_H_

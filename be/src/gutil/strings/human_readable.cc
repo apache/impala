@@ -1,15 +1,15 @@
 // Copyright 2007 Google Inc. All Rights Reserved.
 
-#include "kudu/gutil/strings/human_readable.h"
+#include "gutil/strings/human_readable.h"
 
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <glog/logging.h>
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/stringprintf.h"
-#include "kudu/gutil/strings/strip.h"
+#include <common/logging.h>
+#include "gutil/logging-inl.h"
+#include "gutil/stringprintf.h"
+#include "gutil/strings/strip.h"
 
 namespace {
 

@@ -7,15 +7,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef KUDU_GUTIL_CALLBACK_H_
-#define KUDU_GUTIL_CALLBACK_H_
+#ifndef GUTIL_CALLBACK_H_
+#define GUTIL_CALLBACK_H_
 
-#include "kudu/gutil/callback_forward.h"
-#include "kudu/gutil/callback_internal.h"
-#include "kudu/gutil/template_util.h"
+#include "gutil/callback_forward.h"
+#include "gutil/callback_internal.h"
+#include "gutil/template_util.h"
 
 // NOTE: Header files that do not require the full definition of Callback or
-// Closure should #include "kudu/gutil/callback_forward.h" instead of this file.
+// Closure should #include "gutil/callback_forward.h" instead of this file.
 
 // -----------------------------------------------------------------------------
 // Introduction
@@ -762,4 +762,4 @@ typedef Callback<void(void)> Closure;
 
 }  // namespace kudu
 
-#endif  // KUDU_GUTIL_CALLBACK_H
+#endif  // GUTIL_CALLBACK_H

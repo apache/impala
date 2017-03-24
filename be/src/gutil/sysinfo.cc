@@ -53,11 +53,11 @@
 #include <shlwapi.h>          // for SHGetValueA()
 #include <tlhelp32.h>         // for Module32First()
 #endif
-#include "kudu/gutil/dynamic_annotations.h"   // for RunningOnValgrind
-#include "kudu/gutil/macros.h"
-#include "kudu/gutil/sysinfo.h"
-#include "kudu/gutil/walltime.h"
-#include <glog/logging.h>
+#include "gutil/dynamic_annotations.h"   // for RunningOnValgrind
+#include "gutil/macros.h"
+#include "gutil/sysinfo.h"
+#include "gutil/walltime.h"
+#include <common/logging.h>
 
 // This isn't in the 'base' namespace in tcmallc. But, tcmalloc
 // exports these functions, so we need to namespace them to avoid

@@ -7,16 +7,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef KUDU_GUTIL_BIND_INTERNAL_H_
-#define KUDU_GUTIL_BIND_INTERNAL_H_
+#ifndef GUTIL_BIND_INTERNAL_H_
+#define GUTIL_BIND_INTERNAL_H_
 
-#include "kudu/gutil/bind_helpers.h"
-#include "kudu/gutil/callback_internal.h"
-#include "kudu/gutil/raw_scoped_refptr_mismatch_checker.h"
-#include "kudu/gutil/template_util.h"
+#include "gutil/bind_helpers.h"
+#include "gutil/callback_internal.h"
+#include "gutil/raw_scoped_refptr_mismatch_checker.h"
+#include "gutil/template_util.h"
 
 #if defined(OS_WIN)
-#include "kudu/gutil/bind_internal_win.h"
+#include "gutil/bind_internal_win.h"
 #endif
 
 // During Chromium import, WeakPtr-related code was removed.
@@ -2692,4 +2692,4 @@ struct BindState<Runnable, RunType, void(P1, P2, P3, P4, P5, P6,
 }  // namespace internal
 }  // namespace kudu
 
-#endif  // KUDU_GUTIL_BIND_INTERNAL_H_
+#endif  // GUTIL_BIND_INTERNAL_H_

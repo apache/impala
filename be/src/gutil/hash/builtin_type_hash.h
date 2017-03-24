@@ -10,10 +10,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kudu/gutil/casts.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/macros.h"
-#include "kudu/gutil/hash/jenkins_lookup2.h"
+#include "gutil/casts.h"
+#include "gutil/integral_types.h"
+#include "gutil/macros.h"
+#include "gutil/hash/jenkins_lookup2.h"
 
 inline uint32 Hash32NumWithSeed(uint32 num, uint32 c) {
   uint32 b = 0x9e3779b9UL;            // the golden ratio; an arbitrary value

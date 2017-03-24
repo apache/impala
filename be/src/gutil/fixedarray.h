@@ -25,11 +25,11 @@
 
 #include <stddef.h>
 
-#include <glog/logging.h>
+#include <common/logging.h>
 
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/macros.h"
-#include "kudu/gutil/manual_constructor.h"
+#include "gutil/logging-inl.h"
+#include "gutil/macros.h"
+#include "gutil/manual_constructor.h"
 
 // A FixedArray<T> represents a non-resizable array of T where the
 // length of the array does not need to be a compile time constant.

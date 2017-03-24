@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "kudu/gutil/cpu.h"
+#include "gutil/cpu.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 #include <algorithm>
 
-#include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/strings/stringpiece.h"
+#include "gutil/basictypes.h"
+#include "gutil/strings/stringpiece.h"
 
 #if defined(__x86_64__)
 #if defined(_MSC_VER)

@@ -32,11 +32,11 @@
  * Author: Sanjay Ghemawat
  */
 
-#include "kudu/gutil/spinlock.h"
-#include "kudu/gutil/synchronization_profiling.h"
-#include "kudu/gutil/spinlock_internal.h"
-#include "kudu/gutil/walltime.h"
-#include "kudu/gutil/sysinfo.h"   /* for NumCPUs() */
+#include "gutil/spinlock.h"
+#include "gutil/synchronization_profiling.h"
+#include "gutil/spinlock_internal.h"
+#include "gutil/walltime.h"
+#include "gutil/sysinfo.h"   /* for NumCPUs() */
 
 namespace base {
 

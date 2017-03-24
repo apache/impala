@@ -11,7 +11,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "kudu/gutil/basictypes.h"  // For COMPILE_ASSERT
+#include "gutil/basictypes.h"  // For COMPILE_ASSERT
 
 typedef int32 Atomic32;
 

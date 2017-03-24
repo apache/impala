@@ -2,12 +2,12 @@
 //
 // A collection of useful (static) bit-twiddling functions.
 
-#include <glog/logging.h>
+#include <common/logging.h>
 
-#include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/logging-inl.h"
-#include "kudu/gutil/macros.h"
+#include "gutil/basictypes.h"
+#include "gutil/integral_types.h"
+#include "gutil/logging-inl.h"
+#include "gutil/macros.h"
 
 #ifndef _BITS_H_
 #define _BITS_H_
@@ -156,9 +156,9 @@ inline int Bits::FindLSBSetNonZero64(uint64 n) {
   return __builtin_ctzll(n);
 }
 #elif defined(_MSC_VER)
-#include "kudu/gutil/bits-internal-windows.h"
+#include "gutil/bits-internal-windows.h"
 #else
-#include "kudu/gutil/bits-internal-unknown.h"
+#include "gutil/bits-internal-unknown.h"
 #endif
 
 inline int Bits::CountOnesInByte(unsigned char n) {

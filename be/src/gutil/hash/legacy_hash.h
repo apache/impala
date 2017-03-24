@@ -10,9 +10,9 @@
 #ifndef UTIL_HASH_LEGACY_HASH_H_
 #define UTIL_HASH_LEGACY_HASH_H_
 
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/hash/builtin_type_hash.h"
-#include "kudu/gutil/hash/string_hash.h"
+#include "gutil/integral_types.h"
+#include "gutil/hash/builtin_type_hash.h"
+#include "gutil/hash/string_hash.h"
 
 // Hash8, Hash16 and Hash32 are for legacy use only.
 typedef uint32 Hash32;

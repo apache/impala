@@ -12,9 +12,9 @@ using std::less;
 #include <string>
 using std::string;
 
-#include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/macros.h"
+#include "gutil/basictypes.h"
+#include "gutil/integral_types.h"
+#include "gutil/macros.h"
 
 //                                 WARNING
 // HumanReadable{NumBytes, Int} don't give you the standard set of SI prefixes.

@@ -22,9 +22,10 @@
 #include <string>
 #include <vector>
 
+#include "common/logging.h"
 #include "gen-cpp/CatalogObjects_types.h"
-#include "gen-cpp/ErrorCodes_types.h"
 #include "gen-cpp/ErrorCodes_constants.h"
+#include "gen-cpp/ErrorCodes_types.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/strings/substitute.h"
 

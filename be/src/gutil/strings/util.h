@@ -42,9 +42,9 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include "kudu/gutil/integral_types.h"
-#include "kudu/gutil/port.h"
-#include "kudu/gutil/strings/stringpiece.h"
+#include "gutil/integral_types.h"
+#include "gutil/port.h"
+#include "gutil/strings/stringpiece.h"
 
 // Newer functions.
 
