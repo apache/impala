@@ -35,8 +35,7 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 . ${IMPALA_HOME}/testdata/bin/run-step.sh
 
 # Environment variables used to direct the data loading process to an external cluster.
-# TODO: We need a better way of managing how these get set. See:
-# https://issues.cloudera.org/browse/IMPALA-4346
+# TODO: We need a better way of managing how these get set. See IMPALA-4346
 : ${HS2_HOST_PORT=localhost:11050}
 : ${HDFS_NN=localhost:20500}
 : ${IMPALAD=localhost:21000}
@@ -181,8 +180,7 @@ function load-data {
     WORKLOAD="functional"
   fi
 
-  # TODO: Why is there a REMOTE_LOAD condition?
-  # See https://issues.cloudera.org/browse/IMPALA-4347
+  # TODO: Why is there a REMOTE_LOAD condition? See IMPALA-4347
   #
   # Force load the dataset if we detect a schema change.
   if [[ -z "$REMOTE_LOAD" ]]; then
@@ -296,7 +294,7 @@ function copy-and-load-dependent-tables {
   # The error occurs while loading dependent tables.
   #
   # See: logs/data_loading/copy-and-load-dependent-tables.log)
-  # See also: https://issues.cloudera.org/browse/IMPALA-4345
+  # See also: IMPALA-4345
   hadoop fs -chmod -R 777 /tmp/alltypes_rc
   hadoop fs -chmod -R 777 /tmp/alltypes_seq
 
@@ -341,8 +339,7 @@ function load-custom-data {
   # Cleanup the old bad_text_lzo files, if they exist.
   hadoop fs -rm -r -f /test-warehouse/bad_text_lzo/
 
-  # TODO: Why is there a REMOTE_LOAD condition?
-  # See https://issues.cloudera.org/browse/IMPALA-4347
+  # TODO: Why is there a REMOTE_LOAD condition? See IMPALA-4347
   if [[ -z $REMOTE_LOAD ]]; then
     # Index all lzo files in HDFS under /test-warehouse
     ${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse
@@ -414,8 +411,7 @@ function build-and-copy-hive-udfs {
 
 # Additional data loading actions that must be executed after the main data is loaded.
 function custom-post-load-steps {
-  # TODO: Why is there a REMOTE_LOAD condition?
-  # See https://issues.cloudera.org/browse/IMPALA-4347
+  # TODO: Why is there a REMOTE_LOAD condition? See IMPALA-4347
   if [[ -z "$REMOTE_LOAD" ]]; then
     # Configure alltypes_seq as a read-only table. This is required for fe tests.
     # Set both read and execute permissions because accessing the contents of a directory on

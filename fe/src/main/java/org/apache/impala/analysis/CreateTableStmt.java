@@ -247,8 +247,7 @@ public class CreateTableStmt extends StatementBase {
     }
 
     // TODO: Find out what is creating a directory in HDFS and stop doing that. Kudu
-    //       tables shouldn't have HDFS dirs.
-    //       https://issues.cloudera.org/browse/IMPALA-3570
+    //       tables shouldn't have HDFS dirs: IMPALA-3570
     AnalysisUtils.throwIfNotNull(getCachingOp(),
         "A Kudu table cannot be cached in HDFS.");
     AnalysisUtils.throwIfNotNull(getLocation(), "LOCATION cannot be specified for a " +

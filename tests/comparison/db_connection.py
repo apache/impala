@@ -833,8 +833,7 @@ class ImpalaCursor(DbCursor):
 
   def close(self, quiet=False):
     try:
-      # Explicitly close the operation to avoid issues like
-      # https://issues.cloudera.org/browse/IMPALA-2562.
+      # Explicitly close the operation to avoid issues like IMPALA-2562.
       # This can be remove if https://github.com/cloudera/impyla/pull/142 is merged.
       self._cursor.close_operation()
       self._cursor.close()

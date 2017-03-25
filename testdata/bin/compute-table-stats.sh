@@ -24,8 +24,7 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 
-# TODO: We need a better way of managing how these get set. See:
-# https://issues.cloudera.org/browse/IMPALA-4346
+# TODO: We need a better way of managing how these get set. See IMPALA-4346
 IMPALAD=${IMPALAD:-localhost:21000}
 
 COMPUTE_STATS_SCRIPT="${IMPALA_HOME}/tests/util/compute_table_stats.py --impalad=${IMPALAD}"

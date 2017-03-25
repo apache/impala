@@ -36,8 +36,7 @@ class PrettyOutputFormatter(object):
     except Exception, e:
       # beeswax returns each row as a tab separated string. If a string column
       # value in a row has tabs, it will break the row split. Default to displaying
-      # raw results. This will change with a move to hiveserver2.
-      # Reference:  https://issues.cloudera.org/browse/IMPALA-116
+      # raw results. This will change with a move to hiveserver2. Reference: IMPALA-116
       error_msg = ("Prettytable cannot resolve string columns values that have "
                    " embedded tabs. Reverting to tab delimited text output")
       print >>sys.stderr, error_msg

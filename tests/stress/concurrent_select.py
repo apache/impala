@@ -900,8 +900,7 @@ class QueryRunner(object):
             op_handle_to_query_id(cursor._last_operation.handle), e)
     caught_msg = str(caught_exception).lower().strip()
 
-    # Exceeding a mem limit may result in the message "cancelled".
-    # https://issues.cloudera.org/browse/IMPALA-2234
+    # Exceeding a mem limit may result in the message "cancelled". See IMPALA-2234
     if "memory limit exceeded" in caught_msg or \
        "repartitioning did not reduce the size of a spilled partition" in caught_msg or \
        caught_msg == "cancelled":

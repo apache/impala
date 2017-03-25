@@ -128,10 +128,10 @@ class QueryResultComparator(object):
         if 'Expressions in the ORDER BY clause must not be constant' in error_message \
             or 'Expressions in the PARTITION BY clause must not be consta' in error_message:
           # It's too much work to avoid this bug. Just ignore it if it comes up.
-          known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1354')
+          known_error = KnownError('IMPALA-1354')
         elif 'GROUP BY expression must not contain aggregate functions' in error_message \
             or 'select list expression not produced by aggregation output' in error_message:
-          known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1423')
+          known_error = KnownError('IMPALA-1423')
         elif ('max(' in error_message or 'min(' in error_message) \
             and 'only supported with an UNBOUNDED PRECEDING start bound' in error_message:
           # This analytic isn't supported and ignoring this here is much easier than not
@@ -139,18 +139,18 @@ class QueryResultComparator(object):
           known_error = KnownError('MAX UNBOUNDED PRECISION')
         elif 'IN and/or EXISTS subquery predicates are not supported in binary predicates' \
             in error_message:
-          known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1418')
+          known_error = KnownError('IMPALA-1418')
         elif 'Unsupported predicate with subquery' in error_message:
-          known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1950')
+          known_error = KnownError('IMPALA-1950')
         elif 'RIGHT OUTER JOIN type with no equi-join' in error_message:
-          known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-3063')
+          known_error = KnownError('IMPALA-3063')
         elif 'Operation is in ERROR_STATE' in error_message:
           known_error = KnownError('Mem limit exceeded')
       elif self.test_db_type is db_connection.HIVE:
         if 'ParseException line' in error_message and 'missing ) at' in \
               error_message and query.select_clause and \
               query.select_clause.analytic_items:
-          known_error = KnownError("https://issues.apache.org/jira/browse/HIVE-14871")
+          known_error = KnownError("HIVE-14871")
 
       if known_error:
         comparison_result.exception = known_error
@@ -189,13 +189,11 @@ class QueryResultComparator(object):
             and isinstance(ref_val, (int, float, Decimal)) \
             and abs(ref_val) > BigInt.MAX:
           # Impala will return incorrect results if the val is greater than max BigInt
-          comparison_result.exception = KnownError(
-              'https://issues.cloudera.org/browse/IMPALA-865')
+          comparison_result.exception = KnownError('IMPALA-865')
         elif isinstance(test_val, float) \
             and (isinf(test_val) or isnan(test_val)):
           # In some cases, Impala gives NaNs and Infs instead of NULLs
-          comparison_result.exception = KnownError(
-              'https://issues.cloudera.org/browse/IMPALA-724')
+          comparison_result.exception = KnownError('IMPALA-724')
         comparison_result.ref_row = ref_row
         comparison_result.test_row = test_row
         comparison_result.mismatch_at_row_number = row_idx + 1

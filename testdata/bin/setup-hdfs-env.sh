@@ -43,7 +43,7 @@ fi
 
 # TODO: Investigate how to setup encryption keys for running HDFS encryption tests
 # against a remote cluster, rather than the local mini-cluster (i.e., when REMOTE_LOAD
-# is true. See: https://issues.cloudera.org/browse/IMPALA-4344)
+# is true. See: IMPALA-4344)
 
 if [[ $TARGET_FILESYSTEM == hdfs && -z "$REMOTE_LOAD" ]]; then  # Otherwise assume KMS isn't setup.
   # Create encryption keys for HDFS encryption tests. Keys are stored by the KMS.

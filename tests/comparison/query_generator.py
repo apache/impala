@@ -514,7 +514,7 @@ class QueryGenerator(object):
               select_item_data_types=select_item_data_types,
               required_table_expr_col_type=join_expr_type,
               require_aggregate=use_agg_subquery,
-              # Don't use UNION + LIMIT; https://issues.cloudera.org/browse/IMPALA-1379
+              # Don't use UNION + LIMIT; IMPALA-1379
               allow_union_clause=(not signature_arg.is_subquery),
               table_alias_prefix=(table_alias_prefix +
                   ('t' if use_correlated_subquery else '')),
@@ -1322,7 +1322,7 @@ class QueryGenerator(object):
       predicate, _ = self._create_boolean_func_tree()
     predicate = self.populate_func_with_vals(
         predicate, val_exprs=basic_select_item_exprs)
-    # https://issues.cloudera.org/browse/IMPALA-1423
+    # IMPALA-1423
     # Make sure any cols used have a table identifier. As of this writing the only
     # single table FROM clauses don't use table aliases. Setting a table alias
     # automatically propagates as a column table identifier ("t1.col" instead of "col").

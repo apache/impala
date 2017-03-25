@@ -43,8 +43,7 @@ class TestKuduNotAvailable(CustomClusterTestSuite):
         return
       cursor.execute("USE functional_kudu")
 
-      # CREATE TABLE succeeds, the execution is in the frontend only.
-      # https://issues.cloudera.org/browse/IMPALA-3233
+      # CREATE TABLE succeeds, the execution is in the frontend only. See IMPALA-3233
       self.assert_failure("SELECT * FROM tinytable", cursor)
       self.assert_failure("INSERT INTO tinytable VALUES ('a', 'b')", cursor)
       self.assert_failure("DELETE FROM tinytable", cursor)

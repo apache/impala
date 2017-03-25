@@ -73,8 +73,8 @@ if [[ "$REPLY" =~ ^[Yy]$ ]]; then
     echo "Creating ${TEST_WAREHOUSE_DIR} directory"
     hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
 
-    # TODO: commented out because of regressions in local end-to-end testing
-    # See: https://issues.cloudera.org/browse/IMPALA-4345
+    # TODO: commented out because of regressions in local end-to-end testing. See
+    # IMPALA-4345
     #
     # hdfs dfs -chmod 1777 ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
   fi
