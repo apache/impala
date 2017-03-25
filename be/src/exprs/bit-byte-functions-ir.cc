@@ -158,7 +158,9 @@ static T RotateRightImpl(T v, int32_t shift) {
 
   // Handle wrapping around multiple times
   shift = shift % (sizeof(T) * 8);
-  return BitUtil::ShiftRightLogical(v, shift) | (v << (sizeof(T) * 8 - shift));
+  using UnsignedT = std::make_unsigned_t<T>;
+  return BitUtil::ShiftRightLogical(v, shift)
+      | (static_cast<UnsignedT>(v) << (sizeof(T) * 8 - shift));
 }
 
 template<typename T>

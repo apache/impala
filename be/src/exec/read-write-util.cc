@@ -93,7 +93,7 @@ ReadWriteUtil::ReadZInteger<ReadWriteUtil::MAX_ZINT_LEN, ReadWriteUtil::ZIntResu
 
 int ReadWriteUtil::PutZInt(int32_t integer, uint8_t* buf) {
   // Move the sign bit to the first bit.
-  uint32_t uinteger = (integer << 1) ^ (integer >> 31);
+  uint32_t uinteger = (static_cast<uint32_t>(integer) << 1) ^ (integer >> 31);
   const int mask = 0x7f;
   const int cont = 0x80;
   buf[0] = uinteger & mask;
@@ -110,7 +110,7 @@ int ReadWriteUtil::PutZInt(int32_t integer, uint8_t* buf) {
 
 int ReadWriteUtil::PutZLong(int64_t longint, uint8_t* buf) {
   // Move the sign bit to the first bit.
-  uint64_t ulongint = (longint << 1) ^ (longint >> 63);
+  uint64_t ulongint = (static_cast<uint64_t>(longint) << 1) ^ (longint >> 63);
   const int mask = 0x7f;
   const int cont = 0x80;
   buf[0] = ulongint & mask;

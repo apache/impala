@@ -98,7 +98,7 @@ TEST(ZigzagTest, Basic) {
     value = HashUtil::Hash(&value, sizeof (value), i);
     TestZInt(value);
     TestZLong(value);
-    TestZLong((static_cast<int64_t>(value) << 32) | value);
+    TestZLong((static_cast<uint64_t>(value) << 32) | value);
   }
 }
 
