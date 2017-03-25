@@ -627,7 +627,7 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
         GetOutputPartition(state, nullptr, ROOT_PARTITION_KEY, &partition_pair, false));
     RETURN_IF_ERROR(WriteRowsToPartition(state, batch, partition_pair));
   } else if (input_is_clustered_) {
-    WriteClusteredRowBatch(state, batch);
+    RETURN_IF_ERROR(WriteClusteredRowBatch(state, batch));
   } else {
     for (int i = 0; i < batch->num_rows(); ++i) {
       const TupleRow* current_row = batch->GetRow(i);
