@@ -66,13 +66,13 @@ DISTCC_HOSTS+=" --localslots_cpp=$(nproc)"
 DISTCC_HOSTS+=" --randomize"
 DISTCC_HOSTS+=" ${BUILD_FARM}"
 
-# The compiler that distcc.sh should use: gcc or clang.
-: ${IMPALA_REAL_CXX_COMPILER=}
-export IMPALA_REAL_CXX_COMPILER
+# Set to true to enable the distcc.sh wrapper script. Takes effect when CMake is next run.
+export IMPALA_DISTCC_ENABLED=true
 
-# Set to false to use local compilation instead of distcc.
-: ${IMPALA_USE_DISTCC=}
-export IMPALA_USE_DISTCC
+# Set to false to make distcc.sh use local compilation instead of distcc. Takes effect
+# immediately if the distcc.sh wrapper script is used.
+: ${IMPALA_DISTCC_LOCAL=}
+export IMPALA_DISTCC_LOCAL
 
 # Even after generating make files, some state about compiler options would only exist in
 # environment vars. Any such vars should be saved to this file so they can be restored.
@@ -80,12 +80,12 @@ if [[ -z "$IMPALA_HOME" ]]; then
   echo '$IMPALA_HOME must be set before sourcing this file.' 1>&2
   return 1
 fi
-IMPALA_COMPILER_CONFIG_FILE="$IMPALA_HOME/.impala_compiler_opts"
+IMPALA_COMPILER_CONFIG_FILE="$IMPALA_HOME/.impala_compiler_opts_v2"
 
 # Completely disable anything that could have been setup using this script and clean
 # the make files.
 function disable_distcc {
-  export IMPALA_CXX_COMPILER=default
+  export IMPALA_DISTCC_ENABLED=false
   export IMPALA_BUILD_THREADS=$(nproc)
   save_compiler_opts
   if ! clean_cmake_files; then
@@ -97,8 +97,7 @@ function disable_distcc {
 }
 
 function enable_distcc {
-  export IMPALA_CXX_COMPILER="$DISTCC_ENV_DIR"/distcc.sh
-  switch_compiler distcc gcc
+  switch_compiler distcc
   export IMPALA_BUILD_THREADS=$(distcc -j)
   if ! clean_cmake_files; then
     echo Failed to clean cmake files. 1>&2
@@ -116,27 +115,27 @@ function clean_cmake_files {
     return 1
   fi
   # Copied from $IMPALA_HOME/bin/clean.sh.
-  find "$IMPALA_HOME" -iname '*cmake*' -not -name CMakeLists.txt \
-      -not -path '*cmake_modules*' \
-      -not -path '*thirdparty*'  | xargs rm -rf
+  FIND_ARGS=("$IMPALA_HOME" -iname '*cmake*' -not -name CMakeLists.txt \
+      -not -path "$IMPALA_HOME/cmake_modules*" \
+      -not -path "$IMPALA_HOME/thirdparty*")
+  if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
+    FIND_ARGS+=(-not -path "$IMPALA_TOOLCHAIN/*")
+  fi
+  find "${FIND_ARGS[@]}" -exec rm -Rf {} +
 }
 
 function switch_compiler {
   for ARG in "$@"; do
     case "$ARG" in
       "local")
-        IMPALA_USE_DISTCC=false
+        IMPALA_DISTCC_LOCAL=false
         IMPALA_BUILD_THREADS=$(nproc);;
       distcc)
-        IMPALA_USE_DISTCC=true
+        IMPALA_DISTCC_LOCAL=true
         IMPALA_BUILD_THREADS=$(distcc -j);;
-      gcc) IMPALA_REAL_CXX_COMPILER=gcc;;
-      clang) IMPALA_REAL_CXX_COMPILER=clang;;
       *) echo "Valid compiler options are:
-    'local'  - Don't use distcc and set -j value to $(nproc). (gcc/clang) remains unchanged.
-    'distcc' - Use distcc and set -j value to $(distcc -j). (gcc/clang) remains unchanged.
-    'gcc'    - Use gcc. (local/distcc remains unchanged).
-    'clang'  - Use clang. (local/distcc remains unchanged)." 2>&1
+    'local'  - Don't use distcc and set -j value to $(nproc).
+    'distcc' - Use distcc and set -j value to $(distcc -j)." 2>&1
         return 1;;
     esac
   done
@@ -146,10 +145,9 @@ function switch_compiler {
 function save_compiler_opts {
   rm -f "$IMPALA_COMPILER_CONFIG_FILE"
   cat <<EOF > "$IMPALA_COMPILER_CONFIG_FILE"
-IMPALA_CXX_COMPILER=$IMPALA_CXX_COMPILER
+IMPALA_DISTCC_ENABLED=$IMPALA_DISTCC_ENABLED
 IMPALA_BUILD_THREADS=$IMPALA_BUILD_THREADS
-IMPALA_USE_DISTCC=$IMPALA_USE_DISTCC
-IMPALA_REAL_CXX_COMPILER=$IMPALA_REAL_CXX_COMPILER
+IMPALA_DISTCC_LOCAL=$IMPALA_DISTCC_LOCAL
 EOF
 }
 

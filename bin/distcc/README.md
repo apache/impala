@@ -66,18 +66,6 @@ to switch back
 ```
 switch_compiler distcc
 ```
-
-### Switch to clang++
-Clang is faster and gives better error messages. This setup is still somewhat
-experimental.
-```
-switch_compiler clang
-```
-to switch back
-```
-switch_compiler gcc
-```
-
 ### Second time
 If you open a new terminal and attempt to build with "make" or "bin/make_impala.sh",
 that will fail. To fix:

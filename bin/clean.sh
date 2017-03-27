@@ -80,4 +80,4 @@ FIND_ARGS=("$IMPALA_HOME" -iname '*cmake*' -not -name CMakeLists.txt \
 if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
   FIND_ARGS+=(-not -path "$IMPALA_TOOLCHAIN/*")
 fi
-find "${FIND_ARGS[@]}" | xargs rm -Rf
+find "${FIND_ARGS[@]}" -exec rm -Rf {} +

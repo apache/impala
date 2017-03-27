@@ -144,9 +144,9 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_CFLAGS}")
 
 # Use ccache when found and not explicitly disabled by setting the DISABLE_CCACHE envvar.
 find_program(CCACHE ccache)
+set(RULE_LAUNCH_PREFIX)
 if (CCACHE AND NOT DEFINED ENV{DISABLE_CCACHE})
-  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
-  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+  set(RULE_LAUNCH_PREFIX ccache)
   if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"
       OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY"
       OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
@@ -159,6 +159,15 @@ if (CCACHE AND NOT DEFINED ENV{DISABLE_CCACHE})
     SET(ENV{CCACHE_CPP} YES)
   endif()
 endif()
+
+if(DEFINED ENV{IMPALA_DISTCC_ENABLED})
+  if ($ENV{IMPALA_DISTCC_ENABLED} STREQUAL "true")
+    SET(RULE_LAUNCH_PREFIX "${RULE_LAUNCH_PREFIX} $ENV{IMPALA_HOME}/bin/distcc/distcc.sh")
+  endif()
+endif()
+
+set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${RULE_LAUNCH_PREFIX})
+set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${RULE_LAUNCH_PREFIX})
 
 # Thrift requires these definitions for some types that we use
 add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)

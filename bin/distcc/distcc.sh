@@ -17,7 +17,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-if [[ -z "$DISTCC_HOSTS" || -z "$IMPALA_REAL_CXX_COMPILER" ]]; then
+set -euo pipefail
+
+CXX_COMPILER="$1"
+shift
+
+if [[ ! -x "$CXX_COMPILER" ]]; then
+  echo Configured compiler "$CXX_COMPILER" is not executable.
+  exit 1
+fi
+
+if [[ -z "$DISTCC_HOSTS" || -z "$CXX_COMPILER" ]]; then
   # This could be sourced here and the build would work but the parallelization (-j)
   # should be wrong at this point and it's too late to fix.
   DIR=$(dirname "$0")
@@ -41,22 +51,10 @@ fi
 
 CMD=
 CMD_POST_ARGS=
-if $IMPALA_USE_DISTCC; then
+if $IMPALA_DISTCC_LOCAL; then
   CMD="distcc ccache"
 fi
 
-GCC_ROOT="$TOOLCHAIN_DIR/gcc-$IMPALA_GCC_VERSION"
-case "$IMPALA_REAL_CXX_COMPILER" in
-  gcc) CMD+=" $GCC_ROOT/bin/g++";;
-  clang) # Assume the compilation options were setup for gcc, which would happen using
-         # default build options. Now some additional options need to be added for clang.
-         CMD+=" $TOOLCHAIN_DIR/llvm-$IMPALA_LLVM_ASAN_VERSION/bin/clang++"
-         CMD+=" --gcc-toolchain=$GCC_ROOT"
-         # -Wno-unused-local-typedef needs to go after -Wall
-         # -Wno-error is needed, clang generates more warnings than gcc.
-         CMD_POST_ARGS+=" -Wno-unused-local-typedef -Wno-error";;
-  *) echo "Unexpected IMPALA_REAL_CXX_COMPILER: '$IMPALA_REAL_CXX_COMPILER'" 1>&2
-     exit 1;;
-esac
+CMD+=" $CXX_COMPILER"
 
 exec $CMD "$@" $CMD_POST_ARGS
