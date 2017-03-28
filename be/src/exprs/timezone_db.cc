@@ -671,30 +671,34 @@ Status TimezoneDatabase::Initialize() {
   // Create a temporary file and write the timezone information.  The boost
   // interface only loads this format from a file. We abort the startup if
   // this initialization fails for some reason.
-  char *filestr = const_cast<char*>((boost::filesystem::path(FLAGS_local_library_dir)
-      / string("impala.tzdb.XXXXXXX")).string().c_str());
+  string pathname = (boost::filesystem::path(FLAGS_local_library_dir) /
+      string("impala.tzdb.XXXXXXX")).string();
+  // mkstemp operates in place, so we need a mutable array.
+  std::vector<char> filestr(pathname.c_str(), pathname.c_str() + pathname.size() + 1);
   FILE* file;
   int fd;
-  if ((fd = mkstemp(filestr)) == -1) {
+  if ((fd = mkstemp(filestr.data())) == -1) {
     return Status(Substitute("Could not create temporary timezone file: $0. Check that "
-        "the directory $1 is writable by the user running Impala.", filestr,
+        "the directory $1 is writable by the user running Impala.", filestr.data(),
         FLAGS_local_library_dir));
   }
-  if ((file = fopen(filestr, "w")) == NULL) {
-    unlink(filestr);
+  if ((file = fopen(filestr.data(), "w")) == NULL) {
+    unlink(filestr.data());
     close(fd);
-    return Status(Substitute("Could not open temporary timezone file: $0", filestr));
+    return Status(Substitute("Could not open temporary timezone file: $0",
+      filestr.data()));
   }
   if (fputs(TIMEZONE_DATABASE_STR, file) == EOF) {
-    unlink(filestr);
+    unlink(filestr.data());
     close(fd);
     fclose(file);
-    return Status(Substitute("Could not load temporary timezone file: $0", filestr));
+    return Status(Substitute("Could not load temporary timezone file: $0",
+      filestr.data()));
   }
   fclose(file);
-  tz_database_.load_from_file(string(filestr));
+  tz_database_.load_from_file(string(filestr.data()));
   tz_region_list_ = tz_database_.region_list();
-  unlink(filestr);
+  unlink(filestr.data());
   close(fd);
   return Status::OK();
 }
