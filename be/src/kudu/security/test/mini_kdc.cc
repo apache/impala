@@ -61,7 +61,9 @@ MiniKdc::MiniKdc(MiniKdcOptions options)
     options_.realm = "KRBTEST.COM";
   }
   if (options_.data_root.empty()) {
-    options_.data_root = JoinPathSegments(GetTestDataDirectory(), "krb5kdc");
+    // We hardcode "/tmp" here since the original function which initializes a random test
+    // directory (GetTestDataDirectory()), depends on gmock.
+    options_.data_root = JoinPathSegments("/tmp", "krb5kdc");
   }
   if (options_.ticket_lifetime.empty()) {
     options_.ticket_lifetime = "24h";
