@@ -65,6 +65,8 @@ class TQueryOptions;
 /// tracker has a GcFunction that releases any unused memory still held by tcmalloc, so
 /// this will be called before the process limit is reported as exceeded. GcFunctions are
 /// called in the order they are added, so expensive functions should be added last.
+/// GcFunctions are called with a global lock held, so should be non-blocking and not
+/// call back into MemTrackers, except to release memory.
 //
 /// This class is thread-safe.
 class MemTracker {
@@ -293,6 +295,7 @@ class MemTracker {
   MemTracker* parent() const { return parent_; }
 
   /// Signature for function that can be called to free some memory after limit is reached.
+  /// See the class header for further details on what these functions should do.
   typedef boost::function<void ()> GcFunction;
 
   /// Add a function 'f' to be called if the limit is reached.
@@ -324,8 +327,7 @@ class MemTracker {
   bool CheckLimitExceeded() const { return limit_ >= 0 && limit_ < consumption(); }
 
   /// If consumption is higher than max_consumption, attempts to free memory by calling
-  /// any
-  /// added GC functions.  Returns true if max_consumption is still exceeded. Takes
+  /// any added GC functions.  Returns true if max_consumption is still exceeded. Takes
   /// gc_lock. Updates metrics if initialized.
   bool GcMemory(int64_t max_consumption);
 
@@ -384,9 +386,9 @@ class MemTracker {
   UIntGauge* consumption_metric_;
 
   /// If non-NULL, counters from a corresponding ReservationTracker that should be
-  /// reported in logs and other diagnostics. The counters are owned by the fragment's
-  /// RuntimeProfile.
-  boost::scoped_ptr<ReservationTrackerCounters> reservation_counters_;
+  /// reported in logs and other diagnostics. Owned by this MemTracker. The counters
+  /// are owned by the fragment's RuntimeProfile.
+  AtomicPtr<ReservationTrackerCounters> reservation_counters_;
 
   std::vector<MemTracker*> all_trackers_;  // this tracker plus all of its ancestors
   std::vector<MemTracker*> limit_trackers_;  // all_trackers_ with valid limits
@@ -394,7 +396,7 @@ class MemTracker {
   /// All the child trackers of this tracker. Used only for computing resource pool mem
   /// reserved and error reporting, i.e., updating a parent tracker does not update its
   /// children.
-  mutable boost::mutex child_trackers_lock_;
+  mutable SpinLock child_trackers_lock_;
   std::list<MemTracker*> child_trackers_;
 
   /// Iterator into parent_->child_trackers_ for this object. Stored to have O(1)

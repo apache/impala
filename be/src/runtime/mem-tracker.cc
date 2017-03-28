@@ -108,20 +108,20 @@ void MemTracker::Init() {
 }
 
 void MemTracker::AddChildTracker(MemTracker* tracker) {
-  lock_guard<mutex> l(child_trackers_lock_);
+  lock_guard<SpinLock> l(child_trackers_lock_);
   tracker->child_tracker_it_ = child_trackers_.insert(child_trackers_.end(), tracker);
 }
 
 void MemTracker::UnregisterFromParent() {
   DCHECK(parent_ != NULL);
-  lock_guard<mutex> l(parent_->child_trackers_lock_);
+  lock_guard<SpinLock> l(parent_->child_trackers_lock_);
   parent_->child_trackers_.erase(child_tracker_it_);
   child_tracker_it_ = parent_->child_trackers_.end();
 }
 
 void MemTracker::EnableReservationReporting(const ReservationTrackerCounters& counters) {
-  reservation_counters_.reset(new ReservationTrackerCounters);
-  *reservation_counters_ = counters;
+  ReservationTrackerCounters* new_counters = new ReservationTrackerCounters(counters);
+  reservation_counters_.Store(new_counters);
 }
 
 int64_t MemTracker::GetPoolMemReserved() const {
@@ -130,7 +130,7 @@ int64_t MemTracker::GetPoolMemReserved() const {
   DCHECK_EQ(limit_, -1) << LogUsage("");
 
   int64_t mem_reserved = 0L;
-  lock_guard<mutex> l(child_trackers_lock_);
+  lock_guard<SpinLock> l(child_trackers_lock_);
   for (list<MemTracker*>::const_iterator it = child_trackers_.begin();
        it != child_trackers_.end(); ++it) {
     int64_t child_limit = (*it)->limit();
@@ -194,6 +194,7 @@ MemTracker::~MemTracker() {
   DCHECK_EQ(consumption_->current_value(), 0) << label_ << "\n"
                                               << GetStackTrace() << "\n"
                                               << LogUsage("");
+  delete reservation_counters_.Load();
 }
 
 void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
@@ -246,11 +247,13 @@ string MemTracker::LogUsage(const string& prefix) const {
 
   int64_t total = consumption();
   int64_t peak = consumption_->value();
-  if (reservation_counters_ != NULL) {
-    int64_t reservation = reservation_counters_->peak_reservation->current_value();
+
+  ReservationTrackerCounters* reservation_counters = reservation_counters_.Load();
+  if (reservation_counters != nullptr) {
+    int64_t reservation = reservation_counters->peak_reservation->current_value();
     int64_t used_reservation =
-        reservation_counters_->peak_used_reservation->current_value();
-    int64_t reservation_limit = reservation_counters_->reservation_limit->value();
+        reservation_counters->peak_used_reservation->current_value();
+    int64_t reservation_limit = reservation_counters->reservation_limit->value();
     ss << " BufferPoolUsed/Reservation="
        << PrettyPrinter::Print(used_reservation, TUnit::BYTES) << "/"
        << PrettyPrinter::Print(reservation, TUnit::BYTES);
@@ -265,7 +268,7 @@ string MemTracker::LogUsage(const string& prefix) const {
   stringstream prefix_ss;
   prefix_ss << prefix << "  ";
   string new_prefix = prefix_ss.str();
-  lock_guard<mutex> l(child_trackers_lock_);
+  lock_guard<SpinLock> l(child_trackers_lock_);
   string child_trackers_usage = LogUsage(new_prefix, child_trackers_);
   if (!child_trackers_usage.empty()) ss << "\n" << child_trackers_usage;
   return ss.str();
