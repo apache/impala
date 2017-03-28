@@ -148,7 +148,8 @@ static T RotateLeftImpl(T v, int32_t shift) {
 
   // Handle wrapping around multiple times
   shift = shift % (sizeof(T) * 8);
-  return (v << shift) | BitUtil::ShiftRightLogical(v, sizeof(T) * 8 - shift);
+  return static_cast<T>((static_cast<std::make_unsigned_t<T>>(v) << shift)
+      | BitUtil::ShiftRightLogical(v, sizeof(T) * 8 - shift));
 }
 
 template<typename T>
@@ -158,15 +159,14 @@ static T RotateRightImpl(T v, int32_t shift) {
 
   // Handle wrapping around multiple times
   shift = shift % (sizeof(T) * 8);
-  using UnsignedT = std::make_unsigned_t<T>;
-  return BitUtil::ShiftRightLogical(v, shift)
-      | (static_cast<UnsignedT>(v) << (sizeof(T) * 8 - shift));
+  return static_cast<T>(BitUtil::ShiftRightLogical(v, shift)
+      | (static_cast<std::make_unsigned_t<T>>(v) << (sizeof(T) * 8 - shift)));
 }
 
 template<typename T>
 static T ShiftLeftImpl(T v, int32_t shift) {
   if (shift < 0) return ShiftRightLogicalImpl(v, -shift);
-  return v << shift;
+  return static_cast<T>(static_cast<std::make_unsigned_t<T>>(v) << shift);
 }
 
 // Logical right shift rather than arithmetic right shift
