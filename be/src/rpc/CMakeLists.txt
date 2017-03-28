@@ -38,6 +38,9 @@ add_dependencies(Rpc gen-deps)
 
 ADD_BE_TEST(thrift-util-test)
 ADD_BE_TEST(thrift-server-test)
+# The thrift-server-test uses some utilites from the Kudu security test code.
+target_link_libraries(thrift-server-test security-test-for-impala)
+
 ADD_BE_TEST(authentication-test)
 
 ADD_BE_TEST(rpc-mgr-test)

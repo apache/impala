@@ -301,6 +301,10 @@ IMPALA_ADD_THIRDPARTY_LIB(breakpad_client ${BREAKPAD_INCLUDE_DIR} ${BREAKPAD_STA
 find_package(Kerberos REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(krb5 ${KERBEROS_INCLUDE_DIR} "" ${KERBEROS_LIBRARY})
 
+# We require certain binaries from the kerberos project for our automated kerberos
+# testing.
+find_package(KerberosPrograms REQUIRED)
+
 ###################################################################
 
 # System dependencies

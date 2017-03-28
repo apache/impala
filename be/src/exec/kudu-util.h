@@ -39,6 +39,13 @@ namespace impala {
     } \
   } while (0)
 
+
+#define KUDU_ASSERT_OK(status)                                     \
+  do {                                                             \
+    const Status& status_ = FromKuduStatus(status);                \
+    ASSERT_TRUE(status_.ok()) << "Error: " << status_.GetDetail(); \
+  } while (0)
+
 class TimestampValue;
 
 /// Returns false when running on an operating system that Kudu doesn't support. If this

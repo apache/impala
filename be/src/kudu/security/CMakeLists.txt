@@ -84,6 +84,14 @@ ADD_EXPORTABLE_LIBRARY(security
   SRCS ${SECURITY_SRCS}
   DEPS ${SECURITY_LIBS})
 
+# Since Kudu tests are explicitly disabled, we want to expose some of their sources
+# to Impala using another variable.
+set(SECURITY_TEST_SRCS_FOR_IMPALA test/mini_kdc.cc)
+add_library(security-test-for-impala ${SECURITY_TEST_SRCS_FOR_IMPALA})
+target_link_libraries(security-test-for-impala
+  gutil
+  kudu_util
+  security)
 
 ##############################
 # security-test

@@ -37,7 +37,10 @@
 #include "kudu/util/path_util.h"
 #include "kudu/util/stopwatch.h"
 #include "kudu/util/subprocess.h"
-#include "kudu/util/test_util.h"
+
+// test_util.h has a dependancy on gmock which Impala doesn't depend on, so we rewrite
+// parts of this code that use test_util members.
+//#include "kudu/util/test_util.h"
 
 using std::map;
 using std::string;
@@ -60,7 +63,9 @@ MiniKdc::MiniKdc(const MiniKdcOptions& options)
     options_.realm = "KRBTEST.COM";
   }
   if (options_.data_root.empty()) {
-    options_.data_root = JoinPathSegments(GetTestDataDirectory(), "krb5kdc");
+    // We hardcode "/tmp" here since the original function which initializes a random test
+    // directory (GetTestDataDirectory()), depends on gmock.
+    options_.data_root = JoinPathSegments("/tmp", "krb5kdc");
   }
   if (options_.renew_lifetime.empty()) {
     options_.renew_lifetime = "7d";
