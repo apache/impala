@@ -128,7 +128,7 @@ void TestImpalaDate(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue(data->data[j].ptr, data->data[j].len);
+      data->result[j] = TimestampValue::Parse(data->data[j].ptr, data->data[j].len);
     }
   }
 }
@@ -170,7 +170,8 @@ void TestImpalaTimestamp(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue(data->data[j].ptr, data->data[j].len, dt_ctx);
+      data->result[j] = TimestampValue::Parse(data->data[j].ptr, data->data[j].len,
+          dt_ctx);
     }
   }
 }
@@ -180,7 +181,8 @@ void TestImpalaTZTimestamp(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j] = TimestampValue(data->data[j].ptr, data->data[j].len, dt_ctx_tz);
+      data->result[j] = TimestampValue::Parse(data->data[j].ptr, data->data[j].len,
+          dt_ctx_tz);
     }
   }
 }

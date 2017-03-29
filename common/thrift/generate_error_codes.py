@@ -318,6 +318,10 @@ error_codes = (
 
   ("PARQUET_MR_TIMESTAMP_CONVERSION_FAILED", 103, "Failed to convert timestamp '$0' to "
    "timezone '$1' for a Parquet file in table '$2'."),
+
+  ("KUDU_TIMESTAMP_OUT_OF_RANGE", 104,
+   "Kudu table '$0' column '$1' contains an out of range timestamp. "
+   "The valid date range is 1400-01-01..9999-12-31."),
 )
 
 import sys

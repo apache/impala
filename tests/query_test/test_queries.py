@@ -50,11 +50,11 @@ class TestQueries(ImpalaTestSuite):
     return 'functional-query'
 
   def test_analytic_fns(self, vector):
-    # TODO: Enable some of these tests for Avro/Kudu if possible
-    # Don't attempt to evaluate timestamp expressions with Avro/Kudu tables which don't
-    # support a timestamp type yet
+    # TODO: Enable some of these tests for Avro if possible
+    # Don't attempt to evaluate timestamp expressions with Avro tables which don't
+    # support a timestamp type
     table_format = vector.get_value('table_format')
-    if table_format.file_format in ['avro', 'kudu']:
+    if table_format.file_format == 'avro':
       pytest.xfail("%s doesn't support TIMESTAMP" % (table_format.file_format))
     if table_format.file_format == 'hbase':
       pytest.xfail("A lot of queries check for NULLs, which hbase does not recognize")

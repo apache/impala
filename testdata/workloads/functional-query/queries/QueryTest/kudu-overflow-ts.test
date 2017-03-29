@@ -1,0 +1,11 @@
+====
+---- QUERY
+select * from times
+---- RESULTS
+0,1987-05-19 00:00:00
+1,NULL
+---- TYPES
+INT,TIMESTAMP
+---- ERRORS
+Kudu table 'impala::$DATABASE.times' column 'ts' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.
+====

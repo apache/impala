@@ -27,6 +27,7 @@
 #include "exec/kudu-util.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
@@ -66,6 +67,11 @@ KuduScanner::KuduScanner(KuduScanNodeBase* scan_node, RuntimeState* state)
 }
 
 Status KuduScanner::Open() {
+  for (int i = 0; i < scan_node_->tuple_desc()->slots().size(); ++i) {
+    const SlotDescriptor* slot = scan_node_->tuple_desc()->slots()[i];
+    if (slot->type().type != TYPE_TIMESTAMP) continue;
+    timestamp_slots_.push_back(slot);
+  }
   return scan_node_->GetConjunctCtxs(&conjunct_ctxs_);
 }
 
@@ -145,6 +151,8 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
       "Could not set scanner timeout");
   VLOG_ROW << "Starting KuduScanner with ReadMode=" << mode << " timeout=" <<
       FLAGS_kudu_operation_timeout_ms;
+  uint64_t row_format_flags = kudu::client::KuduScanner::PAD_UNIXTIME_MICROS_TO_16_BYTES;
+  scanner_->SetRowFormatFlags(row_format_flags);
 
   {
     SCOPED_TIMER(state_->total_storage_wait_timer());
@@ -178,13 +186,44 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
   // 'row_batch'.
   bool has_conjuncts = !conjunct_ctxs_.empty();
   int num_rows = cur_kudu_batch_.NumRows();
+
   for (int krow_idx = cur_kudu_batch_num_read_; krow_idx < num_rows; ++krow_idx) {
+    Tuple* kudu_tuple = const_cast<Tuple*>(reinterpret_cast<const Tuple*>(
+        cur_kudu_batch_.direct_data().data() +
+        (krow_idx * scan_node_->row_desc().GetRowSize())));
+    ++cur_kudu_batch_num_read_;
+
+    // Kudu tuples containing TIMESTAMP columns (UNIXTIME_MICROS in Kudu, stored as an
+    // int64) have 8 bytes of padding following the timestamp. Because this padding is
+    // provided, Impala can convert these unixtime values to Impala's TimestampValue
+    // format in place and copy the rows to Impala row batches.
+    // TODO: avoid mem copies with a Kudu mem 'release' mechanism, attaching mem to the
+    // batch.
+    // TODO: consider codegen for this per-timestamp col fixup
+    for (const SlotDescriptor* slot : timestamp_slots_) {
+      DCHECK(slot->type().type == TYPE_TIMESTAMP);
+      if (slot->is_nullable() && kudu_tuple->IsNull(slot->null_indicator_offset())) {
+        continue;
+      }
+      int64_t ts_micros = *reinterpret_cast<int64_t*>(
+          kudu_tuple->GetSlot(slot->tuple_offset()));
+      int64_t ts_seconds = ts_micros / MICROS_PER_SEC;
+      int64_t micros_part = ts_micros - (ts_seconds * MICROS_PER_SEC);
+      TimestampValue tv = TimestampValue::FromUnixTimeMicros(ts_seconds, micros_part);
+      if (tv.HasDateAndTime()) {
+        RawValue::Write(&tv, kudu_tuple, slot, NULL);
+      } else {
+        kudu_tuple->SetNull(slot->null_indicator_offset());
+        RETURN_IF_ERROR(state_->LogOrReturnError(
+            ErrorMsg::Init(TErrorCode::KUDU_TIMESTAMP_OUT_OF_RANGE,
+              scan_node_->table_->name(),
+              scan_node_->table_->schema().Column(slot->col_pos()).name())));
+      }
+    }
+
     // Evaluate the conjuncts that haven't been pushed down to Kudu. Conjunct evaluation
     // is performed directly on the Kudu tuple because its memory layout is identical to
     // Impala's. We only copy the surviving tuples to Impala's output row batch.
-    KuduScanBatch::RowPtr krow = cur_kudu_batch_.Row(krow_idx);
-    Tuple* kudu_tuple = reinterpret_cast<Tuple*>(const_cast<void*>(krow.cell(0)));
-    ++cur_kudu_batch_num_read_;
     if (has_conjuncts && !ExecNode::EvalConjuncts(&conjunct_ctxs_[0],
         conjunct_ctxs_.size(), reinterpret_cast<TupleRow*>(&kudu_tuple))) {
       continue;

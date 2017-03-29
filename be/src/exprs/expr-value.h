@@ -65,7 +65,6 @@ struct ExprValue {
   ExprValue(int64_t v) : bigint_val(v) {}
   ExprValue(float v) : float_val(v) {}
   ExprValue(double v) : double_val(v) {}
-  ExprValue(int64_t t, int64_t n) : timestamp_val(t, n) {}
 
   void Init(const std::string& str) {
     string_data = str;

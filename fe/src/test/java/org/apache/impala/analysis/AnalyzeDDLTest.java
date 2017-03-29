@@ -1585,9 +1585,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "external Kudu tables.");
 
     // CTAS into Kudu tables with unsupported types
-    AnalysisError("create table t primary key (id) partition by hash partitions 3" +
-        " stored as kudu as select id, timestamp_col from functional.alltypestiny",
-        "Cannot create table 't': Type TIMESTAMP is not supported in Kudu");
     AnalysisError("create table t primary key (cs) partition by hash partitions 3" +
         " stored as kudu as select cs from functional.chars_tiny",
         "Cannot create table 't': Type CHAR(5) is not supported in Kudu");
@@ -2007,6 +2004,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "partition by hash(x) partitions 8 stored as kudu");
     AnalyzesOk("create table tab (x int, y int, primary key(x, y)) " +
         "partition by hash(y) partitions 8 stored as kudu");
+    AnalyzesOk("create table tab (x timestamp, y timestamp, primary key(x)) " +
+        "partition by hash(x) partitions 8 stored as kudu");
     AnalyzesOk("create table tab (x int, y string, primary key (x)) partition by " +
         "hash (x) partitions 3, range (x) (partition values < 1, partition " +
         "1 <= values < 10, partition 10 <= values < 20, partition value = 30) " +
@@ -2181,7 +2180,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Test unsupported Kudu types
     List<String> unsupportedTypes = Lists.newArrayList(
-        "DECIMAL(9,0)", "TIMESTAMP", "VARCHAR(20)", "CHAR(20)",
+        "DECIMAL(9,0)", "VARCHAR(20)", "CHAR(20)",
         "STRUCT<F1:INT,F2:STRING>", "ARRAY<INT>", "MAP<STRING,STRING>");
     for (String t: unsupportedTypes) {
       String expectedError = String.format(

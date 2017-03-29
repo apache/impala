@@ -262,7 +262,7 @@ void StatestoreSubscriber::RecoveryModeChecker() {
       // we would otherwise have to cache updates here.
       last_recovery_duration_metric_->set_value(
           recovery_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-      last_recovery_time_metric_->set_value(TimestampValue::LocalTime().DebugString());
+      last_recovery_time_metric_->set_value(TimestampValue::LocalTime().ToString());
     }
 
     SleepForMs(SLEEP_INTERVAL_MS);

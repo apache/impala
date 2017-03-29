@@ -251,7 +251,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
       }
 
       PrimitiveType type = output_expr_ctxs_[j]->root()->type().type;
-      WriteKuduRowValue(write->mutable_row(), col, type, value);
+      WriteKuduValue(col, type, value, true, write->mutable_row());
     }
     if (add_row) write_ops.push_back(move(write));
   }

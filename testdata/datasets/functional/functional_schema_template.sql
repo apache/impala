@@ -89,7 +89,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   double_col DOUBLE,
   date_string_col STRING,
   string_col STRING,
-  timestamp_col STRING,
+  timestamp_col TIMESTAMP,
   year INT,
   month INT
 )
@@ -97,7 +97,7 @@ PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
-       cast(timestamp_col as string), year, month
+       timestamp_col, year, month
 FROM {db_name}.{table_name};
 ====
 ---- DATASET
@@ -167,7 +167,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   double_col DOUBLE,
   date_string_col STRING,
   string_col STRING,
-  timestamp_col STRING,
+  timestamp_col TIMESTAMP,
   year INT,
   month INT
 )
@@ -175,7 +175,7 @@ PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
-       cast(timestamp_col as string), year, month
+       timestamp_col, year, month
 FROM {db_name}.{table_name};
 ====
 ---- DATASET
@@ -226,7 +226,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   double_col DOUBLE,
   date_string_col STRING,
   string_col STRING,
-  timestamp_col STRING,
+  timestamp_col TIMESTAMP,
   year INT,
   month INT
 )
@@ -234,7 +234,7 @@ PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
 ---- DEPENDENT_LOAD_KUDU
 INSERT INTO TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col,
-       cast(timestamp_col as string), year, month
+       timestamp_col, year, month
 FROM {db_name}.{table_name};
 ====
 ---- DATASET
@@ -319,7 +319,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_tmp (
   double_col STRING,
   date_string_col STRING,
   string_col STRING,
-  timestamp_col STRING)
+  timestamp_col TIMESTAMP)
 PARTITIONED BY (year INT, month INT)
 ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
@@ -443,7 +443,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_tmp (
   double_col STRING,
   date_string_col STRING,
   string_col STRING,
-  timestamp_col STRING)
+  timestamp_col TIMESTAMP)
 PARTITIONED BY (year INT, month INT)
 ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
@@ -561,7 +561,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name}_idx (
   double_col DOUBLE NULL,
   date_string_col STRING NULL,
   string_col STRING NULL,
-  timestamp_col STRING NULL,
+  timestamp_col TIMESTAMP NULL,
   year INT NULL,
   month INT NULL,
   day INT NULL
@@ -576,7 +576,7 @@ INSERT into TABLE {db_name}{db_suffix}.{table_name}_idx
 SELECT row_number() over (order by year, month, id, day),
        id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
        double_col, date_string_col, string_col,
-       cast(timestamp_col as string), year, month, day
+       timestamp_col, year, month, day
 FROM {db_name}.{table_name};
 ====
 ---- DATASET
@@ -640,7 +640,7 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
   double_col DOUBLE,
   date_string_col STRING,
   string_col STRING,
-  timestamp_col STRING,
+  timestamp_col TIMESTAMP,
   year INT,
   month INT,
   day INT
@@ -650,7 +650,7 @@ PARTITION BY HASH (id) PARTITIONS 3 STORED AS KUDU;
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
        double_col, date_string_col, string_col,
-       cast(timestamp_col as string), year, month, day
+       timestamp_col, year, month, day
 FROM {db_name}.{table_name};
 ====
 ---- DATASET

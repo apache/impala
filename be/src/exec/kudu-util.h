@@ -21,11 +21,22 @@
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
 
+#include "common/status.h"
+#include "runtime/string-value.h"
 #include "runtime/types.h"
 
 namespace impala {
 
-class Status;
+/// Takes a Kudu status and returns an impala one, if it's not OK.
+#define KUDU_RETURN_IF_ERROR(expr, prepend) \
+  do { \
+    kudu::Status _s = (expr); \
+    if (UNLIKELY(!_s.ok())) {                                      \
+      return Status(strings::Substitute("$0: $1", prepend, _s.ToString())); \
+    } \
+  } while (0)
+
+class TimestampValue;
 
 /// Returns false when running on an operating system that Kudu doesn't support. If this
 /// check fails, there is no way Kudu should be expected to work. Exposed for testing.
@@ -59,19 +70,10 @@ void LogKuduMessage(kudu::client::KuduLogSeverity severity, const char* filename
 
 /// Casts 'value' according to 'type' and writes it into 'row' at position 'col'.
 /// If 'type' is STRING or VARCHAR, 'copy_strings' determines if 'value' will be copied
-/// into memory owned by the row. If false, string data must remain valid while the row is
-/// being used.
-Status WriteKuduRowValue(kudu::KuduPartialRow* row, int col, PrimitiveType type,
-    const void* value, bool copy_strings = true);
-
-/// Takes a Kudu status and returns an impala one, if it's not OK.
-#define KUDU_RETURN_IF_ERROR(expr, prepend) \
-  do { \
-    kudu::Status _s = (expr); \
-    if (UNLIKELY(!_s.ok())) {                                      \
-      return Status(strings::Substitute("$0: $1", prepend, _s.ToString())); \
-    } \
-  } while (0)
+/// into memory owned by the row. If false, string data must remain valid while the row
+/// is being used.
+Status WriteKuduValue(int col, PrimitiveType type, const void* value,
+    bool copy_strings, kudu::KuduPartialRow* row);
 
 } /// namespace impala
 #endif

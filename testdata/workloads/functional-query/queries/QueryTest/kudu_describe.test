@@ -14,7 +14,7 @@ NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_
 'month','int','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 'smallint_col','smallint','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 'string_col','string','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
-'timestamp_col','string','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'timestamp_col','timestamp','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 'tinyint_col','tinyint','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 'year','int','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
 ---- TYPES

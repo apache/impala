@@ -107,7 +107,7 @@ ClientRequestState::ClientRequestState(
     summary_profile_.AddInfoString("HiveServer2 Protocol Version",
         Substitute("V$0", 1 + session->hs2_version));
   }
-  summary_profile_.AddInfoString("Start Time", start_time().DebugString());
+  summary_profile_.AddInfoString("Start Time", start_time().ToString());
   summary_profile_.AddInfoString("End Time", "");
   summary_profile_.AddInfoString("Query Type", "N/A");
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
@@ -570,7 +570,7 @@ void ClientRequestState::Done() {
 
   unique_lock<mutex> l(lock_);
   end_time_ = TimestampValue::LocalTime();
-  summary_profile_.AddInfoString("End Time", end_time().DebugString());
+  summary_profile_.AddInfoString("End Time", end_time().ToString());
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   query_events_->MarkEvent("Unregister query");
 

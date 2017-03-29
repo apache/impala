@@ -101,6 +101,10 @@ class KuduScanner {
 
   /// The scanner's cloned copy of the conjuncts to apply.
   vector<ExprContext*> conjunct_ctxs_;
+
+  /// Timestamp slots in the tuple descriptor of the scan node. Used to convert Kudu
+  /// UNIXTIME_MICRO values inline.
+  vector<const SlotDescriptor*> timestamp_slots_;
 };
 
 } /// namespace impala

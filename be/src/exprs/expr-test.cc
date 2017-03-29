@@ -211,7 +211,7 @@ class ExprTest : public testing::Test {
     default_decimal_str_ = "1.23";
     default_bool_val_ = false;
     default_string_val_ = "abc";
-    default_timestamp_val_ = TimestampValue(1293872461);
+    default_timestamp_val_ = TimestampValue::FromUnixTime(1293872461);
     default_type_strs_[TYPE_TINYINT] =
         lexical_cast<string>(min_int_values_[TYPE_TINYINT]);
     default_type_strs_[TYPE_SMALLINT] =
@@ -279,67 +279,67 @@ class ExprTest : public testing::Test {
   void TestNextDayFunction() {
     // Sequential test cases
     TestTimestampValue("next_day('2016-05-01','Sunday')",
-      TimestampValue("2016-05-08 00:00:00", 19));
+      TimestampValue::Parse("2016-05-08 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Monday')",
-      TimestampValue("2016-05-02 00:00:00", 19));
+      TimestampValue::Parse("2016-05-02 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Tuesday')",
-      TimestampValue("2016-05-03 00:00:00", 19));
+      TimestampValue::Parse("2016-05-03 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Wednesday')",
-      TimestampValue("2016-05-04 00:00:00", 19));
+      TimestampValue::Parse("2016-05-04 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Thursday')",
-      TimestampValue("2016-05-05 00:00:00", 19));
+      TimestampValue::Parse("2016-05-05 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Friday')",
-      TimestampValue("2016-05-06 00:00:00", 19));
+      TimestampValue::Parse("2016-05-06 00:00:00", 19));
     TestTimestampValue("next_day('2016-05-01','Saturday')",
-      TimestampValue("2016-05-07 00:00:00", 19));
+      TimestampValue::Parse("2016-05-07 00:00:00", 19));
 
     // Random test cases
     TestTimestampValue("next_day('1910-01-18','SunDay')",
-      TimestampValue("1910-01-23 00:00:00", 19));
+      TimestampValue::Parse("1910-01-23 00:00:00", 19));
     TestTimestampValue("next_day('1916-06-05', 'SUN')",
-      TimestampValue("1916-06-11 00:00:00", 19));
+      TimestampValue::Parse("1916-06-11 00:00:00", 19));
     TestTimestampValue("next_day('1932-11-08','monday')",
-      TimestampValue("1932-11-14 00:00:00", 19));
+      TimestampValue::Parse("1932-11-14 00:00:00", 19));
     TestTimestampValue("next_day('1933-09-11','Mon')",
-      TimestampValue("1933-09-18 00:00:00", 19));
+      TimestampValue::Parse("1933-09-18 00:00:00", 19));
     TestTimestampValue("next_day('1934-03-21','TUeSday')",
-      TimestampValue("1934-03-27 00:00:00", 19));
+      TimestampValue::Parse("1934-03-27 00:00:00", 19));
     TestTimestampValue("next_day('1954-02-25','tuE')",
-      TimestampValue("1954-03-02 00:00:00", 19));
+      TimestampValue::Parse("1954-03-02 00:00:00", 19));
     TestTimestampValue("next_day('1965-04-18','WeDneSdaY')",
-      TimestampValue("1965-04-21 00:00:00", 19));
+      TimestampValue::Parse("1965-04-21 00:00:00", 19));
     TestTimestampValue("next_day('1966-08-29','wed')",
-      TimestampValue("1966-08-31 00:00:00", 19));
+      TimestampValue::Parse("1966-08-31 00:00:00", 19));
     TestTimestampValue("next_day('1968-07-23','tHurSday')",
-      TimestampValue("1968-07-25 00:00:00", 19));
+      TimestampValue::Parse("1968-07-25 00:00:00", 19));
     TestTimestampValue("next_day('1969-05-28','thu')",
-      TimestampValue("1969-05-29 00:00:00", 19));
+      TimestampValue::Parse("1969-05-29 00:00:00", 19));
     TestTimestampValue("next_day('1989-10-12','fRIDay')",
-      TimestampValue("1989-10-13 00:00:00", 19));
+      TimestampValue::Parse("1989-10-13 00:00:00", 19));
     TestTimestampValue("next_day('1973-10-02','frI')",
-      TimestampValue("1973-10-05 00:00:00", 19));
+      TimestampValue::Parse("1973-10-05 00:00:00", 19));
     TestTimestampValue("next_day('2000-02-29','saTUrDaY')",
-      TimestampValue("2000-03-04 00:00:00", 19));
+      TimestampValue::Parse("2000-03-04 00:00:00", 19));
     TestTimestampValue("next_day('2013-04-12','sat')",
-      TimestampValue("2013-04-13 00:00:00", 19));
+      TimestampValue::Parse("2013-04-13 00:00:00", 19));
     TestTimestampValue("next_day('2013-12-25','Saturday')",
-      TimestampValue("2013-12-28 00:00:00", 19));
+      TimestampValue::Parse("2013-12-28 00:00:00", 19));
 
     // Explicit timestamp conversion tests
     TestTimestampValue("next_day(to_timestamp('12-27-2008', 'MM-dd-yyyy'), 'moN')",
-      TimestampValue("2008-12-29 00:00:00", 19));
+      TimestampValue::Parse("2008-12-29 00:00:00", 19));
     TestTimestampValue("next_day(to_timestamp('2007-20-10 11:22', 'yyyy-dd-MM HH:mm'),\
-      'TUeSdaY')", TimestampValue("2007-10-23 11:22:00", 19));
+      'TUeSdaY')", TimestampValue::Parse("2007-10-23 11:22:00", 19));
     TestTimestampValue("next_day(to_timestamp('18-11-2070 09:12', 'dd-MM-yyyy HH:mm'),\
-      'WeDneSdaY')", TimestampValue("2070-11-19 09:12:00", 19));
+      'WeDneSdaY')", TimestampValue::Parse("2070-11-19 09:12:00", 19));
     TestTimestampValue("next_day(to_timestamp('12-1900-05', 'dd-yyyy-MM'), 'tHurSday')",
-      TimestampValue("1900-05-17 00:00:00", 19));
+      TimestampValue::Parse("1900-05-17 00:00:00", 19));
     TestTimestampValue("next_day(to_timestamp('08-1987-21', 'MM-yyyy-dd'), 'FRIDAY')",
-      TimestampValue("1987-08-28 00:00:00", 19));
+      TimestampValue::Parse("1987-08-28 00:00:00", 19));
     TestTimestampValue("next_day(to_timestamp('02-04-2001', 'dd-MM-yyyy'), 'SAT')",
-      TimestampValue("2001-04-07 00:00:00", 19));
+      TimestampValue::Parse("2001-04-07 00:00:00", 19));
     TestTimestampValue("next_day(to_timestamp('1970-01-31 00:00:00',\
-      'yyyy-MM-dd HH:mm:ss'), 'SunDay')", TimestampValue("1970-02-01 00:00:00", 19));
+      'yyyy-MM-dd HH:mm:ss'), 'SunDay')", TimestampValue::Parse("1970-02-01 00:00:00", 19));
 
     // Invalid input: unacceptable date parameter
     TestIsNull("next_day('12202010','Saturday')", TYPE_TIMESTAMP);
@@ -955,6 +955,10 @@ class ExprTest : public testing::Test {
     // Check factorial function exists as alias
     TestValue("factorial(3!)", TYPE_BIGINT, 720);
   }
+
+  template<typename T>
+  TimestampValue CreateTestTimestamp(T val);
+
   // Test casting stmt to all types.  Expected result is val.
   template<typename T>
   void TestCast(const string& stmt, T val, bool timestamp_out_of_range = false) {
@@ -969,12 +973,37 @@ class ExprTest : public testing::Test {
     TestValue("cast(" + stmt + " as real)", TYPE_DOUBLE, static_cast<double>(val));
     TestStringValue("cast(" + stmt + " as string)", lexical_cast<string>(val));
     if (!timestamp_out_of_range) {
-      TestTimestampValue("cast(" + stmt + " as timestamp)", TimestampValue(val));
+      TestTimestampValue("cast(" + stmt + " as timestamp)", CreateTestTimestamp(val));
     } else {
       TestIsNull("cast(" + stmt + " as timestamp)", TYPE_TIMESTAMP);
     }
   }
 };
+
+template<>
+TimestampValue ExprTest::CreateTestTimestamp(const string& val) {
+  return TimestampValue::Parse(val);
+}
+
+template<>
+TimestampValue ExprTest::CreateTestTimestamp(float val) {
+  return TimestampValue::FromSubsecondUnixTime(val);
+}
+
+template<>
+TimestampValue ExprTest::CreateTestTimestamp(double val) {
+  return TimestampValue::FromSubsecondUnixTime(val);
+}
+
+template<>
+TimestampValue ExprTest::CreateTestTimestamp(int val) {
+  return TimestampValue::FromUnixTime(val);
+}
+
+template<>
+TimestampValue ExprTest::CreateTestTimestamp(int64_t val) {
+  return TimestampValue::FromUnixTime(val);
+}
 
 // Test casting 'stmt' to each of the native types.  The result should be 'val'
 // 'stmt' is a partial stmt that could be of any valid type.
@@ -1035,7 +1064,7 @@ int64_t ExprTest::ConvertValue<int64_t>(const string& value) {
 
 template <>
 TimestampValue ExprTest::ConvertValue<TimestampValue>(const string& value) {
-  return TimestampValue(&value[0], value.size());
+  return TimestampValue::Parse(&value[0], value.size());
 }
 
 // We can't put this into TestValue() because GTest can't resolve
@@ -2180,24 +2209,24 @@ TEST_F(ExprTest, CastExprs) {
 
   // IMPALA-3163: Test precise conversion from Decimal to Timestamp.
   TestTimestampValue("cast(cast(1457473016.1230 as decimal(17,4)) as timestamp)",
-      TimestampValue("2016-03-08 21:36:56.123000000", 29));
+      TimestampValue::Parse("2016-03-08 21:36:56.123000000", 29));
   // 32 bit Decimal.
   TestTimestampValue("cast(cast(123.45 as decimal(9,2)) as timestamp)",
-      TimestampValue("1970-01-01 00:02:03.450000000", 29));
+      TimestampValue::Parse("1970-01-01 00:02:03.450000000", 29));
   // 64 bit Decimal.
   TestTimestampValue("cast(cast(123.45 as decimal(18,2)) as timestamp)",
-      TimestampValue("1970-01-01 00:02:03.450000000", 29));
+      TimestampValue::Parse("1970-01-01 00:02:03.450000000", 29));
   TestTimestampValue("cast(cast(253402300799.99 as decimal(18, 2)) as timestamp)",
-      TimestampValue("9999-12-31 23:59:59.990000000", 29));
+      TimestampValue::Parse("9999-12-31 23:59:59.990000000", 29));
   TestIsNull("cast(cast(260000000000.00 as decimal(18, 2)) as timestamp)",
       TYPE_TIMESTAMP);
   // 128 bit Decimal.
   TestTimestampValue("cast(cast(123.45 as decimal(38,2)) as timestamp)",
-      TimestampValue("1970-01-01 00:02:03.450000000", 29));
+      TimestampValue::Parse("1970-01-01 00:02:03.450000000", 29));
   TestTimestampValue("cast(cast(253402300799.99 as decimal(38, 2)) as timestamp)",
-      TimestampValue("9999-12-31 23:59:59.990000000", 29));
+      TimestampValue::Parse("9999-12-31 23:59:59.990000000", 29));
   TestTimestampValue("cast(cast(253402300799.99 as decimal(38, 26)) as timestamp)",
-      TimestampValue("9999-12-31 23:59:59.990000000", 29));
+      TimestampValue::Parse("9999-12-31 23:59:59.990000000", 29));
   TestIsNull("cast(cast(260000000000.00 as decimal(38, 2)) as timestamp)",
       TYPE_TIMESTAMP);
   // numeric_limits<int64_t>::max()
@@ -2230,18 +2259,18 @@ TEST_F(ExprTest, CastExprs) {
   TestValue("cast(cast('2000-01-01 09:10:11.000000' as timestamp) as int)", TYPE_INT,
       946717811);
   TestTimestampValue("cast(946717811 as timestamp)",
-      TimestampValue("2000-01-01 09:10:11", 19));
+      TimestampValue::Parse("2000-01-01 09:10:11", 19));
 
   // Timestamp <--> Int conversions boundary cases
   TestValue("cast(cast('1400-01-01 00:00:00' as timestamp) as bigint)",
       TYPE_BIGINT, -17987443200);
   TestTimestampValue("cast(-17987443200 as timestamp)",
-      TimestampValue("1400-01-01 00:00:00", 19));
+      TimestampValue::Parse("1400-01-01 00:00:00", 19));
   TestIsNull("cast(-17987443201 as timestamp)", TYPE_TIMESTAMP);
   TestValue("cast(cast('9999-12-31 23:59:59' as timestamp) as bigint)",
       TYPE_BIGINT, 253402300799);
   TestTimestampValue("cast(253402300799 as timestamp)",
-      TimestampValue("9999-12-31 23:59:59", 19));
+      TimestampValue::Parse("9999-12-31 23:59:59", 19));
   TestIsNull("cast(253402300800 as timestamp)", TYPE_TIMESTAMP);
 
   // Timestamp <--> Float
@@ -2251,12 +2280,12 @@ TEST_F(ExprTest, CastExprs) {
   TestValue("cast(cast('2000-01-01 09:10:11.720000' as timestamp) as double)",
       TYPE_DOUBLE, 946717811.72);
   TestTimestampValue("cast(cast(946717811.033 as double) as timestamp)",
-      TimestampValue("2000-01-01 09:10:11.032999992", 29));
+      TimestampValue::Parse("2000-01-01 09:10:11.032999992", 29));
   TestValue("cast(cast('1400-01-01' as timestamp) as double)", TYPE_DOUBLE,
       -17987443200);
   TestIsNull("cast(cast(-17987443201.03 as double) as timestamp)", TYPE_TIMESTAMP);
   TestTimestampValue("cast(253402300799 as timestamp)",
-      TimestampValue("9999-12-31 23:59:59", 19));
+      TimestampValue::Parse("9999-12-31 23:59:59", 19));
   TestIsNull("cast(253433923200 as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast(cast(null as bigint) as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast(cast(null as timestamp) as bigint)", TYPE_BIGINT);
@@ -5092,7 +5121,7 @@ TEST_F(ExprTest, TimestampFunctions) {
       (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
   timestamp_result = ConvertValue<TimestampValue>(GetValue(
       "cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP));
-  EXPECT_BETWEEN(TimestampValue(unix_start_time - 1), timestamp_result,
+  EXPECT_BETWEEN(TimestampValue::FromUnixTime(unix_start_time - 1), timestamp_result,
       TimestampValue::LocalTime());
 
   // Test alias
@@ -5592,8 +5621,8 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestValue("if(FALSE, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 8.8);
   TestStringValue("if(TRUE, 'abc', 'defgh')", "abc");
   TestStringValue("if(FALSE, 'abc', 'defgh')", "defgh");
-  TimestampValue then_val(1293872461);
-  TimestampValue else_val(929387245);
+  TimestampValue then_val = TimestampValue::FromUnixTime(1293872461);
+  TimestampValue else_val = TimestampValue::FromUnixTime(929387245);
   TestTimestampValue("if(TRUE, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", then_val);
   TestTimestampValue("if(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
@@ -5619,7 +5648,7 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestStringValue("nullif('abc', NULL)", "abc");
   TestIsNull("nullif(cast('2011-01-01 09:01:01' as timestamp), "
       "cast('2011-01-01 09:01:01' as timestamp))", TYPE_TIMESTAMP);
-  TimestampValue testlhs(1293872461);
+  TimestampValue testlhs = TimestampValue::FromUnixTime(1293872461);
   TestTimestampValue("nullif(cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", testlhs);
   TestIsNull("nullif(NULL, "
@@ -5682,8 +5711,8 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestStringValue("coalesce(NULL, 'abc', NULL)", "abc");
   TestStringValue("coalesce('defgh', NULL, 'abc', NULL)", "defgh");
   TestStringValue("coalesce(NULL, NULL, NULL, 'abc', NULL, NULL)", "abc");
-  TimestampValue ats(1293872461);
-  TimestampValue bts(929387245);
+  TimestampValue ats = TimestampValue::FromUnixTime(1293872461);
+  TimestampValue bts = TimestampValue::FromUnixTime(929387245);
   TestTimestampValue("coalesce(cast('2011-01-01 09:01:01' as timestamp))", ats);
   TestTimestampValue("coalesce(NULL, cast('2011-01-01 09:01:01' as timestamp),"
       "NULL)", ats);

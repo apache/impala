@@ -100,9 +100,9 @@ TEST(DictTest, TestStrings) {
 }
 
 TEST(DictTest, TestTimestamps) {
-  TimestampValue tv1("2011-01-01 09:01:01", 19);
-  TimestampValue tv2("2012-01-01 09:01:01", 19);
-  TimestampValue tv3("2011-01-01 09:01:02", 19);
+  TimestampValue tv1 = TimestampValue::Parse("2011-01-01 09:01:01");
+  TimestampValue tv2 = TimestampValue::Parse("2012-01-01 09:01:01");
+  TimestampValue tv3 = TimestampValue::Parse("2011-01-01 09:01:02");
 
   vector<TimestampValue> dict_values;
   dict_values.push_back(tv1);

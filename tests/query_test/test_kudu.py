@@ -31,6 +31,8 @@ from kudu.client import Partitioning
 import logging
 import pytest
 import textwrap
+from datetime import datetime
+from pytz import utc
 
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
@@ -44,6 +46,33 @@ class TestKuduOperations(KuduTestSuite):
   """
   This suite tests the different modification operations when using a kudu table.
   """
+
+  def test_out_of_range_timestamps(self, vector, cursor, kudu_client, unique_database):
+    """Test timestamp values that are outside of Impala's supported date range."""
+    cursor.execute("""CREATE TABLE %s.times (a INT PRIMARY KEY, ts TIMESTAMP)
+        PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
+    assert kudu_client.table_exists(
+        KuduTestSuite.to_kudu_table_name(unique_database, "times"))
+
+    table = kudu_client.table(KuduTestSuite.to_kudu_table_name(unique_database, "times"))
+    session = kudu_client.new_session()
+    session.apply(table.new_insert((0, datetime(1987, 5, 19, 0, 0, tzinfo=utc))))
+    # Add a date before 1400
+    session.apply(table.new_insert((1, datetime(1300, 1, 1, 0, 0, tzinfo=utc))))
+    # TODO: Add a date after 9999. There isn't a way to represent a date greater than
+    # 9999 in Python datetime.
+    #session.apply(table.new_insert((2, datetime(12000, 1, 1, 0, 0, tzinfo=utc))))
+    session.flush()
+
+    # TODO: The test driver should have a way to specify query options in an 'options'
+    # section rather than having to split abort_on_error cases into separate files.
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/kudu-overflow-ts', vector,
+        use_db=unique_database)
+
+    vector.get_value('exec_option')['abort_on_error'] = 1
+    self.run_test_case('QueryTest/kudu-overflow-ts-abort-on-error', vector,
+        use_db=unique_database)
 
   def test_kudu_scan_node(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database)
@@ -380,22 +409,9 @@ class TestCreateExternalTable(KuduTestSuite):
             STORED AS KUDU
             TBLPROPERTIES('kudu.table_name' = '%s')""" % (impala_table_name,
                 kudu_table.name))
+        assert False
       except Exception as e:
         assert "Kudu type 'binary' is not supported in Impala" in str(e)
-
-  def test_unsupported_unixtime_col(self, cursor, kudu_client):
-    """Check that external tables with UNIXTIME_MICROS columns fail gracefully.
-    """
-    with self.temp_kudu_table(kudu_client, [INT32, UNIXTIME_MICROS]) as kudu_table:
-      impala_table_name = self.random_table_name()
-      try:
-        cursor.execute("""
-            CREATE EXTERNAL TABLE %s
-            STORED AS KUDU
-            TBLPROPERTIES('kudu.table_name' = '%s')""" % (impala_table_name,
-                kudu_table.name))
-      except Exception as e:
-        assert "Kudu type 'unixtime_micros' is not supported in Impala" in str(e)
 
   def test_drop_external_table(self, cursor, kudu_client):
     """Check that dropping an external table only affects the catalog and does not delete
@@ -454,6 +470,7 @@ class TestCreateExternalTable(KuduTestSuite):
           STORED AS KUDU
           TBLPROPERTIES('kudu.table_name' = '%s')""" % (
               self.random_table_name(), kudu_table_name))
+      assert False
     except Exception as e:
       assert "Table does not exist in Kudu: '%s'" % kudu_table_name in str(e)
 
@@ -469,6 +486,7 @@ class TestCreateExternalTable(KuduTestSuite):
             STORED AS KUDU
             TBLPROPERTIES('kudu.table_name' = '%s')""" % (
               self.get_kudu_table_base_name(kudu_table.name), table_name))
+        assert False
       except Exception as e:
         assert "Table does not exist in Kudu: '%s'" % table_name in str(e)
 

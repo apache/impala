@@ -341,10 +341,10 @@ public class KuduUtil {
       case STRING: return org.apache.kudu.Type.STRING;
       case DOUBLE: return org.apache.kudu.Type.DOUBLE;
       case FLOAT: return org.apache.kudu.Type.FLOAT;
+      case TIMESTAMP: return org.apache.kudu.Type.UNIXTIME_MICROS;
         /* Fall through below */
       case INVALID_TYPE:
       case NULL_TYPE:
-      case TIMESTAMP:
       case BINARY:
       case DATE:
       case DATETIME:
@@ -368,6 +368,7 @@ public class KuduUtil {
       case INT32: return Type.INT;
       case INT64: return Type.BIGINT;
       case STRING: return Type.STRING;
+      case UNIXTIME_MICROS: return Type.TIMESTAMP;
       default:
         throw new ImpalaRuntimeException(String.format(
             "Kudu type '%s' is not supported in Impala", t.getName()));

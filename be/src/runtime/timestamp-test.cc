@@ -25,6 +25,7 @@
 #include "runtime/raw-value.inline.h"
 #include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "testutil/gtest-util.h"
 #include "util/string-parser.h"
 
@@ -34,6 +35,7 @@ using boost::assign::list_of;
 using boost::date_time::Dec;
 using boost::date_time::not_a_date_time;
 using boost::gregorian::date;
+using boost::posix_time::ptime;
 using boost::posix_time::time_duration;
 
 namespace impala {
@@ -180,7 +182,7 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
       string fmt_val = "Format: " + fmt + ", Val: " + val;
       DateTimeFormatContext dt_ctx(fmt.c_str(), fmt.length());
       ASSERT_TRUE(TimestampParser::ParseFormatTokens(&dt_ctx)) << fmt_val;
-      TimestampValue tv(val.c_str(), val.length(), dt_ctx);
+      TimestampValue tv = TimestampValue::Parse(val.c_str(), val.length(), dt_ctx);
       ValidateTimestamp(tv, fmt, val, fmt_val, year, month, day, hours, mins, secs,
           frac);
       int buff_len = dt_ctx.fmt_out_len + 1;
@@ -210,7 +212,7 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
         string fmt_val = "Format: " + fmt + ", Val: " + val;
         DateTimeFormatContext dt_ctx(fmt.c_str(), fmt.length());
         ASSERT_TRUE(TimestampParser::ParseFormatTokens(&dt_ctx)) << fmt_val;
-        TimestampValue tv(val.c_str(), val.length(), dt_ctx);
+        TimestampValue tv = TimestampValue::Parse(val.c_str(), val.length(), dt_ctx);
         ValidateTimestamp(tv, fmt, val, fmt_val, year, month, day, hours, mins, secs,
             frac);
         int buff_len = dt_ctx.fmt_out_len + 1;
@@ -232,9 +234,9 @@ TEST(TimestampTest, Basic) {
   char s2[] = "1990-10-20 10:10:10.123456789  ";
   char s3[] = "  1990-10-20 10:10:10.123456789";
 
-  TimestampValue v1(s1, strlen(s1));
-  TimestampValue v2(s2, strlen(s2));
-  TimestampValue v3(s3, strlen(s3));
+  TimestampValue v1 = TimestampValue::Parse(s1, strlen(s1));
+  TimestampValue v2 = TimestampValue::Parse(s2, strlen(s2));
+  TimestampValue v3 = TimestampValue::Parse(s3, strlen(s3));
 
   EXPECT_EQ(v1.date().year(), 2012);
   EXPECT_EQ(v1.date().month(), 1);
@@ -260,8 +262,8 @@ TEST(TimestampTest, Basic) {
   char s4[] = "2012-01-20T01:10:01";
   char s5[] = "1990-10-20T10:10:10.123456789";
 
-  TimestampValue v4(s4, strlen(s4));
-  TimestampValue v5(s5, strlen(s5));
+  TimestampValue v4 = TimestampValue::Parse(s4, strlen(s4));
+  TimestampValue v5 = TimestampValue::Parse(s5, strlen(s5));
 
   EXPECT_EQ(v4.date().year(), 2012);
   EXPECT_EQ(v4.date().month(), 1);
@@ -281,8 +283,8 @@ TEST(TimestampTest, Basic) {
   // Test Dates and Times as timestamps.
   char d1[] = "2012-01-20";
   char d2[] = "1990-10-20";
-  TimestampValue dv1(d1, strlen(d1));
-  TimestampValue dv2(d2, strlen(d2));
+  TimestampValue dv1 = TimestampValue::Parse(d1, strlen(d1));
+  TimestampValue dv2 = TimestampValue::Parse(d2, strlen(d2));
 
   EXPECT_NE(dv1, dv2);
   EXPECT_LT(dv1, v1);
@@ -297,8 +299,8 @@ TEST(TimestampTest, Basic) {
 
   char t1[] = "10:11:12.123456789";
   char t2[] = "00:00:00";
-  TimestampValue tv1(t1, strlen(t1));
-  TimestampValue tv2(t2, strlen(t2));
+  TimestampValue tv1 = TimestampValue::Parse(t1, strlen(t1));
+  TimestampValue tv2 = TimestampValue::Parse(t2, strlen(t2));
 
   EXPECT_NE(tv1, tv2);
   EXPECT_NE(tv1, v2);
@@ -322,7 +324,7 @@ TEST(TimestampTest, Basic) {
       memcpy(frac_buff, TEST_VALS[i], VAL_LEN);
       memcpy(frac_buff + VAL_LEN, FRACTION_MAX_STR, fraction_len);
       *(frac_buff + VAL_LEN + fraction_len) = '\0';
-      TimestampValue tv_frac(frac_buff, strlen(frac_buff));
+      TimestampValue tv_frac = TimestampValue::Parse(frac_buff, strlen(frac_buff));
       if (frac_buff[4] == '-') {
         EXPECT_EQ(tv_frac.date().year(), 2013);
         EXPECT_EQ(tv_frac.date().month(), 12);
@@ -343,44 +345,44 @@ TEST(TimestampTest, Basic) {
 
   // Bad formats
   char b1[] = "1990-10 10:10:10.123456789";
-  TimestampValue bv1(b1, strlen(b1));
+  TimestampValue bv1 = TimestampValue::Parse(b1, strlen(b1));
   boost::gregorian::date not_a_date;
 
   EXPECT_EQ(bv1.date(), not_a_date);
   EXPECT_EQ(bv1.time(), not_a_date_time);
 
   char b2[] = "1991-10-10 99:10:10.123456789";
-  TimestampValue bv2(b2, strlen(b2));
+  TimestampValue bv2 = TimestampValue::Parse(b2, strlen(b2));
 
   EXPECT_EQ(bv2.time(), not_a_date_time);
   EXPECT_EQ(bv2.date(), not_a_date);
 
   char b3[] = "1990-10- 10:10:10.123456789";
-  TimestampValue bv3(b3, strlen(b3));
+  TimestampValue bv3 = TimestampValue::Parse(b3, strlen(b3));
 
   EXPECT_EQ(bv3.date(), not_a_date);
   EXPECT_EQ(bv3.time(), not_a_date_time);
 
   char b4[] = "10:1010.123456789";
-  TimestampValue bv4(b4, strlen(b4));
+  TimestampValue bv4 = TimestampValue::Parse(b4, strlen(b4));
 
   EXPECT_EQ(bv4.date(), not_a_date);
   EXPECT_EQ(bv4.time(), not_a_date_time);
 
   char b5[] = "10:11:12.123456 1991-10-10";
-  TimestampValue bv5(b5, strlen(b5));
+  TimestampValue bv5 = TimestampValue::Parse(b5, strlen(b5));
 
   EXPECT_EQ(bv5.date(), not_a_date);
   EXPECT_EQ(bv5.time(), not_a_date_time);
 
   char b6[] = "2012-01-20 01:10:00.123.466";
-  TimestampValue bv6(b6, strlen(b6));
+  TimestampValue bv6 = TimestampValue::Parse(b6, strlen(b6));
 
   EXPECT_EQ(bv6.date(), not_a_date);
   EXPECT_EQ(bv6.time(), not_a_date_time);
 
   char b7[] = "2012-01-20 01:10:00.123 477 ";
-  TimestampValue bv7(b7, strlen(b7));
+  TimestampValue bv7 = TimestampValue::Parse(b7, strlen(b7));
 
   EXPECT_EQ(bv7.date(), not_a_date);
   EXPECT_EQ(bv7.time(), not_a_date_time);
@@ -506,7 +508,7 @@ TEST(TimestampTest, Basic) {
     } else {
       ASSERT_TRUE(parse_result) << "TC: " << i;
     }
-    TimestampValue cust_tv(test_case.str, strlen(test_case.str), dt_ctx);
+    TimestampValue cust_tv = TimestampValue::Parse(test_case.str, strlen(test_case.str), dt_ctx);
     boost::gregorian::date cust_date = cust_tv.date();
     boost::posix_time::time_duration cust_time = cust_tv.time();
     if (test_case.str_should_fail) {
@@ -574,7 +576,7 @@ TEST(TimestampTest, Basic) {
     TimestampFormatTC test_case = fmt_test_cases[i];
     DateTimeFormatContext dt_ctx(test_case.fmt, strlen(test_case.fmt));
     ASSERT_TRUE(TimestampParser::ParseFormatTokens(&dt_ctx))  << "TC: " << i;
-    TimestampValue cust_tv(test_case.ts);
+    TimestampValue cust_tv = TimestampValue::FromUnixTime(test_case.ts);
     EXPECT_NE(cust_tv.date(), not_a_date) << "TC: " << i;
     EXPECT_NE(cust_tv.time(), not_a_date_time) << "TC: " << i;
     EXPECT_GE(dt_ctx.fmt_out_len, dt_ctx.fmt_len);
@@ -586,39 +588,119 @@ TEST(TimestampTest, Basic) {
     EXPECT_EQ(string(buff, actual_len),
         string(test_case.str, strlen(test_case.str))) << "TC: " << i;
   }
+
   // Test edge cases
-  TimestampValue min_date = TimestampValue("1400-01-01", 10);
+  const int64_t MIN_DATE_AS_UNIX_TIME = -17987443200;
+  TimestampValue min_date = TimestampValue::Parse("1400-01-01");
   EXPECT_TRUE(min_date.HasDate());
   EXPECT_TRUE(min_date.HasTime());
   time_t tm_min;
   EXPECT_TRUE(min_date.ToUnixTime(&tm_min));
-  EXPECT_EQ(-17987443200, tm_min);
-  EXPECT_EQ("1400-01-01 00:00:00", TimestampValue(-17987443200).DebugString());
-  TimestampValue too_early(-17987443201);
+  EXPECT_EQ(MIN_DATE_AS_UNIX_TIME, tm_min);
+  int64_t tm_min_micros;
+  EXPECT_TRUE(min_date.UtcToUnixTimeMicros(&tm_min_micros));
+  EXPECT_EQ(MIN_DATE_AS_UNIX_TIME * MICROS_PER_SEC, tm_min_micros);
+
+  // Add 250ns and check the value is rounded down
+  min_date = TimestampValue::FromUnixTimeNanos(MIN_DATE_AS_UNIX_TIME, 250);
+  EXPECT_TRUE(min_date.ToUnixTime(&tm_min));
+  EXPECT_EQ(MIN_DATE_AS_UNIX_TIME, tm_min);
+  EXPECT_TRUE(min_date.UtcToUnixTimeMicros(&tm_min_micros));
+  EXPECT_EQ(MIN_DATE_AS_UNIX_TIME * MICROS_PER_SEC, tm_min_micros);
+
+  // Add another 250ns and check the value is rounded up to the nearest microsecond.
+  EXPECT_TRUE(min_date.ToUnixTime(&tm_min));
+  EXPECT_EQ(MIN_DATE_AS_UNIX_TIME, tm_min);
+  min_date.set_time(min_date.time() + boost::posix_time::nanoseconds(250));
+  EXPECT_TRUE(min_date.UtcToUnixTimeMicros(&tm_min_micros));
+  EXPECT_EQ(MIN_DATE_AS_UNIX_TIME * MICROS_PER_SEC + 1, tm_min_micros);
+
+  EXPECT_EQ("1400-01-01 00:00:00",
+      TimestampValue::FromUnixTime(MIN_DATE_AS_UNIX_TIME).ToString());
+  TimestampValue too_early = TimestampValue::FromUnixTime(MIN_DATE_AS_UNIX_TIME - 1);
   EXPECT_FALSE(too_early.HasDate());
   EXPECT_FALSE(too_early.HasTime());
-  // Boost's max supported year is 9999.
+  EXPECT_FALSE(too_early.UtcToUnixTimeMicros(&tm_min_micros));
+
+  // Test the max supported date that can be represented in seconds.
+  const int64_t MAX_DATE_AS_UNIX_TIME = 253402300799;
   TimestampValue max_date =
       TimestampValue(date(9999, Dec, 31), time_duration(23, 59, 59));
   EXPECT_TRUE(max_date.HasDate());
   EXPECT_TRUE(max_date.HasTime());
   time_t tm_max;
   EXPECT_TRUE(max_date.ToUnixTime(&tm_max));
-  EXPECT_EQ(253402300799, tm_max);
-  EXPECT_EQ("9999-12-31 23:59:59", TimestampValue(253402300799).DebugString());
-  TimestampValue too_late(253402300800);
+  EXPECT_EQ(MAX_DATE_AS_UNIX_TIME, tm_max);
+  int64_t tm_max_micros;
+  EXPECT_TRUE(max_date.UtcToUnixTimeMicros(&tm_max_micros));
+  EXPECT_EQ(MAX_DATE_AS_UNIX_TIME * MICROS_PER_SEC, tm_max_micros);
+
+  // Add 250 nanoseconds and test the result of UtcToUnixTimeMicros
+  max_date.set_time(max_date.time() + boost::posix_time::nanoseconds(250));
+  EXPECT_TRUE(max_date.UtcToUnixTimeMicros(&tm_max_micros));
+  EXPECT_EQ(MAX_DATE_AS_UNIX_TIME * MICROS_PER_SEC, tm_max_micros);
+  // Adding another 250ns will result in the timestamp being rounded up.
+  max_date.set_time(max_date.time() + boost::posix_time::nanoseconds(250));
+  EXPECT_TRUE(max_date.UtcToUnixTimeMicros(&tm_max_micros));
+  EXPECT_EQ(MAX_DATE_AS_UNIX_TIME * MICROS_PER_SEC + 1, tm_max_micros);
+
+  // The max date that can be represented with the maximum number of nanoseconds. Unlike
+  // the cases above, converting to microseconds does not round up to the next
+  // microsecond because that time is not supported by Impala.
+  max_date = TimestampValue::FromUnixTimeNanos(MAX_DATE_AS_UNIX_TIME, 999999999);
+  EXPECT_TRUE(max_date.HasDate());
+  EXPECT_TRUE(max_date.HasTime());
+  // The result is the maximum date with the maximum number of microseconds supported by
+  // Impala.
+  EXPECT_TRUE(max_date.UtcToUnixTimeMicros(&tm_max_micros));
+  EXPECT_EQ(MAX_DATE_AS_UNIX_TIME * MICROS_PER_SEC + 999999, tm_max_micros);
+
+  EXPECT_EQ("9999-12-31 23:59:59",
+      TimestampValue::FromUnixTime(MAX_DATE_AS_UNIX_TIME).ToString());
+  TimestampValue too_late = TimestampValue::FromUnixTime(MAX_DATE_AS_UNIX_TIME + 1);
   EXPECT_FALSE(too_late.HasDate());
   EXPECT_FALSE(too_late.HasTime());
 
   // Regression tests for IMPALA-1676, Unix times overflow int32 during year 2038
-  EXPECT_EQ("2038-01-19 03:14:08", TimestampValue(2147483648).DebugString());
-  EXPECT_EQ("2038-01-19 03:14:09", TimestampValue(2147483649).DebugString());
+  EXPECT_EQ("2038-01-19 03:14:08",
+      TimestampValue::FromUnixTime(2147483648).ToString());
+  EXPECT_EQ("2038-01-19 03:14:09",
+      TimestampValue::FromUnixTime(2147483649).ToString());
+
+  // Test a leap second in 1998 represented by the UTC time 1998-12-31 23:59:60.
+  // Unix time cannot represent the leap second, which repeats 915148800.
+  EXPECT_EQ("1998-12-31 23:59:59",
+      TimestampValue::FromUnixTime(915148799).ToString());
+  EXPECT_EQ("1999-01-01 00:00:00",
+      TimestampValue::FromUnixTime(915148800).ToString());
+  // The leap second doesn't parse in Impala.
+  TimestampValue leap_tv = TimestampValue::Parse("1998-12-31 23:59:60.00");
+  EXPECT_FALSE(leap_tv.HasDateAndTime());
+
+  // The leap second can be parsed by ptime, though it is just converted to the time
+  // that the Unix time would represent (i.e. the second after the new year). This shows
+  // both times constructed via ptime compare equally.
+  ptime leap_ptime1 = boost::posix_time::time_from_string("1998-12-31 23:59:60");
+  ptime leap_ptime2 = boost::posix_time::time_from_string("1999-01-01 00:00:00");
+  TimestampValue leap_tv1 = TimestampValue(leap_ptime1);
+  TimestampValue leap_tv2 = TimestampValue(leap_ptime2);
+  EXPECT_TRUE(leap_tv1.HasDateAndTime());
+  EXPECT_TRUE(leap_tv1 == TimestampValue(leap_ptime2));
+  time_t leap_time_t;
+  EXPECT_TRUE(leap_tv1.ToUnixTime(&leap_time_t));
+  EXPECT_EQ(915148800, leap_time_t);
+  EXPECT_EQ("1999-01-01 00:00:00", leap_tv1.ToString());
+  EXPECT_TRUE(leap_tv2.ToUnixTime(&leap_time_t));
+  EXPECT_EQ(915148800, leap_time_t);
+  EXPECT_EQ("1999-01-01 00:00:00", leap_tv2.ToString());
 
   // Test Unix time as a float
   double result;
-  EXPECT_TRUE(TimestampValue("2013-10-21 06:43:12.07", 22).ToSubsecondUnixTime(&result));
+  EXPECT_TRUE(
+      TimestampValue::Parse("2013-10-21 06:43:12.07").ToSubsecondUnixTime(&result));
   EXPECT_EQ(1382337792.07, result);
-  EXPECT_EQ("1970-01-01 00:00:00.008000000", TimestampValue(0.008).DebugString());
+  EXPECT_EQ("1970-01-01 00:00:00.008000000",
+      TimestampValue::FromSubsecondUnixTime(0.008).ToString());
 }
 
 }

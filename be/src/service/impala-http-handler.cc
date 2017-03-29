@@ -27,6 +27,8 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
+#include "runtime/timestamp-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "service/impala-server.h"
 #include "service/client-request-state.h"
 #include "thrift/protocol/TDebugProtocol.h"
@@ -289,10 +291,10 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
       document->GetAllocator());
   value->AddMember("stmt_type", stmt_type, document->GetAllocator());
 
-  Value start_time(record.start_time.DebugString().c_str(), document->GetAllocator());
+  Value start_time(record.start_time.ToString().c_str(), document->GetAllocator());
   value->AddMember("start_time", start_time, document->GetAllocator());
 
-  Value end_time(record.end_time.DebugString().c_str(), document->GetAllocator());
+  Value end_time(record.end_time.ToString().c_str(), document->GetAllocator());
   value->AddMember("end_time", end_time, document->GetAllocator());
 
   const TimestampValue& end_timestamp =
@@ -460,17 +462,19 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::ArgumentMap& args,
     Value default_db(state->database.c_str(), document->GetAllocator());
     session_json.AddMember("default_database", default_db, document->GetAllocator());
 
-    TimestampValue local_start_time(session.second->start_time_ms / 1000);
+    TimestampValue local_start_time = TimestampValue::FromUnixTime(
+        session.second->start_time_ms / 1000);
     local_start_time.UtcToLocal();
-    Value start_time(local_start_time.DebugString().c_str(), document->GetAllocator());
+    Value start_time(local_start_time.ToString().c_str(), document->GetAllocator());
     session_json.AddMember("start_time", start_time, document->GetAllocator());
     session_json.AddMember(
         "start_time_sort", session.second->start_time_ms, document->GetAllocator());
 
-    TimestampValue local_last_accessed(session.second->last_accessed_ms / 1000);
+    TimestampValue local_last_accessed = TimestampValue::FromUnixTime(
+        session.second->last_accessed_ms / 1000);
     local_last_accessed.UtcToLocal();
     Value last_accessed(
-        local_last_accessed.DebugString().c_str(), document->GetAllocator());
+        local_last_accessed.ToString().c_str(), document->GetAllocator());
     session_json.AddMember("last_accessed", last_accessed, document->GetAllocator());
     session_json.AddMember(
         "last_accessed_sort", session.second->last_accessed_ms, document->GetAllocator());

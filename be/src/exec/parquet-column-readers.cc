@@ -614,7 +614,7 @@ inline bool ScalarColumnReader<TimestampValue, true>::NeedsConversionInline() co
 bool __attribute__((noinline)) SetTimestampConversionError(HdfsScanNodeBase* scan_node,
     RuntimeState* scanner_state, const TimestampValue* tv, const string& timezone,
     const string& detail, Status* scanner_status) {
-  ErrorMsg msg(TErrorCode::PARQUET_MR_TIMESTAMP_CONVERSION_FAILED, tv->DebugString(),
+  ErrorMsg msg(TErrorCode::PARQUET_MR_TIMESTAMP_CONVERSION_FAILED, tv->ToString(),
       timezone, scan_node->hdfs_table()->fully_qualified_name());
   if (!detail.empty()) msg.AddDetail(detail);
   Status status = scanner_state->LogOrReturnError(msg);

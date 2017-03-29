@@ -70,10 +70,10 @@ IntVal KuduPartitionExpr::GetIntVal(ExprContext* ctx, const TupleRow* row) {
     int col = tkudu_partition_expr_.referenced_columns[i];
     const ColumnDescriptor& col_desc = table_desc_->col_descs()[col];
     PrimitiveType type = col_desc.type().type;
-    Status s = WriteKuduRowValue(row_.get(), col, type, val, false);
+    Status s = WriteKuduValue(col, type, val, false, row_.get());
     // This can only fail if we set a col to an incorect type, which would be a bug in
     // planning, so we can DCHECK.
-    DCHECK(s.ok()) << "WriteKuduRowValue failed for col = " << col_desc.name()
+    DCHECK(s.ok()) << "WriteKuduValue failed for col = " << col_desc.name()
                    << " and type = " << col_desc.type() << ": " << s.GetDetail();
   }
 

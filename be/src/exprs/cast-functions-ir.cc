@@ -26,6 +26,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "util/string-parser.h"
 #include "string-functions.h"
 
@@ -229,11 +230,24 @@ CAST_FROM_TIMESTAMP(BigIntVal);
 CAST_FROM_SUBSECOND_TIMESTAMP(FloatVal);
 CAST_FROM_SUBSECOND_TIMESTAMP(DoubleVal);
 
+#define CAST_TO_SUBSECOND_TIMESTAMP(from_type) \
+  TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx, \
+                                                 const from_type& val) { \
+    if (val.is_null) return TimestampVal::null(); \
+    TimestampValue timestamp_value = TimestampValue::FromSubsecondUnixTime(val.val); \
+    TimestampVal result; \
+    timestamp_value.ToTimestampVal(&result); \
+    return result; \
+  }
+
+CAST_TO_SUBSECOND_TIMESTAMP(FloatVal);
+CAST_TO_SUBSECOND_TIMESTAMP(DoubleVal);
+
 #define CAST_TO_TIMESTAMP(from_type) \
   TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx, \
                                                  const from_type& val) { \
     if (val.is_null) return TimestampVal::null(); \
-    TimestampValue timestamp_value(val.val); \
+    TimestampValue timestamp_value = TimestampValue::FromUnixTime(val.val); \
     TimestampVal result; \
     timestamp_value.ToTimestampVal(&result); \
     return result; \
@@ -244,15 +258,13 @@ CAST_TO_TIMESTAMP(TinyIntVal);
 CAST_TO_TIMESTAMP(SmallIntVal);
 CAST_TO_TIMESTAMP(IntVal);
 CAST_TO_TIMESTAMP(BigIntVal);
-CAST_TO_TIMESTAMP(FloatVal);
-CAST_TO_TIMESTAMP(DoubleVal);
 
 TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx,
-                                               const StringVal& val) {
+    const StringVal& val) {
   if (val.is_null) return TimestampVal::null();
-  TimestampValue timestamp_value(reinterpret_cast<char*>(val.ptr), val.len);
+  TimestampValue tv = TimestampValue::Parse(reinterpret_cast<char*>(val.ptr), val.len);
   // Return null if 'val' did not parse
   TimestampVal result;
-  timestamp_value.ToTimestampVal(&result);
+  tv.ToTimestampVal(&result);
   return result;
 }

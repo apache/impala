@@ -616,7 +616,7 @@ TimestampVal DecimalOperators::CastToTimestampVal(
       int32_t seconds = dv.whole_part(scale);
       int32_t nanoseconds = ConvertToNanoseconds(
           dv.fractional_part(scale), scale);
-      TimestampValue tv(seconds, nanoseconds);
+      TimestampValue tv = TimestampValue::FromUnixTimeNanos(seconds, nanoseconds);
       tv.ToTimestampVal(&result);
       break;
     }
@@ -625,7 +625,7 @@ TimestampVal DecimalOperators::CastToTimestampVal(
       int64_t seconds = dv.whole_part(scale);
       int64_t nanoseconds = ConvertToNanoseconds(
           dv.fractional_part(scale), scale);
-      TimestampValue tv(seconds, nanoseconds);
+      TimestampValue tv = TimestampValue::FromUnixTimeNanos(seconds, nanoseconds);
       tv.ToTimestampVal(&result);
       break;
     }
@@ -639,7 +639,7 @@ TimestampVal DecimalOperators::CastToTimestampVal(
       }
       int128_t nanoseconds = ConvertToNanoseconds(
           dv.fractional_part(scale), scale);
-      TimestampValue tv(seconds, nanoseconds);
+      TimestampValue tv = TimestampValue::FromUnixTimeNanos(seconds, nanoseconds);
       tv.ToTimestampVal(&result);
       break;
     }

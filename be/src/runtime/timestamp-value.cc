@@ -59,16 +59,25 @@ namespace impala {
 const char* TimestampValue::LLVM_CLASS_NAME = "class.impala::TimestampValue";
 const double TimestampValue::ONE_BILLIONTH = 0.000000001;
 
-TimestampValue::TimestampValue(const char* str, int len) {
-  TimestampParser::Parse(str, len, &date_, &time_);
+TimestampValue TimestampValue::Parse(const char* str, int len) {
+  TimestampValue tv;
+  TimestampParser::Parse(str, len, &tv.date_, &tv.time_);
+  return tv;
 }
 
-TimestampValue::TimestampValue(const char* str, int len,
+TimestampValue TimestampValue::Parse(const string& str) {
+  return Parse(str.c_str(), str.size());
+}
+
+TimestampValue TimestampValue::Parse(const char* str, int len,
     const DateTimeFormatContext& dt_ctx) {
-  TimestampParser::Parse(str, len, dt_ctx, &date_, &time_);
+  TimestampValue tv;
+  TimestampParser::Parse(str, len, dt_ctx, &tv.date_, &tv.time_);
+  return tv;
 }
 
-int TimestampValue::Format(const DateTimeFormatContext& dt_ctx, int len, char* buff) const {
+int TimestampValue::Format(const DateTimeFormatContext& dt_ctx, int len, char* buff)
+    const {
   return TimestampParser::Format(dt_ctx, date_, time_, len, buff);
 }
 
@@ -85,7 +94,7 @@ Status TimestampValue::UtcToLocal() {
         time_.minutes() * SECONDS_IN_MINUTE +
         time_.seconds();
     tm temp;
-    if (UNLIKELY(NULL == localtime_r(&utc, &temp))) {
+    if (UNLIKELY(localtime_r(&utc, &temp) == nullptr)) {
       *this = ptime(not_a_date_time);
       return Status("Failed to convert timestamp to local time.");
     }
@@ -109,7 +118,7 @@ Status TimestampValue::UtcToLocal() {
 bool TimestampValue::FromUtc(const std::string& timezone_str) {
   DCHECK(HasDateAndTime());
   time_zone_ptr timezone = TimezoneDatabase::FindTimezone(timezone_str, *this, true);
-  if (UNLIKELY(timezone == NULL)) {
+  if (UNLIKELY(timezone == nullptr)) {
     *this = ptime(not_a_date_time);
     return false;
   }
@@ -118,7 +127,7 @@ bool TimestampValue::FromUtc(const std::string& timezone_str) {
 
 bool TimestampValue::FromUtc(time_zone_ptr timezone) {
   DCHECK(HasDateAndTime());
-  DCHECK(timezone != NULL);
+  DCHECK(timezone != nullptr);
   ptime temp;
   ToPtime(&temp);
   local_date_time lt(temp, timezone);
@@ -127,20 +136,20 @@ bool TimestampValue::FromUtc(time_zone_ptr timezone) {
 }
 
 ostream& operator<<(ostream& os, const TimestampValue& timestamp_value) {
-  return os << timestamp_value.DebugString();
+  return os << timestamp_value.ToString();
 }
 
-ptime TimestampValue::UnixTimeToPtime(time_t unix_time) const {
+ptime TimestampValue::UnixTimeToPtime(time_t unix_time) {
   /// Unix times are represented internally in boost as 32 bit ints which limits the
   /// range of dates to 1901-2038 (https://svn.boost.org/trac/boost/ticket/3109), so
   /// libc functions will be used instead.
   tm temp_tm;
   if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
-    if (UNLIKELY(localtime_r(&unix_time, &temp_tm) == NULL)) {
+    if (UNLIKELY(localtime_r(&unix_time, &temp_tm) == nullptr)) {
       return ptime(not_a_date_time);
     }
   } else {
-    if (UNLIKELY(gmtime_r(&unix_time, &temp_tm) == NULL)) {
+    if (UNLIKELY(gmtime_r(&unix_time, &temp_tm) == nullptr)) {
       return ptime(not_a_date_time);
     }
   }
@@ -151,7 +160,7 @@ ptime TimestampValue::UnixTimeToPtime(time_t unix_time) const {
   }
 }
 
-string TimestampValue::DebugString() const {
+string TimestampValue::ToString() const {
   stringstream ss;
   if (HasDate()) {
     ss << boost::gregorian::to_iso_extended_string(date_);

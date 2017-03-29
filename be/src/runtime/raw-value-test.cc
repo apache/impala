@@ -171,7 +171,7 @@ TEST_F(RawValueTest, TemplatizedHash) {
     RawValue::GetHashValue(&string_value,ColumnType::CreateVarcharType(
     ColumnType::MAX_VARCHAR_LENGTH), seed));
 
-  TimestampValue timestamp_value(253433923200);
+  TimestampValue timestamp_value = TimestampValue::FromUnixTime(253433923200);
   EXPECT_EQ(RawValue::GetHashValue<impala::TimestampValue>(
     &timestamp_value, TYPE_TIMESTAMP, seed),RawValue::GetHashValue(
     &timestamp_value, TYPE_TIMESTAMP, seed));

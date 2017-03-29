@@ -21,10 +21,9 @@
 #include <algorithm>
 #include <boost/thread.hpp>
 
-#include "common/logging.h"
-#include "runtime/timestamp-value.h"
 #include "util/time.h"
 #include "common/atomic.h"
+#include "common/logging.h"
 
 namespace impala {
 

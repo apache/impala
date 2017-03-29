@@ -281,7 +281,7 @@ Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool, Tuple* tuple)
         const string& val = col.binary_vals[val_idx];
         if (val.size() != TIMESTAMP_SIZE) return Status(ERROR_INVALID_TIMESTAMP);
         const uint8_t* bytes = reinterpret_cast<const uint8_t*>(val.data());
-        *reinterpret_cast<TimestampValue*>(slot) = TimestampValue(
+        *reinterpret_cast<TimestampValue*>(slot) = TimestampValue::FromUnixTimeNanos(
             ReadWriteUtil::GetInt<uint64_t>(bytes),
             ReadWriteUtil::GetInt<uint32_t>(bytes + sizeof(int64_t)));
         break;

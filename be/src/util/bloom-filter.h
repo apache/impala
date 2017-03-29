@@ -29,6 +29,7 @@
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/macros.h"
 #include "runtime/buffered-block-mgr.h"
+#include "util/hash-util.h"
 
 namespace impala {
 

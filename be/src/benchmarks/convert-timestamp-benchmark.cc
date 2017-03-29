@@ -77,7 +77,7 @@ void AddTestDataDateTimes(TestData* data, int n, const string& startstr) {
     stringstream ss;
     ss << to_simple_string(start);
     string ts = ss.str();
-    data->data.push_back(TimestampValue(ts.c_str(), ts.size(), dt_ctx));
+    data->data.push_back(TimestampValue::Parse(ts.c_str(), ts.size(), dt_ctx));
   }
 }
 

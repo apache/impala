@@ -106,7 +106,7 @@ TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
   } catch (boost::exception&) {
     const string& msg = Substitute(
         "Timestamp '$0' did not convert to a valid local time in timezone '$1'",
-        ts_value.DebugString(), tz_string_value.DebugString());
+        ts_value.ToString(), tz_string_value.DebugString());
     context->AddWarning(msg.c_str());
     return TimestampVal::null();
   }
@@ -154,7 +154,7 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
   } catch (boost::exception&) {
     const string& msg =
         Substitute("Timestamp '$0' in timezone '$1' could not be converted to UTC",
-            ts_value.DebugString(), tz_string_value.DebugString());
+            ts_value.ToString(), tz_string_value.DebugString());
     context->AddWarning(msg.c_str());
     return TimestampVal::null();
   }
