@@ -35,7 +35,6 @@
 #include "common/names.h"
 
 using boost::algorithm::join;
-using namespace llvm;
 using namespace strings;
 
 // In 'thrift_partition', the location is stored in a compressed format that references
@@ -294,8 +293,7 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
     null_bytes_offset_(tdesc.byteSize - tdesc.numNullBytes),
     slots_(),
     has_varlen_slots_(false),
-    tuple_path_(tdesc.tuplePath),
-    llvm_struct_(NULL) {
+    tuple_path_(tdesc.tuplePath) {
 }
 
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
@@ -595,8 +593,8 @@ void DescriptorTbl::GetTupleDescs(vector<TupleDescriptor*>* descs) const {
   }
 }
 
-Value* SlotDescriptor::CodegenIsNull(
-    LlvmCodeGen* codegen, LlvmBuilder* builder, Value* tuple) const {
+llvm::Value* SlotDescriptor::CodegenIsNull(
+    LlvmCodeGen* codegen, LlvmBuilder* builder, llvm::Value* tuple) const {
   return CodegenIsNull(codegen, builder, null_indicator_offset_, tuple);
 }
 
@@ -606,14 +604,14 @@ Value* SlotDescriptor::CodegenIsNull(
 //  %null_byte = load i8, i8* %null_byte_ptr
 //  %null_mask = and i8 %null_byte, 1
 //  %is_null = icmp ne i8 %null_mask, 0
-Value* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, LlvmBuilder* builder,
-    const NullIndicatorOffset& null_indicator_offset, Value* tuple) {
-  Value* null_byte =
+llvm::Value* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    const NullIndicatorOffset& null_indicator_offset, llvm::Value* tuple) {
+  llvm::Value* null_byte =
       CodegenGetNullByte(codegen, builder, null_indicator_offset, tuple, NULL);
-  Constant* mask =
-      ConstantInt::get(codegen->tinyint_type(), null_indicator_offset.bit_mask);
-  Value* null_mask = builder->CreateAnd(null_byte, mask, "null_mask");
-  Constant* zero = ConstantInt::get(codegen->tinyint_type(), 0);
+  llvm::Constant* mask =
+      llvm::ConstantInt::get(codegen->tinyint_type(), null_indicator_offset.bit_mask);
+  llvm::Value* null_mask = builder->CreateAnd(null_byte, mask, "null_mask");
+  llvm::Constant* zero = llvm::ConstantInt::get(codegen->tinyint_type(), 0);
   return builder->CreateICmpNE(null_mask, zero, "is_null");
 }
 
@@ -627,18 +625,19 @@ Value* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, LlvmBuilder* builder,
 //  %null_bit_set = or i8 %null_bit_cleared, %null_bit
 //  store i8 %null_bit_set, i8* %null_byte_ptr3
 void SlotDescriptor::CodegenSetNullIndicator(
-    LlvmCodeGen* codegen, LlvmBuilder* builder, Value* tuple, Value* is_null) const {
+    LlvmCodeGen* codegen, LlvmBuilder* builder, llvm::Value* tuple, llvm::Value* is_null)
+    const {
   DCHECK_EQ(is_null->getType(), codegen->boolean_type());
-  Value* null_byte_ptr;
-  Value* null_byte =
+  llvm::Value* null_byte_ptr;
+  llvm::Value* null_byte =
       CodegenGetNullByte(codegen, builder, null_indicator_offset_, tuple, &null_byte_ptr);
-  Constant* mask =
-      ConstantInt::get(codegen->tinyint_type(), null_indicator_offset_.bit_mask);
-  Constant* not_mask =
-      ConstantInt::get(codegen->tinyint_type(), ~null_indicator_offset_.bit_mask);
+  llvm::Constant* mask =
+      llvm::ConstantInt::get(codegen->tinyint_type(), null_indicator_offset_.bit_mask);
+  llvm::Constant* not_mask =
+      llvm::ConstantInt::get(codegen->tinyint_type(), ~null_indicator_offset_.bit_mask);
 
-  ConstantInt* constant_is_null = dyn_cast<ConstantInt>(is_null);
-  Value* result = NULL;
+  llvm::ConstantInt* constant_is_null = llvm::dyn_cast<llvm::ConstantInt>(is_null);
+  llvm::Value* result = NULL;
   if (constant_is_null != NULL) {
     if (constant_is_null->isOne()) {
       result = builder->CreateOr(null_byte, mask, "null_bit_set");
@@ -649,37 +648,37 @@ void SlotDescriptor::CodegenSetNullIndicator(
   } else {
     // Avoid branching by computing the new byte as:
     // (null_byte & ~mask) | (-null & mask);
-    Value* byte_with_cleared_bit =
+    llvm::Value* byte_with_cleared_bit =
         builder->CreateAnd(null_byte, not_mask, "null_bit_cleared");
-    Value* sign_extended_null = builder->CreateSExt(is_null, codegen->tinyint_type());
-    Value* bit_only = builder->CreateAnd(sign_extended_null, mask, "null_bit");
+    llvm::Value* sign_extended_null =
+        builder->CreateSExt(is_null, codegen->tinyint_type());
+    llvm::Value* bit_only = builder->CreateAnd(sign_extended_null, mask, "null_bit");
     result = builder->CreateOr(byte_with_cleared_bit, bit_only, "null_bit_set");
   }
 
   builder->CreateStore(result, null_byte_ptr);
 }
 
-Value* SlotDescriptor::CodegenGetNullByte(LlvmCodeGen* codegen, LlvmBuilder* builder,
-    const NullIndicatorOffset& null_indicator_offset, Value* tuple,
-    Value** null_byte_ptr) {
-  Constant* byte_offset =
-      ConstantInt::get(codegen->int_type(), null_indicator_offset.byte_offset);
-  Value* tuple_bytes = builder->CreateBitCast(tuple, codegen->ptr_type());
-  Value* byte_ptr = builder->CreateInBoundsGEP(tuple_bytes, byte_offset, "null_byte_ptr");
+llvm::Value* SlotDescriptor::CodegenGetNullByte(
+    LlvmCodeGen* codegen, LlvmBuilder* builder,
+    const NullIndicatorOffset& null_indicator_offset, llvm::Value* tuple,
+    llvm::Value** null_byte_ptr) {
+  llvm::Constant* byte_offset =
+      llvm::ConstantInt::get(codegen->int_type(), null_indicator_offset.byte_offset);
+  llvm::Value* tuple_bytes = builder->CreateBitCast(tuple, codegen->ptr_type());
+  llvm::Value* byte_ptr =
+      builder->CreateInBoundsGEP(tuple_bytes, byte_offset, "null_byte_ptr");
   if (null_byte_ptr != NULL) *null_byte_ptr = byte_ptr;
   return builder->CreateLoad(byte_ptr, "null_byte");
 }
 
-StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
-  // If we already generated the llvm type, just return it.
-  if (llvm_struct_ != NULL) return llvm_struct_;
-
+llvm::StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
   // Sort slots in the order they will appear in LLVM struct.
   vector<SlotDescriptor*> sorted_slots(slots_.size());
   for (SlotDescriptor* slot: slots_) sorted_slots[slot->slot_idx_] = slot;
 
   // Add the slot types to the struct description.
-  vector<Type*> struct_fields;
+  vector<llvm::Type*> struct_fields;
   int curr_struct_offset = 0;
   for (SlotDescriptor* slot: sorted_slots) {
     // IMPALA-3207: Codegen for CHAR is not yet implemented: bail out of codegen here.
@@ -697,7 +696,7 @@ StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
 
   DCHECK_LE(curr_struct_offset, byte_size_);
   if (curr_struct_offset < byte_size_) {
-    struct_fields.push_back(ArrayType::get(codegen->GetType(TYPE_TINYINT),
+    struct_fields.push_back(llvm::ArrayType::get(codegen->GetType(TYPE_TINYINT),
         byte_size_ - curr_struct_offset));
   }
 
@@ -706,16 +705,15 @@ StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
   // fields are already aligned because we order the slots by descending size and only
   // have powers-of-two slot sizes. Note that STRING and TIMESTAMP slots both occupy
   // 16 bytes although their useful payload is only 12 bytes.
-  StructType* tuple_struct = StructType::get(codegen->context(),
-      ArrayRef<Type*>(struct_fields), true);
-  const DataLayout& data_layout = codegen->execution_engine()->getDataLayout();
-  const StructLayout* layout = data_layout.getStructLayout(tuple_struct);
+  llvm::StructType* tuple_struct = llvm::StructType::get(codegen->context(),
+      llvm::ArrayRef<llvm::Type*>(struct_fields), true);
+  const llvm::DataLayout& data_layout = codegen->execution_engine()->getDataLayout();
+  const llvm::StructLayout* layout = data_layout.getStructLayout(tuple_struct);
   for (SlotDescriptor* slot: slots()) {
     // Verify that the byte offset in the llvm struct matches the tuple offset
     // computed in the FE.
     DCHECK_EQ(layout->getElementOffset(slot->llvm_field_idx()), slot->tuple_offset());
   }
-  llvm_struct_ = tuple_struct;
   return tuple_struct;
 }
 

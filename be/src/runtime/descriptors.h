@@ -419,7 +419,6 @@ class TupleDescriptor {
   ///   int32_t  min_a;
   ///   int64_t  count_val;
   /// };
-  /// The resulting struct definition is cached.
   llvm::StructType* GetLlvmStruct(LlvmCodeGen* codegen) const;
 
   static const char* LLVM_CLASS_NAME;
@@ -450,9 +449,6 @@ class TupleDescriptor {
   /// materialized into this tuple. Non-empty if this tuple belongs to a nested
   /// collection, empty otherwise.
   SchemaPath tuple_path_;
-
-  /// Cached codegen'd struct type for this tuple desc
-  mutable llvm::StructType* llvm_struct_;
 
   TupleDescriptor(const TTupleDescriptor& tdesc);
   void AddSlot(SlotDescriptor* slot);
