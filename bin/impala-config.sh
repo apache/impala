@@ -72,14 +72,14 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=371-4cf61fa2f3
+export IMPALA_TOOLCHAIN_BUILD_ID=374-72f1e9bb85
 
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p4
 export IMPALA_BINUTILS_VERSION=2.26.1
 export IMPALA_BOOST_VERSION=1.57.0-p1
-export IMPALA_BREAKPAD_VERSION=88e5b2c8806bac3f2c80d2fe80094be5bd371601
+export IMPALA_BREAKPAD_VERSION=88e5b2c8806bac3f2c80d2fe80094be5bd371601-p2
 export IMPALA_BZIP2_VERSION=1.0.6-p2
 export IMPALA_CMAKE_VERSION=3.2.3-p1
 export IMPALA_CRCUTIL_VERSION=440ba7babeff77ffad992df3a10c767f184e946e
