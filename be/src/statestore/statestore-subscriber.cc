@@ -48,6 +48,10 @@ DEFINE_int32(statestore_subscriber_cnxn_retry_interval_ms, 3000, "The interval, 
     "to wait between attempts to make an RPC connection to the statestore.");
 DECLARE_string(ssl_client_ca_certificate);
 
+DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_private_key);
+DECLARE_string(ssl_private_key_password_cmd);
+
 namespace impala {
 
 // Used to identify the statestore in the failure detector
@@ -189,7 +193,13 @@ Status StatestoreSubscriber::Start() {
 
     heartbeat_server_.reset(new ThriftServer("StatestoreSubscriber", processor,
         heartbeat_address_.port, NULL, NULL, 5));
+    if (EnableInternalSslConnections()) {
+      LOG(INFO) << "Enabling SSL for Statestore subscriber";
+      RETURN_IF_ERROR(heartbeat_server_->EnableSsl(FLAGS_ssl_server_certificate,
+          FLAGS_ssl_private_key, FLAGS_ssl_private_key_password_cmd));
+    }
     RETURN_IF_ERROR(heartbeat_server_->Start());
+
     LOG(INFO) << "Registering with statestore";
     status = Register();
     if (status.ok()) {
