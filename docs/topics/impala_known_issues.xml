@@ -93,7 +93,7 @@ Upstream & Internal JIRAs: https://issues.apache.org/jira/browse/IMPALA-2648, IM
 Severity: Low.  This does not occur frequently.
 Workaround:  Reduce the number of partitions.
 
-More from: https://issues.cloudera.org/browse/IMPALA-2093?filter=11278&jql=project%20%3D%20IMPALA%20AND%20priority%20in%20(blocker%2C%20critical)%20AND%20status%20in%20(open%2C%20Reopened)%20AND%20labels%20%3D%20correctness%20ORDER%20BY%20priority%20DESC
+More from the JIRA report of blocker/critical issues:
 
 IMPALA-2093
 Wrong plan of NOT IN aggregate subquery when a constant is used in subquery predicate
@@ -1720,7 +1720,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
           <b>Bug:</b> <xref keyref="IMPALA-1619">IMPALA-1619</xref>
         </p>
 
-        <p><b>Resolution:</b> Fixed in <keyword keyref="impala2?0"/> and <keyword keyref="impala263"/>.</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala270"/> and <keyword keyref="impala263"/>.</p>
 
       </conbody>
 

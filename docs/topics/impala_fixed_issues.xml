@@ -56,7 +56,7 @@ under the License.
 
       <p>
         For the full list of Impala fixed issues in <keyword keyref="impala28_full"/>, see
-        <xref href="https://issues.cloudera.org/issues/?jql=type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.8.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.8.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">this report in the Impala JIRA tracker</xref>.
+        <xref keyref="jira_list_280"/>.
       </p>
 
     </conbody>
@@ -76,7 +76,7 @@ under the License.
         (<codeph>priority='Blocker'</codeph>) from the JIRA system.
 -->
         For the full list of Impala fixed issues in Impala 2.7.0, see
-        <xref href="https://issues.cloudera.org/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.7.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.7.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">this report in the Impala JIRA tracker</xref>.
+        <xref keyref="jira_list_270"/>.
       </p>
 
     </conbody>
@@ -108,7 +108,7 @@ under the License.
         The following list contains the most critical fixed issues
         (<codeph>priority='Blocker'</codeph>) from the JIRA system.
         For the full list of fixed issues in <keyword keyref="impala260"/>, see
-        <xref href="https://issues.cloudera.org/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.6.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.6.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">this report in the Impala JIRA tracker</xref>.
+        <xref keyref="jira_list_260"/>.
       </p>
 
     </conbody>
@@ -280,7 +280,7 @@ under the License.
       <p>
         The following list contains the most critical issues (<codeph>priority='Blocker'</codeph>) from the JIRA system.
         For the full list of fixed issues in <keyword keyref="impala25_full"/>, see
-        <xref href="https://issues.cloudera.org/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.5.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.5.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">this report in the Impala JIRA tracker</xref>.
+        <xref keyref="jira_list_250"/>.
       </p>
 
     </conbody>
@@ -567,9 +567,11 @@ select 2061013007, conv(cast(cast(2061013007 as decimal(20,0)) as bigint), 16, 1
 
     <conbody>
 
-      <p> The set of fixes for Impala in <keyword keyref="impala240"/> is the same as in <keyword keyref="impala232"/>.
-        See <xref href="impala_fixed_issues.xml#fixed_issues_232"
-          audience="integrated"/> for details. </p>
+      <p>
+        The set of fixes for Impala in <keyword keyref="impala240"/> is the same as
+        in <keyword keyref="impala232"/>.
+        <!-- See <xref href="impala_fixed_issues.xml#fixed_issues_232"/> for details. -->
+      </p>
 
     </conbody>
 
@@ -1821,8 +1823,7 @@ d93fb5a IMPALA-1899: Cleanup handling of Hive's field schema
 
       <p>
         For the full list of fixed issues in <keyword keyref="impala220"/>, including over 40 critical issues, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.2%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_220"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -1998,9 +1999,9 @@ IMPALA-1607
 
 <!-- All 2.1.x subsections go under here -->
 
-  <concept rev="2.3.10" id="fixed_issues_2310">
+  <concept rev="2.1.10" id="fixed_issues_2110">
 
-    <title>Issues Fixed in <keyword keyref="impala2310"/></title>
+    <title>Issues Fixed in <keyword keyref="impala2110"/></title>
 
     <conbody>
       <p></p>
@@ -2457,8 +2458,7 @@ c132c75 IMPALA-1808: AnalyticEvalNode cannot handle partition/order by exprs wit
 
       <p>
         For the full list of fixed issues in Impala 2.1.2, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.1.2%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_212"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -2525,8 +2525,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
 
       <p>
         For the full list of fixed issues in Impala 2.1.1, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.1.1%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_211"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -2588,8 +2587,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
 
       <p>
         For the full list of fixed issues in Impala 2.1.0, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.1%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_210"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -2686,8 +2684,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
 
       <p>
         For the full list of fixed issues in Impala 2.0.5, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.5%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_205"/>.
       </p>
 
     </conbody>
@@ -2705,8 +2702,7 @@ IMPALA-1120: Fetch column statistics using Hive 0.13 bulk API - also in 5.2.4 / 
 
       <p>
         For the full list of fixed issues in Impala 2.0.4, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.4%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_204"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -2756,8 +2752,6 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
       </conbody>
     </concept>
 
-
-
   </concept>
 
   <concept rev="2.0.3" id="fixed_issues_203">
@@ -2772,8 +2766,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
       <p>
         For the full list of fixed issues in Impala 2.0.3, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.3%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_203"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -2823,8 +2816,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
       <p>
         For the full list of fixed issues in Impala 2.0.2, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.2%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_202"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -2948,8 +2940,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
       <p>
         For the full list of fixed issues in Impala 2.0.1, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.1%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_201"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -2996,8 +2987,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
       <p>
         For the full list of fixed issues in Impala 2.0.0, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+2.0%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_200"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -3351,8 +3341,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
       <p>
         For the full list of fixed issues in Impala 1.4.2, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.4.2%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_142"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -3371,8 +3360,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
       <p>
         For the full list of fixed issues in Impala 1.4.1, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.4.1%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_141"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -3533,8 +3521,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
       <p>
         For the full list of fixed issues in Impala 1.4.0, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.4%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_140"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -3845,8 +3832,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
       <p>
         For the full list of fixed issues in Impala 1.3.1, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.3.1%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_131"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -4084,8 +4070,7 @@ db3362f IMPALA-1801: external-data-source-executor leaking global jni refs
 
       <p>
         For the full list of fixed issues, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.3%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_130"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -4363,8 +4348,7 @@ Bad stats:
       <p>
         This section lists the most significant issues fixed in Impala 1.2.4. For the full list of fixed issues,
         see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.4%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_124"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -4591,14 +4575,6 @@ Bad stats:
 
     <conbody>
 
-<!--
-  <p>
-    This section lists the most significant issues fixed in Impala 1.2.3. For the full list of fixed issues, see
-    <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.3%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-    this report in the JIRA system</xref>.
-  </p>
--->
-
       <p>
         This release is a fix release that supercedes Impala 1.2.2, with the same features and fixes as 1.2.2 plus
         one additional fix for compatibility with Parquet files generated outside of Impala by components such as
@@ -4641,9 +4617,7 @@ Bad stats:
 
       <p>
         This section lists the most significant issues fixed in Impala 1.2.2. For the full list of fixed issues,
-        see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.2%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        see <xref keyref="jira_list_122"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -4786,9 +4760,7 @@ Bad stats:
 
       <p>
         This section lists the most significant issues fixed in Impala 1.2.1. For the full list of fixed issues,
-        see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.1%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        see <xref keyref="jira_list_121"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -4883,9 +4855,7 @@ Bad stats:
 
       <p>
         This section lists the most significant issues fixed in Impala 1.2 (beta). For the full list of fixed
-        issues, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.2%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        issues, see <xref keyref="jira_list_120"/>.
       </p>
     </conbody>
   </concept>
@@ -4898,9 +4868,7 @@ Bad stats:
 
       <p>
         This section lists the most significant issues fixed in Impala 1.1.1. For the full list of fixed issues,
-        see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.1.1%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        see <xref keyref="jira_list_111"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -5062,8 +5030,7 @@ Bad stats:
 
       <p>
         This section lists the most significant issues fixed in Impala 1.1. For the full list of fixed issues, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.1%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        <xref keyref="jira_list_110"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -5193,9 +5160,7 @@ Bad stats:
 
       <p>
         This section lists the most significant issues fixed in Impala 1.0.1. For the full list of fixed issues,
-        see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project%3Dimpala+and+fixVersion%3D%22Impala+1.0.1%22+and+resolution%3D%22Fixed%22" format="html" scope="external">
-        this report in the JIRA system</xref>.
+        see <xref keyref="jira_list_101"/>.
       </p>
 
       <p outputclass="toc inpage"/>
@@ -5429,8 +5394,7 @@ hive&gt; NULL</codeblock>
 
       <p>
         Here are the major user-visible issues fixed in Impala 1.0. For a full list of fixed issues, see
-        <xref href="https://issues.cloudera.org/secure/IssueNavigator.jspa?reset=true&amp;jqlQuery=project+%3D+impala+AND+resolution+%3D+Fixed+AND+fixVersion+%3D+%22Impala+1.0%22+ORDER+BY+key+ASC%2C+assignee+ASC%2C+priority+DESC" scope="external" format="html">this
-        report in the public issue tracker</xref>.
+        <xref keyref="jira_list_100"/>.
       </p>
 
       <p outputclass="toc inpage"/>

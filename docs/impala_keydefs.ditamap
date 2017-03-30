@@ -308,6 +308,201 @@ under the License.
   <keydef href="http://blog.cloudera.com/blog/2012/03/hbase-hadoop-xceivers/" scope="external" format="html" keys="hbase-hadoop-xceivers"/>
   <keydef href="http://blog.cloudera.com/blog/2013/07/how-hiveserver2-brings-security-and-concurrency-to-apache-hive/" scope="external" format="html" keys="how-hiveserver2-brings-security-and-concurrency-to-apache-hive"/>
 
+<!-- Pointers to JIRA reports for various Impala releases. -->
+<!-- Used in the "Fixed Issues" page. -->
+
+  <keydef keys="jira_list_280" href="https://issues.apache.org/jira/issues/?jql=type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.8.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.8.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_270" href="https://issues.apache.org/jira/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.7.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.7.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_263" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_262" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_260" href="https://issues.apache.org/jira/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.6.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.6.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_254" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_252" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_251" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_250" href="https://issues.apache.org/jira/issues/?jql=%20type%20%3D%20bug%20and%20project%20%3D%20IMPALA%20AND%20resolution%20%3D%20fixed%20AND%20affectedVersion%20!%3D%20%22Impala%202.5.0%22%20AND%20fixVersion%20%3D%20%22Impala%202.5.0%22%20and%20not%20labels%20%3D%20broken-build%20order%20by%20priority%20desc" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_234" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_232" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_230" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_2210" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_229" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_228" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_227" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_225" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_223" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_221" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_220" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+2.2%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_217" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_216" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_215" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_214" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_213" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_212" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+2.1.2%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_211" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+2.1.1%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_210" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+2.1%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_205" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.5%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_204" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.4%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_203" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.3%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_202" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.2%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_201" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+2.0.1%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_200" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+2.0%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_144" href="" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_142" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.4.2%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_141" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.4.1%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_140" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.4%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_131" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.3.1%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_130" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.3%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_124" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.4%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_122" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.2%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_121" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.2.1%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_120" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.2%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_111" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.1.1%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_110" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.1%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_101" href="https://issues.apache.org/jira/issues/?jql=project%3Dimpala+and+fixVersion%3D%22Impala+1.0.1%22+and+resolution%3D%22Fixed%22" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
+  <keydef keys="jira_list_100" href="https://issues.apache.org/jira/issues/?jql=project+%3D+impala+AND+resolution+%3D+Fixed+AND+fixVersion+%3D+%22Impala+1.0%22+ORDER+BY+key+ASC%2C+assignee+ASC%2C+priority+DESC" scope="external" format="html">
+    <topicmeta><linktext>this report in the Impala JIRA tracker</linktext></topicmeta>
+  </keydef>
+
 <!-- Pointers to external Impala JIRA URLs.
      All the way up to IMPALA-9999, so even future JIRAs are
      easy to link without further fiddling.
@@ -10355,6 +10550,7 @@ under the License.
   <keydef keys="impala225"><topicmeta><keywords><keyword>Impala 2.2.5</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala221"><topicmeta><keywords><keyword>Impala 2.2.1</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala220"><topicmeta><keywords><keyword>Impala 2.2.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala2110"><topicmeta><keywords><keyword>Impala 2.1.10</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala217"><topicmeta><keywords><keyword>Impala 2.1.7</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala210"><topicmeta><keywords><keyword>Impala 2.1.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala200"><topicmeta><keywords><keyword>Impala 2.0.0</keyword></keywords></topicmeta></keydef>
@@ -10390,7 +10586,6 @@ under the License.
   <keydef href="topics/impala_cluster_sizing.xml" keys="cluster_sizing"/>
   <keydef href="topics/impala_schema_design.xml" keys="schema_design"/>
   <keydef href="topics/impala_install.xml" keys="install"/>
-  <keydef audience="hidden" href="topics/impala_cm_installation.xml" keys="cm_installation"/>
   <keydef href="topics/impala_config.xml" keys="config"/>
   <keydef href="topics/impala_config_performance.xml" keys="config_performance"/>
   <keydef href="topics/impala_odbc.xml" keys="impala_odbc"/>
