@@ -294,6 +294,7 @@ Status HdfsSequenceScanner::ProcessRange() {
   // We count the time here since there is too much overhead to do
   // this on each record.
   SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+  int64_t num_rows_read = 0;
 
   while (!finished()) {
     DCHECK_GT(record_locations_.size(), 0);
@@ -336,13 +337,12 @@ Status HdfsSequenceScanner::ProcessRange() {
     } else {
       add_row = WriteTemplateTuples(tuple_row_mem, 1);
     }
-
-    COUNTER_ADD(scan_node_->rows_read_counter(), 1);
+    num_rows_read++;
     if (add_row) RETURN_IF_ERROR(CommitRows(1));
     if (scan_node_->ReachedLimit()) break;
 
     // Sequence files don't end with syncs
-    if (stream_->eof()) return Status::OK();
+    if (stream_->eof())  break;
 
     // Check for sync by looking for the marker that precedes syncs.
     int marker;
@@ -353,6 +353,7 @@ Status HdfsSequenceScanner::ProcessRange() {
     }
   }
 
+  COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
   return Status::OK();
 }
 

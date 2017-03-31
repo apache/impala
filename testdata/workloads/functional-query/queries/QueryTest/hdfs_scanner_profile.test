@@ -1,0 +1,8 @@
+====
+---- QUERY
+# This query will do a full table scan to count the num of rows
+# read during a scan
+select * from alltypesagg
+---- RUNTIME_PROFILE
+row_regex: .*RowsRead: 11.00K .
+====

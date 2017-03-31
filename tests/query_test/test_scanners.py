@@ -68,6 +68,13 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/scanners', new_vector)
 
+  def test_hdfs_scanner_profile(self, vector):
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['num_nodes'] = 1
+    if new_vector.get_value('table_format').file_format in ('kudu', 'hbase'):
+      pytest.skip()
+    self.run_test_case('QueryTest/hdfs_scanner_profile', new_vector)
+
 # Test all the scanners with a simple limit clause. The limit clause triggers
 # cancellation in the scanner code paths.
 class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
