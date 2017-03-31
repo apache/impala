@@ -78,7 +78,8 @@ KUDU_TS_RPC_FREE_PORT_START=31200
 # existing cluster.
 export HDFS_WEBUI_PORT=5070   # changed from 50070 so it is not ephemeral
 export YARN_WEBUI_PORT=8088   # same as default
-export KMS_WEBUI_PORT=16000   # same as default
+export KMS_WEBUI_PORT=9600    # changed to make room for non-ephemeral HBase ports
+                              # (HADOOP-12811)
 export KUDU_WEBUI_PORT=8051   # same as default
 
 # Empty dirs that should be included in the templates. Since git ignores empty dirs it is

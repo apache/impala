@@ -21,6 +21,9 @@ DIR=$(dirname $0)
 
 . "$DIR/common"
 
+# KMS_WEBUI_PORT from impala config
+export KMS_HTTP_PORT=$KMS_WEBUI_PORT
+
 # Path to the file where the catalina server writes the PID
 export CATALINA_PID=$PID_DIR/kms
 export KMS_CONFIG="$HADOOP_CONF_DIR"

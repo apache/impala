@@ -54,6 +54,31 @@
     <value>${IMPALA_CLUSTER_LOGS_DIR}/zoo</value>
   </property>
 
+  <property>
+    <name>hbase.master.port</name>
+    <value>16000</value>
+  </property>
+
+  <property>
+    <name>hbase.master.info.port</name>
+    <value>16010</value>
+  </property>
+
+  <property>
+    <name>hbase.regionserver.port</name>
+    <value>16020</value>
+  </property>
+
+  <property>
+    <name>hbase.regionserver.info.port</name>
+    <value>16030</value>
+  </property>
+
+  <property>
+    <name>hbase.status.multicast.port</name>
+    <value>16100</value>
+  </property>
+
   <!-- BEGIN Kerberos settings -->
   <property>
     <name>hbase.security.authentication</name>
