@@ -44,6 +44,7 @@ from urlparse import urlparse
 from xml.etree.ElementTree import parse as parse_xml
 from zipfile import ZipFile
 
+
 from db_connection import HiveConnection, ImpalaConnection
 from tests.common.errors import Timeout
 from tests.util.shell_util import shell as local_shell
@@ -71,7 +72,8 @@ class Cluster(object):
     self._hadoop_configs = None
     self._local_hadoop_conf_dir = None
     self.hadoop_user_name = getuser()
-    self.is_kerberized = False
+    self.use_kerberos = False
+    self.use_ssl = False
 
     self._hdfs = None
     self._yarn = None
@@ -360,9 +362,18 @@ class Hdfs(Service):
     """Returns an HdfsClient."""
     endpoint = self.cluster.get_hadoop_config("dfs.namenode.http-address",
                                               "0.0.0.0:50070")
-    if endpoint.startswith("0.0.0.0"):
-      endpoint.replace("0.0.0.0", "127.0.0.1")
-    return HdfsClient("http://%s" % endpoint, use_kerberos=False,
+    ip, port = endpoint.split(':')
+    if ip == "0.0.0.0":
+      ip = "127.0.0.1"
+    if self.cluster.use_ssl:
+      port = self.cluster.get_hadoop_config("dfs.https.port", 20102)
+      scheme = 'https'
+    else:
+      scheme = 'http'
+    endpoint = ':'.join([ip, port])
+    return HdfsClient(
+        "{scheme}://{endpoint}".format(scheme=scheme, endpoint=endpoint),
+        use_kerberos=self.cluster.use_kerberos,
         user_name=(self._admin_user_name if as_admin else self.cluster.hadoop_user_name))
 
   def ensure_home_dir(self, user=None):
@@ -381,12 +392,16 @@ class Hdfs(Service):
 class HdfsClient(object):
 
   def __init__(self, url, user_name=None, use_kerberos=False):
+    # Set a specific session that doesn't verify SSL certs. This is needed because
+    # requests doesn't like self-signed certs.
+    # TODO: Support a CA bundle.
+    s = requests.Session()
+    s.verify = False
     if use_kerberos:
-      # TODO: Have the virtualenv attempt to install a list of optional libs.
       try:
-        import kerberos
+        from hdfs.ext.kerberos import KerberosClient
       except ImportError as e:
-        if "No module named kerberos" not in str(e):
+        if "No module named requests_kerberos" not in str(e):
           raise e
         import os
         import subprocess
@@ -394,16 +409,18 @@ class HdfsClient(object):
         pip_path = os.path.join(os.environ["IMPALA_HOME"], "infra", "python", "env",
             "bin", "pip")
         try:
-          local_shell(pip_path + " install kerboros", stdout=subprocess.PIPE,
-              stderr=subprocess.STDOUT)
+          local_shell(pip_path + " install pykerberos==1.1.14 requests-kerberos==0.11.0",
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.STDOUT)
           LOG.info("kerberos installation complete.")
         except Exception as e:
           LOG.error("kerberos installation failed. Try installing libkrb5-dev and"
               " then try again.")
           raise e
-      self._client = hdfs.ext.kerberos.KerberosClient(url, user=user_name)
+      from hdfs.ext.kerberos import KerberosClient
+      self._client = KerberosClient(url, session=s)
     else:
-      self._client = hdfs.client.InsecureClient(url, user=user_name)
+      self._client = hdfs.client.InsecureClient(url, user=user_name, session=s)
 
   def __getattr__(self, name):
     return getattr(self._client, name)
@@ -463,7 +480,7 @@ class Hive(Service):
   def connect(self, db_name=None):
     conn = HiveConnection(host_name=self.hs2_host_name, port=self.hs2_port,
         user_name=self.cluster.hadoop_user_name, db_name=db_name,
-        use_kerberos=self.cluster.is_kerberized)
+        use_kerberos=self.cluster.use_kerberos, use_ssl=self.cluster.use_ssl)
     conn.cluster = self.cluster
     return conn
 
@@ -497,7 +514,7 @@ class Impala(Service):
       impalad = choice(self.impalads)
     conn = ImpalaConnection(host_name=impalad.host_name, port=impalad.hs2_port,
         user_name=self.cluster.hadoop_user_name, db_name=db_name,
-        use_kerberos=self.cluster.is_kerberized)
+        use_kerberos=self.cluster.use_kerberos, use_ssl=self.cluster.use_ssl)
     conn.cluster = self.cluster
     return conn
 
@@ -734,9 +751,19 @@ class Impalad(object):
     return data
 
   def _request_web_page(self, relative_url, params={}, timeout_secs=DEFAULT_TIMEOUT):
-    url = "http://%s:%s%s" % (self.host_name, self.web_ui_port, relative_url)
+    if self.cluster.use_ssl:
+      scheme = 'https'
+    else:
+      scheme = 'http'
+    url = '{scheme}://{host}:{port}{url}'.format(
+        scheme=scheme,
+        host=self.host_name,
+        port=self.web_ui_port,
+        url=relative_url)
     try:
-      resp = requests.get(url, params=params, timeout=timeout_secs)
+      # verify=False is needed because of self-signed certifiates
+      # TODO: support a CA bundle that users could point to instead
+      resp = requests.get(url, params=params, timeout=timeout_secs, verify=False)
     except requests.exceptions.Timeout as e:
       raise Timeout(underlying_exception=e)
     resp.raise_for_status()

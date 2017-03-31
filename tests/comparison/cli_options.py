@@ -156,6 +156,13 @@ def add_cm_options(parser):
       help='If CM manages multiple clusters, use this to specify which cluster to use.')
 
 
+def add_ssl_options(parser):
+  group = parser.add_argument_group('SSL Options')
+  group.add_argument(
+      '--use-ssl', action='store_true', default=False,
+      help='Use SSL to connect')
+
+
 def create_cluster(args):
   if args.cm_host:
     cluster = CmCluster(
@@ -167,6 +174,8 @@ def create_cluster(args):
   else:
     cluster = MiniCluster(args.hive_host, args.hive_port, args.minicluster_num_impalads)
   cluster.hadoop_user_name = args.hadoop_user_name
+  cluster.use_kerberos = getattr(args, 'use_kerberos', False)
+  cluster.use_ssl = getattr(args, 'use_ssl', False)
   return cluster
 
 

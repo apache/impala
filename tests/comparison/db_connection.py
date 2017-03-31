@@ -851,11 +851,13 @@ class ImpalaConnection(DbConnection):
 
   _DB_TYPE = IMPALA
   _CURSOR_CLASS = ImpalaCursor
+  _KERBEROS_SERVICE_NAME = 'impala'
   _NON_KERBEROS_AUTH_MECH = 'NOSASL'
 
-  def __init__(self, use_kerberos=False, **kwargs):
+  def __init__(self, use_kerberos=False, use_ssl=False, **kwargs):
     self._use_kerberos = use_kerberos
     self.cluster = None
+    self._use_ssl = use_ssl
     DbConnection.__init__(self, **kwargs)
 
   def clone(self, db_name):
@@ -884,7 +886,9 @@ class ImpalaConnection(DbConnection):
         password=self._password,
         database=self.db_name,
         timeout=(60 * 60),
-        auth_mechanism=('GSSAPI' if self._use_kerberos else self._NON_KERBEROS_AUTH_MECH))
+        auth_mechanism=('GSSAPI' if self._use_kerberos else self._NON_KERBEROS_AUTH_MECH),
+        kerberos_service_name=self._KERBEROS_SERVICE_NAME,
+        use_ssl=self._use_ssl)
 
 
 class HiveCursor(ImpalaCursor):
@@ -909,6 +913,7 @@ class HiveConnection(ImpalaConnection):
 
   _DB_TYPE = HIVE
   _CURSOR_CLASS = HiveCursor
+  _KERBEROS_SERVICE_NAME = 'hive'
   _NON_KERBEROS_AUTH_MECH = 'PLAIN'
 
 

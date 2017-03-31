@@ -298,6 +298,8 @@ if __name__ == "__main__":
   parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
   cli_options.add_logging_options(parser)
   cli_options.add_cluster_options(parser)  # --cm-host and similar args added here
+  cli_options.add_kerberos_options(parser)
+  cli_options.add_ssl_options(parser)
 
   parser.add_argument("-s", "--source-db", default="tpch_parquet")
   parser.add_argument("-t", "--target-db", default="tpch_nested_parquet")

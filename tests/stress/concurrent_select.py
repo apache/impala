@@ -1650,6 +1650,7 @@ def main():
   cli_options.add_logging_options(parser)
   cli_options.add_cluster_options(parser)
   cli_options.add_kerberos_options(parser)
+  cli_options.add_ssl_options(parser)
   parser.add_argument(
       "--runtime-info-path",
       default=os.path.join(gettempdir(), "{cm_host}_query_runtime_info.json"),
@@ -1825,7 +1826,6 @@ def main():
             query_option=query_option, value=value))
 
   cluster = cli_options.create_cluster(args)
-  cluster.is_kerberized = args.use_kerberos
   impala = cluster.impala
   if impala.find_stopped_impalads():
     impala.restart()
