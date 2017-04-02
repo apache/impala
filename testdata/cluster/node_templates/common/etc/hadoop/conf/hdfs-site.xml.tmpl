@@ -29,17 +29,17 @@
 
   <property>
     <name>dfs.datanode.http.address</name>
-    <value>127.0.0.1:0</value>
+    <value>127.0.0.1:${DATANODE_HTTP_PORT}</value>
   </property>
 
   <property>
     <name>dfs.datanode.ipc.address</name>
-    <value>127.0.0.1:0</value>
+    <value>127.0.0.1:${DATANODE_IPC_PORT}</value>
   </property>
 
   <property>
     <name>dfs.datanode.https.address</name>
-    <value>0.0.0.0:0</value>
+    <value>127.0.0.1:${DATANODE_HTTPS_PORT}</value>
   </property>
 
   <!-- Configuration to enable disk location metadata -->
