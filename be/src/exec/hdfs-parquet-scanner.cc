@@ -491,7 +491,8 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
   return Status::OK();
 }
 
-Status HdfsParquetScanner::EvaluateStatsConjuncts(const parquet::RowGroup& row_group,
+Status HdfsParquetScanner::EvaluateStatsConjuncts(
+    const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
     bool* skip_row_group) {
   *skip_row_group = false;
 
@@ -538,25 +539,27 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(const parquet::RowGroup& row_g
     int col_idx = node->col_idx;
     DCHECK(col_idx < row_group.columns.size());
 
-    if (!ParquetMetadataUtils::HasRowGroupStats(row_group, col_idx)) continue;
-    const parquet::Statistics& stats = row_group.columns[col_idx].meta_data.statistics;
+    const vector<parquet::ColumnOrder>& col_orders = file_metadata.column_orders;
+    const parquet::ColumnOrder* col_order = nullptr;
+    if (col_idx < col_orders.size()) col_order = &col_orders[col_idx];
 
+    const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
+    const ColumnType& col_type = slot_desc->type();
     bool stats_read = false;
     void* slot = min_max_tuple->GetSlot(slot_desc->tuple_offset());
-    const ColumnType& col_type = slot_desc->type();
-
     const string& fn_name = conjunct->root()->function_name();
     if (fn_name == "lt" || fn_name == "le") {
       // We need to get min stats.
-      stats_read = ColumnStatsBase::ReadFromThrift(stats, col_type,
-          ColumnStatsBase::StatsField::MIN, slot);
+      stats_read = ColumnStatsBase::ReadFromThrift(
+          col_chunk, col_type, col_order, ColumnStatsBase::StatsField::MIN, slot);
     } else if (fn_name == "gt" || fn_name == "ge") {
       // We need to get max stats.
-      stats_read = ColumnStatsBase::ReadFromThrift(stats, col_type,
-          ColumnStatsBase::StatsField::MAX, slot);
+      stats_read = ColumnStatsBase::ReadFromThrift(
+          col_chunk, col_type, col_order, ColumnStatsBase::StatsField::MAX, slot);
     } else {
       DCHECK(false) << "Unsupported function name for statistics evaluation: " << fn_name;
     }
+
     if (stats_read) min_max_conjuncts_ctxs_to_eval_.push_back(conjunct);
   }
 
@@ -628,7 +631,8 @@ Status HdfsParquetScanner::NextRowGroup() {
 
     // Evaluate row group statistics.
     bool skip_row_group_on_stats;
-    RETURN_IF_ERROR(EvaluateStatsConjuncts(row_group, &skip_row_group_on_stats));
+    RETURN_IF_ERROR(
+        EvaluateStatsConjuncts(file_metadata_, row_group, &skip_row_group_on_stats));
     if (skip_row_group_on_stats) {
       COUNTER_ADD(num_stats_filtered_row_groups_counter_, 1);
       continue;

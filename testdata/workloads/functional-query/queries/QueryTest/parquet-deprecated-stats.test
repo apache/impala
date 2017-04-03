@@ -1,0 +1,144 @@
+====
+---- QUERY
+select id, bool_col from deprecated_stats where int_col < 0
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where tinyint_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where smallint_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where int_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where bigint_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where float_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where double_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# Test with inverted predicate
+select id, bool_col from deprecated_stats where -1 > int_col
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where tinyint_col > 9
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where smallint_col > 9
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select id, bool_col from deprecated_stats where int_col > 9
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where bigint_col > 90
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where float_col > 9.9
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where double_col > 99
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from deprecated_stats where string_col < "0"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+select count(*) from deprecated_stats where string_col > ":"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+select count(*) from deprecated_stats where timestamp_col = "2119-02-01 00:00:00"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+# Test that adding a column without stats will not disable stats-based pruning.
+select count(*) from deprecated_stats where int_col < 0 and timestamp_col != "2009-02-01 00:00:00"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====

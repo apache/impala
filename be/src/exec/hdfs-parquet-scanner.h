@@ -486,9 +486,11 @@ class HdfsParquetScanner : public HdfsScanner {
   virtual Status GetNextInternal(RowBatch* row_batch);
 
   /// Evaluates the min/max predicates of the 'scan_node_' using the parquet::Statistics
-  /// of 'row_group'. Sets 'skip_row_group' to true if the row group can be skipped,
-  /// 'false' otherwise.
-  Status EvaluateStatsConjuncts(const parquet::RowGroup& row_group, bool* skip_row_group);
+  /// of 'row_group'. 'file_metadata' is used to determine the ordering that was used to
+  /// compute the statistics. Sets 'skip_row_group' to true if the row group can be
+  /// skipped, 'false' otherwise.
+  Status EvaluateStatsConjuncts(const parquet::FileMetaData& file_metadata,
+      const parquet::RowGroup& row_group, bool* skip_row_group);
 
   /// Check runtime filters' effectiveness every BATCHES_PER_FILTER_SELECTIVITY_CHECK
   /// row batches. Will update 'filter_stats_'.

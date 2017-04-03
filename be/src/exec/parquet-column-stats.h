@@ -21,30 +21,32 @@
 #include <string>
 #include <type_traits>
 
+#include "runtime/decimal-value.h"
+#include "runtime/string-buffer.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/types.h"
-#include "exec/parquet-common.h"
 
 namespace impala {
 
-/// This class, together with its derivatives, is used to track column statistics when
+/// This class, together with its derivatives, is used to update column statistics when
 /// writing parquet files. It provides an interface to populate a parquet::Statistics
 /// object and attach it to an object supplied by the caller. It can also be used to
 /// decode parquet::Statistics into slots.
 ///
-/// We currently support tracking 'min' and 'max' values for statistics. The other two
-/// statistical values in parquet.thrift, 'null_count' and 'distinct_count' are not
-/// tracked or populated.
+/// We currently support writing the 'min_value' and 'max_value' fields in
+/// parquet::Statistics. The other two statistical values - 'null_count' and
+/// 'distinct_count' - are not tracked or populated. We do not populate the deprecated
+/// 'min' and 'max' fields.
 ///
-/// Regarding the ordering of values, we follow the parquet-mr reference implementation.
+/// Regarding the ordering of values, we follow the parquet-format specification for
+/// logical types (LogicalTypes.md in parquet-format):
 ///
-/// Numeric values (BOOLEAN, INT, FLOAT, DOUBLE) are ordered by their numeric
-/// value (as opposed to their binary representation).
+/// - Numeric values (BOOLEAN, INT, FLOAT, DOUBLE, DECIMAL) are ordered by their numeric
+///   value (as opposed to their binary representation).
 ///
-/// We currently don't write statistics for DECIMAL values and character array values
-/// (CHAR, VARCHAR, STRING) due to several issues with parquet-mr and subsequently, Hive
-/// (PARQUET-251, PARQUET-686). For those types, the Update() method is empty, so that the
-/// stats are not tracked.
+/// - Strings are ordered using bytewise, unsigned comparison.
+///
+/// - Timestamps are compared by numerically comparing the points in time they represent.
 ///
 /// NULL values are not considered for min/max statistics, and if a column consists only
 /// of NULL values, then no min/max statistics are written.
@@ -55,22 +57,31 @@ namespace impala {
 /// TODO: Populate null_count and distinct_count.
 class ColumnStatsBase {
  public:
-  /// Enum to select statistics value when reading from parquet::Statistics structs.
-  enum class StatsField { MAX, MIN, NULL_COUNT, DISTINCT_COUNT };
+  /// Enum to select whether to read minimum or maximum statistics. Values do not
+  /// correspond to fields in parquet::Statistics, but instead select between retrieving
+  /// the minimum or maximum value.
+  enum class StatsField { MIN, MAX };
 
   ColumnStatsBase() : has_values_(false) {}
   virtual ~ColumnStatsBase() {}
 
-  /// Decodes the parquet::Statistics from 'row_group' and writes the value selected by
+  /// Decodes the parquet::Statistics from 'col_chunk' and writes the value selected by
   /// 'stats_field' into the buffer pointed to by 'slot', based on 'col_type'. Returns
-  /// 'true' if reading statistics for columns of type 'col_type' is supported and
-  /// decoding was successful, 'false' otherwise.
-  static bool ReadFromThrift(const parquet::Statistics& thrift_stats,
-      const ColumnType& col_type, const StatsField& stats_field, void* slot);
+  /// true if reading statistics for columns of type 'col_type' is supported and decoding
+  /// was successful, false otherwise.
+  static bool ReadFromThrift(const parquet::ColumnChunk& col_chunk,
+      const ColumnType& col_type, const parquet::ColumnOrder* col_order,
+      StatsField stats_field, void* slot);
 
   /// Merges this statistics object with values from 'other'. If other has not been
   /// initialized, then this object will not be changed.
   virtual void Merge(const ColumnStatsBase& other) = 0;
+
+  /// Copies the contents of this object's statistics values to internal buffers. Some
+  /// data types (e.g. StringValue) need to be copied at the end of processing a row
+  /// batch, since the batch memory will be released. Overwrite this method in derived
+  /// classes to provide the functionality.
+  virtual void MaterializeStringValuesToInternalBuffers() {}
 
   /// Returns the number of bytes needed to encode the current statistics into a
   /// parquet::Statistics object.
@@ -85,13 +96,32 @@ class ColumnStatsBase {
   bool has_values() const { return has_values_; }
 
  protected:
+  // Copies the memory of 'value' into 'buffer' and make 'value' point to 'buffer'.
+  // 'buffer' is reset before making the copy.
+  static void CopyToBuffer(StringBuffer* buffer, StringValue* value);
+
   /// Stores whether the current object has been initialized with a set of values.
   bool has_values_;
+
+ private:
+  /// Returns true if we support reading statistics stored in the fields 'min_value' and
+  /// 'max_value' in parquet::Statistics for the type 'col_type' and the column order
+  /// 'col_order'. Otherwise, returns false. If 'col_order' is nullptr, only primitive
+  /// numeric types are supported.
+  static bool CanUseStats(
+      const ColumnType& col_type, const parquet::ColumnOrder* col_order);
+
+  /// Returns true if we consider statistics stored in the deprecated fields 'min' and
+  /// 'max' in parquet::Statistics to be correct for the type 'col_type' and the column
+  /// order 'col_order'. Otherwise, returns false.
+  static bool CanUseDeprecatedStats(
+      const ColumnType& col_type, const parquet::ColumnOrder* col_order);
 };
 
-/// This class contains the type-specific behavior to track statistics per column.
+/// This class contains behavior specific to our in-memory formats for different types.
 template <typename T>
 class ColumnStats : public ColumnStatsBase {
+  friend class ColumnStatsBase;
   // We explicitly require types to be listed here in order to support column statistics.
   // When adding a type here, users of this class need to ensure that the statistics
   // follow the ordering semantics of parquet's min/max statistics for the new type.
@@ -108,34 +138,40 @@ class ColumnStats : public ColumnStatsBase {
       T>::type;
 
  public:
-  ColumnStats(int plain_encoded_value_size)
-    : ColumnStatsBase(), plain_encoded_value_size_(plain_encoded_value_size) {}
-
-  /// Decodes the parquet::Statistics from 'row_group' and writes the value selected by
-  /// 'stats_field' into the buffer pointed to by 'slot'. Returns 'true' if reading
-  /// statistics for columns of type 'col_type' is supported and decoding was successful,
-  /// 'false' otherwise.
-  static bool ReadFromThrift(const parquet::Statistics& thrift_stats,
-      const StatsField& stats_field, void* slot);
+  /// 'mem_pool' is used to materialize string values so that the user of this class can
+  /// free the memory of the original values.
+  /// 'plain_encoded_value_size' specifies the size of each encoded value in plain
+  /// encoding, -1 if the type is variable-length.
+  ColumnStats(MemPool* mem_pool, int plain_encoded_value_size)
+    : ColumnStatsBase(),
+      plain_encoded_value_size_(plain_encoded_value_size),
+      mem_pool_(mem_pool),
+      min_buffer_(mem_pool),
+      max_buffer_(mem_pool) {}
 
   /// Updates the statistics based on the value 'v'. If necessary, initializes the
-  /// statistics.
+  /// statistics. It may keep a reference to 'v' until
+  /// MaterializeStringValuesToInternalBuffers() gets called.
   void Update(const T& v);
 
   virtual void Merge(const ColumnStatsBase& other) override;
+  virtual void MaterializeStringValuesToInternalBuffers() override {}
+
   virtual int64_t BytesNeeded() const override;
   virtual void EncodeToThrift(parquet::Statistics* out) const override;
 
  protected:
-  /// Encodes a single value using parquet's PLAIN encoding and stores it into the
-  /// binary string 'out'.
-  void EncodeValueToString(const T& v, std::string* out) const;
+  /// Encodes a single value using parquet's plain encoding and stores it into the
+  /// binary string 'out'. String values are stored without additional encoding.
+  static void EncodePlainValue(const T& v, int64_t bytes_needed, std::string* out);
 
-  /// Decodes a statistics values from 'buffer' into 'result'.
-  static bool DecodeValueFromThrift(const std::string& buffer, T* result);
+  /// Decodes the plain encoded stats value from 'buffer' and writes the result into the
+  /// buffer pointed to by 'slot'. Returns true if decoding was successful, false
+  /// otherwise. For timestamps, an additional validation will be performed.
+  static bool DecodePlainValue(const std::string& buffer, void* slot);
 
   /// Returns the number of bytes needed to encode value 'v'.
-  int64_t BytesNeededInternal(const T& v) const;
+  int64_t BytesNeeded(const T& v) const;
 
   // Size of each encoded value in plain encoding, -1 if the type is variable-length.
   int plain_encoded_value_size_;
@@ -145,6 +181,13 @@ class ColumnStats : public ColumnStatsBase {
 
   // Maximum value since the last call to Reset().
   T max_value_;
+
+  // Memory pool to allocate from when making copies of the statistics data.
+  MemPool* mem_pool_;
+
+  // Local buffers to copy statistics data into.
+  StringBuffer min_buffer_;
+  StringBuffer max_buffer_;
 };
 
 } // end ns impala

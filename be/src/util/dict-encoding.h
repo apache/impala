@@ -314,7 +314,7 @@ inline bool DictDecoder<Decimal16Value>::GetNextValue(Decimal16Value* value) {
 template<typename T>
 inline void DictEncoder<T>::WriteDict(uint8_t* buffer) {
   for (const Node& node: nodes_) {
-    buffer += ParquetPlainEncoder::Encode(buffer, encoded_value_size_, node.value);
+    buffer += ParquetPlainEncoder::Encode(node.value, encoded_value_size_, buffer);
   }
 }
 

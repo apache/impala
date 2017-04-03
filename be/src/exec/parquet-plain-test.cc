@@ -33,7 +33,7 @@ namespace impala {
 template <typename T>
 void TestTruncate(const T& v, int expected_byte_size) {
   uint8_t buffer[expected_byte_size];
-  int encoded_size = ParquetPlainEncoder::Encode(buffer, expected_byte_size, v);
+  int encoded_size = ParquetPlainEncoder::Encode(v, expected_byte_size, buffer);
   EXPECT_EQ(encoded_size, expected_byte_size);
 
   // Check all possible truncations of the buffer.
@@ -52,7 +52,7 @@ void TestTruncate(const T& v, int expected_byte_size) {
 template <typename T>
 void TestType(const T& v, int expected_byte_size) {
   uint8_t buffer[expected_byte_size];
-  int encoded_size = ParquetPlainEncoder::Encode(buffer, expected_byte_size, v);
+  int encoded_size = ParquetPlainEncoder::Encode(v, expected_byte_size, buffer);
   EXPECT_EQ(encoded_size, expected_byte_size);
 
   T result;
@@ -134,15 +134,15 @@ TEST(PlainEncoding, DecimalBigEndian) {
   memcpy(&d8, buffer, sizeof(d8));
   memcpy(&d16, buffer, sizeof(d16));
 
-  int size = ParquetPlainEncoder::Encode(result_buffer, sizeof(d4), d4);
+  int size = ParquetPlainEncoder::Encode(d4, sizeof(d4), result_buffer);
   ASSERT_EQ(size, sizeof(d4));
   ASSERT_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d4), sizeof(d4)), 0);
 
-  size = ParquetPlainEncoder::Encode(result_buffer, sizeof(d8), d8);
+  size = ParquetPlainEncoder::Encode(d8, sizeof(d8), result_buffer);
   ASSERT_EQ(size, sizeof(d8));
   ASSERT_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d8), sizeof(d8)), 0);
 
-  size = ParquetPlainEncoder::Encode(result_buffer, sizeof(d16), d16);
+  size = ParquetPlainEncoder::Encode(d16, sizeof(d16), result_buffer);
   ASSERT_EQ(size, sizeof(d16));
   ASSERT_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d16), sizeof(d16)), 0);
 }

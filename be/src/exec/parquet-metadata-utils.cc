@@ -227,13 +227,6 @@ Status ParquetMetadataUtils::ValidateColumn(const parquet::FileMetaData& file_me
   return Status::OK();
 }
 
-bool ParquetMetadataUtils::HasRowGroupStats(const parquet::RowGroup& row_group,
-    int col_idx) {
-  DCHECK(col_idx < row_group.columns.size());
-  const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
-  return col_chunk.__isset.meta_data && col_chunk.meta_data.__isset.statistics;
-}
-
 ParquetFileVersion::ParquetFileVersion(const string& created_by) {
   string created_by_lower = created_by;
   std::transform(created_by_lower.begin(), created_by_lower.end(),

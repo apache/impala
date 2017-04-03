@@ -3,8 +3,8 @@
 select id, bool_col from functional_parquet.alltypessmall where int_col < 0
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 set explain_level=2;
@@ -17,119 +17,119 @@ select count(*) from functional_parquet.alltypessmall where tinyint_col < 0
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where smallint_col < 0
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where int_col < 0
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where bigint_col < 0
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where float_col < 0
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where double_col < 0
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 # Test with inverted predicate
 select id, bool_col from functional_parquet.alltypessmall where -1 > int_col
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where tinyint_col > 9
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where smallint_col > 9
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select id, bool_col from functional_parquet.alltypessmall where int_col > 9
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where bigint_col > 90
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where float_col > 9.9
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where double_col > 99
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where tinyint_col >= 10
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where tinyint_col <= 0
 ---- RESULTS
 12
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 0 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
 ====
 ---- QUERY
@@ -137,24 +137,24 @@ select count(*) from functional_parquet.alltypessmall where tinyint_col >= 9
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 0 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where tinyint_col = -1
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where tinyint_col = 10
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 set explain_level=2;
@@ -167,8 +167,8 @@ select count(*) from functional_parquet.alltypessmall where id >= 30 and id <= 8
 ---- RESULTS
 51
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 1 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 1
 ====
 ---- QUERY
 # Mix with partitioning columns
@@ -176,31 +176,22 @@ select count(*) from functional_parquet.alltypessmall where int_col < 0 and year
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
-====
----- QUERY
-# Test that adding a column without stats will not disable stats-based pruning.
-select count(*) from functional_parquet.alltypessmall where int_col < 0 and string_col < ""
----- RESULTS
-0
----- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select id, bool_col from functional_parquet.alltypessmall where int_col < 3 - 3
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select id, bool_col from functional_parquet.alltypessmall where int_col < 3 - 3
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 # Test that without expr rewrite and thus without constant folding, constant exprs still
@@ -209,15 +200,15 @@ set enable_expr_rewrites=0;
 select id, bool_col from functional_parquet.alltypessmall where int_col < 3 - 3
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 select id, bool_col from functional_parquet.alltypessmall where 5 + 5 < int_col
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 # Test that without expr rewrite and thus without constant folding, constant exprs still
@@ -226,8 +217,8 @@ set enable_expr_rewrites=0;
 select id, bool_col from functional_parquet.alltypessmall where 5 + 5 < int_col
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 # Test name based column resolution
@@ -240,8 +231,8 @@ select count(*) from name_resolve where id > 10;
 ---- RESULTS
 89
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 1 .*
-row_regex: .*NumStatsFilteredRowGroups: 0 .*
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
 ---- QUERY
 # Query that has an implicit cast to a larger integer type
@@ -249,8 +240,8 @@ select count(*) from functional_parquet.alltypessmall where tinyint_col > 100000
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 4 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====
 ---- QUERY
 # Predicates with explicit casts are not supported when evaluating parquet::Statistics.
@@ -258,8 +249,8 @@ select count(*) from functional_parquet.alltypessmall where '0' > cast(tinyint_c
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 4 .*
-row_regex: .*NumStatsFilteredRowGroups: 0 .*
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
 ---- QUERY
 # Explicit casts between numerical types can violate the transitivity of "min()", so they
@@ -268,16 +259,16 @@ select count(*) from functional_parquet.alltypes where cast(id as tinyint) < 10;
 ---- RESULTS
 3878
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 24 .*
-row_regex: .*NumStatsFilteredRowGroups: 0 .*
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
 ---- QUERY
 select count(*) from functional_parquet.complextypestbl.int_array where pos < 5;
 ---- RESULTS
 9
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 2 .*
-row_regex: .*NumStatsFilteredRowGroups: 0 .*
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
 ---- QUERY
 # Test the conversion of constant IN lists to min/max predicats
@@ -295,4 +286,164 @@ select count(*) from functional_parquet.alltypes where id IN (1,25,49);
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 24
 aggregation(SUM, NumStatsFilteredRowGroups): 23
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where string_col < "0"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where string_col <= "/"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where string_col < "1"
+---- RESULTS
+12
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where string_col >= "9"
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where string_col > ":"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where timestamp_col < "2009-01-01 00:00:00"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where timestamp_col <= "2009-01-01 00:00:00"
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 3
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where timestamp_col = "2009-01-01 00:00:00"
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 3
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where timestamp_col > "2009-04-03 00:24:00.96"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where timestamp_col >= "2009-04-03 00:24:00.96"
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 3
+====
+---- QUERY
+select count(*) from functional_parquet.alltypessmall where timestamp_col = "2009-04-03 00:24:00.96"
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 3
+====
+---- QUERY
+select count(*) from functional_parquet.decimal_tbl where d1 < 1234
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from functional_parquet.decimal_tbl where d3 < 1.23456789
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from functional_parquet.decimal_tbl where d3 = 1.23456788
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from functional_parquet.decimal_tbl where d3 = 1.23456789
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+select count(*) from functional_parquet.decimal_tbl where d4 > 0.123456789
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from functional_parquet.decimal_tbl where d4 >= 0.12345678
+---- RESULTS
+5
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+select count(*) from functional_parquet.decimal_tbl where d4 >= 0.12345679
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# Test that stats are disabled for CHAR type columns.
+create table chars (id int, c char(4)) stored as parquet;
+insert into chars values (1, cast("abaa" as char(4))), (2, cast("abab" as char(4)));
+select count(*) from chars;
+---- RESULTS
+2
+====
+---- QUERY
+select count(*) from chars where c <= "aaaa"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====

@@ -50,9 +50,6 @@ class ParquetMetadataUtils {
       const char* filename, int row_group_idx, int col_idx,
       const parquet::SchemaElement& schema_element, const SlotDescriptor* slot_desc,
       RuntimeState* state);
-
-  /// Returns whether column 'col_idx' in 'row_group' has statistics attached to it.
-  static bool HasRowGroupStats(const parquet::RowGroup& row_group, int col_idx);
 };
 
 struct ParquetFileVersion {

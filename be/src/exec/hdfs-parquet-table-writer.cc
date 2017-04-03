@@ -130,6 +130,13 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   Status Flush(int64_t* file_pos, int64_t* first_data_page,
       int64_t* first_dictionary_page);
 
+  // Materializes the column statistics to the per-file MemPool so they are available
+  // after their row batch buffer has been freed.
+  void MaterializeStatsValues() {
+    row_group_stats_base_->MaterializeStringValuesToInternalBuffers();
+    page_stats_base_->MaterializeStringValuesToInternalBuffers();
+  }
+
   // Encodes the row group statistics into a parquet::Statistics object and attaches it to
   // 'meta_data'.
   void EncodeRowGroupStats(ColumnMetaData* meta_data) {
@@ -142,7 +149,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   }
 
   // Resets all the data accumulated for this column.  Memory can now be reused for
-  // the next row group
+  // the next row group.
   // Any data for previous row groups must be reset (e.g. dictionaries).
   // Subclasses must call this if they override this function.
   virtual void Reset() {
@@ -284,12 +291,8 @@ class HdfsParquetTableWriter::ColumnWriter :
     : BaseColumnWriter(parent, ctx, codec),
       num_values_since_dict_size_check_(0),
       plain_encoded_value_size_(
-          ParquetPlainEncoder::EncodedByteSize(ctx->root()->type())),
-      page_stats_(plain_encoded_value_size_),
-      row_group_stats_(plain_encoded_value_size_) {
+          ParquetPlainEncoder::EncodedByteSize(ctx->root()->type())) {
     DCHECK_NE(ctx->root()->type().type, TYPE_BOOLEAN);
-    page_stats_base_ = &page_stats_;
-    row_group_stats_base_ = &row_group_stats_;
   }
 
   virtual void Reset() {
@@ -300,8 +303,12 @@ class HdfsParquetTableWriter::ColumnWriter :
     dict_encoder_.reset(
         new DictEncoder<T>(parent_->per_file_mem_pool_.get(), plain_encoded_value_size_));
     dict_encoder_base_ = dict_encoder_.get();
-    page_stats_.Reset();
-    row_group_stats_.Reset();
+    page_stats_.reset(
+        new ColumnStats<T>(parent_->per_file_mem_pool_.get(), plain_encoded_value_size_));
+    page_stats_base_ = page_stats_.get();
+    row_group_stats_.reset(
+        new ColumnStats<T>(parent_->per_file_mem_pool_.get(), plain_encoded_value_size_));
+    row_group_stats_base_ = row_group_stats_.get();
   }
 
  protected:
@@ -332,14 +339,14 @@ class HdfsParquetTableWriter::ColumnWriter :
       }
       uint8_t* dst_ptr = values_buffer_ + current_page_->header.uncompressed_page_size;
       int64_t written_len =
-          ParquetPlainEncoder::Encode(dst_ptr, plain_encoded_value_size_, *v);
+          ParquetPlainEncoder::Encode(*v, plain_encoded_value_size_, dst_ptr);
       DCHECK_EQ(*bytes_needed, written_len);
       current_page_->header.uncompressed_page_size += written_len;
     } else {
       // TODO: support other encodings here
       DCHECK(false);
     }
-    page_stats_.Update(*CastValue(value));
+    page_stats_->Update(*CastValue(value));
     return true;
   }
 
@@ -366,10 +373,10 @@ class HdfsParquetTableWriter::ColumnWriter :
   StringValue temp_;
 
   // Tracks statistics per page.
-  ColumnStats<T> page_stats_;
+  scoped_ptr<ColumnStats<T>> page_stats_;
 
   // Tracks statistics per row group. This gets reset when starting a new row group.
-  ColumnStats<T> row_group_stats_;
+  scoped_ptr<ColumnStats<T>> row_group_stats_;
 
   // Converts a slot pointer to a raw value suitable for encoding
   inline T* CastValue(void* value) {
@@ -394,7 +401,9 @@ class HdfsParquetTableWriter::BoolColumnWriter :
  public:
   BoolColumnWriter(HdfsParquetTableWriter* parent, ExprContext* ctx,
       const THdfsCompression::type& codec)
-    : BaseColumnWriter(parent, ctx, codec), page_stats_(-1), row_group_stats_(-1) {
+    : BaseColumnWriter(parent, ctx, codec),
+      page_stats_(parent_->reusable_col_mem_pool_.get(), -1),
+      row_group_stats_(parent_->reusable_col_mem_pool_.get(), -1) {
     DCHECK_EQ(ctx->root()->type().type, TYPE_BOOLEAN);
     bool_values_ = parent_->state_->obj_pool()->Add(
         new BitWriter(values_buffer_, values_buffer_len_));
@@ -985,6 +994,9 @@ Status HdfsParquetTableWriter::AppendRows(
     }
   }
 
+  // We exhausted the batch, so we materialize the statistics before releasing the memory.
+  for (unique_ptr<BaseColumnWriter>& column : columns_) column->MaterializeStatsValues();
+
   // Reset the row_idx_ when we exhaust the batch.  We can exit before exhausting
   // the batch if we run out of file space and will continue from the last index.
   row_idx_ = 0;
@@ -997,6 +1009,13 @@ Status HdfsParquetTableWriter::Finalize() {
   // At this point we write out the rest of the file.  We first update the file
   // metadata, now that all the values have been seen.
   file_metadata_.num_rows = row_count_;
+
+  // Set the ordering used to write parquet statistics for columns in the file.
+  ColumnOrder col_order = ColumnOrder();
+  col_order.__set_TYPE_ORDER(TypeDefinedOrder());
+  file_metadata_.column_orders.assign(columns_.size(), col_order);
+  file_metadata_.__isset.column_orders = true;
+
   RETURN_IF_ERROR(FlushCurrentRowGroup());
   RETURN_IF_ERROR(WriteFileFooter());
   stats_.__set_parquet_stats(parquet_insert_stats_);
