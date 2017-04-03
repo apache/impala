@@ -224,39 +224,15 @@ Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
   return Status::OK();
 }
 
-void RuntimeState::LogMemLimitExceeded(
-    const MemTracker* tracker, int64_t failed_allocation_size) {
-  DCHECK_GE(failed_allocation_size, 0);
-  DCHECK(query_mem_tracker_ != NULL);
-  stringstream ss;
-  ss << "Memory Limit Exceeded by fragment: " << fragment_instance_id() << endl;
-  if (failed_allocation_size != 0) {
-    DCHECK(tracker != NULL);
-    ss << "  " << tracker->label() << " could not allocate "
-       << PrettyPrinter::Print(failed_allocation_size, TUnit::BYTES)
-       << " without exceeding limit." << endl;
-  }
-
-  if (exec_env_->process_mem_tracker()->LimitExceeded()) {
-    ss << exec_env_->process_mem_tracker()->LogUsage();
-  } else {
-    ss << query_mem_tracker_->LogUsage();
-  }
-  LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
-}
-
-Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
+void RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
     int64_t failed_allocation_size, const ErrorMsg* msg) {
+  Status status = tracker->MemLimitExceeded(this, msg == nullptr ? "" : msg->msg(),
+      failed_allocation_size);
   {
     lock_guard<SpinLock> l(query_status_lock_);
-    if (query_status_.ok()) {
-      query_status_ = Status::MemLimitExceeded();
-      if (msg != NULL) query_status_.MergeStatus(*msg);
-    } else {
-      return query_status_;
-    }
+    if (query_status_.ok()) query_status_ = status;
   }
-  LogMemLimitExceeded(tracker, failed_allocation_size);
+  LogError(status.msg());
   // Add warning about missing stats except for compute stats child queries.
   if (!query_ctx().__isset.parent_query_id &&
       query_ctx().__isset.tables_missing_stats &&
@@ -265,13 +241,12 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
         GetTablesMissingStatsWarning(query_ctx().tables_missing_stats)));
   }
   DCHECK(query_status_.IsMemLimitExceeded());
-  return query_status_;
 }
 
 Status RuntimeState::CheckQueryState() {
   if (instance_mem_tracker_ != nullptr
       && UNLIKELY(instance_mem_tracker_->AnyLimitExceeded())) {
-    return SetMemLimitExceeded();
+    SetMemLimitExceeded(instance_mem_tracker_.get());
   }
   return GetQueryStatus();
 }

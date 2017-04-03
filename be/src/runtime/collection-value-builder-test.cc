@@ -17,6 +17,7 @@
 
 #include "runtime/collection-value-builder.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/test-env.h"
 #include "service/fe-support.h"
 #include "service/frontend.h"
 #include "testutil/desc-tbl-builder.h"
@@ -30,6 +31,8 @@ using namespace impala;
 static scoped_ptr<Frontend> fe;
 
 TEST(CollectionValueBuilderTest, MaxBufferSize) {
+  TestEnv test_env;
+  ASSERT_OK(test_env.Init());
   ObjectPool obj_pool;
   DescriptorTblBuilder builder(fe.get(), &obj_pool);
   builder.DeclareTuple() << TYPE_TINYINT << TYPE_TINYINT << TYPE_TINYINT;

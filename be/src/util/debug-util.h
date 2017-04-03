@@ -104,6 +104,9 @@ std::string GetVersionString(bool compact = false);
 /// for recursive calls.
 std::string GetStackTrace();
 
+/// Returns the backend name in "host:port" form suitable for human consumption.
+std::string GetBackendString();
+
 // FILE_CHECKs are conditions that we expect to be true but could fail due to a malformed
 // input file. They differentiate these cases from DCHECKs, which indicate conditions that
 // are true unless there's a bug in Impala. We would ideally always return a bad Status

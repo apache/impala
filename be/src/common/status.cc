@@ -37,6 +37,11 @@ Status Status::MemLimitExceeded() {
   return Status(TErrorCode::MEM_LIMIT_EXCEEDED, "Memory limit exceeded");
 }
 
+Status Status::MemLimitExceeded(const std::string& details) {
+  return Status(TErrorCode::MEM_LIMIT_EXCEEDED,
+        Substitute("Memory limit exceeded: $0", details));
+}
+
 Status::Status(TErrorCode::type code)
     : msg_(new ErrorMsg(code)) {
   VLOG(1) << msg_->msg() << "\n" << GetStackTrace();

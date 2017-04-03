@@ -286,9 +286,37 @@ string MemTracker::LogUsage(const string& prefix, const list<MemTracker*>& track
 
 Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& details,
     int64_t failed_allocation_size) {
-  Status status = Status::MemLimitExceeded();
-  status.AddDetail(details);
-  if (state != NULL) state->LogMemLimitExceeded(this, failed_allocation_size);
+  DCHECK_GE(failed_allocation_size, 0);
+  stringstream ss;
+  if (details.size() != 0) ss << details << endl;
+  if (failed_allocation_size != 0) {
+    ss << label() << " could not allocate "
+       << PrettyPrinter::Print(failed_allocation_size, TUnit::BYTES)
+       << " without exceeding limit." << endl;
+  }
+  ss << "Error occurred on backend " << GetBackendString();
+  if (state != nullptr) ss << " by fragment " << state->fragment_instance_id();
+  ss << endl;
+  ExecEnv* exec_env = ExecEnv::GetInstance();
+  MemTracker* process_tracker = exec_env->process_mem_tracker();
+  const int64_t process_capacity = process_tracker->SpareCapacity();
+  ss << "Memory left in process limit: "
+     << PrettyPrinter::Print(process_capacity, TUnit::BYTES) << endl;
+
+  // Choose which tracker to log the usage of. Default to the process tracker so we can
+  // get the full view of memory consumption.
+  MemTracker* tracker_to_log = process_tracker;
+  if (state != nullptr && state->query_mem_tracker()->has_limit()) {
+    MemTracker* query_tracker = state->query_mem_tracker();
+    const int64_t query_capacity = query_tracker->limit() - query_tracker->consumption();
+    ss << "Memory left in query limit: "
+       << PrettyPrinter::Print(query_capacity, TUnit::BYTES) << endl;
+    // Log the query tracker only if the query limit was closer to being exceeded.
+    if (query_capacity < process_capacity) tracker_to_log = query_tracker;
+  }
+  ss << tracker_to_log->LogUsage();
+  Status status = Status::MemLimitExceeded(ss.str());
+  if (state != nullptr) state->LogError(status.msg());
   return status;
 }
 

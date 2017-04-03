@@ -90,6 +90,7 @@ class Status {
 
   // Return a MEM_LIMIT_EXCEEDED error status.
   static Status MemLimitExceeded();
+  static Status MemLimitExceeded(const std::string& details);
 
   static const Status CANCELLED;
   static const Status DEPRECATED_RPC;

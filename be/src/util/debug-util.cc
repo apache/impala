@@ -45,6 +45,9 @@ using boost::tokenizer;
 using namespace beeswax;
 using namespace parquet;
 
+DECLARE_int32(be_port);
+DECLARE_string(hostname);
+
 namespace impala {
 
 #define THRIFT_ENUM_OUTPUT_FN_IMPL(E, MAP) \
@@ -320,6 +323,10 @@ string GetStackTrace() {
   string s;
   google::glog_internal_namespace_::DumpStackTraceToString(&s);
   return s;
+}
+
+string GetBackendString() {
+  return Substitute("$0:$1", FLAGS_hostname, FLAGS_be_port);
 }
 
 }
