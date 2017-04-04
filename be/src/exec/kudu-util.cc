@@ -17,6 +17,7 @@
 
 #include "exec/kudu-util.h"
 
+#include <algorithm>
 #include <string>
 #include <sstream>
 
@@ -102,7 +103,8 @@ void InitKuduLogging() {
   DCHECK(KuduIsAvailable());
   static kudu::client::KuduLoggingFunctionCallback<void*> log_cb(&LogKuduMessage, NULL);
   kudu::client::InstallLoggingCallback(&log_cb);
-  kudu::client::SetVerboseLogLevel(FLAGS_v);
+  // Kudu client logging is more noisy than Impala logging, log at v-1.
+  kudu::client::SetVerboseLogLevel(std::max(0, FLAGS_v - 1));
 }
 
 }  // namespace impala
