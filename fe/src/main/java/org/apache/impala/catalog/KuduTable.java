@@ -356,6 +356,9 @@ public class KuduTable extends Table {
     tbl.setMaster_addresses(Lists.newArrayList(kuduMasters_.split(",")));
     tbl.setTable_name(kuduTableName_);
     Preconditions.checkNotNull(partitionBy_);
+    // IMPALA-5154: partitionBy_ may be empty if Kudu table created outside Impala,
+    // partition_by must be explicitly created because the field is required.
+    tbl.partition_by = Lists.newArrayList();
     for (KuduPartitionParam partitionParam: partitionBy_) {
       tbl.addToPartition_by(partitionParam.toThrift());
     }

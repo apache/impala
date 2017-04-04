@@ -477,6 +477,38 @@ class TestCreateExternalTable(KuduTestSuite):
       except Exception as e:
         assert "Table does not exist in Kudu: '%s'" % table_name in str(e)
 
+  def test_table_without_partitioning(self, cursor, kudu_client, unique_database):
+    """Test a Kudu table created without partitioning (i.e. equivalent to a single
+       unbounded partition). It is not possible to create such a table in Impala, but
+       it can be created directly in Kudu and then loaded as an external table.
+       Regression test for IMPALA-5154."""
+    schema_builder = SchemaBuilder()
+    column_spec = schema_builder.add_column("id", INT64)
+    column_spec.nullable(False)
+    schema_builder.set_primary_keys(["id"])
+    schema = schema_builder.build()
+    partitioning = Partitioning().set_range_partition_columns([])
+    name = "%s.one_big_unbounded_partition" % unique_database
+
+    try:
+      kudu_client.create_table(name, schema, partitioning=partitioning)
+      kudu_table = kudu_client.table(name)
+
+      props = "TBLPROPERTIES('kudu.table_name'='%s')" % name
+      cursor.execute("CREATE EXTERNAL TABLE %s STORED AS KUDU %s" % (name, props))
+      with self.drop_impala_table_after_context(cursor, name):
+        cursor.execute("INSERT INTO %s VALUES (1), (2), (3)" % name)
+        cursor.execute("SELECT COUNT(*) FROM %s" % name)
+        assert cursor.fetchall() == [(3, )]
+        try:
+          cursor.execute("SHOW RANGE PARTITIONS %s" % name)
+          assert False
+        except Exception as e:
+          assert "AnalysisException: SHOW RANGE PARTITIONS requested but table does "\
+              "not have range partitions" in str(e)
+    finally:
+      if kudu_client.table_exists(name):
+        kudu_client.delete_table(name)
 
 class TestShowCreateTable(KuduTestSuite):
 
