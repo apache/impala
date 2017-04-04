@@ -966,6 +966,8 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
       exec_summary = PrintExecSummary(summary);
     }
     exec_state->summary_profile()->AddInfoString("ExecSummary", exec_summary);
+    exec_state->summary_profile()->AddInfoString("Errors",
+        exec_state->coord()->GetErrorLog());
 
     const unordered_set<TNetworkAddress>& unique_hosts =
         exec_state->schedule()->unique_hosts();
