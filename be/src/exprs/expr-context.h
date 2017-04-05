@@ -152,6 +152,7 @@ class ExprContext {
   friend class CaseExpr;
   friend class HiveUdfCall;
   friend class ScalarFnCall;
+  friend class KuduPartitionExpr;
 
   /// FunctionContexts for each registered expression. The FunctionContexts are created
   /// and owned by this ExprContext.

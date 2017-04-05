@@ -104,8 +104,7 @@ class DataStreamSender : public DataSink {
   /// Sender instance id, unique within a fragment.
   int sender_id_;
   RuntimeState* state_;
-  bool broadcast_;  // if true, send all rows on all channels
-  bool random_; // if true, round-robins row batches among channels
+  TPartitionType::type partition_type_; // The type of partitioning to perform.
   int current_channel_idx_; // index of current channel to send to if random_ == true
 
   /// If true, this sender has called FlushFinal() successfully.
@@ -139,6 +138,10 @@ class DataStreamSender : public DataSink {
 
   /// Identifier of the destination plan node.
   PlanNodeId dest_node_id_;
+
+  /// Used for Kudu partitioning to round-robin rows that don't correspond to a partition
+  /// or when errors are encountered.
+  int next_unknown_partition_;
 };
 
 }

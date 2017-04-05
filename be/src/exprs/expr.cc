@@ -44,6 +44,7 @@
 #include "exprs/in-predicate.h"
 #include "exprs/is-not-empty-predicate.h"
 #include "exprs/is-null-predicate.h"
+#include "exprs/kudu-partition-expr.h"
 #include "exprs/like-predicate.h"
 #include "exprs/literal.h"
 #include "exprs/math-functions.h"
@@ -261,6 +262,9 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       return Status::OK();
     case TExprNodeType::IS_NOT_EMPTY_PRED:
       *expr = pool->Add(new IsNotEmptyPredicate(texpr_node));
+      return Status::OK();
+    case TExprNodeType::KUDU_PARTITION_EXPR:
+      *expr = pool->Add(new KuduPartitionExpr(texpr_node));
       return Status::OK();
     default:
       stringstream os;

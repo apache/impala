@@ -27,6 +27,7 @@
 #include "common/logging.h"
 #include "common/names.h"
 #include "common/status.h"
+#include "runtime/string-value.h"
 
 using kudu::client::KuduSchema;
 using kudu::client::KuduClient;
@@ -105,6 +106,57 @@ void InitKuduLogging() {
   kudu::client::InstallLoggingCallback(&log_cb);
   // Kudu client logging is more noisy than Impala logging, log at v-1.
   kudu::client::SetVerboseLogLevel(std::max(0, FLAGS_v - 1));
+}
+
+Status WriteKuduRowValue(kudu::KuduPartialRow* row, int col, PrimitiveType type,
+    const void* value, bool copy_strings) {
+  // TODO: codegen this to eliminate braching on type.
+  switch (type) {
+    case TYPE_VARCHAR:
+    case TYPE_STRING: {
+      const StringValue* sv = reinterpret_cast<const StringValue*>(value);
+      kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
+      if (copy_strings) {
+        KUDU_RETURN_IF_ERROR(row->SetString(col, slice), "Could not set Kudu row value.");
+      } else {
+        KUDU_RETURN_IF_ERROR(
+            row->SetStringNoCopy(col, slice), "Could not set Kudu row value.");
+      }
+      break;
+    }
+    case TYPE_FLOAT:
+      KUDU_RETURN_IF_ERROR(row->SetFloat(col, *reinterpret_cast<const float*>(value)),
+          "Could not set Kudu row value.");
+      break;
+    case TYPE_DOUBLE:
+      KUDU_RETURN_IF_ERROR(row->SetDouble(col, *reinterpret_cast<const double*>(value)),
+          "Could not set Kudu row value.");
+      break;
+    case TYPE_BOOLEAN:
+      KUDU_RETURN_IF_ERROR(row->SetBool(col, *reinterpret_cast<const bool*>(value)),
+          "Could not set Kudu row value.");
+      break;
+    case TYPE_TINYINT:
+      KUDU_RETURN_IF_ERROR(row->SetInt8(col, *reinterpret_cast<const int8_t*>(value)),
+          "Could not set Kudu row value.");
+      break;
+    case TYPE_SMALLINT:
+      KUDU_RETURN_IF_ERROR(row->SetInt16(col, *reinterpret_cast<const int16_t*>(value)),
+          "Could not set Kudu row value.");
+      break;
+    case TYPE_INT:
+      KUDU_RETURN_IF_ERROR(row->SetInt32(col, *reinterpret_cast<const int32_t*>(value)),
+          "Could not set Kudu row value.");
+      break;
+    case TYPE_BIGINT:
+      KUDU_RETURN_IF_ERROR(row->SetInt64(col, *reinterpret_cast<const int64_t*>(value)),
+          "Could not set Kudu row value.");
+      break;
+    default:
+      return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(type));
+  }
+
+  return Status::OK();
 }
 
 }  // namespace impala

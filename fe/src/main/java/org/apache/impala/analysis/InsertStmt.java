@@ -106,8 +106,16 @@ public class InsertStmt extends StatementBase {
   // Set in analyze(). Contains metadata of target table to determine type of sink.
   private Table table_;
 
-  // Set in analyze(). Exprs corresponding to the partitionKeyValues.
+  // Set in analyze(). Exprs correspond to the partitionKeyValues, if specified, or to
+  // the partition columns for Kudu tables.
   private List<Expr> partitionKeyExprs_ = Lists.newArrayList();
+
+  // Set in analyze(). Maps exprs in partitionKeyExprs_ to their column's position in the
+  // table, eg. partitionKeyExprs_[i] corresponds to table_.columns(partitionKeyIdx_[i]).
+  // For Kudu tables, the primary keys are a leading subset of the cols, and the partition
+  // cols can be any subset of the primary keys, meaning that this list will be in
+  // ascending order from '0' to '# primary key cols - 1' but may leave out some numbers.
+  private List<Integer> partitionColPos_ = Lists.newArrayList();
 
   // Indicates whether this insert stmt has a shuffle or noshuffle plan hint.
   // Both flags may be false. Only one of them may be true, not both.
@@ -218,6 +226,7 @@ public class InsertStmt extends StatementBase {
     queryStmt_.reset();
     table_ = null;
     partitionKeyExprs_.clear();
+    partitionColPos_.clear();
     hasShuffleHint_ = false;
     hasNoShuffleHint_ = false;
     hasClusteredHint_ = false;
@@ -633,6 +642,11 @@ public class InsertStmt extends StatementBase {
     List<String> tmpPartitionKeyNames = new ArrayList<String>();
 
     int numClusteringCols = (tbl instanceof HBaseTable) ? 0 : tbl.getNumClusteringCols();
+    boolean isKuduTable = table_ instanceof KuduTable;
+    Set<String> kuduPartitionColumnNames = null;
+    if (isKuduTable) {
+      kuduPartitionColumnNames = ((KuduTable) table_).getPartitionColumnNames();
+    }
 
     // Check dynamic partition columns for type compatibility.
     for (int i = 0; i < selectListExprs.size(); ++i) {
@@ -643,6 +657,11 @@ public class InsertStmt extends StatementBase {
         // This is a dynamic clustering column
         tmpPartitionKeyExprs.add(compatibleExpr);
         tmpPartitionKeyNames.add(targetColumn.getName());
+      } else if (isKuduTable) {
+        if (kuduPartitionColumnNames.contains(targetColumn.getName())) {
+          tmpPartitionKeyExprs.add(compatibleExpr);
+          tmpPartitionKeyNames.add(targetColumn.getName());
+        }
       }
       selectListExprs.set(i, compatibleExpr);
     }
@@ -663,24 +682,28 @@ public class InsertStmt extends StatementBase {
     }
 
     // Reorder the partition key exprs and names to be consistent with the target table
-    // declaration.  We need those exprs in the original order to create the corresponding
-    // Hdfs folder structure correctly.
-    for (Column c: table_.getColumns()) {
+    // declaration, and store their column positions.  We need those exprs in the original
+    // order to create the corresponding Hdfs folder structure correctly, or the indexes
+    // to construct rows to pass to the Kudu partitioning API.
+    for (int i = 0; i < table_.getColumns().size(); ++i) {
+      Column c = table_.getColumns().get(i);
       for (int j = 0; j < tmpPartitionKeyNames.size(); ++j) {
         if (c.getName().equals(tmpPartitionKeyNames.get(j))) {
           partitionKeyExprs_.add(tmpPartitionKeyExprs.get(j));
+          partitionColPos_.add(i);
           break;
         }
       }
     }
 
-    Preconditions.checkState(partitionKeyExprs_.size() == numClusteringCols);
+    Preconditions.checkState(
+        (isKuduTable && partitionKeyExprs_.size() == kuduPartitionColumnNames.size())
+        || partitionKeyExprs_.size() == numClusteringCols);
     // Make sure we have stats for partitionKeyExprs
     for (Expr expr: partitionKeyExprs_) {
       expr.analyze(analyzer);
     }
 
-    boolean isKuduTable = table_ instanceof KuduTable;
     // Finally, 'undo' the permutation so that the selectListExprs are in Hive column
     // order, and add NULL expressions to all missing columns, unless this is an UPSERT.
     ArrayList<Column> columns = table_.getColumnsInHiveOrder();
@@ -741,9 +764,13 @@ public class InsertStmt extends StatementBase {
   }
 
   private void analyzePlanHints(Analyzer analyzer) throws AnalysisException {
-    if (!planHints_.isEmpty() && table_ instanceof HBaseTable) {
+    if (planHints_.isEmpty()) return;
+    if (isUpsert_) {
+      throw new AnalysisException("Hints not supported in UPSERT statements.");
+    }
+    if (table_ instanceof HBaseTable || table_ instanceof KuduTable) {
       throw new AnalysisException(String.format("INSERT hints are only supported for " +
-          "inserting into Hdfs and Kudu tables: %s", getTargetTableName()));
+          "inserting into Hdfs tables: %s", getTargetTableName()));
     }
     boolean hasNoClusteredHint = false;
     for (PlanHint hint: planHints_) {
@@ -776,29 +803,17 @@ public class InsertStmt extends StatementBase {
   }
 
   private void analyzeSortByHint(PlanHint hint) throws AnalysisException {
-    // HBase tables don't support insert hints at all (must be enforced by the caller).
-    Preconditions.checkState(!(table_ instanceof HBaseTable));
-
-    if (isUpsert_) {
-      throw new AnalysisException("SORTBY hint is not supported in UPSERT statements.");
-    }
+    // HBase and Kudu tables don't support insert hints at all (must be enforced by the caller).
+    Preconditions.checkState(!(table_ instanceof HBaseTable || table_ instanceof KuduTable));
 
     List<String> columnNames = hint.getArgs();
     Preconditions.checkState(!columnNames.isEmpty());
     for (String columnName: columnNames) {
-      // Make sure it's not a Kudu primary key column or Hdfs partition column.
-      if (table_ instanceof KuduTable) {
-        KuduTable kuduTable = (KuduTable) table_;
-        if (kuduTable.isPrimaryKeyColumn(columnName)) {
-          throw new AnalysisException(String.format("SORTBY hint column list must not " +
-              "contain Kudu primary key column: '%s'", columnName));
-        }
-      } else {
-        for (Column tableColumn: table_.getClusteringColumns()) {
-          if (tableColumn.getName().equals(columnName)) {
-            throw new AnalysisException(String.format("SORTBY hint column list must " +
-                "not contain Hdfs partition column: '%s'", columnName));
-          }
+      // Make sure it's not an Hdfs partition column.
+      for (Column tableColumn: table_.getClusteringColumns()) {
+        if (tableColumn.getName().equals(columnName)) {
+          throw new AnalysisException(String.format("SORTBY hint column list must " +
+              "not contain Hdfs partition column: '%s'", columnName));
         }
       }
 
@@ -843,6 +858,7 @@ public class InsertStmt extends StatementBase {
    */
   public QueryStmt getQueryStmt() { return queryStmt_; }
   public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs_; }
+  public List<Integer> getPartitionColPos() { return partitionColPos_; }
   public boolean hasShuffleHint() { return hasShuffleHint_; }
   public boolean hasNoShuffleHint() { return hasNoShuffleHint_; }
   public boolean hasClusteredHint() { return hasClusteredHint_; }

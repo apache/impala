@@ -37,7 +37,8 @@ enum TExprNodeType {
   TUPLE_IS_NULL_PRED,
   FUNCTION_CALL,
   AGGREGATE_EXPR,
-  IS_NOT_EMPTY_PRED
+  IS_NOT_EMPTY_PRED,
+  KUDU_PARTITION_EXPR
 }
 
 struct TBoolLiteral {
@@ -122,6 +123,18 @@ struct TAggregateExpr {
   2: required list<Types.TColumnType> arg_types;
 }
 
+// Expr used to call into the Kudu client to determine the partition index for rows. The
+// values for the partition columns are produced by its children.
+struct TKuduPartitionExpr {
+  // The Kudu table to use the partitioning scheme from.
+  1: required Types.TTableId target_table_id
+
+  // Mapping from the children of this expr to their column positions in the table, i.e.
+  // child(i) produces the value for column referenced_columns[i].
+  // TODO: Include the partition cols in the KuduTableDesciptor and remove this.
+  2: required list<i32> referenced_columns
+}
+
 // This is essentially a union over the subclasses of Expr.
 struct TExprNode {
   1: required TExprNodeType node_type
@@ -151,6 +164,7 @@ struct TExprNode {
   18: optional TDecimalLiteral decimal_literal
   19: optional TAggregateExpr agg_expr
   20: optional TTimestampLiteral timestamp_literal
+  21: optional TKuduPartitionExpr kudu_partition_expr
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

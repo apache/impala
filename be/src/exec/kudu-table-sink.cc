@@ -251,53 +251,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
       }
 
       PrimitiveType type = output_expr_ctxs_[j]->root()->type().type;
-      switch (type) {
-        case TYPE_VARCHAR:
-        case TYPE_STRING: {
-          StringValue* sv = reinterpret_cast<StringValue*>(value);
-          kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
-          KUDU_RETURN_IF_ERROR(write->mutable_row()->SetString(col, slice),
-              "Could not add Kudu WriteOp.");
-          break;
-        }
-        case TYPE_FLOAT:
-          KUDU_RETURN_IF_ERROR(
-              write->mutable_row()->SetFloat(col, *reinterpret_cast<float*>(value)),
-              "Could not add Kudu WriteOp.");
-          break;
-        case TYPE_DOUBLE:
-          KUDU_RETURN_IF_ERROR(
-              write->mutable_row()->SetDouble(col, *reinterpret_cast<double*>(value)),
-              "Could not add Kudu WriteOp.");
-          break;
-        case TYPE_BOOLEAN:
-          KUDU_RETURN_IF_ERROR(
-              write->mutable_row()->SetBool(col, *reinterpret_cast<bool*>(value)),
-              "Could not add Kudu WriteOp.");
-          break;
-        case TYPE_TINYINT:
-          KUDU_RETURN_IF_ERROR(
-              write->mutable_row()->SetInt8(col, *reinterpret_cast<int8_t*>(value)),
-              "Could not add Kudu WriteOp.");
-          break;
-        case TYPE_SMALLINT:
-          KUDU_RETURN_IF_ERROR(
-              write->mutable_row()->SetInt16(col, *reinterpret_cast<int16_t*>(value)),
-              "Could not add Kudu WriteOp.");
-          break;
-        case TYPE_INT:
-          KUDU_RETURN_IF_ERROR(
-              write->mutable_row()->SetInt32(col, *reinterpret_cast<int32_t*>(value)),
-              "Could not add Kudu WriteOp.");
-          break;
-        case TYPE_BIGINT:
-          KUDU_RETURN_IF_ERROR(
-              write->mutable_row()->SetInt64(col, *reinterpret_cast<int64_t*>(value)),
-              "Could not add Kudu WriteOp.");
-          break;
-        default:
-          return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(type));
-      }
+      WriteKuduRowValue(write->mutable_row(), col, type, value);
     }
     if (add_row) write_ops.push_back(move(write));
   }

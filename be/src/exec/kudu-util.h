@@ -21,6 +21,8 @@
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
 
+#include "runtime/types.h"
+
 namespace impala {
 
 class Status;
@@ -54,6 +56,13 @@ void InitKuduLogging();
 // This method is not supposed to be used directly.
 void LogKuduMessage(kudu::client::KuduLogSeverity severity, const char* filename,
     int line_number, const struct ::tm* time, const char* message, size_t message_len);
+
+/// Casts 'value' according to 'type' and writes it into 'row' at position 'col'.
+/// If 'type' is STRING or VARCHAR, 'copy_strings' determines if 'value' will be copied
+/// into memory owned by the row. If false, string data must remain valid while the row is
+/// being used.
+Status WriteKuduRowValue(kudu::KuduPartialRow* row, int col, PrimitiveType type,
+    const void* value, bool copy_strings = true);
 
 /// Takes a Kudu status and returns an impala one, if it's not OK.
 #define KUDU_RETURN_IF_ERROR(expr, prepend) \

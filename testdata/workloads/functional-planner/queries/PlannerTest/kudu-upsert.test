@@ -7,6 +7,16 @@ UPSERT INTO KUDU [functional_kudu.testtbl]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=1/24 files=1 size=20.36KB
+---- DISTRIBUTEDPLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+02:SORT
+|  order by: KuduPartition(bigint_col) ASC NULLS LAST, bigint_col ASC NULLS LAST
+|
+01:EXCHANGE [KUDU(KuduPartition(bigint_col))]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 files=1 size=20.36KB
 ====
 # simple upsert with values clause
 upsert into table functional_kudu.testtbl
@@ -40,6 +50,11 @@ UPSERT INTO KUDU [functional_kudu.testtbl]
    runtime filters: RF000 -> a.string_col
 ---- DISTRIBUTEDPLAN
 UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+08:SORT
+|  order by: KuduPartition(a.bigint_col) ASC NULLS LAST, bigint_col ASC NULLS LAST
+|
+07:EXCHANGE [KUDU(KuduPartition(a.bigint_col))]
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: a.string_col = string_col
@@ -79,14 +94,99 @@ UPSERT INTO KUDU [functional_kudu.testtbl]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+05:SORT
+|  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
+|
+04:EXCHANGE [KUDU(KuduPartition(id))]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: id, string_col
+|  having: CAST(count(*) AS INT) < 10
+|
+02:EXCHANGE [HASH(id,string_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: id, string_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
 ====
-upsert into functional_kudu.testtbl /*+ clustered */
+upsert into functional_kudu.testtbl
 select * from functional_kudu.testtbl
 ---- PLAN
 UPSERT INTO KUDU [functional_kudu.testtbl]
 |
-01:SORT
-|  order by: id ASC NULLS LAST
+00:SCAN KUDU [functional_kudu.testtbl]
+---- DISTRIBUTEDPLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+02:SORT
+|  order by: KuduPartition(functional_kudu.testtbl.id) ASC NULLS LAST, id ASC NULLS LAST
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_kudu.testtbl.id))]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
+====
+# upsert with a union
+upsert into functional_kudu.testtbl select * from functional_kudu.testtbl where id % 3 = 0
+union all select * from functional_kudu.testtbl where id % 3 = 1
+---- PLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+00:UNION
+|
+|--02:SCAN KUDU [functional_kudu.testtbl]
+|     predicates: id % 3 = 1
+|
+01:SCAN KUDU [functional_kudu.testtbl]
+   predicates: id % 3 = 0
+---- DISTRIBUTEDPLAN
+UPSERT INTO KUDU [functional_kudu.testtbl]
+|
+04:SORT
+|  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
+|
+03:EXCHANGE [KUDU(KuduPartition(id))]
+|
+00:UNION
+|
+|--02:SCAN KUDU [functional_kudu.testtbl]
+|     predicates: id % 3 = 1
+|
+01:SCAN KUDU [functional_kudu.testtbl]
+   predicates: id % 3 = 0
+====
+# upsert with agg on col that is already partitioned in the input and target table
+# TODO: we shouldn't need to do any repartioning here (IMPALA-5254).
+upsert into functional_kudu.alltypes
+select id, true, 0, 0, 0, 0, 0, 0, '', '', '', 0, 0 from functional_kudu.alltypes group by id
+---- PLAN
+UPSERT INTO KUDU [functional_kudu.alltypes]
+|
+01:AGGREGATE [FINALIZE]
+|  group by: id
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+---- DISTRIBUTEDPLAN
+UPSERT INTO KUDU [functional_kudu.alltypes]
+|
+05:SORT
+|  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
+|
+04:EXCHANGE [KUDU(KuduPartition(id))]
+|
+03:AGGREGATE [FINALIZE]
+|  group by: id
+|
+02:EXCHANGE [HASH(id)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: id
+|
+00:SCAN KUDU [functional_kudu.alltypes]
 ====

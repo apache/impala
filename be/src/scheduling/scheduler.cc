@@ -304,7 +304,8 @@ void Scheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
       const TDataStreamSink& sink = src_fragment.output_sink.stream_sink;
       DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
           || sink.output_partition.type == TPartitionType::HASH_PARTITIONED
-          || sink.output_partition.type == TPartitionType::RANDOM);
+          || sink.output_partition.type == TPartitionType::RANDOM
+          || sink.output_partition.type == TPartitionType::KUDU);
       PlanNodeId exch_id = sink.dest_node_id;
       int sender_id_base = dest_params->per_exch_num_senders[exch_id];
       dest_params->per_exch_num_senders[exch_id] +=

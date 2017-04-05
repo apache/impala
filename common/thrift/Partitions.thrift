@@ -32,7 +32,13 @@ enum TPartitionType {
 
   // ordered partition on a list of exprs
   // (partition bounds don't overlap)
-  RANGE_PARTITIONED
+  RANGE_PARTITIONED,
+
+  // use the partitioning scheme of a Kudu table
+  // TODO: this is a special case now because Kudu supports multilevel partition
+  // schemes. We should add something like lists of TDataPartitions to reflect that
+  // and then this can be removed. (IMPALA-5255)
+  KUDU
 }
 
 // Specification of how a single logical data stream is partitioned.

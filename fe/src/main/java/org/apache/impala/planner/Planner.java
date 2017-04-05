@@ -24,10 +24,12 @@ import java.util.List;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnLineageGraph;
+import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
+import org.apache.impala.analysis.KuduPartitionExpr;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.catalog.HBaseTable;
@@ -38,6 +40,7 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
@@ -493,12 +496,17 @@ public class Planner {
        Analyzer analyzer) throws ImpalaException {
     List<Expr> orderingExprs = Lists.newArrayList();
 
-    if (insertStmt.hasClusteredHint()) {
-      if (insertStmt.getTargetTable() instanceof KuduTable) {
+    if (insertStmt.getTargetTable() instanceof KuduTable) {
+      if (inputFragment.getDataPartition().getType() == TPartitionType.KUDU) {
+        Preconditions.checkState(
+            inputFragment.getDataPartition().getPartitionExprs().size() == 1);
+        // Only sort for Kudu if we've already partitioned so that we can sort the
+        // partitions separately. This will be true if this is a distributed exec.
+        orderingExprs.add(inputFragment.getDataPartition().getPartitionExprs().get(0));
         orderingExprs.addAll(insertStmt.getPrimaryKeyExprs());
-      } else {
-        orderingExprs.addAll(insertStmt.getPartitionKeyExprs());
       }
+    } else if (insertStmt.hasClusteredHint()) {
+      orderingExprs.addAll(insertStmt.getPartitionKeyExprs());
     }
     orderingExprs.addAll(insertStmt.getSortByExprs());
     // Ignore constants for the sake of clustering.

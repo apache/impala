@@ -50,6 +50,11 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
+02:SORT
+|  order by: KuduPartition(10) ASC NULLS LAST, 10 ASC NULLS LAST
+|
+01:EXCHANGE [KUDU(KuduPartition(10))]
+|
 00:UNION
    constant-operands=1
 ====
@@ -60,6 +65,11 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 00:SCAN KUDU [functional_kudu.tinyinttable]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
+|
+02:SORT
+|  order by: KuduPartition(int_col) ASC NULLS LAST, int_col ASC NULLS LAST
+|
+01:EXCHANGE [KUDU(KuduPartition(int_col))]
 |
 00:SCAN KUDU [functional_kudu.tinyinttable]
 ====
@@ -79,6 +89,11 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 00:SCAN KUDU [functional_kudu.dimtbl]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
+|
+06:SORT
+|  order by: KuduPartition(count(id)) ASC NULLS LAST, count(id) ASC NULLS LAST
+|
+05:EXCHANGE [KUDU(KuduPartition(count(id)))]
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(id)
@@ -240,26 +255,23 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.alltypes]
    kudu predicates: id < 1475059775, id > 1475059665
 ====
-# IMPALA-2521: clustered insert into table adds sort node.
-insert into table functional_kudu.alltypes /*+ clustered */
+insert into table functional_kudu.alltypes
 select * from functional_kudu.alltypes
 ---- PLAN
 INSERT INTO KUDU [functional_kudu.alltypes]
-|
-01:SORT
-|  order by: id ASC NULLS LAST
 |
 00:SCAN KUDU [functional_kudu.alltypes]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.alltypes]
 |
-01:SORT
-|  order by: id ASC NULLS LAST
+02:SORT
+|  order by: KuduPartition(functional_kudu.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_kudu.alltypes.id))]
 |
 00:SCAN KUDU [functional_kudu.alltypes]
 ====
-# IMPALA-2521: clustered insert into table adds sort node, correctly substituting exprs.
-insert into table functional_kudu.testtbl /*+ clustered */
+insert into table functional_kudu.testtbl
 select id, name, maxzip as zip
 from (
 select id, max(zip) as maxzip, name
@@ -267,9 +279,6 @@ from functional_kudu.testtbl group by id, name
 ) as sub;
 ---- PLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
-|
-02:SORT
-|  order by: id ASC NULLS LAST
 |
 01:AGGREGATE [FINALIZE]
 |  output: max(zip)
@@ -279,8 +288,10 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
-04:SORT
-|  order by: id ASC NULLS LAST
+05:SORT
+|  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
+|
+04:EXCHANGE [KUDU(KuduPartition(id))]
 |
 03:AGGREGATE [FINALIZE]
 |  output: max:merge(zip)

@@ -1842,6 +1842,18 @@ void Coordinator::SetExecPlanDescriptorTable(const TPlanFragment& fragment,
     table_ids.insert(fragment.output_sink.table_sink.target_table_id);
   }
 
+  // For DataStreamSinks that partition according to the partitioning scheme of a Kudu
+  // table, we need the corresponding tableId.
+  if (fragment.__isset.output_sink && fragment.output_sink.__isset.stream_sink
+      && fragment.output_sink.type == TDataSinkType::DATA_STREAM_SINK
+      && fragment.output_sink.stream_sink.output_partition.type == TPartitionType::KUDU) {
+    TDataPartition partition = fragment.output_sink.stream_sink.output_partition;
+    DCHECK_EQ(partition.partition_exprs.size(), 1);
+    DCHECK(partition.partition_exprs[0].nodes[0].__isset.kudu_partition_expr);
+    table_ids.insert(
+        partition.partition_exprs[0].nodes[0].kudu_partition_expr.target_table_id);
+  }
+
   // Iterate over all TTableDescriptor(s) and add the ones that are needed.
   for (const TTableDescriptor& table_desc: desc_tbl_.tableDescriptors) {
     if (table_ids.find(table_desc.id) == table_ids.end()) continue;

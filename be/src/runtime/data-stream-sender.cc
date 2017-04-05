@@ -331,6 +331,7 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
     int per_channel_buffer_size)
   : DataSink(row_desc),
     sender_id_(sender_id),
+    partition_type_(sink.output_partition.type),
     current_channel_idx_(0),
     flushed_(false),
     closed_(false),
@@ -339,13 +340,13 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
     thrift_transmit_timer_(NULL),
     bytes_sent_counter_(NULL),
     total_sent_rows_counter_(NULL),
-    dest_node_id_(sink.dest_node_id) {
+    dest_node_id_(sink.dest_node_id),
+    next_unknown_partition_(0) {
   DCHECK_GT(destinations.size(), 0);
   DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
       || sink.output_partition.type == TPartitionType::HASH_PARTITIONED
-      || sink.output_partition.type == TPartitionType::RANDOM);
-  broadcast_ = sink.output_partition.type == TPartitionType::UNPARTITIONED;
-  random_ = sink.output_partition.type == TPartitionType::RANDOM;
+      || sink.output_partition.type == TPartitionType::RANDOM
+      || sink.output_partition.type == TPartitionType::KUDU);
   // TODO: use something like google3's linked_ptr here (scoped_ptr isn't copyable)
   for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
@@ -354,17 +355,18 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
                     sink.dest_node_id, per_channel_buffer_size));
   }
 
-  if (broadcast_ || random_) {
+  if (partition_type_ == TPartitionType::UNPARTITIONED
+      || partition_type_ == TPartitionType::RANDOM) {
     // Randomize the order we open/transmit to channels to avoid thundering herd problems.
     srand(reinterpret_cast<uint64_t>(this));
     random_shuffle(channels_.begin(), channels_.end());
   }
 
-  if (sink.output_partition.type == TPartitionType::HASH_PARTITIONED) {
+  if (partition_type_ == TPartitionType::HASH_PARTITIONED
+      || partition_type_ == TPartitionType::KUDU) {
     // TODO: move this to Init()? would need to save 'sink' somewhere
-    Status status =
-        Expr::CreateExprTrees(pool, sink.output_partition.partition_exprs,
-                              &partition_expr_ctxs_);
+    Status status = Expr::CreateExprTrees(
+        pool, sink.output_partition.partition_exprs, &partition_expr_ctxs_);
     DCHECK(status.ok());
   }
 }
@@ -420,7 +422,8 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   DCHECK(!flushed_);
 
   if (batch->num_rows() == 0) return Status::OK();
-  if (broadcast_ || channels_.size() == 1) {
+  if (partition_type_ == TPartitionType::UNPARTITIONED
+      || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
     RETURN_IF_ERROR(SerializeBatch(batch, current_thrift_batch_, channels_.size()));
@@ -431,7 +434,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     }
     current_thrift_batch_ =
         (current_thrift_batch_ == &thrift_batch1_ ? &thrift_batch2_ : &thrift_batch1_);
-  } else if (random_) {
+  } else if (partition_type_ == TPartitionType::RANDOM) {
     // Round-robin batches among channels. Wait for the current channel to finish its
     // rpc before overwriting its batch.
     Channel* current_channel = channels_[current_channel_idx_];
@@ -439,8 +442,25 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     RETURN_IF_ERROR(SerializeBatch(batch, current_channel->thrift_batch()));
     RETURN_IF_ERROR(current_channel->SendBatch(current_channel->thrift_batch()));
     current_channel_idx_ = (current_channel_idx_ + 1) % channels_.size();
+  } else if (partition_type_ == TPartitionType::KUDU) {
+    DCHECK_EQ(partition_expr_ctxs_.size(), 1);
+    int num_channels = channels_.size();
+    for (int i = 0; i < batch->num_rows(); ++i) {
+      TupleRow* row = batch->GetRow(i);
+      int32_t partition =
+          *reinterpret_cast<int32_t*>(partition_expr_ctxs_[0]->GetValue(row));
+      if (partition < 0) {
+        // This row doesn't coorespond to a partition, e.g. it's outside the given ranges.
+        partition = next_unknown_partition_;
+        ++next_unknown_partition_;
+      }
+      channels_[partition % num_channels]->AddRow(row);
+    }
   } else {
+    DCHECK(partition_type_ == TPartitionType::HASH_PARTITIONED);
     // hash-partition batch's rows across channels
+    // TODO: encapsulate this in an Expr as we've done for Kudu above and remove this case
+    // once we have codegen here.
     int num_channels = channels_.size();
     for (int i = 0; i < batch->num_rows(); ++i) {
       TupleRow* row = batch->GetRow(i);

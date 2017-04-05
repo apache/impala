@@ -1736,8 +1736,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalysisError(String.format(
           "insert into table functional_hbase.alltypes %sshuffle%s " +
           "select * from functional_hbase.alltypes", prefix, suffix),
-          "INSERT hints are only supported for inserting into Hdfs and Kudu tables: " +
+          "INSERT hints are only supported for inserting into Hdfs tables: " +
           "functional_hbase.alltypes");
+      // Plan hints do not make sense for inserting into Kudu tables.
+      AnalysisError(String.format(
+          "insert into table functional_kudu.alltypes %sshuffle%s " +
+          "select * from functional_kudu.alltypes", prefix, suffix),
+          "INSERT hints are only supported for inserting into Hdfs tables: " +
+          "functional_kudu.alltypes");
       // Conflicting plan hints.
       AnalysisError("insert into table functional.alltypessmall " +
           "partition (year, month) /* +shuffle,noshuffle */ " +
@@ -1791,14 +1797,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "partition (year, month) %ssortby(year)%s select * from " +
           "functional.alltypes", prefix, suffix),
           "SORTBY hint column list must not contain Hdfs partition column: 'year'");
-      // Column in sortby hint must not be a Kudu primary key column.
-      AnalysisError(String.format("insert into functional_kudu.alltypessmall " +
-          "%ssortby(id)%s select * from functional_kudu.alltypes", prefix, suffix),
-          "SORTBY hint column list must not contain Kudu primary key column: 'id'");
-      // sortby() hint is not supported in UPSERT queries
-      AnalysisError(String.format("upsert into functional_kudu.alltypessmall " +
-          "%ssortby(id)%s select * from functional_kudu.alltypes", prefix, suffix),
-          "SORTBY hint is not supported in UPSERT statements.");
     }
 
     // Multiple non-conflicting hints and case insensitivity of hints.

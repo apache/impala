@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -148,6 +149,14 @@ public class KuduTable extends Table {
 
   public List<KuduPartitionParam> getPartitionBy() {
     return ImmutableList.copyOf(partitionBy_);
+  }
+
+  public Set<String> getPartitionColumnNames() {
+    Set<String> ret = new HashSet<String>();
+    for (KuduPartitionParam partitionParam : partitionBy_) {
+      ret.addAll(partitionParam.getColumnNames());
+    }
+    return ret;
   }
 
   /**

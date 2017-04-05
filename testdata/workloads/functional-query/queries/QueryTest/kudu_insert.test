@@ -278,42 +278,6 @@ NumModifiedRows: 1
 NumRowErrors: 7299
 ====
 ---- QUERY
-# IMPALA-2521: clustered insert into table.
-create table impala_2521
-(id bigint primary key, name string, zip int)
-partition by hash partitions 3 stored as kudu
----- RESULTS
-====
----- QUERY
-insert into impala_2521 /*+ clustered */
-select id, name, maxzip as zip
-from (
-select tinyint_col as id, cast(max(int_col) + 1 as int) as maxzip, string_col as name
-from functional_kudu.alltypessmall group by id, name
-) as sub;
----- RESULTS
-: 10
----- RUNTIME_PROFILE
-NumModifiedRows: 10
-NumRowErrors: 0
-====
----- QUERY
-select * from impala_2521
----- RESULTS
-0,'0',1
-1,'1',2
-2,'2',3
-3,'3',4
-4,'4',5
-5,'5',6
-6,'6',7
-7,'7',8
-8,'8',9
-9,'9',10
----- TYPES
-BIGINT,STRING,INT
-====
----- QUERY
 # Table with all supported types as primary key and distribution columns
 create table allkeytypes (i1 tinyint, i2 smallint, i3 int, i4 bigint, name string,
   valf float, vald double, primary key (i1, i2, i3, i4, name)) partition by

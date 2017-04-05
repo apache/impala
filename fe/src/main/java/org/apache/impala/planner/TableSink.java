@@ -119,8 +119,6 @@ public abstract class TableSink extends DataSink {
     } else if (table instanceof KuduTable) {
       // Kudu doesn't have a way to perform INSERT OVERWRITE.
       Preconditions.checkState(overwrite == false);
-      // Partition clauses don't make sense for Kudu inserts.
-      Preconditions.checkState(partitionKeyExprs.isEmpty());
       // sortby() hint is not supported for Kudu tables.
       Preconditions.checkState(sortByColumns.isEmpty());
       return new KuduTableSink(table, sinkAction, referencedColumns);
