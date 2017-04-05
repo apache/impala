@@ -690,3 +690,39 @@ BIGINT
 ---- RUNTIME_PROFILE
 row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ====
+---- QUERY
+# IMPALA-5171: spilling hash join feeding into right side of nested loop join.
+# Equivalent to:
+#   select *
+#   from lineitem
+#   where l1.l_quantity = 31.0 and l1.l_tax = 0.03 and l1.l_orderkey <= 100000
+# order by l_orderkey, l_partkey, l_suppkey, l_linenumber
+# limit 5
+set max_block_mgr_memory=7m;
+set num_nodes=1;
+select straight_join l.*
+from
+   (select *
+    from tpch_parquet.orders limit 1) o,
+   (select l2.*
+     from tpch_parquet.lineitem l1
+        inner join tpch_parquet.lineitem l2 on l1.l_orderkey = l2.l_orderkey
+            and l1.l_partkey = l2.l_partkey
+            and l1.l_suppkey = l2.l_suppkey and l1.l_linenumber = l2.l_linenumber
+     where
+        # Include a selective post-join predicate so that the RHS of the nested loop join
+        # doesn't consume too much memory.
+        (l1.l_quantity != l2.l_quantity or l1.l_quantity = 31.0 and l1.l_tax = 0.03)
+        # Reduce the data size to get the test to execute quicker
+         and l1.l_orderkey <= 100000) l
+order by l_orderkey, l_partkey, l_suppkey, l_linenumber
+limit 5;
+---- TYPES
+bigint,bigint,bigint,int,decimal,decimal,decimal,decimal,string,string,string,string,string,string,string,string
+---- RESULTS
+288,50641,8157,1,31.00,49340.84,0.00,0.03,'N','O','1997-03-17','1997-04-28','1997-04-06','TAKE BACK RETURN','AIR','instructions wa'
+418,18552,1054,1,31.00,45587.05,0.00,0.03,'N','F','1995-06-05','1995-06-18','1995-06-26','COLLECT COD','FOB','final theodolites. fluffil'
+482,61141,6154,3,31.00,34166.34,0.04,0.03,'N','O','1996-06-01','1996-05-06','1996-06-17','NONE','MAIL',' blithe pin'
+1382,156162,6163,5,31.00,37762.96,0.07,0.03,'R','F','1993-10-26','1993-10-15','1993-11-09','TAKE BACK RETURN','FOB','hely regular dependencies. f'
+1509,186349,3904,6,31.00,44495.54,0.04,0.03,'A','F','1993-07-14','1993-08-21','1993-08-06','COLLECT COD','SHIP','ic deposits cajole carefully. quickly bold '
+====

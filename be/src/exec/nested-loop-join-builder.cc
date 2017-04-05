@@ -45,10 +45,16 @@ Status NljBuilder::Send(RuntimeState* state, RowBatch* batch) {
   build_batch->AcquireState(batch);
 
   AddBuildBatch(build_batch);
-  if (build_batch->needs_deep_copy()) {
+  if (build_batch->needs_deep_copy() || build_batch->num_blocks() > 0
+      || build_batch->num_buffers() > 0) {
     // This batch and earlier batches may refer to resources passed from the child
     // that aren't owned by the row batch itself. Deep copying ensures that the row
     // batches are backed by memory owned by this node that is safe to hold on to.
+    //
+    // Acquiring ownership of attached Blocks or Buffers does not correctly update the
+    // accounting, so also copy data in that cases to avoid stealing reservation
+    // from whoever created the Block/Buffer. TODO: remove workaround when IMPALA-4179
+    // is fixed.
     RETURN_IF_ERROR(DeepCopyBuildBatches(state));
   }
   return Status::OK();
