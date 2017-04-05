@@ -101,16 +101,17 @@ void ReservationTracker::InitCounters(
   }
 
   // Check that another tracker's counters aren't already registered in the profile.
-  DCHECK(profile->GetCounter("BufferPoolInitialReservation") == nullptr);
-  counters_.reservation_limit =
-      ADD_COUNTER(profile, "BufferPoolReservationLimit", TUnit::BYTES);
+  DCHECK(profile->GetCounter("PeakReservation") == nullptr);
   counters_.peak_reservation =
-      profile->AddHighWaterMarkCounter("BufferPoolPeakReservation", TUnit::BYTES);
+      profile->AddHighWaterMarkCounter("PeakReservation", TUnit::BYTES);
   counters_.peak_used_reservation =
-      profile->AddHighWaterMarkCounter("BufferPoolPeakUsedReservation", TUnit::BYTES);
-
-  COUNTER_SET(counters_.reservation_limit, reservation_limit);
-
+      profile->AddHighWaterMarkCounter("PeakUsedReservation", TUnit::BYTES);
+  // Only show the limit if set.
+  counters_.reservation_limit = nullptr;
+  if (reservation_limit != numeric_limits<int64_t>::max()) {
+    counters_.reservation_limit = ADD_COUNTER(profile, "ReservationLimit", TUnit::BYTES);
+    COUNTER_SET(counters_.reservation_limit, reservation_limit);
+  }
   if (mem_tracker_ != nullptr) mem_tracker_->EnableReservationReporting(counters_);
 }
 
@@ -365,7 +366,9 @@ void ReservationTracker::CheckConsistency() const {
   DCHECK_LE(reservation_, counters_.peak_reservation->value());
   DCHECK_EQ(used_reservation_, counters_.peak_used_reservation->current_value());
   DCHECK_LE(used_reservation_, counters_.peak_used_reservation->value());
-  DCHECK_EQ(reservation_limit_, counters_.reservation_limit->value());
+  if (counters_.reservation_limit != nullptr) {
+    DCHECK_EQ(reservation_limit_, counters_.reservation_limit->value());
+  }
 }
 
 void ReservationTracker::UpdateUsedReservation(int64_t delta) {

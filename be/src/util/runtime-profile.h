@@ -130,6 +130,12 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// existing profiles.
   void PrependChild(RuntimeProfile* child, bool indent = true);
 
+  /// Creates a new child profile with the given 'name'. A child profile with that name
+  /// must not already exist. If 'prepend' is true, prepended before other child profiles,
+  /// otherwise appended after other child profiles.
+  RuntimeProfile* CreateChild(
+      const std::string& name, bool indent = true, bool prepend = false);
+
   /// Sorts all children according to a custom comparator. Does not
   /// invalidate pointers to profiles.
   template <class Compare>

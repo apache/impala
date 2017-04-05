@@ -143,9 +143,9 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
   Value detailed(mem_tracker->LogUsage().c_str(), document->GetAllocator());
   document->AddMember("detailed", detailed, document->GetAllocator());
 
-  if (metric_group != NULL) {
+  if (metric_group != nullptr) {
     MetricGroup* jvm_group = metric_group->FindChildGroup("jvm");
-    if (jvm_group != NULL) {
+    if (jvm_group != nullptr) {
       Value jvm(kObjectType);
       jvm_group->ToJson(false, document, &jvm);
       Value heap(kArrayType);
@@ -163,6 +163,13 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
       document->AddMember("jvm_total", total, document->GetAllocator());
       document->AddMember("jvm_heap", heap, document->GetAllocator());
       document->AddMember("jvm_non_heap", non_heap, document->GetAllocator());
+    }
+    MetricGroup* buffer_pool_group = metric_group->FindChildGroup("buffer-pool");
+    if (buffer_pool_group != nullptr) {
+      Value json_metrics(kObjectType);
+      buffer_pool_group->ToJson(false, document, &json_metrics);
+      document->AddMember(
+          "buffer_pool", json_metrics["metrics"], document->GetAllocator());
     }
   }
 }

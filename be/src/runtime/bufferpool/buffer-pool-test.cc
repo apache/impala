@@ -1142,17 +1142,27 @@ void BufferPoolTest::TestEvictionPolicy(int64_t page_size) {
       nullptr, total_mem, profile, &client));
   ASSERT_TRUE(client.IncreaseReservation(total_mem));
 
-  RuntimeProfile::Counter* bytes_alloced =
-      profile->GetCounter("BufferPoolAllocationBytes");
-  RuntimeProfile::Counter* write_ios = profile->GetCounter("BufferPoolWriteIoOps");
-  RuntimeProfile::Counter* read_ios = profile->GetCounter("BufferPoolReadIoOps");
+  RuntimeProfile* buffer_pool_profile = nullptr;
+  vector<RuntimeProfile*> profile_children;
+  profile->GetChildren(&profile_children);
+  for (RuntimeProfile* child : profile_children) {
+    if (child->name() == "Buffer pool") {
+      buffer_pool_profile = child;
+      break;
+    }
+  }
+  ASSERT_TRUE(buffer_pool_profile != nullptr);
+  RuntimeProfile::Counter* cumulative_bytes_alloced =
+      buffer_pool_profile->GetCounter("CumulativeAllocationBytes");
+  RuntimeProfile::Counter* write_ios = buffer_pool_profile->GetCounter("WriteIoOps");
+  RuntimeProfile::Counter* read_ios = buffer_pool_profile->GetCounter("ReadIoOps");
 
   vector<PageHandle> pages;
   CreatePages(&pool, &client, page_size, total_mem, &pages);
   WriteData(pages, 0);
 
   // Unpin pages. Writes should be started and memory should not be deallocated.
-  EXPECT_EQ(total_mem, bytes_alloced->value());
+  EXPECT_EQ(total_mem, cumulative_bytes_alloced->value());
   EXPECT_EQ(total_mem, SystemBytesAllocated(&pool));
   UnpinAll(&pool, &client, &pages);
   ASSERT_GT(write_ios->value(), 0);

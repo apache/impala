@@ -1132,7 +1132,7 @@
     "key": "buffer-pool.system-allocated"
   },
   {
-    "description": "Total memory currently reserved for buffers.",
+    "description": "Total bytes of buffers reserved by Impala subsystems",
     "contexts": [
       "IMPALAD"
     ],

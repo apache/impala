@@ -52,8 +52,8 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
     ReservationTracker* global_reservations, BufferPool* buffer_pool) {
   if (global_reservations != nullptr) {
     DCHECK(buffer_pool != nullptr);
-    RETURN_IF_ERROR(
-        BufferPoolMetric::InitMetrics(metrics, global_reservations, buffer_pool));
+    RETURN_IF_ERROR(BufferPoolMetric::InitMetrics(
+        metrics->GetOrCreateChildGroup("buffer-pool"), global_reservations, buffer_pool));
   }
 #ifndef ADDRESS_SANITIZER
   // We rely on TCMalloc for our global memory metrics, so skip setting them up

@@ -180,8 +180,8 @@ BufferPool::BufferAllocator::~BufferAllocator() {
 Status BufferPool::BufferAllocator::Allocate(
     ClientHandle* client, int64_t len, BufferHandle* buffer) {
   SCOPED_TIMER(client->impl_->counters().alloc_time);
-  COUNTER_ADD(client->impl_->counters().bytes_alloced, len);
-  COUNTER_ADD(client->impl_->counters().num_allocations, 1);
+  COUNTER_ADD(client->impl_->counters().cumulative_bytes_alloced, len);
+  COUNTER_ADD(client->impl_->counters().cumulative_allocations, 1);
 
   RETURN_IF_ERROR(AllocateInternal(len, buffer));
   DCHECK(buffer->is_open());

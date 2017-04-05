@@ -433,6 +433,15 @@ void RuntimeProfile::PrependChild(RuntimeProfile* child, bool indent) {
   AddChildLocked(child, indent, children_.begin());
 }
 
+RuntimeProfile* RuntimeProfile::CreateChild(const string& name, bool indent,
+    bool prepend) {
+  lock_guard<SpinLock> l(children_lock_);
+  DCHECK(child_map_.find(name) == child_map_.end());
+  RuntimeProfile* child = pool_->Add(new RuntimeProfile(pool_, name));
+  AddChildLocked(child, indent, prepend ? children_.begin() : children_.end());
+  return child;
+}
+
 void RuntimeProfile::GetChildren(vector<RuntimeProfile*>* children) {
   children->clear();
   lock_guard<SpinLock> l(children_lock_);

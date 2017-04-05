@@ -29,10 +29,10 @@ struct BufferPoolClientCounters {
   RuntimeProfile::Counter* alloc_time;
 
   /// Number of buffers allocated via BufferAllocator::AllocateBuffer().
-  RuntimeProfile::Counter* num_allocations;
+  RuntimeProfile::Counter* cumulative_allocations;
 
   /// Bytes of buffers allocated via BufferAllocator::AllocateBuffer().
-  RuntimeProfile::Counter* bytes_alloced;
+  RuntimeProfile::Counter* cumulative_bytes_alloced;
 
   /// Amount of time spent waiting for reads from disk to complete.
   RuntimeProfile::Counter* read_wait_time;
@@ -54,10 +54,6 @@ struct BufferPoolClientCounters {
 
   /// The peak total size of unpinned pages.
   RuntimeProfile::HighWaterMarkCounter* peak_unpinned_bytes;
-
-  /// The total bytes of data unpinned. Every time a page's pin count goes from 1 to 0,
-  /// this counter is incremented by the page size.
-  RuntimeProfile::Counter* total_unpinned_bytes;
 };
 
 }

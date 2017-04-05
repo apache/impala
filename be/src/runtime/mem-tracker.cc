@@ -225,7 +225,7 @@ void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
 //      DataStreamSender (dst_id=4): Total=680.00 B Peak=680.00 B
 //
 // If 'reservation_metrics_' are set, we ge a more granular breakdown:
-//   TrackerName: Limit=5.00 MB BufferPoolUsed/Reservation=0/5.00 MB OtherMemory=1.04 MB
+//   TrackerName: Limit=5.00 MB Reservation=5.00 MB OtherMemory=1.04 MB
 //                Total=6.04 MB Peak=6.45 MB
 //
 string MemTracker::LogUsage(const string& prefix, int64_t* logged_consumption) const {
@@ -243,14 +243,10 @@ string MemTracker::LogUsage(const string& prefix, int64_t* logged_consumption) c
   ReservationTrackerCounters* reservation_counters = reservation_counters_.Load();
   if (reservation_counters != nullptr) {
     int64_t reservation = reservation_counters->peak_reservation->current_value();
-    int64_t used_reservation =
-        reservation_counters->peak_used_reservation->current_value();
-    int64_t reservation_limit = reservation_counters->reservation_limit->value();
-    ss << " BufferPoolUsed/Reservation="
-       << PrettyPrinter::Print(used_reservation, TUnit::BYTES) << "/"
-       << PrettyPrinter::Print(reservation, TUnit::BYTES);
-    if (reservation_limit != numeric_limits<int64_t>::max()) {
-      ss << " BufferPoolLimit=" << PrettyPrinter::Print(reservation_limit, TUnit::BYTES);
+    ss << " Reservation=" << PrettyPrinter::Print(reservation, TUnit::BYTES);
+    if (reservation_counters->reservation_limit != nullptr) {
+      int64_t limit = reservation_counters->reservation_limit->value();
+      ss << " ReservationLimit=" << PrettyPrinter::Print(limit, TUnit::BYTES);
     }
     ss << " OtherMemory="
        << PrettyPrinter::Print(curr_consumption - reservation, TUnit::BYTES);

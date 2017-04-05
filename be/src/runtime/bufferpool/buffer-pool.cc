@@ -200,7 +200,6 @@ void BufferPool::Unpin(ClientHandle* client, PageHandle* handle) {
     // Data is in memory - move it to dirty unpinned.
     client->impl_->MoveToDirtyUnpinned(page);
   }
-  COUNTER_ADD(client->impl_->counters().total_unpinned_bytes, handle->len());
   COUNTER_ADD(client->impl_->counters().peak_unpinned_bytes, handle->len());
 }
 
@@ -302,22 +301,23 @@ BufferPool::Client::Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
     debug_write_delay_ms_(0),
     num_pages_(0),
     buffers_allocated_bytes_(0) {
+  // Set up a child profile with buffer pool info.
+  RuntimeProfile* child_profile = profile->CreateChild("Buffer pool", true, true);
   reservation_.InitChildTracker(
-      profile, parent_reservation, mem_tracker, reservation_limit);
-  counters_.alloc_time = ADD_TIMER(profile, "BufferPoolAllocTime");
-  counters_.num_allocations = ADD_COUNTER(profile, "BufferPoolAllocations", TUnit::UNIT);
-  counters_.bytes_alloced =
-      ADD_COUNTER(profile, "BufferPoolAllocationBytes", TUnit::BYTES);
-  counters_.read_wait_time = ADD_TIMER(profile, "BufferPoolReadIoWaitTime");
-  counters_.read_io_ops = ADD_COUNTER(profile, "BufferPoolReadIoOps", TUnit::UNIT);
-  counters_.bytes_read = ADD_COUNTER(profile, "BufferPoolReadIoBytes", TUnit::BYTES);
-  counters_.write_wait_time = ADD_TIMER(profile, "BufferPoolWriteIoWaitTime");
-  counters_.write_io_ops = ADD_COUNTER(profile, "BufferPoolWriteIoOps", TUnit::UNIT);
-  counters_.bytes_written = ADD_COUNTER(profile, "BufferPoolWriteIoBytes", TUnit::BYTES);
+      child_profile, parent_reservation, mem_tracker, reservation_limit);
+  counters_.alloc_time = ADD_TIMER(profile, "AllocTime");
+  counters_.cumulative_allocations =
+      ADD_COUNTER(child_profile, "CumulativeAllocations", TUnit::UNIT);
+  counters_.cumulative_bytes_alloced =
+      ADD_COUNTER(child_profile, "CumulativeAllocationBytes", TUnit::BYTES);
+  counters_.read_wait_time = ADD_TIMER(child_profile, "ReadIoWaitTime");
+  counters_.read_io_ops = ADD_COUNTER(child_profile, "ReadIoOps", TUnit::UNIT);
+  counters_.bytes_read = ADD_COUNTER(child_profile, "ReadIoBytes", TUnit::BYTES);
+  counters_.write_wait_time = ADD_TIMER(child_profile, "WriteIoWaitTime");
+  counters_.write_io_ops = ADD_COUNTER(child_profile, "WriteIoOps", TUnit::UNIT);
+  counters_.bytes_written = ADD_COUNTER(child_profile, "WriteIoBytes", TUnit::BYTES);
   counters_.peak_unpinned_bytes =
-      profile->AddHighWaterMarkCounter("BufferPoolPeakUnpinnedBytes", TUnit::BYTES);
-  counters_.total_unpinned_bytes =
-      ADD_COUNTER(profile, "BufferPoolTotalUnpinnedBytes", TUnit::BYTES);
+      child_profile->AddHighWaterMarkCounter("PeakUnpinnedBytes", TUnit::BYTES);
 }
 
 BufferPool::Page* BufferPool::Client::CreatePinnedPage(BufferHandle&& buffer) {
