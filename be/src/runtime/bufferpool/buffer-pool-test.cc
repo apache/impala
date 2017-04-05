@@ -296,7 +296,7 @@ class BufferPoolTest : public ::testing::Test {
     directory_iterator dir_it(SCRATCH_DIR);
     for (; dir_it != directory_iterator(); ++dir_it) {
       ++num_files;
-      chmod(dir_it->path().c_str(), 0);
+      EXPECT_EQ(0, chmod(dir_it->path().c_str(), 0));
     }
     return num_files;
   }
@@ -307,6 +307,25 @@ class BufferPoolTest : public ::testing::Test {
     EXPECT_GT(path.size(), 0);
     EXPECT_EQ(0, chmod(path.c_str(), 0));
     LOG(INFO) << "Injected fault by removing file permissions " << path;
+  }
+
+  /// Write out a bunch of nonsense to replace the file's current data.
+  static void CorruptBackingFile(const string& path) {
+    EXPECT_GT(path.size(), 0);
+    FILE* file = fopen(path.c_str(), "rb+");
+    EXPECT_EQ(0, fseek(file, 0, SEEK_END));
+    int64_t size = ftell(file);
+    EXPECT_EQ(0, fseek(file, 0, SEEK_SET));
+    for (int64_t i = 0; i < size; ++i) fputc(123, file);
+    fclose(file);
+    LOG(INFO) << "Injected fault by corrupting file " << path;
+  }
+
+  /// Truncate the file to 0 bytes.
+  static void TruncateBackingFile(const string& path) {
+    EXPECT_GT(path.size(), 0);
+    EXPECT_EQ(0, truncate(path.c_str(), 0));
+    LOG(INFO) << "Injected fault by truncating file " << path;
   }
 
   // Return the path of the temporary file backing the page.
@@ -1194,7 +1213,7 @@ void BufferPoolTest::TestWriteError(int write_delay_ms) {
   WaitForAllWrites(&client);
   // Repin the pages
   PinAll(&pool, &client, &pages);
-  // Remove the backing storage so that future writes will fail
+  // Remove permissions to the backing storage so that future writes will fail
   ASSERT_GT(RemoveScratchPerms(), 0);
   // Give the first write a chance to fail before the second write starts.
   const int INTERVAL_MS = 10;
@@ -1247,7 +1266,7 @@ TEST_F(BufferPoolTest, TmpFileAllocateError) {
   // Unpin a page, which will trigger a write.
   pool.Unpin(&client, &pages[0]);
   WaitForAllWrites(&client);
-  // Remove temporary files - subsequent operations will fail.
+  // Remove permissions to the temporary files - subsequent operations will fail.
   ASSERT_GT(RemoveScratchPerms(), 0);
   // The write error will happen asynchronously.
   pool.Unpin(&client, &pages[1]);
@@ -1379,6 +1398,73 @@ TEST_F(BufferPoolTest, WriteErrorBlacklist) {
   for (int i = 0; i < TOTAL_QUERIES; ++i) {
     DestroyAll(&pool, &clients[i], &pages[i]);
     pool.DeregisterClient(&clients[i]);
+  }
+}
+
+// Test error handling when on-disk data is corrupted and the read fails.
+TEST_F(BufferPoolTest, ScratchReadError) {
+  // Only allow one buffer in memory.
+  const int64_t TOTAL_MEM = TEST_BUFFER_LEN;
+  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM);
+  global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
+
+  // Simulate different types of error.
+  enum ErrType {
+    CORRUPT_DATA, // Overwrite real spilled data with bogus data.
+    NO_PERMS, // Remove permissions on the scratch file.
+    TRUNCATE // Truncate the scratch file, destroying spilled data.
+  };
+  for (ErrType error_type : {CORRUPT_DATA, NO_PERMS, TRUNCATE}) {
+    ClientHandle client;
+    ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
+        nullptr, TOTAL_MEM, NewProfile(), &client));
+    ASSERT_TRUE(client.IncreaseReservation(TOTAL_MEM));
+    PageHandle page;
+    ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &page));
+    // Unpin a page, which will trigger a write.
+    pool.Unpin(&client, &page);
+    WaitForAllWrites(&client);
+
+    // Force eviction of the page.
+    ASSERT_OK(AllocateAndFree(&pool, &client, TEST_BUFFER_LEN));
+
+    string tmp_file = TmpFilePath(&page);
+    if (error_type == CORRUPT_DATA) {
+      CorruptBackingFile(tmp_file);
+    } else if (error_type == NO_PERMS) {
+      DisableBackingFile(tmp_file);
+    } else {
+      DCHECK_EQ(error_type, TRUNCATE);
+      TruncateBackingFile(tmp_file);
+    }
+    Status status = pool.Pin(&client, &page);
+    if (error_type == CORRUPT_DATA && !FLAGS_disk_spill_encryption) {
+      // Without encryption we can't detect that the data changed.
+      EXPECT_OK(status);
+    } else {
+      // Otherwise the read should fail.
+      EXPECT_FALSE(status.ok());
+    }
+    // Should be able to destroy the page, even though we hit an error.
+    pool.DestroyPage(&client, &page);
+
+    // If the backing file is still enabled, we should still be able to pin and unpin
+    // pages as normal.
+    ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &page));
+    WriteData(page, 1);
+    pool.Unpin(&client, &page);
+    WaitForAllWrites(&client);
+    if (error_type == NO_PERMS) {
+      // The error prevents read/write of scratch files - this will fail.
+      EXPECT_FALSE(pool.Pin(&client, &page).ok());
+    } else {
+      // The error does not prevent read/write of scratch files.
+      ASSERT_OK(AllocateAndFree(&pool, &client, TEST_BUFFER_LEN));
+      ASSERT_OK(pool.Pin(&client, &page));
+      VerifyData(page, 1);
+    }
+    pool.DestroyPage(&client, &page);
+    pool.DeregisterClient(&client);
   }
 }
 

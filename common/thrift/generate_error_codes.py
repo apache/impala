@@ -312,6 +312,9 @@ error_codes = (
   ("SCRATCH_ALLOCATION_FAILED", 101, "Could not create files in any configured scratch "
    "directories (--scratch_dirs). See logs for previous errors that may have prevented "
    "creating or writing scratch files."),
+
+  ("SCRATCH_READ_TRUNCATED", 102, "Error reading $0 bytes from scratch file '$1' at "
+   "offset $2: could only read $3 bytes"),
 )
 
 import sys

@@ -372,6 +372,7 @@ Status TmpFileMgr::FileGroup::Read(WriteHandle* handle, MemRange buffer) {
   DCHECK(handle->write_range_ != nullptr);
   DCHECK(!handle->is_cancelled_);
   DCHECK_EQ(buffer.len(), handle->len());
+  Status status;
 
   // Don't grab 'lock_' in this method - it is not necessary because we don't touch
   // any members that it protects and could block other threads for the duration of
@@ -384,23 +385,35 @@ Status TmpFileMgr::FileGroup::Read(WriteHandle* handle, MemRange buffer) {
   scan_range->Reset(nullptr, handle->write_range_->file(), handle->write_range_->len(),
       handle->write_range_->offset(), handle->write_range_->disk_id(), false,
       DiskIoMgr::BufferOpts::ReadInto(buffer.data(), buffer.len()));
-  DiskIoMgr::BufferDescriptor* io_mgr_buffer;
+  DiskIoMgr::BufferDescriptor* io_mgr_buffer = nullptr;
   {
     SCOPED_TIMER(disk_read_timer_);
     read_counter_->Add(1);
     bytes_read_counter_->Add(buffer.len());
-    RETURN_IF_ERROR(io_mgr_->Read(io_ctx_, scan_range, &io_mgr_buffer));
+    status = io_mgr_->Read(io_ctx_, scan_range, &io_mgr_buffer);
+    if (!status.ok()) goto exit;
   }
 
   if (FLAGS_disk_spill_encryption) {
-    RETURN_IF_ERROR(handle->CheckHashAndDecrypt(buffer));
+    status = handle->CheckHashAndDecrypt(buffer);
+    if (!status.ok()) goto exit;
   }
 
-  DCHECK_EQ(io_mgr_buffer->buffer(), buffer.data());
-  DCHECK_EQ(io_mgr_buffer->len(), buffer.len());
   DCHECK(io_mgr_buffer->eosr());
-  io_mgr_buffer->Return();
-  return Status::OK();
+  DCHECK_LE(io_mgr_buffer->len(), buffer.len());
+  if (io_mgr_buffer->len() < buffer.len()) {
+    // The read was truncated - this is an error.
+    status = Status(TErrorCode::SCRATCH_READ_TRUNCATED, buffer.len(),
+        handle->write_range_->file(), handle->write_range_->offset(),
+        io_mgr_buffer->len());
+    goto exit;
+  }
+  DCHECK_EQ(io_mgr_buffer->buffer(), buffer.data());
+
+exit:
+  // Always return the buffer before exiting to avoid leaking it.
+  if (io_mgr_buffer != nullptr) io_mgr_buffer->Return();
+  return status;
 }
 
 Status TmpFileMgr::FileGroup::RestoreData(
