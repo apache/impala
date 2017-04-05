@@ -51,7 +51,7 @@ testdata/bin/README-BENCHMARK-TEST-GENERATION
 tests/comparison/ORACLE.txt
 bin/distcc/README.md
 tests/comparison/POSTGRES.txt
-docs/generatingImpalaDoc.md
+docs/README.md
 
 # http://www.apache.org/legal/src-headers.html: "Test data for which the addition of a
 # source header would cause the tests to fail."
