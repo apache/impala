@@ -20,7 +20,9 @@
 
 #include "common/object-pool.h"
 #include "runtime/bufferpool/free-list.h"
+#include "runtime/bufferpool/system-allocator.h"
 #include "testutil/gtest-util.h"
+#include "testutil/rand-util.h"
 
 #include "common/names.h"
 
@@ -29,8 +31,8 @@ namespace impala {
 class FreeListTest : public ::testing::Test {
  protected:
   virtual void SetUp() override {
-    allocator_ = obj_pool_.Add(new BufferAllocator(MIN_BUFFER_LEN));
-    SeedRng();
+    allocator_ = obj_pool_.Add(new SystemAllocator(MIN_BUFFER_LEN));
+    RandTestUtil::SeedRng("FREE_LIST_TEST_SEED", &rng_);
   }
 
   virtual void TearDown() override {
@@ -38,16 +40,8 @@ class FreeListTest : public ::testing::Test {
     obj_pool_.Clear();
   }
 
-  /// Seed 'rng_' with a seed either for the environment or based on the current time.
-  void SeedRng() {
-    const char* seed_str = getenv("FREE_LIST_TEST_SEED");
-    int64_t seed = seed_str != nullptr ? atoi(seed_str) : time(nullptr);
-    LOG(INFO) << "Random seed: " << seed;
-    rng_.seed(seed);
-  }
-
-  void AllocateBuffers(int num_buffers, int64_t buffer_len,
-      vector<BufferHandle>* buffers) {
+  void AllocateBuffers(
+      int num_buffers, int64_t buffer_len, vector<BufferHandle>* buffers) {
     for (int i = 0; i < num_buffers; ++i) {
       BufferHandle buffer;
       ASSERT_OK(allocator_->Allocate(buffer_len, &buffer));
@@ -69,11 +63,10 @@ class FreeListTest : public ::testing::Test {
     buffers->clear();
   }
 
-  void FreeBuffers(vector<BufferHandle>* buffers) {
-    for (BufferHandle& buffer : *buffers) {
+  void FreeBuffers(vector<BufferHandle>&& buffers) {
+    for (BufferHandle& buffer : buffers) {
       allocator_->Free(move(buffer));
     }
-    buffers->clear();
   }
 
   const static int MIN_BUFFER_LEN = 1024;
@@ -85,7 +78,7 @@ class FreeListTest : public ::testing::Test {
   ObjectPool obj_pool_;
 
   /// The buffer allocator, owned by 'obj_pool_'.
-  BufferAllocator* allocator_;
+  SystemAllocator* allocator_;
 };
 
 const int FreeListTest::MIN_BUFFER_LEN;
@@ -115,7 +108,8 @@ TEST_F(FreeListTest, SmallList) {
       std::shuffle(buffers.begin(), buffers.end(), rng_);
       AddFreeBuffers(&small_list, &buffers);
       // Shrink list down to LIST_SIZE.
-      small_list.FreeBuffers(allocator_, max<int64_t>(0, small_list.Size() - LIST_SIZE));
+      FreeBuffers(
+          small_list.GetBuffersToFree(max<int64_t>(0, small_list.Size() - LIST_SIZE)));
 
       // The LIST_SIZE buffers with the lowest address should be retained, and the
       // remaining buffers should have been freed.
@@ -125,7 +119,7 @@ TEST_F(FreeListTest, SmallList) {
         buffers.push_back(move(buffer));
       }
       ASSERT_FALSE(small_list.PopFreeBuffer(&buffer));
-      FreeBuffers(&buffers);
+      FreeBuffers(move(buffers));
     }
   }
 }
@@ -148,7 +142,7 @@ TEST_F(FreeListTest, ReturnOrder) {
       AddFreeBuffers(&list, &buffers);
 
       // Free buffers. Only the buffers with the high addresses should be freed.
-      list.FreeBuffers(allocator_, max<int64_t>(0, list.Size() - LIST_SIZE));
+      FreeBuffers(list.GetBuffersToFree(max<int64_t>(0, list.Size() - LIST_SIZE)));
 
       // Validate that the buffers with lowest addresses are returned in ascending order.
       BufferHandle buffer;

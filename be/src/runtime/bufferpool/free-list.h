@@ -26,7 +26,6 @@
 
 #include "common/logging.h"
 #include "gutil/macros.h"
-#include "runtime/bufferpool/buffer-allocator.h"
 #include "runtime/bufferpool/buffer-pool.h"
 
 namespace impala {
@@ -75,28 +74,21 @@ class FreeList {
     std::push_heap(free_list_.begin(), free_list_.end(), HeapCompare);
   }
 
-  /// Frees all the buffers in the list with 'allocator'. Returns the number of bytes
-  /// freed.
-  int64_t FreeAll(BufferAllocator* allocator) {
-    return FreeBuffers(allocator, free_list_.size());
-  }
-
-  /// Free 'num_buffers' buffers from the list with 'allocator'. Returns the number of
-  /// bytes freed. The average time complexity is n log n, where n is the current size of
-  /// the list.
-  int64_t FreeBuffers(BufferAllocator* allocator, int64_t num_buffers) {
+  /// Get the 'num_buffers' buffers with the highest memory address from the list to
+  /// free. The average time complexity is n log n, where n is the current size of the
+  /// list.
+  vector<BufferHandle> GetBuffersToFree(int64_t num_buffers) {
+    vector<BufferHandle> buffers;
     DCHECK_LE(num_buffers, free_list_.size());
     // Sort the list so we can free the buffers with higher memory addresses.
     // Note that the sorted list is still a valid min-heap.
     std::sort(free_list_.begin(), free_list_.end(), SortCompare);
 
-    int64_t bytes_freed = 0;
     for (int64_t i = 0; i < num_buffers; ++i) {
-      bytes_freed += free_list_.back().len();
-      allocator->Free(std::move(free_list_.back()));
+      buffers.emplace_back(std::move(free_list_.back()));
       free_list_.pop_back();
     }
-    return bytes_freed;
+    return buffers;
   }
 
   /// Returns the number of buffers currently in the list.

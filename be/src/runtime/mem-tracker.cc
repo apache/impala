@@ -292,26 +292,37 @@ Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& deta
   return status;
 }
 
+void MemTracker::AddGcFunction(GcFunction f) {
+  gc_functions_.push_back(f);
+}
+
 bool MemTracker::GcMemory(int64_t max_consumption) {
   if (max_consumption < 0) return true;
   lock_guard<mutex> l(gc_lock_);
   if (consumption_metric_ != NULL) consumption_->Set(consumption_metric_->value());
-  uint64_t pre_gc_consumption = consumption();
+  int64_t pre_gc_consumption = consumption();
   // Check if someone gc'd before us
   if (pre_gc_consumption < max_consumption) return false;
   if (num_gcs_metric_ != NULL) num_gcs_metric_->Increment(1);
 
+  int64_t curr_consumption = pre_gc_consumption;
   // Try to free up some memory
   for (int i = 0; i < gc_functions_.size(); ++i) {
-    gc_functions_[i]();
+    // Try to free up the amount we are over plus some extra so that we don't have to
+    // immediately GC again. Don't free all the memory since that can be unnecessarily
+    // expensive.
+    const int64_t EXTRA_BYTES_TO_FREE = 512L * 1024L * 1024L;
+    int64_t bytes_to_free = curr_consumption - max_consumption + EXTRA_BYTES_TO_FREE;
+    gc_functions_[i](bytes_to_free);
     if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
-    if (consumption() <= max_consumption) break;
+    curr_consumption = consumption();
+    if (max_consumption - curr_consumption <= EXTRA_BYTES_TO_FREE) break;
   }
 
   if (bytes_freed_by_last_gc_metric_ != NULL) {
-    bytes_freed_by_last_gc_metric_->set_value(pre_gc_consumption - consumption());
+    bytes_freed_by_last_gc_metric_->set_value(pre_gc_consumption - curr_consumption);
   }
-  return consumption() > max_consumption;
+  return curr_consumption > max_consumption;
 }
 
 void MemTracker::GcTcmalloc() {

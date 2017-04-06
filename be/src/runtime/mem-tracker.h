@@ -294,14 +294,17 @@ class MemTracker {
 
   MemTracker* parent() const { return parent_; }
 
-  /// Signature for function that can be called to free some memory after limit is reached.
-  /// See the class header for further details on what these functions should do.
-  typedef boost::function<void ()> GcFunction;
+  /// Signature for function that can be called to free some memory after limit is
+  /// reached. The function should try to free at least 'bytes_to_free' bytes of
+  /// memory. See the class header for further details on the expected behaviour of
+  /// these functions.
+  typedef std::function<void(int64_t bytes_to_free)> GcFunction;
 
-  /// Add a function 'f' to be called if the limit is reached.
+  /// Add a function 'f' to be called if the limit is reached, if none of the other
+  /// previously-added GC functions were successful at freeing up enough memory.
   /// 'f' does not need to be thread-safe as long as it is added to only one MemTracker.
   /// Note that 'f' must be valid for the lifetime of this MemTracker.
-  void AddGcFunction(GcFunction f) { gc_functions_.push_back(f); }
+  void AddGcFunction(GcFunction f);
 
   /// Register this MemTracker's metrics. Each key will be of the form
   /// "<prefix>.<metric name>".

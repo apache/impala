@@ -25,8 +25,14 @@ namespace impala {
 /// A set of counters for each buffer pool client.
 struct BufferPoolClientCounters {
  public:
-  /// Amount of time spent trying to get a buffer.
-  RuntimeProfile::Counter* get_buffer_time;
+  /// Total amount of time spent inside BufferAllocator::AllocateBuffer().
+  RuntimeProfile::Counter* alloc_time;
+
+  /// Number of buffers allocated via BufferAllocator::AllocateBuffer().
+  RuntimeProfile::Counter* num_allocations;
+
+  /// Bytes of buffers allocated via BufferAllocator::AllocateBuffer().
+  RuntimeProfile::Counter* bytes_alloced;
 
   /// Amount of time spent waiting for reads from disk to complete.
   RuntimeProfile::Counter* read_wait_time;

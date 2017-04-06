@@ -77,6 +77,8 @@ int CpuInfo::max_num_cores_;
 string CpuInfo::model_name_ = "unknown";
 int CpuInfo::max_num_numa_nodes_;
 unique_ptr<int[]> CpuInfo::core_to_numa_node_;
+vector<vector<int>> CpuInfo::numa_node_to_cores_;
+vector<int> CpuInfo::numa_node_core_idx_;
 
 static struct {
   string name;
@@ -182,6 +184,7 @@ void CpuInfo::InitNuma() {
     // Assume a single NUMA node.
     max_num_numa_nodes_ = 1;
     std::fill_n(core_to_numa_node_.get(), max_num_cores_, 0);
+    InitNumaNodeToCores();
     return;
   }
 
@@ -214,6 +217,29 @@ void CpuInfo::InitNuma() {
                    << " from /sys/devices/system/cpu/";
       core_to_numa_node_[core] = 0;
     }
+  }
+  InitNumaNodeToCores();
+}
+
+void CpuInfo::InitFakeNumaForTest(
+    int max_num_numa_nodes, const vector<int>& core_to_numa_node) {
+  DCHECK_EQ(max_num_cores_, core_to_numa_node.size());
+  max_num_numa_nodes_ = max_num_numa_nodes;
+  for (int i = 0; i < max_num_cores_; ++i) {
+    core_to_numa_node_[i] = core_to_numa_node[i];
+  }
+  numa_node_to_cores_.clear();
+  InitNumaNodeToCores();
+}
+
+void CpuInfo::InitNumaNodeToCores() {
+  DCHECK(numa_node_to_cores_.empty());
+  numa_node_to_cores_.resize(max_num_numa_nodes_);
+  numa_node_core_idx_.resize(max_num_cores_);
+  for (int core = 0; core < max_num_cores_; ++core) {
+    vector<int>* cores_of_node = &numa_node_to_cores_[core_to_numa_node_[core]];
+    numa_node_core_idx_[core] = cores_of_node->size();
+    cores_of_node->push_back(core);
   }
 }
 

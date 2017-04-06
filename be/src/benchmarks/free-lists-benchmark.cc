@@ -27,8 +27,8 @@
 
 #include "common/object-pool.h"
 #include "gutil/strings/substitute.h"
-#include "runtime/bufferpool/buffer-allocator.h"
 #include "runtime/bufferpool/free-list.h"
+#include "runtime/bufferpool/system-allocator.h"
 #include "util/aligned-new.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
@@ -320,7 +320,7 @@ static const int MAX_LIST_ENTRIES = 64;
 static const int ALLOC_OP = 0;
 static const int FREE_OP = 1;
 
-static BufferAllocator allocator(64 * 1024);
+static SystemAllocator allocator(64 * 1024);
 
 // Simulate doing some work with the buffer.
 void DoWork(uint8_t* data, int64_t len) {
@@ -359,7 +359,9 @@ void DoFree(const BenchmarkParams& params, LockedList* free_list,
       list->AddFreeBuffer(move(buffers->back()));
       if (list->Size() > MAX_LIST_ENTRIES) {
         // Discard around 1/4 of the buffers to amortise the cost of sorting.
-        list->FreeBuffers(&allocator, list->Size() - MAX_LIST_ENTRIES * 3 / 4);
+        vector<BufferHandle> buffers =
+            list->GetBuffersToFree(list->Size() - MAX_LIST_ENTRIES * 3 / 4);
+        for (BufferHandle& buffer : buffers) allocator.Free(move(buffer));
       }
     } else {
       allocator.Free(move(buffers->back()));
@@ -417,7 +419,9 @@ void FreeListBenchmark(int batch_size, void* data) {
 
   // Empty out all of the free lists.
   for (LockedList* free_list : free_lists) {
-    free_list->list.FreeAll(&allocator);
+    vector<BufferHandle> buffers =
+        free_list->list.GetBuffersToFree(free_list->list.Size());
+    for (BufferHandle& buffer : buffers) allocator.Free(move(buffer));
   }
 }
 

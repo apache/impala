@@ -21,6 +21,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include <boost/cstdint.hpp>
 
 #include "common/logging.h"
@@ -109,8 +110,33 @@ class CpuInfo {
   /// [0, GetMaxNumCores()).
   static int GetNumaNodeOfCore(int core) {
     DCHECK_LE(0, core);
-    DCHECK_LT(core, max_num_numa_nodes_);
+    DCHECK_LT(core, max_num_cores_);
     return core_to_numa_node_[core];
+  }
+
+  /// Returns the cores in a NUMA node. 'node' must be in the range
+  /// [0, GetMaxNumNumaNodes()).
+  static const std::vector<int>& GetCoresOfNumaNode(int node) {
+    DCHECK_LE(0, node);
+    DCHECK_LT(node, max_num_numa_nodes_);
+    return numa_node_to_cores_[node];
+  }
+
+  /// Returns the cores in the same NUMA node as 'core'. 'core' must be in the range
+  /// [0, GetMaxNumCores()).
+  static const std::vector<int>& GetCoresOfSameNumaNode(int core) {
+    DCHECK_LE(0, core);
+    DCHECK_LT(core, max_num_cores_);
+    return GetCoresOfNumaNode(GetNumaNodeOfCore(core));
+  }
+
+  /// Returns the index of the given core within the vector returned by
+  /// GetCoresOfNumaNode() and GetCoresOfSameNumaNode(). 'core' must be in the range
+  /// [0, GetMaxNumCores()).
+  static int GetNumaNodeCoreIdx(int core) {
+    DCHECK_LE(0, core);
+    DCHECK_LT(core, max_num_cores_);
+    return numa_node_core_idx_[core];
   }
 
   /// Returns the model name of the cpu (e.g. Intel i7-2600)
@@ -150,9 +176,22 @@ class CpuInfo {
     bool reenable_;
   };
 
+ protected:
+  friend class CpuTestUtil;
+
+  /// Setup fake NUMA info to simulate NUMA for backend tests. Sets up CpuInfo to
+  /// simulate 'max_num_numa_nodes' with 'core_to_numa_node' specifying the NUMA node
+  /// of each core in [0, GetMaxNumCores()).
+  static void InitFakeNumaForTest(
+      int max_num_numa_nodes, const std::vector<int>& core_to_numa_node);
+
  private:
   /// Initialize NUMA-related state - called from Init();
   static void InitNuma();
+
+  /// Initialize 'numa_node_to_cores_' based on 'max_num_numa_nodes_' and
+  /// 'core_to_numa_node_'. Called from InitNuma();
+  static void InitNumaNodeToCores();
 
   /// Populates the arguments with information about this machine's caches.
   /// The values returned are not reliable in some environments, e.g. RHEL5 on EC2, so
@@ -173,7 +212,14 @@ class CpuInfo {
 
   /// Array with 'max_num_cores_' entries, each of which is the NUMA node of that core.
   static std::unique_ptr<int[]> core_to_numa_node_;
-};
 
+  /// Vector with 'max_num_numa_nodes_' entries, each of which is a vector of the cores
+  /// belonging to that NUMA node.
+  static std::vector<std::vector<int>> numa_node_to_cores_;
+
+  /// Array with 'max_num_cores_' entries, each of which is the index of that core in its
+  /// NUMA node.
+  static std::vector<int> numa_node_core_idx_;
+};
 }
 #endif

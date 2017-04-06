@@ -20,11 +20,13 @@
 
 #include <stdint.h>
 #include <string>
+#include <vector>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/locks.hpp>
 
 #include "common/atomic.h"
 #include "common/compiler-util.h"
+#include "common/object-pool.h"
 #include "common/status.h"
 #include "gutil/macros.h"
 #include "runtime/tmp-file-mgr.h"
@@ -35,9 +37,9 @@
 
 namespace impala {
 
-class BufferAllocator;
 class ReservationTracker;
 class RuntimeProfile;
+class SystemAllocator;
 
 /// A buffer pool that manages memory buffers for all queries in an Impala daemon.
 /// The buffer pool enforces buffer reservations, limits, and implements policies
@@ -56,9 +58,6 @@ class RuntimeProfile;
 /// includes info that is helpful for debugging (e.g. the operator that is associated
 /// with the buffer). Unless otherwise noted, it is not safe to invoke concurrent buffer
 /// pool operations for the same client.
-///
-/// TODO:
-/// * Decide on, document, and enforce upper limits on page size.
 ///
 /// Pages, Buffers and Pinning
 /// ==========================
@@ -146,9 +145,9 @@ class RuntimeProfile;
 /// operations with the same Client, PageHandle or BufferHandle.
 class BufferPool : public CacheLineAligned {
  public:
+  class BufferAllocator;
   class BufferHandle;
   class ClientHandle;
-  class Client;
   class PageHandle;
 
   /// Constructs a new buffer pool.
@@ -240,79 +239,44 @@ class BufferPool : public CacheLineAligned {
   Status TransferBuffer(ClientHandle* src_client, BufferHandle* src,
       ClientHandle* dst_client, BufferHandle* dst) WARN_UNUSED_RESULT;
 
+  /// Try to release at least 'bytes_to_free' bytes of memory to the system allocator.
+  /// TODO: once IMPALA-4834 is done and all large allocations are served from the buffer
+  /// pool, this may not be necessary.
+  void ReleaseMemory(int64_t bytes_to_free);
+
+  /// Called periodically by a maintenance thread to released unneeded memory back to the
+  /// system allocator.
+  void Maintenance();
+
   /// Print a debug string with the state of the buffer pool.
   std::string DebugString();
 
   int64_t min_buffer_len() const { return min_buffer_len_; }
-  int64_t buffer_bytes_limit() const { return buffer_bytes_limit_; }
+
+  /// Generous upper bounds on page and buffer size and the number of different
+  /// power-of-two buffer sizes.
+  static constexpr int LOG_MAX_BUFFER_BYTES = 48;
+  static constexpr int64_t MAX_BUFFER_BYTES = 1L << LOG_MAX_BUFFER_BYTES;
+
+ protected:
+  friend class BufferPoolTest;
+  /// Test helper: get a reference to the allocator.
+  BufferAllocator* allocator() { return allocator_.get(); }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferPool);
+  class Client;
+  class FreeBufferArena;
   class PageList;
   struct Page;
-  /// Allocate a buffer of length 'len'. Assumes that the client's reservation has already
-  /// been consumed for the buffer. Returns an error if the pool is unable to fulfill the
-  /// reservation. This function may acquire 'clean_pages_lock_' and Page::lock so
-  /// no locks lower in the lock acquisition order (see buffer-pool-internal.h) should be
-  /// held by the caller.
-  Status AllocateBufferInternal(
-      ClientHandle* client, int64_t len, BufferHandle* buffer) WARN_UNUSED_RESULT;
 
-  /// Frees 'buffer', which must be open before calling. Closes 'buffer' and updates
-  /// internal state but does not release to any reservation.
-  void FreeBufferInternal(BufferHandle* buffer);
-
-  /// Decrease 'buffer_bytes_remaining_' by up to 'len', down to a minimum of 0.
-  /// Returns the amount it was decreased by.
-  int64_t DecreaseBufferBytesRemaining(int64_t max_decrease);
-
-  /// Adds a clean page 'page' to the global clean pages list, unless the page is in the
-  /// process of being cleaned up. Caller must hold the page's client's lock via
-  /// 'client_lock' so that moving the page between a client list and the global free
-  /// page list is atomic. Caller must not hold 'clean_pages_lock_' or any Page::lock.
-  void AddCleanPage(const boost::unique_lock<boost::mutex>& client_lock, Page* page);
-
-  /// Removes a clean page 'page' from the global clean pages list, if present. Returns
-  /// true if it was present. Caller must hold the page's client's lock via
-  /// 'client_lock' so that moving the page between list is atomic and there is not a
-  /// window so that moving the page between a client list and the global free page list
-  /// is atomic. Caller must not hold 'clean_pages_lock_' or any Page::lock.
-  bool RemoveCleanPage(const boost::unique_lock<boost::mutex>& client_lock, Page* page);
-
-  /// Evict at least 'bytes_to_evict' bytes of clean pages and free the associated
-  /// buffers with 'allocator_'. Any bytes freed in excess of 'bytes_to_evict' are
-  /// added to 'buffer_bytes_remaining_.'
-  ///
-  /// Returns an error and adds any freed bytes to 'buffer_bytes_remaining_' if not
-  /// enough bytes could be evicted. This will only happen if there is an internal
-  /// bug: if all clients write out enough dirty pages to stay within their reservation,
-  /// then there should always be enough clean pages.
-  Status EvictCleanPages(int64_t bytes_to_evict);
-
-  /// Allocator for allocating and freeing all buffer memory.
+  /// Allocator for allocating and freeing all buffer memory and managing lists of free
+  /// buffers and clean pages.
   boost::scoped_ptr<BufferAllocator> allocator_;
 
   /// The minimum length of a buffer in bytes. All buffers and pages are a power-of-two
   /// multiple of this length. This is always a power of two.
   const int64_t min_buffer_len_;
-
-  /// The maximum physical memory in bytes that can be used for buffers.
-  const int64_t buffer_bytes_limit_;
-
-  /// The remaining number of bytes of 'buffer_bytes_limit_' that can be used for
-  /// allocating new buffers. Must be updated atomically before a new buffer is
-  /// allocated or after an existing buffer is freed.
-  /// TODO: reconsider this to avoid all threads contending on this one value.
-  AtomicInt64 buffer_bytes_remaining_;
-
-  /// Unpinned pages that have had their contents written to disk. These pages can be
-  /// evicted to allocate a buffer for any client. Pages are evicted in FIFO order,
-  /// so that pages are evicted in approximately the same order that the clients wrote
-  /// them to disk. 'clean_pages_lock_' protects 'clean_pages_'.
-  /// TODO: consider breaking up by page size
-  /// TODO: consider breaking up by core/NUMA node to improve locality
-  alignas(CACHE_LINE_SIZE) SpinLock clean_pages_lock_;
-  InternalList<Page> clean_pages_;
 };
 
 /// External representation of a client of the BufferPool. Clients are used for
@@ -390,17 +354,17 @@ class BufferPool::BufferHandle {
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferHandle);
   friend class BufferPool;
-  friend class BufferAllocator;
+  friend class SystemAllocator;
 
   /// Internal helper to set the handle to an opened state.
-  void Open(uint8_t* data, int64_t len);
+  void Open(uint8_t* data, int64_t len, int home_core);
 
   /// Internal helper to reset the handle to an unopened state. Inlined to make moving
   /// efficient.
   inline void Reset();
 
   /// The client the buffer handle belongs to, used to validate that the correct client
-  /// is provided in BufferPool method calls.
+  /// is provided in BufferPool method calls. Set to NULL if the buffer is in a free list.
   const ClientHandle* client_;
 
   /// Pointer to the start of the buffer. Non-NULL if open, NULL if closed.
@@ -408,6 +372,10 @@ class BufferPool::BufferHandle {
 
   /// Length of the buffer in bytes.
   int64_t len_;
+
+  /// The CPU core that the buffer was allocated from - used to determine which arena
+  /// it will be added to.
+  int home_core_;
 };
 
 /// The handle for a page used by clients of the BufferPool. Each PageHandle should
@@ -477,6 +445,7 @@ inline BufferPool::BufferHandle& BufferPool::BufferHandle::operator=(
   client_ = src.client_;
   data_ = src.data_;
   len_ = src.len_;
+  home_core_ = src.home_core_;
   src.Reset();
   return *this;
 }
@@ -485,6 +454,7 @@ inline void BufferPool::BufferHandle::Reset() {
   client_ = NULL;
   data_ = NULL;
   len_ = -1;
+  home_core_ = -1;
 }
 }
 

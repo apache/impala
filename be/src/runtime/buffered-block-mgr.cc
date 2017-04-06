@@ -693,9 +693,12 @@ Status BufferedBlockMgr::CancelWrite(Block* block) {
     if (is_cancelled_) return Status::CANCELLED;
   }
   if (block->write_handle_ != NULL) {
+    // Make sure the write is not in-flight.
+    block->write_handle_->Cancel();
+    block->write_handle_->WaitForWrite();
     // Restore the in-memory data without reading from disk (e.g. decrypt it).
-    RETURN_IF_ERROR(tmp_file_group_->CancelWriteAndRestoreData(
-        move(block->write_handle_), block->valid_data()));
+    RETURN_IF_ERROR(
+        tmp_file_group_->RestoreData(move(block->write_handle_), block->valid_data()));
   }
   return Status::OK();
 }

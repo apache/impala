@@ -117,8 +117,7 @@ class TmpFileMgr {
     /// a different thread when the write completes successfully or unsuccessfully or is
     /// cancelled.
     ///
-    /// 'handle' must be destroyed by passing the DestroyWriteHandle() or
-    /// CancelWriteAndRestoreData().
+    /// 'handle' must be destroyed by passing the DestroyWriteHandle() or RestoreData().
     Status Write(MemRange buffer, WriteDoneCallback cb,
         std::unique_ptr<WriteHandle>* handle) WARN_UNUSED_RESULT;
 
@@ -127,11 +126,11 @@ class TmpFileMgr {
     /// after a write successfully completes.
     Status Read(WriteHandle* handle, MemRange buffer) WARN_UNUSED_RESULT;
 
-    /// Cancels the write referenced by 'handle' and destroy associate resources. Also
-    /// restore the original data in the 'buffer' passed to Write(), decrypting or
-    /// decompressing as necessary. The cancellation always succeeds, but an error
-    /// is returned if restoring the data fails.
-    Status CancelWriteAndRestoreData(
+    /// Restore the original data in the 'buffer' passed to Write(), decrypting or
+    /// decompressing as necessary. Returns an error if restoring the data fails.
+    /// The write must not be in-flight - the caller is responsible for waiting for
+    /// the write to complete.
+    Status RestoreData(
         std::unique_ptr<WriteHandle> handle, MemRange buffer) WARN_UNUSED_RESULT;
 
     /// Wait for the in-flight I/Os to complete and destroy resources associated with
@@ -255,19 +254,27 @@ class TmpFileMgr {
   /// handle can be passed to FileGroup::Read() to read back the data zero or more times.
   /// FileGroup::DestroyWriteHandle() can be called at any time to destroy the handle and
   /// allow reuse of the scratch file range written to. Alternatively,
-  /// FileGroup::CancelWriteAndRestoreData() can be called to reverse the effects of
-  /// FileGroup::Write() by destroying the handle and restoring the original data to the
-  /// buffer, so long as the data in the buffer was not modified by the caller.
+  /// FileGroup::RestoreData() can be called to reverse the effects of FileGroup::Write()
+  /// by destroying the handle and restoring the original data to the buffer, so long as
+  /// the data in the buffer was not modified by the caller.
   ///
   /// Public methods of WriteHandle are safe to call concurrently from multiple threads.
   class WriteHandle {
    public:
     /// The write must be destroyed by passing it to FileGroup - destroying it before
-    /// cancelling the write is an error.
-    ~WriteHandle() {
-      DCHECK(!write_in_flight_);
-      DCHECK(is_cancelled_);
-    }
+    /// the write completes is an error.
+    ~WriteHandle() { DCHECK(!write_in_flight_); }
+
+    /// Cancels the write asynchronously. After Cancel() is called, writes are not
+    /// retried. The write callback may be called with a CANCELLED status (unless
+    /// it succeeded or encountered a different error first).
+    /// TODO: IMPALA-3200: make this private once BufferedBlockMgr doesn't need it.
+    void Cancel();
+
+    /// Blocks until the write completes either successfully or unsuccessfully.
+    /// May return before the write callback has been called.
+    /// TODO: IMPALA-3200: make this private once BufferedBlockMgr doesn't need it.
+    void WaitForWrite();
 
     /// Path of temporary file backing the block. Intended for use in testing.
     /// Returns empty string if no backing file allocated.
@@ -295,13 +302,6 @@ class TmpFileMgr {
     /// After returning, 'write_in_flight_' is true on success or false on failure.
     Status RetryWrite(DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file,
         int64_t offset) WARN_UNUSED_RESULT;
-
-    /// Cancels the write asynchronously. After Cancel() is called, writes are not
-    /// retried.
-    void Cancel();
-
-    /// Blocks until the write completes either successfully or unsuccessfully.
-    void WaitForWrite();
 
     /// Called when the write has completed successfully or not. Sets 'write_in_flight_'
     /// then calls 'cb_'.

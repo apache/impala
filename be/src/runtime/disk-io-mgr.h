@@ -774,6 +774,10 @@ class DiskIoMgr {
   /// later reuse.
   void CacheOrCloseFileHandle(const char* fname, HdfsCachedFileHandle* fid, bool close);
 
+  /// Garbage collect unused I/O buffers up to 'bytes_to_free', or all the buffers if
+  /// 'bytes_to_free' is -1.
+  void GcIoBuffers(int64_t bytes_to_free = -1);
+
   /// Default ready buffer queue capacity. This constant doesn't matter too much
   /// since the system dynamically adjusts.
   static const int DEFAULT_QUEUE_CAPACITY;
@@ -901,12 +905,6 @@ class DiskIoMgr {
 
   /// Returns a buffer desc object which can now be used for another reader.
   void ReturnBufferDesc(BufferDescriptor* desc);
-
-  /// Garbage collect all unused io buffers. This is currently only triggered when the
-  /// process wide limit is hit. This is not good enough. While it is sufficient for
-  /// the IoMgr, other components do not trigger this GC.
-  /// TODO: make this run periodically?
-  void GcIoBuffers();
 
   /// Disassociates the desc->buffer_ memory from 'desc' (which cannot be NULL), either
   /// freeing it or returning it to 'free_buffers_'. Memory tracking is updated to

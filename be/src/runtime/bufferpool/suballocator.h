@@ -89,10 +89,10 @@ class Suballocator {
   /// failed Allocate() call).
   void Free(std::unique_ptr<Suballocation> allocation);
 
-  /// Generous upper bounds on the max allocation size and the number of different
+  /// Upper bounds on the max allocation size and the number of different
   /// power-of-two allocation sizes. Used to bound the number of free lists.
-  static constexpr int LOG_MAX_ALLOCATION_BYTES = 48;
-  static constexpr int64_t MAX_ALLOCATION_BYTES = 1L << LOG_MAX_ALLOCATION_BYTES;
+  static constexpr int LOG_MAX_ALLOCATION_BYTES = BufferPool::LOG_MAX_BUFFER_BYTES;
+  static constexpr int64_t MAX_ALLOCATION_BYTES = BufferPool::MAX_BUFFER_BYTES;
 
   /// Don't support allocations less than 4kb to avoid high overhead.
   static constexpr int LOG_MIN_ALLOCATION_BYTES = 12;

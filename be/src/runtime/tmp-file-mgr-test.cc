@@ -481,7 +481,9 @@ TEST_F(TmpFileMgrTest, TestEncryptionDuringCancellation) {
   string file_path = handle->TmpFilePath();
 
   // Cancel the write - prior to the IMPALA-4820 fix decryption could race with the write.
-  ASSERT_OK(file_group.CancelWriteAndRestoreData(move(handle), data_mem_range));
+  handle->Cancel();
+  handle->WaitForWrite();
+  ASSERT_OK(file_group.RestoreData(move(handle), data_mem_range));
   WaitForCallbacks(1);
 
   // Read the data from the scratch file and check that the plaintext isn't present.

@@ -380,9 +380,6 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
   DCHECK(process_mem_tracker != NULL);
   free_buffer_mem_tracker_.reset(
       new MemTracker(-1, "Free Disk IO Buffers", process_mem_tracker, false));
-  // If we hit the process limit, see if we can reclaim some memory by removing
-  // previously allocated (but unused) io buffers.
-  process_mem_tracker->AddGcFunction(bind(&DiskIoMgr::GcIoBuffers, this));
 
   for (int i = 0; i < disk_queues_.size(); ++i) {
     disk_queues_[i] = new DiskQueue(i);
@@ -759,12 +756,17 @@ DiskIoMgr::BufferDescriptor* DiskIoMgr::GetFreeBuffer(DiskIoRequestContext* read
   return GetBufferDesc(reader, reader->mem_tracker_, range, buffer, buffer_size);
 }
 
-void DiskIoMgr::GcIoBuffers() {
+void DiskIoMgr::GcIoBuffers(int64_t bytes_to_free) {
   unique_lock<mutex> lock(free_buffers_lock_);
   int buffers_freed = 0;
   int bytes_freed = 0;
+  // Free small-to-large to avoid retaining many small buffers and fragmenting memory.
   for (int idx = 0; idx < free_buffers_.size(); ++idx) {
-    for (uint8_t* buffer : free_buffers_[idx]) {
+    std::list<uint8_t*>* free_buffers = &free_buffers_[idx];
+    while (
+        !free_buffers->empty() && (bytes_to_free == -1 || bytes_freed <= bytes_to_free)) {
+      uint8_t* buffer = free_buffers->front();
+      free_buffers->pop_front();
       int64_t buffer_size = (1LL << idx) * min_buffer_size_;
       delete[] buffer;
       free_buffer_mem_tracker_->Release(buffer_size);
@@ -773,7 +775,7 @@ void DiskIoMgr::GcIoBuffers() {
       ++buffers_freed;
       bytes_freed += buffer_size;
     }
-    free_buffers_[idx].clear();
+    if (bytes_to_free != -1 && bytes_freed >= bytes_to_free) break;
   }
 
   if (ImpaladMetrics::IO_MGR_NUM_BUFFERS != NULL) {
@@ -783,7 +785,7 @@ void DiskIoMgr::GcIoBuffers() {
     ImpaladMetrics::IO_MGR_TOTAL_BYTES->Increment(-bytes_freed);
   }
   if (ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS != NULL) {
-    ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS->set_value(0);
+    ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS->Increment(-buffers_freed);
   }
 }
 
@@ -1125,7 +1127,7 @@ DiskIoMgr::BufferDescriptor* DiskIoMgr::TryAllocateNextBufferForRange(
   DCHECK(reader->mem_tracker_ != NULL);
   bool enough_memory = reader->mem_tracker_->SpareCapacity() > LOW_MEMORY;
   if (!enough_memory) {
-    // Low memory, GC and try again.
+    // Low memory, GC all the buffers and try again.
     GcIoBuffers();
     enough_memory = reader->mem_tracker_->SpareCapacity() > LOW_MEMORY;
   }

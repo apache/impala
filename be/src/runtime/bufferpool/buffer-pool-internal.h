@@ -25,7 +25,8 @@
 /// =============
 /// The lock acquisition order is:
 /// 1. Client::lock_
-/// 2. BufferPool::clean_pages_lock_
+/// 2. FreeBufferArena::lock_. If multiple arena locks are acquired, must be acquired in
+///    ascending order.
 /// 3. Page::lock
 ///
 /// If a reference to a Page is acquired through a page list, the Page* reference only
@@ -44,7 +45,7 @@
 ///     a dirty unpinned page. The page is in Client::write_in_flight_pages_. For
 ///     accounting purposes this is considered a dirty page.
 /// * Unpinned - Clean: When the write has completed but the page was not evicted. The
-///     page is in BufferPool::clean_pages_.
+///     page is in a clean pages list in a BufferAllocator arena.
 /// * Unpinned - Evicted: After a clean page's buffer has been reclaimed. The page is
 ///     not in any list.
 ///

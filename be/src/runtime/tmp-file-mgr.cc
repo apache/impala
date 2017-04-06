@@ -407,13 +407,11 @@ Status TmpFileMgr::FileGroup::Read(WriteHandle* handle, MemRange buffer) {
   return Status::OK();
 }
 
-Status TmpFileMgr::FileGroup::CancelWriteAndRestoreData(
+Status TmpFileMgr::FileGroup::RestoreData(
     unique_ptr<WriteHandle> handle, MemRange buffer) {
   DCHECK_EQ(handle->write_range_->data(), buffer.data());
   DCHECK_EQ(handle->len(), buffer.len());
-  handle->Cancel();
-
-  handle->WaitForWrite();
+  DCHECK(!handle->write_in_flight_);
   // Decrypt after the write is finished, so that we don't accidentally write decrypted
   // data to disk.
   Status status;

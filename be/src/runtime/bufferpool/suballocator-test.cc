@@ -29,6 +29,7 @@
 #include "runtime/bufferpool/suballocator.h"
 #include "testutil/death-test-util.h"
 #include "testutil/gtest-util.h"
+#include "testutil/rand-util.h"
 #include "util/bit-util.h"
 
 #include "common/names.h"
@@ -43,7 +44,7 @@ namespace impala {
 class SuballocatorTest : public ::testing::Test {
  public:
   virtual void SetUp() override {
-    SeedRng();
+    RandTestUtil::SeedRng("SUBALLOCATOR_TEST_SEED", &rng_);
     profile_.reset(new RuntimeProfile(&obj_pool_, "test profile"));
   }
 
@@ -63,19 +64,6 @@ class SuballocatorTest : public ::testing::Test {
   const static int64_t TEST_BUFFER_LEN = Suballocator::MIN_ALLOCATION_BYTES * 16;
 
  protected:
-  /// Seed 'rng_' with a seed either for the environment or based on the current time.
-  void SeedRng() {
-    const char* seed_str = getenv("SUBALLOCATOR_TEST_SEED");
-    int64_t seed;
-    if (seed_str != nullptr) {
-      seed = atoi(seed_str);
-    } else {
-      seed = time(nullptr);
-    }
-    LOG(INFO) << "Random seed: " << seed;
-    rng_.seed(seed);
-  }
-
   /// Initialize 'buffer_pool_' and 'global_reservation_' with a limit of 'total_mem'
   /// bytes of buffers of minimum length 'min_buffer_len'.
   void InitPool(int64_t min_buffer_len, int total_mem) {

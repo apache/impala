@@ -27,13 +27,16 @@
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "common/object-pool.h"
+#include "runtime/bufferpool/buffer-allocator.h"
 #include "runtime/bufferpool/buffer-pool-internal.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
+#include "testutil/cpu-util.h"
 #include "testutil/death-test-util.h"
 #include "testutil/gtest-util.h"
+#include "testutil/rand-util.h"
 #include "util/metrics.h"
 
 #include "common/names.h"
@@ -47,6 +50,7 @@ class BufferPoolTest : public ::testing::Test {
   virtual void SetUp() {
     test_env_ = obj_pool_.Add(new TestEnv);
     ASSERT_OK(test_env_->Init());
+    RandTestUtil::SeedRng("BUFFER_POOL_TEST_SEED", &rng_);
   }
 
   virtual void TearDown() {
@@ -59,6 +63,7 @@ class BufferPoolTest : public ::testing::Test {
     }
     global_reservations_.Close();
     obj_pool_.Clear();
+    CpuTestUtil::ResetAffinity(); // Some tests modify affinity.
   }
 
   /// The minimum buffer size used in most tests.
@@ -105,10 +110,68 @@ class BufferPoolTest : public ::testing::Test {
     return !page->page_->buffer.is_open();
   }
 
+  /// Allocate buffers of varying sizes at most 'max_buffer_size' that add up to
+  /// 'total_bytes'. Both numbers must be a multiple of the minimum buffer size.
+  /// If 'randomize_core' is true, will switch thread between cores randomly before
+  /// each allocation.
+  void AllocateBuffers(BufferPool* pool, BufferPool::ClientHandle* client,
+      int64_t max_buffer_size, int64_t total_bytes,
+      vector<BufferPool::BufferHandle>* buffers, bool randomize_core = false) {
+    int64_t curr_buffer_size = max_buffer_size;
+    int64_t bytes_remaining = total_bytes;
+    while (bytes_remaining > 0) {
+      while (curr_buffer_size > client->GetUnusedReservation()) curr_buffer_size /= 2;
+      if (randomize_core) CpuTestUtil::PinToRandomCore(&rng_);
+      buffers->emplace_back();
+      ASSERT_OK(pool->AllocateBuffer(client, curr_buffer_size, &buffers->back()));
+      bytes_remaining -= curr_buffer_size;
+    }
+  }
+
+  /// Create pages of varying sizes at most 'max_page_size' that add up to
+  /// 'total_bytes'. Both numbers must be a multiple of the minimum buffer size.
+  /// If 'randomize_core' is true, will switch thread between cores randomly before
+  /// each allocation.
+  void CreatePages(BufferPool* pool, BufferPool::ClientHandle* client,
+      int64_t max_page_size, int64_t total_bytes, vector<BufferPool::PageHandle>* pages,
+      bool randomize_core = false) {
+    int64_t curr_page_size = max_page_size;
+    int64_t bytes_remaining = total_bytes;
+    while (bytes_remaining > 0) {
+      while (curr_page_size > client->GetUnusedReservation()) curr_page_size /= 2;
+      pages->emplace_back();
+      if (randomize_core) CpuTestUtil::PinToRandomCore(&rng_);
+      ASSERT_OK(pool->CreatePage(client, curr_page_size, &pages->back()));
+      bytes_remaining -= curr_page_size;
+    }
+  }
+
+  /// Free all the 'buffers' and clear the vector.
+  /// If 'randomize_core' is true, will switch thread between cores randomly before
+  /// each free.
+  void FreeBuffers(BufferPool* pool, BufferPool::ClientHandle* client,
+      vector<BufferPool::BufferHandle>* buffers, bool randomize_core = false) {
+    for (auto& buffer : *buffers) {
+      if (randomize_core) CpuTestUtil::PinToRandomCore(&rng_);
+      pool->FreeBuffer(client, &buffer);
+    }
+    buffers->clear();
+  }
+
+  /// Set the maximum number of scavenge attempts that the pool's allocator wil do.
+  void SetMaxScavengeAttempts(BufferPool* pool, int max_attempts) {
+    pool->allocator()->set_max_scavenge_attempts(max_attempts);
+  }
+
+  void TestMemoryReclamation(BufferPool* pool, int src_core, int dst_core);
+
   ObjectPool obj_pool_;
   ReservationTracker global_reservations_;
 
   TestEnv* test_env_; // Owned by 'obj_pool_'.
+
+  /// Per-test random number generator. Seeded before every test.
+  std::mt19937 rng_;
 
   // The file groups created - closed at end of each test.
   vector<TmpFileMgr::FileGroup*> file_groups_;
@@ -668,6 +731,103 @@ TEST_F(BufferPoolTest, MultiplyPinnedPageAccounting) {
   pool.FreeBuffer(&client, &buffer);
   pool.DeregisterClient(&client);
 }
+
+// Constants for TestMemoryReclamation().
+const int MEM_RECLAMATION_NUM_CLIENTS = 2;
+// Choose a non-power-of two so that AllocateBuffers() will allocate a mix of sizes:
+// 32 + 32 + 32 + 8 + 4 + 2 + 1
+const int64_t MEM_RECLAMATION_BUFFERS_PER_CLIENT = 127;
+const int64_t MEM_RECLAMATION_CLIENT_RESERVATION =
+    BufferPoolTest::TEST_BUFFER_LEN * MEM_RECLAMATION_BUFFERS_PER_CLIENT;
+const int64_t MEM_RECLAMATION_TOTAL_BYTES =
+    MEM_RECLAMATION_NUM_CLIENTS * MEM_RECLAMATION_CLIENT_RESERVATION;
+
+// Test that we can reclaim buffers and pages from the same arena and from other arenas.
+TEST_F(BufferPoolTest, MemoryReclamation) {
+  global_reservations_.InitRootTracker(NULL, MEM_RECLAMATION_TOTAL_BYTES);
+  BufferPool pool(TEST_BUFFER_LEN, MEM_RECLAMATION_TOTAL_BYTES);
+  // Assume that all cores are online. Test various combinations of cores to validate
+  // that it can reclaim from any other other core.
+  for (int src = 0; src < CpuInfo::num_cores(); ++src) {
+    // Limit the max scavenge attempts to force use of the "locked" scavenging sometimes,
+    // which would otherwise only be triggered by racing threads.
+    SetMaxScavengeAttempts(&pool, 1 + src % 3);
+    for (int j = 0; j < 4; ++j) {
+      int dst = (src + j) % CpuInfo::num_cores();
+      TestMemoryReclamation(&pool, src, dst);
+    }
+    // Test with one fixed and the other randomly changing
+    TestMemoryReclamation(&pool, src, -1);
+    TestMemoryReclamation(&pool, -1, src);
+  }
+  // Test with both src and dst randomly changing.
+  TestMemoryReclamation(&pool, -1, -1);
+  global_reservations_.Close();
+}
+
+// Test that we can reclaim buffers and pages from the same arena or a different arena.
+// Allocates then frees memory on 'src_core' then allocates on 'dst_core' to force
+// reclamation of memory from src_core's free buffer lists and clean page lists.
+// If 'src_core' or 'dst_core' is -1, randomly switch between cores instead of sticking
+// to a fixed core.
+void BufferPoolTest::TestMemoryReclamation(BufferPool* pool, int src_core, int dst_core) {
+  LOG(INFO) << "TestMemoryReclamation " << src_core << " -> " << dst_core;
+  const bool rand_src_core = src_core == -1;
+  const bool rand_dst_core = dst_core == -1;
+
+  BufferPool::ClientHandle clients[MEM_RECLAMATION_NUM_CLIENTS];
+  for (int i = 0; i < MEM_RECLAMATION_NUM_CLIENTS; ++i) {
+    ASSERT_OK(pool->RegisterClient(Substitute("test client $0", i), NewFileGroup(),
+        &global_reservations_, NULL, MEM_RECLAMATION_CLIENT_RESERVATION, NewProfile(),
+        &clients[i]));
+    ASSERT_TRUE(clients[i].IncreaseReservation(MEM_RECLAMATION_CLIENT_RESERVATION));
+  }
+
+  // Allocate and free the whole pool's buffers on src_core to populate its free lists.
+  if (!rand_src_core) CpuTestUtil::PinToCore(src_core);
+  vector<BufferPool::BufferHandle> client_buffers[MEM_RECLAMATION_NUM_CLIENTS];
+  AllocateBuffers(pool, &clients[0], 32 * TEST_BUFFER_LEN,
+      MEM_RECLAMATION_CLIENT_RESERVATION, &client_buffers[0], rand_src_core);
+  AllocateBuffers(pool, &clients[1], 32 * TEST_BUFFER_LEN,
+      MEM_RECLAMATION_CLIENT_RESERVATION, &client_buffers[1], rand_src_core);
+  FreeBuffers(pool, &clients[0], &client_buffers[0], rand_src_core);
+  FreeBuffers(pool, &clients[1], &client_buffers[1], rand_src_core);
+
+  // Allocate buffers again on dst_core. Make sure the size is bigger, smaller, and the
+  // same size as buffers we allocated earlier to we exercise different code paths.
+  if (!rand_dst_core) CpuTestUtil::PinToCore(dst_core);
+  AllocateBuffers(pool, &clients[0], 4 * TEST_BUFFER_LEN,
+      MEM_RECLAMATION_CLIENT_RESERVATION, &client_buffers[0], rand_dst_core);
+  FreeBuffers(pool, &clients[0], &client_buffers[0], rand_dst_core);
+
+  // Allocate and unpin the whole pool's buffers as clean pages on src_core to populate
+  // its clean page lists.
+  if (!rand_src_core) CpuTestUtil::PinToCore(src_core);
+  vector<BufferPool::PageHandle> client_pages[MEM_RECLAMATION_NUM_CLIENTS];
+  CreatePages(pool, &clients[0], 32 * TEST_BUFFER_LEN, MEM_RECLAMATION_CLIENT_RESERVATION,
+      &client_pages[0], rand_src_core);
+  CreatePages(pool, &clients[1], 32 * TEST_BUFFER_LEN, MEM_RECLAMATION_CLIENT_RESERVATION,
+      &client_pages[1], rand_src_core);
+  for (auto& page : client_pages[0]) pool->Unpin(&clients[0], &page);
+  for (auto& page : client_pages[1]) pool->Unpin(&clients[1], &page);
+
+  // Allocate the buffers again to force reclamation of the buffers from the clean pages.
+  if (!rand_dst_core) CpuTestUtil::PinToCore(dst_core);
+  AllocateBuffers(pool, &clients[0], 4 * TEST_BUFFER_LEN,
+      MEM_RECLAMATION_CLIENT_RESERVATION, &client_buffers[0], rand_dst_core);
+  FreeBuffers(pool, &clients[0], &client_buffers[0]);
+
+  // Just for good measure, pin the pages again then destroy them.
+  for (auto& page : client_pages[0]) {
+    ASSERT_OK(pool->Pin(&clients[0], &page));
+    pool->DestroyPage(&clients[0], &page);
+  }
+  for (auto& page : client_pages[1]) {
+    ASSERT_OK(pool->Pin(&clients[1], &page));
+    pool->DestroyPage(&clients[1], &page);
+  }
+  for (BufferPool::ClientHandle& client : clients) pool->DeregisterClient(&client);
+}
 }
 
 int main(int argc, char** argv) {
@@ -677,11 +837,16 @@ int main(int argc, char** argv) {
   impala::LlvmCodeGen::InitializeLlvm();
   int result = 0;
   for (bool encryption : {false, true}) {
-    FLAGS_disk_spill_encryption = encryption;
-    std::cerr << "+==================================================" << std::endl
-              << "| Running tests with encryption=" << encryption << std::endl
-              << "+==================================================" << std::endl;
-    if (RUN_ALL_TESTS() != 0) result = 1;
+    for (bool numa : {false, true}) {
+      if (!numa && encryption) continue; // Not an interesting combination.
+      impala::CpuTestUtil::SetupFakeNuma(numa);
+      FLAGS_disk_spill_encryption = encryption;
+      std::cerr << "+==================================================" << std::endl
+                << "| Running tests with encryption=" << encryption << " numa=" << numa
+                << std::endl
+                << "+==================================================" << std::endl;
+      if (RUN_ALL_TESTS() != 0) result = 1;
+    }
   }
   return result;
 }

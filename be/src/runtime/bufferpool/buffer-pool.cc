@@ -22,9 +22,11 @@
 #include <boost/bind.hpp>
 
 #include "common/names.h"
+#include "gutil/bits.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/bufferpool/buffer-allocator.h"
 #include "util/bit-util.h"
+#include "util/cpu-info.h"
 #include "util/runtime-profile-counters.h"
 #include "util/uid-util.h"
 
@@ -35,10 +37,16 @@ DEFINE_int32(concurrent_scratch_ios_per_device, 2,
 
 namespace impala {
 
-void BufferPool::BufferHandle::Open(uint8_t* data, int64_t len) {
+constexpr int BufferPool::LOG_MAX_BUFFER_BYTES;
+constexpr int64_t BufferPool::MAX_BUFFER_BYTES;
+
+void BufferPool::BufferHandle::Open(uint8_t* data, int64_t len, int home_core) {
+  DCHECK_LE(0, home_core);
+  DCHECK_LT(home_core, CpuInfo::GetMaxNumCores());
   client_ = nullptr;
   data_ = data;
   len_ = len;
+  home_core_ = home_core;
 }
 
 BufferPool::PageHandle::PageHandle() {
@@ -90,17 +98,13 @@ const BufferPool::BufferHandle* BufferPool::PageHandle::buffer_handle() const {
 }
 
 BufferPool::BufferPool(int64_t min_buffer_len, int64_t buffer_bytes_limit)
-  : allocator_(new BufferAllocator(min_buffer_len)),
-    min_buffer_len_(min_buffer_len),
-    buffer_bytes_limit_(buffer_bytes_limit),
-    buffer_bytes_remaining_(buffer_bytes_limit) {
+  : allocator_(new BufferAllocator(this, min_buffer_len, buffer_bytes_limit)),
+    min_buffer_len_(min_buffer_len) {
   DCHECK_GT(min_buffer_len, 0);
   DCHECK_EQ(min_buffer_len, BitUtil::RoundUpToPowerOfTwo(min_buffer_len));
 }
 
-BufferPool::~BufferPool() {
-  DCHECK_EQ(0, clean_pages_.size());
-}
+BufferPool::~BufferPool() {}
 
 Status BufferPool::RegisterClient(const string& name, TmpFileMgr::FileGroup* file_group,
     ReservationTracker* parent_reservation, MemTracker* mem_tracker,
@@ -196,7 +200,7 @@ void BufferPool::ExtractBuffer(
 Status BufferPool::AllocateBuffer(
     ClientHandle* client, int64_t len, BufferHandle* handle) {
   RETURN_IF_ERROR(client->impl_->PrepareToAllocateBuffer(len));
-  Status status = AllocateBufferInternal(client, len, handle);
+  Status status = allocator_->Allocate(client, len, handle);
   if (!status.ok()) {
     // Allocation failed - update client's accounting to reflect the failure.
     client->impl_->FreedBuffer(len);
@@ -204,44 +208,12 @@ Status BufferPool::AllocateBuffer(
   return status;
 }
 
-Status BufferPool::AllocateBufferInternal(
-    ClientHandle* client, int64_t len, BufferHandle* buffer) {
-  DCHECK(!buffer->is_open());
-  DCHECK_GE(len, min_buffer_len_);
-  DCHECK_EQ(len, BitUtil::RoundUpToPowerOfTwo(len));
-  SCOPED_TIMER(client->impl_->counters().get_buffer_time);
-
-  // If there is headroom in 'buffer_bytes_remaining_', we can just allocate a new buffer.
-  int64_t delta = DecreaseBufferBytesRemaining(len);
-  if (delta < len) {
-    // We must evict some pages to free memory before allocating.
-    int64_t to_evict = len - delta;
-    RETURN_IF_ERROR(EvictCleanPages(to_evict));
-  }
-  Status status = allocator_->Allocate(len, buffer);
-  if (!status.ok()) {
-    buffer_bytes_remaining_.Add(len);
-    return status;
-  }
-  DCHECK(buffer->is_open());
-  buffer->client_ = client;
-  return Status::OK();
-}
-
 void BufferPool::FreeBuffer(ClientHandle* client, BufferHandle* handle) {
   if (!handle->is_open()) return; // Should be idempotent.
   DCHECK_EQ(client, handle->client_);
   int64_t len = handle->len_;
-  FreeBufferInternal(handle);
-  client->impl_->FreedBuffer(len);
-}
-
-void BufferPool::FreeBufferInternal(BufferHandle* handle) {
-  DCHECK(handle->is_open());
-  int64_t buffer_len = handle->len();
   allocator_->Free(move(*handle));
-  buffer_bytes_remaining_.Add(buffer_len);
-  handle->Reset();
+  client->impl_->FreedBuffer(len);
 }
 
 Status BufferPool::TransferBuffer(ClientHandle* src_client, BufferHandle* src,
@@ -259,63 +231,12 @@ Status BufferPool::TransferBuffer(ClientHandle* src_client, BufferHandle* src,
   return Status::OK();
 }
 
-int64_t BufferPool::DecreaseBufferBytesRemaining(int64_t max_decrease) {
-  // TODO: we may want to change this policy so that we don't always use up to the limit
-  // for buffers, since this may starve other operators using non-buffer-pool memory.
-  while (true) {
-    int64_t old_value = buffer_bytes_remaining_.Load();
-    int64_t decrease = min(old_value, max_decrease);
-    int64_t new_value = old_value - decrease;
-    if (buffer_bytes_remaining_.CompareAndSwap(old_value, new_value)) {
-      return decrease;
-    }
-  }
+void BufferPool::Maintenance() {
+  allocator_->Maintenance();
 }
 
-void BufferPool::AddCleanPage(const unique_lock<mutex>& client_lock, Page* page) {
-  page->client->DCheckHoldsLock(client_lock);
-  lock_guard<SpinLock> cpl(clean_pages_lock_);
-  clean_pages_.Enqueue(page);
-}
-
-bool BufferPool::RemoveCleanPage(const unique_lock<mutex>& client_lock, Page* page) {
-  page->client->DCheckHoldsLock(client_lock);
-  lock_guard<SpinLock> cpl(clean_pages_lock_);
-  return clean_pages_.Remove(page);
-}
-
-Status BufferPool::EvictCleanPages(int64_t bytes_to_evict) {
-  DCHECK_GE(bytes_to_evict, 0);
-  vector<BufferHandle> buffers;
-  int64_t bytes_found = 0;
-  {
-    lock_guard<SpinLock> cpl(clean_pages_lock_);
-    while (bytes_found < bytes_to_evict) {
-      Page* page = clean_pages_.Dequeue();
-      if (page == NULL) break;
-      lock_guard<SpinLock> pl(page->buffer_lock);
-      bytes_found += page->len;
-      buffers.emplace_back(move(page->buffer));
-    }
-  }
-
-  // Free buffers after releasing all the locks. Do this regardless of success to avoid
-  // leaking buffers.
-  for (BufferHandle& buffer : buffers) allocator_->Free(move(buffer));
-  if (bytes_found < bytes_to_evict) {
-    // The buffer pool should not be overcommitted so this should only happen if there
-    // is an accounting error. Add any freed buffers back to 'buffer_bytes_remaining_'
-    // to restore consistency.
-    buffer_bytes_remaining_.Add(bytes_found);
-    return Status(TErrorCode::INTERNAL_ERROR,
-        Substitute("Tried to evict $0 bytes but only $1 bytes of clean pages:\n$2",
-                      bytes_to_evict, bytes_found, DebugString()));
-  }
-  // Update 'buffer_bytes_remaining_' with any excess.
-  if (bytes_found > bytes_to_evict) {
-    buffer_bytes_remaining_.Add(bytes_found - bytes_to_evict);
-  }
-  return Status::OK();
+void BufferPool::ReleaseMemory(int64_t bytes_to_free) {
+  allocator_->ReleaseMemory(bytes_to_free);
 }
 
 bool BufferPool::ClientHandle::IncreaseReservation(int64_t bytes) {
@@ -348,7 +269,10 @@ BufferPool::Client::Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
     buffers_allocated_bytes_(0) {
   reservation_.InitChildTracker(
       profile, parent_reservation, mem_tracker, reservation_limit);
-  counters_.get_buffer_time = ADD_TIMER(profile, "BufferPoolGetBufferTime");
+  counters_.alloc_time = ADD_TIMER(profile, "BufferPoolAllocTime");
+  counters_.num_allocations = ADD_COUNTER(profile, "BufferPoolAllocations", TUnit::UNIT);
+  counters_.bytes_alloced =
+      ADD_COUNTER(profile, "BufferPoolAllocationBytes", TUnit::BYTES);
   counters_.read_wait_time = ADD_TIMER(profile, "BufferPoolReadIoWaitTime");
   counters_.read_io_ops = ADD_COUNTER(profile, "BufferPoolReadIoOps", TUnit::UNIT);
   counters_.bytes_read = ADD_COUNTER(profile, "BufferPoolReadIoBytes", TUnit::BYTES);
@@ -389,7 +313,7 @@ void BufferPool::Client::DestroyPageInternal(
       // Let the write complete, if in flight.
       WaitForWrite(&cl, page);
       // If clean, remove it from the clean pages list. If evicted, this is a no-op.
-      pool_->RemoveCleanPage(cl, page);
+      pool_->allocator_->RemoveCleanPage(cl, out_buffer != nullptr, page);
     }
     DCHECK(!page->in_queue());
     --num_pages_;
@@ -404,7 +328,7 @@ void BufferPool::Client::DestroyPageInternal(
     *out_buffer = std::move(page->buffer);
     buffers_allocated_bytes_ += out_buffer->len();
   } else if (page->buffer.is_open()) {
-    pool_->FreeBufferInternal(&page->buffer);
+    pool_->allocator_->Free(move(page->buffer));
   }
   delete page;
   handle->Reset();
@@ -431,20 +355,6 @@ Status BufferPool::Client::MoveToPinned(ClientHandle* client, PageHandle* handle
   // Propagate any write errors that occurred for this client.
   RETURN_IF_ERROR(write_status_);
 
-  // Check if the page is evicted first. This is not necessary for correctness, since
-  // we re-check this later, but by doing it upfront we avoid grabbing the global
-  // 'clean_pages_lock_' in the common case.
-  bool evicted;
-  {
-    lock_guard<SpinLock> pl(page->buffer_lock);
-    evicted = !page->buffer.is_open();
-  }
-  if (evicted) {
-    // We may need to clean some pages to allocate a buffer for the evicted page.
-    RETURN_IF_ERROR(CleanPages(&cl, page->len));
-    return MoveEvictedToPinned(&cl, client, handle);
-  }
-
   if (dirty_unpinned_pages_.Remove(page)) {
     // No writes were initiated for the page - just move it back to the pinned state.
     pinned_pages_.Enqueue(page);
@@ -460,19 +370,17 @@ Status BufferPool::Client::MoveToPinned(ClientHandle* client, PageHandle* handle
   // At this point we need to either reclaim a clean page or allocate a new buffer.
   // We may need to clean some pages to do so.
   RETURN_IF_ERROR(CleanPages(&cl, page->len));
-  if (pool_->RemoveCleanPage(cl, page)) {
-    // The clean page still has an associated buffer. Just clean up the write, restore
-    // the data, and move the page back to the pinned state.
+  if (pool_->allocator_->RemoveCleanPage(cl, true, page)) {
+    // The clean page still has an associated buffer. Restore the data, and move the page
+    // back to the pinned state.
     pinned_pages_.Enqueue(page);
     DCHECK(page->buffer.is_open());
     DCHECK(page->write_handle != NULL);
     // Don't need on-disk data.
     cl.unlock(); // Don't block progress for other threads operating on other pages.
-    return file_group_->CancelWriteAndRestoreData(
-        move(page->write_handle), page->buffer.mem_range());
+    return file_group_->RestoreData(move(page->write_handle), page->buffer.mem_range());
   }
-  // If the page wasn't in the global clean pages list, it must have been evicted after
-  // the earlier 'evicted' check.
+  // If the page wasn't in the clean pages list, it must have been evicted.
   return MoveEvictedToPinned(&cl, client, handle);
 }
 
@@ -486,7 +394,7 @@ Status BufferPool::Client::MoveEvictedToPinned(
   // can modify evicted pages.
   client_lock->unlock();
   BufferHandle buffer;
-  RETURN_IF_ERROR(pool_->AllocateBufferInternal(client, page->len, &page->buffer));
+  RETURN_IF_ERROR(pool_->allocator_->Allocate(client, page->len, &page->buffer));
   COUNTER_ADD(counters().bytes_read, page->len);
   COUNTER_ADD(counters().read_io_ops, 1);
   {
@@ -604,7 +512,7 @@ void BufferPool::Client::WriteCompleteCallback(Page* page, const Status& write_s
     // Move to clean pages list even if an error was encountered - the buffer can be
     // repurposed by other clients and 'write_status_' must be checked by this client
     // before reading back the bad data.
-    pool_->AddCleanPage(cl, page);
+    pool_->allocator_->AddCleanPage(cl, page);
     WriteDirtyPagesAsync(); // Start another asynchronous write if needed.
 
     // Notify before releasing lock to avoid race with Page and Client destruction.
@@ -680,14 +588,8 @@ string BufferPool::BufferHandle::DebugString() const {
 
 string BufferPool::DebugString() {
   stringstream ss;
-  ss << "<BufferPool> " << this << " min_buffer_len: " << min_buffer_len_
-     << " buffer_bytes_limit: " << buffer_bytes_limit_
-     << " buffer_bytes_remaining: " << buffer_bytes_remaining_.Load() << "\n"
-     << "  Clean pages: ";
-  {
-    lock_guard<SpinLock> cpl(clean_pages_lock_);
-    clean_pages_.Iterate(bind<bool>(Page::DebugStringCallback, &ss, _1));
-  }
+  ss << "<BufferPool> " << this << " min_buffer_len: " << min_buffer_len_ << "\n"
+     << allocator_->DebugString();
   return ss.str();
 }
 }

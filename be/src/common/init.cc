@@ -27,6 +27,7 @@
 #include "gutil/atomicops.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/decimal-value.h"
 #include "runtime/exec-env.h"
 #include "runtime/hdfs-fs-cache.h"
@@ -68,6 +69,9 @@ DEFINE_int32(max_audit_event_log_files, 0, "Maximum number of audit event log fi
     "to retain. The most recent audit event log files are retained. If set to 0, "
     "all audit event log files are retained.");
 
+DEFINE_int32(memory_maintenance_sleep_time_ms, 1000, "Sleep time in milliseconds "
+    "between memory maintenance iterations");
+
 DEFINE_int64(pause_monitor_sleep_time_ms, 500, "Sleep time in milliseconds for "
     "pause monitor thread.");
 
@@ -92,27 +96,45 @@ static const float TCMALLOC_RELEASE_FREE_MEMORY_FRACTION = 0.5f;
 
 using std::string;
 
-// Maintenance thread that runs periodically. It does a few things:
-// 1) flushes glog every logbufsecs sec. glog flushes the log file only if
-//    logbufsecs has passed since the previous flush when a new log is written. That means
-//    that on a quiet system, logs will be buffered indefinitely.
-// 2) checks that tcmalloc has not left too much memory in its pageheap
-static scoped_ptr<impala::Thread> maintenance_thread;
+// Log maintenance thread that runs periodically. It flushes glog every logbufsecs sec.
+// glog only automatically flushes the log file if logbufsecs has passed since the
+// previous flush when a new log is written. That means that on a quiet system, logs
+// will be buffered indefinitely. It also rotates log files.
+static scoped_ptr<impala::Thread> log_maintenance_thread;
+
+// Memory Maintenance thread that runs periodically to free up memory. It does the
+// following things every memory_maintenance_sleep_time_ms secs:
+// 1) Releases BufferPool memory that is not currently in use.
+// 2) Frees excess memory that TCMalloc has left in its pageheap.
+static scoped_ptr<impala::Thread> memory_maintenance_thread;
 
 // A pause monitor thread to monitor process pauses in impala daemons. The thread sleeps
 // for a short interval of time (THREAD_SLEEP_TIME_MS), wakes up and calculates the actual
 // time slept. If that exceeds PAUSE_WARN_THRESHOLD_MS, a warning is logged.
 static scoped_ptr<impala::Thread> pause_monitor;
 
-[[noreturn]] static void MaintenanceThread() {
+[[noreturn]] static void LogMaintenanceThread() {
   while (true) {
     sleep(FLAGS_logbufsecs);
 
     google::FlushLogFiles(google::GLOG_INFO);
 
-    // Tests don't need to run the maintenance thread. It causes issues when
-    // on teardown.
+    // No need to rotate log files in tests.
     if (impala::TestInfo::is_test()) continue;
+    // Check for log rotation in every interval of the maintenance thread
+    impala::CheckAndRotateLogFiles(FLAGS_max_log_files);
+    // Check for audit event log rotation in every interval of the maintenance thread
+    impala::CheckAndRotateAuditEventLogFiles(FLAGS_max_audit_event_log_files);
+  }
+}
+
+[[noreturn]] static void MemoryMaintenanceThread() {
+  while (true) {
+    SleepForMs(FLAGS_memory_maintenance_sleep_time_ms);
+    impala::ExecEnv* env = impala::ExecEnv::GetInstance();
+    if (env == nullptr) continue; // ExecEnv may not have been created yet.
+    BufferPool* buffer_pool = env->buffer_pool();
+    if (buffer_pool != nullptr) buffer_pool->Maintenance();
 
 #ifndef ADDRESS_SANITIZER
     // Required to ensure memory gets released back to the OS, even if tcmalloc doesn't do
@@ -139,18 +161,12 @@ static scoped_ptr<impala::Thread> pause_monitor;
 
     // When using tcmalloc, the process limit as measured by our trackers will
     // be out of sync with the process usage. Update the process tracker periodically.
-    impala::ExecEnv* env = impala::ExecEnv::GetInstance();
     if (env != NULL && env->process_mem_tracker() != NULL) {
       env->process_mem_tracker()->RefreshConsumptionFromMetric();
     }
 #endif
     // TODO: we should also update the process mem tracker with the reported JVM
     // mem usage.
-
-    // Check for log rotation in every interval of the maintenance thread
-    impala::CheckAndRotateLogFiles(FLAGS_max_log_files);
-    // Check for audit event log rotation in every interval of the maintenance thread
-    impala::CheckAndRotateAuditEventLogFiles(FLAGS_max_audit_event_log_files);
   }
 }
 
@@ -204,11 +220,18 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   ABORT_IF_ERROR(impala::InitAuth(argv[0]));
 
   // Initialize maintenance_thread after InitGoogleLoggingSafe and InitThreading.
-  maintenance_thread.reset(
-      new Thread("common", "maintenance-thread", &MaintenanceThread));
+  log_maintenance_thread.reset(
+      new Thread("common", "log-maintenance-thread", &LogMaintenanceThread));
 
-  pause_monitor.reset(
-      new Thread("common", "pause-monitor", &PauseMonitorLoop));
+  // Memory maintenance isn't necessary for frontend tests, and it's undesirable
+  // to asynchronously free memory in backend tests that are testing memory
+  // management behaviour.
+  if (!impala::TestInfo::is_test()) {
+    memory_maintenance_thread.reset(
+        new Thread("common", "memory-maintenance-thread", &MemoryMaintenanceThread));
+  }
+
+  pause_monitor.reset(new Thread("common", "pause-monitor", &PauseMonitorLoop));
 
   LOG(INFO) << impala::GetVersionString();
   LOG(INFO) << "Using hostname: " << FLAGS_hostname;
