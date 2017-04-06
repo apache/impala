@@ -75,7 +75,7 @@ public class PartitionSet extends PartitionSpecBase {
       }
 
       // Make sure every conjunct only contains partition slot refs.
-      if(!e.isBoundBySlotIds(partitionSlots)) {
+      if (!e.isBoundBySlotIds(partitionSlots)) {
         throw new AnalysisException("Partition exprs cannot contain non-partition " +
             "column(s): " + e.toSql() + ".");
       }

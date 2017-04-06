@@ -485,6 +485,7 @@ public class HdfsScanNode extends ScanNode {
       List<SlotId> slotIds = Lists.newArrayList();
 
       conjunct.getIds(tupleIds, slotIds);
+      if (slotIds.size() == 0) continue;
       Preconditions.checkState(tupleIds.size() == 1);
       if (slotIds.size() != 1) continue;
 

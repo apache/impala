@@ -1016,14 +1016,42 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=0/24 files=0 size=0B
 ====
-# IMPALA-4592: Test that we bail on evaluating non-deterministic predicates when trying
-# to prune partitions.
-select * from functional.alltypes where rand() > 100
----- PLAN
-not implemented: Unsupported non-deterministic predicate: rand() > 100
-====
-# IMPALA-4592: Same as above but the predicate references a partition column.
+# IMPALA-4592: Test random predicates that reference a partition column.
 select * from functional.alltypes where rand() > year
 ---- PLAN
-not implemented: Unsupported non-deterministic predicate: year < rand()
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: year < rand()
+====
+# IMPALA-5180: Test that predicates not touching a partition column are ignored in
+# partition pruning
+select count(*) from
+  (select * from functional.alltypes) T
+where random() = 100
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: random() = 100
+====
+# Same as above, with a column that gets constant folded away
+select count(*) from
+  (select * from functional.alltypes) T
+where (coalesce(NULL, T.int_col) + random() * T.int_col = 100 OR
+      coalesce(NULL, T.int_col) + T.int_col = 20) and T.int_col = 1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.int_col = 1, FALSE OR 1 + random() * 1 = 100
 ====

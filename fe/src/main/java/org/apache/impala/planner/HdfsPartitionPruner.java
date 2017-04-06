@@ -108,7 +108,8 @@ public class HdfsPartitionPruner {
     Iterator<Expr> it = conjuncts.iterator();
     while (it.hasNext()) {
       Expr conjunct = it.next();
-      if (conjunct.isBoundBySlotIds(partitionSlots_)) {
+      if (conjunct.isBoundBySlotIds(partitionSlots_) &&
+          !conjunct.contains(Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE)) {
         // Check if the conjunct can be evaluated from the partition metadata.
         // Use a cloned conjunct to rewrite BetweenPredicates and allow
         // canEvalUsingPartitionMd() to fold constant expressions without modifying
