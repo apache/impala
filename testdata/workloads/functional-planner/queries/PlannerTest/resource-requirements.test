@@ -320,7 +320,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 select count(*) from tpch_parquet.lineitem
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=20.00MB
+Per-Host Resource Estimates: Memory=90.00MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
@@ -337,7 +337,7 @@ PLAN-ROOT SINK
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 01:AGGREGATE
-|  output: count(*)
+|  output: sum_init_zero(tpch_parquet.lineitem.parquet-stats: num_rows)
 |  mem-estimate=10.00MB mem-reservation=0B
 |  tuple-ids=1 row-size=8B cardinality=1
 |
@@ -346,8 +346,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
    stats-rows=6001215 extrapolated-rows=disabled
    table stats: rows=6001215 size=193.92MB
    column stats: all
-   mem-estimate=0B mem-reservation=0B
-   tuple-ids=0 row-size=0B cardinality=6001215
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=8B cardinality=6001215
 ---- PARALLELPLANS
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=180.00MB
@@ -367,7 +367,7 @@ PLAN-ROOT SINK
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 01:AGGREGATE
-|  output: count(*)
+|  output: sum_init_zero(tpch_parquet.lineitem.parquet-stats: num_rows)
 |  mem-estimate=10.00MB mem-reservation=0B
 |  tuple-ids=1 row-size=8B cardinality=1
 |
@@ -377,7 +377,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
    table stats: rows=6001215 size=193.92MB
    column stats: all
    mem-estimate=80.00MB mem-reservation=0B
-   tuple-ids=0 row-size=0B cardinality=6001215
+   tuple-ids=0 row-size=8B cardinality=6001215
 ====
 # Sort
 select *

@@ -168,7 +168,7 @@ abstract public class ScanNode extends PlanNode {
 
   public boolean isTableMissingColumnStats() {
     for (SlotDescriptor slot: desc_.getSlots()) {
-      if (!slot.getStats().hasStats()) return true;
+      if (slot.getColumn() != null && !slot.getStats().hasStats()) return true;
     }
     return false;
   }

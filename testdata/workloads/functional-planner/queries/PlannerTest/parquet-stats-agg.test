@@ -1,0 +1,349 @@
+# Verify that that the parquet count(*) optimization is applied in all count(*) or
+# count(<literal>) cases when scanning a Parquet table. In the last case, we are scanning
+# a text table, so the optimization is not applied.
+select count(*) from functional_parquet.alltypes
+union all
+select count(1) from functional_parquet.alltypes
+union all
+select count(123) from functional_parquet.alltypes
+union all
+select count(*) from functional.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|
+|--08:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  07:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|
+|--06:AGGREGATE [FINALIZE]
+|  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  |
+|  05:SCAN HDFS [functional_parquet.alltypes]
+|     partitions=24/24 files=24 size=178.13KB
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  |
+|  03:SCAN HDFS [functional_parquet.alltypes]
+|     partitions=24/24 files=24 size=178.13KB
+|
+02:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|
+01:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|
+|--16:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |
+|  15:EXCHANGE [UNPARTITIONED]
+|  |
+|  08:AGGREGATE
+|  |  output: count(*)
+|  |
+|  07:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|
+|--14:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |
+|  13:EXCHANGE [UNPARTITIONED]
+|  |
+|  06:AGGREGATE
+|  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  |
+|  05:SCAN HDFS [functional_parquet.alltypes]
+|     partitions=24/24 files=24 size=178.13KB
+|
+|--12:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |
+|  11:EXCHANGE [UNPARTITIONED]
+|  |
+|  04:AGGREGATE
+|  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  |
+|  03:SCAN HDFS [functional_parquet.alltypes]
+|     partitions=24/24 files=24 size=178.13KB
+|
+10:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|
+01:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# Verify that the parquet count(*) optimization is applied even if there is more than
+# one item in the select list.
+select count(*), count(1), count(123) from functional_parquet.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# Select count(<partition col>) - the optimization should be disabled because it's not a
+# count(<literal>) or count(*) aggregate function.
+select count(year) from functional_parquet.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(year)
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# Group by partition columns.
+select month, count(*) from functional_parquet.alltypes group by month, year
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  group by: month, year
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# The optimization is disabled because tinyint_col is not a partition col.
+select tinyint_col, count(*) from functional_parquet.alltypes group by tinyint_col, year
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: tinyint_col, year
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# The optimization is disabled because there are two aggregate functions.
+select avg(year), count(*) from functional_parquet.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: avg(year), count(*)
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# Optimization is not applied because the inner count(*) is not materialized. The outer
+# count(*) does not reference a base table.
+select count(*) from (select count(*) from functional_parquet.alltypes) t
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+01:AGGREGATE [FINALIZE]
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# The optimization is applied if count(*) is in the having clause.
+select 1 from functional_parquet.alltypes having count(*) > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  having: count(*) > 1
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# The count(*) optimization is applied in the inline view.
+select count(*), count(a) from (select count(1) as a from functional_parquet.alltypes) t
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(*), count(count(*))
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# The count(*) optimization is applied to the inline view even if there is a join.
+select *
+from functional.alltypes x inner join (
+  select count(1) as a from functional_parquet.alltypes group by year
+) t on x.id = t.a;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: x.id = count(*)
+|  runtime filters: RF000 <- count(*)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  |  group by: year
+|  |
+|  01:SCAN HDFS [functional_parquet.alltypes]
+|     partitions=24/24 files=24 size=178.13KB
+|
+00:SCAN HDFS [functional.alltypes x]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> x.id
+====
+# The count(*) optimization is not applied if there is more than 1 table ref.
+select count(*) from functional_parquet.alltypes a, functional_parquet.alltypes b
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+02:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--01:SCAN HDFS [functional_parquet.alltypes b]
+|     partitions=24/24 files=24 size=178.13KB
+|
+00:SCAN HDFS [functional_parquet.alltypes a]
+   partitions=24/24 files=24 size=178.13KB
+====
+# The count(*) optimization is applied if there are predicates on partition columns.
+select count(1) from functional_parquet.alltypes where year < 2010 and month > 8;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=4/24 files=4 size=29.75KB
+====
+# tinyint_col is not a partition column so the optimization is disabled.
+select count(1) from functional_parquet.alltypes where year < 2010 and tinyint_col > 8;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=12/24 files=12 size=89.05KB
+   predicates: tinyint_col > 8
+====
+# Optimization is applied after constant folding.
+select count(1 + 2 + 3) from functional_parquet.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# Optimization is not applied to count(null).
+select count(1 + null + 3) from functional_parquet.alltypes
+union all
+select count(null) from functional_parquet.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: count(NULL)
+|  |
+|  03:SCAN HDFS [functional_parquet.alltypes]
+|     partitions=24/24 files=24 size=178.13KB
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(NULL + 3)
+|
+01:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# Optimization is not applied when selecting from an empty table.
+select count(*) from functional_parquet.emptytable
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional_parquet.emptytable]
+   partitions=0/0 files=0 size=0B
+====
+# Optimization is not applied when all partitions are pruned.
+select count(1) from functional_parquet.alltypes where year = -1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=0/24 files=0 size=0B
+====
+# Optimization is not applied across query blocks, even though it would be correct here.
+select count(*) from (select int_col from functional_parquet.alltypes) t
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# Optimization is not applied when there is a distinct agg.
+select count(*), count(distinct 1) from functional_parquet.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(1), count:merge(*)
+|
+01:AGGREGATE
+|  output: count(*)
+|  group by: 1
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# The optimization is applied here because only the count(*) and a partition column are
+# materialized. Non-materialized agg exprs are ignored.
+select year, cnt from (
+  select year, count(bigint_col), count(*) cnt, avg(int_col)
+  from functional_parquet.alltypes
+  where month=1
+  group by year
+) t
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  group by: year
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=2/24 files=2 size=15.01KB
+====

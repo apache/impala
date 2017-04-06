@@ -1458,7 +1458,7 @@ on (t3.string_col = t1.string_col_1 and t3.date_string_col = t1.string_col_2)
 PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
-|  output: count(1)
+|  output: count(*)
 |
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t2.string_col = t3.string_col, t1.string_col = t3.date_string_col

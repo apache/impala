@@ -302,6 +302,9 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testParquetStatsAgg() { runPlannerTestFile("parquet-stats-agg"); }
+
+  @Test
   public void testParquetFiltering() {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);

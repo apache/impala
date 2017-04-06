@@ -445,11 +445,11 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
-|  output: count(1), count:merge(1)
-|  having: count(1) > 0, zeroifnull(count(1)) > 1, count(1) + zeroifnull(count(1)) > 10
+|  output: count(1), count:merge(*)
+|  having: count(1) > 0, zeroifnull(count(*)) > 1, count(1) + zeroifnull(count(*)) > 10
 |
 01:AGGREGATE
-|  output: count(1)
+|  output: count(*)
 |  group by: 1
 |
 00:SCAN HDFS [functional.alltypes]
@@ -458,22 +458,22 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
-|  output: count:merge(1), count:merge(1)
-|  having: count(1) > 0, zeroifnull(count(1)) > 1, count(1) + zeroifnull(count(1)) > 10
+|  output: count:merge(1), count:merge(*)
+|  having: count(1) > 0, zeroifnull(count(*)) > 1, count(1) + zeroifnull(count(*)) > 10
 |
 05:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE
-|  output: count(1), count:merge(1)
+|  output: count(1), count:merge(*)
 |
 04:AGGREGATE
-|  output: count:merge(1)
+|  output: count:merge(*)
 |  group by: 1
 |
 03:EXCHANGE [HASH(1)]
 |
 01:AGGREGATE [STREAMING]
-|  output: count(1)
+|  output: count(*)
 |  group by: 1
 |
 00:SCAN HDFS [functional.alltypes]

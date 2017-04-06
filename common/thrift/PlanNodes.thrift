@@ -216,6 +216,10 @@ struct THdfsScanNode {
   // Map from SlotIds to the indices in TPlanNode.conjuncts that are eligible
   // for dictionary filtering.
   9: optional map<Types.TSlotId, list<i32>> dictionary_filter_conjuncts
+
+  // The byte offset of the slot for Parquet metadata if Parquet count star optimization
+  // is enabled.
+  10: optional i32 parquet_count_star_slot_offset
 }
 
 struct TDataSourceScanNode {

@@ -652,6 +652,17 @@ public class AggregateInfo extends AggregateInfoBase {
   }
 
   /**
+   * Returns true if there is a single count(*) materialized aggregate expression.
+   */
+  public boolean hasCountStarOnly() {
+    if (getMaterializedAggregateExprs().size() != 1) return false;
+    if (isDistinctAgg()) return false;
+    FunctionCallExpr origExpr = getMaterializedAggregateExprs().get(0);
+    if (!origExpr.getFnName().getFunction().equalsIgnoreCase("count")) return false;
+    return origExpr.getParams().isStar();
+  }
+
+  /**
    * Validates the internal state of this agg info: Checks that the number of
    * materialized slots of the output tuple corresponds to the number of materialized
    * aggregate functions plus the number of grouping exprs. Also checks that the return

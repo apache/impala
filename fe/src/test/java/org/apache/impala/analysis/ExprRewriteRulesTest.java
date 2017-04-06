@@ -24,13 +24,14 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
-import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
 import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
+import org.apache.impala.rewrite.NormalizeCountStarRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
+import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -509,5 +510,19 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
         "int_col = 1 and int_col in "
             + "(select smallint_col from functional.alltypessmall where smallint_col<10)",
         edToInrule, null);
+  }
+
+  @Test
+  public void TestNormalizeCountStarRule() throws AnalysisException {
+    ExprRewriteRule rule = NormalizeCountStarRule.INSTANCE;
+
+    RewritesOk("count(1)", rule, "count(*)");
+    RewritesOk("count(5)", rule, "count(*)");
+
+    // Verify that these don't get rewritten.
+    RewritesOk("count(null)", rule, null);
+    RewritesOk("count(id)", rule, null);
+    RewritesOk("count(1 + 1)", rule, null);
+    RewritesOk("count(1 + null)", rule, null);
   }
 }

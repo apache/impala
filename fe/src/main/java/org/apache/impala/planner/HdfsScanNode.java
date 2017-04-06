@@ -27,10 +27,15 @@ import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.FunctionCallExpr;
+import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
@@ -43,9 +48,9 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FileSystemUtil;
@@ -97,6 +102,13 @@ import com.google.common.collect.Sets;
  * parquet::Statistics of row groups. If the conjuncts don't match, then whole row groups
  * will be skipped.
  *
+ * Count(*) aggregation optimization flow:
+ * The caller passes in an AggregateInfo to the constructor that this scan node uses to
+ * determine whether to apply the optimization or not. The produced smap must then be
+ * applied to the AggregateInfo in this query block. We do not apply the smap in this
+ * class directly to avoid side effects and make it easier to reason about.
+ * See HdfsScanNode.applyParquetCountStartOptimization().
+ *
  * TODO: pass in range restrictions.
  */
 public class HdfsScanNode extends ScanNode {
@@ -126,6 +138,10 @@ public class HdfsScanNode extends ScanNode {
   private final TReplicaPreference replicaPreference_;
   private final boolean randomReplica_;
 
+  // The AggregationInfo from the query block of this scan node. Used for determining if
+  // the Parquet count(*) optimization can be applied.
+  private final AggregateInfo aggInfo_;
+
   // Number of partitions, files and bytes scanned. Set in computeScanRangeLocations().
   // Might not match 'partitions_' due to table sampling.
   private int numPartitions_ = 0;
@@ -139,6 +155,11 @@ public class HdfsScanNode extends ScanNode {
 
   // True if this scan node should use the MT implementation in the backend.
   private boolean useMtScanNode_;
+
+  // Should be applied to the AggregateInfo from the same query block. We cannot use the
+  // PlanNode.outputSmap_ for this purpose because we don't want the smap entries to be
+  // propagated outside the query block.
+  protected ExprSubstitutionMap optimizedAggSmap_;
 
   // Conjuncts that can be evaluated while materializing the items (tuples) of
   // collection-typed slots. Maps from tuple descriptor to the conjuncts bound by that
@@ -182,6 +203,10 @@ public class HdfsScanNode extends ScanNode {
   // parquet::Statistics.
   private TupleDescriptor minMaxTuple_;
 
+  // Slot that is used to record the Parquet metatdata for the count(*) aggregation if
+  // this scan node has the count(*) optimization enabled.
+  private SlotDescriptor countStarSlot_ = null;
+
   /**
    * Construct a node to scan given data files into tuples described by 'desc',
    * with 'conjuncts' being the unevaluated conjuncts bound by the tuple and
@@ -189,7 +214,7 @@ public class HdfsScanNode extends ScanNode {
    * class comments above for details.
    */
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
-      List<HdfsPartition> partitions, TableRef hdfsTblRef) {
+      List<HdfsPartition> partitions, TableRef hdfsTblRef, AggregateInfo aggInfo) {
     super(id, desc, "SCAN HDFS");
     Preconditions.checkState(desc.getTable() instanceof HdfsTable);
     tbl_ = (HdfsTable)desc.getTable();
@@ -201,6 +226,7 @@ public class HdfsScanNode extends ScanNode {
     HdfsTable hdfsTable = (HdfsTable)hdfsTblRef.getTable();
     Preconditions.checkState(tbl_ == hdfsTable);
     StringBuilder error = new StringBuilder();
+    aggInfo_ = aggInfo;
     skipHeaderLineCount_ = tbl_.parseSkipHeaderLineCount(error);
     if (error.length() > 0) {
       // Any errors should already have been caught during analysis.
@@ -218,6 +244,47 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
+   * Adds a new slot descriptor to the tuple descriptor of this scan. The new slot will be
+   * used for storing the data extracted from the Parquet num rows statistic. Also adds an
+   * entry to 'optimizedAggSmap_' that substitutes count(*) with
+   * sum_init_zero(<new-slotref>). Returns the new slot descriptor.
+   */
+  private SlotDescriptor applyParquetCountStartOptimization(Analyzer analyzer) {
+    FunctionCallExpr countFn = new FunctionCallExpr(new FunctionName("count"),
+        FunctionParams.createStarParam());
+    countFn.analyzeNoThrow(analyzer);
+
+    // Create the sum function.
+    SlotDescriptor sd = analyzer.addSlotDescriptor(getTupleDesc());
+    sd.setType(Type.BIGINT);
+    sd.setIsMaterialized(true);
+    sd.setIsNullable(false);
+    sd.setLabel("parquet-stats: num_rows");
+    ArrayList<Expr> args = Lists.newArrayList();
+    args.add(new SlotRef(sd));
+    FunctionCallExpr sumFn = new FunctionCallExpr("sum_init_zero", args);
+    sumFn.analyzeNoThrow(analyzer);
+
+    optimizedAggSmap_ = new ExprSubstitutionMap();
+    optimizedAggSmap_.put(countFn, sumFn);
+    return sd;
+  }
+
+  /**
+   * Returns true if the Parquet count(*) optimization can be applied to the query block
+   * of this scan node.
+   */
+  private boolean canApplyParquetCountStarOptimization(Analyzer analyzer,
+      Set<HdfsFileFormat> fileFormats) {
+    if (analyzer.getNumTableRefs() != 1) return false;
+    if (aggInfo_ == null || !aggInfo_.hasCountStarOnly()) return false;
+    if (fileFormats.size() != 1) return false;
+    if (!fileFormats.contains(HdfsFileFormat.PARQUET)) return false;
+    if (!conjuncts_.isEmpty()) return false;
+    return desc_.getMaterializedSlots().isEmpty() || desc_.hasClusteringColsOnly();
+  }
+
+  /**
    * Populate collectionConjuncts_ and scanRanges_.
    */
   @Override
@@ -227,7 +294,6 @@ public class HdfsScanNode extends ScanNode {
 
     assignCollectionConjuncts(analyzer);
     computeDictionaryFilterConjuncts(analyzer);
-    computeMemLayout(analyzer);
 
     // compute scan range locations with optional sampling
     Set<HdfsFileFormat> fileFormats = computeScanRangeLocations(analyzer);
@@ -248,7 +314,16 @@ public class HdfsScanNode extends ScanNode {
       computeMinMaxTupleAndConjuncts(analyzer);
     }
 
-    // do this at the end so it can take all conjuncts and scan ranges into account
+    if (canApplyParquetCountStarOptimization(analyzer, fileFormats)) {
+      Preconditions.checkState(desc_.getPath().destTable() != null);
+      Preconditions.checkState(collectionConjuncts_.isEmpty());
+      countStarSlot_ = applyParquetCountStartOptimization(analyzer);
+    }
+
+    computeMemLayout(analyzer);
+
+    // This is towards the end, so that it can take all conjuncts, scan ranges and mem
+    // layout into account.
     computeStats(analyzer);
 
     // TODO: do we need this?
@@ -308,10 +383,6 @@ public class HdfsScanNode extends ScanNode {
           firstComplexTypedCol.getName(), firstComplexTypedCol.getType().toSql(),
           errSuffix));
     }
-  }
-
-  public boolean isPartitionedTable() {
-    return desc_.getTable().getNumClusteringCols() > 0;
   }
 
   /**
@@ -855,6 +926,11 @@ public class HdfsScanNode extends ScanNode {
       msg.hdfs_scan_node.setSkip_header_line_count(skipHeaderLineCount_);
     }
     msg.hdfs_scan_node.setUse_mt_scan_node(useMtScanNode_);
+    Preconditions.checkState((optimizedAggSmap_ == null) == (countStarSlot_ == null));
+    if (countStarSlot_ != null) {
+      msg.hdfs_scan_node.setParquet_count_star_slot_offset(
+          countStarSlot_.getByteOffset());
+    }
     if (!minMaxConjuncts_.isEmpty()) {
       for (Expr e: minMaxConjuncts_) {
         msg.hdfs_scan_node.addToMin_max_conjuncts(e.treeToThrift());
@@ -1015,6 +1091,8 @@ public class HdfsScanNode extends ScanNode {
     return (long) RuntimeEnv.INSTANCE.getNumCores() * (long) MAX_THREAD_TOKENS_PER_CORE *
         MAX_IO_BUFFERS_PER_THREAD * BackendConfig.INSTANCE.getReadSize();
   }
+
+  public ExprSubstitutionMap getOptimizedAggSmap() { return optimizedAggSmap_; }
 
   @Override
   public boolean isTableMissingTableStats() {

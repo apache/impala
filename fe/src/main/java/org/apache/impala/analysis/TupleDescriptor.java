@@ -339,7 +339,7 @@ public class TupleDescriptor {
     for (SlotDescriptor slotDesc: getSlots()) {
       if (!slotDesc.isMaterialized()) continue;
       if (slotDesc.getColumn() == null ||
-          slotDesc.getColumn().getPosition() >= hdfsTable.getNumClusteringCols()) {
+          !hdfsTable.isClusteringColumn(slotDesc.getColumn())) {
         return false;
       }
     }

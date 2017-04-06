@@ -93,7 +93,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // assigned to a fragment. Set and maintained by enclosing PlanFragment.
   protected PlanFragment fragment_;
 
-  // if set, needs to be applied by parent node to reference this node's output
+  // If set, needs to be applied by parent node to reference this node's output. The
+  // entries need to be propagated all the way to the root node.
   protected ExprSubstitutionMap outputSmap_;
 
   // global state of planning wrt conjunct assignment; used by planner as a shortcut
@@ -206,7 +207,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   /**
    * Set the limit_ to the given limit_ only if the limit_ hasn't been set, or the new limit_
    * is lower.
-   * @param limit_
    */
   public void setLimit(long limit) {
     if (limit_ == -1 || (limit != -1 && limit_ > limit)) limit_ = limit;

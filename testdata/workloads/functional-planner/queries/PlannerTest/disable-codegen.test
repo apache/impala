@@ -41,7 +41,7 @@ PLAN-ROOT SINK
 select count(*) from functional_parquet.alltypes
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=20.00MB
+Per-Host Resource Estimates: Memory=26.00MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypes
 
@@ -53,10 +53,10 @@ PLAN-ROOT SINK
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
-|  output: count(*)
+|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=178.13KB
+   partitions=24/24 files=24 size=179.68KB
 ====
 # > 3000 rows returned to coordinator: codegen should be enabled
 select * from functional_parquet.alltypes
@@ -71,7 +71,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=178.13KB
+   partitions=24/24 files=24 size=179.68KB
 ====
 # Optimisation is enabled for join producing < 3000 rows
 select count(*)

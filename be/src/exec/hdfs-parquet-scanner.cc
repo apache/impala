@@ -18,7 +18,6 @@
 #include "exec/hdfs-parquet-scanner.h"
 
 #include <limits> // for std::numeric_limits
-#include <memory>
 #include <queue>
 
 #include <gflags/gflags.h>
@@ -374,7 +373,7 @@ static bool CheckRowGroupOverlapsSplit(const parquet::RowGroup& row_group,
 }
 
 int HdfsParquetScanner::CountScalarColumns(const vector<ParquetColumnReader*>& column_readers) {
-  DCHECK(!column_readers.empty());
+  DCHECK(!column_readers.empty() || scan_node_->optimize_parquet_count_star());
   int num_columns = 0;
   stack<ParquetColumnReader*> readers;
   for (ParquetColumnReader* r: column_readers_) readers.push(r);
@@ -425,9 +424,39 @@ Status HdfsParquetScanner::ProcessSplit() {
 }
 
 Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
-  if (scan_node_->IsZeroSlotTableScan()) {
-    // There are no materialized slots, e.g. count(*) over the table.  We can serve
-    // this query from just the file metadata. We don't need to read the column data.
+  if (scan_node_->optimize_parquet_count_star()) {
+    // Populate the single slot with the Parquet num rows statistic.
+    int64_t tuple_buf_size;
+    uint8_t* tuple_buf;
+    // We try to allocate a smaller row batch here because in most cases the number row
+    // groups in a file is much lower than the default row batch capacity.
+    int capacity = min(
+        static_cast<int>(file_metadata_.row_groups.size()), row_batch->capacity());
+    RETURN_IF_ERROR(RowBatch::ResizeAndAllocateTupleBuffer(state_,
+        row_batch->tuple_data_pool(), row_batch->row_desc()->GetRowSize(),
+        &capacity, &tuple_buf_size, &tuple_buf));
+    while (!row_batch->AtCapacity()) {
+      RETURN_IF_ERROR(NextRowGroup());
+      DCHECK_LE(row_group_idx_, file_metadata_.row_groups.size());
+      DCHECK_LE(row_group_rows_read_, file_metadata_.num_rows);
+      if (row_group_idx_ == file_metadata_.row_groups.size()) break;
+      Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buf);
+      TupleRow* dst_row = row_batch->GetRow(row_batch->AddRow());
+      InitTuple(template_tuple_, dst_tuple);
+      int64_t* dst_slot = reinterpret_cast<int64_t*>(dst_tuple->GetSlot(
+          scan_node_->parquet_count_star_slot_offset()));
+      *dst_slot = file_metadata_.row_groups[row_group_idx_].num_rows;
+      row_group_rows_read_ += *dst_slot;
+      dst_row->SetTuple(0, dst_tuple);
+      row_batch->CommitLastRow();
+      tuple_buf += scan_node_->tuple_desc()->byte_size();
+    }
+    eos_ = row_group_idx_ == file_metadata_.row_groups.size();
+    return Status::OK();
+  } else if (scan_node_->IsZeroSlotTableScan()) {
+    // There are no materialized slots and we are not optimizing count(*), e.g.
+    // "select 1 from alltypes". We can serve this query from just the file metadata.
+    // We don't need to read the column data.
     if (row_group_rows_read_ == file_metadata_.num_rows) {
       eos_ = true;
       return Status::OK();
@@ -466,7 +495,8 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
       if (!status.ok()) RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
     }
     RETURN_IF_ERROR(NextRowGroup());
-    if (row_group_idx_ >= file_metadata_.row_groups.size()) {
+    DCHECK_LE(row_group_idx_, file_metadata_.row_groups.size());
+    if (row_group_idx_ == file_metadata_.row_groups.size()) {
       eos_ = true;
       DCHECK(parse_status_.ok());
       return Status::OK();
@@ -540,7 +570,7 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     }
 
     int col_idx = node->col_idx;
-    DCHECK(col_idx < row_group.columns.size());
+    DCHECK_LT(col_idx, row_group.columns.size());
 
     const vector<parquet::ColumnOrder>& col_orders = file_metadata.column_orders;
     const parquet::ColumnOrder* col_order = nullptr;
@@ -1422,6 +1452,12 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
   DCHECK(column_readers != NULL);
   DCHECK(column_readers->empty());
 
+  if (scan_node_->optimize_parquet_count_star()) {
+    // Column readers are not needed because we are not reading from any columns if this
+    // optimization is enabled.
+    return Status::OK();
+  }
+
   // Each tuple can have at most one position slot. We'll process this slot desc last.
   SlotDescriptor* pos_slot_desc = NULL;
 
@@ -1605,7 +1641,8 @@ Status HdfsParquetScanner::InitColumns(
     int64_t col_end = col_start + col_len;
 
     // Already validated in ValidateColumnOffsets()
-    DCHECK(col_end > 0 && col_end < file_desc->file_length);
+    DCHECK_GT(col_end, 0);
+    DCHECK_LT(col_end, file_desc->file_length);
     if (file_version_.application == "parquet-mr" && file_version_.VersionLt(1, 2, 9)) {
       // The Parquet MR writer had a bug in 1.2.8 and below where it didn't include the
       // dictionary page header size in total_compressed_size and total_uncompressed_size

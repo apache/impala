@@ -1255,3 +1255,67 @@ where t2.int_col IN (t1.int_col_1, t1.int_col)
 ---- TYPES
 TIMESTAMP,BIGINT
 ====
+---- QUERY
+# IMPALA-5036: Tests the correctness of the Parquet count(*) optimization.
+select count(1)
+from functional_parquet.alltypes
+---- RESULTS
+7300
+---- TYPES
+bigint
+=====
+---- QUERY
+# IMPALA-5036: Parquet count(*) optimization with predicates on the partition columns.
+select count(1)
+from functional_parquet.alltypes where year < 2010 and month > 8
+---- RESULTS
+1220
+---- TYPES
+bigint
+=====
+---- QUERY
+# IMPALA-5036: Parquet count(*) optimization with group by partition columns.
+select year, month, count(1)
+from functional_parquet.alltypes where month > 10 group by year, month
+---- RESULTS
+2009,11,300
+2009,12,310
+2010,11,300
+2010,12,310
+---- TYPES
+int, int, bigint
+=====
+---- QUERY
+# IMPALA-5036: Parquet count(*) optimization with both group by and predicates on
+# partition columns.
+select count(1)
+from functional_parquet.alltypes where year < 2010 and month > 8
+group by month
+---- RESULTS
+310
+300
+310
+300
+---- TYPES
+bigint
+=====
+---- QUERY
+# IMPALA-5036: Parquet count(*) optimization with the result of the going into a join.
+select x.bigint_col from functional.alltypes x
+  inner join (
+    select count(1) as a from functional_parquet.alltypes group by year
+  ) t on x.id = t.a;
+---- RESULTS
+0
+0
+---- TYPES
+bigint
+=====
+---- QUERY
+# IMPALA-5036: Parquet count(*) optimization with the agg function in the having clause.
+select 1 from functional_parquet.alltypes having count(*) > 1
+---- RESULTS
+1
+---- TYPES
+tinyint
+====

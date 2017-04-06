@@ -271,6 +271,15 @@ class TestAggregationQueries(ImpalaTestSuite):
       # Verify codegen was enabled for all four stages of the aggregation.
       assert_codegen_enabled(result.runtime_profile, [1, 2, 4, 6])
 
+  def test_parquet_count_star_optimization(self, vector):
+    if (vector.get_value('table_format').file_format != 'text' or
+        vector.get_value('table_format').compression_codec != 'none'):
+      # No need to run this test on all file formats
+      pytest.skip()
+    self.run_test_case('QueryTest/parquet-stats-agg', vector)
+    vector.get_value('exec_option')['batch_size'] = 1
+    self.run_test_case('QueryTest/parquet-stats-agg', vector)
+
 class TestWideAggregationQueries(ImpalaTestSuite):
   """Test that aggregations with many grouping columns work"""
   @classmethod

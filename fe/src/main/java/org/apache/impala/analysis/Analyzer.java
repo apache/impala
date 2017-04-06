@@ -60,11 +60,12 @@ import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
-import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExprRewriteRule;
+import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
 import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
+import org.apache.impala.rewrite.NormalizeCountStarRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.service.FeSupport;
@@ -343,6 +344,7 @@ public class Analyzer {
         // Relies on FoldConstantsRule and NormalizeExprsRule.
         rules.add(SimplifyConditionalsRule.INSTANCE);
         rules.add(EqualityDisjunctsToInRule.INSTANCE);
+        rules.add(NormalizeCountStarRule.INSTANCE);
       }
       exprRewriter_ = new ExprRewriter(rules);
     }
@@ -602,7 +604,6 @@ public class Analyzer {
     Preconditions.checkNotNull(resolvedPath);
     if (resolvedPath.destTable() != null) {
       Table table = resolvedPath.destTable();
-      Preconditions.checkNotNull(table);
       if (table instanceof View) return new InlineViewRef((View) table, tableRef);
       // The table must be a base table.
       Preconditions.checkState(table instanceof HdfsTable ||
@@ -695,6 +696,7 @@ public class Analyzer {
     return globalState_.descTbl.getSlotDesc(id);
   }
 
+  public int getNumTableRefs() { return tableRefMap_.size(); }
   public TableRef getTableRef(TupleId tid) { return tableRefMap_.get(tid); }
   public ExprRewriter getConstantFolder() { return globalState_.constantFolder_; }
   public ExprRewriter getExprRewriter() { return globalState_.exprRewriter_; }

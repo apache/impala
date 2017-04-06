@@ -46,7 +46,7 @@ class TestParquetStats(ImpalaTestSuite):
     # The test makes assumptions about the number of row groups that are processed and
     # skipped inside a fragment, so we ensure that the tests run in a single fragment.
     vector.get_value('exec_option')['num_nodes'] = 1
-    self.run_test_case('QueryTest/parquet_stats', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/parquet-stats', vector, use_db=unique_database)
 
   def test_deprecated_stats(self, vector, unique_database):
     """Test that reading parquet files with statistics with deprecated 'min'/'max' fields
@@ -69,4 +69,3 @@ class TestParquetStats(ImpalaTestSuite):
     # skipped inside a fragment, so we ensure that the tests run in a single fragment.
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/parquet-deprecated-stats', vector, unique_database)
-

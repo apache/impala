@@ -51,7 +51,7 @@ public class FunctionCallExpr extends Expr {
   // feeding into this Merge(). This is stored so that we can access the types of the
   // original input argument exprs. Note that the nullness affects the behaviour of
   // resetAnalysisState(), which is used during expr substitution.
-  private final FunctionCallExpr mergeAggInputFn_;
+  private FunctionCallExpr mergeAggInputFn_;
 
   // Printed in toSqlImpl(), if set. Used for merge agg fns.
   private String label_;
@@ -568,6 +568,9 @@ public class FunctionCallExpr extends Expr {
     if (hasChildCosts()) evalCost_ = getChildCosts() + FUNCTION_CALL_COST;
   }
 
+  public FunctionCallExpr getMergeAggInputFn() { return mergeAggInputFn_; }
+  public void setMergeAggInputFn(FunctionCallExpr fn) { mergeAggInputFn_ = fn; }
+
   /**
    * Checks that no special aggregate params are included in 'params' that would be
    * invalid for a scalar function. Analysis of the param exprs is not done.
@@ -604,4 +607,21 @@ public class FunctionCallExpr extends Expr {
 
   @Override
   public Expr clone() { return new FunctionCallExpr(this); }
+
+  @Override
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
+      throws AnalysisException {
+    Expr e = super.substituteImpl(smap, analyzer);
+    if (!(e instanceof FunctionCallExpr)) return e;
+    FunctionCallExpr fn = (FunctionCallExpr) e;
+    FunctionCallExpr mergeFn = fn.getMergeAggInputFn();
+    if (mergeFn != null) {
+      // The merge function needs to be substituted as well.
+      Expr substitutedFn = mergeFn.substitute(smap, analyzer, true);
+      Preconditions.checkState(substitutedFn instanceof FunctionCallExpr);
+      fn.setMergeAggInputFn((FunctionCallExpr) substitutedFn);
+    }
+    return e;
+  }
+
 }
