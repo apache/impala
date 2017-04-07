@@ -179,6 +179,7 @@ under the License.
           <topicref href="topics/impala_default_order_by_limit.xml"/>
           <topicref audience="hidden" href="topics/impala_disable_cached_reads.xml"/>
           <topicref href="topics/impala_disable_codegen.xml"/>
+          <topicref rev="2.9.0" href="topics/impala_decimal_v2.xml"/>
           <topicref audience="hidden" href="topics/impala_disable_outermost_topn.xml"/>
           <topicref rev="2.5.0" href="topics/impala_disable_row_runtime_filtering.xml"/>
           <topicref rev="2.5.0" href="topics/impala_disable_streaming_preaggregations.xml"/>
