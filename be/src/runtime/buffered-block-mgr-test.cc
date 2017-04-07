@@ -61,8 +61,9 @@ const string SCRATCH_DIR = "/tmp/impala-scratch";
 // This suffix is appended to a tmp dir
 const string SCRATCH_SUFFIX = "/impala-scratch";
 
-// Number of millieconds to wait to ensure write completes
-const static int WRITE_WAIT_MILLIS = 500;
+// Number of millieconds to wait to ensure write completes. We don't know for sure how
+// slow the disk will be, so this is much higher than we expect the writes to take.
+const static int WRITE_WAIT_MILLIS = 10000;
 
 // How often to check for write completion
 const static int WRITE_CHECK_INTERVAL_MILLIS = 10;
