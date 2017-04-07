@@ -17,13 +17,12 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.catalog.Catalog;
+import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
-import org.apache.impala.testutil.TestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -78,10 +77,10 @@ public class ExprRewriterTest extends AnalyzerTest {
    * number of expressions and complicate validation.
    */
   public void RewritesOk(String stmt, int expectedNumChanges,
-      int expectedNumExprTrees) throws AnalysisException {
+      int expectedNumExprTrees) throws ImpalaException {
+    // Analyze without rewrites since that's what we want to test here.
     StatementBase parsedStmt = (StatementBase) ParsesOk(stmt);
-    parsedStmt.analyze(createAnalyzer(Catalog.DEFAULT_DB));
-
+    AnalyzesOkNoRewrite(parsedStmt);
     exprToTrue_.reset();
     parsedStmt.rewriteExprs(exprToTrue_);
     Assert.assertEquals(expectedNumChanges, exprToTrue_.getNumChanges());
@@ -93,21 +92,17 @@ public class ExprRewriterTest extends AnalyzerTest {
 
     // Make sure the stmt can be successfully re-analyzed.
     parsedStmt.reset();
-    parsedStmt.analyze(createAnalyzer(Catalog.DEFAULT_DB));
+    AnalyzesOkNoRewrite(parsedStmt);
   }
 
   /**
    * Asserts that no rewrites are performed on the given stmt.
    */
-  public void CheckNoRewrite(String stmt) throws AnalysisException {
+  public void CheckNoRewrite(String stmt) throws ImpalaException {
     exprToTrue_.reset();
-    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
-    AnalysisContext analysisCtx = new AnalysisContext(catalog_,
-        TestUtils.createQueryContext(Catalog.DEFAULT_DB,
-            System.getProperty("user.name")),
-            AuthorizationConfig.createAuthDisabledConfig(), exprToTrue_);
-    analysisCtx.analyze(stmt, analyzer);
-    Preconditions.checkNotNull(analysisCtx.getAnalysisResult().getStmt());
+    AnalysisContext analysisCtx = createAnalysisCtx();
+    AnalysisResult result = parseAndAnalyze(stmt, analysisCtx);
+    Preconditions.checkNotNull(result.getStmt());
     Assert.assertEquals(0, exprToTrue_.getNumChanges());
   }
 
@@ -122,7 +117,7 @@ public class ExprRewriterTest extends AnalyzerTest {
       "order by a.int_col, 4 limit 10";
 
   @Test
-  public void TestQueryStmts() throws AnalysisException {
+  public void TestQueryStmts() throws ImpalaException {
     RewritesOk(stmt_, 23, 11);
     // Test rewriting in inline views. The view stmt is the same as the query above
     // but with an order by + limit. Expanded star exprs are not rewritten.
@@ -146,7 +141,7 @@ public class ExprRewriterTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestDdlStmts() throws AnalysisException {
+  public void TestDdlStmts() throws ImpalaException {
     RewritesOk("create table ctas_test as " + stmt_, 23, 11);
     // Create/alter view stmts are not rewritten to preserve the original SQL.
     CheckNoRewrite("create view view_test as " + stmt_);
@@ -154,7 +149,7 @@ public class ExprRewriterTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestDmlStmts() throws AnalysisException {
+  public void TestDmlStmts() throws ImpalaException {
     // Insert.
     RewritesOk("insert into functional.alltypes (id, int_col, float_col, bigint_col) " +
       "partition(year=2009,month=10) " + stmt_, 23, 11);

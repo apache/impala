@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.apache.hadoop.fs.permission.FsAction;
-
 import org.apache.impala.authorization.AuthorizeableFn;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
@@ -33,6 +32,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCreateFunctionParams;
 import org.apache.impala.thrift.TFunctionBinaryType;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

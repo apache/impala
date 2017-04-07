@@ -19,11 +19,7 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.permission.FsAction;
-
-import org.apache.impala.analysis.TableDef;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
@@ -33,6 +29,9 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCreateTableLikeParams;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TTableName;
+
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 
 /**
  * Represents a CREATE TABLE LIKE statement which creates a new table based on
@@ -141,6 +140,12 @@ public class CreateTableLikeStmt extends StatementBase {
     params.setIf_not_exists(getIfNotExists());
     params.setSort_columns(sortColumns_);
     return params;
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
+    tblRefs.add(new TableRef(srcTableName_.toPath(), null));
   }
 
   @Override

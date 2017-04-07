@@ -17,9 +17,8 @@
 
 package org.apache.impala.analysis;
 
-import org.junit.Test;
-
 import org.apache.impala.testutil.TestUtils;
+import org.junit.Test;
 
 /**
  * Tests analysis phase of the ModifyStmt and its sub-classes.
@@ -42,12 +41,12 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
     AnalyzesOk("update a set a.name = 'values' from functional_kudu.testtbl a " +
         "where a.zip in (select zip from functional.testtbl limit 10)");
     AnalyzesOk("update functional_kudu.dimtbl set name = 'Oskar' FROM dimtbl",
-        createAnalyzer("functional_kudu"));
+        createAnalysisCtx("functional_kudu"));
     AnalysisError("update a set b.name = 'Oskar' FROM dimtbl b",
-        createAnalyzer("functional_kudu"),
+        createAnalysisCtx("functional_kudu"),
         "'a' is not a valid table alias or reference.");
     AnalyzesOk("update a set a.name = 'Oskar' FROM dimtbl a",
-        createAnalyzer("functional_kudu"));
+        createAnalysisCtx("functional_kudu"));
     // Table name is an implicit alias
     AnalyzesOk(
         "update functional_kudu.dimtbl set name = 'Oskar' FROM functional_kudu.dimtbl");
@@ -65,7 +64,7 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
     // Location of the kudu table doesnt matter
     AnalyzesOk(
         "update a set a.name = 'Oskar' from functional.testtbl b, dimtbl a where b.id =" +
-        " a.id ", createAnalyzer("functional_kudu"));
+        " a.id ", createAnalysisCtx("functional_kudu"));
     AnalyzesOk("update a set name = 'Oskar' from functional_kudu.testtbl a");
     AnalysisError(
         "update functional_kudu.testtbl set name = 'Oskar' from functional_kudu.dimtbl",
@@ -87,7 +86,8 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
     TestUtils.assumeKuduIsSupported();
     AnalyzesOk("update functional_kudu.dimtbl set name = 'Oskar'");
     // Correct default database resolution
-    AnalyzesOk("update dimtbl set name = 'Oskar'", createAnalyzer("functional_kudu"));
+    AnalyzesOk("update dimtbl set name = 'Oskar'",
+        createAnalysisCtx("functional_kudu"));
     // Correct table alias resolution
     AnalyzesOk("update functional_kudu.dimtbl set name = '10'");
     // Check type compatibility, zip is int, 4711 is smallint
@@ -239,5 +239,4 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
         "'functional.allcomplextypes.int_array_col' is not a valid table alias or " +
         "reference.");
   }
-
 }

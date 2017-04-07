@@ -17,15 +17,19 @@
 
 package org.apache.impala.testutil;
 
+import java.util.Set;
+
+import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.HdfsCachePool;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.util.PatternMatcher;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -68,27 +72,46 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
   public void reset() throws CatalogException { srcCatalog_.reset(); }
 
   /**
-   * Overrides ImpaladCatalog.getTable to load the table metadata if it is missing.
+   * Returns the Table for the given name, loading the table's metadata if necessary.
+   * Returns null if the database or table does not exist.
    */
-  @Override
-  public Table getTable(String dbName, String tableName)
-      throws CatalogException {
-    Table existingTbl = super.getTable(dbName, tableName);
-    // Table doesn't exist or is already loaded. Just return it.
+  public Table getOrLoadTable(String dbName, String tblName) {
+    Db db = getDb(dbName);
+    if (db == null) return null;
+    Table existingTbl = db.getTable(tblName);
+    // Table doesn't exist or is already loaded.
     if (existingTbl == null || existingTbl.isLoaded()) return existingTbl;
 
-    // The table was not yet loaded. Load it in to the catalog and try getTable()
-    // again.
-    Table newTbl = srcCatalog_.getOrLoadTable(dbName,  tableName);
+    // The table was not yet loaded. Load it in to the catalog now.
+    Table newTbl = null;
+    try {
+      newTbl = srcCatalog_.getOrLoadTable(dbName, tblName);
+    } catch (CatalogException e) {
+      throw new IllegalStateException("Unexpected table loading failure.", e);
+    }
     Preconditions.checkNotNull(newTbl);
     Preconditions.checkState(newTbl.isLoaded());
-    Db db = getDb(dbName);
-    Preconditions.checkNotNull(db);
-    db.addTable(newTbl);
-    Table resultTable = super.getTable(dbName, tableName);
-    if (resultTable instanceof HdfsTable) {
-      ((HdfsTable) resultTable).computeHdfsStatsForTesting();
+    if (newTbl instanceof HdfsTable) {
+      ((HdfsTable) newTbl).computeHdfsStatsForTesting();
     }
-    return resultTable;
+    db.addTable(newTbl);
+    return newTbl;
+  }
+
+  /**
+   * Fast loading path for FE unit testing. Immediately loads the given tables into
+   * this catalog from this thread without involving the catalogd/statestored.
+   */
+  @Override
+  public void prioritizeLoad(Set<TableName> tableNames) {
+    for (TableName tbl: tableNames) getOrLoadTable(tbl.getDb(), tbl.getTbl());
+  }
+
+  /**
+   * No-op. Metadata loading does not go through the catalogd/statestored in a
+   * FE test environment.
+   */
+  @Override
+  public void waitForCatalogUpdate(long timeoutMs) {
   }
 }

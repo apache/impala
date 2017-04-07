@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.analysis.Path.PathType;
@@ -101,6 +102,11 @@ public class DescribeTableStmt extends StatementBase {
   }
 
   @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(rawPath_, null));
+  }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     try {
       path_ = analyzer.resolvePath(rawPath_, PathType.ANY);
@@ -108,7 +114,6 @@ public class DescribeTableStmt extends StatementBase {
       // Register privilege requests to prefer reporting an authorization error over
       // an analysis error. We should not accidentally reveal the non-existence of a
       // table/database if the user is not authorized.
-      if (analyzer.hasMissingTbls()) throw ae;
       if (rawPath_.size() > 1) {
         analyzer.registerPrivReq(new PrivilegeRequestBuilder()
             .onTable(rawPath_.get(0), rawPath_.get(1))

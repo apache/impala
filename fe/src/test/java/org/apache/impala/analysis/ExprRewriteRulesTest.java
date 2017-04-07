@@ -19,12 +19,10 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 
-import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
-import org.apache.impala.rewrite.RemoveRedundantStringCast;
-import org.apache.impala.rewrite.SimplifyDistinctFromRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -33,7 +31,9 @@ import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeCountStarRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
+import org.apache.impala.rewrite.RemoveRedundantStringCast;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
+import org.apache.impala.rewrite.SimplifyDistinctFromRule;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -62,50 +62,51 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   public Expr RewritesOk(String exprStr, ExprRewriteRule rule, String expectedExprStr)
-      throws AnalysisException {
+      throws ImpalaException {
     return RewritesOk("functional.alltypessmall", exprStr, rule, expectedExprStr);
   }
 
   public Expr RewritesOk(String tableName, String exprStr, ExprRewriteRule rule, String expectedExprStr)
-      throws AnalysisException {
+      throws ImpalaException {
     return RewritesOk(tableName, exprStr, Lists.newArrayList(rule), expectedExprStr);
   }
 
   public Expr RewritesOk(String exprStr, List<ExprRewriteRule> rules, String expectedExprStr)
-      throws AnalysisException {
+      throws ImpalaException {
     return RewritesOk("functional.alltypessmall", exprStr, rules, expectedExprStr);
   }
 
   public Expr RewritesOk(String tableName, String exprStr, List<ExprRewriteRule> rules,
-      String expectedExprStr) throws AnalysisException {
+      String expectedExprStr) throws ImpalaException {
     String stmtStr = "select " + exprStr + " from " + tableName;
+    // Analyze without rewrites since that's what we want to test here.
     SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
-    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
-    stmt.analyze(analyzer);
+    AnalyzesOkNoRewrite(stmt);
     Expr origExpr = stmt.getSelectList().getItems().get(0).getExpr();
-    Expr rewrittenExpr = verifyExprEquivalence(origExpr, expectedExprStr, rules, analyzer);
+    Expr rewrittenExpr =
+        verifyExprEquivalence(origExpr, expectedExprStr, rules, stmt.getAnalyzer());
     return rewrittenExpr;
   }
 
   public Expr RewritesOkWhereExpr(String exprStr, ExprRewriteRule rule, String expectedExprStr)
-      throws AnalysisException {
+      throws ImpalaException {
     return RewritesOkWhereExpr("functional.alltypessmall", exprStr, rule, expectedExprStr);
   }
 
   public Expr RewritesOkWhereExpr(String tableName, String exprStr, ExprRewriteRule rule, String expectedExprStr)
-      throws AnalysisException {
+      throws ImpalaException {
     return RewritesOkWhereExpr(tableName, exprStr, Lists.newArrayList(rule), expectedExprStr);
   }
 
   public Expr RewritesOkWhereExpr(String tableName, String exprStr, List<ExprRewriteRule> rules,
-      String expectedExprStr) throws AnalysisException {
+      String expectedExprStr) throws ImpalaException {
     String stmtStr = "select count(1)  from " + tableName + " where " + exprStr;
-    System.out.println(stmtStr);
+    // Analyze without rewrites since that's what we want to test here.
     SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
-    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
-    stmt.analyze(analyzer);
+    AnalyzesOkNoRewrite(stmt);
     Expr origExpr = stmt.getWhereClause();
-    Expr rewrittenExpr = verifyExprEquivalence(origExpr, expectedExprStr, rules, analyzer);
+    Expr rewrittenExpr =
+        verifyExprEquivalence(origExpr, expectedExprStr, rules, stmt.getAnalyzer());
     return rewrittenExpr;
   }
 
@@ -151,7 +152,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestBetweenToCompoundRule() throws AnalysisException {
+  public void TestBetweenToCompoundRule() throws ImpalaException {
     ExprRewriteRule rule = BetweenToCompoundRule.INSTANCE;
 
     // Basic BETWEEN predicates.
@@ -190,7 +191,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestExtractCommonConjunctsRule() throws AnalysisException {
+  public void TestExtractCommonConjunctsRule() throws ImpalaException {
     ExprRewriteRule rule = ExtractCommonConjunctRule.INSTANCE;
 
     // One common conjunct: int_col < 10
@@ -285,7 +286,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
    * testing is done in expr-test.cc.
    */
   @Test
-  public void TestFoldConstantsRule() throws AnalysisException {
+  public void TestFoldConstantsRule() throws ImpalaException {
     ExprRewriteRule rule = FoldConstantsRule.INSTANCE;
 
     RewritesOk("1 + 1", rule, "2");
@@ -312,7 +313,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestSimplifyConditionalsRule() throws AnalysisException {
+  public void TestSimplifyConditionalsRule() throws ImpalaException {
     ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
 
     // IF
@@ -448,7 +449,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestNormalizeExprsRule() throws AnalysisException {
+  public void TestNormalizeExprsRule() throws ImpalaException {
     ExprRewriteRule rule = NormalizeExprsRule.INSTANCE;
 
     // CompoundPredicate
@@ -461,7 +462,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestNormalizeBinaryPredicatesRule() throws AnalysisException {
+  public void TestNormalizeBinaryPredicatesRule() throws ImpalaException {
     ExprRewriteRule rule = NormalizeBinaryPredicatesRule.INSTANCE;
 
     RewritesOk("0 = id", rule, "id = 0");
@@ -483,7 +484,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestEqualityDisjunctsToInRule() throws AnalysisException {
+  public void TestEqualityDisjunctsToInRule() throws ImpalaException {
     ExprRewriteRule edToInrule = EqualityDisjunctsToInRule.INSTANCE;
     ExprRewriteRule normalizeRule = NormalizeBinaryPredicatesRule.INSTANCE;
     List<ExprRewriteRule> comboRules = Lists.newArrayList(normalizeRule,
@@ -546,7 +547,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestNormalizeCountStarRule() throws AnalysisException {
+  public void TestNormalizeCountStarRule() throws ImpalaException {
     ExprRewriteRule rule = NormalizeCountStarRule.INSTANCE;
 
     RewritesOk("count(1)", rule, "count(*)");
@@ -560,7 +561,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestSimplifyDistinctFromRule() throws AnalysisException {
+  public void TestSimplifyDistinctFromRule() throws ImpalaException {
     ExprRewriteRule rule = SimplifyDistinctFromRule.INSTANCE;
 
     // Can be simplified
@@ -583,7 +584,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestRemoveRedundantStringCastRule() throws AnalysisException {
+  public void TestRemoveRedundantStringCastRule() throws ImpalaException {
     ExprRewriteRule removeRule = RemoveRedundantStringCast.INSTANCE;
     ExprRewriteRule foldConstantRule = FoldConstantsRule.INSTANCE;
     List<ExprRewriteRule> comboRules = Lists.newArrayList(removeRule, foldConstantRule);
@@ -677,7 +678,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
    * it can be further simplified via SimplifyDistinctFromRule.
    */
   @Test
-  public void TestNullif() throws AnalysisException {
+  public void TestNullif() throws ImpalaException {
     List<ExprRewriteRule> rules = Lists.newArrayList(
         SimplifyConditionalsRule.INSTANCE,
         SimplifyDistinctFromRule.INSTANCE);

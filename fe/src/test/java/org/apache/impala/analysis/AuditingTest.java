@@ -19,27 +19,28 @@ package org.apache.impala.analysis;
 
 import java.util.Set;
 
-import org.junit.Assert;
-import org.junit.Test;
-
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.AuthorizationException;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.InternalException;
+import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.junit.Assert;
+import org.junit.Test;
+
 import com.google.common.collect.Sets;
 
 /**
  * Tests that auditing access events are properly captured during analysis for all
  * statement types.
  */
-public class AuditingTest extends AnalyzerTest {
+public class AuditingTest extends FrontendTestBase {
   @Test
   public void TestSelect() throws AuthorizationException, AnalysisException {
     // Simple select from a table.
@@ -354,22 +355,20 @@ public class AuditingTest extends AnalyzerTest {
 
   @Test
   public void TestAccessEventsOnAuthFailure() throws AuthorizationException,
-      AnalysisException, InternalException {
+      ImpalaException {
     // The policy file doesn't exist so all operations will result in
     // an AuthorizationError
     AuthorizationConfig config = AuthorizationConfig.createHadoopGroupAuthConfig(
         "server1", "/does/not/exist", "");
     ImpaladCatalog catalog = new ImpaladTestCatalog(config);
     Frontend fe = new Frontend(config, catalog);
-    AnalysisContext analysisContext =
-        new AnalysisContext(catalog, TestUtils.createQueryContext(), config);
+    AnalysisContext analysisCtx = createAnalysisCtx(config);
     // We should get an audit event even when an authorization failure occurs.
     try {
-      analysisContext.analyze("create table foo_does_not_exist(i int)");
-      analysisContext.authorize(fe.getAuthzChecker());
+      parseAndAnalyze("create table foo_does_not_exist(i int)", analysisCtx, fe);
       Assert.fail("Expected AuthorizationException");
     } catch (AuthorizationException e) {
-      Assert.assertEquals(1, analysisContext.getAnalyzer().getAccessEvents().size());
+      Assert.assertEquals(1, analysisCtx.getAnalyzer().getAccessEvents().size());
     }
   }
 
@@ -468,8 +467,8 @@ public class AuditingTest extends AnalyzerTest {
 
   private Set<TAccessEvent> AnalyzeAccessEvents(String stmt, String db)
       throws AuthorizationException, AnalysisException {
-    Analyzer analyzer = createAnalyzer(db);
-    AnalyzesOk(stmt, analyzer);
-    return analyzer.getAccessEvents();
+    AnalysisContext ctx = createAnalysisCtx(db);
+    AnalyzesOk(stmt, ctx);
+    return ctx.getAnalyzer().getAccessEvents();
   }
 }

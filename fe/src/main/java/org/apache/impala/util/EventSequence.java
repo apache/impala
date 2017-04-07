@@ -48,6 +48,9 @@ public class EventSequence {
     labels_.add(label);
   }
 
+  // For testing
+  public int getNumEvents() { return labels_.size(); }
+
   public TEventSequence toThrift() {
     TEventSequence ret = new TEventSequence();
     ret.timestamps = timestamps_;

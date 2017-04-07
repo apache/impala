@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
@@ -26,6 +28,7 @@ import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TTableName;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -50,7 +53,7 @@ public class DropTableOrViewStmt extends StatementBase {
    */
   public DropTableOrViewStmt(TableName tableName, boolean ifExists,
       boolean dropTable, boolean purgeTable) {
-    tableName_ = tableName;
+    tableName_ = Preconditions.checkNotNull(tableName);
     ifExists_ = ifExists;
     dropTable_ = dropTable;
     purgeTable_ = purgeTable;
@@ -75,6 +78,11 @@ public class DropTableOrViewStmt extends StatementBase {
     params.setPurge(purgeTable_);
     params.setIs_table(dropTable_);
     return params;
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
   }
 
   /**
@@ -108,8 +116,7 @@ public class DropTableOrViewStmt extends StatementBase {
           analyzer.getFqTableName(tableName_).toString(), TCatalogObjectType.TABLE,
           Privilege.DROP.toString()));
     } catch (AnalysisException e) {
-      if (ifExists_ && analyzer.getMissingTbls().isEmpty()) return;
-      throw e;
+      if (!ifExists_) throw e;
     }
   }
 

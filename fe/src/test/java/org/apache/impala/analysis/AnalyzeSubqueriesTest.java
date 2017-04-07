@@ -17,10 +17,9 @@
 
 package org.apache.impala.analysis;
 
-import org.junit.Test;
-
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.junit.Test;
 
 public class AnalyzeSubqueriesTest extends AnalyzerTest {
   private static String cmpOperators[] = {"=", "!=", "<=", ">=", ">", "<"};
@@ -1198,7 +1197,7 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "where id in (select id from functional.allcomplextypes)");
     AnalyzesOk("select id from functional.allcomplextypes " +
         "where id < (select count(1) cnt from allcomplextypes)",
-        createAnalyzer("functional"));
+        createAnalysisCtx("functional"));
     // Illegal correlated table references.
     AnalysisError("select id from (select * from functional.alltypestiny) t " +
         "where t.int_col = (select count(*) from t)",

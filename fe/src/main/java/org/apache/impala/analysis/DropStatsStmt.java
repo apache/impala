@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDropStatsParams;
@@ -41,12 +43,12 @@ public class DropStatsStmt extends StatementBase {
    * Constructor for building the DROP TABLE/VIEW statement
    */
   public DropStatsStmt(TableName tableName) {
-    this.tableName_ = tableName;
+    this.tableName_ = Preconditions.checkNotNull(tableName);
     this.partitionSet_ = null;
   }
 
   public DropStatsStmt(TableName tableName, PartitionSet partitionSet) {
-    this.tableName_ = tableName;
+    this.tableName_ = Preconditions.checkNotNull(tableName);;
     this.partitionSet_ = partitionSet;
   }
 
@@ -73,6 +75,11 @@ public class DropStatsStmt extends StatementBase {
       params.setPartition_set(partitionSet_.toThrift());
     }
     return params;
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
   }
 
   /**

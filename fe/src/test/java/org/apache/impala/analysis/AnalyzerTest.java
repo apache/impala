@@ -114,7 +114,7 @@ public class AnalyzerTest extends FrontendTestBase {
     Preconditions.checkState(tbl.isFullyQualified());
     Preconditions.checkState(query.contains("$TBL"));
     String uqQuery = query.replace("$TBL", tbl.getTbl());
-    AnalyzesOk(uqQuery, createAnalyzer(tbl.getDb()));
+    AnalyzesOk(uqQuery, createAnalysisCtx(tbl.getDb()));
     String fqQuery = query.replace("$TBL", tbl.toString());
     AnalyzesOk(fqQuery);
   }
@@ -128,7 +128,7 @@ public class AnalyzerTest extends FrontendTestBase {
     Preconditions.checkState(tbl.isFullyQualified());
     Preconditions.checkState(query.contains("$TBL"));
     String uqQuery = query.replace("$TBL", tbl.getTbl());
-    AnalysisError(uqQuery, createAnalyzer(tbl.getDb()), expectedError);
+    AnalysisError(uqQuery, createAnalysisCtx(tbl.getDb()), expectedError);
     String fqQuery = query.replace("$TBL", tbl.toString());
     AnalysisError(fqQuery, expectedError);
   }

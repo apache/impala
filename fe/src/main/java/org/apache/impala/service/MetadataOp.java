@@ -22,11 +22,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
@@ -34,7 +34,6 @@ import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TColumn;
@@ -43,6 +42,9 @@ import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.util.PatternMatcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 
@@ -277,12 +279,7 @@ public class MetadataOp {
         List<String> tableComments = Lists.newArrayList();
         List<String> tableTypes = Lists.newArrayList();
         for (String tabName: fe.getTableNames(db.getName(), tablePatternMatcher, user)) {
-          Table table = null;
-          try {
-            table = catalog.getTable(db.getName(), tabName);
-          } catch (TableLoadingException e) {
-            // Ignore exception (this table will be skipped).
-          }
+          Table table = catalog.getTable(db.getName(), tabName);
           if (table == null) continue;
 
           String comment = null;
@@ -356,25 +353,24 @@ public class MetadataOp {
    * The parameters catalogName, schemaName, tableName and columnName are JDBC search
    * patterns.
    */
-  public static TResultSet getColumns(Frontend fe,
-      String catalogName, String schemaName, String tableName, String columnName,
-      User user)
+  public static TResultSet getColumns(Frontend fe, String catalogName, String schemaName,
+      String tableName, String columnName, User user)
       throws ImpalaException {
-    TResultSet result = createEmptyResultSet(GET_COLUMNS_MD);
-
     // Get the list of schemas, tables, and columns that satisfy the search conditions.
-    DbsMetadata dbsMetadata = null;
     PatternMatcher schemaMatcher = PatternMatcher.createJdbcPatternMatcher(schemaName);
     PatternMatcher tableMatcher = PatternMatcher.createJdbcPatternMatcher(tableName);
     PatternMatcher columnMatcher = PatternMatcher.createJdbcPatternMatcher(columnName);
-    while (dbsMetadata == null || !dbsMetadata.missingTbls.isEmpty()) {
-      dbsMetadata = getDbsMetadata(fe, catalogName, schemaMatcher, tableMatcher,
-          columnMatcher, PatternMatcher.MATCHER_MATCH_NONE, user);
-      if (!fe.requestTblLoadAndWait(dbsMetadata.missingTbls)) {
-        LOG.info("Timed out waiting for missing tables. Load request will be retried.");
-      }
+    DbsMetadata dbsMetadata = getDbsMetadata(fe, catalogName, schemaMatcher,
+        tableMatcher, columnMatcher, PatternMatcher.MATCHER_MATCH_NONE, user);
+    if (!dbsMetadata.missingTbls.isEmpty()) {
+      // Need to load tables for column metadata.
+      StmtMetadataLoader mdLoader = new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, null);
+      mdLoader.loadTables(dbsMetadata.missingTbls);
+      dbsMetadata = getDbsMetadata(fe, catalogName, schemaMatcher,
+          tableMatcher, columnMatcher, PatternMatcher.MATCHER_MATCH_NONE, user);
     }
 
+    TResultSet result = createEmptyResultSet(GET_COLUMNS_MD);
     for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
       String dbName = dbsMetadata.dbs.get(i);
       for (int j = 0; j < dbsMetadata.tableNames.get(i).size(); ++j) {

@@ -19,13 +19,13 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 
-import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.thrift.TGetFunctionsParams;
 import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.thrift.TGetFunctionsParams;
+
 import com.google.common.base.Preconditions;
 
 /**

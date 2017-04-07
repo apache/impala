@@ -19,14 +19,14 @@ package org.apache.impala.analysis;
 
 import java.util.HashSet;
 
-import org.junit.Test;
-
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.util.EventSequence;
+import org.junit.Test;
 
 public class AnalyzeAuthStmtsTest extends AnalyzerTest {
   public AnalyzeAuthStmtsTest() throws AnalysisException {
@@ -35,18 +35,23 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
   }
 
   @Override
-  protected Analyzer createAnalyzer(String defaultDb) {
-    TQueryCtx queryCtx =
-        TestUtils.createQueryContext(defaultDb, System.getProperty("user.name"));
-    return new Analyzer(catalog_, queryCtx,
-        AuthorizationConfig.createHadoopGroupAuthConfig("server1", null, null));
+  protected AnalysisContext createAnalysisCtx(String defaultDb) {
+    TQueryCtx queryCtx = TestUtils.createQueryContext(
+        defaultDb, System.getProperty("user.name"));
+    EventSequence timeline = new EventSequence("Authorization Test");
+    AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
+        AuthorizationConfig.createHadoopGroupAuthConfig("server1", null, null),
+        timeline);
+    return analysisCtx;
   }
 
-  private Analyzer createAuthDisabledAnalyzer(String defaultDb) {
-    TQueryCtx queryCtx =
-        TestUtils.createQueryContext(defaultDb, System.getProperty("user.name"));
-    return new Analyzer(catalog_, queryCtx,
-        AuthorizationConfig.createAuthDisabledConfig());
+  private AnalysisContext createAuthDisabledAnalysisCtx() {
+    TQueryCtx queryCtx = TestUtils.createQueryContext(
+        Catalog.DEFAULT_DB, System.getProperty("user.name"));
+    EventSequence timeline = new EventSequence("Authorization Test");
+    AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
+        AuthorizationConfig.createAuthDisabledConfig(), timeline);
+    return analysisCtx;
   }
 
   @Test
@@ -55,12 +60,12 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
     AnalyzesOk("SHOW ROLE GRANT GROUP myGroup");
     AnalyzesOk("SHOW CURRENT ROLES");
 
-    Analyzer authDisabledAnalyzer = createAuthDisabledAnalyzer(Catalog.DEFAULT_DB);
-    AnalysisError("SHOW ROLES", authDisabledAnalyzer,
+    AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();
+    AnalysisError("SHOW ROLES", authDisabledCtx,
         "Authorization is not enabled.");
-    AnalysisError("SHOW ROLE GRANT GROUP myGroup", authDisabledAnalyzer,
+    AnalysisError("SHOW ROLE GRANT GROUP myGroup", authDisabledCtx,
         "Authorization is not enabled.");
-    AnalysisError("SHOW CURRENT ROLES", authDisabledAnalyzer,
+    AnalysisError("SHOW CURRENT ROLES", authDisabledCtx,
         "Authorization is not enabled.");
   }
 
@@ -76,10 +81,10 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
     AnalysisError("SHOW GRANT ROLE does_not_exist ON SERVER",
         "Role 'does_not_exist' does not exist.");
 
-    Analyzer authDisabledAnalyzer = createAuthDisabledAnalyzer(Catalog.DEFAULT_DB);
-    AnalysisError("SHOW GRANT ROLE myRole", authDisabledAnalyzer,
+    AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();
+    AnalysisError("SHOW GRANT ROLE myRole", authDisabledCtx,
         "Authorization is not enabled.");
-    AnalysisError("SHOW GRANT ROLE myRole ON SERVER", authDisabledAnalyzer,
+    AnalysisError("SHOW GRANT ROLE myRole ON SERVER", authDisabledCtx,
         "Authorization is not enabled.");
   }
 
@@ -95,10 +100,10 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
     AnalyzesOk("DROP ROLE MYrole");
     AnalysisError("CREATE ROLE MYrole", "Role 'MYrole' already exists.");
 
-    Analyzer authDisabledAnalyzer = createAuthDisabledAnalyzer(Catalog.DEFAULT_DB);
-    AnalysisError("DROP ROLE myRole", authDisabledAnalyzer,
+    AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();
+    AnalysisError("DROP ROLE myRole", authDisabledCtx,
         "Authorization is not enabled.");
-    AnalysisError("CREATE ROLE doesNotExist", authDisabledAnalyzer,
+    AnalysisError("CREATE ROLE doesNotExist", authDisabledCtx,
         "Authorization is not enabled.");
   }
 
@@ -111,10 +116,10 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
     AnalysisError("REVOKE ROLE doesNotExist FROM GROUP abc",
         "Role 'doesNotExist' does not exist.");
 
-    Analyzer authDisabledAnalyzer = createAuthDisabledAnalyzer(Catalog.DEFAULT_DB);
-    AnalysisError("GRANT ROLE myrole TO GROUP abc", authDisabledAnalyzer,
+    AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();
+    AnalysisError("GRANT ROLE myrole TO GROUP abc", authDisabledCtx,
         "Authorization is not enabled.");
-    AnalysisError("REVOKE ROLE myrole FROM GROUP abc", authDisabledAnalyzer,
+    AnalysisError("REVOKE ROLE myrole FROM GROUP abc", authDisabledCtx,
         "Authorization is not enabled.");
   }
 
@@ -126,7 +131,7 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       if (isGrant) formatArgs = new String[] {"GRANT", "TO"};
       // ALL privileges
       AnalyzesOk(String.format("%s ALL ON TABLE alltypes %s myrole", formatArgs),
-          createAnalyzer("functional"));
+          createAnalysisCtx("functional"));
       AnalyzesOk(String.format("%s ALL ON TABLE functional.alltypes %s myrole",
           formatArgs));
       AnalyzesOk(String.format("%s ALL ON TABLE functional_kudu.alltypes %s myrole",
@@ -152,7 +157,7 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
 
       // INSERT privilege
       AnalyzesOk(String.format("%s INSERT ON TABLE alltypesagg %s myrole", formatArgs),
-          createAnalyzer("functional"));
+          createAnalysisCtx("functional"));
       AnalyzesOk(String.format(
           "%s INSERT ON TABLE functional_kudu.alltypessmall %s myrole", formatArgs));
       AnalyzesOk(String.format("%s INSERT ON TABLE functional.alltypesagg %s myrole",
@@ -167,7 +172,7 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
 
       // SELECT privilege
       AnalyzesOk(String.format("%s SELECT ON TABLE alltypessmall %s myrole", formatArgs),
-          createAnalyzer("functional"));
+          createAnalysisCtx("functional"));
       AnalyzesOk(String.format("%s SELECT ON TABLE functional.alltypessmall %s myrole",
           formatArgs));
       AnalyzesOk(String.format(
@@ -187,7 +192,7 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
           "%s myrole", formatArgs));
       // SELECT privilege on both regular and partition columns
       AnalyzesOk(String.format("%s SELECT (id, int_col, year, month) ON TABLE " +
-          "alltypes %s myrole", formatArgs), createAnalyzer("functional"));
+          "alltypes %s myrole", formatArgs), createAnalysisCtx("functional"));
       AnalyzesOk(String.format("%s SELECT (id, bool_col) ON TABLE " +
           "functional_kudu.alltypessmall %s myrole", formatArgs));
       // Empty column list
@@ -216,16 +221,20 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
           "exists and that you have permissions to issue a GRANT/REVOKE statement.");
     }
 
-    Analyzer authDisabledAnalyzer = createAuthDisabledAnalyzer(Catalog.DEFAULT_DB);
-    AnalysisError("GRANT ALL ON SERVER TO myRole", authDisabledAnalyzer,
+    AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();
+    AnalysisError("GRANT ALL ON SERVER TO myRole", authDisabledCtx,
         "Authorization is not enabled.");
-    AnalysisError("REVOKE ALL ON SERVER FROM myRole", authDisabledAnalyzer,
+    AnalysisError("REVOKE ALL ON SERVER FROM myRole", authDisabledCtx,
         "Authorization is not enabled.");
 
-    TQueryCtx queryCtxNoUsername = TestUtils.createQueryContext("default", "");
-    Analyzer noUsernameAnalyzer = new Analyzer(catalog_, queryCtxNoUsername,
-        AuthorizationConfig.createHadoopGroupAuthConfig("server1", null, null));
-    AnalysisError("GRANT ALL ON SERVER TO myRole", noUsernameAnalyzer,
+
+    TQueryCtx noUserNameQueryCtx = TestUtils.createQueryContext(
+        Catalog.DEFAULT_DB, "");
+    EventSequence timeline = new EventSequence("Authorization Test");
+    AnalysisContext noUserNameCtx = new AnalysisContext(noUserNameQueryCtx,
+        AuthorizationConfig.createHadoopGroupAuthConfig("server1", null, null),
+        timeline);
+    AnalysisError("GRANT ALL ON SERVER TO myRole", noUserNameCtx,
         "Cannot execute authorization statement with an empty username.");
   }
 }

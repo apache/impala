@@ -30,4 +30,8 @@ abstract public class ImpalaException extends java.lang.Exception {
   protected ImpalaException(String msg) {
     super(msg);
   }
+
+  protected ImpalaException(Throwable cause) {
+    super(cause);
+  }
 }

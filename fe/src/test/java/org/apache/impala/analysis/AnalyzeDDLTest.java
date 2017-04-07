@@ -34,7 +34,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.impala.catalog.ArrayType;
-import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
@@ -366,7 +365,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Cannot ALTER TABLE a nested collection.
     AnalysisError("alter table allcomplextypes.int_array_col " +
         "add columns (c1 string comment 'hi')",
-        createAnalyzer("functional"),
+        createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     // Cannot ALTER TABLE produced by a data source.
     AnalysisError("alter table functional.alltypes_datasource " +
@@ -405,7 +404,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
     // Cannot ALTER TABLE a nested collection.
     AnalysisError("alter table allcomplextypes.int_array_col drop column int_col",
-        createAnalyzer("functional"),
+        createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     // Cannot ALTER TABLE produced by a data source.
     AnalysisError("alter table functional.alltypes_datasource drop column int_col",
@@ -457,7 +456,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Cannot ALTER TABLE a nested collection.
     AnalysisError("alter table allcomplextypes.int_array_col " +
         "change column int_col int_col2 int",
-        createAnalyzer("functional"),
+        createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     // Cannot ALTER TABLE produced by a data source.
     AnalysisError("alter table functional.alltypes_datasource " +
@@ -681,7 +680,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
     // Cannot ALTER TABLE a nested collection.
     AnalysisError("alter table allcomplextypes.int_array_col set fileformat sequencefile",
-        createAnalyzer("functional"),
+        createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     // Cannot ALTER TABLE produced by a data source.
     AnalysisError("alter table functional.alltypes_datasource set fileformat parquet",
@@ -721,7 +720,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional.view_view set cached in 'testPool'",
         "ALTER TABLE not allowed on a view: functional.view_view");
     AnalysisError("alter table allcomplextypes.int_array_col set cached in 'testPool'",
-        createAnalyzer("functional"),
+        createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
 
     AnalysisError("alter table functional.alltypes set cached in 'badPool'",
@@ -841,7 +840,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError(
         "alter table allcomplextypes.int_array_col " +
         "set column stats int_col ('numNulls'='2')",
-        createAnalyzer("functional"),
+        createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     // Cannot set column stats of partition columns.
     AnalysisError(
@@ -1024,7 +1023,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "ALTER TABLE not allowed on a view: functional.alltypes_view");
     // Cannot ALTER TABLE a nested collection.
     AnalysisError("alter table allcomplextypes.int_array_col rename to new_alltypes",
-        createAnalyzer("functional"),
+        createAnalysisCtx("functional"),
         "Database does not exist: allcomplextypes");
 
     // It should be okay to rename an HBase table.
@@ -1046,7 +1045,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional.view_view recover partitions",
         "ALTER TABLE not allowed on a view: functional.view_view");
     AnalysisError("alter table allcomplextypes.int_array_col recover partitions",
-        createAnalyzer("functional"),
+        createAnalysisCtx("functional"),
         "ALTER TABLE not allowed on a nested collection: allcomplextypes.int_array_col");
     AnalysisError("alter table functional_hbase.alltypes recover partitions",
         "ALTER TABLE RECOVER PARTITIONS must target an HDFS table: " +
@@ -1176,21 +1175,21 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   ComputeStatsStmt checkComputeStatsStmt(String stmt) throws AnalysisException {
-    return checkComputeStatsStmt(stmt, createAnalyzer(Catalog.DEFAULT_DB));
+    return checkComputeStatsStmt(stmt, createAnalysisCtx());
   }
 
-  ComputeStatsStmt checkComputeStatsStmt(String stmt, Analyzer analyzer)
+  ComputeStatsStmt checkComputeStatsStmt(String stmt, AnalysisContext ctx)
       throws AnalysisException {
-    return checkComputeStatsStmt(stmt, analyzer, null);
+    return checkComputeStatsStmt(stmt, ctx, null);
   }
 
   /**
    * Analyzes 'stmt' and checks that the table-level and column-level SQL that is used
    * to compute the stats is valid. Returns the analyzed statement.
    */
-  ComputeStatsStmt checkComputeStatsStmt(String stmt, Analyzer analyzer,
+  ComputeStatsStmt checkComputeStatsStmt(String stmt, AnalysisContext ctx,
       String expectedWarning) throws AnalysisException {
-    ParseNode parseNode = AnalyzesOk(stmt, analyzer, expectedWarning);
+    ParseNode parseNode = AnalyzesOk(stmt, ctx, expectedWarning);
     assertTrue(parseNode instanceof ComputeStatsStmt);
     ComputeStatsStmt parsedStmt = (ComputeStatsStmt)parseNode;
     AnalyzesOk(parsedStmt.getTblStatsQuery());
@@ -1349,7 +1348,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           queryOpts.compute_stats_min_sample_size == 1024 * 1024 * 1024);
       ComputeStatsStmt noSamplingStmt = checkComputeStatsStmt(
           "compute stats functional.alltypes tablesample system (10) repeatable(1)",
-          createAnalyzer(queryOpts),
+          createAnalysisCtx(queryOpts),
           "Ignoring TABLESAMPLE because the effective sampling rate is 100%");
       Assert.assertTrue(noSamplingStmt.getEffectiveSamplingPerc() == 1.0);
       String tblStatsQuery = noSamplingStmt.getTblStatsQuery().toUpperCase();
@@ -1362,10 +1361,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       // No minimum sample bytes.
       queryOpts.setCompute_stats_min_sample_size(0);
       checkComputeStatsStmt("compute stats functional.alltypes tablesample system (10)",
-          createAnalyzer(queryOpts));
+          createAnalysisCtx(queryOpts));
       checkComputeStatsStmt(
           "compute stats functional.alltypes tablesample system (55) repeatable(1)",
-          createAnalyzer(queryOpts));
+          createAnalysisCtx(queryOpts));
 
       // Sample is adjusted based on the minimum sample bytes.
       // Assumes that functional.alltypes has 24 files of roughly 20KB each.
@@ -1374,7 +1373,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       queryOpts.setCompute_stats_min_sample_size(0);
       ComputeStatsStmt baselineStmt = checkComputeStatsStmt(
           "compute stats functional.alltypes tablesample system (1) repeatable(1)",
-          createAnalyzer(queryOpts));
+          createAnalysisCtx(queryOpts));
       // Approximate validation of effective sampling rate.
       Assert.assertTrue(baselineStmt.getEffectiveSamplingPerc() > 0.03);
       Assert.assertTrue(baselineStmt.getEffectiveSamplingPerc() < 0.05);
@@ -1383,7 +1382,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       queryOpts.setCompute_stats_min_sample_size(100 * 1024);
       ComputeStatsStmt adjustedStmt = checkComputeStatsStmt(
           "compute stats functional.alltypes tablesample system (1) repeatable(1)",
-          createAnalyzer(queryOpts));
+          createAnalysisCtx(queryOpts));
       // Approximate validation to avoid flakiness due to sampling and file size
       // changes. Expect a sample between 4 and 6 of the 24 total files.
       Assert.assertTrue(adjustedStmt.getEffectiveSamplingPerc() >= 4.0 / 24);
@@ -3592,7 +3591,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     addTestTable("create table ambig.ambig (ambig struct<ambig:array<int>>)");
     // Single element path can only be resolved as <table>.
     DescribeTableStmt describe = (DescribeTableStmt)AnalyzesOk("describe ambig",
-        createAnalyzer("ambig"));
+        createAnalysisCtx("ambig"));
     TDescribeTableParams tdesc = (TDescribeTableParams) describe.toThrift();
     Assert.assertTrue(tdesc.isSetTable_name());
     Assert.assertEquals("ambig", tdesc.table_name.getDb_name());
@@ -3600,14 +3599,14 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     Assert.assertFalse(tdesc.isSetResult_struct());
 
     // Path could be resolved as either <db>.<table> or <table>.<complex field>
-    AnalysisError("describe ambig.ambig", createAnalyzer("ambig"),
+    AnalysisError("describe ambig.ambig", createAnalysisCtx("ambig"),
         "Path is ambiguous: 'ambig.ambig'");
     // Path could be resolved as either <db>.<table>.<field> or <table>.<field>.<field>
-    AnalysisError("describe ambig.ambig.ambig", createAnalyzer("ambig"),
+    AnalysisError("describe ambig.ambig.ambig", createAnalysisCtx("ambig"),
         "Path is ambiguous: 'ambig.ambig.ambig'");
     // 4 element path can only be resolved to nested array.
     describe = (DescribeTableStmt) AnalyzesOk(
-        "describe ambig.ambig.ambig.ambig", createAnalyzer("ambig"));
+        "describe ambig.ambig.ambig.ambig", createAnalysisCtx("ambig"));
     tdesc = (TDescribeTableParams) describe.toThrift();
     Type expectedType =
         org.apache.impala.analysis.Path.getTypeAsStruct(new ArrayType(Type.INT));
@@ -3660,7 +3659,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           partition),
           "SHOW FILES not applicable to a non hdfs table: functional.alltypes_view");
       AnalysisError(String.format("show files in allcomplextypes.int_array_col %s",
-          partition), createAnalyzer("functional"),
+          partition), createAnalysisCtx("functional"),
           "SHOW FILES not applicable to a non hdfs table: allcomplextypes.int_array_col");
     }
 

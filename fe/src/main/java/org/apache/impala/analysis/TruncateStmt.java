@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
@@ -47,12 +49,17 @@ public class TruncateStmt extends StatementBase {
   }
 
   @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
+  }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     tableName_ = analyzer.getFqTableName(tableName_);
     try {
       table_ = analyzer.getTable(tableName_, Privilege.INSERT);
     } catch (AnalysisException e) {
-      if (ifExists_ && analyzer.getMissingTbls().isEmpty()) return;
+      if (ifExists_) return;
       throw e;
     }
     // We only support truncating hdfs tables now.

@@ -162,6 +162,8 @@ public class UnionStmt extends QueryStmt {
   public UnionStmt(List<UnionOperand> operands,
       ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
     super(orderByElements, limitElement);
+    Preconditions.checkNotNull(operands);
+    Preconditions.checkState(operands.size() > 0);
     operands_ = operands;
   }
 
@@ -207,12 +209,7 @@ public class UnionStmt extends QueryStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed()) return;
-    try {
-      super.analyze(analyzer);
-    } catch (AnalysisException e) {
-      if (analyzer.getMissingTbls().isEmpty()) throw e;
-    }
-    Preconditions.checkState(operands_.size() > 0);
+    super.analyze(analyzer);
 
     // Propagates DISTINCT from right to left.
     propagateDistinct();
@@ -279,24 +276,17 @@ public class UnionStmt extends QueryStmt {
    */
   private void analyzeOperands(Analyzer analyzer) throws AnalysisException {
     for (int i = 0; i < operands_.size(); ++i) {
-      try {
-        operands_.get(i).analyze(analyzer);
-        QueryStmt firstQuery = operands_.get(0).getQueryStmt();
-        List<Expr> firstExprs = operands_.get(0).getQueryStmt().getResultExprs();
-        QueryStmt query = operands_.get(i).getQueryStmt();
-        List<Expr> exprs = query.getResultExprs();
-        if (firstExprs.size() != exprs.size()) {
-          throw new AnalysisException("Operands have unequal number of columns:\n" +
-              "'" + queryStmtToSql(firstQuery) + "' has " +
-              firstExprs.size() + " column(s)\n" +
-              "'" + queryStmtToSql(query) + "' has " + exprs.size() + " column(s)");
-        }
-      } catch (AnalysisException e) {
-        if (analyzer.getMissingTbls().isEmpty()) throw e;
+      operands_.get(i).analyze(analyzer);
+      QueryStmt firstQuery = operands_.get(0).getQueryStmt();
+      List<Expr> firstExprs = operands_.get(0).getQueryStmt().getResultExprs();
+      QueryStmt query = operands_.get(i).getQueryStmt();
+      List<Expr> exprs = query.getResultExprs();
+      if (firstExprs.size() != exprs.size()) {
+        throw new AnalysisException("Operands have unequal number of columns:\n" +
+            "'" + queryStmtToSql(firstQuery) + "' has " +
+            firstExprs.size() + " column(s)\n" +
+            "'" + queryStmtToSql(query) + "' has " + exprs.size() + " column(s)");
       }
-    }
-    if (!analyzer.getMissingTbls().isEmpty()) {
-      throw new AnalysisException("Found missing tables. Aborting analysis.");
     }
   }
 
@@ -552,8 +542,11 @@ public class UnionStmt extends QueryStmt {
   }
 
   @Override
-  public void collectTableRefs(List<TableRef> tblRefs) {
-    for (UnionOperand op: operands_) op.getQueryStmt().collectTableRefs(tblRefs);
+  public void collectTableRefs(List<TableRef> tblRefs, boolean fromClauseOnly) {
+    super.collectTableRefs(tblRefs, fromClauseOnly);
+    for (UnionOperand op: operands_) {
+      op.getQueryStmt().collectTableRefs(tblRefs, fromClauseOnly);
+    }
   }
 
   @Override
