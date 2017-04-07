@@ -39,9 +39,15 @@ TcmallocMetric* TcmallocMetric::TOTAL_BYTES_RESERVED = NULL;
 TcmallocMetric* TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = NULL;
 TcmallocMetric::PhysicalBytesMetric* TcmallocMetric::PHYSICAL_BYTES_RESERVED = NULL;
 
+AsanMallocMetric* AsanMallocMetric::BYTES_ALLOCATED = nullptr;
+
 BufferPoolMetric* BufferPoolMetric::LIMIT = nullptr;
 BufferPoolMetric* BufferPoolMetric::SYSTEM_ALLOCATED = nullptr;
 BufferPoolMetric* BufferPoolMetric::RESERVED = nullptr;
+BufferPoolMetric* BufferPoolMetric::NUM_FREE_BUFFERS = nullptr;
+BufferPoolMetric* BufferPoolMetric::FREE_BUFFER_BYTES = nullptr;
+BufferPoolMetric* BufferPoolMetric::NUM_CLEAN_PAGES = nullptr;
+BufferPoolMetric* BufferPoolMetric::CLEAN_PAGE_BYTES = nullptr;
 
 TcmallocMetric* TcmallocMetric::CreateAndRegister(
     MetricGroup* metrics, const string& key, const string& tcmalloc_var) {
@@ -55,7 +61,21 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
     RETURN_IF_ERROR(BufferPoolMetric::InitMetrics(
         metrics->GetOrCreateChildGroup("buffer-pool"), global_reservations, buffer_pool));
   }
-#ifndef ADDRESS_SANITIZER
+
+  // Add compound metrics that track totals across malloc and the buffer pool.
+  // total-used should track the total physical memory in use.
+  vector<UIntGauge*> used_metrics;
+  if (FLAGS_mmap_buffers && global_reservations != nullptr) {
+    // If we mmap() buffers, the buffers are not allocated via malloc. Ensure they are
+    // properly tracked.
+    used_metrics.push_back(BufferPoolMetric::SYSTEM_ALLOCATED);
+  }
+
+#ifdef ADDRESS_SANITIZER
+  AsanMallocMetric::BYTES_ALLOCATED = metrics->RegisterMetric(
+      new AsanMallocMetric(MetricDefs::Get("asan-total-bytes-allocated")));
+  used_metrics.push_back(AsanMallocMetric::BYTES_ALLOCATED);
+#else
   // We rely on TCMalloc for our global memory metrics, so skip setting them up
   // if we're not using TCMalloc.
   TcmallocMetric::BYTES_IN_USE = TcmallocMetric::CreateAndRegister(
@@ -74,18 +94,10 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
       metrics->RegisterMetric(new TcmallocMetric::PhysicalBytesMetric(
           MetricDefs::Get("tcmalloc.physical-bytes-reserved")));
 
-  // Add compound metrics that track totals across TCMalloc and the buffer pool.
-  // total-used should track the total physical memory in use.
-  vector<UIntGauge*> used_metrics{TcmallocMetric::PHYSICAL_BYTES_RESERVED};
-  if (FLAGS_mmap_buffers && global_reservations != nullptr) {
-    // If we mmap() buffers, the buffers are not allocated via TCMalloc. Ensure they are
-    // properly tracked.
-    used_metrics.push_back(BufferPoolMetric::SYSTEM_ALLOCATED);
-  }
-
+  used_metrics.push_back(TcmallocMetric::PHYSICAL_BYTES_RESERVED);
+#endif
   AggregateMemoryMetric::TOTAL_USED = metrics->RegisterMetric(
       new SumGauge<uint64_t>(MetricDefs::Get("memory.total-used"), used_metrics));
-#endif
   if (register_jvm_metrics) {
     RETURN_IF_ERROR(JvmMetric::InitMetrics(metrics->GetOrCreateChildGroup("jvm")));
   }
@@ -175,6 +187,18 @@ Status BufferPoolMetric::InitMetrics(MetricGroup* metrics,
   RESERVED = metrics->RegisterMetric(
       new BufferPoolMetric(MetricDefs::Get("buffer-pool.reserved"),
           BufferPoolMetricType::RESERVED, global_reservations, buffer_pool));
+  NUM_FREE_BUFFERS = metrics->RegisterMetric(
+      new BufferPoolMetric(MetricDefs::Get("buffer-pool.free-buffers"),
+          BufferPoolMetricType::NUM_FREE_BUFFERS, global_reservations, buffer_pool));
+  FREE_BUFFER_BYTES = metrics->RegisterMetric(
+      new BufferPoolMetric(MetricDefs::Get("buffer-pool.free-buffer-bytes"),
+          BufferPoolMetricType::FREE_BUFFER_BYTES, global_reservations, buffer_pool));
+  NUM_CLEAN_PAGES = metrics->RegisterMetric(
+      new BufferPoolMetric(MetricDefs::Get("buffer-pool.clean-pages"),
+          BufferPoolMetricType::NUM_CLEAN_PAGES, global_reservations, buffer_pool));
+  CLEAN_PAGE_BYTES = metrics->RegisterMetric(
+      new BufferPoolMetric(MetricDefs::Get("buffer-pool.clean-page-bytes"),
+          BufferPoolMetricType::CLEAN_PAGE_BYTES, global_reservations, buffer_pool));
   return Status::OK();
 }
 
@@ -195,6 +219,18 @@ void BufferPoolMetric::CalculateValue() {
       break;
     case BufferPoolMetricType::RESERVED:
       value_ = global_reservations_->GetReservation();
+      break;
+    case BufferPoolMetricType::NUM_FREE_BUFFERS:
+      value_ = buffer_pool_->GetNumFreeBuffers();
+      break;
+    case BufferPoolMetricType::FREE_BUFFER_BYTES:
+      value_ = buffer_pool_->GetFreeBufferBytes();
+      break;
+    case BufferPoolMetricType::NUM_CLEAN_PAGES:
+      value_ = buffer_pool_->GetNumCleanPages();
+      break;
+    case BufferPoolMetricType::CLEAN_PAGE_BYTES:
+      value_ = buffer_pool_->GetCleanPageBytes();
       break;
     default:
       DCHECK(false) << "Unknown BufferPoolMetricType: " << static_cast<int>(type_);

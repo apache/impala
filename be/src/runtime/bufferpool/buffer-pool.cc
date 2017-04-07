@@ -272,6 +272,22 @@ int64_t BufferPool::GetSystemBytesAllocated() const {
   return allocator_->GetSystemBytesAllocated();
 }
 
+int64_t BufferPool::GetNumCleanPages() const {
+  return allocator_->GetNumCleanPages();
+}
+
+int64_t BufferPool::GetCleanPageBytes() const {
+  return allocator_->GetCleanPageBytes();
+}
+
+int64_t BufferPool::GetNumFreeBuffers() const {
+  return allocator_->GetNumFreeBuffers();
+}
+
+int64_t BufferPool::GetFreeBufferBytes() const {
+  return allocator_->GetFreeBufferBytes();
+}
+
 bool BufferPool::ClientHandle::IncreaseReservation(int64_t bytes) {
   return impl_->reservation()->IncreaseReservation(bytes);
 }

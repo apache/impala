@@ -55,7 +55,6 @@ MemTracker::MemTracker(
     bytes_freed_by_last_gc_metric_(NULL),
     bytes_over_limit_metric_(NULL),
     limit_metric_(NULL) {
-  if (parent != NULL) parent_->AddChildTracker(this);
   Init();
 }
 
@@ -72,15 +71,14 @@ MemTracker::MemTracker(RuntimeProfile* profile, int64_t byte_limit,
     bytes_freed_by_last_gc_metric_(NULL),
     bytes_over_limit_metric_(NULL),
     limit_metric_(NULL) {
-  if (parent != NULL) parent_->AddChildTracker(this);
   Init();
 }
 
-MemTracker::MemTracker(
-    UIntGauge* consumption_metric, int64_t byte_limit, const string& label)
+MemTracker::MemTracker(UIntGauge* consumption_metric, int64_t byte_limit,
+    const string& label, MemTracker* parent)
   : limit_(byte_limit),
     label_(label),
-    parent_(NULL),
+    parent_(parent),
     consumption_(&local_counter_),
     local_counter_(TUnit::BYTES),
     consumption_metric_(consumption_metric),
@@ -94,6 +92,7 @@ MemTracker::MemTracker(
 
 void MemTracker::Init() {
   DCHECK_GE(limit_, -1);
+  if (parent_ != NULL) parent_->AddChildTracker(this);
   // populate all_trackers_ and limit_trackers_
   MemTracker* tracker = this;
   while (tracker != NULL) {
@@ -122,7 +121,7 @@ void MemTracker::EnableReservationReporting(const ReservationTrackerCounters& co
   reservation_counters_.Store(new_counters);
 }
 
-int64_t MemTracker::GetPoolMemReserved() const {
+int64_t MemTracker::GetPoolMemReserved() {
   // Pool trackers should have a pool_name_ and no limit.
   DCHECK(!pool_name_.empty());
   DCHECK_EQ(limit_, -1) << LogUsage("");
@@ -228,7 +227,9 @@ void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
 //   TrackerName: Limit=5.00 MB Reservation=5.00 MB OtherMemory=1.04 MB
 //                Total=6.04 MB Peak=6.45 MB
 //
-string MemTracker::LogUsage(const string& prefix, int64_t* logged_consumption) const {
+string MemTracker::LogUsage(const string& prefix, int64_t* logged_consumption) {
+  // Make sure the consumption is up to date.
+  if (consumption_metric_ != nullptr) RefreshConsumptionFromMetric();
   int64_t curr_consumption = consumption();
   int64_t peak_consumption = consumption_->value();
   if (logged_consumption != nullptr) *logged_consumption = curr_consumption;
@@ -251,8 +252,14 @@ string MemTracker::LogUsage(const string& prefix, int64_t* logged_consumption) c
     ss << " OtherMemory="
        << PrettyPrinter::Print(curr_consumption - reservation, TUnit::BYTES);
   }
-  ss << " Total=" << PrettyPrinter::Print(curr_consumption, TUnit::BYTES)
-     << " Peak=" << PrettyPrinter::Print(peak_consumption, TUnit::BYTES);
+  ss << " Total=" << PrettyPrinter::Print(curr_consumption, TUnit::BYTES);
+  // Peak consumption is not accurate if the metric is lazily updated (i.e.
+  // this is a non-root tracker that exists only for reporting purposes).
+  // Only report peak consumption if we actually call Consume()/Release() on
+  // this tracker or an descendent.
+  if (consumption_metric_ == nullptr || parent_ == nullptr) {
+    ss << " Peak=" << PrettyPrinter::Print(peak_consumption, TUnit::BYTES);
+  }
 
   string new_prefix = Substitute("  $0", prefix);
   int64_t child_consumption;
@@ -263,7 +270,7 @@ string MemTracker::LogUsage(const string& prefix, int64_t* logged_consumption) c
   }
   if (!child_trackers_usage.empty()) ss << "\n" << child_trackers_usage;
 
-  if (consumption_metric_ != nullptr) {
+  if (parent_ == nullptr) {
     // Log the difference between the metric value and children as "untracked" memory so
     // that the values always add up. This value is not always completely accurate because
     // we did not necessarily get a consistent snapshot of the consumption values for all

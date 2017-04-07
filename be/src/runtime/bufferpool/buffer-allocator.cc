@@ -84,6 +84,22 @@ class BufferPool::FreeBufferArena : public CacheLineAligned {
   /// on core 'core'.
   int GetFreeListSize(int64_t len);
 
+  /// Return the total number of free buffers in the arena. May be approximate since
+  /// it doesn't acquire the arena lock.
+  int64_t GetNumFreeBuffers();
+
+  /// Return the total bytes of free buffers in the arena. May be approximate since
+  /// it doesn't acquire the arena lock.
+  int64_t GetFreeBufferBytes();
+
+  /// Return the total number of clean pages in the arena. May be approximate since
+  /// it doesn't acquire the arena lock.
+  int64_t GetNumCleanPages();
+
+  /// Return the total bytes of clean pages in the arena. May be approximate since
+  /// it doesn't acquire the arena lock.
+  int64_t GetCleanPageBytes();
+
   string DebugString();
 
  private:
@@ -126,6 +142,10 @@ class BufferPool::FreeBufferArena : public CacheLineAligned {
     DCHECK_LT(idx, NumBufferSizes());
     return &buffer_sizes_[idx];
   }
+
+  /// Compute a sum over all the lists in the arena. Does not lock the arena.
+  int64_t SumOverSizes(
+      std::function<int64_t(PerSizeLists* lists, int64_t buffer_size)> compute_fn);
 
   BufferAllocator* const parent_;
 
@@ -381,6 +401,32 @@ int64_t BufferPool::BufferAllocator::FreeToSystem(vector<BufferHandle>&& buffers
   return bytes_freed;
 }
 
+int64_t BufferPool::BufferAllocator::SumOverArenas(
+    std::function<int64_t(FreeBufferArena* arena)> compute_fn) const {
+  int64_t total = 0;
+  for (const unique_ptr<FreeBufferArena>& arena : per_core_arenas_) {
+    total += compute_fn(arena.get());
+  }
+  return total;
+}
+
+int64_t BufferPool::BufferAllocator::GetNumFreeBuffers() const {
+  return SumOverArenas([](FreeBufferArena* arena) { return arena->GetNumFreeBuffers(); });
+}
+
+int64_t BufferPool::BufferAllocator::GetFreeBufferBytes() const {
+  return SumOverArenas(
+      [](FreeBufferArena* arena) { return arena->GetFreeBufferBytes(); });
+}
+
+int64_t BufferPool::BufferAllocator::GetNumCleanPages() const {
+  return SumOverArenas([](FreeBufferArena* arena) { return arena->GetNumCleanPages(); });
+}
+
+int64_t BufferPool::BufferAllocator::GetCleanPageBytes() const {
+  return SumOverArenas([](FreeBufferArena* arena) { return arena->GetCleanPageBytes(); });
+}
+
 string BufferPool::BufferAllocator::DebugString() {
   stringstream ss;
   ss << "<BufferAllocator> " << this << " min_buffer_len: " << min_buffer_len_
@@ -570,6 +616,40 @@ int BufferPool::FreeBufferArena::GetFreeListSize(int64_t len) {
   PerSizeLists* lists = GetListsForSize(len);
   DCHECK_EQ(lists->num_free_buffers.Load(), lists->free_buffers.Size());
   return lists->free_buffers.Size();
+}
+
+int64_t BufferPool::FreeBufferArena::SumOverSizes(
+    std::function<int64_t(PerSizeLists* lists, int64_t buffer_size)> compute_fn) {
+  int64_t total = 0;
+  for (int i = 0; i < NumBufferSizes(); ++i) {
+    int64_t buffer_size = (1L << i) * parent_->min_buffer_len_;
+    total += compute_fn(&buffer_sizes_[i], buffer_size);
+  }
+  return total;
+}
+
+int64_t BufferPool::FreeBufferArena::GetNumFreeBuffers() {
+  return SumOverSizes([](PerSizeLists* lists, int64_t buffer_size) {
+    return lists->num_free_buffers.Load();
+  });
+}
+
+int64_t BufferPool::FreeBufferArena::GetFreeBufferBytes() {
+  return SumOverSizes([](PerSizeLists* lists, int64_t buffer_size) {
+    return lists->num_free_buffers.Load() * buffer_size;
+  });
+}
+
+int64_t BufferPool::FreeBufferArena::GetNumCleanPages() {
+  return SumOverSizes([](PerSizeLists* lists, int64_t buffer_size) {
+    return lists->num_clean_pages.Load();
+  });
+}
+
+int64_t BufferPool::FreeBufferArena::GetCleanPageBytes() {
+  return SumOverSizes([](PerSizeLists* lists, int64_t buffer_size) {
+    return lists->num_clean_pages.Load() * buffer_size;
+  });
 }
 
 string BufferPool::FreeBufferArena::DebugString() {

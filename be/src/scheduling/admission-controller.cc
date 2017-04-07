@@ -703,7 +703,7 @@ void AdmissionController::UpdateClusterAggregates() {
 void AdmissionController::PoolStats::UpdateMemTrackerStats() {
   // May be NULL if no queries have ever executed in this pool on this node but another
   // node sent stats for this pool.
-  const MemTracker* tracker =
+  MemTracker* tracker =
       ExecEnv::GetInstance()->pool_mem_trackers()->GetRequestPoolMemTracker(name_, false);
 
   const int64_t current_reserved =

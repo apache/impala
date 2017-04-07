@@ -25,6 +25,7 @@
 #include <kudu/client/client.h>
 
 #include "common/logging.h"
+#include "common/object-pool.h"
 #include "exec/kudu-util.h"
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -137,7 +138,8 @@ struct ExecEnv::KuduClientPtr {
 ExecEnv* ExecEnv::exec_env_ = nullptr;
 
 ExecEnv::ExecEnv()
-  : metrics_(new MetricGroup("impala-metrics")),
+  : obj_pool_(new ObjectPool),
+    metrics_(new MetricGroup("impala-metrics")),
     stream_mgr_(new DataStreamMgr(metrics_.get())),
     impalad_client_cache_(
         new ImpalaBackendClientCache(FLAGS_backend_client_connection_num_retries, 0,
@@ -158,8 +160,8 @@ ExecEnv::ExecEnv()
     tmp_file_mgr_(new TmpFileMgr),
     request_pool_service_(new RequestPoolService(metrics_.get())),
     frontend_(new Frontend()),
-    exec_rpc_thread_pool_(new CallableThreadPool("exec-rpc-pool",
-        "worker", FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
+    exec_rpc_thread_pool_(new CallableThreadPool("exec-rpc-pool", "worker",
+        FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
     buffer_reservation_(nullptr),
@@ -203,7 +205,8 @@ ExecEnv::ExecEnv()
 // TODO: Need refactor to get rid of duplicated code.
 ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     int webserver_port, const string& statestore_host, int statestore_port)
-  : metrics_(new MetricGroup("impala-metrics")),
+  : obj_pool_(new ObjectPool),
+    metrics_(new MetricGroup("impala-metrics")),
     stream_mgr_(new DataStreamMgr(metrics_.get())),
     impalad_client_cache_(
         new ImpalaBackendClientCache(FLAGS_backend_client_connection_num_retries, 0,
@@ -223,8 +226,8 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
     tmp_file_mgr_(new TmpFileMgr),
     frontend_(new Frontend()),
-    exec_rpc_thread_pool_(new CallableThreadPool("exec-rpc-pool",
-        "worker", FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
+    exec_rpc_thread_pool_(new CallableThreadPool("exec-rpc-pool", "worker",
+        FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
     buffer_reservation_(nullptr),
@@ -318,10 +321,18 @@ Status ExecEnv::StartServices() {
   RETURN_IF_ERROR(RegisterMemoryMetrics(
       metrics_.get(), true, buffer_reservation_.get(), buffer_pool_.get()));
 
-#ifndef ADDRESS_SANITIZER
   // Limit of -1 means no memory limit.
   mem_tracker_.reset(new MemTracker(
       AggregateMemoryMetric::TOTAL_USED, bytes_limit > 0 ? bytes_limit : -1, "Process"));
+  if (buffer_pool_ != nullptr) {
+    // Add BufferPool MemTrackers for cached memory that is not tracked against queries
+    // but is included in process memory consumption.
+    obj_pool_->Add(new MemTracker(BufferPoolMetric::FREE_BUFFER_BYTES, -1,
+        "Buffer Pool: Free Buffers", mem_tracker_.get()));
+    obj_pool_->Add(new MemTracker(BufferPoolMetric::CLEAN_PAGE_BYTES, -1,
+        "Buffer Pool: Clean Pages", mem_tracker_.get()));
+  }
+#ifndef ADDRESS_SANITIZER
   // Aggressive decommit is required so that unused pages in the TCMalloc page heap are
   // not backed by physical pages and do not contribute towards memory consumption.
   size_t aggressive_decommit_enabled = 0;
@@ -330,12 +341,7 @@ Status ExecEnv::StartServices() {
   if (!aggressive_decommit_enabled) {
     return Status("TCMalloc aggressive decommit is required but is disabled.");
   }
-#else
-  // tcmalloc metrics aren't defined in ASAN builds, just use the default behavior to
-  // track process memory usage (sum of all children trackers).
-  mem_tracker_.reset(new MemTracker(bytes_limit > 0 ? bytes_limit : -1, "Process"));
 #endif
-
   mem_tracker_->RegisterMetrics(metrics_.get(), "mem-tracker.process");
 
   if (bytes_limit > MemInfo::physical_mem()) {

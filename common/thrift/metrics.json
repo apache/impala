@@ -1112,6 +1112,18 @@
     "key": "tcmalloc.total-bytes-reserved"
   },
   {
+    "description": "Bytes allocated from Address Sanitizer's malloc (Address Sanitizer debug builds only)",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Address Sanitizer Malloc Bytes Allocated",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "asan-total-bytes-allocated"
+  },
+  {
     "description": "Maximum allowed bytes allocated by the buffer pool.",
     "contexts": [
       "IMPALAD"
@@ -1140,6 +1152,46 @@
     "units": "BYTES",
     "kind": "GAUGE",
     "key": "buffer-pool.reserved"
+  },
+  {
+    "description": "Total number of free buffers cached in the buffer pool.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Free Buffers.",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "buffer-pool.free-buffers"
+  },
+  {
+    "description": "Total bytes of free buffer memory cached in the buffer pool.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Free Buffer Bytes.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "buffer-pool.free-buffer-bytes"
+  },
+  {
+    "description": "Total number of clean pages cached in the buffer pool.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Clean Pages.",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "buffer-pool.clean-pages"
+  },
+  {
+    "description": "Total bytes of clean page memory cached in the buffer pool.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Clean Page Bytes.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "buffer-pool.clean-page-bytes"
   },
   {
     "description": "Total memory currently used by TCMalloc and buffer pool.",

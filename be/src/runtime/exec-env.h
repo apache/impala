@@ -45,8 +45,9 @@ class HdfsFsCache;
 class ImpalaServer;
 class LibCache;
 class MemTracker;
-class PoolMemTrackerRegistry;
 class MetricGroup;
+class PoolMemTrackerRegistry;
+class ObjectPool;
 class QueryResourceMgr;
 class RequestPoolService;
 class ReservationTracker;
@@ -135,6 +136,7 @@ class ExecEnv {
 
  protected:
   /// Leave protected so that subclasses can override
+  boost::scoped_ptr<ObjectPool> obj_pool_;
   boost::scoped_ptr<MetricGroup> metrics_;
   boost::scoped_ptr<DataStreamMgr> stream_mgr_;
   boost::scoped_ptr<Scheduler> scheduler_;

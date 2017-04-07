@@ -58,7 +58,10 @@ class TQueryOptions;
 /// tally maintained by Consume() and Release(). A tcmalloc metric is used to track
 /// process memory consumption, since the process memory usage may be higher than the
 /// computed total memory (tcmalloc does not release deallocated memory immediately).
-//
+/// Other consumption metrics are used in trackers below the process level to account
+/// for memory (such as free buffer pool buffers) that is not tracked by Consume() and
+/// Release().
+///
 /// GcFunctions can be attached to a MemTracker in order to free up memory if the limit is
 /// reached. If LimitExceeded() is called and the limit is exceeded, it will first call
 /// the GcFunctions to try to free memory and recheck the limit. For example, the process
@@ -84,9 +87,11 @@ class MemTracker {
       const std::string& label = std::string(), MemTracker* parent = NULL);
 
   /// C'tor for tracker that uses consumption_metric as the consumption value.
-  /// Consume()/Release() can still be called. This is used for the process tracker.
+  /// Consume()/Release() can still be called. This is used for the root process tracker
+  /// (if 'parent' is NULL). It is also to report on other categories of memory under the
+  /// process tracker, e.g. buffer pool free buffers (if 'parent - non-NULL).
   MemTracker(UIntGauge* consumption_metric, int64_t byte_limit = -1,
-      const std::string& label = std::string());
+      const std::string& label = std::string(), MemTracker* parent = NULL);
 
   ~MemTracker();
 
@@ -257,7 +262,6 @@ class MemTracker {
   /// call if this tracker has a consumption metric.
   void RefreshConsumptionFromMetric() {
     DCHECK(consumption_metric_ != nullptr);
-    DCHECK(parent_ == nullptr);
     consumption_->Set(consumption_metric_->value());
   }
 
@@ -281,7 +285,7 @@ class MemTracker {
   /// of the memory reserved by the queries in it (i.e. its child trackers). The mem
   /// reserved for a query is its limit_, if set (which should be the common case with
   /// admission control). Otherwise the current consumption is used.
-  int64_t GetPoolMemReserved() const;
+  int64_t GetPoolMemReserved();
 
   /// Returns the memory consumed in bytes.
   int64_t consumption() const { return consumption_->current_value(); }
@@ -314,7 +318,7 @@ class MemTracker {
   /// TODO: once all memory is accounted in ReservationTracker hierarchy, move
   /// reporting there.
   std::string LogUsage(
-      const std::string& prefix = "", int64_t* logged_consumption = nullptr) const;
+      const std::string& prefix = "", int64_t* logged_consumption = nullptr);
 
   /// Log the memory usage when memory limit is exceeded and return a status object with
   /// details of the allocation which caused the limit to be exceeded.
@@ -385,7 +389,7 @@ class MemTracker {
   /// All the child trackers of this tracker. Used only for computing resource pool mem
   /// reserved and error reporting, i.e., updating a parent tracker does not update its
   /// children.
-  mutable SpinLock child_trackers_lock_;
+  SpinLock child_trackers_lock_;
   std::list<MemTracker*> child_trackers_;
 
   /// Iterator into parent_->child_trackers_ for this object. Stored to have O(1)

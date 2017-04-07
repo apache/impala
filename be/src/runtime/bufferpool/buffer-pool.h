@@ -263,6 +263,18 @@ class BufferPool : public CacheLineAligned {
   int64_t GetSystemBytesLimit() const;
   int64_t GetSystemBytesAllocated() const;
 
+  /// Return the total number of clean pages in the pool.
+  int64_t GetNumCleanPages() const;
+
+  /// Return the total bytes of clean pages in the pool.
+  int64_t GetCleanPageBytes() const;
+
+  /// Return the total number of free buffers in the pool.
+  int64_t GetNumFreeBuffers() const;
+
+  /// Return the total bytes of free buffers in the pool.
+  int64_t GetFreeBufferBytes() const;
+
   /// Generous upper bounds on page and buffer size and the number of different
   /// power-of-two buffer sizes.
   static constexpr int LOG_MAX_BUFFER_BYTES = 48;

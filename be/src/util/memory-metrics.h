@@ -20,12 +20,15 @@
 
 #include "util/metrics.h"
 
-#include <boost/thread/mutex.hpp>
 #include <boost/bind.hpp>
+#include <boost/thread/mutex.hpp>
 #include <gperftools/malloc_extension.h>
+#ifdef ADDRESS_SANITIZER
+#include <sanitizer/allocator_interface.h>
+#endif
 
-#include "util/debug-util.h"
 #include "gen-cpp/Frontend_types.h"
+#include "util/debug-util.h"
 
 namespace impala {
 
@@ -99,6 +102,20 @@ class TcmallocMetric : public UIntGauge {
   }
 };
 
+/// Alternative to TCMallocMetric if we're running under Address Sanitizer, which
+/// does not provide the same metrics.
+class AsanMallocMetric : public UIntGauge {
+ public:
+  AsanMallocMetric(const TMetricDef& def) : UIntGauge(def, 0) {}
+  static AsanMallocMetric* BYTES_ALLOCATED;
+ private:
+  virtual void CalculateValue() override {
+#ifdef ADDRESS_SANITIZER
+    value_ = __sanitizer_get_current_allocated_bytes();
+#endif
+  }
+};
+
 /// A JvmMetric corresponds to one value drawn from one 'memory pool' in the JVM. A memory
 /// pool is an area of memory assigned for one particular aspect of memory management. For
 /// example Hotspot has pools for the permanent generation, the old generation, survivor
@@ -151,6 +168,10 @@ class BufferPoolMetric : public UIntGauge {
   static BufferPoolMetric* LIMIT;
   static BufferPoolMetric* SYSTEM_ALLOCATED;
   static BufferPoolMetric* RESERVED;
+  static BufferPoolMetric* NUM_FREE_BUFFERS;
+  static BufferPoolMetric* FREE_BUFFER_BYTES;
+  static BufferPoolMetric* NUM_CLEAN_PAGES;
+  static BufferPoolMetric* CLEAN_PAGE_BYTES;
 
  protected:
   virtual void CalculateValue();
@@ -164,6 +185,10 @@ class BufferPoolMetric : public UIntGauge {
     // are fulfilled, or > SYSTEM_ALLOCATED because of additional memory cached by
     // BufferPool. Always <= LIMIT.
     RESERVED,
+    NUM_FREE_BUFFERS, // Total number of free buffers in BufferPool.
+    FREE_BUFFER_BYTES, // Total bytes of free buffers in BufferPool.
+    NUM_CLEAN_PAGES, // Total number of clean pages in BufferPool.
+    CLEAN_PAGE_BYTES, // Total bytes of clean pages in BufferPool.
   };
 
   BufferPoolMetric(const TMetricDef& def, BufferPoolMetricType type,

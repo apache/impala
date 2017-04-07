@@ -287,11 +287,6 @@ class BufferPoolTest : public ::testing::Test {
     return buffer->mem_range();
   }
 
-  /// Return the total number of bytes allocated from the system currently.
-  int64_t SystemBytesAllocated(BufferPool* pool) {
-    return pool->allocator()->GetSystemBytesAllocated();
-  }
-
   /// Set the maximum number of scavenge attempts that the pool's allocator wil do.
   void SetMaxScavengeAttempts(BufferPool* pool, int max_attempts) {
     pool->allocator()->set_max_scavenge_attempts(max_attempts);
@@ -556,15 +551,22 @@ TEST_F(BufferPoolTest, BufferAllocation) {
   vector<BufferPool::BufferHandle> handles(num_buffers);
 
   // Create buffers of various valid sizes.
+  int64_t total_allocated = 0;
   for (int i = 0; i < num_buffers; ++i) {
     int size_multiple = 1 << i;
     int64_t buffer_len = TEST_BUFFER_LEN * size_multiple;
     int64_t used_before = client.GetUsedReservation();
     ASSERT_OK(pool.AllocateBuffer(&client, buffer_len, &handles[i]));
+    total_allocated += buffer_len;
     ASSERT_TRUE(handles[i].is_open());
     ASSERT_TRUE(handles[i].data() != NULL);
     ASSERT_EQ(handles[i].len(), buffer_len);
     ASSERT_EQ(client.GetUsedReservation(), used_before + buffer_len);
+
+    // Check that pool-wide values are updated correctly.
+    EXPECT_EQ(total_allocated, pool.GetSystemBytesAllocated());
+    EXPECT_EQ(0, pool.GetNumFreeBuffers());
+    EXPECT_EQ(0, pool.GetFreeBufferBytes());
   }
 
   // Close the handles and check memory consumption.
@@ -579,6 +581,52 @@ TEST_F(BufferPoolTest, BufferAllocation) {
 
   // All the reservations should be released at this point.
   ASSERT_EQ(global_reservations_.GetReservation(), 0);
+  // But freed memory is not released to the system immediately.
+  EXPECT_EQ(total_allocated, pool.GetSystemBytesAllocated());
+  EXPECT_EQ(num_buffers, pool.GetNumFreeBuffers());
+  EXPECT_EQ(total_allocated, pool.GetFreeBufferBytes());
+  global_reservations_.Close();
+}
+
+// Test that the buffer pool correctly reports the number of clean pages.
+TEST_F(BufferPoolTest, CleanPageStats) {
+  const int MAX_NUM_BUFFERS = 4;
+  const int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
+  global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
+  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM);
+
+  ClientHandle client;
+  ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
+      nullptr, TOTAL_MEM, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservation(TOTAL_MEM));
+
+  vector<PageHandle> pages;
+  CreatePages(&pool, &client, TEST_BUFFER_LEN, TOTAL_MEM, &pages);
+  WriteData(pages, 0);
+
+  // Pages don't start off clean.
+  EXPECT_EQ(0, pool.GetNumCleanPages());
+  EXPECT_EQ(0, pool.GetCleanPageBytes());
+
+  // Unpin pages and wait until they're written out and therefore clean.
+  UnpinAll(&pool, &client, &pages);
+  WaitForAllWrites(&client);
+  EXPECT_EQ(MAX_NUM_BUFFERS, pool.GetNumCleanPages());
+  EXPECT_EQ(TOTAL_MEM, pool.GetCleanPageBytes());
+
+  // Do an allocation to force eviction of one page.
+  ASSERT_OK(AllocateAndFree(&pool, &client, TEST_BUFFER_LEN));
+  EXPECT_EQ(MAX_NUM_BUFFERS - 1, pool.GetNumCleanPages());
+  EXPECT_EQ(TOTAL_MEM - TEST_BUFFER_LEN, pool.GetCleanPageBytes());
+
+  // Re-pin all the pages - none will be clean afterwards.
+  ASSERT_OK(PinAll(&pool, &client, &pages));
+  VerifyData(pages, 0);
+  EXPECT_EQ(0, pool.GetNumCleanPages());
+  EXPECT_EQ(0, pool.GetCleanPageBytes());
+
+  DestroyAll(&pool, &client, &pages);
+  pool.DeregisterClient(&client);
   global_reservations_.Close();
 }
 
@@ -1163,7 +1211,7 @@ void BufferPoolTest::TestEvictionPolicy(int64_t page_size) {
 
   // Unpin pages. Writes should be started and memory should not be deallocated.
   EXPECT_EQ(total_mem, cumulative_bytes_alloced->value());
-  EXPECT_EQ(total_mem, SystemBytesAllocated(&pool));
+  EXPECT_EQ(total_mem, pool.GetSystemBytesAllocated());
   UnpinAll(&pool, &client, &pages);
   ASSERT_GT(write_ios->value(), 0);
 
@@ -1186,7 +1234,7 @@ void BufferPoolTest::TestEvictionPolicy(int64_t page_size) {
   // At least two unpinned pages should have been written out.
   ASSERT_GE(write_ios->value(), prev_write_ios + NUM_EXTRA_BUFFERS);
   // No additional memory should have been allocated - it should have been recycled.
-  EXPECT_EQ(total_mem, SystemBytesAllocated(&pool));
+  EXPECT_EQ(total_mem, pool.GetSystemBytesAllocated());
   // Check that two pages were evicted.
   int num_evicted = 0;
   for (PageHandle& page : pages) {

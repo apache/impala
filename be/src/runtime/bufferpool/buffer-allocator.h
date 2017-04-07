@@ -129,6 +129,18 @@ class BufferPool::BufferAllocator {
     return system_bytes_limit_ - system_bytes_remaining_.Load();
   }
 
+  /// Return the total number of free buffers in the allocator.
+  int64_t GetNumFreeBuffers() const;
+
+  /// Return the total bytes of free buffers in the allocator.
+  int64_t GetFreeBufferBytes() const;
+
+  /// Return the total number of clean pages in the allocator.
+  int64_t GetNumCleanPages() const;
+
+  /// Return the total bytes of clean pages in the allocator.
+  int64_t GetCleanPageBytes() const;
+
   std::string DebugString();
 
  protected:
@@ -176,6 +188,9 @@ class BufferPool::BufferAllocator {
 
   /// Helper to free a list of buffers to the system. Returns the number of bytes freed.
   int64_t FreeToSystem(std::vector<BufferHandle>&& buffers);
+
+  /// Compute a sum over all arenas. Does not lock the arenas.
+  int64_t SumOverArenas(std::function<int64_t(FreeBufferArena* arena)> compute_fn) const;
 
   /// The pool that this allocator is associated with.
   BufferPool* const pool_;
