@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
@@ -43,8 +45,8 @@ public class ShowFilesStmt extends StatementBase {
   protected Table table_;
 
   public ShowFilesStmt(TableName tableName, PartitionSet partitionSet) {
-    this.tableName_ = tableName;
-    this.partitionSet_ = partitionSet;
+    tableName_ = Preconditions.checkNotNull(tableName);
+    partitionSet_ = partitionSet;
   }
 
   @Override
@@ -53,6 +55,11 @@ public class ShowFilesStmt extends StatementBase {
     strBuilder.append("SHOW FILES IN " + tableName_.toString());
     if (partitionSet_ != null) strBuilder.append(" " + partitionSet_.toSql());
     return strBuilder.toString();
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
   }
 
   @Override

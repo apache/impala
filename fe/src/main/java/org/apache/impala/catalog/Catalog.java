@@ -141,21 +141,27 @@ public abstract class Catalog {
   }
 
   /**
-   * Returns the Table object for the given dbName/tableName. If 'throwIfError' is true,
-   * an exception is thrown if the associated database does not exist. Otherwise, null is
-   * returned.
+   * Returns the Table object for the given dbName/tableName or null if the database or
+   * table does not exist.
    */
-  public Table getTable(String dbName, String tableName, boolean throwIfError)
-      throws CatalogException {
+  public Table getTableNoThrow(String dbName, String tableName) {
     Db db = getDb(dbName);
-    if (db == null && throwIfError) {
-      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
-    }
+    if (db == null) return null;
     return db.getTable(tableName);
   }
 
-  public Table getTable(String dbName, String tableName) throws CatalogException {
-    return getTable(dbName, tableName, true);
+  /**
+   * Returns the Table object for the given dbName/tableName. Throws if the database
+   * does not exists. Returns null if the table does not exist.
+   * TODO: Clean up the inconsistent error behavior (throwing vs. returning null).
+   */
+  public Table getTable(String dbName, String tableName)
+      throws DatabaseNotFoundException {
+    Db db = getDb(dbName);
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
+    }
+    return db.getTable(tableName);
   }
 
   /**

@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.Table;
@@ -64,6 +66,11 @@ public abstract class AlterTableStmt extends StatementBase {
     TAlterTableParams params = new TAlterTableParams();
     params.setTable_name(new TTableName(getDb(), getTbl()));
     return params;
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
   }
 
   @Override

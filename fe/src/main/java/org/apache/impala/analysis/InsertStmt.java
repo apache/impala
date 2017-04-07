@@ -20,7 +20,6 @@ package org.apache.impala.analysis;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
@@ -38,12 +37,9 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.TableSink;
 import org.apache.impala.rewrite.ExprRewriter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -129,7 +125,7 @@ public class InsertStmt extends StatementBase {
   // For Kudu tables, the primary keys are a leading subset of the cols, and the partition
   // cols can be any subset of the primary keys, meaning that this list will be in
   // ascending order from '0' to '# primary key cols - 1' but may leave out some numbers.
-  private List<Integer> partitionColPos_ = Lists.newArrayList();
+  private final List<Integer> partitionColPos_ = Lists.newArrayList();
 
   // Indicates whether this insert stmt has a shuffle or noshuffle plan hint.
   // Both flags may be false. Only one of them may be true, not both.
@@ -266,27 +262,17 @@ public class InsertStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed()) return;
     super.analyze(analyzer);
-    try {
-      if (withClause_ != null) withClause_.analyze(analyzer);
-    } catch (AnalysisException e) {
-      // Ignore AnalysisExceptions if tables are missing to ensure the maximum number
-      // of missing tables can be collected before failing analyze().
-      if (analyzer.getMissingTbls().isEmpty()) throw e;
-    }
+    if (withClause_ != null) withClause_.analyze(analyzer);
 
     List<Expr> selectListExprs = null;
     if (!needsGeneratedQueryStatement_) {
-      try {
-        // Use a child analyzer for the query stmt to properly scope WITH-clause
-        // views and to ignore irrelevant ORDER BYs.
-        Analyzer queryStmtAnalyzer = new Analyzer(analyzer);
-        queryStmt_.analyze(queryStmtAnalyzer);
-        // Use getResultExprs() and not getBaseTblResultExprs() here because the final
-        // substitution with TupleIsNullPredicate() wrapping happens in planning.
-        selectListExprs = Expr.cloneList(queryStmt_.getResultExprs());
-      } catch (AnalysisException e) {
-        if (analyzer.getMissingTbls().isEmpty()) throw e;
-      }
+      // Use a child analyzer for the query stmt to properly scope WITH-clause
+      // views and to ignore irrelevant ORDER BYs.
+      Analyzer queryStmtAnalyzer = new Analyzer(analyzer);
+      queryStmt_.analyze(queryStmtAnalyzer);
+      // Use getResultExprs() and not getBaseTblResultExprs() here because the final
+      // substitution with TupleIsNullPredicate() wrapping happens in planning.
+      selectListExprs = Expr.cloneList(queryStmt_.getResultExprs());
     } else {
       selectListExprs = Lists.newArrayList();
     }
@@ -294,11 +280,6 @@ public class InsertStmt extends StatementBase {
     // Set target table and perform table-type specific analysis and auth checking.
     // Also checks if the target table is missing.
     analyzeTargetTable(analyzer);
-
-    // Abort analysis if there are any missing tables beyond this point.
-    if (!analyzer.getMissingTbls().isEmpty()) {
-      throw new AnalysisException("Found missing tables. Aborting analysis.");
-    }
 
     boolean isHBaseTable = (table_ instanceof HBaseTable);
     int numClusteringCols = isHBaseTable ? 0 : table_.getNumClusteringCols();
@@ -946,5 +927,16 @@ public class InsertStmt extends StatementBase {
       strBuilder.append(" " + queryStmt_.toSql());
     }
     return strBuilder.toString();
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    if (withClause_ != null) {
+      for (View v: withClause_.getViews()) {
+        v.getQueryStmt().collectTableRefs(tblRefs);
+      }
+    }
+    tblRefs.add(new TableRef(targetTableName_.toPath(), null));
+    if (queryStmt_ != null) queryStmt_.collectTableRefs(tblRefs);
   }
 }

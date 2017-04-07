@@ -17,9 +17,8 @@
 
 package org.apache.impala.analysis;
 
-import org.junit.Test;
-
 import org.apache.impala.testutil.TestUtils;
+import org.junit.Test;
 
 public class AnalyzeUpsertStmtTest extends AnalyzerTest {
   @Test
@@ -101,7 +100,8 @@ public class AnalyzeUpsertStmtTest extends AnalyzerTest {
         "UPSERT is only supported for Kudu tables");
     // Unknown target DB
     AnalysisError("upsert into UNKNOWNDB.testtbl select * " +
-        "from functional.alltypesnopart", "Database does not exist: UNKNOWNDB");
+        "from functional.alltypesnopart",
+        "Database does not exist: UNKNOWNDB");
     // WITH-clause tables cannot be upserted into
     AnalysisError("with t1 as (select 'a' x) upsert into t1 values('b' x)",
         "Table does not exist: default.t1");

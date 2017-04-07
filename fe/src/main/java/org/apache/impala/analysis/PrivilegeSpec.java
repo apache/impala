@@ -21,7 +21,6 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.DataSourceTable;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RolePrivilege;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
@@ -30,6 +29,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -171,6 +171,10 @@ public class PrivilegeSpec implements ParseNode {
     return sb.toString();
   }
 
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    if (tableName_ != null) tblRefs.add(new TableRef(tableName_.toPath(), null));
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     String configServerName = analyzer.getAuthzConfig().getServerName();
@@ -277,7 +281,6 @@ public class PrivilegeSpec implements ParseNode {
     } catch (TableLoadingException e) {
       throw new AnalysisException(e.getMessage(), e);
     } catch (AnalysisException e) {
-      if (analyzer.hasMissingTbls()) throw e;
       throw new AnalysisException(String.format("Error setting privileges for " +
           "table '%s'. Verify that the table exists and that you have permissions " +
           "to issue a GRANT/REVOKE statement.", tableName_.toString()));

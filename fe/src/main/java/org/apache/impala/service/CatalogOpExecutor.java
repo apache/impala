@@ -53,10 +53,8 @@ import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
-import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
-import org.apache.impala.catalog.CatalogUsageMonitor;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnNotFoundException;
 import org.apache.impala.catalog.DataSource;
@@ -117,7 +115,6 @@ import org.apache.impala.thrift.TCreateFunctionParams;
 import org.apache.impala.thrift.TCreateOrAlterViewParams;
 import org.apache.impala.thrift.TCreateTableLikeParams;
 import org.apache.impala.thrift.TCreateTableParams;
-import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TDropDataSourceParams;
@@ -1544,7 +1541,7 @@ public class CatalogOpExecutor {
     Preconditions.checkState(params.getColumns() != null,
         "Null column list given as argument to Catalog.createTable");
 
-    Table existingTbl = catalog_.getTable(tableName.getDb(), tableName.getTbl(), false);
+    Table existingTbl = catalog_.getTableNoThrow(tableName.getDb(), tableName.getTbl());
     if (params.if_not_exists && existingTbl != null) {
       LOG.trace(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tableName));
@@ -1760,7 +1757,7 @@ public class CatalogOpExecutor {
     Preconditions.checkState(tblName != null && tblName.isFullyQualified());
     Preconditions.checkState(srcTblName != null && srcTblName.isFullyQualified());
 
-    Table existingTbl = catalog_.getTable(tblName.getDb(), tblName.getTbl(), false);
+    Table existingTbl = catalog_.getTableNoThrow(tblName.getDb(), tblName.getTbl());
     if (params.if_not_exists && existingTbl != null) {
       LOG.trace(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tblName));
@@ -2130,9 +2127,6 @@ public class CatalogOpExecutor {
       throw new PartitionNotFoundException(
           "The partitions being dropped don't exist any more");
     }
-
-    org.apache.hadoop.hive.metastore.api.Table msTbl =
-        tbl.getMetaStoreTable().deepCopy();
 
     PartitionDropOptions dropOptions = PartitionDropOptions.instance();
     dropOptions.purgeData(purge);

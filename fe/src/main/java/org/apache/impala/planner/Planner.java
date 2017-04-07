@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.impala.analysis.AnalysisContext;
+import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnLineageGraph;
 import org.apache.impala.analysis.Expr;
@@ -44,6 +45,7 @@ import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MaxRowsProcessedVisitor;
 import org.slf4j.Logger;
@@ -69,8 +71,9 @@ public class Planner {
 
   private final PlannerContext ctx_;
 
-  public Planner(AnalysisContext.AnalysisResult analysisResult, TQueryCtx queryCtx) {
-    ctx_ = new PlannerContext(analysisResult, queryCtx);
+  public Planner(AnalysisResult analysisResult, TQueryCtx queryCtx,
+      EventSequence timeline) {
+    ctx_ = new PlannerContext(analysisResult, queryCtx, timeline);
   }
 
   public TQueryCtx getQueryCtx() { return ctx_.getQueryCtx(); }
@@ -96,7 +99,7 @@ public class Planner {
     SingleNodePlanner singleNodePlanner = new SingleNodePlanner(ctx_);
     DistributedPlanner distributedPlanner = new DistributedPlanner(ctx_);
     PlanNode singleNodePlan = singleNodePlanner.createSingleNodePlan();
-    ctx_.getAnalysisResult().getTimeline().markEvent("Single node plan created");
+    ctx_.getTimeline().markEvent("Single node plan created");
     ArrayList<PlanFragment> fragments = null;
 
     checkForSmallQueryOptimization(singleNodePlan);
@@ -120,7 +123,7 @@ public class Planner {
     PlanFragment rootFragment = fragments.get(fragments.size() - 1);
     if (ctx_.getQueryOptions().getRuntime_filter_mode() != TRuntimeFilterMode.OFF) {
       RuntimeFilterGenerator.generateRuntimeFilters(ctx_, rootFragment.getPlanRoot());
-      ctx_.getAnalysisResult().getTimeline().markEvent("Runtime filters computed");
+      ctx_.getTimeline().markEvent("Runtime filters computed");
     }
 
     rootFragment.verifyTree();
@@ -169,7 +172,7 @@ public class Planner {
     }
 
     Collections.reverse(fragments);
-    ctx_.getAnalysisResult().getTimeline().markEvent("Distributed plan created");
+    ctx_.getTimeline().markEvent("Distributed plan created");
 
     ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
@@ -212,7 +215,7 @@ public class Planner {
         graph.computeLineageGraph(resultExprs, ctx_.getRootAnalyzer());
       }
       if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
-      ctx_.getAnalysisResult().getTimeline().markEvent("Lineage info computed");
+      ctx_.getTimeline().markEvent("Lineage info computed");
     }
 
     return fragments;
@@ -231,7 +234,7 @@ public class Planner {
     // Only use one scanner thread per scan-node instance since intra-node
     // parallelism is achieved via multiple fragment instances.
     ctx_.getQueryOptions().setNum_scanner_threads(1);
-    ctx_.getAnalysisResult().getTimeline().markEvent("Parallel plans created");
+    ctx_.getTimeline().markEvent("Parallel plans created");
     return parallelPlans;
   }
 

@@ -19,11 +19,13 @@ package org.apache.impala.catalog;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCatalogObject;
@@ -219,6 +221,13 @@ public class ImpaladCatalog extends Catalog {
 
 
   /**
+   * Issues a load request to the catalogd for the given tables.
+   */
+  public void prioritizeLoad(Set<TableName> tableNames) throws InternalException {
+    FeSupport.PrioritizeLoad(tableNames);
+  }
+
+  /**
    * Causes the calling thread to wait until a catalog update notification has been sent
    * or the given timeout has been reached. A timeout value of 0 indicates an indefinite
    * wait. Does not protect against spurious wakeups, so this should be called in a loop.
@@ -234,27 +243,6 @@ public class ImpaladCatalog extends Catalog {
     }
   }
 
-  /**
-   * Returns the Table object for the given dbName/tableName. Returns null
-   * if the table does not exist. Will throw a TableLoadingException if the table's
-   * metadata was not able to be loaded successfully and DatabaseNotFoundException
-   * if the parent database does not exist.
-   */
-  @Override
-  public Table getTable(String dbName, String tableName)
-      throws CatalogException {
-    Table table = super.getTable(dbName, tableName);
-    if (table == null) return null;
-
-    if (table.isLoaded() && table instanceof IncompleteTable) {
-      // If there were problems loading this table's metadata, throw an exception
-      // when it is accessed.
-      ImpalaException cause = ((IncompleteTable) table).getCause();
-      if (cause instanceof TableLoadingException) throw (TableLoadingException) cause;
-      throw new TableLoadingException("Missing metadata for table: " + tableName, cause);
-    }
-    return table;
-  }
 
   /**
    * Returns the HDFS path where the metastore would create the given table. If the table
@@ -542,4 +530,5 @@ public class ImpaladCatalog extends Catalog {
       LOG.error("LibCacheRemoveEntry(" + hdfsLibFile + ") failed.");
     }
   }
+  public TUniqueId getCatalogServiceId() { return catalogServiceId_; }
 }

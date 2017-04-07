@@ -19,13 +19,14 @@ package org.apache.impala.analysis;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsFileFormat;
@@ -96,6 +97,11 @@ public class LoadDataStmt extends StatementBase {
     sb.append("INTO TABLE " + tableName_.toString());
     if (partitionSpec_ != null) sb.append(" " + partitionSpec_.toSql());
     return sb.toString();
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
   }
 
   @Override

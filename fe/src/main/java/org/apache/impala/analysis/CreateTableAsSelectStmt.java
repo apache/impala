@@ -92,6 +92,12 @@ public class CreateTableAsSelectStmt extends StatementBase {
   public String toSql() { return ToSqlUtils.getCreateTableSql(this); }
 
   @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    createStmt_.collectTableRefs(tblRefs);
+    insertStmt_.collectTableRefs(tblRefs);
+  }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed()) return;
     super.analyze(analyzer);
@@ -113,19 +119,14 @@ public class CreateTableAsSelectStmt extends StatementBase {
     // query portion of the insert statement. If this passes, analysis will be run
     // over the full INSERT statement. To avoid duplicate registrations of table/colRefs,
     // create a new root analyzer and clone the query statement for this initial pass.
-    Analyzer dummyRootAnalyzer = new Analyzer(analyzer.getCatalog(),
+    Analyzer dummyRootAnalyzer = new Analyzer(analyzer.getStmtTableCache(),
         analyzer.getQueryCtx(), analyzer.getAuthzConfig());
     QueryStmt tmpQueryStmt = insertStmt_.getQueryStmt().clone();
-    try {
-      Analyzer tmpAnalyzer = new Analyzer(dummyRootAnalyzer);
-      tmpAnalyzer.setUseHiveColLabels(true);
-      tmpQueryStmt.analyze(tmpAnalyzer);
-      // Subqueries need to be rewritten by the StmtRewriter first.
-      if (analyzer.containsSubquery()) return;
-    } finally {
-      // Record missing tables in the original analyzer.
-      analyzer.getMissingTbls().addAll(dummyRootAnalyzer.getMissingTbls());
-    }
+    Analyzer tmpAnalyzer = new Analyzer(dummyRootAnalyzer);
+    tmpAnalyzer.setUseHiveColLabels(true);
+    tmpQueryStmt.analyze(tmpAnalyzer);
+    // Subqueries need to be rewritten by the StmtRewriter first.
+    if (analyzer.containsSubquery()) return;
 
     // Add the columns from the partition clause to the create statement.
     if (partitionKeys_ != null) {

@@ -18,8 +18,6 @@
 package org.apache.impala.analysis;
 
 import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.common.AnalysisException;

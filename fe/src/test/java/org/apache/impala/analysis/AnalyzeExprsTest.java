@@ -27,7 +27,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
-import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
@@ -1363,8 +1362,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   /**
    * Get the result type of a select statement with a single select list element.
    */
-  Type getReturnType(String stmt, Analyzer analyzer) {
-    SelectStmt select = (SelectStmt) AnalyzesOk(stmt, analyzer, null);
+  Type getReturnType(String stmt, AnalysisContext ctx) {
+    SelectStmt select = (SelectStmt) AnalyzesOk(stmt, ctx);
     List<Expr> selectListExprs = select.getResultExprs();
     assertNotNull(selectListExprs);
     assertEquals(selectListExprs.size(), 1);
@@ -1373,13 +1372,13 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     return expr.getType();
   }
 
-  private void checkReturnType(String stmt, Type resultType, Analyzer analyzer) {
-    Type exprType = getReturnType(stmt, analyzer);
+  private void checkReturnType(String stmt, Type resultType, AnalysisContext ctx) {
+    Type exprType = getReturnType(stmt, ctx);
     assertEquals("Expected: " + resultType + " != " + exprType, resultType, exprType);
   }
 
   private void checkReturnType(String stmt, Type resultType) {
-    checkReturnType(stmt, resultType, createAnalyzer(Catalog.DEFAULT_DB));
+    checkReturnType(stmt, resultType, createAnalysisCtx(Catalog.DEFAULT_DB));
   }
 
   /**
@@ -1388,12 +1387,12 @@ public class AnalyzeExprsTest extends AnalyzerTest {
    */
   private void checkDecimalReturnType(String stmt, Type decimalV1ResultType,
       Type decimalV2ResultType) {
-    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
-    analyzer.getQueryOptions().setDecimal_v2(false);
-    checkReturnType(stmt, decimalV1ResultType, analyzer);
-    analyzer = createAnalyzer(Catalog.DEFAULT_DB);
-    analyzer.getQueryOptions().setDecimal_v2(true);
-    checkReturnType(stmt, decimalV2ResultType, analyzer);
+    AnalysisContext ctx = createAnalysisCtx(Catalog.DEFAULT_DB);
+    ctx.getQueryOptions().setDecimal_v2(false);
+    checkReturnType(stmt, decimalV1ResultType, ctx);
+    ctx = createAnalysisCtx(Catalog.DEFAULT_DB);
+    ctx.getQueryOptions().setDecimal_v2(true);
+    checkReturnType(stmt, decimalV2ResultType, ctx);
   }
 
   /**
@@ -2214,10 +2213,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   // decimal v2.
   private void testDecimalExpr(String expr,
       Type decimalV1ExpectedType, Type decimalV2ExpectedType) {
-    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
+    TQueryOptions queryOpts = new TQueryOptions();
 
-    analyzer.getQueryOptions().setDecimal_v2(false);
-    SelectStmt selectStmt = (SelectStmt) AnalyzesOk("select " + expr, analyzer);
+    queryOpts.setDecimal_v2(false);
+    SelectStmt selectStmt =
+        (SelectStmt) AnalyzesOk("select " + expr, createAnalysisCtx(queryOpts));
     Expr root = selectStmt.resultExprs_.get(0);
     Type actualType = root.getType();
     Assert.assertTrue(
@@ -2225,8 +2225,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         " Expected: " + decimalV1ExpectedType + " Actual: " + actualType,
         decimalV1ExpectedType.equals(actualType));
 
-    analyzer.getQueryOptions().setDecimal_v2(true);
-    selectStmt = (SelectStmt) AnalyzesOk("select " + expr, analyzer);
+    queryOpts.setDecimal_v2(true);
+    selectStmt = (SelectStmt) AnalyzesOk("select " + expr, createAnalysisCtx(queryOpts));
     root = selectStmt.resultExprs_.get(0);
     actualType = root.getType();
     Assert.assertTrue(
@@ -2563,16 +2563,16 @@ public class AnalyzeExprsTest extends AnalyzerTest {
           "select count(distinct %s), sum(distinct smallint_col), " +
           "avg(float_col), min(%s) " +
           "from functional.alltypes",
-          colName, colName), createAnalyzer(queryOptions));
+          colName, colName), createAnalysisCtx(queryOptions));
       countDistinctFns.add(String.format("count(distinct %s)", colName));
     }
     // Test a single query with a count(distinct) on all columns of alltypesTbl.
     AnalyzesOk(String.format("select %s from functional.alltypes",
-        Joiner.on(",").join(countDistinctFns)), createAnalyzer(queryOptions));
+        Joiner.on(",").join(countDistinctFns)), createAnalysisCtx(queryOptions));
 
     allCountDistinctFns.addAll(countDistinctFns);
     countDistinctFns.clear();
-    Table decimalTbl = catalog_.getTable("functional", "decimal_tbl");
+    Table decimalTbl = catalog_.getOrLoadTable("functional", "decimal_tbl");
     for (Column col: decimalTbl.getColumns()) {
       String colName = col.getName();
       // Test a single count(distinct) with some other aggs.
@@ -2580,12 +2580,12 @@ public class AnalyzeExprsTest extends AnalyzerTest {
           "select count(distinct %s), sum(distinct d1), " +
           "avg(d2), min(%s) " +
           "from functional.decimal_tbl",
-          colName, colName), createAnalyzer(queryOptions));
+          colName, colName), createAnalysisCtx(queryOptions));
       countDistinctFns.add(String.format("count(distinct %s)", colName));
     }
     // Test a single query with a count(distinct) on all columns of decimalTbl.
     AnalyzesOk(String.format("select %s from functional.decimal_tbl",
-        Joiner.on(",").join(countDistinctFns)), createAnalyzer(queryOptions));
+        Joiner.on(",").join(countDistinctFns)), createAnalysisCtx(queryOptions));
 
     allCountDistinctFns.addAll(countDistinctFns);
 
@@ -2593,19 +2593,19 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // alltypes/decimalTbl.
     AnalyzesOk(String.format(
         "select %s from functional.alltypes cross join functional.decimal_tbl",
-        Joiner.on(",").join(countDistinctFns)), createAnalyzer(queryOptions));
+        Joiner.on(",").join(countDistinctFns)), createAnalysisCtx(queryOptions));
 
     // The rewrite does not work for multiple count() arguments.
     AnalysisError("select count(distinct int_col, bigint_col), " +
         "count(distinct string_col, float_col) from functional.alltypes",
-        createAnalyzer(queryOptions),
+        createAnalysisCtx(queryOptions),
         "all DISTINCT aggregate functions need to have the same set of parameters as " +
         "count(DISTINCT int_col, bigint_col); deviating function: " +
         "count(DISTINCT string_col, float_col)");
     // The rewrite only applies to the count() function.
     AnalysisError(
         "select avg(distinct int_col), sum(distinct float_col) from functional.alltypes",
-        createAnalyzer(queryOptions),
+        createAnalysisCtx(queryOptions),
         "all DISTINCT aggregate functions need to have the same set of parameters as " +
         "avg(DISTINCT int_col); deviating function: sum(DISTINCT");
   }
@@ -2623,8 +2623,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     Assert.assertTrue(tinyIntFn.compare(decimalFn,
         CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
     // Check that this resolves to the decimal version of the function.
-    Analyzer analyzer = createAnalyzer(Catalog.BUILTINS_DB);
-    Db db = analyzer.getDb(Catalog.BUILTINS_DB, Privilege.VIEW_METADATA, true);
+    Db db = catalog_.getDb(Catalog.BUILTINS_DB);
     Function foundFn = db.getFunction(decimalFn, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     assertNotNull(foundFn);
     Assert.assertTrue(foundFn.getArgs()[0].isDecimal());

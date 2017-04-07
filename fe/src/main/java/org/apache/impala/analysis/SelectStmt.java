@@ -151,6 +151,7 @@ public class SelectStmt extends QueryStmt {
     if (isAnalyzed()) return;
     super.analyze(analyzer);
 
+    // Start out with table refs to establish aliases.
     fromClause_.analyze(analyzer);
 
     // Generate !empty() predicates to filter out empty collections.
@@ -541,12 +542,12 @@ public class SelectStmt extends QueryStmt {
     // Analyze the HAVING clause first so we can check if it contains aggregates.
     // We need to analyze/register it even if we are not computing aggregates.
     if (havingClause_ != null) {
-      havingPred_ = substituteOrdinalOrAlias(havingClause_, "HAVING", analyzer);
       // can't contain subqueries
-      if (havingPred_.contains(Predicates.instanceOf(Subquery.class))) {
+      if (havingClause_.contains(Predicates.instanceOf(Subquery.class))) {
         throw new AnalysisException(
             "Subqueries are not supported in the HAVING clause.");
       }
+      havingPred_ = substituteOrdinalOrAlias(havingClause_, "HAVING", analyzer);
       // can't contain analytic exprs
       Expr analyticExpr = havingPred_.findFirstOf(AnalyticExpr.class);
       if (analyticExpr != null) {
@@ -1041,13 +1042,19 @@ public class SelectStmt extends QueryStmt {
   }
 
   @Override
-  public void collectTableRefs(List<TableRef> tblRefs) {
-    for (TableRef tblRef: fromClause_) {
-      if (tblRef instanceof InlineViewRef) {
-        InlineViewRef inlineViewRef = (InlineViewRef) tblRef;
-        inlineViewRef.getViewStmt().collectTableRefs(tblRefs);
-      } else {
-        tblRefs.add(tblRef);
+  protected void collectTableRefs(List<TableRef> tblRefs, boolean fromClauseOnly) {
+    super.collectTableRefs(tblRefs, fromClauseOnly);
+    if (fromClauseOnly) {
+      fromClause_.collectFromClauseTableRefs(tblRefs);
+    } else {
+      fromClause_.collectTableRefs(tblRefs);
+    }
+    if (!fromClauseOnly && whereClause_ != null) {
+      // Collect TableRefs in WHERE-clause subqueries.
+      List<Subquery> subqueries = Lists.newArrayList();
+      whereClause_.collect(Subquery.class, subqueries);
+      for (Subquery sq: subqueries) {
+        sq.getStatement().collectTableRefs(tblRefs, fromClauseOnly);
       }
     }
   }

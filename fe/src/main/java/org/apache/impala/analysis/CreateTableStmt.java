@@ -182,6 +182,11 @@ public class CreateTableStmt extends StatementBase {
   }
 
   @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableDef_.getTblName().toPath(), null));
+  }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     owner_ = analyzer.getUser().getName();

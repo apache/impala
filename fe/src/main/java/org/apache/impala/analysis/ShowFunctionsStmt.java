@@ -21,6 +21,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.thrift.TShowFunctionsParams;
+
 import com.google.common.base.Preconditions;
 
 /**

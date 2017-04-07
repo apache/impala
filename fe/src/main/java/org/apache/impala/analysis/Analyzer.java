@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -30,13 +29,13 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
+import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizeableTable;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.authorization.User;
-import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.DatabaseNotFoundException;
@@ -44,6 +43,7 @@ import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
@@ -57,7 +57,6 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
-import org.apache.impala.rewrite.RemoveRedundantStringCast;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -66,6 +65,7 @@ import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeCountStarRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
+import org.apache.impala.rewrite.RemoveRedundantStringCast;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
 import org.apache.impala.service.FeSupport;
@@ -192,9 +192,6 @@ public class Analyzer {
   // a tuple is outer/semi joined, etc. Remove the maps in favor of making
   // them properties of the tuple descriptor itself.
   private static class GlobalState {
-    // TODO: Consider adding an "exec-env"-like global singleton that contains the
-    // catalog and authzConfig.
-    public final ImpaladCatalog catalog;
     public final TQueryCtx queryCtx;
     public final AuthorizationConfig authzConfig;
     public final DescriptorTable descTbl = new DescriptorTable();
@@ -302,10 +299,8 @@ public class Analyzer {
     // Decreases the size of the scan range locations.
     private final ListMap<TNetworkAddress> hostIndex = new ListMap<TNetworkAddress>();
 
-    // The Impalad Catalog has the latest tables from the statestore. In order to use the
-    // same version of a table in a single query, we cache all referenced tables here.
-    // TODO: Investigate what to do with other catalog objects.
-    private final HashMap<TableName, Table> referencedTables_ = Maps.newHashMap();
+    // Cache of statement-relevant table metadata populated before analysis.
+    private final StmtTableCache stmtTableCache;
 
     // Expr rewriter for folding constants.
     private final ExprRewriter constantFolder_ =
@@ -314,9 +309,9 @@ public class Analyzer {
     // Expr rewriter for normalizing and rewriting expressions.
     private final ExprRewriter exprRewriter_;
 
-    public GlobalState(ImpaladCatalog catalog, TQueryCtx queryCtx,
+    public GlobalState(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
         AuthorizationConfig authzConfig) {
-      this.catalog = catalog;
+      this.stmtTableCache = stmtTableCache;
       this.queryCtx = queryCtx;
       this.authzConfig = authzConfig;
       this.lineageGraph = new ColumnLineageGraph();
@@ -373,9 +368,6 @@ public class Analyzer {
   // that have a scalar type as destination (see registerSlotRef()).
   private final Map<String, SlotDescriptor> slotPathMap_ = Maps.newHashMap();
 
-  // Tracks the all tables/views found during analysis that were missing metadata.
-  private Set<TableName> missingTbls_ = new HashSet<TableName>();
-
   // Indicates whether this analyzer/block is guaranteed to have an empty result set
   // due to a limit 0 or constant conjunct evaluating to false.
   private boolean hasEmptyResultSet_ = false;
@@ -385,10 +377,10 @@ public class Analyzer {
   // conjunct evaluating to false.
   private boolean hasEmptySpjResultSet_ = false;
 
-  public Analyzer(ImpaladCatalog catalog, TQueryCtx queryCtx,
+  public Analyzer(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
       AuthorizationConfig authzConfig) {
     ancestors_ = Lists.newArrayList();
-    globalState_ = new GlobalState(catalog, queryCtx, authzConfig);
+    globalState_ = new GlobalState(stmtTableCache, queryCtx, authzConfig);
     user_ = new User(TSessionStateUtil.getEffectiveUser(queryCtx.session));
   }
 
@@ -407,7 +399,6 @@ public class Analyzer {
     ancestors_ = Lists.newArrayList(parentAnalyzer);
     ancestors_.addAll(parentAnalyzer.ancestors_);
     globalState_ = globalState;
-    missingTbls_ = parentAnalyzer.missingTbls_;
     user_ = parentAnalyzer.getUser();
     useHiveColLabels_ = parentAnalyzer.useHiveColLabels_;
     authErrorMsg_ = parentAnalyzer.authErrorMsg_;
@@ -421,7 +412,7 @@ public class Analyzer {
    * global state.
    */
   public static Analyzer createWithNewGlobalState(Analyzer parentAnalyzer) {
-    GlobalState globalState = new GlobalState(parentAnalyzer.globalState_.catalog,
+    GlobalState globalState = new GlobalState(parentAnalyzer.globalState_.stmtTableCache,
         parentAnalyzer.getQueryCtx(), parentAnalyzer.getAuthzConfig());
     return new Analyzer(parentAnalyzer, globalState);
   }
@@ -437,8 +428,6 @@ public class Analyzer {
     visibleSemiJoinedTupleId_ = tid;
   }
 
-  public Set<TableName> getMissingTbls() { return missingTbls_; }
-  public boolean hasMissingTbls() { return !missingTbls_.isEmpty(); }
   public boolean hasAncestors() { return !ancestors_.isEmpty(); }
   public Analyzer getParentAnalyzer() {
     return hasAncestors() ? ancestors_.get(0) : null;
@@ -575,19 +564,17 @@ public class Analyzer {
     try {
       resolvedPath = resolvePath(tableRef.getPath(), PathType.TABLE_REF);
     } catch (AnalysisException e) {
-      if (!hasMissingTbls()) {
-        // Register privilege requests to prefer reporting an authorization error over
-        // an analysis error. We should not accidentally reveal the non-existence of a
-        // table/database if the user is not authorized.
-        if (rawPath.size() > 1) {
-          registerPrivReq(new PrivilegeRequestBuilder()
-              .onTable(rawPath.get(0), rawPath.get(1))
-              .allOf(tableRef.getPrivilege()).toRequest());
-        }
+      // Register privilege requests to prefer reporting an authorization error over
+      // an analysis error. We should not accidentally reveal the non-existence of a
+      // table/database if the user is not authorized.
+      if (rawPath.size() > 1) {
         registerPrivReq(new PrivilegeRequestBuilder()
-            .onTable(getDefaultDb(), rawPath.get(0))
+            .onTable(rawPath.get(0), rawPath.get(1))
             .allOf(tableRef.getPrivilege()).toRequest());
       }
+      registerPrivReq(new PrivilegeRequestBuilder()
+          .onTable(getDefaultDb(), rawPath.get(0))
+          .allOf(tableRef.getPrivilege()).toRequest());
       throw e;
     } catch (TableLoadingException e) {
       throw new AnalysisException(String.format(
@@ -780,16 +767,14 @@ public class Analyzer {
       candidates.clear();
 
       // Add paths rooted at a table with an unqualified and fully-qualified table name.
-      int end = Math.min(2, rawPath.size());
-      for (int tblNameIdx = 0; tblNameIdx < end; ++tblNameIdx) {
-        String dbName = (tblNameIdx == 0) ? getDefaultDb() : rawPath.get(0);
-        String tblName = rawPath.get(tblNameIdx);
+      List<TableName> candidateTbls = Path.getCandidateTables(rawPath, getDefaultDb());
+      for (int tblNameIdx = 0; tblNameIdx < candidateTbls.size(); ++tblNameIdx) {
+        TableName tblName = candidateTbls.get(tblNameIdx);
         Table tbl = null;
         try {
-          tbl = getTable(dbName, tblName);
+          tbl = getTable(tblName.getDb(), tblName.getTbl());
         } catch (AnalysisException e) {
-          if (hasMissingTbls()) throw e;
-          // Ignore other exceptions to allow path resolution to continue.
+          // Ignore to allow path resolution to continue.
         }
         if (tbl != null) {
           candidates.add(new Path(tbl, rawPath.subList(tblNameIdx + 1, rawPath.size())));
@@ -1318,7 +1303,8 @@ public class Analyzer {
   }
 
   public DescriptorTable getDescTbl() { return globalState_.descTbl; }
-  public ImpaladCatalog getCatalog() { return globalState_.catalog; }
+  public ImpaladCatalog getCatalog() { return globalState_.stmtTableCache.catalog; }
+  public StmtTableCache getStmtTableCache() { return globalState_.stmtTableCache; }
   public Set<String> getAliases() { return aliasMap_.keySet(); }
 
   /**
@@ -2361,64 +2347,47 @@ public class Analyzer {
   }
 
   /**
-   * Returns the Catalog Table object for the given database and table name. A table
-   * referenced for the first time is cached in globalState_.referencedTables_. The same
-   * table instance is returned for all subsequent references in the same query.
-   * Adds the table to this analyzer's "missingTbls_" and throws an AnalysisException if
-   * the table has not yet been loaded in the local catalog cache.
-   * Throws an AnalysisException if the table or the db does not exist in the Catalog.
-   * This function does not register authorization requests and does not log access events.
+   * Returns the Table for the given database and table name from the 'stmtTableCache'
+   * in the global analysis state.
+   * Throws an AnalysisException if the database or table does not exist.
+   * Throws a TableLoadingException if the registered table failed to load.
+   * Does not register authorization requests or access events.
    */
   public Table getTable(String dbName, String tableName)
       throws AnalysisException, TableLoadingException {
     TableName tblName = new TableName(dbName, tableName);
-    Table table = globalState_.referencedTables_.get(tblName);
-    if (table != null) {
-      // Return query-local version of table.
-      Preconditions.checkState(table.isLoaded());
-      return table;
-    }
-    try {
-      table = getCatalog().getTable(dbName, tableName);
-    } catch (DatabaseNotFoundException e) {
-      throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
-    } catch (CatalogException e) {
-      String errMsg = String.format("Failed to load metadata for table: %s", tableName);
-      // We don't want to log all AnalysisExceptions as ERROR, only failures due to
-      // TableLoadingExceptions.
-      LOG.error(String.format("%s\n%s", errMsg, e.getMessage()));
-      if (e instanceof TableLoadingException) throw (TableLoadingException) e;
-      throw new TableLoadingException(errMsg, e);
-    }
+    Table table = globalState_.stmtTableCache.tables.get(tblName);
     if (table == null) {
-      throw new AnalysisException(
-          TBL_DOES_NOT_EXIST_ERROR_MSG + dbName + "." + tableName);
+      if (!globalState_.stmtTableCache.dbs.contains(tblName.getDb())) {
+        throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + tblName.getDb());
+      } else {
+        throw new AnalysisException(TBL_DOES_NOT_EXIST_ERROR_MSG + tblName.toString());
+      }
     }
-    if (!table.isLoaded()) {
-      missingTbls_.add(new TableName(table.getDb().getName(), table.getName()));
-      throw new AnalysisException(
-          "Table/view is missing metadata: " + table.getFullName());
+    Preconditions.checkState(table.isLoaded());
+    if (table instanceof IncompleteTable) {
+      // If there were problems loading this table's metadata, throw an exception
+      // when it is accessed.
+      ImpalaException cause = ((IncompleteTable) table).getCause();
+      if (cause instanceof TableLoadingException) throw (TableLoadingException) cause;
+      throw new TableLoadingException("Missing metadata for table: " + tableName, cause);
     }
-    globalState_.referencedTables_.put(tblName, table);
     return table;
   }
 
   /**
-   * Returns the Catalog Table object for the TableName.
-   * Adds the table to this analyzer's "missingTbls_" and throws an AnalysisException if
-   * the table has not yet been loaded in the local catalog cache.
-   * Throws an AnalysisException if the table or the db does not exist in the Catalog.
+   * Returns the Table with the given name from the 'loadedTables' map in the global
+   * analysis state. Throws an AnalysisException if the table or the db does not exist.
+   * Throws a TableLoadingException if the registered table failed to load.
    * Always registers a privilege request for the table at the given privilege level,
    * regardless of the state of the table (i.e. whether it exists, is loaded, etc.).
-   * If addAccessEvent is true, adds an access event if the catalog access succeeded.
+   * If addAccessEvent is true adds an access event for successfully loaded tables.
    */
   public Table getTable(TableName tableName, Privilege privilege, boolean addAccessEvent)
       throws AnalysisException, TableLoadingException {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilege);
-    Table table = null;
-    tableName = new TableName(getTargetDbName(tableName), tableName.getTbl());
-
+    tableName = getFqTableName(tableName);
     if (privilege == Privilege.ANY) {
       registerPrivReq(new PrivilegeRequestBuilder()
           .any().onAnyColumn(tableName.getDb(), tableName.getTbl()).toRequest());
@@ -2426,7 +2395,7 @@ public class Analyzer {
       registerPrivReq(new PrivilegeRequestBuilder()
           .allOf(privilege).onTable(tableName.getDb(), tableName.getTbl()).toRequest());
     }
-    table = getTable(tableName.getDb(), tableName.getTbl());
+    Table table = getTable(tableName.getDb(), tableName.getTbl());
     Preconditions.checkNotNull(table);
     if (addAccessEvent) {
       // Add an audit event for this access
@@ -2448,12 +2417,10 @@ public class Analyzer {
    */
   public Table getTable(TableName tableName, Privilege privilege)
       throws AnalysisException {
-    // This may trigger a metadata load, in which case we want to return the errors as
-    // AnalysisExceptions.
     try {
       return getTable(tableName, privilege, true);
     } catch (TableLoadingException e) {
-      throw new AnalysisException(e.getMessage(), e);
+      throw new AnalysisException(e);
     }
   }
 

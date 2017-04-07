@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import static org.junit.Assert.fail;
 
-import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.testutil.TestUtils;
@@ -67,22 +66,6 @@ public class ToSqlTest extends FrontendTestBase {
     }
   }
 
-  private static AnalysisContext.AnalysisResult analyze(String query, String defaultDb) {
-    try {
-      AnalysisContext analysisCtx = new AnalysisContext(catalog_,
-          TestUtils.createQueryContext(defaultDb, System.getProperty("user.name")),
-          AuthorizationConfig.createAuthDisabledConfig());
-      analysisCtx.analyze(query);
-      AnalysisContext.AnalysisResult analysisResult = analysisCtx.getAnalysisResult();
-      Preconditions.checkNotNull(analysisResult.getStmt());
-      return analysisResult;
-    } catch (Exception e) {
-      e.printStackTrace();
-      fail("Failed to analyze query: " + query + "\n" + e.getMessage());
-    }
-    return null;
-  }
-
   private void testToSql(String query, String expected) {
     testToSql(query, System.getProperty("user.name"), expected);
   }
@@ -95,7 +78,7 @@ public class ToSqlTest extends FrontendTestBase {
       boolean ignoreWhitespace) {
     String actual = null;
     try {
-      ParseNode node = AnalyzesOk(query, createAnalyzer(defaultDb));
+      ParseNode node = AnalyzesOk(query, createAnalysisCtx(defaultDb));
       actual = node.toSql();
       if (ignoreWhitespace) {
         // Transform whitespace to single space.
@@ -112,7 +95,7 @@ public class ToSqlTest extends FrontendTestBase {
       fail("Failed to analyze query: " + query + "\n" + e.getMessage());
     }
     // Parse and analyze the resulting SQL to ensure its validity.
-    AnalyzesOk(actual, createAnalyzer(defaultDb));
+    AnalyzesOk(actual, createAnalysisCtx(defaultDb));
   }
 
   private void runTestTemplate(String sql, String expectedSql, String[]... testDims) {
@@ -151,7 +134,7 @@ public class ToSqlTest extends FrontendTestBase {
     Preconditions.checkState(query.contains("$TBL"));
     String uqQuery = query.replace("$TBL", tbl.getTbl());
     testToSql(uqQuery, tbl.getDb(), expectedSql);
-    AnalyzesOk(uqQuery, createAnalyzer(tbl.getDb()));
+    AnalyzesOk(uqQuery, createAnalysisCtx(tbl.getDb()));
     String fqQuery = query.replace("$TBL", tbl.toString());
     testToSql(fqQuery, expectedSql);
   }

@@ -23,6 +23,7 @@ import java.util.ListIterator;
 import java.util.Set;
 
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.PlanRootSink;
@@ -95,6 +96,32 @@ public abstract class QueryStmt extends StatementBase {
     ambiguousAliasList_ = Lists.newArrayList();
   }
 
+  /**
+  * Returns all table references in the FROM clause of this statement and all statements
+  * nested within FROM clauses.
+  */
+  public void collectFromClauseTableRefs(List<TableRef> tblRefs) {
+    collectTableRefs(tblRefs, true);
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    collectTableRefs(tblRefs, false);
+  }
+
+  /**
+   * Helper for collectFromClauseTableRefs() and collectTableRefs().
+   * If 'fromClauseOnly' is true only collects table references in the FROM clause,
+   * otherwise all table references.
+   */
+  protected void collectTableRefs(List<TableRef> tblRefs, boolean fromClauseOnly) {
+    if (!fromClauseOnly && withClause_ != null) {
+      for (View v: withClause_.getViews()) {
+        v.getQueryStmt().collectTableRefs(tblRefs, fromClauseOnly);
+      }
+    }
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed()) return;
@@ -132,7 +159,7 @@ public abstract class QueryStmt extends StatementBase {
     Set<TupleId> tblRefIds = Sets.newHashSet();
 
     List<TableRef> tblRefs = Lists.newArrayList();
-    collectTableRefs(tblRefs);
+    collectTableRefs(tblRefs, true);
     for (TableRef tblRef: tblRefs) {
       if (absoluteRef == null && !tblRef.isRelative()) absoluteRef = tblRef;
       if (tblRef.isCorrelated()) {
@@ -338,12 +365,6 @@ public abstract class QueryStmt extends StatementBase {
    * producing logical (non-materialized) tuples. Re-think and clean up.
    */
   public abstract void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList);
-
-  /**
-   * Returns all physical (non-inline-view) TableRefs of this statement and the nested
-   * statements of inline views. The returned TableRefs are in depth-first order.
-   */
-  public abstract void collectTableRefs(List<TableRef> tblRefs);
 
   @Override
   public List<Expr> getResultExprs() { return resultExprs_; }

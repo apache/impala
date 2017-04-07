@@ -21,6 +21,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -118,9 +119,9 @@ class LimitElement {
    */
   private static long evalIntegerExpr(Analyzer analyzer, Expr expr, String name)
       throws AnalysisException {
-    // Check for slotrefs before analysis so we can provide a more helpful message than
-    // "Could not resolve column/field reference".
-    if (expr.contains(SlotRef.class)) {
+    // Check for slotrefs and subqueries before analysis so we can provide a more
+    // helpful error message.
+    if (expr.contains(SlotRef.class) || expr.contains(Subquery.class)) {
       throw new AnalysisException(name + " expression must be a constant expression: " +
           expr.toSql());
     }

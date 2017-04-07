@@ -187,6 +187,11 @@ public class ComputeStatsStmt extends StatementBase {
     }
   }
 
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
+  }
+
   /**
    * Returns a stmt for COMPUTE STATS. The optional 'sampleParams' indicates whether the
    * stats should be computed with table sampling.

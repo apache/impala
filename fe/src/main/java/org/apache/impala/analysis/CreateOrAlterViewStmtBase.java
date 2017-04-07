@@ -80,6 +80,12 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     this.viewDefStmt_ = viewDefStmt;
   }
 
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
+    viewDefStmt_.collectTableRefs(tblRefs);
+  }
+
   /**
    * Sets the originalViewDef and the expanded inlineViewDef based on viewDefStmt.
    * If columnDefs were given, checks that they do not contain duplicate column names

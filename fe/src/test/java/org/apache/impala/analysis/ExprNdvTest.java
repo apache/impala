@@ -17,9 +17,9 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.catalog.Catalog;
-import org.apache.impala.common.AnalysisException;
+import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.common.ImpalaException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -29,7 +29,7 @@ import org.junit.Test;
 public class ExprNdvTest extends FrontendTestBase {
 
   public void verifyNdv(String expr, long expectedNdv)
-      throws AnalysisException {
+      throws ImpalaException {
     String stmtStr = "select " + expr + " from functional.alltypes";
     verifyNdvStmt(stmtStr, expectedNdv);
   }
@@ -40,18 +40,17 @@ public class ExprNdvTest extends FrontendTestBase {
    * functional.tinytable (tiny) does not
    */
   public void verifyNdvTwoTable(String expr, long expectedNdv)
-      throws AnalysisException {
+      throws ImpalaException {
     String stmtStr = "select " + expr + " from functional.alltypes a, " +
                      "functional.tinytable tiny";
     verifyNdvStmt(stmtStr, expectedNdv);
   }
 
-  public void verifyNdvStmt(String stmtStr, long expectedNdv)
-      throws AnalysisException {
-    SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
-    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
-    stmt.analyze(analyzer);
-    Expr analyzedExpr = stmt.getSelectList().getItems().get(0).getExpr();
+  public void verifyNdvStmt(String stmt, long expectedNdv) throws ImpalaException {
+    AnalysisContext ctx = createAnalysisCtx();
+    AnalysisResult result = parseAndAnalyze(stmt, ctx);
+    SelectStmt parsedStmt = (SelectStmt) result.getStmt();
+    Expr analyzedExpr = parsedStmt.getSelectList().getItems().get(0).getExpr();
     long calculatedNdv = analyzedExpr.getNumDistinctValues();
     assertEquals(expectedNdv, calculatedNdv);
   }
@@ -66,7 +65,7 @@ public class ExprNdvTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestCaseExprBasic() throws AnalysisException {
+  public void TestCaseExprBasic() throws ImpalaException {
     // All constants tests
     verifyNdv("case when id = 1 then 'yes' else 'no' end", 2);
     verifyNdv("case when id = 1 then 'yes' " +
@@ -92,7 +91,7 @@ public class ExprNdvTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestCaseExprMissingStats() throws AnalysisException {
+  public void TestCaseExprMissingStats() throws ImpalaException {
 
     // Consts still work
     verifyNdvTwoTable("case when a.id = 1 then 'yes' " +

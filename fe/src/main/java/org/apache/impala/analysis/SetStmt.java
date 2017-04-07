@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.thrift.TSetQueryOptionRequest;
+
 import com.google.common.base.Preconditions;
 
 /**

@@ -19,12 +19,13 @@ package org.apache.impala.planner;
 
 import java.util.LinkedList;
 
-import org.apache.impala.analysis.AnalysisContext;
+import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.EventSequence;
 
 import com.google.common.collect.Lists;
 
@@ -56,14 +57,16 @@ public class PlannerContext {
   // Keeps track of subplan nesting. Maintained with push/popSubplan().
   private final LinkedList<SubplanNode> subplans_ = Lists.newLinkedList();
 
+  private final AnalysisResult analysisResult_;
+  private final EventSequence timeline_;
   private final TQueryCtx queryCtx_;
-  private final AnalysisContext.AnalysisResult analysisResult_;
   private final QueryStmt queryStmt_;
 
-  public PlannerContext (AnalysisContext.AnalysisResult analysisResult,
-      TQueryCtx queryCtx) {
+  public PlannerContext (AnalysisResult analysisResult, TQueryCtx queryCtx,
+      EventSequence timeline) {
     analysisResult_ = analysisResult;
     queryCtx_ = queryCtx;
+    timeline_ = timeline;
     if (isInsertOrCtas()) {
       queryStmt_ = analysisResult.getInsertStmt().getQueryStmt();
     } else if (analysisResult.isUpdateStmt()) {
@@ -78,7 +81,8 @@ public class PlannerContext {
   public QueryStmt getQueryStmt() { return queryStmt_; }
   public TQueryCtx getQueryCtx() { return queryCtx_; }
   public TQueryOptions getQueryOptions() { return getRootAnalyzer().getQueryOptions(); }
-  public AnalysisContext.AnalysisResult getAnalysisResult() { return analysisResult_; }
+  public AnalysisResult getAnalysisResult() { return analysisResult_; }
+  public EventSequence getTimeline() { return timeline_; }
   public Analyzer getRootAnalyzer() { return analysisResult_.getAnalyzer(); }
   public boolean isSingleNodeExec() { return getQueryOptions().num_nodes == 1; }
   public PlanNodeId getNextNodeId() { return nodeIdGenerator_.getNextId(); }

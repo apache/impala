@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -74,30 +75,23 @@ public class WithClause implements ParseNode {
     Analyzer withClauseAnalyzer = Analyzer.createWithNewGlobalState(analyzer);
     withClauseAnalyzer.setIsWithClause();
     if (analyzer.isExplain()) withClauseAnalyzer.setIsExplain();
-    try {
-      for (View view: views_) {
-        Analyzer viewAnalyzer = new Analyzer(withClauseAnalyzer);
-        view.getQueryStmt().analyze(viewAnalyzer);
-        // Register this view so that the next view can reference it.
-        withClauseAnalyzer.registerLocalView(view);
-      }
-      // Register all local views with the analyzer.
-      for (View localView: withClauseAnalyzer.getLocalViews().values()) {
-        analyzer.registerLocalView(localView);
-      }
-      // Record audit events because the resolved table references won't generate any
-      // when a view is referenced.
-      analyzer.getAccessEvents().addAll(withClauseAnalyzer.getAccessEvents());
+    for (View view: views_) {
+      Analyzer viewAnalyzer = new Analyzer(withClauseAnalyzer);
+      view.getQueryStmt().analyze(viewAnalyzer);
+      // Register this view so that the next view can reference it.
+      withClauseAnalyzer.registerLocalView(view);
+    }
+    // Register all local views with the analyzer.
+    for (View localView: withClauseAnalyzer.getLocalViews().values()) {
+      analyzer.registerLocalView(localView);
+    }
+    // Record audit events because the resolved table references won't generate any
+    // when a view is referenced.
+    analyzer.getAccessEvents().addAll(withClauseAnalyzer.getAccessEvents());
 
-      // Register all privilege requests made from the root analyzer.
-      for (PrivilegeRequest req: withClauseAnalyzer.getPrivilegeReqs()) {
-        analyzer.registerPrivReq(req);
-      }
-    } finally {
-      // Record missing tables in the original analyzer.
-      if (analyzer.isRootAnalyzer()) {
-        analyzer.getMissingTbls().addAll(withClauseAnalyzer.getMissingTbls());
-      }
+    // Register all privilege requests made from the root analyzer.
+    for (PrivilegeRequest req: withClauseAnalyzer.getPrivilegeReqs()) {
+      analyzer.registerPrivReq(req);
     }
   }
 

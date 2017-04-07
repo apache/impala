@@ -20,38 +20,28 @@ package org.apache.impala.service;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hive.service.rpc.thrift.TGetCatalogsReq;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
 import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
 import org.apache.hive.service.rpc.thrift.TGetInfoReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
-import org.junit.Test;
-import org.apache.impala.analysis.AuthorizationTest;
-import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.Db;
-import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.testutil.ImpaladTestCatalog;
-import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
-import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
+import org.junit.Test;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -205,15 +195,15 @@ public class FrontendTest extends FrontendTestBase {
       }
     }
 
-    // Make sure tables that can't be loaded don't result in errors in the GetTables
-    // request (see IMPALA-5579)
+    // IMPALA-5579: GetTables() should succeed and display the available information for
+    // tables that cannot be loaded.
     req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_TABLES;
     req.get_tables_req = new TGetTablesReq();
     req.get_tables_req.setSchemaName("functional");
     req.get_tables_req.setTableName("hive_index_tbl");
     resp = execMetadataOp(req);
-    assertEquals(0, resp.rows.size());
+    assertEquals(1, resp.rows.size());
   }
 
   @Test

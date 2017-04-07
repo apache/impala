@@ -27,6 +27,7 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -268,6 +269,28 @@ public class Path {
       Preconditions.checkState(t.isMapType());
       return CollectionStructType.createMapStructType((MapType) t);
     }
+  }
+
+  /**
+   * Returns a list of table names that might be referenced by the given path.
+   * The path must be non-empty.
+   *
+   * Examples: path -> result
+   * a -> [<sessionDb>.a]
+   * a.b -> [<sessionDb>.a, a.b]
+   * a.b.c -> [<sessionDb>.a, a.b]
+   * a.b.c... -> [<sessionDb>.a, a.b]
+   */
+  public static List<TableName> getCandidateTables(List<String> path, String sessionDb) {
+    Preconditions.checkArgument(path != null && !path.isEmpty());
+    List<TableName> result = Lists.newArrayList();
+    int end = Math.min(2, path.size());
+    for (int tblNameIdx = 0; tblNameIdx < end; ++tblNameIdx) {
+      String dbName = (tblNameIdx == 0) ? sessionDb : path.get(0);
+      String tblName = path.get(tblNameIdx);
+      result.add(new TableName(dbName, tblName));
+    }
+    return result;
   }
 
   public Table getRootTable() { return rootTable_; }

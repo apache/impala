@@ -17,10 +17,13 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TShowGrantRoleParams;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
@@ -57,6 +60,11 @@ public class ShowGrantRoleStmt extends AuthorizationStmt {
     sb.append(roleName_);
     if (privilegeSpec_ != null) sb.append(" " + privilegeSpec_.toSql());
     return sb.toString();
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    if (privilegeSpec_ != null) privilegeSpec_.collectTableRefs(tblRefs);
   }
 
   @Override

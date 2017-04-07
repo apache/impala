@@ -122,7 +122,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Parent/collection join requires the child to use an alias of the parent.
     AnalysisError(String.format(
         "select %s from allcomplextypes, %s", collectionField, collectionTable),
-        createAnalyzer("functional"),
+        createAnalysisCtx("functional"),
         String.format("Could not resolve table reference: '%s'", collectionTable));
     AnalysisError(String.format(
         "select %s from functional.allcomplextypes, %s",
@@ -315,7 +315,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select alltypes.smallint_col, functional.alltypes.int_col " +
         "from alltypes inner join functional.alltypes " +
         "on (alltypes.id = functional.alltypes.id)",
-        createAnalyzer("functional"),
+        createAnalysisCtx("functional"),
         "Duplicate table alias: 'functional.alltypes'");
   }
 
@@ -410,7 +410,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     }
     List<List<Integer>> expectedPaths = Lists.newArrayList(expectedAbsPaths);
     Assert.assertEquals("Mismatched absolute paths.", expectedPaths, actualAbsPaths);
-
   }
 
   /**
@@ -805,13 +804,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select 1 from a.a");
     AnalyzesOk("select 1 from a.a.a");
     AnalyzesOk("select 1 from a.a.a.a");
-    AnalyzesOk("select 1 from a", createAnalyzer("a"));
-    AnalyzesOk("select 1 from a.a.a.a", createAnalyzer("a"));
+    AnalyzesOk("select 1 from a", createAnalysisCtx("a"));
+    AnalyzesOk("select 1 from a.a.a.a", createAnalysisCtx("a"));
 
     // Table paths are ambiguous.
-    AnalysisError("select 1 from a.a", createAnalyzer("a"),
+    AnalysisError("select 1 from a.a", createAnalysisCtx("a"),
         "Table reference is ambiguous: 'a.a'");
-    AnalysisError("select 1 from a.a.a", createAnalyzer("a"),
+    AnalysisError("select 1 from a.a.a", createAnalysisCtx("a"),
         "Table reference is ambiguous: 'a.a.a'");
 
     // Ambiguous reference to registered table aliases.
@@ -1211,18 +1210,18 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // test auto-generated column labels by enforcing their use in inline views
     AnalyzesOk("select _c0, a, int_col, _c3 from " +
         "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
-        "from functional.alltypes) t", createAnalyzerUsingHiveColLabels());
+        "from functional.alltypes) t", createAnalysisCtxUsingHiveColLabels());
     // test auto-generated column labels in group by and order by
     AnalyzesOk("select _c0, count(a), count(int_col), _c3 from " +
         "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
         "from functional.alltypes) t group by _c0, _c3 order by _c0 limit 10",
-        createAnalyzerUsingHiveColLabels());
+        createAnalysisCtxUsingHiveColLabels());
     // test auto-generated column labels in multiple scopes
     AnalyzesOk("select x.front, x._c1, x._c2 from " +
         "(select y.back as front, y._c0 * 10, y._c2 + 2 from " +
         "(select int_col * 10, int_col as back, int_col + 2 from " +
         "functional.alltypestiny) y) x",
-        createAnalyzerUsingHiveColLabels());
+        createAnalysisCtxUsingHiveColLabels());
     // IMPALA-3537: Test that auto-generated column labels are only applied in
     // the appropriate child query blocks.
     SelectStmt colLabelsStmt =
@@ -1236,13 +1235,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "(select int_col * 2, id from functional.alltypes) a inner join " +
         "(select int_col + 6, id from functional.alltypes) b " +
         "on (a.id = b.id)",
-        createAnalyzerUsingHiveColLabels(),
+        createAnalysisCtxUsingHiveColLabels(),
         "Column/field reference is ambiguous: '_c0'");
     // auto-generated column doesn't exist
     AnalysisError("select _c0, a, _c2, _c3 from " +
         "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
         "from functional.alltypes) t",
-        createAnalyzerUsingHiveColLabels(),
+        createAnalysisCtxUsingHiveColLabels(),
         "Could not resolve column/field reference: '_c2'");
 
     // Regression test for IMPALA-984.
@@ -1332,7 +1331,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select cnt from functional.allcomplextypes, " +
         "(select count(1) cnt from functional.allcomplextypes) v");
     AnalyzesOk("select cnt from functional.allcomplextypes, " +
-        "(select count(1) cnt from allcomplextypes) v", createAnalyzer("functional"));
+        "(select count(1) cnt from allcomplextypes) v", createAnalysisCtx("functional"));
     // Illegal correlated reference.
     AnalysisError("select cnt from functional.allcomplextypes t, " +
         "(select count(1) cnt from t) v",
@@ -2843,19 +2842,19 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("with t1 as (select int_col x, bigint_col y from alltypes), " +
         "alltypes as (select x a, y b from t1)" +
         "select a, b from alltypes",
-        createAnalyzer("functional"));
+        createAnalysisCtx("functional"));
     // Recursion is prevented because of scoping rules. The inner 'complex_view'
     // refers to a view in the catalog.
     AnalyzesOk("with t1 as (select abc x, xyz y from complex_view), " +
         "complex_view as (select x a, y b from t1)" +
         "select a, b from complex_view",
-        createAnalyzer("functional"));
+        createAnalysisCtx("functional"));
     // Nested WITH clauses. Scoping prevents recursion.
     AnalyzesOk("with t1 as (with t1 as (select int_col x, bigint_col y from alltypes) " +
         "select x, y from t1), " +
         "alltypes as (select x a, y b from t1) " +
         "select a, b from alltypes",
-        createAnalyzer("functional"));
+        createAnalysisCtx("functional"));
     // Nested WITH clause inside a subquery.
     AnalyzesOk("with t1 as " +
         "(select * from (with t2 as (select * from functional.alltypes) " +
@@ -2928,7 +2927,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // The inner alltypes_view gets resolved to the catalog view.
     AnalyzesOk("with alltypes_view as (select int_col x from alltypes_view) " +
         "select x from alltypes_view",
-        createAnalyzer("functional"));
+        createAnalysisCtx("functional"));
     // The inner 't' is resolved to a non-existent base table.
     AnalysisError("with t as (select int_col x, bigint_col y from t1) " +
         "select x, y from t",
@@ -3381,7 +3380,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Unknown target DB
     AnalysisError("INSERT " + qualifier + " table UNKNOWNDB.alltypesnopart SELECT * " +
-        "from functional.alltypesnopart", "Database does not exist: UNKNOWNDB");
+        "from functional.alltypesnopart",
+        "Database does not exist: UNKNOWNDB");
   }
 
   /**

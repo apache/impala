@@ -35,13 +35,13 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TExprBatch;
 import org.apache.impala.thrift.TPrioritizeLoadRequest;
 import org.apache.impala.thrift.TPrioritizeLoadResponse;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultRow;
-import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolLookupResult;
 import org.apache.impala.thrift.TTable;
@@ -53,6 +53,7 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
 /**
@@ -263,9 +264,12 @@ public class FeSupport {
     return NativePrioritizeLoad(thriftReq);
   }
 
-  public static TStatus PrioritizeLoad(Set<TableName> tableNames)
+  public static void PrioritizeLoad(Set<TableName> tableNames)
       throws InternalException {
     Preconditions.checkNotNull(tableNames);
+
+    LOG.info(String.format("Requesting prioritized load of table(s): %s",
+        Joiner.on(", ").join(tableNames)));
 
     List<TCatalogObject> objectDescs = new ArrayList<TCatalogObject>(tableNames.size());
     for (TableName tableName: tableNames) {
@@ -286,7 +290,10 @@ public class FeSupport {
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
       TPrioritizeLoadResponse response = new TPrioritizeLoadResponse();
       deserializer.deserialize(response, result);
-      return response.getStatus();
+      if (response.getStatus().getStatus_code() != TErrorCode.OK) {
+        throw new InternalException("Error requesting prioritized load: " +
+            Joiner.on("\n").join(response.getStatus().getError_msgs()));
+      }
     } catch (TException e) {
       // this should never happen
       throw new InternalException("Error processing request: " + e.getMessage(), e);

@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
@@ -25,6 +27,7 @@ import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -39,8 +42,8 @@ public class ShowStatsStmt extends StatementBase {
   protected Table table_;
 
   public ShowStatsStmt(TableName tableName, TShowStatsOp op) {
-    this.op_ = op;
-    this.tableName_ = tableName;
+    op_ = Preconditions.checkNotNull(op);
+    tableName_ = Preconditions.checkNotNull(tableName);
   }
 
   @Override
@@ -61,6 +64,11 @@ public class ShowStatsStmt extends StatementBase {
       Preconditions.checkState(false);
       return "";
     }
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
   }
 
   @Override

@@ -23,6 +23,7 @@ import org.apache.impala.catalog.Role;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TPrivilege;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
@@ -76,6 +77,11 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
     sb.append(roleName_);
     if (isGrantPrivStmt_ && hasGrantOpt_) sb.append(" WITH GRANT OPTION");
     return sb.toString();
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    if (privilegeSpec_ != null) privilegeSpec_.collectTableRefs(tblRefs);
   }
 
   @Override

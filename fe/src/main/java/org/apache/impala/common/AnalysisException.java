@@ -29,4 +29,8 @@ public class AnalysisException extends ImpalaException {
   public AnalysisException(String msg) {
     super(msg);
   }
+
+  public AnalysisException(Throwable cause) {
+    super(cause);
+  }
 }

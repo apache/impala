@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.impala.analysis.AnalysisContext;
+import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.CreateTableStmt;
@@ -36,6 +37,9 @@ import org.apache.impala.analysis.ParseNode;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SqlParser;
 import org.apache.impala.analysis.SqlScanner;
+import org.apache.impala.analysis.StatementBase;
+import org.apache.impala.analysis.StmtMetadataLoader;
+import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Catalog;
@@ -44,7 +48,6 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.ScalarType;
@@ -58,6 +61,7 @@ import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.EventSequence;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -73,7 +77,7 @@ import com.google.common.collect.Lists;
  * as well as helper functions for creating test-local tables/views and UDF/UDAs.
  */
 public class FrontendTestBase {
-  protected static ImpaladCatalog catalog_ = new ImpaladTestCatalog();
+  protected static ImpaladTestCatalog catalog_ = new ImpaladTestCatalog();
   protected static Frontend frontend_ = new Frontend(
       AuthorizationConfig.createAuthDisabledConfig(), catalog_);
 
@@ -89,26 +93,6 @@ public class FrontendTestBase {
   @AfterClass
   public static void cleanUp() throws Exception {
     RuntimeEnv.INSTANCE.setTestEnv(false);
-  }
-
-  protected Analyzer createAnalyzer(String defaultDb) {
-    TQueryCtx queryCtx =
-        TestUtils.createQueryContext(defaultDb, System.getProperty("user.name"));
-    return new Analyzer(catalog_, queryCtx,
-        AuthorizationConfig.createAuthDisabledConfig());
-  }
-
-  protected Analyzer createAnalyzer(TQueryOptions queryOptions) {
-    TQueryCtx queryCtx = TestUtils.createQueryContext();
-    queryCtx.client_request.query_options = queryOptions;
-    return new Analyzer(catalog_, queryCtx,
-        AuthorizationConfig.createAuthDisabledConfig());
-  }
-
-  protected Analyzer createAnalyzerUsingHiveColLabels() {
-    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
-    analyzer.setUseHiveColLabels(true);
-    return analyzer;
   }
 
   // Adds a Udf: default.name(args) to the catalog.
@@ -292,7 +276,11 @@ public class FrontendTestBase {
    * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
    */
   public ParseNode AnalyzesOk(String stmt) {
-    return AnalyzesOk(stmt, createAnalyzer(Catalog.DEFAULT_DB), null);
+    return AnalyzesOk(stmt, createAnalysisCtx(), null);
+  }
+
+  public ParseNode AnalyzesOk(String stmt, AnalysisContext analysisCtx) {
+    return AnalyzesOk(stmt, analysisCtx, null);
   }
 
   /**
@@ -300,21 +288,56 @@ public class FrontendTestBase {
    * If 'expectedWarning' is not null, asserts that a warning is produced.
    */
   public ParseNode AnalyzesOk(String stmt, String expectedWarning) {
-    return AnalyzesOk(stmt, createAnalyzer(Catalog.DEFAULT_DB), expectedWarning);
+    return AnalyzesOk(stmt, createAnalysisCtx(), expectedWarning);
+  }
+
+  protected AnalysisContext createAnalysisCtx() {
+    return createAnalysisCtx(Catalog.DEFAULT_DB);
+  }
+
+  protected AnalysisContext createAnalysisCtx(String defaultDb) {
+    TQueryCtx queryCtx = TestUtils.createQueryContext(
+        defaultDb, System.getProperty("user.name"));
+    EventSequence timeline = new EventSequence("Frontend Test Timeline");
+    AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
+        AuthorizationConfig.createAuthDisabledConfig(), timeline);
+    return analysisCtx;
+  }
+
+  protected AnalysisContext createAnalysisCtx(TQueryOptions queryOptions) {
+    TQueryCtx queryCtx = TestUtils.createQueryContext();
+    queryCtx.client_request.query_options = queryOptions;
+    EventSequence timeline = new EventSequence("Frontend Test Timeline");
+    AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
+        AuthorizationConfig.createAuthDisabledConfig(), timeline);
+    return analysisCtx;
+  }
+
+  protected AnalysisContext createAnalysisCtx(AuthorizationConfig authzConfig) {
+    return createAnalysisCtx(authzConfig, System.getProperty("user.name"));
+  }
+
+  protected AnalysisContext createAnalysisCtx(AuthorizationConfig authzConfig,
+      String user) {
+    TQueryCtx queryCtx = TestUtils.createQueryContext(Catalog.DEFAULT_DB, user);
+    EventSequence timeline = new EventSequence("Frontend Test Timeline");
+    AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzConfig, timeline);
+    return analysisCtx;
+  }
+
+  protected AnalysisContext createAnalysisCtxUsingHiveColLabels() {
+    AnalysisContext analysisCtx = createAnalysisCtx();
+    analysisCtx.setUseHiveColLabels(true);
+    return analysisCtx;
   }
 
   /**
    * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
    * If 'expectedWarning' is not null, asserts that a warning is produced.
    */
-  public ParseNode AnalyzesOk(String stmt, Analyzer analyzer, String expectedWarning) {
+  public ParseNode AnalyzesOk(String stmt, AnalysisContext ctx, String expectedWarning) {
     try {
-      AnalysisContext analysisCtx = new AnalysisContext(catalog_,
-          TestUtils.createQueryContext(Catalog.DEFAULT_DB,
-            System.getProperty("user.name")),
-          AuthorizationConfig.createAuthDisabledConfig());
-      analysisCtx.analyze(stmt, analyzer);
-      AnalysisContext.AnalysisResult analysisResult = analysisCtx.getAnalysisResult();
+      AnalysisResult analysisResult = parseAndAnalyze(stmt, ctx);
       if (expectedWarning != null) {
         List<String> actualWarnings = analysisResult.getAnalyzer().getWarnings();
         boolean matchedWarning = false;
@@ -340,6 +363,19 @@ public class FrontendTestBase {
   }
 
   /**
+   * Analyzes the given statement without performing rewrites or authorization.
+   */
+  public StatementBase AnalyzesOkNoRewrite(StatementBase stmt) throws ImpalaException {
+    AnalysisContext ctx = createAnalysisCtx();
+    StmtMetadataLoader mdLoader =
+        new StmtMetadataLoader(frontend_, ctx.getQueryCtx().session.database, null);
+    StmtTableCache loadedTables = mdLoader.loadTables(stmt);
+    Analyzer analyzer = ctx.createAnalyzer(loadedTables);
+    stmt.analyze(analyzer);
+    return stmt;
+  }
+
+  /**
    * Asserts if stmt passes analysis.
    */
   public void AnalysisError(String stmt) {
@@ -347,33 +383,21 @@ public class FrontendTestBase {
   }
 
   /**
-   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
-   */
-  public ParseNode AnalyzesOk(String stmt, Analyzer analyzer) {
-    return AnalyzesOk(stmt, analyzer, null);
-  }
-
-  /**
    * Asserts if stmt passes analysis or the error string doesn't match and it
    * is non-null.
    */
   public void AnalysisError(String stmt, String expectedErrorString) {
-    AnalysisError(stmt, createAnalyzer(Catalog.DEFAULT_DB), expectedErrorString);
+    AnalysisError(stmt, createAnalysisCtx(), expectedErrorString);
   }
 
   /**
    * Asserts if stmt passes analysis or the error string doesn't match and it
    * is non-null.
    */
-  public void AnalysisError(String stmt, Analyzer analyzer, String expectedErrorString) {
+  public void AnalysisError(String stmt, AnalysisContext ctx, String expectedErrorString) {
     Preconditions.checkNotNull(expectedErrorString, "No expected error message given.");
     try {
-      AnalysisContext analysisCtx = new AnalysisContext(catalog_,
-          TestUtils.createQueryContext(Catalog.DEFAULT_DB,
-              System.getProperty("user.name")),
-              AuthorizationConfig.createAuthDisabledConfig());
-      analysisCtx.analyze(stmt, analyzer);
-      AnalysisContext.AnalysisResult analysisResult = analysisCtx.getAnalysisResult();
+      AnalysisResult analysisResult = parseAndAnalyze(stmt, ctx);
       Preconditions.checkNotNull(analysisResult.getStmt());
     } catch (Exception e) {
       String errorString = e.getMessage();
@@ -384,5 +408,19 @@ public class FrontendTestBase {
       return;
     }
     fail("Stmt didn't result in analysis error: " + stmt);
+  }
+
+  protected AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx)
+      throws ImpalaException {
+    return parseAndAnalyze(stmt, ctx, frontend_);
+  }
+
+  protected AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx, Frontend fe)
+      throws ImpalaException {
+    StatementBase parsedStmt = fe.parse(stmt);
+    StmtMetadataLoader mdLoader =
+        new StmtMetadataLoader(fe, ctx.getQueryCtx().session.database, null);
+    StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
+    return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache, fe.getAuthzChecker());
   }
 }

@@ -31,13 +31,12 @@ import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.AnalyticInfo;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BaseTableRef;
-import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.analysis.CollectionTableRef;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
-import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.InlineViewRef;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.NullLiteral;
@@ -48,12 +47,11 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TableRef;
-import org.apache.impala.analysis.TableSampleClause;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
-import org.apache.impala.analysis.UnionStmt.UnionOperand;
 import org.apache.impala.analysis.UnionStmt;
+import org.apache.impala.analysis.UnionStmt.UnionOperand;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.HBaseTable;
@@ -62,7 +60,6 @@ import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
@@ -129,7 +126,7 @@ public class SingleNodePlanner {
     // to detect empty result sets.
     Analyzer analyzer = queryStmt.getAnalyzer();
     analyzer.computeValueTransferGraph();
-    ctx_.getAnalysisResult().getTimeline().markEvent("Value transfer graph computed");
+    ctx_.getTimeline().markEvent("Value transfer graph computed");
 
     // Mark slots referenced by output exprs as materialized, prior to generating the
     // plan tree.
@@ -231,7 +228,7 @@ public class SingleNodePlanner {
    */
   private void unmarkCollectionSlots(QueryStmt stmt) {
     List<TableRef> tblRefs = Lists.newArrayList();
-    stmt.collectTableRefs(tblRefs);
+    stmt.collectFromClauseTableRefs(tblRefs);
     for (TableRef ref: tblRefs) {
       if (!ref.isRelative()) continue;
       Preconditions.checkState(ref instanceof CollectionTableRef);

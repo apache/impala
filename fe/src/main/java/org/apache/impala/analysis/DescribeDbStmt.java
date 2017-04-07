@@ -21,6 +21,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDescribeDbParams;
 import org.apache.impala.thrift.TDescribeOutputStyle;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 

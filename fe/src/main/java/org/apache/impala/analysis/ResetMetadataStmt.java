@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
@@ -76,6 +78,11 @@ public class ResetMetadataStmt extends StatementBase {
   }
 
   public TableName getTableName() { return tableName_; }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    if (tableName_ != null) tblRefs.add(new TableRef(tableName_.toPath(), null));
+  }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {

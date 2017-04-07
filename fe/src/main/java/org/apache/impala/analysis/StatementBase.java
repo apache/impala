@@ -31,7 +31,7 @@ import com.google.common.base.Preconditions;
 /**
  * Base class for all Impala SQL statements.
  */
-abstract class StatementBase implements ParseNode {
+public abstract class StatementBase implements ParseNode {
 
   // True if this Stmt is the top level of an explain stmt.
   protected boolean isExplain_ = false;
@@ -54,6 +54,13 @@ abstract class StatementBase implements ParseNode {
     analyzer_ = other.analyzer_;
     isExplain_ = other.isExplain_;
   }
+
+  /**
+   * Returns all table references in this statement and all its nested statements.
+   * The TableRefs are collected depth-first in SQL-clause order.
+   * Subclasses should override this method as necessary.
+   */
+  public void collectTableRefs(List<TableRef> tblRefs) { }
 
   /**
    * Analyzes the statement and throws an AnalysisException if analysis fails. A failure
