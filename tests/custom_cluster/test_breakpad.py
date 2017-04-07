@@ -37,6 +37,9 @@ class TestBreakpad(CustomClusterTestSuite):
   writing minidump files on unhandled signals and rotating old minidumps on startup. The
   tests kill the daemons by sending a SIGSEGV signal.
   """
+  # Limit for the number of minidumps that gets passed to the daemons as a startup flag.
+  MAX_MINIDUMPS = 2
+
   @classmethod
   def get_workload(cls):
     return 'functional-query'
@@ -77,10 +80,11 @@ class TestBreakpad(CustomClusterTestSuite):
     self._start_impala_cluster(cluster_options)
 
   def start_cluster(self):
-    self.start_cluster_with_args(minidump_path=self.tmp_dir, max_minidumps=2)
+    self.start_cluster_with_args(minidump_path=self.tmp_dir,
+                                 max_minidumps=self.MAX_MINIDUMPS)
 
   def start_cluster_without_minidumps(self):
-    self.start_cluster_with_args(minidump_path='', max_minidumps=2)
+    self.start_cluster_with_args(minidump_path='', max_minidumps=self.MAX_MINIDUMPS)
 
   def kill_cluster(self, signal):
     self.cluster.refresh()
@@ -139,6 +143,18 @@ class TestBreakpad(CustomClusterTestSuite):
   def count_all_minidumps(self, base_dir=None):
     return sum((self.count_minidumps(daemon, base_dir) for daemon in DAEMONS))
 
+  def assert_num_minidumps_for_all_daemons(self, base_dir=None):
+    self.assert_num_logfile_entries(1)
+    # IMPALA-3794 / Breakpad-681: Weak minidump ID generation can lead to name conflicts,
+    # so that one process overwrites the minidump of others. See IMPALA-3794 for more
+    # information.
+    # TODO: Change this here and elsewhere in this file to expect 'cluster_size' minidumps
+    # once Breakpad-681 has been fixed.
+    assert self.count_minidumps('impalad', base_dir) >= 1
+    assert self.count_minidumps('statestored', base_dir) == 1
+    assert self.count_minidumps('catalogd', base_dir) == 1
+
+
   def assert_num_logfile_entries(self, expected_count):
     self.assert_impalad_log_contains('INFO', 'Wrote minidump to ',
         expected_count=expected_count)
@@ -153,10 +169,7 @@ class TestBreakpad(CustomClusterTestSuite):
     assert self.count_all_minidumps() == 0
     cluster_size = self.get_num_processes('impalad')
     self.kill_cluster(SIGSEGV)
-    self.assert_num_logfile_entries(1)
-    assert self.count_minidumps('impalad') == cluster_size
-    assert self.count_minidumps('statestored') == 1
-    assert self.count_minidumps('catalogd') == 1
+    self.assert_num_minidumps_for_all_daemons()
 
   @pytest.mark.execute_serially
   def test_sigusr1_writes_minidump(self):
@@ -175,10 +188,7 @@ class TestBreakpad(CustomClusterTestSuite):
     self.execute_query_expect_success(client, "SELECT COUNT(*) FROM functional.alltypes")
     # Kill the cluster. Sending SIGKILL will not trigger minidumps to be written.
     self.kill_cluster(SIGKILL)
-    self.assert_num_logfile_entries(1)
-    assert self.count_minidumps('impalad') == cluster_size
-    assert self.count_minidumps('statestored') == 1
-    assert self.count_minidumps('catalogd') == 1
+    self.assert_num_minidumps_for_all_daemons()
 
   @pytest.mark.execute_serially
   def test_minidump_relative_path(self):
@@ -193,10 +203,7 @@ class TestBreakpad(CustomClusterTestSuite):
     assert self.count_all_minidumps(minidump_base_dir) == 0
     cluster_size = self.get_num_processes('impalad')
     self.kill_cluster(SIGSEGV)
-    self.assert_num_logfile_entries(1)
-    assert self.count_minidumps('impalad', minidump_base_dir) == cluster_size
-    assert self.count_minidumps('statestored', minidump_base_dir) == 1
-    assert self.count_minidumps('catalogd', minidump_base_dir) == 1
+    self.assert_num_minidumps_for_all_daemons(minidump_base_dir)
     shutil.rmtree(minidump_base_dir)
 
   @pytest.mark.execute_serially
@@ -207,7 +214,7 @@ class TestBreakpad(CustomClusterTestSuite):
     self.kill_cluster(SIGSEGV)
     self.assert_num_logfile_entries(1)
     self.start_cluster()
-    expected_impalads = min(self.get_num_processes('impalad'), 2)
+    expected_impalads = min(self.get_num_processes('impalad'), self.MAX_MINIDUMPS)
     assert self.count_minidumps('impalad') == expected_impalads
     assert self.count_minidumps('statestored') == 1
     assert self.count_minidumps('catalogd') == 1
