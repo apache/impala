@@ -705,6 +705,8 @@ class ImpalaShell(cmd.Cmd):
         self.prompt = self.DISCONNECTED_PROMPT
     except Exception, e:
       print_to_stderr("Error connecting: %s, %s" % (type(e).__name__, e))
+      # A secure connection may still be open. So we explicitly close it.
+      self.imp_client.close_connection()
       # If a connection to another impalad failed while already connected
       # reset the prompt to disconnected.
       self.server_version = self.UNKNOWN_SERVER_VERSION
