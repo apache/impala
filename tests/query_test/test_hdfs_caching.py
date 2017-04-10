@@ -189,7 +189,6 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_caching_ddl(self, vector):
-
     # Get the number of cache requests before starting the test
     num_entries_pre = get_num_cache_requests()
     self.run_test_case('QueryTest/hdfs-caching', vector)
@@ -204,7 +203,7 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     self.client.execute("drop table cachedb.cached_tbl_local")
 
     # Dropping the tables should cleanup cache entries leaving us with the same
-    # total number of entries
+    # total number of entries.
     assert num_entries_pre == get_num_cache_requests()
 
   @pytest.mark.execute_serially
@@ -300,7 +299,24 @@ def change_cache_directive_repl_for_path(path, repl):
       "Error modifying cache directive for path %s (%s, %s)" % (path, stdout, stderr)
 
 def get_num_cache_requests():
-  """Returns the number of outstanding cache requests"""
-  rc, stdout, stderr = exec_process("hdfs cacheadmin -listDirectives -stats")
-  assert rc == 0, 'Error executing hdfs cacheadmin: %s %s' % (stdout, stderr)
-  return len(stdout.split('\n'))
+  """Returns the number of outstanding cache requests. Due to race conditions in the
+    way cache requests are added/dropped/reported (see IMPALA-3040), this function tries
+    to return a stable result by making several attempts to stabilize it within a
+    reasonable timeout."""
+  def get_num_cache_requests_util():
+    rc, stdout, stderr = exec_process("hdfs cacheadmin -listDirectives -stats")
+    assert rc == 0, 'Error executing hdfs cacheadmin: %s %s' % (stdout, stderr)
+    return len(stdout.split('\n'))
+
+  wait_time_in_sec = 5
+  num_stabilization_attempts = 0
+  max_num_stabilization_attempts = 10
+  new_requests = None
+  num_requests = None
+  while num_stabilization_attempts < max_num_stabilization_attempts:
+    new_requests = get_num_cache_requests_util()
+    if new_requests == num_requests: break
+    num_requests = new_requests
+    num_stabilization_attempts = num_stabilization_attempts + 1
+    time.sleep(wait_time_in_sec)
+  return num_requests
