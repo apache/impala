@@ -1,0 +1,209 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="create_database"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>CREATE DATABASE Statement</title></head><body id="create_database"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">CREATE DATABASE Statement</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Creates a new database.
+    </p>
+
+    <p class="p">
+      In Impala, a database is both:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        A logical construct for grouping together related tables, views, and functions within their own namespace.
+        You might use a separate database for each application, set of related tables, or round of experimentation.
+      </li>
+
+      <li class="li">
+        A physical construct represented by a directory tree in HDFS. Tables (internal tables), partitions, and
+        data files are all located under this directory. You can perform HDFS-level operations such as backing it up and measuring space usage,
+        or remove it with a <code class="ph codeph">DROP DATABASE</code> statement.
+      </li>
+    </ul>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>CREATE (DATABASE|SCHEMA) [IF NOT EXISTS] <var class="keyword varname">database_name</var>[COMMENT '<var class="keyword varname">database_comment</var>']
+  [LOCATION <var class="keyword varname">hdfs_path</var>];</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Statement type:</strong> DDL
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      A database is physically represented as a directory in HDFS, with a filename extension <code class="ph codeph">.db</code>,
+      under the main Impala data directory. If the associated HDFS directory does not exist, it is created for you.
+      All databases and their associated directories are top-level objects, with no physical or logical nesting.
+    </p>
+
+    <p class="p">
+      After creating a database, to make it the current database within an <span class="keyword cmdname">impala-shell</span> session,
+      use the <code class="ph codeph">USE</code> statement. You can refer to tables in the current database without prepending
+      any qualifier to their names.
+    </p>
+
+    <p class="p">
+      When you first connect to Impala through <span class="keyword cmdname">impala-shell</span>, the database you start in (before
+      issuing any <code class="ph codeph">CREATE DATABASE</code> or <code class="ph codeph">USE</code> statements) is named
+      <code class="ph codeph">default</code>.
+    </p>
+
+    <div class="p">
+        Impala includes another predefined database, <code class="ph codeph">_impala_builtins</code>, that serves as the location
+        for the <a class="xref" href="../shared/../topics/impala_functions.html#builtins">built-in functions</a>. To see the built-in
+        functions, use a statement like the following:
+<pre class="pre codeblock"><code>show functions in _impala_builtins;
+show functions in _impala_builtins like '*<var class="keyword varname">substring</var>*';
+</code></pre>
+      </div>
+
+    <p class="p">
+      After creating a database, your <span class="keyword cmdname">impala-shell</span> session or another
+      <span class="keyword cmdname">impala-shell</span> connected to the same node can immediately access that database. To access
+      the database through the Impala daemon on a different node, issue the <code class="ph codeph">INVALIDATE METADATA</code>
+      statement first while connected to that other node.
+    </p>
+
+    <p class="p">
+      Setting the <code class="ph codeph">LOCATION</code> attribute for a new database is a way to work with sets of files in an
+      HDFS directory structure outside the default Impala data directory, as opposed to setting the
+      <code class="ph codeph">LOCATION</code> attribute for each individual table.
+    </p>
+
+    <p class="p">
+        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span> session for
+        load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query option to make each DDL
+        statement wait before returning, until the new or changed metadata has been received by all the Impala
+        nodes. See <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Hive considerations:</strong>
+      </p>
+
+    <p class="p">
+      When you create a database in Impala, the database can also be used by Hive.
+      When you create a database in Hive, issue an <code class="ph codeph">INVALIDATE METADATA</code>
+      statement in Impala to make Impala permanently aware of the new database.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">SHOW DATABASES</code> statement lists all databases, or the databases whose name
+      matches a wildcard pattern. <span class="ph">In <span class="keyword">Impala 2.5</span> and higher, the
+      <code class="ph codeph">SHOW DATABASES</code> output includes a second column that displays the associated
+      comment, if any, for each database.</span>
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Amazon S3 considerations:</strong>
+      </p>
+
+    <p class="p">
+      To specify that any tables created within a database reside on the Amazon S3 system,
+      you can include an <code class="ph codeph">s3a://</code> prefix on the <code class="ph codeph">LOCATION</code>
+      attribute. In <span class="keyword">Impala 2.6</span> and higher, Impala automatically creates any
+      required folders as the databases, tables, and partitions are created, and removes
+      them when they are dropped.
+    </p>
+
+    <p class="p">
+        In <span class="keyword">Impala 2.6</span> and higher, Impala DDL statements such as
+        <code class="ph codeph">CREATE DATABASE</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">DROP DATABASE CASCADE</code>,
+        <code class="ph codeph">DROP TABLE</code>, and <code class="ph codeph">ALTER TABLE [ADD|DROP] PARTITION</code> can create or remove folders
+        as needed in the Amazon S3 system. Prior to <span class="keyword">Impala 2.6</span>, you had to create folders yourself and point
+        Impala database, tables, or partitions at them, and manually remove folders when no longer needed.
+        See <a class="xref" href="../shared/../topics/impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">HDFS permissions:</strong>
+      </p>
+    <p class="p">
+      The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
+      typically the <code class="ph codeph">impala</code> user, must have write
+      permission for the parent HDFS directory under which the database
+      is located.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <pre class="pre codeblock"><code>create database first_db;
+use first_db;
+create table t1 (x int);
+
+create database second_db;
+use second_db;
+-- Each database has its own namespace for tables.
+-- You can reuse the same table names in each database.
+create table t1 (s string);
+
+create database temp;
+
+-- You can either USE a database after creating it,
+-- or qualify all references to the table name with the name of the database.
+-- Here, tables T2 and T3 are both created in the TEMP database.
+
+create table temp.t2 (x int, y int);
+use database temp;
+create table t3 (s string);
+
+-- You cannot drop a database while it is selected by the USE statement.
+drop database temp;
+<em class="ph i">ERROR: AnalysisException: Cannot drop current default database: temp</em>
+
+-- The always-available database 'default' is a convenient one to USE
+-- before dropping a database you created.
+use default;
+
+-- Before dropping a database, first drop all the tables inside it,
+<span class="ph">-- or in <span class="keyword">Impala 2.3</span> and higher use the CASCADE clause.</span>
+drop database temp;
+ERROR: ImpalaRuntimeException: Error making 'dropDatabase' RPC to Hive Metastore:
+CAUSED BY: InvalidOperationException: Database temp is not empty
+show tables in temp;
++------+
+| name |
++------+
+| t3   |
++------+
+
+<span class="ph">-- <span class="keyword">Impala 2.3</span> and higher:</span>
+<span class="ph">drop database temp cascade;</span>
+
+-- Earlier releases:
+drop table temp.t3;
+drop database temp;
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_databases.html#databases">Overview of Impala Databases</a>, <a class="xref" href="impala_drop_database.html#drop_database">DROP DATABASE Statement</a>,
+      <a class="xref" href="impala_use.html#use">USE Statement</a>, <a class="xref" href="impala_show.html#show_databases">SHOW DATABASES</a>,
+      <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a>
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

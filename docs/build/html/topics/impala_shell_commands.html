@@ -1,0 +1,392 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="shell_commands"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>impala-shell Command Reference</title></head><body id="shell_commands"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">impala-shell Command Reference</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Use the following commands within <code class="ph codeph">impala-shell</code> to pass requests to the
+      <code class="ph codeph">impalad</code> daemon that the shell is connected to. You can enter a command interactively at the
+      prompt, or pass it as the argument to the <code class="ph codeph">-q</code> option of <code class="ph codeph">impala-shell</code>. Most
+      of these commands are passed to the Impala daemon as SQL statements; refer to the corresponding
+      <a class="xref" href="impala_langref_sql.html#langref_sql">SQL language reference sections</a> for full syntax
+      details.
+    </p>
+
+    <table class="table"><caption></caption><colgroup><col style="width:20%"><col style="width:80%"></colgroup><thead class="thead">
+          <tr class="row">
+            <th class="entry nocellnorowborder" id="shell_commands__entry__1">
+              Command
+            </th>
+            <th class="entry nocellnorowborder" id="shell_commands__entry__2">
+              Explanation
+            </th>
+          </tr>
+        </thead><tbody class="tbody">
+          <tr class="row" id="shell_commands__alter_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">alter</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Changes the underlying structure or settings of an Impala table, or a table shared between Impala
+                and Hive. See <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a> and
+                <a class="xref" href="impala_alter_view.html#alter_view">ALTER VIEW Statement</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__compute_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">compute stats</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Gathers important performance-related information for a table, used by Impala to optimize queries.
+                See <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__connect_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">connect</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Connects to the specified instance of <code class="ph codeph">impalad</code>. The default port of 21000 is
+                assumed unless you provide another value. You can connect to any host in your cluster that is
+                running <code class="ph codeph">impalad</code>. If you connect to an instance of <code class="ph codeph">impalad</code> that
+                was started with an alternate port specified by the <code class="ph codeph">--fe_port</code> flag, you must
+                provide that alternate port. See <a class="xref" href="impala_connecting.html#connecting">Connecting to impalad through impala-shell</a> for examples.
+              </p>
+
+              <p class="p">
+        The <code class="ph codeph">SET</code> statement has no effect until the <span class="keyword cmdname">impala-shell</span> interpreter is
+        connected to an Impala server. Once you are connected, any query options you set remain in effect as you
+        issue a subsequent <code class="ph codeph">CONNECT</code> command to connect to a different Impala host.
+      </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__describe_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">describe</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Shows the columns, column data types, and any column comments for a specified table.
+                <code class="ph codeph">DESCRIBE FORMATTED</code> shows additional information such as the HDFS data directory,
+                partitions, and internal properties for the table. See <a class="xref" href="impala_describe.html#describe">DESCRIBE Statement</a>
+                for details about the basic <code class="ph codeph">DESCRIBE</code> output and the <code class="ph codeph">DESCRIBE
+                FORMATTED</code> variant. You can use <code class="ph codeph">DESC</code> as shorthand for the
+                <code class="ph codeph">DESCRIBE</code> command.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__drop_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">drop</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Removes a schema object, and in some cases its associated data files. See
+                <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a>, <a class="xref" href="impala_drop_view.html#drop_view">DROP VIEW Statement</a>,
+                <a class="xref" href="impala_drop_database.html#drop_database">DROP DATABASE Statement</a>, and
+                <a class="xref" href="impala_drop_function.html#drop_function">DROP FUNCTION Statement</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__explain_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">explain</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Provides the execution plan for a query. <code class="ph codeph">EXPLAIN</code> represents a query as a series of
+                steps. For example, these steps might be map/reduce stages, metastore operations, or file system
+                operations such as move or rename. See <a class="xref" href="impala_explain.html#explain">EXPLAIN Statement</a> and
+                <a class="xref" href="impala_explain_plan.html#perf_explain">Using the EXPLAIN Plan for Performance Tuning</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__help_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">help</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Help provides a list of all available commands and options.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__history_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">history</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Maintains an enumerated cross-session command history. This history is stored in the
+                <span class="ph filepath">~/.impalahistory</span> file.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__insert_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">insert</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Writes the results of a query to a specified table. This either overwrites table data or appends
+                data to the existing table content. See <a class="xref" href="impala_insert.html#insert">INSERT Statement</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__invalidate_metadata_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">invalidate metadata</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Updates <span class="keyword cmdname">impalad</span> metadata for table existence and structure. Use this command
+                after creating, dropping, or altering databases, tables, or partitions in Hive. See
+                <a class="xref" href="impala_invalidate_metadata.html#invalidate_metadata">INVALIDATE METADATA Statement</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__profile_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">profile</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Displays low-level information about the most recent query. Used for performance diagnosis and
+                tuning. <span class="ph"> The report starts with the same information as produced by the
+                <code class="ph codeph">EXPLAIN</code> statement and the <code class="ph codeph">SUMMARY</code> command.</span> See
+                <a class="xref" href="impala_explain_plan.html#perf_profile">Using the Query Profile for Performance Tuning</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__quit_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">quit</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Exits the shell. Remember to include the final semicolon so that the shell recognizes the end of
+                the command.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__refresh_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">refresh</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Refreshes <span class="keyword cmdname">impalad</span> metadata for the locations of HDFS blocks corresponding to
+                Impala data files. Use this command after loading new data files into an Impala table through Hive
+                or through HDFS commands. See <a class="xref" href="impala_refresh.html#refresh">REFRESH Statement</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__select_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">select</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Specifies the data set on which to complete some action. All information returned from
+                <code class="ph codeph">select</code> can be sent to some output such as the console or a file or can be used to
+                complete some other element of query. See <a class="xref" href="impala_select.html#select">SELECT Statement</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__set_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">set</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Manages query options for an <span class="keyword cmdname">impala-shell</span> session. The available options are the
+                ones listed in <a class="xref" href="impala_query_options.html#query_options">Query Options for the SET Statement</a>. These options are used for
+                query tuning and troubleshooting. Issue <code class="ph codeph">SET</code> with no arguments to see the current
+                query options, either based on the <span class="keyword cmdname">impalad</span> defaults, as specified by you at
+                <span class="keyword cmdname">impalad</span> startup, or based on earlier <code class="ph codeph">SET</code> statements in the same
+                session. To modify option values, issue commands with the syntax <code class="ph codeph">set
+                <var class="keyword varname">option</var>=<var class="keyword varname">value</var></code>. To restore an option to its default,
+                use the <code class="ph codeph">unset</code> command. Some options take Boolean values of <code class="ph codeph">true</code>
+                and <code class="ph codeph">false</code>. Others take numeric arguments, or quoted string values.
+              </p>
+
+              <p class="p">
+        The <code class="ph codeph">SET</code> statement has no effect until the <span class="keyword cmdname">impala-shell</span> interpreter is
+        connected to an Impala server. Once you are connected, any query options you set remain in effect as you
+        issue a subsequent <code class="ph codeph">CONNECT</code> command to connect to a different Impala host.
+      </p>
+
+              <p class="p">
+                In Impala 2.0 and later, <code class="ph codeph">SET</code> is available as a SQL statement for any kind of
+                application, not only through <span class="keyword cmdname">impala-shell</span>. See
+                <a class="xref" href="impala_set.html#set">SET Statement</a> for details.
+              </p>
+
+              <p class="p">
+                In Impala 2.5 and later, you can use <code class="ph codeph">SET</code> to define your own substitution variables
+                within an <span class="keyword cmdname">impala-shell</span> session.
+                Within a SQL statement, you substitute the value by using the notation <code class="ph codeph">${var:<var class="keyword varname">variable_name</var>}</code>.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__shell_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">shell</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Executes the specified command in the operating system shell without exiting
+                <code class="ph codeph">impala-shell</code>. You can use the <code class="ph codeph">!</code> character as shorthand for the
+                <code class="ph codeph">shell</code> command.
+              </p>
+
+              <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+                Quote any instances of the <code class="ph codeph">--</code> or <code class="ph codeph">/*</code> tokens to avoid them being
+                interpreted as the start of a comment. To embed comments within <code class="ph codeph">source</code> or
+                <code class="ph codeph">!</code> commands, use the shell comment character <code class="ph codeph">#</code> before the comment
+                portion of the line.
+              </div>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__show_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">show</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Displays metastore data for schema objects created and accessed through Impala, Hive, or both.
+                <code class="ph codeph">show</code> can be used to gather information about objects such as databases, tables, and functions.
+                See <a class="xref" href="impala_show.html#show">SHOW Statement</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__source_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">source</code> or <code class="ph codeph">src</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Executes one or more statements residing in a specified file from the local filesystem.
+                Allows you to perform the same kinds of batch operations as with the <code class="ph codeph">-f</code> option,
+                but interactively within the interpreter. The file can contain SQL statements and other
+                <span class="keyword cmdname">impala-shell</span> commands, including additional <code class="ph codeph">SOURCE</code> commands
+                to perform a flexible sequence of actions. Each command or statement, except the last one in the file,
+                must end with a semicolon.
+                See <a class="xref" href="impala_shell_running_commands.html#shell_running_commands">Running Commands and SQL Statements in impala-shell</a> for examples.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__summary_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">summary</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Summarizes the work performed in various stages of a query. It provides a higher-level view of the
+                information displayed by the <code class="ph codeph">EXPLAIN</code> command. Added in Impala 1.4.0. See
+                <a class="xref" href="impala_explain_plan.html#perf_summary">Using the SUMMARY Report for Performance Tuning</a> for details about the report format
+                and how to interpret it.
+              </p>
+              <p class="p">
+                In <span class="keyword">Impala 2.3</span> and higher, you can see a continuously updated report of
+                the summary information while a query is in progress.
+                See <a class="xref" href="impala_live_summary.html#live_summary">LIVE_SUMMARY Query Option (Impala 2.3 or higher only)</a> for details.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__unset_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">unset</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Removes any user-specified value for a query option and returns the option to its default value.
+                See <a class="xref" href="impala_query_options.html#query_options">Query Options for the SET Statement</a> for the available query options.
+              </p>
+              <p class="p">
+                In <span class="keyword">Impala 2.5</span> and higher, it can also remove user-specified substitution variables
+                using the notation <code class="ph codeph">UNSET VAR:<var class="keyword varname">variable_name</var></code>.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__use_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">use</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Indicates the database against which to execute subsequent commands. Lets you avoid using fully
+                qualified names when referring to tables in databases other than <code class="ph codeph">default</code>. See
+                <a class="xref" href="impala_use.html#use">USE Statement</a> for details. Not effective with the <code class="ph codeph">-q</code> option,
+                because that option only allows a single statement in the argument.
+              </p>
+            </td>
+          </tr>
+          <tr class="row" id="shell_commands__version_cmd">
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__1 ">
+              <p class="p">
+                <code class="ph codeph">version</code>
+              </p>
+            </td>
+            <td class="entry nocellnorowborder" headers="shell_commands__entry__2 ">
+              <p class="p">
+                Returns Impala version information.
+              </p>
+            </td>
+          </tr>
+        </tbody></table>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_impala_shell.html">Using the Impala Shell (impala-shell Command)</a></div></div></nav></article></main></body></html>

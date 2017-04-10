@@ -1,0 +1,558 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="compute_stats"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>COMPUTE STATS Statement</title></head><body id="compute_stats"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">COMPUTE STATS Statement</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Gathers information about volume and distribution of data in a table and all associated columns and
+      partitions. The information is stored in the metastore database, and used by Impala to help optimize queries.
+      For example, if Impala can determine that a table is large or small, or has many or few distinct values it
+      can organize parallelize the work appropriately for a join query or insert operation. For details about the
+      kinds of information gathered by this statement, see <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>COMPUTE STATS [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
+COMPUTE INCREMENTAL STATS [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var> [PARTITION (<var class="keyword varname">partition_spec</var>)]
+
+<var class="keyword varname">partition_spec</var> ::= <var class="keyword varname">simple_partition_spec</var> | <span class="ph"><var class="keyword varname">complex_partition_spec</var></span>
+
+<var class="keyword varname">simple_partition_spec</var> ::= <var class="keyword varname">partition_col</var>=<var class="keyword varname">constant_value</var>
+
+<span class="ph"><var class="keyword varname">complex_partition_spec</var> ::= <var class="keyword varname">comparison_expression_on_partition_col</var></span>
+</code></pre>
+
+    <p class="p">
+        The <code class="ph codeph">PARTITION</code> clause is only allowed in combination with the <code class="ph codeph">INCREMENTAL</code>
+        clause. It is optional for <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, and required for <code class="ph codeph">DROP
+        INCREMENTAL STATS</code>. Whenever you specify partitions through the <code class="ph codeph">PARTITION
+        (<var class="keyword varname">partition_spec</var>)</code> clause in a <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> or
+        <code class="ph codeph">DROP INCREMENTAL STATS</code> statement, you must include all the partitioning columns in the
+        specification, and specify constant values for all the partition key columns.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      Originally, Impala relied on users to run the Hive <code class="ph codeph">ANALYZE TABLE</code> statement, but that method
+      of gathering statistics proved unreliable and difficult to use. The Impala <code class="ph codeph">COMPUTE STATS</code>
+      statement is built from the ground up to improve the reliability and user-friendliness of this operation.
+      <code class="ph codeph">COMPUTE STATS</code> does not require any setup steps or special configuration. You only run a
+      single Impala <code class="ph codeph">COMPUTE STATS</code> statement to gather both table and column statistics, rather
+      than separate Hive <code class="ph codeph">ANALYZE TABLE</code> statements for each kind of statistics.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> variation is a shortcut for partitioned tables that works on a
+      subset of partitions rather than the entire table. The incremental nature makes it suitable for large tables
+      with many partitions, where a full <code class="ph codeph">COMPUTE STATS</code> operation takes too long to be practical
+      each time a partition is added or dropped. See <a class="xref" href="impala_perf_stats.html#perf_stats_incremental">Overview of Incremental Statistics</a>
+      for full usage details.
+    </p>
+
+    <p class="p">
+      <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> only applies to partitioned tables. If you use the
+      <code class="ph codeph">INCREMENTAL</code> clause for an unpartitioned table, Impala automatically uses the original
+      <code class="ph codeph">COMPUTE STATS</code> statement. Such tables display <code class="ph codeph">false</code> under the
+      <code class="ph codeph">Incremental stats</code> column of the <code class="ph codeph">SHOW TABLE STATS</code> output.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      Because many of the most performance-critical and resource-intensive operations rely on table and column
+      statistics to construct accurate and efficient plans, <code class="ph codeph">COMPUTE STATS</code> is an important step at
+      the end of your ETL process. Run <code class="ph codeph">COMPUTE STATS</code> on all tables as your first step during
+      performance tuning for slow queries, or troubleshooting for out-of-memory conditions:
+      <ul class="ul">
+        <li class="li">
+          Accurate statistics help Impala construct an efficient query plan for join queries, improving performance
+          and reducing memory usage.
+        </li>
+
+        <li class="li">
+          Accurate statistics help Impala distribute the work effectively for insert operations into Parquet
+          tables, improving performance and reducing memory usage.
+        </li>
+
+        <li class="li">
+          Accurate statistics help Impala estimate the memory required for each query, which is important when you
+          use resource management features, such as admission control and the YARN resource management framework.
+          The statistics help Impala to achieve high concurrency, full utilization of available memory, and avoid
+          contention with workloads from other Hadoop components.
+        </li>
+        <li class="li">
+          In <span class="keyword">Impala 2.8</span> and higher, when you run the
+          <code class="ph codeph">COMPUTE STATS</code> or <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
+          statement against a Parquet table, Impala automatically applies the query
+          option setting <code class="ph codeph">MT_DOP=4</code> to increase the amount of intra-node
+          parallelism during this CPU-intensive operation. See <a class="xref" href="impala_mt_dop.html">MT_DOP Query Option</a>
+          for details about what this query option does and how to use it with
+          CPU-intensive <code class="ph codeph">SELECT</code> statements.
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+      <strong class="ph b">Computing stats for groups of partitions:</strong>
+    </p>
+
+    <p class="p">
+      In <span class="keyword">Impala 2.8</span> and higher, you can run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
+      on multiple partitions, instead of the entire table or one partition at a time. You include
+      comparison operators other than <code class="ph codeph">=</code> in the <code class="ph codeph">PARTITION</code> clause,
+      and the <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> statement applies to all partitions that
+      match the comparison expression.
+    </p>
+
+    <p class="p">
+      For example, the <code class="ph codeph">INT_PARTITIONS</code> table contains 4 partitions.
+      The following <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> statements affect some but not all
+      partitions, as indicated by the <code class="ph codeph">Updated <var class="keyword varname">n</var> partition(s)</code>
+      messages. The partitions that are affected depend on values in the partition key column <code class="ph codeph">X</code>
+      that match the comparison expression in the <code class="ph codeph">PARTITION</code> clause.
+    </p>
+
+<pre class="pre codeblock"><code>
+show partitions int_partitions;
++-------+-------+--------+------+--------------+-------------------+---------+...
+| x     | #Rows | #Files | Size | Bytes Cached | Cache Replication | Format  |...
++-------+-------+--------+------+--------------+-------------------+---------+...
+| 99    | -1    | 0      | 0B   | NOT CACHED   | NOT CACHED        | PARQUET |...
+| 120   | -1    | 0      | 0B   | NOT CACHED   | NOT CACHED        | TEXT    |...
+| 150   | -1    | 0      | 0B   | NOT CACHED   | NOT CACHED        | TEXT    |...
+| 200   | -1    | 0      | 0B   | NOT CACHED   | NOT CACHED        | TEXT    |...
+| Total | -1    | 0      | 0B   | 0B           |                   |         |...
++-------+-------+--------+------+--------------+-------------------+---------+...
+
+compute incremental stats int_partitions partition (x &lt; 100);
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 1 column(s). |
++-----------------------------------------+
+
+compute incremental stats int_partitions partition (x in (100, 150, 200));
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 2 partition(s) and 1 column(s). |
++-----------------------------------------+
+
+compute incremental stats int_partitions partition (x between 100 and 175);
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 2 partition(s) and 1 column(s). |
++-----------------------------------------+
+
+compute incremental stats int_partitions partition (x in (100, 150, 200) or x &lt; 100);
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 3 partition(s) and 1 column(s). |
++-----------------------------------------+
+
+compute incremental stats int_partitions partition (x != 150);
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 3 partition(s) and 1 column(s). |
++-----------------------------------------+
+
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+    <p class="p">
+      Currently, the statistics created by the <code class="ph codeph">COMPUTE STATS</code> statement do not include
+      information about complex type columns. The column stats metrics for complex columns are always shown
+      as -1. For queries involving complex type columns, Impala uses
+      heuristics to estimate the data distribution within such columns.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">HBase considerations:</strong>
+      </p>
+
+    <p class="p">
+      <code class="ph codeph">COMPUTE STATS</code> works for HBase tables also. The statistics gathered for HBase tables are
+      somewhat different than for HDFS-backed tables, but that metadata is still used for optimization when HBase
+      tables are involved in join queries.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Amazon S3 considerations:</strong>
+      </p>
+
+    <p class="p">
+      <code class="ph codeph">COMPUTE STATS</code> also works for tables where data resides in the Amazon Simple Storage Service (S3).
+      See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Performance considerations:</strong>
+      </p>
+
+    <p class="p">
+      The statistics collected by <code class="ph codeph">COMPUTE STATS</code> are used to optimize join queries
+      <code class="ph codeph">INSERT</code> operations into Parquet tables, and other resource-intensive kinds of SQL statements.
+      See <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a> for details.
+    </p>
+
+    <p class="p">
+      For large tables, the <code class="ph codeph">COMPUTE STATS</code> statement itself might take a long time and you
+      might need to tune its performance. The <code class="ph codeph">COMPUTE STATS</code> statement does not work with the
+      <code class="ph codeph">EXPLAIN</code> statement, or the <code class="ph codeph">SUMMARY</code> command in <span class="keyword cmdname">impala-shell</span>.
+      You can use the <code class="ph codeph">PROFILE</code> statement in <span class="keyword cmdname">impala-shell</span> to examine timing information
+      for the statement as a whole. If a basic <code class="ph codeph">COMPUTE STATS</code> statement takes a long time for a
+      partitioned table, consider switching to the <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> syntax so that only
+      newly added partitions are analyzed each time.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      This example shows two tables, <code class="ph codeph">T1</code> and <code class="ph codeph">T2</code>, with a small number distinct
+      values linked by a parent-child relationship between <code class="ph codeph">T1.ID</code> and <code class="ph codeph">T2.PARENT</code>.
+      <code class="ph codeph">T1</code> is tiny, while <code class="ph codeph">T2</code> has approximately 100K rows. Initially, the statistics
+      includes physical measurements such as the number of files, the total size, and size measurements for
+      fixed-length columns such as with the <code class="ph codeph">INT</code> type. Unknown values are represented by -1. After
+      running <code class="ph codeph">COMPUTE STATS</code> for each table, much more information is available through the
+      <code class="ph codeph">SHOW STATS</code> statements. If you were running a join query involving both of these tables, you
+      would need statistics for both tables to get the most effective optimization for the query.
+    </p>
+
+
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; show table stats t1;
+Query: show table stats t1
++-------+--------+------+--------+
+| #Rows | #Files | Size | Format |
++-------+--------+------+--------+
+| -1    | 1      | 33B  | TEXT   |
++-------+--------+------+--------+
+Returned 1 row(s) in 0.02s
+[localhost:21000] &gt; show table stats t2;
+Query: show table stats t2
++-------+--------+----------+--------+
+| #Rows | #Files | Size     | Format |
++-------+--------+----------+--------+
+| -1    | 28     | 960.00KB | TEXT   |
++-------+--------+----------+--------+
+Returned 1 row(s) in 0.01s
+[localhost:21000] &gt; show column stats t1;
+Query: show column stats t1
++--------+--------+------------------+--------+----------+----------+
+| Column | Type   | #Distinct Values | #Nulls | Max Size | Avg Size |
++--------+--------+------------------+--------+----------+----------+
+| id     | INT    | -1               | -1     | 4        | 4        |
+| s      | STRING | -1               | -1     | -1       | -1       |
++--------+--------+------------------+--------+----------+----------+
+Returned 2 row(s) in 1.71s
+[localhost:21000] &gt; show column stats t2;
+Query: show column stats t2
++--------+--------+------------------+--------+----------+----------+
+| Column | Type   | #Distinct Values | #Nulls | Max Size | Avg Size |
++--------+--------+------------------+--------+----------+----------+
+| parent | INT    | -1               | -1     | 4        | 4        |
+| s      | STRING | -1               | -1     | -1       | -1       |
++--------+--------+------------------+--------+----------+----------+
+Returned 2 row(s) in 0.01s
+[localhost:21000] &gt; compute stats t1;
+Query: compute stats t1
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 2 column(s). |
++-----------------------------------------+
+Returned 1 row(s) in 5.30s
+[localhost:21000] &gt; show table stats t1;
+Query: show table stats t1
++-------+--------+------+--------+
+| #Rows | #Files | Size | Format |
++-------+--------+------+--------+
+| 3     | 1      | 33B  | TEXT   |
++-------+--------+------+--------+
+Returned 1 row(s) in 0.01s
+[localhost:21000] &gt; show column stats t1;
+Query: show column stats t1
++--------+--------+------------------+--------+----------+----------+
+| Column | Type   | #Distinct Values | #Nulls | Max Size | Avg Size |
++--------+--------+------------------+--------+----------+----------+
+| id     | INT    | 3                | -1     | 4        | 4        |
+| s      | STRING | 3                | -1     | -1       | -1       |
++--------+--------+------------------+--------+----------+----------+
+Returned 2 row(s) in 0.02s
+[localhost:21000] &gt; compute stats t2;
+Query: compute stats t2
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 2 column(s). |
++-----------------------------------------+
+Returned 1 row(s) in 5.70s
+[localhost:21000] &gt; show table stats t2;
+Query: show table stats t2
++-------+--------+----------+--------+
+| #Rows | #Files | Size     | Format |
++-------+--------+----------+--------+
+| 98304 | 1      | 960.00KB | TEXT   |
++-------+--------+----------+--------+
+Returned 1 row(s) in 0.03s
+[localhost:21000] &gt; show column stats t2;
+Query: show column stats t2
++--------+--------+------------------+--------+----------+----------+
+| Column | Type   | #Distinct Values | #Nulls | Max Size | Avg Size |
++--------+--------+------------------+--------+----------+----------+
+| parent | INT    | 3                | -1     | 4        | 4        |
+| s      | STRING | 6                | -1     | 14       | 9.3      |
++--------+--------+------------------+--------+----------+----------+
+Returned 2 row(s) in 0.01s</code></pre>
+
+    <p class="p">
+      The following example shows how to use the <code class="ph codeph">INCREMENTAL</code> clause, available in Impala 2.1.0 and
+      higher. The <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> syntax lets you collect statistics for newly added or
+      changed partitions, without rescanning the entire table.
+    </p>
+
+<pre class="pre codeblock"><code>-- Initially the table has no incremental stats, as indicated
+-- by -1 under #Rows and false under Incremental stats.
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | -1    | 1      | 223.74KB | NOT CACHED   | PARQUET | false
+| Children    | -1    | 1      | 230.05KB | NOT CACHED   | PARQUET | false
+| Electronics | -1    | 1      | 232.67KB | NOT CACHED   | PARQUET | false
+| Home        | -1    | 1      | 232.56KB | NOT CACHED   | PARQUET | false
+| Jewelry     | -1    | 1      | 223.72KB | NOT CACHED   | PARQUET | false
+| Men         | -1    | 1      | 231.25KB | NOT CACHED   | PARQUET | false
+| Music       | -1    | 1      | 237.90KB | NOT CACHED   | PARQUET | false
+| Shoes       | -1    | 1      | 234.90KB | NOT CACHED   | PARQUET | false
+| Sports      | -1    | 1      | 227.97KB | NOT CACHED   | PARQUET | false
+| Women       | -1    | 1      | 226.27KB | NOT CACHED   | PARQUET | false
+| Total       | -1    | 10     | 2.25MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+
+-- After the first COMPUTE INCREMENTAL STATS,
+-- all partitions have stats.
+compute incremental stats item_partitioned;
++-------------------------------------------+
+| summary                                   |
++-------------------------------------------+
+| Updated 10 partition(s) and 21 column(s). |
++-------------------------------------------+
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | 1733  | 1      | 223.74KB | NOT CACHED   | PARQUET | true
+| Children    | 1786  | 1      | 230.05KB | NOT CACHED   | PARQUET | true
+| Electronics | 1812  | 1      | 232.67KB | NOT CACHED   | PARQUET | true
+| Home        | 1807  | 1      | 232.56KB | NOT CACHED   | PARQUET | true
+| Jewelry     | 1740  | 1      | 223.72KB | NOT CACHED   | PARQUET | true
+| Men         | 1811  | 1      | 231.25KB | NOT CACHED   | PARQUET | true
+| Music       | 1860  | 1      | 237.90KB | NOT CACHED   | PARQUET | true
+| Shoes       | 1835  | 1      | 234.90KB | NOT CACHED   | PARQUET | true
+| Sports      | 1783  | 1      | 227.97KB | NOT CACHED   | PARQUET | true
+| Women       | 1790  | 1      | 226.27KB | NOT CACHED   | PARQUET | true
+| Total       | 17957 | 10     | 2.25MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+
+-- Add a new partition...
+alter table item_partitioned add partition (i_category='Camping');
+-- Add or replace files in HDFS outside of Impala,
+-- rendering the stats for a partition obsolete.
+!import_data_into_sports_partition.sh
+refresh item_partitioned;
+drop incremental stats item_partitioned partition (i_category='Sports');
+-- Now some partitions have incremental stats
+-- and some do not.
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | 1733  | 1      | 223.74KB | NOT CACHED   | PARQUET | true
+| Camping     | -1    | 1      | 408.02KB | NOT CACHED   | PARQUET | false
+| Children    | 1786  | 1      | 230.05KB | NOT CACHED   | PARQUET | true
+| Electronics | 1812  | 1      | 232.67KB | NOT CACHED   | PARQUET | true
+| Home        | 1807  | 1      | 232.56KB | NOT CACHED   | PARQUET | true
+| Jewelry     | 1740  | 1      | 223.72KB | NOT CACHED   | PARQUET | true
+| Men         | 1811  | 1      | 231.25KB | NOT CACHED   | PARQUET | true
+| Music       | 1860  | 1      | 237.90KB | NOT CACHED   | PARQUET | true
+| Shoes       | 1835  | 1      | 234.90KB | NOT CACHED   | PARQUET | true
+| Sports      | -1    | 1      | 227.97KB | NOT CACHED   | PARQUET | false
+| Women       | 1790  | 1      | 226.27KB | NOT CACHED   | PARQUET | true
+| Total       | 17957 | 11     | 2.65MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+
+-- After another COMPUTE INCREMENTAL STATS,
+-- all partitions have incremental stats, and only the 2
+-- partitions without incremental stats were scanned.
+compute incremental stats item_partitioned;
++------------------------------------------+
+| summary                                  |
++------------------------------------------+
+| Updated 2 partition(s) and 21 column(s). |
++------------------------------------------+
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | 1733  | 1      | 223.74KB | NOT CACHED   | PARQUET | true
+| Camping     | 5328  | 1      | 408.02KB | NOT CACHED   | PARQUET | true
+| Children    | 1786  | 1      | 230.05KB | NOT CACHED   | PARQUET | true
+| Electronics | 1812  | 1      | 232.67KB | NOT CACHED   | PARQUET | true
+| Home        | 1807  | 1      | 232.56KB | NOT CACHED   | PARQUET | true
+| Jewelry     | 1740  | 1      | 223.72KB | NOT CACHED   | PARQUET | true
+| Men         | 1811  | 1      | 231.25KB | NOT CACHED   | PARQUET | true
+| Music       | 1860  | 1      | 237.90KB | NOT CACHED   | PARQUET | true
+| Shoes       | 1835  | 1      | 234.90KB | NOT CACHED   | PARQUET | true
+| Sports      | 1783  | 1      | 227.97KB | NOT CACHED   | PARQUET | true
+| Women       | 1790  | 1      | 226.27KB | NOT CACHED   | PARQUET | true
+| Total       | 17957 | 11     | 2.65MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">File format considerations:</strong>
+      </p>
+
+    <p class="p">
+      The <code class="ph codeph">COMPUTE STATS</code> statement works with tables created with any of the file formats supported
+      by Impala. See <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a> for details about working with the
+      different file formats. The following considerations apply to <code class="ph codeph">COMPUTE STATS</code> depending on the
+      file format of the table.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">COMPUTE STATS</code> statement works with text tables with no restrictions. These tables can be
+      created through either Impala or Hive.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">COMPUTE STATS</code> statement works with Parquet tables. These tables can be created through
+      either Impala or Hive.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">COMPUTE STATS</code> statement works with Avro tables without restriction in <span class="keyword">Impala 2.2</span>
+      and higher. In earlier releases, <code class="ph codeph">COMPUTE STATS</code> worked only for Avro tables created through Hive,
+      and required the <code class="ph codeph">CREATE TABLE</code> statement to use SQL-style column names and types rather than an
+      Avro-style schema specification.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">COMPUTE STATS</code> statement works with RCFile tables with no restrictions. These tables can
+      be created through either Impala or Hive.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">COMPUTE STATS</code> statement works with SequenceFile tables with no restrictions. These
+      tables can be created through either Impala or Hive.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">COMPUTE STATS</code> statement works with partitioned tables, whether all the partitions use
+      the same file format, or some partitions are defined through <code class="ph codeph">ALTER TABLE</code> to use different
+      file formats.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Statement type:</strong> DDL
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Cancellation:</strong> Certain multi-stage statements (<code class="ph codeph">CREATE TABLE AS SELECT</code> and
+        <code class="ph codeph">COMPUTE STATS</code>) can be cancelled during some stages, when running <code class="ph codeph">INSERT</code>
+        or <code class="ph codeph">SELECT</code> operations internally. To cancel this statement, use Ctrl-C from the
+        <span class="keyword cmdname">impala-shell</span> interpreter, the <span class="ph uicontrol">Cancel</span> button from the
+        <span class="ph uicontrol">Watch</span> page in Hue, or <span class="ph uicontrol">Cancel</span> from the list of
+        in-flight queries (for a particular node) on the <span class="ph uicontrol">Queries</span> tab in the Impala web UI
+        (port 25000).
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Restrictions:</strong>
+      </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span>  Prior to Impala 1.4.0,
+          <code class="ph codeph">COMPUTE STATS</code> counted the number of
+          <code class="ph codeph">NULL</code> values in each column and recorded that figure
+        in the metastore database. Because Impala does not currently use the
+          <code class="ph codeph">NULL</code> count during query planning, Impala 1.4.0 and
+        higher speeds up the <code class="ph codeph">COMPUTE STATS</code> statement by
+        skipping this <code class="ph codeph">NULL</code> counting. </div>
+
+    <p class="p">
+        <strong class="ph b">Internal details:</strong>
+      </p>
+    <p class="p">
+      Behind the scenes, the <code class="ph codeph">COMPUTE STATS</code> statement
+      executes two statements: one to count the rows of each partition
+      in the table (or the entire table if unpartitioned) through the
+      <code class="ph codeph">COUNT(*)</code> function,
+      and another to count the approximate number of distinct values
+      in each column through the <code class="ph codeph">NDV()</code> function.
+      You might see these queries in your monitoring and diagnostic displays.
+      The same factors that affect the performance, scalability, and
+      execution of other queries (such as parallel execution, memory usage,
+      admission control, and timeouts) also apply to the queries run by the
+      <code class="ph codeph">COMPUTE STATS</code> statement.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">HDFS permissions:</strong>
+      </p>
+    <p class="p">
+      The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
+      typically the <code class="ph codeph">impala</code> user, must have read
+      permission for all affected files in the source directory:
+      all files in the case of an unpartitioned table or
+      a partitioned table in the case of <code class="ph codeph">COMPUTE STATS</code>;
+      or all the files in partitions without incremental stats in
+      the case of <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>.
+      It must also have read and execute permissions for all
+      relevant directories holding the data files.
+      (Essentially, <code class="ph codeph">COMPUTE STATS</code> requires the
+      same permissions as the underlying <code class="ph codeph">SELECT</code> queries it runs
+      against the table.)
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Kudu considerations:</strong>
+      </p>
+
+    <p class="p">
+      The <code class="ph codeph">COMPUTE STATS</code> statement applies to Kudu tables.
+      Impala does not compute the number of rows for each partition for
+      Kudu tables. Therefore, you do not need to re-run the operation when
+      you see -1 in the <code class="ph codeph"># Rows</code> column of the output from
+      <code class="ph codeph">SHOW TABLE STATS</code>. That column always shows -1 for
+      all Kudu tables. 
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_drop_stats.html#drop_stats">DROP STATS Statement</a>, <a class="xref" href="impala_show.html#show_table_stats">SHOW TABLE STATS Statement</a>,
+      <a class="xref" href="impala_show.html#show_column_stats">SHOW COLUMN STATS Statement</a>, <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a>
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

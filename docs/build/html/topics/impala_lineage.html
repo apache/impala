@@ -1,0 +1,91 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="lineage"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Viewing Lineage Information for Impala Data</title></head><body id="lineage"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Viewing Lineage Information for Impala Data</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      
+      <dfn class="term">Lineage</dfn> is a feature that helps you track where data originated, and how
+      data propagates through the system through SQL statements such as
+        <code class="ph codeph">SELECT</code>, <code class="ph codeph">INSERT</code>, and <code class="ph codeph">CREATE
+        TABLE AS SELECT</code>.
+    </p>
+    <p class="p">
+      This type of tracking is important in high-security configurations, especially in
+      highly regulated industries such as healthcare, pharmaceuticals, financial services and
+      intelligence. For such kinds of sensitive data, it is important to know all
+      the places in the system that contain that data or other data derived from it; to verify who has accessed
+      that data; and to be able to doublecheck that the data used to make a decision was processed correctly and
+      not tampered with.
+    </p>
+
+    <section class="section" id="lineage__column_lineage"><h2 class="title sectiontitle">Column Lineage</h2>
+
+      
+
+      <p class="p">
+        <dfn class="term">Column lineage</dfn> tracks information in fine detail, at the level of
+        particular columns rather than entire tables.
+      </p>
+
+      <p class="p">
+        For example, if you have a table with information derived from web logs, you might copy that data into
+        other tables as part of the ETL process. The ETL operations might involve transformations through
+        expressions and function calls, and rearranging the columns into more or fewer tables
+        (<dfn class="term">normalizing</dfn> or <dfn class="term">denormalizing</dfn> the data). Then for reporting, you might issue
+        queries against multiple tables and views. In this example, column lineage helps you determine that data
+        that entered the system as <code class="ph codeph">RAW_LOGS.FIELD1</code> was then turned into
+        <code class="ph codeph">WEBSITE_REPORTS.IP_ADDRESS</code> through an <code class="ph codeph">INSERT ... SELECT</code> statement. Or,
+        conversely, you could start with a reporting query against a view, and trace the origin of the data in a
+        field such as <code class="ph codeph">TOP_10_VISITORS.USER_ID</code> back to the underlying table and even further back
+        to the point where the data was first loaded into Impala.
+      </p>
+
+      <p class="p">
+        When you have tables where you need to track or control access to sensitive information at the column
+        level, see <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for how to implement column-level
+        security. You set up authorization using the Sentry framework, create views that refer to specific sets of
+        columns, and then assign authorization privileges to those views rather than the underlying tables.
+      </p>
+
+    </section>
+
+    <section class="section" id="lineage__lineage_data"><h2 class="title sectiontitle">Lineage Data for Impala</h2>
+
+      
+
+      <p class="p">
+        The lineage feature is enabled by default. When lineage logging is enabled, the serialized column lineage
+        graph is computed for each query and stored in a specialized log file in JSON format.
+      </p>
+
+      <p class="p">
+        Impala records queries in the lineage log if they complete successfully, or fail due to authorization
+        errors. For write operations such as <code class="ph codeph">INSERT</code> and <code class="ph codeph">CREATE TABLE AS SELECT</code>,
+        the statement is recorded in the lineage log only if it successfully completes. Therefore, the lineage
+        feature tracks data that was accessed by successful queries, or that was attempted to be accessed by
+        unsuccessful queries that were blocked due to authorization failure. These kinds of queries represent data
+        that really was accessed, or where the attempted access could represent malicious activity.
+      </p>
+
+      <p class="p">
+        Impala does not record in the lineage log queries that fail due to syntax errors or that fail or are
+        cancelled before they reach the stage of requesting rows from the result set.
+      </p>
+
+      <p class="p">
+        To enable or disable this feature, set or remove the <code class="ph codeph">-lineage_event_log_dir</code>
+        configuration option for the <span class="keyword cmdname">impalad</span> daemon.
+      </p>
+
+    </section>
+
+  </div>
+
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_security.html">Impala Security</a></div></div></nav></article></main></body></html>

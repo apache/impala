@@ -1,0 +1,138 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_concepts.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="intro_hadoop"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>How Impala Fits Into the Hadoop Ecosystem</title></head><body id="intro_hadoop"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">How Impala Fits Into the Hadoop Ecosystem</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Impala makes use of many familiar components within the Hadoop ecosystem. Impala can interchange data with
+      other Hadoop components, as both a consumer and a producer, so it can fit in flexible ways into your ETL and
+      ELT pipelines.
+    </p>
+
+    <p class="p toc inpage"></p>
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_concepts.html">Impala Concepts and Architecture</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="intro_hadoop__intro_hive">
+
+    <h2 class="title topictitle2" id="ariaid-title2">How Impala Works with Hive</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        A major Impala goal is to make SQL-on-Hadoop operations fast and efficient enough to appeal to new
+        categories of users and open up Hadoop to new types of use cases. Where practical, it makes use of existing
+        Apache Hive infrastructure that many Hadoop users already have in place to perform long-running,
+        batch-oriented SQL queries.
+      </p>
+
+      <p class="p">
+        In particular, Impala keeps its table definitions in a traditional MySQL or PostgreSQL database known as
+        the <strong class="ph b">metastore</strong>, the same database where Hive keeps this type of data. Thus, Impala can access tables
+        defined or loaded by Hive, as long as all columns use Impala-supported data types, file formats, and
+        compression codecs.
+      </p>
+
+      <p class="p">
+        The initial focus on query features and performance means that Impala can read more types of data with the
+        <code class="ph codeph">SELECT</code> statement than it can write with the <code class="ph codeph">INSERT</code> statement. To query
+        data using the Avro, RCFile, or SequenceFile <a class="xref" href="impala_file_formats.html#file_formats">file
+        formats</a>, you load the data using Hive.
+      </p>
+
+      <p class="p">
+        The Impala query optimizer can also make use of <a class="xref" href="impala_perf_stats.html#perf_table_stats">table
+        statistics</a> and <a class="xref" href="impala_perf_stats.html#perf_column_stats">column statistics</a>.
+        Originally, you gathered this information with the <code class="ph codeph">ANALYZE TABLE</code> statement in Hive; in
+        Impala 1.2.2 and higher, use the Impala <code class="ph codeph"><a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE
+        STATS</a></code> statement instead. <code class="ph codeph">COMPUTE STATS</code> requires less setup, is more
+        reliable, and does not require switching back and forth between <span class="keyword cmdname">impala-shell</span>
+        and the Hive shell.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="intro_hadoop__intro_metastore">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Overview of Impala Metadata and the Metastore</h2>
+  
+
+    <div class="body conbody">
+
+      <p class="p">
+        As discussed in <a class="xref" href="impala_hadoop.html#intro_hive">How Impala Works with Hive</a>, Impala maintains information about table
+        definitions in a central database known as the <strong class="ph b">metastore</strong>. Impala also tracks other metadata for the
+        low-level characteristics of data files:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          The physical locations of blocks within HDFS.
+        </li>
+      </ul>
+
+      <p class="p">
+        For tables with a large volume of data and/or many partitions, retrieving all the metadata for a table can
+        be time-consuming, taking minutes in some cases. Thus, each Impala node caches all of this metadata to
+        reuse for future queries against the same table.
+      </p>
+
+      <p class="p">
+        If the table definition or the data in the table is updated, all other Impala daemons in the cluster must
+        receive the latest metadata, replacing the obsolete cached metadata, before issuing a query against that
+        table. In Impala 1.2 and higher, the metadata update is automatic, coordinated through the
+        <span class="keyword cmdname">catalogd</span> daemon, for all DDL and DML statements issued through Impala. See
+        <a class="xref" href="impala_components.html#intro_catalogd">The Impala Catalog Service</a> for details.
+      </p>
+
+      <p class="p">
+        For DDL and DML issued through Hive, or changes made manually to files in HDFS, you still use the
+        <code class="ph codeph">REFRESH</code> statement (when new data files are added to existing tables) or the
+        <code class="ph codeph">INVALIDATE METADATA</code> statement (for entirely new tables, or after dropping a table,
+        performing an HDFS rebalance operation, or deleting data files). Issuing <code class="ph codeph">INVALIDATE
+        METADATA</code> by itself retrieves metadata for all the tables tracked by the metastore. If you know
+        that only specific tables have been changed outside of Impala, you can issue <code class="ph codeph">REFRESH
+        <var class="keyword varname">table_name</var></code> for each affected table to only retrieve the latest metadata for
+        those tables.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="intro_hadoop__intro_hdfs">
+
+    <h2 class="title topictitle2" id="ariaid-title4">How Impala Uses HDFS</h2>
+  
+
+    <div class="body conbody">
+
+      <p class="p">
+        Impala uses the distributed filesystem HDFS as its primary data storage medium. Impala relies on the
+        redundancy provided by HDFS to guard against hardware or network outages on individual nodes. Impala table
+        data is physically represented as data files in HDFS, using familiar HDFS file formats and compression
+        codecs. When data files are present in the directory for a new table, Impala reads them all, regardless of
+        file name. New data is added in files with names controlled by Impala.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="intro_hadoop__intro_hbase">
+
+    <h2 class="title topictitle2" id="ariaid-title5">How Impala Uses HBase</h2>
+  
+
+    <div class="body conbody">
+
+      <p class="p">
+        HBase is an alternative to HDFS as a storage medium for Impala data. It is a database storage system built
+        on top of HDFS, without built-in SQL support. Many Hadoop users already have it configured and store large
+        (often sparse) data sets in it. By defining tables in Impala and mapping them to equivalent tables in
+        HBase, you can query the contents of the HBase tables through Impala, and even perform join queries
+        including both Impala and HBase tables. See <a class="xref" href="impala_hbase.html#impala_hbase">Using Impala to Query HBase Tables</a> for details.
+      </p>
+    </div>
+  </article>
+</article></main></body></html>

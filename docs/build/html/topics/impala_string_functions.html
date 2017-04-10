@@ -1,0 +1,1036 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="string_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala String Functions</title></head><body id="string_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala String Functions</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <div class="p">
+      String functions are classified as those primarily accepting or returning <code class="ph codeph">STRING</code>,
+      <code class="ph codeph">VARCHAR</code>, or <code class="ph codeph">CHAR</code> data types, for example to measure the length of a string
+      or concatenate two strings together.
+      <ul class="ul">
+        <li class="li">
+          All the functions that accept <code class="ph codeph">STRING</code> arguments also accept the <code class="ph codeph">VARCHAR</code>
+          and <code class="ph codeph">CHAR</code> types introduced in Impala 2.0.
+        </li>
+
+        <li class="li">
+          Whenever <code class="ph codeph">VARCHAR</code> or <code class="ph codeph">CHAR</code> values are passed to a function that returns a
+          string value, the return type is normalized to <code class="ph codeph">STRING</code>. For example, a call to
+          <code class="ph codeph">concat()</code> with a mix of <code class="ph codeph">STRING</code>, <code class="ph codeph">VARCHAR</code>, and
+          <code class="ph codeph">CHAR</code> arguments produces a <code class="ph codeph">STRING</code> result.
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      The string functions operate mainly on these data types: <a class="xref" href="impala_string.html#string">STRING Data Type</a>,
+      <a class="xref" href="impala_varchar.html#varchar">VARCHAR Data Type (Impala 2.0 or higher only)</a>, and <a class="xref" href="impala_char.html#char">CHAR Data Type (Impala 2.0 or higher only)</a>.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Function reference:</strong>
+    </p>
+
+    <p class="p">
+      Impala supports the following string functions:
+    </p>
+
+    <dl class="dl">
+      
+
+        <dt class="dt dlterm" id="string_functions__ascii">
+          <code class="ph codeph">ascii(string str)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the numeric ASCII code of the first character of the argument.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__btrim">
+          <code class="ph codeph">btrim(string a)</code>,
+          <code class="ph codeph">btrim(string a, string chars_to_trim)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Removes all instances of one or more characters
+          from the start and end of a <code class="ph codeph">STRING</code> value.
+          By default, removes only spaces.
+          If a non-<code class="ph codeph">NULL</code> optional second argument is specified, the function removes all
+          occurrences of characters in that second argument from the beginning and
+          end of the string.
+          <p class="p"><strong class="ph b">Return type:</strong> <code class="ph codeph">string</code></p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            The following examples show the default <code class="ph codeph">btrim()</code> behavior,
+            and what changes when you specify the optional second argument.
+            All the examples bracket the output value with <code class="ph codeph">[ ]</code>
+            so that you can see any leading or trailing spaces in the <code class="ph codeph">btrim()</code> result.
+            By default, the function removes and number of both leading and trailing spaces.
+            When the second argument is specified, any number of occurrences of any
+            character in the second argument are removed from the start and end of the
+            input string; in this case, spaces are not removed (unless they are part of the second
+            argument) and any instances of the characters are not removed if they do not come
+            right at the beginning or end of the string.
+          </p>
+<pre class="pre codeblock"><code>-- Remove multiple spaces before and one space after.
+select concat('[',btrim('    hello '),']');
++---------------------------------------+
+| concat('[', btrim('    hello '), ']') |
++---------------------------------------+
+| [hello]                               |
++---------------------------------------+
+
+-- Remove any instances of x or y or z at beginning or end. Leave spaces alone.
+select concat('[',btrim('xy    hello zyzzxx','xyz'),']');
++------------------------------------------------------+
+| concat('[', btrim('xy    hello zyzzxx', 'xyz'), ']') |
++------------------------------------------------------+
+| [    hello ]                                         |
++------------------------------------------------------+
+
+-- Remove any instances of x or y or z at beginning or end.
+-- Leave x, y, z alone in the middle of the string.
+select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
++----------------------------------------------------+
+| concat('[', btrim('xyhelxyzlozyzzxx', 'xyz'), ']') |
++----------------------------------------------------+
+| [helxyzlo]                                         |
++----------------------------------------------------+
+</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__char_length">
+          <code class="ph codeph">char_length(string a), <span class="ph" id="string_functions__character_length">character_length(string a)</span></code>
+        </dt>
+
+        <dd class="dd">
+          
+          
+          <strong class="ph b">Purpose:</strong> Returns the length in characters of the argument string. Aliases for the
+          <code class="ph codeph">length()</code> function.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__chr">
+          <code class="ph codeph">chr(int character_code)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns a character specified by a decimal code point value.
+          The interpretation and display of the resulting character depends on your system locale.
+          Because consistent processing of Impala string values is only guaranteed
+          for values within the ASCII range, only use this function for values
+          corresponding to ASCII characters.
+          In particular, parameter values greater than 255 return an empty string.
+          <p class="p"><strong class="ph b">Return type:</strong> <code class="ph codeph">string</code></p>
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong> Can be used as the inverse of the <code class="ph codeph">ascii()</code> function, which
+            converts a character to its numeric ASCII code.
+          </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+<pre class="pre codeblock"><code>SELECT chr(65);
++---------+
+| chr(65) |
++---------+
+| A       |
++---------+
+
+SELECT chr(97);
++---------+
+| chr(97) |
++---------+
+| a       |
++---------+
+</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__concat">
+          <code class="ph codeph">concat(string a, string b...)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns a single string representing all the argument values joined together.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are appropriate for
+        concatenating the values of multiple columns within the same row, while <code class="ph codeph">group_concat()</code>
+        joins together values from different rows.
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__concat_ws">
+          <code class="ph codeph">concat_ws(string sep, string a, string b...)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns a single string representing the second and following argument values joined
+          together, delimited by a specified separator.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are appropriate for
+        concatenating the values of multiple columns within the same row, while <code class="ph codeph">group_concat()</code>
+        joins together values from different rows.
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__find_in_set">
+          <code class="ph codeph">find_in_set(string str, string strList)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the position (starting from 1) of the first occurrence of a specified string
+          within a comma-separated string. Returns <code class="ph codeph">NULL</code> if either argument is
+          <code class="ph codeph">NULL</code>, 0 if the search string is not found, or 0 if the search string contains a comma.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__group_concat">
+          <code class="ph codeph">group_concat(string s [, string sep])</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns a single string representing the argument value concatenated together for each
+          row of the result set. If the optional separator string is specified, the separator is added between each
+          pair of concatenated values.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are appropriate for
+        concatenating the values of multiple columns within the same row, while <code class="ph codeph">group_concat()</code>
+        joins together values from different rows.
+      </p>
+          <p class="p">
+            By default, returns a single string covering the whole result set. To include other columns or values
+            in the result set, or to produce multiple concatenated strings for subsets of rows, include a
+            <code class="ph codeph">GROUP BY</code> clause in the query.
+          </p>
+          <p class="p">
+            Strictly speaking, <code class="ph codeph">group_concat()</code> is an aggregate function, not a scalar
+            function like the others in this list.
+            For additional details and examples, see <a class="xref" href="impala_group_concat.html#group_concat">GROUP_CONCAT Function</a>.
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__initcap">
+          <code class="ph codeph">initcap(string str)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the input string with the first letter capitalized.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__instr">
+          <code class="ph codeph">instr(string str, string substr)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the position (starting from 1) of the first occurrence of a substring within a
+          longer string.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__length">
+          <code class="ph codeph">length(string a)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the length in characters of the argument string.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__locate">
+          <code class="ph codeph">locate(string substr, string str[, int pos])</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the position (starting from 1) of the first occurrence of a substring within a
+          longer string, optionally after a particular position.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__lower">
+          <code class="ph codeph">lower(string a), <span class="ph" id="string_functions__lcase">lcase(string a)</span> </code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the argument string converted to all-lowercase.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+        In <span class="keyword">Impala 2.5</span> and higher, you can simplify queries that
+        use many <code class="ph codeph">UPPER()</code> and <code class="ph codeph">LOWER()</code> calls
+        to do case-insensitive comparisons, by using the <code class="ph codeph">ILIKE</code>
+        or <code class="ph codeph">IREGEXP</code> operators instead. See
+        <a class="xref" href="../shared/../topics/impala_operators.html#ilike">ILIKE Operator</a> and
+        <a class="xref" href="../shared/../topics/impala_operators.html#iregexp">IREGEXP Operator</a> for details.
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__lpad">
+          <code class="ph codeph">lpad(string str, int len, string pad)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns a string of a specified length, based on the first argument string. If the
+          specified string is too short, it is padded on the left with a repeating sequence of the characters from
+          the pad string. If the specified string is too long, it is truncated on the right.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__ltrim">
+          <code class="ph codeph">ltrim(string a)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the argument string with any leading spaces removed from the left side.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__parse_url">
+          <code class="ph codeph">parse_url(string urlString, string partToExtract [, string keyToExtract])</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the portion of a URL corresponding to a specified part. The part argument can be
+          <code class="ph codeph">'PROTOCOL'</code>, <code class="ph codeph">'HOST'</code>, <code class="ph codeph">'PATH'</code>, <code class="ph codeph">'REF'</code>,
+          <code class="ph codeph">'AUTHORITY'</code>, <code class="ph codeph">'FILE'</code>, <code class="ph codeph">'USERINFO'</code>, or
+          <code class="ph codeph">'QUERY'</code>. Uppercase is required for these literal values. When requesting the
+          <code class="ph codeph">QUERY</code> portion of the URL, you can optionally specify a key to retrieve just the
+          associated value from the key-value pairs in the query string.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong> This function is important for the traditional Hadoop use case of interpreting web
+            logs. For example, if the web traffic data features raw URLs not divided into separate table columns,
+            you can count visitors to a particular page by extracting the <code class="ph codeph">'PATH'</code> or
+            <code class="ph codeph">'FILE'</code> field, or analyze search terms by extracting the corresponding key from the
+            <code class="ph codeph">'QUERY'</code> field.
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__regexp_extract">
+          <code class="ph codeph">regexp_extract(string subject, string pattern, int index)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the specified () group from a string based on a regular expression pattern. Group
+          0 refers to the entire extracted string, while group 1, 2, and so on refers to the first, second, and so
+          on <code class="ph codeph">(...)</code> portion.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
+        Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
+        has most idioms familiar from regular expressions in Perl, Python, and so on, including
+        <code class="ph codeph">.*?</code> for non-greedy matches.
+      </p>
+          <p class="p">
+        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
+        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
+        adjust the expression patterns if necessary. See
+        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+      </p>
+          <p class="p">
+        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code> character for escaping,
+        use <code class="ph codeph">\\</code> to represent the regular expression escape character in any regular expressions
+        that you submit through <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character
+        class names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you would have to
+        escape as <code class="ph codeph">\\d</code>.
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            This example shows how group 0 matches the full pattern string, including the portion outside any
+            <code class="ph codeph">()</code> group:
+          </p>
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select regexp_extract('abcdef123ghi456jkl','.*?(\\d+)',0);
++------------------------------------------------------+
+| regexp_extract('abcdef123ghi456jkl', '.*?(\\d+)', 0) |
++------------------------------------------------------+
+| abcdef123ghi456                                      |
++------------------------------------------------------+
+Returned 1 row(s) in 0.11s</code></pre>
+          <p class="p">
+            This example shows how group 1 matches just the contents inside the first <code class="ph codeph">()</code> group in
+            the pattern string:
+          </p>
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select regexp_extract('abcdef123ghi456jkl','.*?(\\d+)',1);
++------------------------------------------------------+
+| regexp_extract('abcdef123ghi456jkl', '.*?(\\d+)', 1) |
++------------------------------------------------------+
+| 456                                                  |
++------------------------------------------------------+
+Returned 1 row(s) in 0.11s</code></pre>
+          <p class="p">
+            Unlike in earlier Impala releases, the regular expression library used in Impala 2.0 and later supports
+            the <code class="ph codeph">.*?</code> idiom for non-greedy matches. This example shows how a pattern string starting
+            with <code class="ph codeph">.*?</code> matches the shortest possible portion of the source string, returning the
+            rightmost set of lowercase letters. A pattern string both starting and ending with <code class="ph codeph">.*?</code>
+            finds two potential matches of equal length, and returns the first one found (the leftmost set of
+            lowercase letters).
+          </p>
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select regexp_extract('AbcdBCdefGHI','.*?([[:lower:]]+)',1);
++--------------------------------------------------------+
+| regexp_extract('abcdbcdefghi', '.*?([[:lower:]]+)', 1) |
++--------------------------------------------------------+
+| def                                                    |
++--------------------------------------------------------+
+[localhost:21000] &gt; select regexp_extract('AbcdBCdefGHI','.*?([[:lower:]]+).*?',1);
++-----------------------------------------------------------+
+| regexp_extract('abcdbcdefghi', '.*?([[:lower:]]+).*?', 1) |
++-----------------------------------------------------------+
+| bcd                                                       |
++-----------------------------------------------------------+
+</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__regexp_like">
+          <code class="ph codeph">regexp_like(string source, string pattern[, string options])</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns <code class="ph codeph">true</code> or <code class="ph codeph">false</code> to indicate
+          whether the source string contains anywhere inside it the regular expression given by the pattern.
+          The optional third argument consists of letter flags that change how the match is performed,
+          such as <code class="ph codeph">i</code> for case-insensitive matching.
+          <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+          <p class="p">
+            The flags that you can include in the optional third argument are:
+          </p>
+          <ul class="ul">
+          <li class="li">
+          <code class="ph codeph">c</code>: Case-sensitive matching (the default).
+          </li>
+          <li class="li">
+          <code class="ph codeph">i</code>: Case-insensitive matching. If multiple instances of <code class="ph codeph">c</code> and <code class="ph codeph">i</code>
+          are included in the third argument, the last such option takes precedence.
+          </li>
+          <li class="li">
+          <code class="ph codeph">m</code>: Multi-line matching. The <code class="ph codeph">^</code> and <code class="ph codeph">$</code>
+          operators match the start or end of any line within the source string, not the
+          start and end of the entire string.
+          </li>
+          <li class="li">
+          <code class="ph codeph">n</code>: Newline matching. The <code class="ph codeph">.</code> operator can match the
+          newline character. A repetition operator such as <code class="ph codeph">.*</code> can
+          match a portion of the source string that spans multiple lines.
+          </li>
+          </ul>
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">boolean</code>
+          </p>
+          <p class="p">
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
+        Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
+        has most idioms familiar from regular expressions in Perl, Python, and so on, including
+        <code class="ph codeph">.*?</code> for non-greedy matches.
+      </p>
+          <p class="p">
+        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
+        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
+        adjust the expression patterns if necessary. See
+        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+      </p>
+          <p class="p">
+        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code> character for escaping,
+        use <code class="ph codeph">\\</code> to represent the regular expression escape character in any regular expressions
+        that you submit through <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character
+        class names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you would have to
+        escape as <code class="ph codeph">\\d</code>.
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            This example shows how <code class="ph codeph">regexp_like()</code> can test for the existence
+            of various kinds of regular expression patterns within a source string:
+          </p>
+<pre class="pre codeblock"><code>
+-- Matches because the 'f' appears somewhere in 'foo'.
+select regexp_like('foo','f');
++-------------------------+
+| regexp_like('foo', 'f') |
++-------------------------+
+| true                    |
++-------------------------+
+
+-- Does not match because the comparison is case-sensitive by default.
+select regexp_like('foo','F');
++-------------------------+
+| regexp_like('foo', 'f') |
++-------------------------+
+| false                   |
++-------------------------+
+
+-- The 3rd argument can change the matching logic, such as 'i' meaning case-insensitive.
+select regexp_like('foo','F','i');
++------------------------------+
+| regexp_like('foo', 'f', 'i') |
++------------------------------+
+| true                         |
++------------------------------+
+
+-- The familiar regular expression notations work, such as ^ and $ anchors...
+select regexp_like('foo','f$');
++--------------------------+
+| regexp_like('foo', 'f$') |
++--------------------------+
+| false                    |
++--------------------------+
+
+select regexp_like('foo','o$');
++--------------------------+
+| regexp_like('foo', 'o$') |
++--------------------------+
+| true                     |
++--------------------------+
+
+-- ...and repetition operators such as * and +
+select regexp_like('foooooobar','fo+b');
++-----------------------------------+
+| regexp_like('foooooobar', 'fo+b') |
++-----------------------------------+
+| true                              |
++-----------------------------------+
+
+select regexp_like('foooooobar','fx*y*o*b');
++---------------------------------------+
+| regexp_like('foooooobar', 'fx*y*o*b') |
++---------------------------------------+
+| true                                  |
++---------------------------------------+
+
+</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__regexp_replace">
+          <code class="ph codeph">regexp_replace(string initial, string pattern, string replacement)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the initial argument with the regular expression pattern replaced by the final
+          argument string.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
+        Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
+        has most idioms familiar from regular expressions in Perl, Python, and so on, including
+        <code class="ph codeph">.*?</code> for non-greedy matches.
+      </p>
+          <p class="p">
+        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
+        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
+        adjust the expression patterns if necessary. See
+        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+      </p>
+          <p class="p">
+        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code> character for escaping,
+        use <code class="ph codeph">\\</code> to represent the regular expression escape character in any regular expressions
+        that you submit through <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character
+        class names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you would have to
+        escape as <code class="ph codeph">\\d</code>.
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            These examples show how you can replace parts of a string matching a pattern with replacement text,
+            which can include backreferences to any <code class="ph codeph">()</code> groups in the pattern string. The
+            backreference numbers start at 1, and any <code class="ph codeph">\</code> characters must be escaped as
+            <code class="ph codeph">\\</code>.
+          </p>
+          <p class="p">
+            Replace a character pattern with new text:
+          </p>
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select regexp_replace('aaabbbaaa','b+','xyz');
++------------------------------------------+
+| regexp_replace('aaabbbaaa', 'b+', 'xyz') |
++------------------------------------------+
+| aaaxyzaaa                                |
++------------------------------------------+
+Returned 1 row(s) in 0.11s</code></pre>
+          <p class="p">
+            Replace a character pattern with substitution text that includes the original matching text:
+          </p>
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select regexp_replace('aaabbbaaa','(b+)','&lt;\\1&gt;');
++----------------------------------------------+
+| regexp_replace('aaabbbaaa', '(b+)', '&lt;\\1&gt;') |
++----------------------------------------------+
+| aaa&lt;bbb&gt;aaa                                  |
++----------------------------------------------+
+Returned 1 row(s) in 0.11s</code></pre>
+          <p class="p">
+            Remove all characters that are not digits:
+          </p>
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select regexp_replace('123-456-789','[^[:digit:]]','');
++---------------------------------------------------+
+| regexp_replace('123-456-789', '[^[:digit:]]', '') |
++---------------------------------------------------+
+| 123456789                                         |
++---------------------------------------------------+
+Returned 1 row(s) in 0.12s</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__repeat">
+          <code class="ph codeph">repeat(string str, int n)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the argument string repeated a specified number of times.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__reverse">
+          <code class="ph codeph">reverse(string a)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the argument string with characters in reversed order.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__rpad">
+          <code class="ph codeph">rpad(string str, int len, string pad)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns a string of a specified length, based on the first argument string. If the
+          specified string is too short, it is padded on the right with a repeating sequence of the characters from
+          the pad string. If the specified string is too long, it is truncated on the right.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__rtrim">
+          <code class="ph codeph">rtrim(string a)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the argument string with any trailing spaces removed from the right side.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__space">
+          <code class="ph codeph">space(int n)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns a concatenated string of the specified number of spaces. Shorthand for
+          <code class="ph codeph">repeat(' ',<var class="keyword varname">n</var>)</code>.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__split_part">
+          <code class="ph codeph">split_part(string source, string delimiter, bigint n)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the nth field within a delimited string.
+          The fields are numbered starting from 1.
+          The delimiter can consist of multiple characters, not just a
+          single character. All matching of the delimiter is done exactly, not using any
+          regular expression patterns.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
+        Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
+        has most idioms familiar from regular expressions in Perl, Python, and so on, including
+        <code class="ph codeph">.*?</code> for non-greedy matches.
+      </p>
+          <p class="p">
+        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
+        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
+        adjust the expression patterns if necessary. See
+        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+      </p>
+          <p class="p">
+        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code> character for escaping,
+        use <code class="ph codeph">\\</code> to represent the regular expression escape character in any regular expressions
+        that you submit through <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character
+        class names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you would have to
+        escape as <code class="ph codeph">\\d</code>.
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            These examples show how to retrieve the nth field from a delimited string:
+          </p>
+<pre class="pre codeblock"><code>
+select split_part('x,y,z',',',1);
++-----------------------------+
+| split_part('x,y,z', ',', 1) |
++-----------------------------+
+| x                           |
++-----------------------------+
+
+select split_part('x,y,z',',',2);
++-----------------------------+
+| split_part('x,y,z', ',', 2) |
++-----------------------------+
+| y                           |
++-----------------------------+
+
+select split_part('x,y,z',',',3);
++-----------------------------+
+| split_part('x,y,z', ',', 3) |
++-----------------------------+
+| z                           |
++-----------------------------+
+&lt;/codeblock&gt;
+
+          &lt;p&gt;
+            These examples show what happens for out-of-range field positions.
+            Specifying a value less than 1 produces an error. Specifying a value
+            greater than the number of fields returns a zero-length string
+            (which is not the same as &lt;codeph&gt;NULL&lt;/codeph&gt;).
+          &lt;/p&gt;
+&lt;codeblock&gt;&lt;![CDATA[
+select split_part('x,y,z',',',0);
+ERROR: Invalid field position: 0
+
+with t1 as (select split_part('x,y,z',',',4) nonexistent_field)
+  select
+      nonexistent_field
+    , concat('[',nonexistent_field,']')
+    , length(nonexistent_field);
+from t1
++-------------------+-------------------------------------+---------------------------+
+| nonexistent_field | concat('[', nonexistent_field, ']') | length(nonexistent_field) |
++-------------------+-------------------------------------+---------------------------+
+|                   | []                                  | 0                         |
++-------------------+-------------------------------------+---------------------------+
+&lt;/codeblock&gt;
+
+          &lt;p&gt;
+            These examples show how the delimiter can be a multi-character value:
+          &lt;/p&gt;
+&lt;codeblock&gt;&lt;![CDATA[
+select split_part('one***two***three','***',2);
++-------------------------------------------+
+| split_part('one***two***three', '***', 2) |
++-------------------------------------------+
+| two                                       |
++-------------------------------------------+
+
+select split_part('one\|/two\|/three','\|/',3);
++-------------------------------------------+
+| split_part('one\|/two\|/three', '\|/', 3) |
++-------------------------------------------+
+| three                                     |
++-------------------------------------------+
+
+</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__strleft">
+          <code class="ph codeph">strleft(string a, int num_chars)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the leftmost characters of the string. Shorthand for a call to
+          <code class="ph codeph">substr()</code> with 2 arguments.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__strright">
+          <code class="ph codeph">strright(string a, int num_chars)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the rightmost characters of the string. Shorthand for a call to
+          <code class="ph codeph">substr()</code> with 2 arguments.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__substr">
+          <code class="ph codeph">substr(string a, int start [, int len]), <span class="ph" id="string_functions__substring">substring(string a, int start [, int
+          len])</span></code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the portion of the string starting at a specified point, optionally with a
+          specified maximum length. The characters in the string are indexed starting at 1.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__translate">
+          <code class="ph codeph">translate(string input, string from, string to)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the input string with a set of characters replaced by another set of characters.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__trim">
+          <code class="ph codeph">trim(string a)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the input string with both leading and trailing spaces removed. The same as
+          passing the string through both <code class="ph codeph">ltrim()</code> and <code class="ph codeph">rtrim()</code>.
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong> Often used during data cleansing operations during the ETL cycle, if input values might still have surrounding spaces.
+            For a more general-purpose function that can remove other leading and trailing characters besides spaces, see <code class="ph codeph">btrim()</code>.
+          </p>
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__upper">
+          <code class="ph codeph">upper(string a), <span class="ph" id="string_functions__ucase">ucase(string a)</span></code>
+        </dt>
+
+        <dd class="dd">
+          
+          
+          <strong class="ph b">Purpose:</strong> Returns the argument string converted to all-uppercase.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+        In <span class="keyword">Impala 2.5</span> and higher, you can simplify queries that
+        use many <code class="ph codeph">UPPER()</code> and <code class="ph codeph">LOWER()</code> calls
+        to do case-insensitive comparisons, by using the <code class="ph codeph">ILIKE</code>
+        or <code class="ph codeph">IREGEXP</code> operators instead. See
+        <a class="xref" href="../shared/../topics/impala_operators.html#ilike">ILIKE Operator</a> and
+        <a class="xref" href="../shared/../topics/impala_operators.html#iregexp">IREGEXP Operator</a> for details.
+      </p>
+        </dd>
+
+      
+    </dl>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div></div></nav></article></main></body></html>

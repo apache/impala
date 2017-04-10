@@ -1,0 +1,82 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="appx_count_distinct"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>APPX_COUNT_DISTINCT Query Option (Impala 2.0 or higher only)</title></head><body id="appx_count_distinct"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">APPX_COUNT_DISTINCT Query Option (<span class="keyword">Impala 2.0</span> or higher only)</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Allows multiple <code class="ph codeph">COUNT(DISTINCT)</code> operations within a single query, by internally rewriting
+      each <code class="ph codeph">COUNT(DISTINCT)</code> to use the <code class="ph codeph">NDV()</code> function. The resulting count is
+      approximate rather than precise.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and <code class="ph codeph">false</code>;
+        any other value interpreted as <code class="ph codeph">false</code>
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code> statement)
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      The following examples show how the <code class="ph codeph">APPX_COUNT_DISTINCT</code> lets you work around the restriction
+      where a query can only evaluate <code class="ph codeph">COUNT(DISTINCT <var class="keyword varname">col_name</var>)</code> for a single
+      column. By default, you can count the distinct values of one column or another, but not both in a single
+      query:
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select count(distinct x) from int_t;
++-------------------+
+| count(distinct x) |
++-------------------+
+| 10                |
++-------------------+
+[localhost:21000] &gt; select count(distinct property) from int_t;
++--------------------------+
+| count(distinct property) |
++--------------------------+
+| 7                        |
++--------------------------+
+[localhost:21000] &gt; select count(distinct x), count(distinct property) from int_t;
+ERROR: AnalysisException: all DISTINCT aggregate functions need to have the same set of parameters
+as count(DISTINCT x); deviating function: count(DISTINCT property)
+</code></pre>
+
+    <p class="p">
+      When you enable the <code class="ph codeph">APPX_COUNT_DISTINCT</code> query option, now the query with multiple
+      <code class="ph codeph">COUNT(DISTINCT)</code> works. The reason this behavior requires a query option is that each
+      <code class="ph codeph">COUNT(DISTINCT)</code> is rewritten internally to use the <code class="ph codeph">NDV()</code> function instead,
+      which provides an approximate result rather than a precise count.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; set APPX_COUNT_DISTINCT=true;
+[localhost:21000] &gt; select count(distinct x), count(distinct property) from int_t;
++-------------------+--------------------------+
+| count(distinct x) | count(distinct property) |
++-------------------+--------------------------+
+| 10                | 7                        |
++-------------------+--------------------------+
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_count.html#count">COUNT Function</a>,
+      <a class="xref" href="impala_distinct.html#distinct">DISTINCT Operator</a>,
+      <a class="xref" href="impala_ndv.html#ndv">NDV Function</a>
+    </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

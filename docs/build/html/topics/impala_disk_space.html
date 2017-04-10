@@ -1,0 +1,133 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="disk_space"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Managing Disk Space for Impala Data</title></head><body id="disk_space"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Managing Disk Space for Impala Data</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Although Impala typically works with many large files in an HDFS storage system with plenty of capacity,
+      there are times when you might perform some file cleanup to reclaim space, or advise developers on techniques
+      to minimize space consumption and file duplication.
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        <p class="p">
+          Use compact binary file formats where practical. Numeric and time-based data in particular can be stored
+          in more compact form in binary data files. Depending on the file format, various compression and encoding
+          features can reduce file size even further. You can specify the <code class="ph codeph">STORED AS</code> clause as part
+          of the <code class="ph codeph">CREATE TABLE</code> statement, or <code class="ph codeph">ALTER TABLE</code> with the <code class="ph codeph">SET
+          FILEFORMAT</code> clause for an existing table or partition within a partitioned table. See
+          <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a> for details about file formats, especially
+          <a class="xref" href="impala_parquet.html#parquet">Using the Parquet File Format with Impala Tables</a>. See <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a> and
+          <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a> for syntax details.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+          You manage underlying data files differently depending on whether the corresponding Impala table is
+          defined as an <a class="xref" href="impala_tables.html#internal_tables">internal</a> or
+          <a class="xref" href="impala_tables.html#external_tables">external</a> table:
+        </p>
+        <ul class="ul">
+          <li class="li">
+            Use the <code class="ph codeph">DESCRIBE FORMATTED</code> statement to check if a particular table is internal
+            (managed by Impala) or external, and to see the physical location of the data files in HDFS. See
+            <a class="xref" href="impala_describe.html#describe">DESCRIBE Statement</a> for details.
+          </li>
+
+          <li class="li">
+            For Impala-managed (<span class="q">"internal"</span>) tables, use <code class="ph codeph">DROP TABLE</code> statements to remove
+            data files. See <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a> for details.
+          </li>
+
+          <li class="li">
+            For tables not managed by Impala (<span class="q">"external"</span> tables), use appropriate HDFS-related commands such
+            as <code class="ph codeph">hadoop fs</code>, <code class="ph codeph">hdfs dfs</code>, or <code class="ph codeph">distcp</code>, to create, move,
+            copy, or delete files within HDFS directories that are accessible by the <code class="ph codeph">impala</code> user.
+            Issue a <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> statement after adding or removing any
+            files from the data directory of an external table. See <a class="xref" href="impala_refresh.html#refresh">REFRESH Statement</a> for
+            details.
+          </li>
+
+          <li class="li">
+            Use external tables to reference HDFS data files in their original location. With this technique, you
+            avoid copying the files, and you can map more than one Impala table to the same set of data files. When
+            you drop the Impala table, the data files are left undisturbed. See
+            <a class="xref" href="impala_tables.html#external_tables">External Tables</a> for details.
+          </li>
+
+          <li class="li">
+            Use the <code class="ph codeph">LOAD DATA</code> statement to move HDFS files into the data directory for an Impala
+            table from inside Impala, without the need to specify the HDFS path of the destination directory. This
+            technique works for both internal and external tables. See
+            <a class="xref" href="impala_load_data.html#load_data">LOAD DATA Statement</a> for details.
+          </li>
+        </ul>
+      </li>
+
+      <li class="li">
+        <p class="p">
+          Make sure that the HDFS trashcan is configured correctly. When you remove files from HDFS, the space
+          might not be reclaimed for use by other files until sometime later, when the trashcan is emptied. See
+          <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a> for details. See
+          <a class="xref" href="impala_prereqs.html#prereqs_account">User Account Requirements</a> for permissions needed for the HDFS trashcan to operate
+          correctly.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+          Drop all tables in a database before dropping the database itself. See
+          <a class="xref" href="impala_drop_database.html#drop_database">DROP DATABASE Statement</a> for details.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+          Clean up temporary files after failed <code class="ph codeph">INSERT</code> statements. If an <code class="ph codeph">INSERT</code>
+          statement encounters an error, and you see a directory named <span class="ph filepath">.impala_insert_staging</span>
+          or <span class="ph filepath">_impala_insert_staging</span> left behind in the data directory for the table, it might
+          contain temporary data files taking up space in HDFS. You might be able to salvage these data files, for
+          example if they are complete but could not be moved into place due to a permission error. Or, you might
+          delete those files through commands such as <code class="ph codeph">hadoop fs</code> or <code class="ph codeph">hdfs dfs</code>, to
+          reclaim space before re-trying the <code class="ph codeph">INSERT</code>. Issue <code class="ph codeph">DESCRIBE FORMATTED
+          <var class="keyword varname">table_name</var></code> to see the HDFS path where you can check for temporary files.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+        By default, intermediate files used during large sort, join, aggregation, or analytic function operations
+        are stored in the directory <span class="ph filepath">/tmp/impala-scratch</span> . These files are removed when the
+        operation finishes. (Multiple concurrent queries can perform operations that use the <span class="q">"spill to disk"</span>
+        technique, without any name conflicts for these temporary files.) You can specify a different location by
+        starting the <span class="keyword cmdname">impalad</span> daemon with the
+        <code class="ph codeph">--scratch_dirs="<var class="keyword varname">path_to_directory</var>"</code> configuration option.
+        You can specify a single directory, or a comma-separated list of directories. The scratch directories must
+        be on the local filesystem, not in HDFS. You might specify different directory paths for different hosts,
+        depending on the capacity and speed
+        of the available storage devices. In <span class="keyword">Impala 2.3</span> or higher, Impala successfully starts (with a warning
+        Impala successfully starts (with a warning written to the log) if it cannot create or read and write files
+        in one of the scratch directories. If there is less than 1 GB free on the filesystem where that directory resides,
+        Impala still runs, but writes a warning message to its log.  If Impala encounters an error reading or writing
+        files in a scratch directory during a query, Impala logs the error and the query fails.
+      </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+          If you use the Amazon Simple Storage Service (S3) as a place to offload
+          data to reduce the volume of local storage, Impala 2.2.0 and higher
+          can query the data directly from S3.
+          See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details.
+        </p>
+      </li>
+    </ul>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_admin.html">Impala Administration</a></div></div></nav></article></main></body></html>

@@ -1,0 +1,565 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="avro"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using the Avro File Format with Impala Tables</title></head><body id="avro"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Using the Avro File Format with Impala Tables</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Impala supports using tables whose data files use the Avro file format. Impala can query Avro
+      tables, and in Impala 1.4.0 and higher can create them, but currently cannot insert data into them. For
+      insert operations, use Hive, then switch back to Impala to run queries.
+    </p>
+
+    <table class="table"><caption><span class="table--title-label">Table 1. </span><span class="title">Avro Format Support in Impala</span></caption><colgroup><col style="width:10%"><col style="width:10%"><col style="width:20%"><col style="width:30%"><col style="width:30%"></colgroup><thead class="thead">
+          <tr class="row">
+            <th class="entry nocellnorowborder" id="avro__entry__1">
+              File Type
+            </th>
+            <th class="entry nocellnorowborder" id="avro__entry__2">
+              Format
+            </th>
+            <th class="entry nocellnorowborder" id="avro__entry__3">
+              Compression Codecs
+            </th>
+            <th class="entry nocellnorowborder" id="avro__entry__4">
+              Impala Can CREATE?
+            </th>
+            <th class="entry nocellnorowborder" id="avro__entry__5">
+              Impala Can INSERT?
+            </th>
+          </tr>
+        </thead><tbody class="tbody">
+          <tr class="row">
+            <td class="entry nocellnorowborder" headers="avro__entry__1 ">
+              <a class="xref" href="impala_avro.html#avro">Avro</a>
+            </td>
+            <td class="entry nocellnorowborder" headers="avro__entry__2 ">
+              Structured
+            </td>
+            <td class="entry nocellnorowborder" headers="avro__entry__3 ">
+              Snappy, gzip, deflate, bzip2
+            </td>
+            <td class="entry nocellnorowborder" headers="avro__entry__4 ">
+              Yes, in Impala 1.4.0 and higher. Before that, create the table using Hive.
+            </td>
+            <td class="entry nocellnorowborder" headers="avro__entry__5 ">
+              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the right format, or use
+              <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> in Impala.
+            </td>
+
+          </tr>
+        </tbody></table>
+
+    <p class="p toc inpage"></p>
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_file_formats.html">How Impala Works with Hadoop File Formats</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="avro__avro_create_table">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Creating Avro Tables</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        To create a new table using the Avro file format, issue the <code class="ph codeph">CREATE TABLE</code> statement through
+        Impala with the <code class="ph codeph">STORED AS AVRO</code> clause, or through Hive. If you create the table through
+        Impala, you must include column definitions that match the fields specified in the Avro schema. With Hive,
+        you can omit the columns and just specify the Avro schema.
+      </p>
+
+      <p class="p">
+        In <span class="keyword">Impala 2.3</span> and higher, the <code class="ph codeph">CREATE TABLE</code> for Avro tables can include
+        SQL-style column definitions rather than specifying Avro notation through the <code class="ph codeph">TBLPROPERTIES</code>
+        clause. Impala issues warning messages if there are any mismatches between the types specified in the
+        SQL column definitions and the underlying types; for example, any <code class="ph codeph">TINYINT</code> or
+        <code class="ph codeph">SMALLINT</code> columns are treated as <code class="ph codeph">INT</code> in the underlying Avro files,
+        and therefore are displayed as <code class="ph codeph">INT</code> in any <code class="ph codeph">DESCRIBE</code> or
+        <code class="ph codeph">SHOW CREATE TABLE</code> output.
+      </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        <p class="p">
+        Currently, Avro tables cannot contain <code class="ph codeph">TIMESTAMP</code> columns. If you need to store date and
+        time values in Avro tables, as a workaround you can use a <code class="ph codeph">STRING</code> representation of the
+        values, convert the values to <code class="ph codeph">BIGINT</code> with the <code class="ph codeph">UNIX_TIMESTAMP()</code> function,
+        or create separate numeric columns for individual date and time fields using the <code class="ph codeph">EXTRACT()</code>
+        function.
+      </p>
+      </div>
+
+      
+
+      <p class="p">
+        The following examples demonstrate creating an Avro table in Impala, using either an inline column
+        specification or one taken from a JSON file stored in HDFS:
+      </p>
+
+<pre class="pre codeblock"><code>
+[localhost:21000] &gt; CREATE TABLE avro_only_sql_columns
+                  &gt; (
+                  &gt;   id INT,
+                  &gt;   bool_col BOOLEAN,
+                  &gt;   tinyint_col TINYINT, /* Gets promoted to INT */
+                  &gt;   smallint_col SMALLINT, /* Gets promoted to INT */
+                  &gt;   int_col INT,
+                  &gt;   bigint_col BIGINT,
+                  &gt;   float_col FLOAT,
+                  &gt;   double_col DOUBLE,
+                  &gt;   date_string_col STRING,
+                  &gt;   string_col STRING
+                  &gt; )
+                  &gt; STORED AS AVRO;
+
+[localhost:21000] &gt; CREATE TABLE impala_avro_table
+                  &gt; (bool_col BOOLEAN, int_col INT, long_col BIGINT, float_col FLOAT, double_col DOUBLE, string_col STRING, nullable_int INT)
+                  &gt; STORED AS AVRO
+                  &gt; TBLPROPERTIES ('avro.schema.literal'='{
+                  &gt;    "name": "my_record",
+                  &gt;    "type": "record",
+                  &gt;    "fields": [
+                  &gt;       {"name":"bool_col", "type":"boolean"},
+                  &gt;       {"name":"int_col", "type":"int"},
+                  &gt;       {"name":"long_col", "type":"long"},
+                  &gt;       {"name":"float_col", "type":"float"},
+                  &gt;       {"name":"double_col", "type":"double"},
+                  &gt;       {"name":"string_col", "type":"string"},
+                  &gt;       {"name": "nullable_int", "type": ["null", "int"]}]}');
+
+[localhost:21000] &gt; CREATE TABLE avro_examples_of_all_types (
+                  &gt;     id INT,
+                  &gt;     bool_col BOOLEAN,
+                  &gt;     tinyint_col TINYINT,
+                  &gt;     smallint_col SMALLINT,
+                  &gt;     int_col INT,
+                  &gt;     bigint_col BIGINT,
+                  &gt;     float_col FLOAT,
+                  &gt;     double_col DOUBLE,
+                  &gt;     date_string_col STRING,
+                  &gt;     string_col STRING
+                  &gt;   )
+                  &gt;   STORED AS AVRO
+                  &gt;   TBLPROPERTIES ('avro.schema.url'='hdfs://localhost:8020/avro_schemas/alltypes.json');
+
+</code></pre>
+
+      <p class="p">
+        The following example demonstrates creating an Avro table in Hive:
+      </p>
+
+<pre class="pre codeblock"><code>
+hive&gt; CREATE TABLE hive_avro_table
+    &gt; ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'
+    &gt; STORED AS INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
+    &gt; OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
+    &gt; TBLPROPERTIES ('avro.schema.literal'='{
+    &gt;    "name": "my_record",
+    &gt;    "type": "record",
+    &gt;    "fields": [
+    &gt;       {"name":"bool_col", "type":"boolean"},
+    &gt;       {"name":"int_col", "type":"int"},
+    &gt;       {"name":"long_col", "type":"long"},
+    &gt;       {"name":"float_col", "type":"float"},
+    &gt;       {"name":"double_col", "type":"double"},
+    &gt;       {"name":"string_col", "type":"string"},
+    &gt;       {"name": "nullable_int", "type": ["null", "int"]}]}');
+
+</code></pre>
+
+      <p class="p">
+        Each field of the record becomes a column of the table. Note that any other information, such as the record
+        name, is ignored.
+      </p>
+
+
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        For nullable Avro columns, make sure to put the <code class="ph codeph">"null"</code> entry before the actual type name.
+        In Impala, all columns are nullable; Impala currently does not have a <code class="ph codeph">NOT NULL</code> clause. Any
+        non-nullable property is only enforced on the Avro side.
+      </div>
+
+      <p class="p">
+        Most column types map directly from Avro to Impala under the same names. These are the exceptions and
+        special cases to consider:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          The <code class="ph codeph">DECIMAL</code> type is defined in Avro as a <code class="ph codeph">BYTE</code> type with the
+          <code class="ph codeph">logicalType</code> property set to <code class="ph codeph">"decimal"</code> and a specified precision and
+          scale.
+        </li>
+
+        <li class="li">
+          The Avro <code class="ph codeph">long</code> type maps to <code class="ph codeph">BIGINT</code> in Impala.
+        </li>
+      </ul>
+
+      <p class="p">
+        If you create the table through Hive, switch back to <span class="keyword cmdname">impala-shell</span> and issue an
+        <code class="ph codeph">INVALIDATE METADATA <var class="keyword varname">table_name</var></code> statement. Then you can run queries for
+        that table through <span class="keyword cmdname">impala-shell</span>.
+      </p>
+
+      <div class="p">
+        In rare instances, a mismatch could occur between the Avro schema and the column definitions in the
+        metastore database. In <span class="keyword">Impala 2.3</span> and higher, Impala checks for such inconsistencies during
+        a <code class="ph codeph">CREATE TABLE</code> statement and each time it loads the metadata for a table (for example,
+        after <code class="ph codeph">INVALIDATE METADATA</code>). Impala uses the following rules to determine how to treat
+        mismatching columns, a process known as <dfn class="term">schema reconciliation</dfn>:
+        <ul class="ul">
+        <li class="li">
+          If there is a mismatch in the number of columns, Impala uses the column
+          definitions from the Avro schema.
+        </li>
+        <li class="li">
+          If there is a mismatch in column name or type, Impala uses the column definition from the Avro schema.
+          Because a <code class="ph codeph">CHAR</code> or <code class="ph codeph">VARCHAR</code> column in Impala maps to an Avro <code class="ph codeph">STRING</code>,
+          this case is not considered a mismatch and the column is preserved as <code class="ph codeph">CHAR</code> or <code class="ph codeph">VARCHAR</code>
+          in the reconciled schema. <span class="ph">Prior to <span class="keyword">Impala 2.7</span> the column
+          name and comment for such <code class="ph codeph">CHAR</code> and <code class="ph codeph">VARCHAR</code> columns was also taken from the SQL column definition.
+          In <span class="keyword">Impala 2.7</span> and higher, the column name and comment from the Avro schema file take precedence for such columns,
+          and only the <code class="ph codeph">CHAR</code> or <code class="ph codeph">VARCHAR</code> type is preserved from the SQL column definition.</span>
+        </li>
+        <li class="li">
+          An Impala <code class="ph codeph">TIMESTAMP</code> column definition maps to an Avro <code class="ph codeph">STRING</code> and is presented as a <code class="ph codeph">STRING</code>
+          in the reconciled schema, because Avro has no binary <code class="ph codeph">TIMESTAMP</code> representation.
+          As a result, no Avro table can have a <code class="ph codeph">TIMESTAMP</code> column; this restriction is the same as
+          in earlier Impala releases.
+        </li>
+        </ul>
+      </div>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+        Although you can create tables in this file format using
+        the complex types (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>,
+        and <code class="ph codeph">MAP</code>) available in <span class="keyword">Impala 2.3</span> and higher,
+        currently, Impala can query these types only in Parquet tables.
+        <span class="ph">
+        The one exception to the preceding rule is <code class="ph codeph">COUNT(*)</code> queries on RCFile tables that include complex types.
+        Such queries are allowed in <span class="keyword">Impala 2.6</span> and higher.
+        </span>
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="avro__avro_map_table">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Using a Hive-Created Avro Table in Impala</h2>
+
+    <div class="body conbody">
+
+      <div class="p">
+        If you have an Avro table created through Hive, you can use it in Impala as long as it contains only
+        Impala-compatible data types. It cannot contain:
+        <ul class="ul">
+          <li class="li">
+            Complex types: <code class="ph codeph">array</code>, <code class="ph codeph">map</code>, <code class="ph codeph">record</code>,
+            <code class="ph codeph">struct</code>, <code class="ph codeph">union</code> other than
+            <code class="ph codeph">[<var class="keyword varname">supported_type</var>,null]</code> or
+            <code class="ph codeph">[null,<var class="keyword varname">supported_type</var>]</code>
+          </li>
+
+          <li class="li">
+            The Avro-specific types <code class="ph codeph">enum</code>, <code class="ph codeph">bytes</code>, and <code class="ph codeph">fixed</code>
+          </li>
+
+          <li class="li">
+            Any scalar type other than those listed in <a class="xref" href="impala_datatypes.html#datatypes">Data Types</a>
+          </li>
+        </ul>
+        Because Impala and Hive share the same metastore database, Impala can directly access the table definitions
+        and data for tables that were created in Hive.
+      </div>
+
+      <p class="p">
+        If you create an Avro table in Hive, issue an <code class="ph codeph">INVALIDATE METADATA</code> the next time you
+        connect to Impala through <span class="keyword cmdname">impala-shell</span>. This is a one-time operation to make Impala
+        aware of the new table. You can issue the statement while connected to any Impala node, and the catalog
+        service broadcasts the change to all other Impala nodes.
+      </p>
+
+      <p class="p">
+        If you load new data into an Avro table through Hive, either through a Hive <code class="ph codeph">LOAD DATA</code> or
+        <code class="ph codeph">INSERT</code> statement, or by manually copying or moving files into the data directory for the
+        table, issue a <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> statement the next time you connect
+        to Impala through <span class="keyword cmdname">impala-shell</span>. You can issue the statement while connected to any
+        Impala node, and the catalog service broadcasts the change to all other Impala nodes. If you issue the
+        <code class="ph codeph">LOAD DATA</code> statement through Impala, you do not need a <code class="ph codeph">REFRESH</code> afterward.
+      </p>
+
+      <p class="p">
+        Impala only supports fields of type <code class="ph codeph">boolean</code>, <code class="ph codeph">int</code>, <code class="ph codeph">long</code>,
+        <code class="ph codeph">float</code>, <code class="ph codeph">double</code>, and <code class="ph codeph">string</code>, or unions of these types with
+        null; for example, <code class="ph codeph">["string", "null"]</code>. Unions with <code class="ph codeph">null</code> essentially
+        create a nullable type.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="avro__avro_json">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Specifying the Avro Schema through JSON</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        While you can embed a schema directly in your <code class="ph codeph">CREATE TABLE</code> statement, as shown above,
+        column width restrictions in the Hive metastore limit the length of schema you can specify. If you
+        encounter problems with long schema literals, try storing your schema as a <code class="ph codeph">JSON</code> file in
+        HDFS instead. Specify your schema in HDFS using table properties similar to the following:
+      </p>
+
+<pre class="pre codeblock"><code>tblproperties ('avro.schema.url'='hdfs//your-name-node:port/path/to/schema.json');</code></pre>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="avro__avro_load_data">
+
+    <h2 class="title topictitle2" id="ariaid-title5">Loading Data into an Avro Table</h2>
+  
+
+    <div class="body conbody">
+
+      <p class="p">
+        Currently, Impala cannot write Avro data files. Therefore, an Avro table cannot be used as the destination
+        of an Impala <code class="ph codeph">INSERT</code> statement or <code class="ph codeph">CREATE TABLE AS SELECT</code>.
+      </p>
+
+      <p class="p">
+        To copy data from another table, issue any <code class="ph codeph">INSERT</code> statements through Hive. For information
+        about loading data into Avro tables through Hive, see
+        <a class="xref" href="https://cwiki.apache.org/confluence/display/Hive/AvroSerDe" target="_blank">Avro
+        page on the Hive wiki</a>.
+      </p>
+
+      <p class="p">
+        If you already have data files in Avro format, you can also issue <code class="ph codeph">LOAD DATA</code> in either
+        Impala or Hive. Impala can move existing Avro data files into an Avro table, it just cannot create new
+        Avro data files.
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="avro__avro_compression">
+
+    <h2 class="title topictitle2" id="ariaid-title6">Enabling Compression for Avro Tables</h2>
+  
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+        To enable compression for Avro tables, specify settings in the Hive shell to enable compression and to
+        specify a codec, then issue a <code class="ph codeph">CREATE TABLE</code> statement as in the preceding examples. Impala
+        supports the <code class="ph codeph">snappy</code> and <code class="ph codeph">deflate</code> codecs for Avro tables.
+      </p>
+
+      <p class="p">
+        For example:
+      </p>
+
+<pre class="pre codeblock"><code>hive&gt; set hive.exec.compress.output=true;
+hive&gt; set avro.output.codec=snappy;</code></pre>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="avro__avro_schema_evolution">
+
+    <h2 class="title topictitle2" id="ariaid-title7">How Impala Handles Avro Schema Evolution</h2>
+  
+
+    <div class="body conbody">
+
+      <p class="p">
+        Starting in Impala 1.1, Impala can deal with Avro data files that employ <dfn class="term">schema evolution</dfn>,
+        where different data files within the same table use slightly different type definitions. (You would
+        perform the schema evolution operation by issuing an <code class="ph codeph">ALTER TABLE</code> statement in the Hive
+        shell.) The old and new types for any changed columns must be compatible, for example a column might start
+        as an <code class="ph codeph">int</code> and later change to a <code class="ph codeph">bigint</code> or <code class="ph codeph">float</code>.
+      </p>
+
+      <p class="p">
+        As with any other tables where the definitions are changed or data is added outside of the current
+        <span class="keyword cmdname">impalad</span> node, ensure that Impala loads the latest metadata for the table if the Avro
+        schema is modified through Hive. Issue a <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> or
+        <code class="ph codeph">INVALIDATE METADATA <var class="keyword varname">table_name</var></code> statement. <code class="ph codeph">REFRESH</code>
+        reloads the metadata immediately, <code class="ph codeph">INVALIDATE METADATA</code> reloads the metadata the next time
+        the table is accessed.
+      </p>
+
+      <p class="p">
+        When Avro data files or columns are not consulted during a query, Impala does not check for consistency.
+        Thus, if you issue <code class="ph codeph">SELECT c1, c2 FROM t1</code>, Impala does not return any error if the column
+        <code class="ph codeph">c3</code> changed in an incompatible way. If a query retrieves data from some partitions but not
+        others, Impala does not check the data files for the unused partitions.
+      </p>
+
+      <p class="p">
+        In the Hive DDL statements, you can specify an <code class="ph codeph">avro.schema.literal</code> table property (if the
+        schema definition is short) or an <code class="ph codeph">avro.schema.url</code> property (if the schema definition is
+        long, or to allow convenient editing for the definition).
+      </p>
+
+      <p class="p">
+        For example, running the following SQL code in the Hive shell creates a table using the Avro file format
+        and puts some sample data into it:
+      </p>
+
+<pre class="pre codeblock"><code>CREATE TABLE avro_table (a string, b string)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.avro.AvroSerDe'
+STORED AS INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
+OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
+TBLPROPERTIES (
+  'avro.schema.literal'='{
+    "type": "record",
+    "name": "my_record",
+    "fields": [
+      {"name": "a", "type": "int"},
+      {"name": "b", "type": "string"}
+    ]}');
+
+INSERT OVERWRITE TABLE avro_table SELECT 1, "avro" FROM functional.alltypes LIMIT 1;
+</code></pre>
+
+      <p class="p">
+        Once the Avro table is created and contains data, you can query it through the
+        <span class="keyword cmdname">impala-shell</span> command:
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select * from avro_table;
++---+------+
+| a | b    |
++---+------+
+| 1 | avro |
++---+------+
+</code></pre>
+
+      <p class="p">
+        Now in the Hive shell, you change the type of a column and add a new column with a default value:
+      </p>
+
+<pre class="pre codeblock"><code>-- Promote column "a" from INT to FLOAT (no need to update Avro schema)
+ALTER TABLE avro_table CHANGE A A FLOAT;
+
+-- Add column "c" with default
+ALTER TABLE avro_table ADD COLUMNS (c int);
+ALTER TABLE avro_table SET TBLPROPERTIES (
+  'avro.schema.literal'='{
+    "type": "record",
+    "name": "my_record",
+    "fields": [
+      {"name": "a", "type": "int"},
+      {"name": "b", "type": "string"},
+      {"name": "c", "type": "int", "default": 10}
+    ]}');
+</code></pre>
+
+      <p class="p">
+        Once again in <span class="keyword cmdname">impala-shell</span>, you can query the Avro table based on its latest schema
+        definition. Because the table metadata was changed outside of Impala, you issue a <code class="ph codeph">REFRESH</code>
+        statement first so that Impala has up-to-date metadata for the table.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; refresh avro_table;
+[localhost:21000] &gt; select * from avro_table;
++---+------+----+
+| a | b    | c  |
++---+------+----+
+| 1 | avro | 10 |
++---+------+----+
+</code></pre>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="avro__avro_data_types">
+
+    <h2 class="title topictitle2" id="ariaid-title8">Data Type Considerations for Avro Tables</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        The Avro format defines a set of data types whose names differ from the names of the corresponding Impala
+        data types. If you are preparing Avro files using other Hadoop components such as Pig or MapReduce, you
+        might need to work with the type names defined by Avro. The following figure lists the Avro-defined types
+        and the equivalent types in Impala.
+      </p>
+
+<pre class="pre codeblock"><code>Primitive Types (Avro -&gt; Impala)
+--------------------------------
+STRING -&gt; STRING
+STRING -&gt; CHAR
+STRING -&gt; VARCHAR
+INT -&gt; INT
+BOOLEAN -&gt; BOOLEAN
+LONG -&gt;  BIGINT
+FLOAT -&gt;  FLOAT
+DOUBLE -&gt; DOUBLE
+
+Logical Types
+-------------
+BYTES + logicalType = "decimal" -&gt; DECIMAL
+
+Avro Types with No Impala Equivalent
+------------------------------------
+RECORD, MAP, ARRAY, UNION,  ENUM, FIXED, NULL
+
+Impala Types with No Avro Equivalent
+------------------------------------
+TIMESTAMP
+
+</code></pre>
+
+      <p class="p">
+        The Avro specification allows string values up to 2**64 bytes in length.
+        Impala queries for Avro tables use 32-bit integers to hold string lengths.
+        In <span class="keyword">Impala 2.5</span> and higher, Impala truncates <code class="ph codeph">CHAR</code>
+        and <code class="ph codeph">VARCHAR</code> values in Avro tables to (2**31)-1 bytes.
+        If a query encounters a <code class="ph codeph">STRING</code> value longer than (2**31)-1
+        bytes in an Avro table, the query fails. In earlier releases,
+        encountering such long values in an Avro table could cause a crash.
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="avro__avro_performance">
+
+    <h2 class="title topictitle2" id="ariaid-title9">Query Performance for Impala Avro Tables</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        In general, expect query performance with Avro tables to be
+        faster than with tables using text data, but slower than with
+        Parquet tables. See <a class="xref" href="impala_parquet.html#parquet">Using the Parquet File Format with Impala Tables</a>
+        for information about using the Parquet file format for
+        high-performance analytic queries.
+      </p>
+
+      <p class="p">
+        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files stored in Amazon S3.
+        For Impala tables that use the file formats Parquet, RCFile, SequenceFile,
+        Avro, and uncompressed text, the setting <code class="ph codeph">fs.s3a.block.size</code>
+        in the <span class="ph filepath">core-site.xml</span> configuration file determines
+        how Impala divides the I/O work of reading the data files. This configuration
+        setting is specified in bytes. By default, this
+        value is 33554432 (32 MB), meaning that Impala parallelizes S3 read operations on the files
+        as if they were made up of 32 MB blocks. For example, if your S3 queries primarily access
+        Parquet files written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code>
+        to 134217728 (128 MB) to match the row group size of those files. If most S3 queries involve
+        Parquet files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code>
+        to 268435456 (256 MB) to match the row group size produced by Impala.
+      </p>
+
+    </div>
+  </article>
+
+</article></main></body></html>

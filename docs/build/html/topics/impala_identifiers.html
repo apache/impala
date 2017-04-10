@@ -1,0 +1,110 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="identifiers"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Overview of Impala Identifiers</title></head><body id="identifiers"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Overview of Impala Identifiers</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Identifiers are the names of databases, tables, or columns that you specify in a SQL statement. The rules for
+      identifiers govern what names you can give to things you create, the notation for referring to names
+      containing unusual characters, and other aspects such as case sensitivity.
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        <p class="p">
+        The minimum length of an identifier is 1 character.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+        The maximum length of an identifier is currently 128 characters, enforced by the metastore database.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+        An identifier must start with an alphabetic character. The remainder can contain any combination of
+        alphanumeric characters and underscores. Quoting the identifier with backticks has no effect on the allowed
+        characters in the name.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+        An identifier can contain only ASCII characters.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+        To use an identifier name that matches one of the Impala reserved keywords (listed in
+        <a class="xref" href="impala_reserved_words.html#reserved_words">Impala Reserved Words</a>), surround the identifier with <code class="ph codeph">``</code>
+        characters (backticks). Quote the reserved word even if it is part of a fully qualified name.
+        The following example shows how a reserved word can be used as a column name if it is quoted
+        with backticks in the <code class="ph codeph">CREATE TABLE</code> statement, and how the column name
+        must also be quoted with backticks in a query:
+        </p>
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table reserved (`data` string);
+
+[localhost:21000] &gt; select data from reserved;
+ERROR: AnalysisException: Syntax error in line 1:
+select data from reserved
+       ^
+Encountered: DATA
+Expected: ALL, CASE, CAST, DISTINCT, EXISTS, FALSE, IF, INTERVAL, NOT, NULL, STRAIGHT_JOIN, TRUE, IDENTIFIER
+CAUSED BY: Exception: Syntax error
+
+[localhost:21000] &gt; select reserved.data from reserved;
+ERROR: AnalysisException: Syntax error in line 1:
+select reserved.data from reserved
+                ^
+Encountered: DATA
+Expected: IDENTIFIER
+CAUSED BY: Exception: Syntax error
+
+[localhost:21000] &gt; select reserved.`data` from reserved;
+
+[localhost:21000] &gt;
+</code></pre>
+
+        <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
+          Because the list of reserved words grows over time as new SQL syntax is added,
+          consider adopting coding conventions (especially for any automated scripts
+          or in packaged applications) to always quote all identifiers with backticks.
+          Quoting all identifiers protects your SQL from compatibility issues if
+          new reserved words are added in later releases.
+        </div>
+
+      </li>
+
+      <li class="li">
+        <p class="p">
+        Impala identifiers are always case-insensitive. That is, tables named <code class="ph codeph">t1</code> and
+        <code class="ph codeph">T1</code> always refer to the same table, regardless of quote characters. Internally, Impala
+        always folds all specified table and column names to lowercase. This is why the column headers in query
+        output are always displayed in lowercase.
+        </p>
+      </li>
+    </ul>
+
+    <p class="p">
+      See <a class="xref" href="impala_aliases.html#aliases">Overview of Impala Aliases</a> for how to define shorter or easier-to-remember aliases if the
+      original names are long or cryptic identifiers.
+      <span class="ph"> Aliases follow the same rules as identifiers when it comes to case
+        insensitivity. Aliases can be longer than identifiers (up to the maximum length of a Java string) and can
+        include additional characters such as spaces and dashes when they are quoted using backtick characters.
+        </span>
+    </p>
+
+    <p class="p">
+        Another way to define different names for the same tables or columns is to create views. See
+        <a class="xref" href="../shared/../topics/impala_views.html#views">Overview of Impala Views</a> for details.
+      </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_schema_objects.html">Impala Schema Objects and Object Names</a></div></div></nav></article></main></body></html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="mem_limits"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Controlling Impala Resource Usage</title></head><body id="mem_limits"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Controlling Impala Resource Usage</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Sometimes, balancing raw query performance against scalability requires limiting the amount of resources,
+      such as memory or CPU, used by a single query or group of queries. Impala can use several mechanisms that
+      help to smooth out the load during heavy concurrent usage, resulting in faster overall query times and
+      sharing of resources across Impala queries, MapReduce jobs, and other kinds of workloads across a <span class="keyword"></span>
+      cluster:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        The Impala admission control feature uses a fast, distributed mechanism to hold back queries that exceed
+        limits on the number of concurrent queries or the amount of memory used. The queries are queued, and
+        executed as other queries finish and resources become available. You can control the concurrency limits,
+        and specify different limits for different groups of users to divide cluster resources according to the
+        priorities of different classes of users. This feature is new in Impala 1.3.
+        See <a class="xref" href="impala_admission.html#admission_control">Admission Control and Query Queuing</a> for details.
+      </li>
+
+      <li class="li">
+        <p class="p">
+          You can restrict the amount of memory Impala reserves during query execution by specifying the
+          <code class="ph codeph">-mem_limit</code> option for the <code class="ph codeph">impalad</code> daemon. See
+          <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for details. This limit applies only to the
+          memory that is directly consumed by queries; Impala reserves additional memory at startup, for example to
+          hold cached metadata.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+          For production deployments, implement resource isolation using your cluster management
+          tool.
+        </p>
+      </li>
+    </ul>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div></div></nav></article></main></body></html>

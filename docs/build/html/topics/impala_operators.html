@@ -1,0 +1,1937 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="operators"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>SQL Operators</title></head><body id="operators"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">SQL Operators</h1>
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      SQL operators are a class of comparison functions that are widely used within the <code class="ph codeph">WHERE</code> clauses of
+      <code class="ph codeph">SELECT</code> statements.
+    </p>
+
+    <p class="p toc inpage"></p>
+
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref.html">Impala SQL Language Reference</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="operators__arithmetic_operators">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Arithmetic Operators</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+        The arithmetic operators use expressions with a left-hand argument, the operator, and then (in most cases) a right-hand argument.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">left_hand_arg</var> <var class="keyword varname">binary_operator</var> <var class="keyword varname">right_hand_arg</var>
+<var class="keyword varname">unary_operator</var> <var class="keyword varname">single_arg</var>
+</code></pre>
+
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">+</code> and <code class="ph codeph">-</code>: Can be used either as unary or binary operators.
+          <ul class="ul">
+            <li class="li">
+              <p class="p">
+                With unary notation, such as <code class="ph codeph">+5</code>, <code class="ph codeph">-2.5</code>, or <code class="ph codeph">-<var class="keyword varname">col_name</var></code>,
+                they multiply their single numeric argument by <code class="ph codeph">+1</code> or <code class="ph codeph">-1</code>. Therefore, unary
+                <code class="ph codeph">+</code> returns its argument unchanged, while unary <code class="ph codeph">-</code> flips the sign of its argument. Although
+                you can double up these operators in expressions such as <code class="ph codeph">++5</code> (always positive) or <code class="ph codeph">-+2</code> or
+                <code class="ph codeph">+-2</code> (both always negative), you cannot double the unary minus operator because <code class="ph codeph">--</code> is
+                interpreted as the start of a comment. (You can use a double unary minus operator if you separate the <code class="ph codeph">-</code>
+                characters, for example with a space or parentheses.)
+              </p>
+            </li>
+
+            <li class="li">
+              <p class="p">
+                With binary notation, such as <code class="ph codeph">2+2</code>, <code class="ph codeph">5-2.5</code>, or <code class="ph codeph"><var class="keyword varname">col1</var> +
+                <var class="keyword varname">col2</var></code>, they add or subtract respectively the right-hand argument to (or from) the left-hand
+                argument. Both arguments must be of numeric types.
+              </p>
+            </li>
+          </ul>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">*</code> and <code class="ph codeph">/</code>: Multiplication and division respectively. Both arguments must be of numeric types.
+          </p>
+
+          <p class="p">
+            When multiplying, the shorter argument is promoted if necessary (such as <code class="ph codeph">SMALLINT</code> to <code class="ph codeph">INT</code> or
+            <code class="ph codeph">BIGINT</code>, or <code class="ph codeph">FLOAT</code> to <code class="ph codeph">DOUBLE</code>), and then the result is promoted again to the
+            next larger type. Thus, multiplying a <code class="ph codeph">TINYINT</code> and an <code class="ph codeph">INT</code> produces a <code class="ph codeph">BIGINT</code>
+            result. Multiplying a <code class="ph codeph">FLOAT</code> and a <code class="ph codeph">FLOAT</code> produces a <code class="ph codeph">DOUBLE</code> result. Multiplying
+            a <code class="ph codeph">FLOAT</code> and a <code class="ph codeph">DOUBLE</code> or a <code class="ph codeph">DOUBLE</code> and a <code class="ph codeph">DOUBLE</code> produces a
+            <code class="ph codeph">DECIMAL(38,17)</code>, because <code class="ph codeph">DECIMAL</code> values can represent much larger and more precise values than
+            <code class="ph codeph">DOUBLE</code>.
+          </p>
+
+          <p class="p">
+            When dividing, Impala always treats the arguments and result as <code class="ph codeph">DOUBLE</code> values to avoid losing precision. If you
+            need to insert the results of a division operation into a <code class="ph codeph">FLOAT</code> column, use the <code class="ph codeph">CAST()</code>
+            function to convert the result to the correct type.
+          </p>
+        </li>
+
+        <li class="li" id="arithmetic_operators__div">
+          <p class="p">
+            <code class="ph codeph">DIV</code>: Integer division. Arguments are not promoted to a floating-point type, and any fractional result
+            is discarded. For example, <code class="ph codeph">13 DIV 7</code> returns 1, <code class="ph codeph">14 DIV 7</code> returns 2, and
+            <code class="ph codeph">15 DIV 7</code> returns 2. This operator is the same as the <code class="ph codeph">QUOTIENT()</code> function.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">%</code>: Modulo operator. Returns the remainder of the left-hand argument divided by the right-hand argument. Both
+            arguments must be of one of the integer types.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">&amp;</code>, <code class="ph codeph">|</code>, <code class="ph codeph">~</code>, and <code class="ph codeph">^</code>: Bitwise operators that return the
+            logical AND, logical OR, <code class="ph codeph">NOT</code>, or logical XOR (exclusive OR) of their argument values. Both arguments must be of
+            one of the integer types. If the arguments are of different type, the argument with the smaller type is implicitly extended to
+            match the argument with the longer type.
+          </p>
+        </li>
+      </ul>
+
+      <p class="p">
+        You can chain a sequence of arithmetic expressions, optionally grouping them with parentheses.
+      </p>
+
+      <p class="p">
+        The arithmetic operators generally do not have equivalent calling conventions using functional notation. For example, prior to
+        <span class="keyword">Impala 2.2</span>, there is no <code class="ph codeph">MOD()</code> function equivalent to the <code class="ph codeph">%</code> modulo operator.
+        Conversely, there are some arithmetic functions that do not have a corresponding operator. For example, for exponentiation you use
+        the <code class="ph codeph">POW()</code> function, but there is no <code class="ph codeph">**</code> exponentiation operator. See
+        <a class="xref" href="impala_math_functions.html#math_functions">Impala Mathematical Functions</a> for the arithmetic functions you can use.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        To access a column with a complex type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>)
+        in an aggregation function, you unpack the individual elements using join notation in the query,
+        and then apply the function to the final scalar item, field, key, or value at the bottom of any nested type hierarchy in the column.
+        See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details about using complex types in Impala.
+      </p>
+
+      <div class="p">
+The following example demonstrates calls to several aggregation functions
+using values from a column containing nested complex types
+(an <code class="ph codeph">ARRAY</code> of <code class="ph codeph">STRUCT</code> items).
+The array is unpacked inside the query using join notation.
+The array elements are referenced using the <code class="ph codeph">ITEM</code>
+pseudocolumn, and the structure fields inside the array elements
+are referenced using dot notation.
+Numeric values such as <code class="ph codeph">SUM()</code> and <code class="ph codeph">AVG()</code>
+are computed using the numeric <code class="ph codeph">R_NATIONKEY</code> field, and
+the general-purpose <code class="ph codeph">MAX()</code> and <code class="ph codeph">MIN()</code>
+values are computed from the string <code class="ph codeph">N_NAME</code> field.
+<pre class="pre codeblock"><code>describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+select r_name, r_nations.item.n_nationkey
+  from region, region.r_nations as r_nations
+order by r_name, r_nations.item.n_nationkey;
++-------------+------------------+
+| r_name      | item.n_nationkey |
++-------------+------------------+
+| AFRICA      | 0                |
+| AFRICA      | 5                |
+| AFRICA      | 14               |
+| AFRICA      | 15               |
+| AFRICA      | 16               |
+| AMERICA     | 1                |
+| AMERICA     | 2                |
+| AMERICA     | 3                |
+| AMERICA     | 17               |
+| AMERICA     | 24               |
+| ASIA        | 8                |
+| ASIA        | 9                |
+| ASIA        | 12               |
+| ASIA        | 18               |
+| ASIA        | 21               |
+| EUROPE      | 6                |
+| EUROPE      | 7                |
+| EUROPE      | 19               |
+| EUROPE      | 22               |
+| EUROPE      | 23               |
+| MIDDLE EAST | 4                |
+| MIDDLE EAST | 10               |
+| MIDDLE EAST | 11               |
+| MIDDLE EAST | 13               |
+| MIDDLE EAST | 20               |
++-------------+------------------+
+
+select
+  r_name,
+  count(r_nations.item.n_nationkey) as count,
+  sum(r_nations.item.n_nationkey) as sum,
+  avg(r_nations.item.n_nationkey) as avg,
+  min(r_nations.item.n_name) as minimum,
+  max(r_nations.item.n_name) as maximum,
+  ndv(r_nations.item.n_nationkey) as distinct_vals
+from
+  region, region.r_nations as r_nations
+group by r_name
+order by r_name;
++-------------+-------+-----+------+-----------+----------------+---------------+
+| r_name      | count | sum | avg  | minimum   | maximum        | distinct_vals |
++-------------+-------+-----+------+-----------+----------------+---------------+
+| AFRICA      | 5     | 50  | 10   | ALGERIA   | MOZAMBIQUE     | 5             |
+| AMERICA     | 5     | 47  | 9.4  | ARGENTINA | UNITED STATES  | 5             |
+| ASIA        | 5     | 68  | 13.6 | CHINA     | VIETNAM        | 5             |
+| EUROPE      | 5     | 77  | 15.4 | FRANCE    | UNITED KINGDOM | 5             |
+| MIDDLE EAST | 5     | 58  | 11.6 | EGYPT     | SAUDI ARABIA   | 5             |
++-------------+-------+-----+------+-----------+----------------+---------------+
+</code></pre>
+</div>
+
+      <p class="p">
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        directly in an operator. You can apply operators only to scalar values that make up a complex type
+        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
+        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
+        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
+        pseudocolumn names.
+      </p>
+
+      <p class="p">
+        The following example shows how to do an arithmetic operation using a numeric field of a <code class="ph codeph">STRUCT</code> type that is an
+        item within an <code class="ph codeph">ARRAY</code> column. Once the scalar numeric value <code class="ph codeph">R_NATIONKEY</code> is extracted, it can be
+        used in an arithmetic expression, such as multiplying by 10:
+      </p>
+
+<pre class="pre codeblock"><code>
+-- The SMALLINT is a field within an array of structs.
+describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+-- When we refer to the scalar value using dot notation,
+-- we can use arithmetic and comparison operators on it
+-- like any other number.
+select r_name, nation.item.n_name, nation.item.n_nationkey * 10
+  from region, region.r_nations as nation
+where nation.item.n_nationkey &lt; 5;
++-------------+-------------+------------------------------+
+| r_name      | item.n_name | nation.item.n_nationkey * 10 |
++-------------+-------------+------------------------------+
+| AMERICA     | CANADA      | 30                           |
+| AMERICA     | BRAZIL      | 20                           |
+| AMERICA     | ARGENTINA   | 10                           |
+| MIDDLE EAST | EGYPT       | 40                           |
+| AFRICA      | ALGERIA     | 0                            |
++-------------+-------------+------------------------------+
+</code></pre>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="operators__between">
+
+    <h2 class="title topictitle2" id="ariaid-title3">BETWEEN Operator</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+        In a <code class="ph codeph">WHERE</code> clause, compares an expression to both a lower and upper bound. The comparison is successful is the
+        expression is greater than or equal to the lower bound, and less than or equal to the upper bound. If the bound values are switched,
+        so the lower bound is greater than the upper bound, does not match any values.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">expression</var> BETWEEN <var class="keyword varname">lower_bound</var> AND <var class="keyword varname">upper_bound</var></code></pre>
+
+      <p class="p">
+        <strong class="ph b">Data types:</strong> Typically used with numeric data types. Works with any data type, although not very practical for
+        <code class="ph codeph">BOOLEAN</code> values. (<code class="ph codeph">BETWEEN false AND true</code> will match all <code class="ph codeph">BOOLEAN</code> values.) Use
+        <code class="ph codeph">CAST()</code> if necessary to ensure the lower and upper bound values are compatible types. Call string or date/time
+        functions if necessary to extract or transform the relevant portion to compare, especially if the value can be transformed into a
+        number.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+      <p class="p">
+        Be careful when using short string operands. A longer string that starts with the upper bound value will not be included, because it
+        is considered greater than the upper bound. For example, <code class="ph codeph">BETWEEN 'A' and 'M'</code> would not match the string value
+        <code class="ph codeph">'Midway'</code>. Use functions such as <code class="ph codeph">upper()</code>, <code class="ph codeph">lower()</code>, <code class="ph codeph">substr()</code>,
+        <code class="ph codeph">trim()</code>, and so on if necessary to ensure the comparison works as expected.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        directly in an operator. You can apply operators only to scalar values that make up a complex type
+        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
+        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
+        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
+        pseudocolumn names.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>-- Retrieve data for January through June, inclusive.
+select c1 from t1 where month <strong class="ph b">between 1 and 6</strong>;
+
+-- Retrieve data for names beginning with 'A' through 'M' inclusive.
+-- Only test the first letter to ensure all the values starting with 'M' are matched.
+-- Do a case-insensitive comparison to match names with various capitalization conventions.
+select last_name from customers where upper(substr(last_name,1,1)) <strong class="ph b">between 'A' and 'M'</strong>;
+
+-- Retrieve data for only the first week of each month.
+select count(distinct visitor_id)) from web_traffic where dayofmonth(when_viewed) <strong class="ph b">between 1 and 7</strong>;</code></pre>
+
+      <p class="p">
+        The following example shows how to do a <code class="ph codeph">BETWEEN</code> comparison using a numeric field of a <code class="ph codeph">STRUCT</code> type
+        that is an item within an <code class="ph codeph">ARRAY</code> column. Once the scalar numeric value <code class="ph codeph">R_NATIONKEY</code> is extracted, it
+        can be used in a comparison operator:
+      </p>
+
+<pre class="pre codeblock"><code>
+-- The SMALLINT is a field within an array of structs.
+describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+-- When we refer to the scalar value using dot notation,
+-- we can use arithmetic and comparison operators on it
+-- like any other number.
+select r_name, nation.item.n_name, nation.item.n_nationkey
+from region, region.r_nations as nation
+where nation.item.n_nationkey between 3 and 5
++-------------+-------------+------------------+
+| r_name      | item.n_name | item.n_nationkey |
++-------------+-------------+------------------+
+| AMERICA     | CANADA      | 3                |
+| MIDDLE EAST | EGYPT       | 4                |
+| AFRICA      | ETHIOPIA    | 5                |
++-------------+-------------+------------------+
+</code></pre>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="operators__comparison_operators">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Comparison Operators</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+        Impala supports the familiar comparison operators for checking equality and sort order for the column data types:
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">left_hand_expression</var> <var class="keyword varname">comparison_operator</var> <var class="keyword varname">right_hand_expression</var></code></pre>
+
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">=</code>, <code class="ph codeph">!=</code>, <code class="ph codeph">&lt;&gt;</code>: apply to all types.
+        </li>
+
+        <li class="li">
+          <code class="ph codeph">&lt;</code>, <code class="ph codeph">&lt;=</code>, <code class="ph codeph">&gt;</code>, <code class="ph codeph">&gt;=</code>: apply to all types; for
+          <code class="ph codeph">BOOLEAN</code>, <code class="ph codeph">TRUE</code> is considered greater than <code class="ph codeph">FALSE</code>.
+        </li>
+      </ul>
+
+      <p class="p">
+        <strong class="ph b">Alternatives:</strong>
+      </p>
+
+      <p class="p">
+        The <code class="ph codeph">IN</code> and <code class="ph codeph">BETWEEN</code> operators provide shorthand notation for expressing combinations of equality,
+        less than, and greater than comparisons with a single operator.
+      </p>
+
+      <p class="p">
+        Because comparing any value to <code class="ph codeph">NULL</code> produces <code class="ph codeph">NULL</code> rather than <code class="ph codeph">TRUE</code> or
+        <code class="ph codeph">FALSE</code>, use the <code class="ph codeph">IS NULL</code> and <code class="ph codeph">IS NOT NULL</code> operators to check if a value is
+        <code class="ph codeph">NULL</code> or not.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        directly in an operator. You can apply operators only to scalar values that make up a complex type
+        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
+        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
+        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
+        pseudocolumn names.
+      </p>
+
+      <p class="p">
+        The following example shows how to do an arithmetic operation using a numeric field of a <code class="ph codeph">STRUCT</code> type that is an
+        item within an <code class="ph codeph">ARRAY</code> column. Once the scalar numeric value <code class="ph codeph">R_NATIONKEY</code> is extracted, it can be
+        used with a comparison operator such as <code class="ph codeph">&lt;</code>:
+      </p>
+
+<pre class="pre codeblock"><code>
+-- The SMALLINT is a field within an array of structs.
+describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+-- When we refer to the scalar value using dot notation,
+-- we can use arithmetic and comparison operators on it
+-- like any other number.
+select r_name, nation.item.n_name, nation.item.n_nationkey
+from region, region.r_nations as nation
+where nation.item.n_nationkey &lt; 5
++-------------+-------------+------------------+
+| r_name      | item.n_name | item.n_nationkey |
++-------------+-------------+------------------+
+| AMERICA     | CANADA      | 3                |
+| AMERICA     | BRAZIL      | 2                |
+| AMERICA     | ARGENTINA   | 1                |
+| MIDDLE EAST | EGYPT       | 4                |
+| AFRICA      | ALGERIA     | 0                |
++-------------+-------------+------------------+
+</code></pre>
+
+    </div>
+
+  </article>
+
+  
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="operators__exists">
+
+    <h2 class="title topictitle2" id="ariaid-title5">EXISTS Operator</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+
+        
+        The <code class="ph codeph">EXISTS</code> operator tests whether a subquery returns any results. You typically use it to find values from one
+        table that have corresponding values in another table.
+      </p>
+
+      <p class="p">
+        The converse, <code class="ph codeph">NOT EXISTS</code>, helps to find all the values from one table that do not have any corresponding values in
+        another table.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>EXISTS (<var class="keyword varname">subquery</var>)
+NOT EXISTS (<var class="keyword varname">subquery</var>)
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+      <p class="p">
+        The subquery can refer to a different table than the outer query block, or the same table. For example, you might use
+        <code class="ph codeph">EXISTS</code> or <code class="ph codeph">NOT EXISTS</code> to check the existence of parent/child relationships between two columns of
+        the same table.
+      </p>
+
+      <p class="p">
+        You can also use operators and function calls within the subquery to test for other kinds of relationships other than strict
+        equality. For example, you might use a call to <code class="ph codeph">COUNT()</code> in the subquery to check whether the number of matching
+        values is higher or lower than some limit. You might call a UDF in the subquery to check whether values in one table matches a
+        hashed representation of those same values in a different table.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">NULL considerations:</strong>
+      </p>
+
+      <p class="p">
+        If the subquery returns any value at all (even <code class="ph codeph">NULL</code>), <code class="ph codeph">EXISTS</code> returns <code class="ph codeph">TRUE</code> and
+        <code class="ph codeph">NOT EXISTS</code> returns false.
+      </p>
+
+      <p class="p">
+        The following example shows how even when the subquery returns only <code class="ph codeph">NULL</code> values, <code class="ph codeph">EXISTS</code> still
+        returns <code class="ph codeph">TRUE</code> and thus matches all the rows from the table in the outer query block.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table all_nulls (x int);
+[localhost:21000] &gt; insert into all_nulls values (null), (null), (null);
+[localhost:21000] &gt; select y from t2 where exists (select x from all_nulls);
++---+
+| y |
++---+
+| 2 |
+| 4 |
+| 6 |
++---+
+</code></pre>
+
+      <p class="p">
+        However, if the table in the subquery is empty and so the subquery returns an empty result set, <code class="ph codeph">EXISTS</code> returns
+        <code class="ph codeph">FALSE</code>:
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table empty (x int);
+[localhost:21000] &gt; select y from t2 where exists (select x from empty);
+[localhost:21000] &gt;
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Restrictions:</strong>
+      </p>
+
+      <p class="p">
+        Correlated subqueries used in <code class="ph codeph">EXISTS</code> and <code class="ph codeph">IN</code> operators cannot include a
+        <code class="ph codeph">LIMIT</code> clause.
+      </p>
+
+      <p class="p">
+        Prior to <span class="keyword">Impala 2.6</span>,
+        the <code class="ph codeph">NOT EXISTS</code> operator required a correlated subquery.
+        In <span class="keyword">Impala 2.6</span> and higher, <code class="ph codeph">NOT EXISTS</code> works with
+        uncorrelated queries also.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        directly in an operator. You can apply operators only to scalar values that make up a complex type
+        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
+        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
+        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
+        pseudocolumn names.
+      </p>
+
+
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+      <div class="p">
+
+
+        The following examples refer to these simple tables containing small sets of integers or strings:
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table t1 (x int);
+[localhost:21000] &gt; insert into t1 values (1), (2), (3), (4), (5), (6);
+
+[localhost:21000] &gt; create table t2 (y int);
+[localhost:21000] &gt; insert into t2 values (2), (4), (6);
+
+[localhost:21000] &gt; create table t3 (z int);
+[localhost:21000] &gt; insert into t3 values (1), (3), (5);
+
+[localhost:21000] &gt; create table month_names (m string);
+[localhost:21000] &gt; insert into month_names values
+                  &gt; ('January'), ('February'), ('March'),
+                  &gt; ('April'), ('May'), ('June'), ('July'),
+                  &gt; ('August'), ('September'), ('October'),
+                  &gt; ('November'), ('December');
+</code></pre>
+      </div>
+
+      <p class="p">
+        The following example shows a correlated subquery that finds all the values in one table that exist in another table. For each value
+        <code class="ph codeph">X</code> from <code class="ph codeph">T1</code>, the query checks if the <code class="ph codeph">Y</code> column of <code class="ph codeph">T2</code> contains an
+        identical value, and the <code class="ph codeph">EXISTS</code> operator returns <code class="ph codeph">TRUE</code> or <code class="ph codeph">FALSE</code> as appropriate in
+        each case.
+      </p>
+
+<pre class="pre codeblock"><code>localhost:21000] &gt; select x from t1 where exists (select y from t2 where t1.x = y);
++---+
+| x |
++---+
+| 2 |
+| 4 |
+| 6 |
++---+
+</code></pre>
+
+      <p class="p">
+        An uncorrelated query is less interesting in this case. Because the subquery always returns <code class="ph codeph">TRUE</code>, all rows from
+        <code class="ph codeph">T1</code> are returned. If the table contents where changed so that the subquery did not match any rows, none of the rows
+        from <code class="ph codeph">T1</code> would be returned.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select x from t1 where exists (select y from t2 where y &gt; 5);
++---+
+| x |
++---+
+| 1 |
+| 2 |
+| 3 |
+| 4 |
+| 5 |
+| 6 |
++---+
+</code></pre>
+
+      <p class="p">
+        The following example shows how an uncorrelated subquery can test for the existence of some condition within a table. By using
+        <code class="ph codeph">LIMIT 1</code> or an aggregate function, the query returns a single result or no result based on whether the subquery
+        matches any rows. Here, we know that <code class="ph codeph">T1</code> and <code class="ph codeph">T2</code> contain some even numbers, but <code class="ph codeph">T3</code>
+        does not.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select "contains an even number" from t1 where exists (select x from t1 where x % 2 = 0) limit 1;
++---------------------------+
+| 'contains an even number' |
++---------------------------+
+| contains an even number   |
++---------------------------+
+[localhost:21000] &gt; select "contains an even number" as assertion from t1 where exists (select x from t1 where x % 2 = 0) limit 1;
++-------------------------+
+| assertion               |
++-------------------------+
+| contains an even number |
++-------------------------+
+[localhost:21000] &gt; select "contains an even number" as assertion from t2 where exists (select x from t2 where y % 2 = 0) limit 1;
+ERROR: AnalysisException: couldn't resolve column reference: 'x'
+[localhost:21000] &gt; select "contains an even number" as assertion from t2 where exists (select y from t2 where y % 2 = 0) limit 1;
++-------------------------+
+| assertion               |
++-------------------------+
+| contains an even number |
++-------------------------+
+[localhost:21000] &gt; select "contains an even number" as assertion from t3 where exists (select z from t3 where z % 2 = 0) limit 1;
+[localhost:21000] &gt;
+</code></pre>
+
+      <p class="p">
+        The following example finds numbers in one table that are 1 greater than numbers from another table. The <code class="ph codeph">EXISTS</code>
+        notation is simpler than an equivalent <code class="ph codeph">CROSS JOIN</code> between the tables. (The example then also illustrates how the
+        same test could be performed using an <code class="ph codeph">IN</code> operator.)
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select x from t1 where exists (select y from t2 where x = y + 1);
++---+
+| x |
++---+
+| 3 |
+| 5 |
++---+
+[localhost:21000] &gt; select x from t1 where x in (select y + 1 from t2);
++---+
+| x |
++---+
+| 3 |
+| 5 |
++---+
+</code></pre>
+
+      <p class="p">
+        The following example finds values from one table that do not exist in another table.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select x from t1 where not exists (select y from t2 where x = y);
++---+
+| x |
++---+
+| 1 |
+| 3 |
+| 5 |
++---+
+</code></pre>
+
+      <p class="p">
+        The following example uses the <code class="ph codeph">NOT EXISTS</code> operator to find all the leaf nodes in tree-structured data. This
+        simplified <span class="q">"tree of life"</span> has multiple levels (class, order, family, and so on), with each item pointing upward through a
+        <code class="ph codeph">PARENT</code> pointer. The example runs an outer query and a subquery on the same table, returning only those items whose
+        <code class="ph codeph">ID</code> value is <em class="ph i">not</em> referenced by the <code class="ph codeph">PARENT</code> of any other item.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table tree (id int, parent int, name string);
+[localhost:21000] &gt; insert overwrite tree values
+                  &gt; (0, null, "animals"),
+                  &gt; (1, 0, "placentals"),
+                  &gt; (2, 0, "marsupials"),
+                  &gt; (3, 1, "bats"),
+                  &gt; (4, 1, "cats"),
+                  &gt; (5, 2, "kangaroos"),
+                  &gt; (6, 4, "lions"),
+                  &gt; (7, 4, "tigers"),
+                  &gt; (8, 5, "red kangaroo"),
+                  &gt; (9, 2, "wallabies");
+[localhost:21000] &gt; select name as "leaf node" from tree one
+                  &gt; where not exists (select parent from tree two where one.id = two.parent);
++--------------+
+| leaf node    |
++--------------+
+| bats         |
+| lions        |
+| tigers       |
+| red kangaroo |
+| wallabies    |
++--------------+
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+      <p class="p">
+        <a class="xref" href="impala_subqueries.html#subqueries">Subqueries in Impala SELECT Statements</a>
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="operators__ilike">
+
+    <h2 class="title topictitle2" id="ariaid-title6">ILIKE Operator</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+        A case-insensitive comparison operator for <code class="ph codeph">STRING</code> data, with basic wildcard capability using <code class="ph codeph">_</code> to match a single
+        character and <code class="ph codeph">%</code> to match multiple characters. The argument expression must match the entire string value.
+        Typically, it is more efficient to put any <code class="ph codeph">%</code> wildcard match at the end of the string.
+      </p>
+
+      <p class="p">
+        This operator, available in <span class="keyword">Impala 2.5</span> and higher, is the equivalent of the <code class="ph codeph">LIKE</code> operator,
+        but with case-insensitive comparisons.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">string_expression</var> ILIKE <var class="keyword varname">wildcard_expression</var>
+<var class="keyword varname">string_expression</var> NOT ILIKE <var class="keyword varname">wildcard_expression</var>
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        directly in an operator. You can apply operators only to scalar values that make up a complex type
+        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
+        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
+        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
+        pseudocolumn names.
+      </p>
+
+
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+      <p class="p">
+        In the following examples, strings that are the same except for differences in uppercase
+        and lowercase match successfully with <code class="ph codeph">ILIKE</code>, but do not match
+        with <code class="ph codeph">LIKE</code>:
+      </p>
+
+<pre class="pre codeblock"><code>select 'fooBar' ilike 'FOOBAR';
++-------------------------+
+| 'foobar' ilike 'foobar' |
++-------------------------+
+| true                    |
++-------------------------+
+
+select 'fooBar' like 'FOOBAR';
++------------------------+
+| 'foobar' like 'foobar' |
++------------------------+
+| false                  |
++------------------------+
+
+select 'FOOBAR' ilike 'f%';
++---------------------+
+| 'foobar' ilike 'f%' |
++---------------------+
+| true                |
++---------------------+
+
+select 'FOOBAR' like 'f%';
++--------------------+
+| 'foobar' like 'f%' |
++--------------------+
+| false              |
++--------------------+
+
+select 'ABCXYZ' not ilike 'ab_xyz';
++-----------------------------+
+| not 'abcxyz' ilike 'ab_xyz' |
++-----------------------------+
+| false                       |
++-----------------------------+
+
+select 'ABCXYZ' not like 'ab_xyz';
++----------------------------+
+| not 'abcxyz' like 'ab_xyz' |
++----------------------------+
+| true                       |
++----------------------------+
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+      <p class="p">
+        For case-sensitive comparisons, see <a class="xref" href="impala_operators.html#like">LIKE Operator</a>.
+        For a more general kind of search operator using regular expressions, see <a class="xref" href="impala_operators.html#regexp">REGEXP Operator</a>
+        or its case-insensitive counterpart <a class="xref" href="impala_operators.html#iregexp">IREGEXP Operator</a>.
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="operators__in">
+
+    <h2 class="title topictitle2" id="ariaid-title7">IN Operator</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+
+        
+        The <code class="ph codeph">IN</code> operator compares an argument value to a set of values, and returns <code class="ph codeph">TRUE</code> if the argument
+        matches any value in the set. The <code class="ph codeph">NOT IN</code> operator reverses the comparison, and checks if the argument value is not
+        part of a set of values.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">expression</var> IN (<var class="keyword varname">expression</var> [, <var class="keyword varname">expression</var>])
+<var class="keyword varname">expression</var> IN (<var class="keyword varname">subquery</var>)
+
+<var class="keyword varname">expression</var> NOT IN (<var class="keyword varname">expression</var> [, <var class="keyword varname">expression</var>])
+<var class="keyword varname">expression</var> NOT IN (<var class="keyword varname">subquery</var>)
+</code></pre>
+
+      <p class="p">
+        The left-hand expression and the set of comparison values must be of compatible types.
+      </p>
+
+      <p class="p">
+        The left-hand expression must consist only of a single value, not a tuple. Although the left-hand expression is typically a column
+        name, it could also be some other value. For example, the <code class="ph codeph">WHERE</code> clauses <code class="ph codeph">WHERE id IN (5)</code> and
+        <code class="ph codeph">WHERE 5 IN (id)</code> produce the same results.
+      </p>
+
+      <p class="p">
+        The set of values to check against can be specified as constants, function calls, column names, or other expressions in the query
+        text. The maximum number of expressions in the <code class="ph codeph">IN</code> list is 9999. (The maximum number of elements of
+        a single expression is 10,000 items, and the <code class="ph codeph">IN</code> operator itself counts as one.)
+      </p>
+
+      <p class="p">
+        In Impala 2.0 and higher, the set of values can also be generated by a subquery. <code class="ph codeph">IN</code> can evaluate an unlimited
+        number of results using a subquery.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+      <p class="p">
+        Any expression using the <code class="ph codeph">IN</code> operator could be rewritten as a series of equality tests connected with
+        <code class="ph codeph">OR</code>, but the <code class="ph codeph">IN</code> syntax is often clearer, more concise, and easier for Impala to optimize. For
+        example, with partitioned tables, queries frequently use <code class="ph codeph">IN</code> clauses to filter data by comparing the partition key
+        columns to specific values.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">NULL considerations:</strong>
+      </p>
+
+      <p class="p">
+        If there really is a matching non-null value, <code class="ph codeph">IN</code> returns <code class="ph codeph">TRUE</code>:
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select 1 in (1,null,2,3);
++----------------------+
+| 1 in (1, null, 2, 3) |
++----------------------+
+| true                 |
++----------------------+
+[localhost:21000] &gt; select 1 not in (1,null,2,3);
++--------------------------+
+| 1 not in (1, null, 2, 3) |
++--------------------------+
+| false                    |
++--------------------------+
+</code></pre>
+
+      <p class="p">
+        If the searched value is not found in the comparison values, and the comparison values include <code class="ph codeph">NULL</code>, the result is
+        <code class="ph codeph">NULL</code>:
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select 5 in (1,null,2,3);
++----------------------+
+| 5 in (1, null, 2, 3) |
++----------------------+
+| NULL                 |
++----------------------+
+[localhost:21000] &gt; select 5 not in (1,null,2,3);
++--------------------------+
+| 5 not in (1, null, 2, 3) |
++--------------------------+
+| NULL                     |
++--------------------------+
+[localhost:21000] &gt; select 1 in (null);
++-------------+
+| 1 in (null) |
++-------------+
+| NULL        |
++-------------+
+[localhost:21000] &gt; select 1 not in (null);
++-----------------+
+| 1 not in (null) |
++-----------------+
+| NULL            |
++-----------------+
+</code></pre>
+
+      <p class="p">
+        If the left-hand argument is <code class="ph codeph">NULL</code>, <code class="ph codeph">IN</code> always returns <code class="ph codeph">NULL</code>. This rule applies even
+        if the comparison values include <code class="ph codeph">NULL</code>.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select null in (1,2,3);
++-------------------+
+| null in (1, 2, 3) |
++-------------------+
+| NULL              |
++-------------------+
+[localhost:21000] &gt; select null not in (1,2,3);
++-----------------------+
+| null not in (1, 2, 3) |
++-----------------------+
+| NULL                  |
++-----------------------+
+[localhost:21000] &gt; select null in (null);
++----------------+
+| null in (null) |
++----------------+
+| NULL           |
++----------------+
+[localhost:21000] &gt; select null not in (null);
++--------------------+
+| null not in (null) |
++--------------------+
+| NULL               |
++--------------------+
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Added in:</strong> Available in earlier Impala releases, but new capabilities were added in
+        <span class="keyword">Impala 2.0.0</span>
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        directly in an operator. You can apply operators only to scalar values that make up a complex type
+        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
+        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
+        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
+        pseudocolumn names.
+      </p>
+
+      <p class="p">
+        The following example shows how to do an arithmetic operation using a numeric field of a <code class="ph codeph">STRUCT</code> type that is an
+        item within an <code class="ph codeph">ARRAY</code> column. Once the scalar numeric value <code class="ph codeph">R_NATIONKEY</code> is extracted, it can be
+        used in an arithmetic expression, such as multiplying by 10:
+      </p>
+
+<pre class="pre codeblock"><code>
+-- The SMALLINT is a field within an array of structs.
+describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+-- When we refer to the scalar value using dot notation,
+-- we can use arithmetic and comparison operators on it
+-- like any other number.
+select r_name, nation.item.n_name, nation.item.n_nationkey
+from region, region.r_nations as nation
+where nation.item.n_nationkey in (1,3,5)
++---------+-------------+------------------+
+| r_name  | item.n_name | item.n_nationkey |
++---------+-------------+------------------+
+| AMERICA | CANADA      | 3                |
+| AMERICA | ARGENTINA   | 1                |
+| AFRICA  | ETHIOPIA    | 5                |
++---------+-------------+------------------+
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Restrictions:</strong>
+      </p>
+
+      <p class="p">
+        Correlated subqueries used in <code class="ph codeph">EXISTS</code> and <code class="ph codeph">IN</code> operators cannot include a
+        <code class="ph codeph">LIMIT</code> clause.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>-- Using IN is concise and self-documenting.
+SELECT * FROM t1 WHERE c1 IN (1,2,10);
+-- Equivalent to series of = comparisons ORed together.
+SELECT * FROM t1 WHERE c1 = 1 OR c1 = 2 OR c1 = 10;
+
+SELECT c1 AS "starts with vowel" FROM t2 WHERE upper(substr(c1,1,1)) IN ('A','E','I','O','U');
+
+SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','June','July');</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+      <p class="p">
+        <a class="xref" href="impala_subqueries.html#subqueries">Subqueries in Impala SELECT Statements</a>
+      </p>
+
+    </div>
+
+  </article>
+
+  
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="operators__iregexp">
+
+    <h2 class="title topictitle2" id="ariaid-title8">IREGEXP Operator</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+        Tests whether a value matches a regular expression, using case-insensitive string comparisons.
+        Uses the POSIX regular expression syntax where <code class="ph codeph">^</code> and
+        <code class="ph codeph">$</code> match the beginning and end of the string, <code class="ph codeph">.</code> represents any single character, <code class="ph codeph">*</code>
+        represents a sequence of zero or more items, <code class="ph codeph">+</code> represents a sequence of one or more items, <code class="ph codeph">?</code>
+        produces a non-greedy match, and so on.
+      </p>
+
+      <p class="p">
+        This operator, available in <span class="keyword">Impala 2.5</span> and higher, is the equivalent of the <code class="ph codeph">REGEXP</code> operator,
+        but with case-insensitive comparisons.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">string_expression</var> IREGEXP <var class="keyword varname">regular_expression</var>
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+      <p class="p">
+        The regular expression must match the entire value, not just occur somewhere inside it. Use <code class="ph codeph">.*</code> at the beginning,
+        the end, or both if you only need to match characters anywhere in the middle. Thus, the <code class="ph codeph">^</code> and <code class="ph codeph">$</code>
+        atoms are often redundant, although you might already have them in your expression strings that you reuse from elsewhere.
+      </p>
+
+
+
+      <p class="p">
+        The <code class="ph codeph">|</code> symbol is the alternation operator, typically used within <code class="ph codeph">()</code> to match different sequences.
+        The <code class="ph codeph">()</code> groups do not allow backreferences. To retrieve the part of a value matched within a <code class="ph codeph">()</code>
+        section, use the <code class="ph codeph"><a class="xref" href="impala_string_functions.html#string_functions__regexp_extract">regexp_extract()</a></code>
+        built-in function. (Currently, there is not any case-insensitive equivalent for the <code class="ph codeph">regexp_extract()</code> function.)
+      </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        <p class="p">
+        In Impala 1.3.1 and higher, the <code class="ph codeph">REGEXP</code> and <code class="ph codeph">RLIKE</code> operators now match a
+        regular expression string that occurs anywhere inside the target string, the same as if the regular
+        expression was enclosed on each side by <code class="ph codeph">.*</code>. See
+        <a class="xref" href="../shared/../topics/impala_operators.html#regexp">REGEXP Operator</a> for examples. Previously, these operators only
+        succeeded when the regular expression matched the entire target string. This change improves compatibility
+        with the regular expression support for popular database systems. There is no change to the behavior of the
+        <code class="ph codeph">regexp_extract()</code> and <code class="ph codeph">regexp_replace()</code> built-in functions.
+      </p>
+      </div>
+
+      <p class="p">
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
+        Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
+        has most idioms familiar from regular expressions in Perl, Python, and so on, including
+        <code class="ph codeph">.*?</code> for non-greedy matches.
+      </p>
+
+      <p class="p">
+        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
+        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
+        adjust the expression patterns if necessary. See
+        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        directly in an operator. You can apply operators only to scalar values that make up a complex type
+        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
+        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
+        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
+        pseudocolumn names.
+      </p>
+
+
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+      <p class="p">
+        The following examples demonstrate the syntax for the <code class="ph codeph">IREGEXP</code> operator.
+      </p>
+
+<pre class="pre codeblock"><code>select 'abcABCaabbcc' iregexp '^[a-c]+$';
++---------------------------------+
+| 'abcabcaabbcc' iregexp '[a-c]+' |
++---------------------------------+
+| true                            |
++---------------------------------+
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+      <p class="p">
+        <a class="xref" href="impala_operators.html#regexp">REGEXP Operator</a>
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="is_distinct_from__is_distinct" id="operators__is_distinct_from">
+
+    <h2 class="title topictitle2" id="is_distinct_from__is_distinct">IS DISTINCT FROM Operator</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+
+        
+        The <code class="ph codeph">IS DISTINCT FROM</code> operator, and its converse the <code class="ph codeph">IS NOT DISTINCT FROM</code> operator, test whether or
+        not values are identical. <code class="ph codeph">IS NOT DISTINCT FROM</code> is similar to the <code class="ph codeph">=</code> operator, and <code class="ph codeph">IS
+        DISTINCT FROM</code> is similar to the <code class="ph codeph">!=</code> operator, except that <code class="ph codeph">NULL</code> values are treated as
+        identical. Therefore, <code class="ph codeph">IS NOT DISTINCT FROM</code> returns <code class="ph codeph">true</code> rather than <code class="ph codeph">NULL</code>, and
+        <code class="ph codeph">IS DISTINCT FROM</code> returns <code class="ph codeph">false</code> rather than <code class="ph codeph">NULL</code>, when comparing two
+        <code class="ph codeph">NULL</code> values. If one of the values being compared is <code class="ph codeph">NULL</code> and the other is not, <code class="ph codeph">IS DISTINCT
+        FROM</code> returns <code class="ph codeph">true</code> and <code class="ph codeph">IS NOT DISTINCT FROM</code> returns <code class="ph codeph">false</code>, again instead
+        of returning <code class="ph codeph">NULL</code> in both cases.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">expression1</var> IS DISTINCT FROM <var class="keyword varname">expression2</var>
+
+<var class="keyword varname">expression1</var> IS NOT DISTINCT FROM <var class="keyword varname">expression2</var>
+<var class="keyword varname">expression1</var> &lt;=&gt; <var class="keyword varname">expression2</var>
+</code></pre>
+
+      <p class="p">
+        The operator <code class="ph codeph">&lt;=&gt;</code> is an alias for <code class="ph codeph">IS NOT DISTINCT FROM</code>.
+        It is typically used as a <code class="ph codeph">NULL</code>-safe equality operator in join queries.
+        That is, <code class="ph codeph">A &lt;=&gt; B</code> is true if <code class="ph codeph">A</code> equals <code class="ph codeph">B</code>
+        or if both <code class="ph codeph">A</code> and <code class="ph codeph">B</code> are <code class="ph codeph">NULL</code>.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+      <p class="p">
+        This operator provides concise notation for comparing two values and always producing a <code class="ph codeph">true</code> or
+        <code class="ph codeph">false</code> result, without treating <code class="ph codeph">NULL</code> as a special case. Otherwise, to unambiguously distinguish
+        between two values requires a compound expression involving <code class="ph codeph">IS [NOT] NULL</code> tests of both operands in addition to the
+        <code class="ph codeph">=</code> or <code class="ph codeph">!=</code> operator.
+      </p>
+
+      <p class="p">
+        The <code class="ph codeph">&lt;=&gt;</code> operator, used like an equality operator in a join query,
+        is more efficient than the equivalent clause: <code class="ph codeph">A = B OR (A IS NULL AND B IS NULL)</code>.
+        The <code class="ph codeph">&lt;=&gt;</code> operator can use a hash join, while the <code class="ph codeph">OR</code> expression
+        cannot.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+      <p class="p">
+        The following examples show how <code class="ph codeph">IS DISTINCT FROM</code> gives output similar to
+        the <code class="ph codeph">!=</code> operator, and <code class="ph codeph">IS NOT DISTINCT FROM</code> gives output
+        similar to the <code class="ph codeph">=</code> operator. The exception is when the expression involves
+        a <code class="ph codeph">NULL</code> value on one side or both sides, where <code class="ph codeph">!=</code> and
+        <code class="ph codeph">=</code> return <code class="ph codeph">NULL</code> but the <code class="ph codeph">IS [NOT] DISTINCT FROM</code>
+        operators still return <code class="ph codeph">true</code> or <code class="ph codeph">false</code>.
+      </p>
+
+<pre class="pre codeblock"><code>
+select 1 is distinct from 0, 1 != 0;
++----------------------+--------+
+| 1 is distinct from 0 | 1 != 0 |
++----------------------+--------+
+| true                 | true   |
++----------------------+--------+
+
+select 1 is distinct from 1, 1 != 1;
++----------------------+--------+
+| 1 is distinct from 1 | 1 != 1 |
++----------------------+--------+
+| false                | false  |
++----------------------+--------+
+
+select 1 is distinct from null, 1 != null;
++-------------------------+-----------+
+| 1 is distinct from null | 1 != null |
++-------------------------+-----------+
+| true                    | NULL      |
++-------------------------+-----------+
+
+select null is distinct from null, null != null;
++----------------------------+--------------+
+| null is distinct from null | null != null |
++----------------------------+--------------+
+| false                      | NULL         |
++----------------------------+--------------+
+
+select 1 is not distinct from 0, 1 = 0;
++--------------------------+-------+
+| 1 is not distinct from 0 | 1 = 0 |
++--------------------------+-------+
+| false                    | false |
++--------------------------+-------+
+
+select 1 is not distinct from 1, 1 = 1;
++--------------------------+-------+
+| 1 is not distinct from 1 | 1 = 1 |
++--------------------------+-------+
+| true                     | true  |
++--------------------------+-------+
+
+select 1 is not distinct from null, 1 = null;
++-----------------------------+----------+
+| 1 is not distinct from null | 1 = null |
++-----------------------------+----------+
+| false                       | NULL     |
++-----------------------------+----------+
+
+select null is not distinct from null, null = null;
++--------------------------------+-------------+
+| null is not distinct from null | null = null |
++--------------------------------+-------------+
+| true                           | NULL        |
++--------------------------------+-------------+
+</code></pre>
+
+      <p class="p">
+        The following example shows how <code class="ph codeph">IS DISTINCT FROM</code> considers
+        <code class="ph codeph">CHAR</code> values to be the same (not distinct from each other)
+        if they only differ in the number of trailing spaces. Therefore, sometimes
+        the result of an <code class="ph codeph">IS [NOT] DISTINCT FROM</code> operator differs
+        depending on whether the values are <code class="ph codeph">STRING</code>/<code class="ph codeph">VARCHAR</code>
+        or <code class="ph codeph">CHAR</code>.
+      </p>
+
+<pre class="pre codeblock"><code>
+select
+  'x' is distinct from 'x ' as string_with_trailing_spaces,
+  cast('x' as char(5)) is distinct from cast('x ' as char(5)) as char_with_trailing_spaces;
++-----------------------------+---------------------------+
+| string_with_trailing_spaces | char_with_trailing_spaces |
++-----------------------------+---------------------------+
+| true                        | false                     |
++-----------------------------+---------------------------+
+</code></pre>
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title10" id="operators__is_null">
+
+    <h2 class="title topictitle2" id="ariaid-title10">IS NULL Operator</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+
+        
+        The <code class="ph codeph">IS NULL</code> operator, and its converse the <code class="ph codeph">IS NOT NULL</code> operator, test whether a specified value is
+        <code class="ph codeph"><a class="xref" href="impala_literals.html#null">NULL</a></code>. Because using <code class="ph codeph">NULL</code> with any of the other
+        comparison operators such as <code class="ph codeph">=</code> or <code class="ph codeph">!=</code> also returns <code class="ph codeph">NULL</code> rather than
+        <code class="ph codeph">TRUE</code> or <code class="ph codeph">FALSE</code>, you use a special-purpose comparison operator to check for this special condition.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">expression</var> IS NULL
+<var class="keyword varname">expression</var> IS NOT NULL
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+      <p class="p">
+        In many cases, <code class="ph codeph">NULL</code> values indicate some incorrect or incomplete processing during data ingestion or conversion.
+        You might check whether any values in a column are <code class="ph codeph">NULL</code>, and if so take some followup action to fill them in.
+      </p>
+
+      <p class="p">
+        With sparse data, often represented in <span class="q">"wide"</span> tables, it is common for most values to be <code class="ph codeph">NULL</code> with only an
+        occasional non-<code class="ph codeph">NULL</code> value. In those cases, you can use the <code class="ph codeph">IS NOT NULL</code> operator to identify the
+        rows containing any data at all for a particular column, regardless of the actual value.
+      </p>
+
+      <p class="p">
+        With a well-designed database schema, effective use of <code class="ph codeph">NULL</code> values and <code class="ph codeph">IS NULL</code> and <code class="ph codeph">IS NOT
+        NULL</code> operators can save having to design custom logic around special values such as 0, -1, <code class="ph codeph">'N/A'</code>, empty
+        string, and so on. <code class="ph codeph">NULL</code> lets you distinguish between a value that is known to be 0, false, or empty, and a truly
+        unknown value.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        This operator is not applicable to complex type columns (<code class="ph codeph">STRUCT</code>,
+        <code class="ph codeph">ARRAY</code>, or <code class="ph codeph">MAP</code>). Using a complex type column
+        with <code class="ph codeph">IS NULL</code> or <code class="ph codeph">IS NOT NULL</code> causes a query error.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>-- If this value is non-zero, something is wrong.
+select count(*) from employees where employee_id is null;
+
+-- With data from disparate sources, some fields might be blank.
+-- Not necessarily an error condition.
+select count(*) from census where household_income is null;
+
+-- Sometimes we expect fields to be null, and followup action
+-- is needed when they are not.
+select count(*) from web_traffic where weird_http_code is not null;</code></pre>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="operators__like">
+
+    <h2 class="title topictitle2" id="ariaid-title11">LIKE Operator</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+        A comparison operator for <code class="ph codeph">STRING</code> data, with basic wildcard capability using the underscore
+        (<code class="ph codeph">_</code>) to match a single character and the percent sign (<code class="ph codeph">%</code>) to match multiple
+        characters. The argument expression must match the entire string value.
+        Typically, it is more efficient to put any <code class="ph codeph">%</code> wildcard match at the end of the string.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">string_expression</var> LIKE <var class="keyword varname">wildcard_expression</var>
+<var class="keyword varname">string_expression</var> NOT LIKE <var class="keyword varname">wildcard_expression</var>
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        directly in an operator. You can apply operators only to scalar values that make up a complex type
+        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
+        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
+        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
+        pseudocolumn names.
+      </p>
+
+
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>select distinct c_last_name from customer where c_last_name like 'Mc%' or c_last_name like 'Mac%';
+select count(c_last_name) from customer where c_last_name like 'M%';
+select c_email_address from customer where c_email_address like '%.edu';
+
+-- We can find 4-letter names beginning with 'M' by calling functions...
+select distinct c_last_name from customer where length(c_last_name) = 4 and substr(c_last_name,1,1) = 'M';
+-- ...or in a more readable way by matching M followed by exactly 3 characters.
+select distinct c_last_name from customer where c_last_name like 'M___';</code></pre>
+
+      <p class="p">
+        For case-insensitive comparisons, see <a class="xref" href="impala_operators.html#ilike">ILIKE Operator</a>.
+        For a more general kind of search operator using regular expressions, see <a class="xref" href="impala_operators.html#regexp">REGEXP Operator</a>
+        or its case-insensitive counterpart <a class="xref" href="impala_operators.html#iregexp">IREGEXP Operator</a>.
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title12" id="operators__logical_operators">
+
+    <h2 class="title topictitle2" id="ariaid-title12">Logical Operators</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+        Logical operators return a <code class="ph codeph">BOOLEAN</code> value, based on a binary or unary logical operation between arguments that are
+        also Booleans. Typically, the argument expressions use <a class="xref" href="impala_operators.html#comparison_operators">comparison
+        operators</a>.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">boolean_expression</var> <var class="keyword varname">binary_logical_operator</var> <var class="keyword varname">boolean_expression</var>
+<var class="keyword varname">unary_logical_operator</var> <var class="keyword varname">boolean_expression</var>
+</code></pre>
+
+      <p class="p">
+        The Impala logical operators are:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">AND</code>: A binary operator that returns <code class="ph codeph">true</code> if its left-hand and right-hand arguments both evaluate
+          to <code class="ph codeph">true</code>, <code class="ph codeph">NULL</code> if either argument is <code class="ph codeph">NULL</code>, and <code class="ph codeph">false</code> otherwise.
+        </li>
+
+        <li class="li">
+          <code class="ph codeph">OR</code>: A binary operator that returns <code class="ph codeph">true</code> if either of its left-hand and right-hand arguments
+          evaluate to <code class="ph codeph">true</code>, <code class="ph codeph">NULL</code> if one argument is <code class="ph codeph">NULL</code> and the other is either
+          <code class="ph codeph">NULL</code> or <code class="ph codeph">false</code>, and <code class="ph codeph">false</code> otherwise.
+        </li>
+
+        <li class="li">
+          <code class="ph codeph">NOT</code>: A unary operator that flips the state of a Boolean expression from <code class="ph codeph">true</code> to
+          <code class="ph codeph">false</code>, or <code class="ph codeph">false</code> to <code class="ph codeph">true</code>. If the argument expression is <code class="ph codeph">NULL</code>,
+          the result remains <code class="ph codeph">NULL</code>. (When <code class="ph codeph">NOT</code> is used this way as a unary logical operator, it works
+          differently than the <code class="ph codeph">IS NOT NULL</code> comparison operator, which returns <code class="ph codeph">true</code> when applied to a
+          <code class="ph codeph">NULL</code>.)
+        </li>
+      </ul>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        directly in an operator. You can apply operators only to scalar values that make up a complex type
+        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
+        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
+        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
+        pseudocolumn names.
+      </p>
+
+      <p class="p">
+        The following example shows how to do an arithmetic operation using a numeric field of a <code class="ph codeph">STRUCT</code> type that is an
+        item within an <code class="ph codeph">ARRAY</code> column. Once the scalar numeric value <code class="ph codeph">R_NATIONKEY</code> is extracted, it can be
+        used in an arithmetic expression, such as multiplying by 10:
+      </p>
+
+<pre class="pre codeblock"><code>
+-- The SMALLINT is a field within an array of structs.
+describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+-- When we refer to the scalar value using dot notation,
+-- we can use arithmetic and comparison operators on it
+-- like any other number.
+select r_name, nation.item.n_name, nation.item.n_nationkey
+  from region, region.r_nations as nation
+where
+  nation.item.n_nationkey between 3 and 5
+  or nation.item.n_nationkey &lt; 15;
++-------------+----------------+------------------+
+| r_name      | item.n_name    | item.n_nationkey |
++-------------+----------------+------------------+
+| EUROPE      | UNITED KINGDOM | 23               |
+| EUROPE      | RUSSIA         | 22               |
+| EUROPE      | ROMANIA        | 19               |
+| ASIA        | VIETNAM        | 21               |
+| ASIA        | CHINA          | 18               |
+| AMERICA     | UNITED STATES  | 24               |
+| AMERICA     | PERU           | 17               |
+| AMERICA     | CANADA         | 3                |
+| MIDDLE EAST | SAUDI ARABIA   | 20               |
+| MIDDLE EAST | EGYPT          | 4                |
+| AFRICA      | MOZAMBIQUE     | 16               |
+| AFRICA      | ETHIOPIA       | 5                |
++-------------+----------------+------------------+
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+      <p class="p">
+        These examples demonstrate the <code class="ph codeph">AND</code> operator:
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select true and true;
++---------------+
+| true and true |
++---------------+
+| true          |
++---------------+
+[localhost:21000] &gt; select true and false;
++----------------+
+| true and false |
++----------------+
+| false          |
++----------------+
+[localhost:21000] &gt; select false and false;
++-----------------+
+| false and false |
++-----------------+
+| false           |
++-----------------+
+[localhost:21000] &gt; select true and null;
++---------------+
+| true and null |
++---------------+
+| NULL          |
++---------------+
+[localhost:21000] &gt; select (10 &gt; 2) and (6 != 9);
++-----------------------+
+| (10 &gt; 2) and (6 != 9) |
++-----------------------+
+| true                  |
++-----------------------+
+</code></pre>
+
+      <p class="p">
+        These examples demonstrate the <code class="ph codeph">OR</code> operator:
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select true or true;
++--------------+
+| true or true |
++--------------+
+| true         |
++--------------+
+[localhost:21000] &gt; select true or false;
++---------------+
+| true or false |
++---------------+
+| true          |
++---------------+
+[localhost:21000] &gt; select false or false;
++----------------+
+| false or false |
++----------------+
+| false          |
++----------------+
+[localhost:21000] &gt; select true or null;
++--------------+
+| true or null |
++--------------+
+| true         |
++--------------+
+[localhost:21000] &gt; select null or true;
++--------------+
+| null or true |
++--------------+
+| true         |
++--------------+
+[localhost:21000] &gt; select false or null;
++---------------+
+| false or null |
++---------------+
+| NULL          |
++---------------+
+[localhost:21000] &gt; select (1 = 1) or ('hello' = 'world');
++--------------------------------+
+| (1 = 1) or ('hello' = 'world') |
++--------------------------------+
+| true                           |
++--------------------------------+
+[localhost:21000] &gt; select (2 + 2 != 4) or (-1 &gt; 0);
++--------------------------+
+| (2 + 2 != 4) or (-1 &gt; 0) |
++--------------------------+
+| false                    |
++--------------------------+
+</code></pre>
+
+      <p class="p">
+        These examples demonstrate the <code class="ph codeph">NOT</code> operator:
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select not true;
++----------+
+| not true |
++----------+
+| false    |
++----------+
+[localhost:21000] &gt; select not false;
++-----------+
+| not false |
++-----------+
+| true      |
++-----------+
+[localhost:21000] &gt; select not null;
++----------+
+| not null |
++----------+
+| NULL     |
++----------+
+[localhost:21000] &gt; select not (1=1);
++-------------+
+| not (1 = 1) |
++-------------+
+| false       |
++-------------+
+</code></pre>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title13" id="operators__regexp">
+
+    <h2 class="title topictitle2" id="ariaid-title13">REGEXP Operator</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+        Tests whether a value matches a regular expression. Uses the POSIX regular expression syntax where <code class="ph codeph">^</code> and
+        <code class="ph codeph">$</code> match the beginning and end of the string, <code class="ph codeph">.</code> represents any single character, <code class="ph codeph">*</code>
+        represents a sequence of zero or more items, <code class="ph codeph">+</code> represents a sequence of one or more items, <code class="ph codeph">?</code>
+        produces a non-greedy match, and so on.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">string_expression</var> REGEXP <var class="keyword varname">regular_expression</var>
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+      <p class="p">
+        The regular expression must match the entire value, not just occur somewhere inside it. Use <code class="ph codeph">.*</code> at the beginning,
+        the end, or both if you only need to match characters anywhere in the middle. Thus, the <code class="ph codeph">^</code> and <code class="ph codeph">$</code>
+        atoms are often redundant, although you might already have them in your expression strings that you reuse from elsewhere.
+      </p>
+
+      <p class="p">
+        The <code class="ph codeph">RLIKE</code> operator is a synonym for <code class="ph codeph">REGEXP</code>.
+      </p>
+
+      <p class="p">
+        The <code class="ph codeph">|</code> symbol is the alternation operator, typically used within <code class="ph codeph">()</code> to match different sequences.
+        The <code class="ph codeph">()</code> groups do not allow backreferences. To retrieve the part of a value matched within a <code class="ph codeph">()</code>
+        section, use the <code class="ph codeph"><a class="xref" href="impala_string_functions.html#string_functions__regexp_extract">regexp_extract()</a></code>
+        built-in function.
+      </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+          <p class="p">
+        In Impala 1.3.1 and higher, the <code class="ph codeph">REGEXP</code> and <code class="ph codeph">RLIKE</code> operators now match a
+        regular expression string that occurs anywhere inside the target string, the same as if the regular
+        expression was enclosed on each side by <code class="ph codeph">.*</code>. See
+        <a class="xref" href="../shared/../topics/impala_operators.html#regexp">REGEXP Operator</a> for examples. Previously, these operators only
+        succeeded when the regular expression matched the entire target string. This change improves compatibility
+        with the regular expression support for popular database systems. There is no change to the behavior of the
+        <code class="ph codeph">regexp_extract()</code> and <code class="ph codeph">regexp_replace()</code> built-in functions.
+      </p>
+      </div>
+
+      <p class="p">
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
+        Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
+        has most idioms familiar from regular expressions in Perl, Python, and so on, including
+        <code class="ph codeph">.*?</code> for non-greedy matches.
+      </p>
+
+      <p class="p">
+        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
+        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
+        adjust the expression patterns if necessary. See
+        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+      <p class="p">
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        directly in an operator. You can apply operators only to scalar values that make up a complex type
+        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
+        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
+        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
+        pseudocolumn names.
+      </p>
+
+
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+      <p class="p">
+        The following examples demonstrate the identical syntax for the <code class="ph codeph">REGEXP</code> and <code class="ph codeph">RLIKE</code> operators.
+      </p>
+
+
+
+<pre class="pre codeblock"><code>-- Find all customers whose first name starts with 'J', followed by 0 or more of any character.
+select c_first_name, c_last_name from customer where c_first_name regexp '^J.*';
+select c_first_name, c_last_name from customer where c_first_name rlike '^J.*';
+
+-- Find 'Macdonald', where the first 'a' is optional and the 'D' can be upper- or lowercase.
+-- The ^...$ are required, to match the start and end of the value.
+select c_first_name, c_last_name from customer where c_last_name regexp '^Ma?c[Dd]onald$';
+select c_first_name, c_last_name from customer where c_last_name rlike '^Ma?c[Dd]onald$';
+
+-- Match multiple character sequences, either 'Mac' or 'Mc'.
+select c_first_name, c_last_name from customer where c_last_name regexp '^(Mac|Mc)donald$';
+select c_first_name, c_last_name from customer where c_last_name rlike '^(Mac|Mc)donald$';
+
+-- Find names starting with 'S', then one or more vowels, then 'r', then any other characters.
+-- Matches 'Searcy', 'Sorenson', 'Sauer'.
+select c_first_name, c_last_name from customer where c_last_name regexp '^S[aeiou]+r.*$';
+select c_first_name, c_last_name from customer where c_last_name rlike '^S[aeiou]+r.*$';
+
+-- Find names that end with 2 or more vowels: letters from the set a,e,i,o,u.
+select c_first_name, c_last_name from customer where c_last_name regexp '.*[aeiou]{2,}$';
+select c_first_name, c_last_name from customer where c_last_name rlike '.*[aeiou]{2,}$';
+
+-- You can use letter ranges in the [] blocks, for example to find names starting with A, B, or C.
+select c_first_name, c_last_name from customer where c_last_name regexp '^[A-C].*';
+select c_first_name, c_last_name from customer where c_last_name rlike '^[A-C].*';
+
+-- If you are not sure about case, leading/trailing spaces, and so on, you can process the
+-- column using string functions first.
+select c_first_name, c_last_name from customer where lower(trim(c_last_name)) regexp '^de.*';
+select c_first_name, c_last_name from customer where lower(trim(c_last_name)) rlike '^de.*';
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+      <p class="p">
+        For regular expression matching with case-insensitive comparisons, see <a class="xref" href="impala_operators.html#iregexp">IREGEXP Operator</a>.
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title14" id="operators__rlike">
+
+    <h2 class="title topictitle2" id="ariaid-title14">RLIKE Operator</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        
+        Synonym for the <code class="ph codeph">REGEXP</code> operator. See <a class="xref" href="impala_operators.html#regexp">REGEXP Operator</a> for details.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+      <p class="p">
+        The following examples demonstrate the identical syntax for the <code class="ph codeph">REGEXP</code> and <code class="ph codeph">RLIKE</code> operators.
+      </p>
+
+
+
+<pre class="pre codeblock"><code>-- Find all customers whose first name starts with 'J', followed by 0 or more of any character.
+select c_first_name, c_last_name from customer where c_first_name regexp '^J.*';
+select c_first_name, c_last_name from customer where c_first_name rlike '^J.*';
+
+-- Find 'Macdonald', where the first 'a' is optional and the 'D' can be upper- or lowercase.
+-- The ^...$ are required, to match the start and end of the value.
+select c_first_name, c_last_name from customer where c_last_name regexp '^Ma?c[Dd]onald$';
+select c_first_name, c_last_name from customer where c_last_name rlike '^Ma?c[Dd]onald$';
+
+-- Match multiple character sequences, either 'Mac' or 'Mc'.
+select c_first_name, c_last_name from customer where c_last_name regexp '^(Mac|Mc)donald$';
+select c_first_name, c_last_name from customer where c_last_name rlike '^(Mac|Mc)donald$';
+
+-- Find names starting with 'S', then one or more vowels, then 'r', then any other characters.
+-- Matches 'Searcy', 'Sorenson', 'Sauer'.
+select c_first_name, c_last_name from customer where c_last_name regexp '^S[aeiou]+r.*$';
+select c_first_name, c_last_name from customer where c_last_name rlike '^S[aeiou]+r.*$';
+
+-- Find names that end with 2 or more vowels: letters from the set a,e,i,o,u.
+select c_first_name, c_last_name from customer where c_last_name regexp '.*[aeiou]{2,}$';
+select c_first_name, c_last_name from customer where c_last_name rlike '.*[aeiou]{2,}$';
+
+-- You can use letter ranges in the [] blocks, for example to find names starting with A, B, or C.
+select c_first_name, c_last_name from customer where c_last_name regexp '^[A-C].*';
+select c_first_name, c_last_name from customer where c_last_name rlike '^[A-C].*';
+
+-- If you are not sure about case, leading/trailing spaces, and so on, you can process the
+-- column using string functions first.
+select c_first_name, c_last_name from customer where lower(trim(c_last_name)) regexp '^de.*';
+select c_first_name, c_last_name from customer where lower(trim(c_last_name)) rlike '^de.*';
+</code></pre>
+
+    </div>
+
+  </article>
+
+</article></main></body></html>

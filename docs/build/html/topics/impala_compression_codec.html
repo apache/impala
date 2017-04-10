@@ -1,0 +1,92 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="compression_codec"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>COMPRESSION_CODEC Query Option (Impala 2.0 or higher only)</title></head><body id="compression_codec"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">COMPRESSION_CODEC Query Option (<span class="keyword">Impala 2.0</span> or higher only)</h1>
+  
+  
+
+  <div class="body conbody">
+
+
+
+
+
+    <p class="p">
+      
+      When Impala writes Parquet data files using the <code class="ph codeph">INSERT</code> statement, the underlying compression
+      is controlled by the <code class="ph codeph">COMPRESSION_CODEC</code> query option.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      Prior to Impala 2.0, this option was named <code class="ph codeph">PARQUET_COMPRESSION_CODEC</code>. In Impala 2.0 and
+      later, the <code class="ph codeph">PARQUET_COMPRESSION_CODEC</code> name is not recognized. Use the more general name
+      <code class="ph codeph">COMPRESSION_CODEC</code> for new code.
+    </div>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>SET COMPRESSION_CODEC=<var class="keyword varname">codec_name</var>;</code></pre>
+
+    <p class="p">
+      The allowed values for this query option are <code class="ph codeph">SNAPPY</code> (the default), <code class="ph codeph">GZIP</code>,
+      and <code class="ph codeph">NONE</code>.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      A Parquet file created with <code class="ph codeph">COMPRESSION_CODEC=NONE</code> is still typically smaller than the
+      original data, due to encoding schemes such as run-length encoding and dictionary encoding that are applied
+      separately from compression.
+    </div>
+
+    <p class="p"></p>
+
+    <p class="p">
+      The option value is not case-sensitive.
+    </p>
+
+    <p class="p">
+      If the option is set to an unrecognized value, all kinds of queries will fail due to the invalid option
+      setting, not just queries involving Parquet tables. (The value <code class="ph codeph">BZIP2</code> is also recognized, but
+      is not compatible with Parquet tables.)
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> <code class="ph codeph">STRING</code>
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> <code class="ph codeph">SNAPPY</code>
+    </p>
+
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>set compression_codec=gzip;
+insert into parquet_table_highly_compressed select * from t1;
+
+set compression_codec=snappy;
+insert into parquet_table_compression_plus_fast_queries select * from t1;
+
+set compression_codec=none;
+insert into parquet_table_no_compression select * from t1;
+
+set compression_codec=foo;
+select * from t1 limit 5;
+ERROR: Invalid compression codec: foo
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      For information about how compressing Parquet data files affects query performance, see
+      <a class="xref" href="impala_parquet.html#parquet_compression">Snappy and GZip Compression for Parquet Data Files</a>.
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

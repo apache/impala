@@ -1,0 +1,321 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="array"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>ARRAY Complex Type (Impala 2.3 or higher only)</title></head><body id="array"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">ARRAY Complex Type (<span class="keyword">Impala 2.3</span> or higher only)</h1>
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      A complex data type that can represent an arbitrary number of ordered elements.
+      The elements can be scalars or another complex type (<code class="ph codeph">ARRAY</code>,
+      <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>).
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+
+
+<pre class="pre codeblock"><code><var class="keyword varname">column_name</var> ARRAY &lt; <var class="keyword varname">type</var> &gt;
+
+type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword varname">complex_type</var>
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+      <p class="p">
+        Because complex types are often used in combination,
+        for example an <code class="ph codeph">ARRAY</code> of <code class="ph codeph">STRUCT</code>
+        elements, if you are unfamiliar with the Impala complex types,
+        start with <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for
+        background information and usage examples.
+      </p>
+
+      <p class="p">
+        The elements of the array have no names. You refer to the value of the array item using the
+        <code class="ph codeph">ITEM</code> pseudocolumn, or its position in the array with the <code class="ph codeph">POS</code>
+        pseudocolumn. See <a class="xref" href="impala_complex_types.html#item">ITEM and POS Pseudocolumns</a> for information about
+        these pseudocolumns.
+      </p>
+
+
+
+    <p class="p">
+      Each row can have a different number of elements (including none) in the array for that row.
+    </p>
+
+
+
+      <p class="p">
+        When an array contains items of scalar types, you can use aggregation functions on the array elements without using join notation. For
+        example, you can find the <code class="ph codeph">COUNT()</code>, <code class="ph codeph">AVG()</code>, <code class="ph codeph">SUM()</code>, and so on of numeric array
+        elements, or the <code class="ph codeph">MAX()</code> and <code class="ph codeph">MIN()</code> of any scalar array elements by referring to
+        <code class="ph codeph"><var class="keyword varname">table_name</var>.<var class="keyword varname">array_column</var></code> in the <code class="ph codeph">FROM</code> clause of the query. When
+        you need to cross-reference values from the array with scalar values from the same row, such as by including a <code class="ph codeph">GROUP
+        BY</code> clause to produce a separate aggregated result for each row, then the join clause is required.
+      </p>
+
+      <p class="p">
+        A common usage pattern with complex types is to have an array as the top-level type for the column:
+        an array of structs, an array of maps, or an array of arrays.
+        For example, you can model a denormalized table by creating a column that is an <code class="ph codeph">ARRAY</code>
+        of <code class="ph codeph">STRUCT</code> elements; each item in the array represents a row from a table that would
+        normally be used in a join query. This kind of data structure lets you essentially denormalize tables by
+        associating multiple rows from one table with the matching row in another table.
+      </p>
+
+      <p class="p">
+        You typically do not create more than one top-level <code class="ph codeph">ARRAY</code> column, because if there is
+        some relationship between the elements of multiple arrays, it is convenient to model the data as
+        an array of another complex type element (either <code class="ph codeph">STRUCT</code> or <code class="ph codeph">MAP</code>).
+      </p>
+
+      <p class="p">
+        You can pass a multi-part qualified name to <code class="ph codeph">DESCRIBE</code>
+        to specify an <code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        column and visualize its structure as if it were a table.
+        For example, if table <code class="ph codeph">T1</code> contains an <code class="ph codeph">ARRAY</code> column
+        <code class="ph codeph">A1</code>, you could issue the statement <code class="ph codeph">DESCRIBE t1.a1</code>.
+        If table <code class="ph codeph">T1</code> contained a <code class="ph codeph">STRUCT</code> column <code class="ph codeph">S1</code>,
+        and a field <code class="ph codeph">F1</code> within the <code class="ph codeph">STRUCT</code> was a <code class="ph codeph">MAP</code>,
+        you could issue the statement <code class="ph codeph">DESCRIBE t1.s1.f1</code>.
+        An <code class="ph codeph">ARRAY</code> is shown as a two-column table, with
+        <code class="ph codeph">ITEM</code> and <code class="ph codeph">POS</code> columns.
+        A <code class="ph codeph">STRUCT</code> is shown as a table with each field
+        representing a column in the table.
+        A <code class="ph codeph">MAP</code> is shown as a two-column table, with
+        <code class="ph codeph">KEY</code> and <code class="ph codeph">VALUE</code> columns.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Restrictions:</strong>
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            Columns with this data type can only be used in tables or partitions with the Parquet file format.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            Columns with this data type cannot be used as partition key columns in a partitioned table.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            The <code class="ph codeph">COMPUTE STATS</code> statement does not produce any statistics for columns of this data type.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p" id="array__d6e2889">
+            The maximum length of the column definition for any complex type, including declarations for any nested types,
+            is 4000 characters.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types_limits">Limitations and Restrictions for Complex Types</a> for a full list of limitations
+            and associated guidelines about complex type columns.
+          </p>
+        </li>
+      </ul>
+
+      <p class="p">
+        <strong class="ph b">Kudu considerations:</strong>
+      </p>
+      <p class="p">
+        Currently, the data types <code class="ph codeph">DECIMAL</code>, <code class="ph codeph">TIMESTAMP</code>, <code class="ph codeph">CHAR</code>, <code class="ph codeph">VARCHAR</code>,
+        <code class="ph codeph">ARRAY</code>, <code class="ph codeph">MAP</code>, and <code class="ph codeph">STRUCT</code> cannot be used with Kudu tables.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      Many of the complex type examples refer to tables
+      such as <code class="ph codeph">CUSTOMER</code> and <code class="ph codeph">REGION</code>
+      adapted from the tables used in the TPC-H benchmark.
+      See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_sample_schema">Sample Schema and Data for Experimenting with Impala Complex Types</a>
+      for the table definitions.
+      </div>
+
+      <p class="p">
+        The following example shows how to construct a table with various kinds of <code class="ph codeph">ARRAY</code> columns,
+        both at the top level and nested within other complex types.
+        Whenever the <code class="ph codeph">ARRAY</code> consists of a scalar value, such as in the <code class="ph codeph">PETS</code>
+        column or the <code class="ph codeph">CHILDREN</code> field, you can see that future expansion is limited.
+        For example, you could not easily evolve the schema to record the kind of pet or the child's birthday alongside the name.
+        Therefore, it is more common to use an <code class="ph codeph">ARRAY</code> whose elements are of <code class="ph codeph">STRUCT</code> type,
+        to associate multiple fields with each array element.
+      </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        Practice the <code class="ph codeph">CREATE TABLE</code> and query notation for complex type columns
+        using empty tables, until you can visualize a complex data structure and construct corresponding SQL statements reliably.
+      </div>
+
+
+
+<pre class="pre codeblock"><code>CREATE TABLE array_demo
+(
+  id BIGINT,
+  name STRING,
+-- An ARRAY of scalar type as a top-level column.
+  pets ARRAY &lt;STRING&gt;,
+
+-- An ARRAY with elements of complex type (STRUCT).
+  places_lived ARRAY &lt; STRUCT &lt;
+    place: STRING,
+    start_year: INT
+  &gt;&gt;,
+
+-- An ARRAY as a field (CHILDREN) within a STRUCT.
+-- (The STRUCT is inside another ARRAY, because it is rare
+-- for a STRUCT to be a top-level column.)
+  marriages ARRAY &lt; STRUCT &lt;
+    spouse: STRING,
+    children: ARRAY &lt;STRING&gt;
+  &gt;&gt;,
+
+-- An ARRAY as the value part of a MAP.
+-- The first MAP field (the key) would be a value such as
+-- 'Parent' or 'Grandparent', and the corresponding array would
+-- represent 2 parents, 4 grandparents, and so on.
+  ancestors MAP &lt; STRING, ARRAY &lt;STRING&gt; &gt;
+)
+STORED AS PARQUET;
+
+</code></pre>
+
+    <p class="p">
+      The following example shows how to examine the structure of a table containing one or more <code class="ph codeph">ARRAY</code> columns by using the
+      <code class="ph codeph">DESCRIBE</code> statement. You can visualize each <code class="ph codeph">ARRAY</code> as its own two-column table, with columns
+      <code class="ph codeph">ITEM</code> and <code class="ph codeph">POS</code>.
+    </p>
+
+
+
+<pre class="pre codeblock"><code>DESCRIBE array_demo;
++--------------+---------------------------+
+| name         | type                      |
++--------------+---------------------------+
+| id           | bigint                    |
+| name         | string                    |
+| pets         | array&lt;string&gt;             |
+| marriages    | array&lt;struct&lt;             |
+|              |   spouse:string,          |
+|              |   children:array&lt;string&gt;  |
+|              | &gt;&gt;                        |
+| places_lived | array&lt;struct&lt;             |
+|              |   place:string,           |
+|              |   start_year:int          |
+|              | &gt;&gt;                        |
+| ancestors    | map&lt;string,array&lt;string&gt;&gt; |
++--------------+---------------------------+
+
+DESCRIBE array_demo.pets;
++------+--------+
+| name | type   |
++------+--------+
+| item | string |
+| pos  | bigint |
++------+--------+
+
+DESCRIBE array_demo.marriages;
++------+--------------------------+
+| name | type                     |
++------+--------------------------+
+| item | struct&lt;                  |
+|      |   spouse:string,         |
+|      |   children:array&lt;string&gt; |
+|      | &gt;                        |
+| pos  | bigint                   |
++------+--------------------------+
+
+DESCRIBE array_demo.places_lived;
++------+------------------+
+| name | type             |
++------+------------------+
+| item | struct&lt;          |
+|      |   place:string,  |
+|      |   start_year:int |
+|      | &gt;                |
+| pos  | bigint           |
++------+------------------+
+
+DESCRIBE array_demo.ancestors;
++-------+---------------+
+| name  | type          |
++-------+---------------+
+| key   | string        |
+| value | array&lt;string&gt; |
++-------+---------------+
+
+</code></pre>
+
+    <p class="p">
+      The following example shows queries involving <code class="ph codeph">ARRAY</code> columns containing elements of scalar or complex types. You
+      <span class="q">"unpack"</span> each <code class="ph codeph">ARRAY</code> column by referring to it in a join query, as if it were a separate table with
+      <code class="ph codeph">ITEM</code> and <code class="ph codeph">POS</code> columns. If the array element is a scalar type, you refer to its value using the
+      <code class="ph codeph">ITEM</code> pseudocolumn. If the array element is a <code class="ph codeph">STRUCT</code>, you refer to the <code class="ph codeph">STRUCT</code> fields
+      using dot notation and the field names. If the array element is another <code class="ph codeph">ARRAY</code> or a <code class="ph codeph">MAP</code>, you use
+      another level of join to unpack the nested collection elements.
+    </p>
+
+
+
+<pre class="pre codeblock"><code>-- Array of scalar values.
+-- Each array element represents a single string, plus we know its position in the array.
+SELECT id, name, pets.pos, pets.item FROM array_demo, array_demo.pets;
+
+-- Array of structs.
+-- Now each array element has named fields, possibly of different types.
+-- You can consider an ARRAY of STRUCT to represent a table inside another table.
+SELECT id, name, places_lived.pos, places_lived.item.place, places_lived.item.start_year
+FROM array_demo, array_demo.places_lived;
+
+-- The .ITEM name is optional for array elements that are structs.
+-- The following query is equivalent to the previous one, with .ITEM
+-- removed from the column references.
+SELECT id, name, places_lived.pos, places_lived.place, places_lived.start_year
+  FROM array_demo, array_demo.places_lived;
+
+-- To filter specific items from the array, do comparisons against the .POS or .ITEM
+-- pseudocolumns, or names of struct fields, in the WHERE clause.
+SELECT id, name, pets.item FROM array_demo, array_demo.pets
+  WHERE pets.pos in (0, 1, 3);
+
+SELECT id, name, pets.item FROM array_demo, array_demo.pets
+  WHERE pets.item LIKE 'Mr. %';
+
+SELECT id, name, places_lived.pos, places_lived.place, places_lived.start_year
+  FROM array_demo, array_demo.places_lived
+WHERE places_lived.place like '%California%';
+
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a>,
+
+      <a class="xref" href="impala_struct.html#struct">STRUCT Complex Type (Impala 2.3 or higher only)</a>, <a class="xref" href="impala_map.html#map">MAP Complex Type (Impala 2.3 or higher only)</a>
+    </p>
+
+  </div>
+
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div></div></nav></article></main></body></html>

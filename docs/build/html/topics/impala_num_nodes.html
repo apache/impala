@@ -1,0 +1,61 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="num_nodes"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>NUM_NODES Query Option</title></head><body id="num_nodes"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">NUM_NODES Query Option</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Limit the number of nodes that process a query, typically during debugging.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> numeric
+    </p>
+
+<p class="p">
+      <strong class="ph b">Allowed values:</strong> Only accepts the values 0
+      (meaning all nodes) or 1 (meaning all work is done on the coordinator node).
+</p>
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> 0
+    </p>
+
+     <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+     <p class="p">
+       If you are diagnosing a problem that you suspect is due to a timing issue due to
+       distributed query processing, you can set <code class="ph codeph">NUM_NODES=1</code> to verify
+       if the problem still occurs when all the work is done on a single node.
+     </p>
+
+    <p class="p">
+        You might set the <code class="ph codeph">NUM_NODES</code> option to 1 briefly, during <code class="ph codeph">INSERT</code> or
+        <code class="ph codeph">CREATE TABLE AS SELECT</code> statements. Normally, those statements produce one or more data
+        files per data node. If the write operation involves small amounts of data, a Parquet table, and/or a
+        partitioned table, the default behavior could produce many small files when intuitively you might expect
+        only a single output file. <code class="ph codeph">SET NUM_NODES=1</code> turns off the <span class="q">"distributed"</span> aspect of the
+        write operation, making it more likely to produce only one or a few data files.
+      </p>
+
+    <div class="note warning note_warning"><span class="note__title warningtitle">Warning:</span> 
+    <p class="p">
+      Because this option results in increased resource utilization on a single host,
+      it could cause problems due to contention with other Impala statements or
+      high resource usage. Symptoms could include queries running slowly, exceeding the memory limit,
+      or appearing to hang. Use it only in a single-user development/test environment;
+      <strong class="ph b">do not</strong> use it in a production environment or in a cluster with a high-concurrency
+      or high-volume or performance-critical workload.
+    </p>
+    </div>
+
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

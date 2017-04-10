@@ -1,0 +1,198 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="intro"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Introducing Apache Impala (incubating)</title></head><body id="intro"><main role="main"><article role="article" aria-labelledby="intro__impala">
+
+  <h1 class="title topictitle1" id="intro__impala"><span class="ph">Introducing Apache Impala (incubating)</span></h1>
+  
+
+  <div class="body conbody" id="intro__intro_body">
+
+      <p class="p">
+        Impala provides fast, interactive SQL queries directly on your Apache Hadoop data stored in HDFS,
+        HBase, <span class="ph">or the Amazon Simple Storage Service (S3)</span>.
+        In addition to using the same unified storage platform,
+        Impala also uses the same metadata, SQL syntax (Hive SQL), ODBC driver, and user interface
+        (Impala query UI in Hue) as Apache Hive. This
+        provides a familiar and unified platform for real-time or batch-oriented queries.
+      </p>
+
+      <p class="p">
+        Impala is an addition to tools available for querying big data. Impala does not replace the batch
+        processing frameworks built on MapReduce such as Hive. Hive and other frameworks built on MapReduce are
+        best suited for long running batch jobs, such as those involving batch processing of Extract, Transform,
+        and Load (ETL) type jobs.
+      </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        Impala was accepted into the Apache incubator on December 2, 2015.
+        In places where the documentation formerly referred to <span class="q">"Cloudera Impala"</span>,
+        now the official name is <span class="q">"Apache Impala (incubating)"</span>.
+      </div>
+
+  </div>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="intro__benefits">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Impala Benefits</h2>
+
+    <div class="body conbody">
+
+      <div class="p">
+        Impala provides:
+
+        <ul class="ul">
+          <li class="li">
+            Familiar SQL interface that data scientists and analysts already know.
+          </li>
+
+          <li class="li">
+            Ability to query high volumes of data (<span class="q">"big data"</span>) in Apache Hadoop.
+          </li>
+
+          <li class="li">
+            Distributed queries in a cluster environment, for convenient scaling and to make use of cost-effective
+            commodity hardware.
+          </li>
+
+          <li class="li">
+            Ability to share data files between different components with no copy or export/import step; for example,
+            to write with Pig, transform with Hive and query with Impala. Impala can read from and write to Hive
+            tables, enabling simple data interchange using Impala for analytics on Hive-produced data.
+          </li>
+
+          <li class="li">
+            Single system for big data processing and analytics, so customers can avoid costly modeling and ETL just
+            for analytics.
+          </li>
+        </ul>
+      </div>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="intro__impala_hadoop">
+
+    <h2 class="title topictitle2" id="ariaid-title3">How Impala Works with <span class="keyword">Apache Hadoop</span></h2>
+  
+
+    <div class="body conbody">
+
+      
+
+      <div class="p">
+        The Impala solution is composed of the following components:
+        <ul class="ul">
+          <li class="li">
+            Clients - Entities including Hue, ODBC clients, JDBC clients, and the Impala Shell can all interact
+            with Impala. These interfaces are typically used to issue queries or complete administrative tasks such
+            as connecting to Impala.
+          </li>
+
+          <li class="li">
+            Hive Metastore - Stores information about the data available to Impala. For example, the metastore lets
+            Impala know what databases are available and what the structure of those databases is. As you create,
+            drop, and alter schema objects, load data into tables, and so on through Impala SQL statements, the
+            relevant metadata changes are automatically broadcast to all Impala nodes by the dedicated catalog
+            service introduced in Impala 1.2.
+          </li>
+
+          <li class="li">
+            Impala - This process, which runs on DataNodes, coordinates and executes queries. Each
+            instance of Impala can receive, plan, and coordinate queries from Impala clients. Queries are
+            distributed among Impala nodes, and these nodes then act as workers, executing parallel query
+            fragments.
+          </li>
+
+          <li class="li">
+            HBase and HDFS - Storage for data to be queried.
+          </li>
+        </ul>
+      </div>
+
+      <div class="p">
+        Queries executed using Impala are handled as follows:
+        <ol class="ol">
+          <li class="li">
+            User applications send SQL queries to Impala through ODBC or JDBC, which provide standardized querying
+            interfaces. The user application may connect to any <code class="ph codeph">impalad</code> in the cluster. This
+            <code class="ph codeph">impalad</code> becomes the coordinator for the query.
+          </li>
+
+          <li class="li">
+            Impala parses the query and analyzes it to determine what tasks need to be performed by
+            <code class="ph codeph">impalad</code> instances across the cluster. Execution is planned for optimal efficiency.
+          </li>
+
+          <li class="li">
+            Services such as HDFS and HBase are accessed by local <code class="ph codeph">impalad</code> instances to provide
+            data.
+          </li>
+
+          <li class="li">
+            Each <code class="ph codeph">impalad</code> returns data to the coordinating <code class="ph codeph">impalad</code>, which sends
+            these results to the client.
+          </li>
+        </ol>
+      </div>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="intro__features">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Primary Impala Features</h2>
+
+    <div class="body conbody">
+
+      <div class="p">
+        Impala provides support for:
+        <ul class="ul">
+          <li class="li">
+            Most common SQL-92 features of Hive Query Language (HiveQL) including
+            <a class="xref" href="../shared/../topics/impala_select.html#select">SELECT</a>,
+            <a class="xref" href="../shared/../topics/impala_joins.html#joins">joins</a>, and
+            <a class="xref" href="../shared/../topics/impala_aggregate_functions.html#aggregate_functions">aggregate functions</a>.
+          </li>
+
+          <li class="li">
+            HDFS, HBase, <span class="ph">and Amazon Simple Storage System (S3)</span> storage, including:
+            <ul class="ul">
+              <li class="li">
+                <a class="xref" href="../shared/../topics/impala_file_formats.html#file_formats">HDFS file formats</a>: delimited text files, Parquet,
+                Avro, SequenceFile, and RCFile.
+              </li>
+
+              <li class="li">
+                Compression codecs: Snappy, GZIP, Deflate, BZIP.
+              </li>
+            </ul>
+          </li>
+
+          <li class="li">
+            Common data access interfaces including:
+            <ul class="ul">
+              <li class="li">
+                <a class="xref" href="../shared/../topics/impala_jdbc.html#impala_jdbc">JDBC driver</a>.
+              </li>
+
+              <li class="li">
+                <a class="xref" href="../shared/../topics/impala_odbc.html#impala_odbc">ODBC driver</a>.
+              </li>
+
+              <li class="li">
+                Hue Beeswax and the Impala Query UI.
+              </li>
+            </ul>
+          </li>
+
+          <li class="li">
+            <a class="xref" href="../shared/../topics/impala_impala_shell.html#impala_shell">impala-shell command-line interface</a>.
+          </li>
+
+          <li class="li">
+            <a class="xref" href="../shared/../topics/impala_security.html#security">Kerberos authentication</a>.
+          </li>
+        </ul>
+      </div>
+    </div>
+  </article>
+</article></main></body></html>

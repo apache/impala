@@ -1,0 +1,131 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="live_progress"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>LIVE_PROGRESS Query Option (Impala 2.3 or higher only)</title></head><body id="live_progress"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">LIVE_PROGRESS Query Option (<span class="keyword">Impala 2.3</span> or higher only)</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      For queries submitted through the <span class="keyword cmdname">impala-shell</span> command,
+      displays an interactive progress bar showing roughly what percentage of
+      processing has been completed. When the query finishes, the progress bar is erased
+      from the <span class="keyword cmdname">impala-shell</span> console output.
+    </p>
+
+    <p class="p">
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and <code class="ph codeph">false</code>;
+        any other value interpreted as <code class="ph codeph">false</code>
+      </p>
+    <p class="p">
+        <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code> statement)
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Command-line equivalent:</strong>
+      </p>
+    <p class="p">
+      You can enable this query option within <span class="keyword cmdname">impala-shell</span>
+      by starting the shell with the <code class="ph codeph">--live_progress</code>
+      command-line option.
+      You can still turn this setting off and on again within the shell through the
+      <code class="ph codeph">SET</code> command.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+    <p class="p">
+        The output from this query option is printed to standard error. The output is only displayed in interactive mode,
+        that is, not when the <code class="ph codeph">-q</code> or <code class="ph codeph">-f</code> options are used.
+      </p>
+    <p class="p">
+      For a more detailed way of tracking the progress of an interactive query through
+      all phases of processing, see <a class="xref" href="impala_live_summary.html#live_summary">LIVE_SUMMARY Query Option (Impala 2.3 or higher only)</a>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Restrictions:</strong>
+      </p>
+    <p class="p">
+      Because the percentage complete figure is calculated using the number of
+      issued and completed <span class="q">"scan ranges"</span>, which occur while reading the table
+      data, the progress bar might reach 100% before the query is entirely finished.
+      For example, the query might do work to perform aggregations after all the
+      table data has been read. If many of your queries fall into this category,
+      consider using the <code class="ph codeph">LIVE_SUMMARY</code> option instead for
+      more granular progress reporting.
+    </p>
+    <p class="p">
+        The <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code> query options
+        currently do not produce any output during <code class="ph codeph">COMPUTE STATS</code> operations.
+      </p>
+    <div class="p">
+        Because the <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code> query options
+        are available only within the <span class="keyword cmdname">impala-shell</span> interpreter:
+        <ul class="ul">
+          <li class="li">
+            <p class="p">
+              You cannot change these query options through the SQL <code class="ph codeph">SET</code>
+              statement using the JDBC or ODBC interfaces. The <code class="ph codeph">SET</code>
+              command in <span class="keyword cmdname">impala-shell</span> recognizes these names as
+              shell-only options.
+            </p>
+          </li>
+          <li class="li">
+            <p class="p">
+              Be careful when using <span class="keyword cmdname">impala-shell</span> on a pre-<span class="keyword">Impala 2.3</span>
+              system to connect to a system running <span class="keyword">Impala 2.3</span> or higher.
+              The older <span class="keyword cmdname">impala-shell</span> does not recognize these
+              query option names. Upgrade <span class="keyword cmdname">impala-shell</span> on the
+              systems where you intend to use these query options.
+            </p>
+          </li>
+          <li class="li">
+            <p class="p">
+              Likewise, the <span class="keyword cmdname">impala-shell</span> command relies on
+              some information only available in <span class="keyword">Impala 2.3</span> and higher
+              to prepare live progress reports and query summaries. The
+              <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code>
+              query options have no effect when <span class="keyword cmdname">impala-shell</span> connects
+              to a cluster running an older version of Impala.
+            </p>
+          </li>
+        </ul>
+      </div>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+<pre class="pre codeblock"><code>[localhost:21000] &gt; set live_progress=true;
+LIVE_PROGRESS set to true
+[localhost:21000] &gt; select count(*) from customer;
++----------+
+| count(*) |
++----------+
+| 150000   |
++----------+
+[localhost:21000] &gt; select count(*) from customer t1 cross join customer t2;
+[###################################                                   ] 50%
+[######################################################################] 100%
+
+
+</code></pre>
+
+    <p class="p">
+        To see how the <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code> query options
+        work in real time, see <a class="xref" href="https://asciinema.org/a/1rv7qippo0fe7h5k1b6k4nexk" target="_blank">this animated demo</a>.
+      </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

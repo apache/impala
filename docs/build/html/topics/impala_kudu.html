@@ -1,0 +1,1329 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_kudu"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala to Query Kudu Tables</title></head><body id="impala_kudu"><main role="main"><article role="article" aria-labelledby="impala_kudu__kudu">
+
+  <h1 class="title topictitle1" id="impala_kudu__kudu">Using Impala to Query Kudu Tables</h1>
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      You can use Impala to query tables stored by Apache Kudu. This capability
+      allows convenient access to a storage system that is tuned for different kinds of
+      workloads than the default with Impala.
+    </p>
+
+    <p class="p">
+      By default, Impala tables are stored on HDFS using data files with various file formats.
+      HDFS files are ideal for bulk loads (append operations) and queries using full-table scans,
+      but do not support in-place updates or deletes. Kudu is an alternative storage engine used
+      by Impala which can do both in-place updates (for mixed read/write workloads) and fast scans
+      (for data-warehouse/analytic operations). Using Kudu tables with Impala can simplify the
+      ETL pipeline by avoiding extra steps to segregate and reorganize newly arrived data.
+    </p>
+
+    <p class="p">
+      Certain Impala SQL statements and clauses, such as <code class="ph codeph">DELETE</code>,
+      <code class="ph codeph">UPDATE</code>, <code class="ph codeph">UPSERT</code>, and <code class="ph codeph">PRIMARY KEY</code> work
+      only with Kudu tables. Other statements and clauses, such as <code class="ph codeph">LOAD DATA</code>,
+      <code class="ph codeph">TRUNCATE TABLE</code>, and <code class="ph codeph">INSERT OVERWRITE</code>, are not applicable
+      to Kudu tables.
+    </p>
+
+    <p class="p toc inpage"></p>
+
+  </div>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="impala_kudu__kudu_benefits">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Benefits of Using Kudu Tables with Impala</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        The combination of Kudu and Impala works best for tables where scan performance is
+        important, but data arrives continuously, in small batches, or needs to be updated
+        without being completely replaced. HDFS-backed tables can require substantial overhead
+        to replace or reorganize data files as new data arrives. Impala can perform efficient
+        lookups and scans within Kudu tables, and Impala can also perform update or
+        delete operations efficiently. You can also use the Kudu Java, C++, and Python APIs to
+        do ingestion or transformation operations outside of Impala, and Impala can query the
+        current data at any time.
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="impala_kudu__kudu_config">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Configuring Impala for Use with Kudu</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        The <code class="ph codeph">-kudu_master_hosts</code> configuration property must be set correctly
+        for the <span class="keyword cmdname">impalad</span> daemon, for <code class="ph codeph">CREATE TABLE ... STORED AS
+        KUDU</code> statements to connect to the appropriate Kudu server. Typically, the
+        required value for this setting is <code class="ph codeph"><var class="keyword varname">kudu_host</var>:7051</code>.
+        In a high-availability Kudu deployment, specify the names of multiple Kudu hosts separated by commas.
+      </p>
+
+      <p class="p">
+        If the <code class="ph codeph">-kudu_master_hosts</code> configuration property is not set, you can
+        still associate the appropriate value for each table by specifying a
+        <code class="ph codeph">TBLPROPERTIES('kudu.master_addresses')</code> clause in the <code class="ph codeph">CREATE TABLE</code> statement or
+        changing the <code class="ph codeph">TBLPROPERTIES('kudu.master_addresses')</code> value with an <code class="ph codeph">ALTER TABLE</code>
+        statement.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title4" id="kudu_config__kudu_topology">
+
+      <h3 class="title topictitle3" id="ariaid-title4">Cluster Topology for Kudu Tables</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          With HDFS-backed tables, you are typically concerned with the number of DataNodes in
+          the cluster, how many and how large HDFS data files are read during a query, and
+          therefore the amount of work performed by each DataNode and the network communication
+          to combine intermediate results and produce the final result set.
+        </p>
+
+        <p class="p">
+          With Kudu tables, the topology considerations are different, because:
+        </p>
+
+        <ul class="ul">
+          <li class="li">
+            <p class="p">
+              The underlying storage is managed and organized by Kudu, not represented as HDFS
+              data files.
+            </p>
+          </li>
+
+          <li class="li">
+            <p class="p">
+              Kudu handles some of the underlying mechanics of partitioning the data. You can specify
+              the partitioning scheme with combinations of hash and range partitioning, so that you can
+              decide how much effort to expend to manage the partitions as new data arrives. For example,
+              you can construct partitions that apply to date ranges rather than a separate partition for each
+              day or each hour.
+            </p>
+          </li>
+
+          <li class="li">
+            <p class="p">
+              Data is physically divided based on units of storage called <dfn class="term">tablets</dfn>. Tablets are
+              stored by <dfn class="term">tablet servers</dfn>. Each tablet server can store multiple tablets,
+              and each tablet is replicated across multiple tablet servers, managed automatically by Kudu.
+              Where practical, colocate the tablet servers on the same hosts as the DataNodes, although that is not required.
+            </p>
+          </li>
+        </ul>
+
+        <p class="p">
+          One consideration for the cluster topology is that the number of replicas for a Kudu table
+          must be odd.
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="impala_kudu__kudu_ddl">
+
+    <h2 class="title topictitle2" id="ariaid-title5">Impala DDL Enhancements for Kudu Tables (CREATE TABLE and ALTER TABLE)</h2>
+
+    
+
+    <div class="body conbody">
+
+      <p class="p">
+        You can use the Impala <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER TABLE</code>
+        statements to create and fine-tune the characteristics of Kudu tables. Because Kudu
+        tables have features and properties that do not apply to other kinds of Impala tables,
+        familiarize yourself with Kudu-related concepts and syntax first.
+        For the general syntax of the <code class="ph codeph">CREATE TABLE</code>
+        statement for Kudu tables, see <a class="xref" href="impala_create_table.html">CREATE TABLE Statement</a>.
+      </p>
+
+      <p class="p toc inpage"></p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title6" id="kudu_ddl__kudu_primary_key">
+
+      <h3 class="title topictitle3" id="ariaid-title6">Primary Key Columns for Kudu Tables</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Kudu tables introduce the notion of primary keys to Impala for the first time. The
+          primary key is made up of one or more columns, whose values are combined and used as a
+          lookup key during queries. The tuple represented by these columns must be unique and cannot contain any
+          <code class="ph codeph">NULL</code> values, and can never be updated once inserted. For a
+          Kudu table, all the partition key columns must come from the set of
+          primary key columns.
+        </p>
+
+        <p class="p">
+          The primary key has both physical and logical aspects:
+        </p>
+
+        <ul class="ul">
+          <li class="li">
+            <p class="p">
+              On the physical side, it is used to map the data values to particular tablets for fast retrieval.
+              Because the tuples formed by the primary key values are unique, the primary key columns are typically
+              highly selective.
+            </p>
+          </li>
+          <li class="li">
+            <p class="p">
+              On the logical side, the uniqueness constraint allows you to avoid duplicate data in a table.
+              For example, if an <code class="ph codeph">INSERT</code> operation fails partway through, only some of the
+              new rows might be present in the table. You can re-run the same <code class="ph codeph">INSERT</code>, and
+              only the missing rows will be added. Or if data in the table is stale, you can run an
+              <code class="ph codeph">UPSERT</code> statement that brings the data up to date, without the possibility
+              of creating duplicate copies of existing rows.
+            </p>
+          </li>
+        </ul>
+
+        <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+          <p class="p">
+            Impala only allows <code class="ph codeph">PRIMARY KEY</code> clauses and <code class="ph codeph">NOT NULL</code>
+            constraints on columns for Kudu tables. These constraints are enforced on the Kudu side.
+          </p>
+        </div>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title7" id="kudu_ddl__kudu_column_attributes">
+
+      <h3 class="title topictitle3" id="ariaid-title7">Kudu-Specific Column Attributes for CREATE TABLE</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          For the general syntax of the <code class="ph codeph">CREATE TABLE</code>
+          statement for Kudu tables, see <a class="xref" href="impala_create_table.html">CREATE TABLE Statement</a>.
+          The following sections provide more detail for some of the
+          Kudu-specific keywords you can use in column definitions.
+        </p>
+
+        <p class="p">
+          The column list in a <code class="ph codeph">CREATE TABLE</code> statement can include the following
+          attributes, which only apply to Kudu tables:
+        </p>
+
+<pre class="pre codeblock"><code>
+  PRIMARY KEY
+| [NOT] NULL
+| ENCODING <var class="keyword varname">codec</var>
+| COMPRESSION <var class="keyword varname">algorithm</var>
+| DEFAULT <var class="keyword varname">constant_expression</var>
+| BLOCK_SIZE <var class="keyword varname">number</var>
+</code></pre>
+
+        <p class="p toc inpage">
+          See the following sections for details about each column attribute.
+        </p>
+
+      </div>
+
+      <article class="topic concept nested3" aria-labelledby="ariaid-title8" id="kudu_column_attributes__kudu_primary_key_attribute">
+
+        <h4 class="title topictitle4" id="ariaid-title8">PRIMARY KEY Attribute</h4>
+
+        <div class="body conbody">
+
+          <p class="p">
+            The primary key for a Kudu table is a column, or set of columns, that uniquely
+            identifies every row. The primary key value also is used as the natural sort order
+            for the values from the table. The primary key value for each row is based on the
+            combination of values for the columns.
+          </p>
+
+          <p class="p">
+        Because all of the primary key columns must have non-null values, specifying a column
+        in the <code class="ph codeph">PRIMARY KEY</code> clause implicitly adds the <code class="ph codeph">NOT
+        NULL</code> attribute to that column.
+      </p>
+
+          <p class="p">
+            The primary key columns must be the first ones specified in the <code class="ph codeph">CREATE
+            TABLE</code> statement. For a single-column primary key, you can include a
+            <code class="ph codeph">PRIMARY KEY</code> attribute inline with the column definition. For a
+            multi-column primary key, you include a <code class="ph codeph">PRIMARY KEY (<var class="keyword varname">c1</var>,
+            <var class="keyword varname">c2</var>, ...)</code> clause as a separate entry at the end of the
+            column list.
+          </p>
+
+          <p class="p">
+            You can specify the <code class="ph codeph">PRIMARY KEY</code> attribute either inline in a single
+            column definition, or as a separate clause at the end of the column list:
+          </p>
+
+<pre class="pre codeblock"><code>
+CREATE TABLE pk_inline
+(
+  col1 BIGINT PRIMARY KEY,
+  col2 STRING,
+  col3 BOOLEAN
+) PARTITION BY HASH(col1) PARTITIONS 2 STORED AS KUDU;
+
+CREATE TABLE pk_at_end
+(
+  col1 BIGINT,
+  col2 STRING,
+  col3 BOOLEAN,
+  PRIMARY KEY (col1)
+) PARTITION BY HASH(col1) PARTITIONS 2 STORED AS KUDU;
+</code></pre>
+
+          <p class="p">
+            When the primary key is a single column, these two forms are equivalent. If the
+            primary key consists of more than one column, you must specify the primary key using
+            a separate entry in the column list:
+          </p>
+
+<pre class="pre codeblock"><code>
+CREATE TABLE pk_multiple_columns
+(
+  col1 BIGINT,
+  col2 STRING,
+  col3 BOOLEAN,
+  <strong class="ph b">PRIMARY KEY (col1, col2)</strong>
+) PARTITION BY HASH(col2) PARTITIONS 2 STORED AS KUDU;
+</code></pre>
+
+          <p class="p">
+            The <code class="ph codeph">SHOW CREATE TABLE</code> statement always represents the
+            <code class="ph codeph">PRIMARY KEY</code> specification as a separate item in the column list:
+          </p>
+
+<pre class="pre codeblock"><code>
+CREATE TABLE inline_pk_rewritten (id BIGINT <strong class="ph b">PRIMARY KEY</strong>, s STRING)
+  PARTITION BY HASH(id) PARTITIONS 2 STORED AS KUDU;
+
+SHOW CREATE TABLE inline_pk_rewritten;
++------------------------------------------------------------------------------+
+| result                                                                       |
++------------------------------------------------------------------------------+
+| CREATE TABLE user.inline_pk_rewritten (                                      |
+|   id BIGINT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION, |
+|   s STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,      |
+|   <strong class="ph b">PRIMARY KEY (id)</strong>                                                           |
+| )                                                                            |
+| PARTITION BY HASH (id) PARTITIONS 2                                          |
+| STORED AS KUDU                                                               |
+| TBLPROPERTIES ('kudu.master_addresses'='host.example.com')                   |
++------------------------------------------------------------------------------+
+</code></pre>
+
+          <p class="p">
+            The notion of primary key only applies to Kudu tables. Every Kudu table requires a
+            primary key. The primary key consists of one or more columns. You must specify any
+            primary key columns first in the column list.
+          </p>
+
+          <p class="p">
+            The contents of the primary key columns cannot be changed by an
+            <code class="ph codeph">UPDATE</code> or <code class="ph codeph">UPSERT</code> statement. Including too many
+            columns in the primary key (more than 5 or 6) can also reduce the performance of
+            write operations. Therefore, pick the most selective and most frequently
+            tested non-null columns for the primary key specification.
+            If a column must always have a value, but that value
+            might change later, leave it out of the primary key and use a <code class="ph codeph">NOT
+            NULL</code> clause for that column instead. If an existing row has an
+            incorrect or outdated key column value, delete the old row and insert an entirely
+            new row with the correct primary key.
+          </p>
+
+        </div>
+
+      </article>
+
+      <article class="topic concept nested3" aria-labelledby="ariaid-title9" id="kudu_column_attributes__kudu_not_null_attribute">
+
+        <h4 class="title topictitle4" id="ariaid-title9">NULL | NOT NULL Attribute</h4>
+
+        <div class="body conbody">
+
+          <p class="p">
+            For Kudu tables, you can specify which columns can contain nulls or not. This
+            constraint offers an extra level of consistency enforcement for Kudu tables. If an
+            application requires a field to always be specified, include a <code class="ph codeph">NOT
+            NULL</code> clause in the corresponding column definition, and Kudu prevents rows
+            from being inserted with a <code class="ph codeph">NULL</code> in that column.
+          </p>
+
+          <p class="p">
+            For example, a table containing geographic information might require the latitude
+            and longitude coordinates to always be specified. Other attributes might be allowed
+            to be <code class="ph codeph">NULL</code>. For example, a location might not have a designated
+            place name, its altitude might be unimportant, and its population might be initially
+            unknown, to be filled in later.
+          </p>
+
+          <p class="p">
+        Because all of the primary key columns must have non-null values, specifying a column
+        in the <code class="ph codeph">PRIMARY KEY</code> clause implicitly adds the <code class="ph codeph">NOT
+        NULL</code> attribute to that column.
+      </p>
+
+          <p class="p">
+            For non-Kudu tables, Impala allows any column to contain <code class="ph codeph">NULL</code>
+            values, because it is not practical to enforce a <span class="q">"not null"</span> constraint on HDFS
+            data files that could be prepared using external tools and ETL processes.
+          </p>
+
+<pre class="pre codeblock"><code>
+CREATE TABLE required_columns
+(
+  id BIGINT PRIMARY KEY,
+  latitude DOUBLE NOT NULL,
+  longitude DOUBLE NOT NULL,
+  place_name STRING,
+  altitude DOUBLE,
+  population BIGINT
+) PARTITION BY HASH(id) PARTITIONS 2 STORED AS KUDU;
+</code></pre>
+
+          <p class="p">
+            During performance optimization, Kudu can use the knowledge that nulls are not
+            allowed to skip certain checks on each input row, speeding up queries and join
+            operations. Therefore, specify <code class="ph codeph">NOT NULL</code> constraints when
+            appropriate.
+          </p>
+
+          <p class="p">
+            The <code class="ph codeph">NULL</code> clause is the default condition for all columns that are not
+            part of the primary key. You can omit it, or specify it to clarify that you have made a
+            conscious design decision to allow nulls in a column.
+          </p>
+
+          <p class="p">
+            Because primary key columns cannot contain any <code class="ph codeph">NULL</code> values, the
+            <code class="ph codeph">NOT NULL</code> clause is not required for the primary key columns,
+            but you might still specify it to make your code self-describing.
+          </p>
+
+        </div>
+
+      </article>
+
+      <article class="topic concept nested3" aria-labelledby="ariaid-title10" id="kudu_column_attributes__kudu_default_attribute">
+
+        <h4 class="title topictitle4" id="ariaid-title10">DEFAULT Attribute</h4>
+
+        <div class="body conbody">
+
+          <p class="p">
+            You can specify a default value for columns in Kudu tables. The default value can be
+            any constant expression, for example, a combination of literal values, arithmetic
+            and string operations. It cannot contain references to columns or non-deterministic
+            function calls.
+          </p>
+
+          <p class="p">
+            The following example shows different kinds of expressions for the
+            <code class="ph codeph">DEFAULT</code> clause. The requirement to use a constant value means that
+            you can fill in a placeholder value such as <code class="ph codeph">NULL</code>, empty string,
+            0, -1, <code class="ph codeph">'N/A'</code> and so on, but you cannot reference functions or
+            column names. Therefore, you cannot use <code class="ph codeph">DEFAULT</code> to do things such as
+            automatically making an uppercase copy of a string value, storing Boolean values based
+            on tests of other columns, or add or subtract one from another column representing a sequence number.
+          </p>
+
+<pre class="pre codeblock"><code>
+CREATE TABLE default_vals
+(
+  id BIGINT PRIMARY KEY,
+  name STRING NOT NULL DEFAULT 'unknown',
+  address STRING DEFAULT upper('no fixed address'),
+  age INT DEFAULT -1,
+  earthling BOOLEAN DEFAULT TRUE,
+  planet_of_origin STRING DEFAULT 'Earth',
+  optional_col STRING DEFAULT NULL
+) PARTITION BY HASH(id) PARTITIONS 2 STORED AS KUDU;
+</code></pre>
+
+          <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+            <p class="p">
+              When designing an entirely new schema, prefer to use <code class="ph codeph">NULL</code> as the
+              placeholder for any unknown or missing values, because that is the universal convention
+              among database systems. Null values can be stored efficiently, and easily checked with the
+              <code class="ph codeph">IS NULL</code> or <code class="ph codeph">IS NOT NULL</code> operators. The <code class="ph codeph">DEFAULT</code>
+              attribute is appropriate when ingesting data that already has an established convention for
+              representing unknown or missing values, or where the vast majority of rows have some common
+              non-null value.
+            </p>
+          </div>
+
+        </div>
+
+      </article>
+
+      <article class="topic concept nested3" aria-labelledby="ariaid-title11" id="kudu_column_attributes__kudu_encoding_attribute">
+
+        <h4 class="title topictitle4" id="ariaid-title11">ENCODING Attribute</h4>
+
+        <div class="body conbody">
+
+          <p class="p">
+            Each column in a Kudu table can optionally use an encoding, a low-overhead form of
+            compression that reduces the size on disk, then requires additional CPU cycles to
+            reconstruct the original values during queries. Typically, highly compressible data
+            benefits from the reduced I/O to read the data back from disk. By default, each
+            column uses the <span class="q">"plain"</span> encoding where the data is stored unchanged.
+          </p>
+
+          <div class="p">
+            The encoding keywords that Impala recognizes are:
+
+            <ul class="ul">
+              <li class="li">
+                <p class="p">
+                  <code class="ph codeph">AUTO_ENCODING</code>: use the default encoding based on the column
+                  type; currently always the same as <code class="ph codeph">PLAIN_ENCODING</code>, but subject to
+                  change in the future.
+                </p>
+              </li>
+              <li class="li">
+                <p class="p">
+                  <code class="ph codeph">PLAIN_ENCODING</code>: leave the value in its original binary format.
+                </p>
+              </li>
+              
+              <li class="li">
+                <p class="p">
+                  <code class="ph codeph">RLE</code>: compress repeated values (when sorted in primary key
+                  order) by including a count.
+                </p>
+              </li>
+              <li class="li">
+                <p class="p">
+                  <code class="ph codeph">DICT_ENCODING</code>: when the number of different string values is
+                  low, replace the original string with a numeric ID.
+                </p>
+              </li>
+              <li class="li">
+                <p class="p">
+                  <code class="ph codeph">BIT_SHUFFLE</code>: rearrange the bits of the values to efficiently
+                  compress sequences of values that are identical or vary only slightly based
+                  on primary key order. The resulting encoded data is also compressed with LZ4.
+                </p>
+              </li>
+              <li class="li">
+                <p class="p">
+                  <code class="ph codeph">PREFIX_ENCODING</code>: compress common prefixes in string values; mainly for use internally within Kudu.
+                </p>
+              </li>
+            </ul>
+          </div>
+
+
+
+          <p class="p">
+            The following example shows the Impala keywords representing the encoding types.
+            (The Impala keywords match the symbolic names used within Kudu.)
+            For usage guidelines on the different kinds of encoding, see
+            <a class="xref" href="https://kudu.apache.org/docs/schema_design.html" target="_blank">the Kudu documentation</a>.
+            The <code class="ph codeph">DESCRIBE</code> output shows how the encoding is reported after
+            the table is created, and that omitting the encoding (in this case, for the
+            <code class="ph codeph">ID</code> column) is the same as specifying <code class="ph codeph">DEFAULT_ENCODING</code>.
+          </p>
+
+<pre class="pre codeblock"><code>
+CREATE TABLE various_encodings
+(
+  id BIGINT PRIMARY KEY,
+  c1 BIGINT ENCODING PLAIN_ENCODING,
+  c2 BIGINT ENCODING AUTO_ENCODING,
+  c3 TINYINT ENCODING BIT_SHUFFLE,
+  c4 DOUBLE ENCODING BIT_SHUFFLE,
+  c5 BOOLEAN ENCODING RLE,
+  c6 STRING ENCODING DICT_ENCODING,
+  c7 STRING ENCODING PREFIX_ENCODING
+) PARTITION BY HASH(id) PARTITIONS 2 STORED AS KUDU;
+
+-- Some columns are omitted from the output for readability.
+describe various_encodings;
++------+---------+-------------+----------+-----------------+
+| name | type    | primary_key | nullable | encoding        |
++------+---------+-------------+----------+-----------------+
+| id   | bigint  | true        | false    | AUTO_ENCODING   |
+| c1   | bigint  | false       | true     | PLAIN_ENCODING  |
+| c2   | bigint  | false       | true     | AUTO_ENCODING   |
+| c3   | tinyint | false       | true     | BIT_SHUFFLE     |
+| c4   | double  | false       | true     | BIT_SHUFFLE     |
+| c5   | boolean | false       | true     | RLE             |
+| c6   | string  | false       | true     | DICT_ENCODING   |
+| c7   | string  | false       | true     | PREFIX_ENCODING |
++------+---------+-------------+----------+-----------------+
+</code></pre>
+
+        </div>
+
+      </article>
+
+      <article class="topic concept nested3" aria-labelledby="ariaid-title12" id="kudu_column_attributes__kudu_compression_attribute">
+
+        <h4 class="title topictitle4" id="ariaid-title12">COMPRESSION Attribute</h4>
+
+        <div class="body conbody">
+
+          <p class="p">
+            You can specify a compression algorithm to use for each column in a Kudu table. This
+            attribute imposes more CPU overhead when retrieving the values than the
+            <code class="ph codeph">ENCODING</code> attribute does. Therefore, use it primarily for columns with
+            long strings that do not benefit much from the less-expensive <code class="ph codeph">ENCODING</code>
+            attribute.
+          </p>
+
+          <p class="p">
+            The choices for <code class="ph codeph">COMPRESSION</code> are <code class="ph codeph">LZ4</code>,
+            <code class="ph codeph">SNAPPY</code>, and <code class="ph codeph">ZLIB</code>.
+          </p>
+
+          <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+            <p class="p">
+              Columns that use the <code class="ph codeph">BITSHUFFLE</code> encoding are already compressed
+              using <code class="ph codeph">LZ4</code>, and so typically do not need any additional
+              <code class="ph codeph">COMPRESSION</code> attribute.
+            </p>
+          </div>
+
+          <p class="p">
+            The following example shows design considerations for several
+            <code class="ph codeph">STRING</code> columns with different distribution characteristics, leading
+            to choices for both the <code class="ph codeph">ENCODING</code> and <code class="ph codeph">COMPRESSION</code>
+            attributes. The <code class="ph codeph">country</code> values come from a specific set of strings,
+            therefore this column is a good candidate for dictionary encoding. The
+            <code class="ph codeph">post_id</code> column contains an ascending sequence of integers, where
+            several leading bits are likely to be all zeroes, therefore this column is a good
+            candidate for bitshuffle encoding. The <code class="ph codeph">body</code>
+            column and the corresponding columns for translated versions tend to be long unique
+            strings that are not practical to use with any of the encoding schemes, therefore
+            they employ the <code class="ph codeph">COMPRESSION</code> attribute instead. The ideal compression
+            codec in each case would require some experimentation to determine how much space
+            savings it provided and how much CPU overhead it added, based on real-world data.
+          </p>
+
+<pre class="pre codeblock"><code>
+CREATE TABLE blog_posts
+(
+  user_id STRING ENCODING DICT_ENCODING,
+  post_id BIGINT ENCODING BIT_SHUFFLE,
+  subject STRING ENCODING PLAIN_ENCODING,
+  body STRING COMPRESSION LZ4,
+  spanish_translation STRING COMPRESSION SNAPPY,
+  esperanto_translation STRING COMPRESSION ZLIB,
+  PRIMARY KEY (user_id, post_id)
+) PARTITION BY HASH(user_id, post_id) PARTITIONS 2 STORED AS KUDU;
+</code></pre>
+
+        </div>
+
+      </article>
+
+      <article class="topic concept nested3" aria-labelledby="ariaid-title13" id="kudu_column_attributes__kudu_block_size_attribute">
+
+        <h4 class="title topictitle4" id="ariaid-title13">BLOCK_SIZE Attribute</h4>
+
+        <div class="body conbody">
+
+          <p class="p">
+            Although Kudu does not use HDFS files internally, and thus is not affected by
+            the HDFS block size, it does have an underlying unit of I/O called the
+            <dfn class="term">block size</dfn>. The <code class="ph codeph">BLOCK_SIZE</code> attribute lets you set the
+            block size for any column.
+          </p>
+
+          <p class="p">
+            The block size attribute is a relatively advanced feature. Refer to
+            <a class="xref" href="https://kudu.apache.org/docs/index.html" target="_blank">the Kudu documentation</a>
+            for usage details.
+          </p>
+
+
+
+        </div>
+
+      </article>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title14" id="kudu_ddl__kudu_partitioning">
+
+      <h3 class="title topictitle3" id="ariaid-title14">Partitioning for Kudu Tables</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Kudu tables use special mechanisms to distribute data among the underlying
+          tablet servers. Although we refer to such tables as partitioned tables, they are
+          distinguished from traditional Impala partitioned tables by use of different clauses
+          on the <code class="ph codeph">CREATE TABLE</code> statement. Kudu tables use
+          <code class="ph codeph">PARTITION BY</code>, <code class="ph codeph">HASH</code>, <code class="ph codeph">RANGE</code>, and
+          range specification clauses rather than the <code class="ph codeph">PARTITIONED BY</code> clause
+          for HDFS-backed tables, which specifies only a column name and creates a new partition for each
+          different value.
+        </p>
+
+        <p class="p">
+          For background information and architectural details about the Kudu partitioning
+          mechanism, see
+          <a class="xref" href="https://kudu.apache.org/kudu.pdf" target="_blank">the Kudu white paper, section 3.2</a>.
+        </p>
+
+
+
+        <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+          <p class="p">
+            The Impala DDL syntax for Kudu tables is different than in early Kudu versions,
+            which used an experimental fork of the Impala code. For example, the
+            <code class="ph codeph">DISTRIBUTE BY</code> clause is now <code class="ph codeph">PARTITION BY</code>, the
+            <code class="ph codeph">INTO <var class="keyword varname">n</var> BUCKETS</code> clause is now
+            <code class="ph codeph">PARTITIONS <var class="keyword varname">n</var></code> and the range partitioning syntax
+            is reworked to replace the <code class="ph codeph">SPLIT ROWS</code> clause with more expressive
+            syntax involving comparison operators.
+          </p>
+        </div>
+
+        <p class="p toc inpage"></p>
+
+      </div>
+
+      <article class="topic concept nested3" aria-labelledby="ariaid-title15" id="kudu_partitioning__kudu_hash_partitioning">
+        <h4 class="title topictitle4" id="ariaid-title15">Hash Partitioning</h4>
+        <div class="body conbody">
+
+          <p class="p">
+            Hash partitioning is the simplest type of partitioning for Kudu tables.
+            For hash-partitioned Kudu tables, inserted rows are divided up between a fixed number
+            of <span class="q">"buckets"</span> by applying a hash function to the values of the columns specified
+            in the <code class="ph codeph">HASH</code> clause.
+            Hashing ensures that rows with similar values are evenly distributed, instead of
+            clumping together all in the same bucket. Spreading new rows across the buckets this
+            way lets insertion operations work in parallel across multiple tablet servers.
+            Separating the hashed values can impose additional overhead on queries, where
+            queries with range-based predicates might have to read multiple tablets to retrieve
+            all the relevant values.
+          </p>
+
+<pre class="pre codeblock"><code>
+-- 1M rows with 50 hash partitions = approximately 20,000 rows per partition.
+-- The values in each partition are not sequential, but rather based on a hash function.
+-- Rows 1, 99999, and 123456 might be in the same partition.
+CREATE TABLE million_rows (id string primary key, s string)
+  PARTITION BY HASH(id) PARTITIONS 50
+  STORED AS KUDU;
+
+-- Because the ID values are unique, we expect the rows to be roughly
+-- evenly distributed between the buckets in the destination table.
+INSERT INTO million_rows SELECT * FROM billion_rows ORDER BY id LIMIT 1e6;
+</code></pre>
+
+          <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+            <p class="p">
+              The largest number of buckets that you can create with a <code class="ph codeph">PARTITIONS</code>
+              clause varies depending on the number of tablet servers in the cluster, while the smallest is 2.
+              For simplicity, some of the simple <code class="ph codeph">CREATE TABLE</code> statements throughout this section
+              use <code class="ph codeph">PARTITIONS 2</code> to illustrate the minimum requirements for a Kudu table.
+              For large tables, prefer to use roughly 10 partitions per server in the cluster.
+            </p>
+          </div>
+
+        </div>
+      </article>
+
+      <article class="topic concept nested3" aria-labelledby="ariaid-title16" id="kudu_partitioning__kudu_range_partitioning">
+        <h4 class="title topictitle4" id="ariaid-title16">Range Partitioning</h4>
+        <div class="body conbody">
+
+          <p class="p">
+            Range partitioning lets you specify partitioning precisely, based on single values or ranges
+            of values within one or more columns. You add one or more <code class="ph codeph">RANGE</code> clauses to the
+            <code class="ph codeph">CREATE TABLE</code> statement, following the <code class="ph codeph">PARTITION BY</code>
+            clause.
+          </p>
+
+          <p class="p">
+            Range-partitioned Kudu tables use one or more range clauses, which include a
+            combination of constant expressions, <code class="ph codeph">VALUE</code> or <code class="ph codeph">VALUES</code>
+            keywords, and comparison operators. (This syntax replaces the <code class="ph codeph">SPLIT
+            ROWS</code> clause used with early Kudu versions.)
+            For the full syntax, see <a class="xref" href="impala_create_table.html">CREATE TABLE Statement</a>.
+          </p>
+
+<pre class="pre codeblock"><code>
+-- 50 buckets, all for IDs beginning with a lowercase letter.
+-- Having only a single range enforces the allowed range of values
+-- but does not add any extra parallelism.
+create table million_rows_one_range (id string primary key, s string)
+  partition by hash(id) partitions 50,
+  range (partition 'a' &lt;= values &lt; '{')
+  stored as kudu;
+
+-- 50 buckets for IDs beginning with a lowercase letter
+-- plus 50 buckets for IDs beginning with an uppercase letter.
+-- Total number of buckets = number in the PARTITIONS clause x number of ranges.
+-- We are still enforcing constraints on the primary key values
+-- allowed in the table, and the 2 ranges provide better parallelism
+-- as rows are inserted or the table is scanned.
+create table million_rows_two_ranges (id string primary key, s string)
+  partition by hash(id) partitions 50,
+  range (partition 'a' &lt;= values &lt; '{', partition 'A' &lt;= values &lt; '[')
+  stored as kudu;
+
+-- Same as previous table, with an extra range covering the single key value '00000'.
+create table million_rows_three_ranges (id string primary key, s string)
+  partition by hash(id) partitions 50,
+  range (partition 'a' &lt;= values &lt; '{', partition 'A' &lt;= values &lt; '[', partition value = '00000')
+  stored as kudu;
+
+-- The range partitioning can be displayed with a SHOW command in impala-shell.
+show range partitions million_rows_three_ranges;
++---------------------+
+| RANGE (id)          |
++---------------------+
+| VALUE = "00000"     |
+| "A" &lt;= VALUES &lt; "[" |
+| "a" &lt;= VALUES &lt; "{" |
++---------------------+
+
+</code></pre>
+
+          <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+            <p class="p">
+              When defining ranges, be careful to avoid <span class="q">"fencepost errors"</span> where values at the
+              extreme ends might be included or omitted by accident. For example, in the tables defined
+              in the preceding code listings, the range <code class="ph codeph">"a" &lt;= VALUES &lt; "{"</code> ensures that
+              any values starting with <code class="ph codeph">z</code>, such as <code class="ph codeph">za</code> or <code class="ph codeph">zzz</code>
+              or <code class="ph codeph">zzz-ZZZ</code>, are all included, by using a less-than operator for the smallest
+              value after all the values starting with <code class="ph codeph">z</code>.
+            </p>
+          </div>
+
+          <p class="p">
+            For range-partitioned Kudu tables, an appropriate range must exist before a data value can be created in the table.
+            Any <code class="ph codeph">INSERT</code>, <code class="ph codeph">UPDATE</code>, or <code class="ph codeph">UPSERT</code> statements fail if they try to
+            create column values that fall outside the specified ranges. The error checking for ranges is performed on the
+            Kudu side; Impala passes the specified range information to Kudu, and passes back any error or warning if the
+            ranges are not valid. (A nonsensical range specification causes an error for a DDL statement, but only a warning
+            for a DML statement.)
+          </p>
+
+          <p class="p">
+            Ranges can be non-contiguous:
+          </p>
+
+<pre class="pre codeblock"><code>
+partition by range (year) (partition 1885 &lt;= values &lt;= 1889, partition 1893 &lt;= values &lt;= 1897)
+
+partition by range (letter_grade) (partition value = 'A', partition value = 'B',
+  partition value = 'C', partition value = 'D', partition value = 'F')
+
+</code></pre>
+
+          <p class="p">
+            The <code class="ph codeph">ALTER TABLE</code> statement with the <code class="ph codeph">ADD PARTITION</code> or
+            <code class="ph codeph">DROP PARTITION</code> clauses can be used to add or remove ranges from an
+            existing Kudu table.
+          </p>
+
+<pre class="pre codeblock"><code>
+ALTER TABLE foo ADD PARTITION 30 &lt;= VALUES &lt; 50;
+ALTER TABLE foo DROP PARTITION 1 &lt;= VALUES &lt; 5;
+
+</code></pre>
+
+          <p class="p">
+            When a range is added, the new range must not overlap with any of the previous ranges;
+            that is, it can only fill in gaps within the previous ranges.
+          </p>
+
+<pre class="pre codeblock"><code>
+alter table test_scores add range partition value = 'E';
+
+alter table year_ranges add range partition 1890 &lt;= values &lt; 1893;
+
+</code></pre>
+
+          <p class="p">
+            When a range is removed, all the associated rows in the table are deleted. (This
+            is true whether the table is internal or external.)
+          </p>
+
+<pre class="pre codeblock"><code>
+alter table test_scores drop range partition value = 'E';
+
+alter table year_ranges drop range partition 1890 &lt;= values &lt; 1893;
+
+</code></pre>
+
+        <p class="p">
+          Kudu tables can also use a combination of hash and range partitioning.
+        </p>
+
+<pre class="pre codeblock"><code>
+partition by hash (school) partitions 10,
+  range (letter_grade) (partition value = 'A', partition value = 'B',
+    partition value = 'C', partition value = 'D', partition value = 'F')
+
+</code></pre>
+
+        </div>
+      </article>
+
+      <article class="topic concept nested3" aria-labelledby="ariaid-title17" id="kudu_partitioning__kudu_partitioning_misc">
+        <h4 class="title topictitle4" id="ariaid-title17">Working with Partitioning in Kudu Tables</h4>
+        <div class="body conbody">
+
+          <p class="p">
+            To see the current partitioning scheme for a Kudu table, you can use the <code class="ph codeph">SHOW
+            CREATE TABLE</code> statement or the <code class="ph codeph">SHOW PARTITIONS</code> statement. The
+            <code class="ph codeph">CREATE TABLE</code> syntax displayed by this statement includes all the
+            hash, range, or both clauses that reflect the original table structure plus any
+            subsequent <code class="ph codeph">ALTER TABLE</code> statements that changed the table structure.
+          </p>
+
+          <p class="p">
+            To see the underlying buckets and partitions for a Kudu table, use the
+            <code class="ph codeph">SHOW TABLE STATS</code> or <code class="ph codeph">SHOW PARTITIONS</code> statement.
+          </p>
+
+        </div>
+      </article>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title18" id="kudu_ddl__kudu_timestamps">
+
+      <h3 class="title topictitle3" id="ariaid-title18">Handling Date, Time, or Timestamp Data with Kudu</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Because currently a Kudu table cannot have a column with the Impala
+          <code class="ph codeph">TIMESTAMP</code> type, expect to store date/time information as the number
+          of seconds, milliseconds, or microseconds since the Unix epoch date of January 1,
+          1970. Specify the column as <code class="ph codeph">BIGINT</code> in the Impala <code class="ph codeph">CREATE
+          TABLE</code> statement, corresponding to an 8-byte integer (an
+          <code class="ph codeph">int64</code>) in the underlying Kudu table). Then use Impala date/time
+          conversion functions as necessary to produce a numeric, <code class="ph codeph">TIMESTAMP</code>,
+          or <code class="ph codeph">STRING</code> value depending on the context.
+        </p>
+
+        <p class="p">
+          For example, the <code class="ph codeph">unix_timestamp()</code> function returns an integer result
+          representing the number of seconds past the epoch. The <code class="ph codeph">now()</code> function
+          produces a <code class="ph codeph">TIMESTAMP</code> representing the current date and time, which can
+          be passed as an argument to <code class="ph codeph">unix_timestamp()</code>. And string literals
+          representing dates and date/times can be cast to <code class="ph codeph">TIMESTAMP</code>, and from there
+          converted to numeric values. The following examples show how you might store a date/time
+          column as <code class="ph codeph">BIGINT</code> in a Kudu table, but still use string literals and
+          <code class="ph codeph">TIMESTAMP</code> values for convenience.
+        </p>
+
+<pre class="pre codeblock"><code>
+-- now() returns a TIMESTAMP and shows the format for string literals you can cast to TIMESTAMP.
+select now();
++-------------------------------+
+| now()                         |
++-------------------------------+
+| 2017-01-25 23:50:10.132385000 |
++-------------------------------+
+
+-- unix_timestamp() accepts either a TIMESTAMP or an equivalent string literal.
+select unix_timestamp(now());
++------------------+
+| unix_timestamp() |
++------------------+
+| 1485386670       |
++------------------+
+
+select unix_timestamp('2017-01-01');
++------------------------------+
+| unix_timestamp('2017-01-01') |
++------------------------------+
+| 1483228800                   |
++------------------------------+
+
+-- Make a table representing a date/time value as BIGINT.
+-- Construct 1 range partition and 20 associated hash partitions for each year.
+-- Use date/time conversion functions to express the ranges as human-readable dates.
+create table time_series(id bigint, when_exactly bigint, event string, primary key (id, when_exactly))
+	partition by hash (id) partitions 20,
+	range (when_exactly)
+	(
+		partition unix_timestamp('2015-01-01') &lt;= values &lt; unix_timestamp('2016-01-01'),
+		partition unix_timestamp('2016-01-01') &lt;= values &lt; unix_timestamp('2017-01-01'),
+		partition unix_timestamp('2017-01-01') &lt;= values &lt; unix_timestamp('2018-01-01')
+	)
+	stored as kudu;
+
+-- On insert, we can transform a human-readable date/time into a numeric value.
+insert into time_series values (12345, unix_timestamp('2017-01-25 23:24:56'), 'Working on doc examples');
+
+-- On retrieval, we can examine the numeric date/time value or turn it back into a string for readability.
+select id, when_exactly, from_unixtime(when_exactly) as 'human-readable date/time', event
+  from time_series order by when_exactly limit 100;
++-------+--------------+--------------------------+-------------------------+
+| id    | when_exactly | human-readable date/time | event                   |
++-------+--------------+--------------------------+-------------------------+
+| 12345 | 1485386696   | 2017-01-25 23:24:56      | Working on doc examples |
++-------+--------------+--------------------------+-------------------------+
+
+</code></pre>
+
+        <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+          <p class="p">
+            If you do high-precision arithmetic involving numeric date/time values,
+            when dividing millisecond values by 1000, or microsecond values by 1 million, always
+            cast the integer numerator to a <code class="ph codeph">DECIMAL</code> with sufficient precision
+            and scale to avoid any rounding or loss of precision.
+          </p>
+        </div>
+
+<pre class="pre codeblock"><code>
+-- 1 million and 1 microseconds = 1.000001 seconds.
+select microseconds,
+  cast (microseconds as decimal(20,7)) / 1e6 as fractional_seconds
+  from table_with_microsecond_column;
++--------------+----------------------+
+| microseconds | fractional_seconds   |
++--------------+----------------------+
+| 1000001      | 1.000001000000000000 |
++--------------+----------------------+
+
+</code></pre>
+
+      </div>
+
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title19" id="kudu_ddl__kudu_metadata">
+
+      <h3 class="title topictitle3" id="ariaid-title19">How Impala Handles Kudu Metadata</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+        Much of the metadata for Kudu tables is handled by the underlying
+        storage layer. Kudu tables have less reliance on the metastore
+        database, and require less metadata caching on the Impala side.
+        For example, information about partitions in Kudu tables is managed
+        by Kudu, and Impala does not cache any block locality metadata
+        for Kudu tables.
+      </p>
+        <p class="p">
+        The <code class="ph codeph">REFRESH</code> and <code class="ph codeph">INVALIDATE METADATA</code>
+        statements are needed less frequently for Kudu tables than for
+        HDFS-backed tables. Neither statement is needed when data is
+        added to, removed, or updated in a Kudu table, even if the changes
+        are made directly to Kudu through a client program using the Kudu API.
+        Run <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> or
+        <code class="ph codeph">INVALIDATE METADATA <var class="keyword varname">table_name</var></code>
+        for a Kudu table only after making a change to the Kudu table schema,
+        such as adding or dropping a column, by a mechanism other than
+        Impala.
+      </p>
+
+        <p class="p">
+          Because Kudu manages the metadata for its own tables separately from the metastore
+          database, there is a table name stored in the metastore database for Impala to use,
+          and a table name on the Kudu side, and these names can be modified independently
+          through <code class="ph codeph">ALTER TABLE</code> statements.
+        </p>
+
+        <p class="p">
+          To avoid potential name conflicts, the prefix <code class="ph codeph">impala::</code>
+          and the Impala database name are encoded into the underlying Kudu
+          table name:
+        </p>
+
+<pre class="pre codeblock"><code>
+create database some_database;
+use some_database;
+
+create table table_name_demo (x int primary key, y int)
+  partition by hash (x) partitions 2 stored as kudu;
+
+describe formatted table_name_demo;
+...
+kudu.table_name  | impala::some_database.table_name_demo
+
+</code></pre>
+
+        <p class="p">
+          See <a class="xref" href="impala_tables.html">Overview of Impala Tables</a> for examples of how to change the name of
+          the Impala table in the metastore database, the name of the underlying Kudu
+          table, or both.
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title20" id="impala_kudu__kudu_etl">
+
+    <h2 class="title topictitle2" id="ariaid-title20">Loading Data into Kudu Tables</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Kudu tables are well-suited to use cases where data arrives continuously, in small or
+        moderate volumes. To bring data into Kudu tables, use the Impala <code class="ph codeph">INSERT</code>
+        and <code class="ph codeph">UPSERT</code> statements. The <code class="ph codeph">LOAD DATA</code> statement does
+        not apply to Kudu tables.
+      </p>
+
+      <p class="p">
+        Because Kudu manages its own storage layer that is optimized for smaller block sizes than
+        HDFS, and performs its own housekeeping to keep data evenly distributed, it is not
+        subject to the <span class="q">"many small files"</span> issue and does not need explicit reorganization
+        and compaction as the data grows over time. The partitions within a Kudu table can be
+        specified to cover a variety of possible data distributions, instead of hardcoding a new
+        partition for each new day, hour, and so on, which can lead to inefficient,
+        hard-to-scale, and hard-to-manage partition schemes with HDFS tables.
+      </p>
+
+      <p class="p">
+        Your strategy for performing ETL or bulk updates on Kudu tables should take into account
+        the limitations on consistency for DML operations.
+      </p>
+
+      <p class="p">
+        Make <code class="ph codeph">INSERT</code>, <code class="ph codeph">UPDATE</code>, and <code class="ph codeph">UPSERT</code>
+        operations <dfn class="term">idempotent</dfn>: that is, able to be applied multiple times and still
+        produce an identical result.
+      </p>
+
+      <p class="p">
+        If a bulk operation is in danger of exceeding capacity limits due to timeouts or high
+        memory usage, split it into a series of smaller operations.
+      </p>
+
+      <p class="p">
+        Avoid running concurrent ETL operations where the end results depend on precise
+        ordering. In particular, do not rely on an <code class="ph codeph">INSERT ... SELECT</code> statement
+        that selects from the same table into which it is inserting, unless you include extra
+        conditions in the <code class="ph codeph">WHERE</code> clause to avoid reading the newly inserted rows
+        within the same statement.
+      </p>
+
+      <p class="p">
+        Because relationships between tables cannot be enforced by Impala and Kudu, and cannot
+        be committed or rolled back together, do not expect transactional semantics for
+        multi-table operations.
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title21" id="impala_kudu__kudu_dml">
+
+    <h2 class="title topictitle2" id="ariaid-title21">Impala DML Support for Kudu Tables (INSERT, UPDATE, DELETE, UPSERT)</h2>
+
+    
+
+    <div class="body conbody">
+
+      <p class="p">
+        Impala supports certain DML statements for Kudu tables only. The <code class="ph codeph">UPDATE</code>
+        and <code class="ph codeph">DELETE</code> statements let you modify data within Kudu tables without
+        rewriting substantial amounts of table data. The <code class="ph codeph">UPSERT</code> statement acts
+        as a combination of <code class="ph codeph">INSERT</code> and <code class="ph codeph">UPDATE</code>, inserting rows
+        where the primary key does not already exist, and updating the non-primary key columns
+        where the primary key does already exist in the table.
+      </p>
+
+      <p class="p">
+        The <code class="ph codeph">INSERT</code> statement for Kudu tables honors the unique and <code class="ph codeph">NOT
+        NULL</code> requirements for the primary key columns.
+      </p>
+
+      <p class="p">
+        Because Impala and Kudu do not support transactions, the effects of any
+        <code class="ph codeph">INSERT</code>, <code class="ph codeph">UPDATE</code>, or <code class="ph codeph">DELETE</code> statement
+        are immediately visible. For example, you cannot do a sequence of
+        <code class="ph codeph">UPDATE</code> statements and only make the changes visible after all the
+        statements are finished. Also, if a DML statement fails partway through, any rows that
+        were already inserted, deleted, or changed remain in the table; there is no rollback
+        mechanism to undo the changes.
+      </p>
+
+      <p class="p">
+        In particular, an <code class="ph codeph">INSERT ... SELECT</code> statement that refers to the table
+        being inserted into might insert more rows than expected, because the
+        <code class="ph codeph">SELECT</code> part of the statement sees some of the new rows being inserted
+        and processes them again.
+      </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        <p class="p">
+          The <code class="ph codeph">LOAD DATA</code> statement, which involves manipulation of HDFS data files,
+          does not apply to Kudu tables.
+        </p>
+      </div>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title22" id="impala_kudu__kudu_consistency">
+
+    <h2 class="title topictitle2" id="ariaid-title22">Consistency Considerations for Kudu Tables</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Kudu tables have consistency characteristics such as uniqueness, controlled by the
+        primary key columns, and non-nullable columns. The emphasis for consistency is on
+        preventing duplicate or incomplete data from being stored in a table.
+      </p>
+
+      <p class="p">
+        Currently, Kudu does not enforce strong consistency for order of operations, total
+        success or total failure of a multi-row statement, or data that is read while a write
+        operation is in progress. Changes are applied atomically to each row, but not applied
+        as a single unit to all rows affected by a multi-row DML statement. That is, Kudu does
+        not currently have atomic multi-row statements or isolation between statements.
+      </p>
+
+      <p class="p">
+        If some rows are rejected during a DML operation because of a mismatch with duplicate
+        primary key values, <code class="ph codeph">NOT NULL</code> constraints, and so on, the statement
+        succeeds with a warning. Impala still inserts, deletes, or updates the other rows that
+        are not affected by the constraint violation.
+      </p>
+
+      <p class="p">
+        Consequently, the number of rows affected by a DML operation on a Kudu table might be
+        different than you expect.
+      </p>
+
+      <p class="p">
+        Because there is no strong consistency guarantee for information being inserted into,
+        deleted from, or updated across multiple tables simultaneously, consider denormalizing
+        the data where practical. That is, if you run separate <code class="ph codeph">INSERT</code>
+        statements to insert related rows into two different tables, one <code class="ph codeph">INSERT</code>
+        might fail while the other succeeds, leaving the data in an inconsistent state. Even if
+        both inserts succeed, a join query might happen during the interval between the
+        completion of the first and second statements, and the query would encounter incomplete
+        inconsistent data. Denormalizing the data into a single wide table can reduce the
+        possibility of inconsistency due to multi-table operations.
+      </p>
+
+      <p class="p">
+        Information about the number of rows affected by a DML operation is reported in
+        <span class="keyword cmdname">impala-shell</span> output, and in the <code class="ph codeph">PROFILE</code> output, but
+        is not currently reported to HiveServer2 clients such as JDBC or ODBC applications.
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title23" id="impala_kudu__kudu_security">
+
+    <h2 class="title topictitle2" id="ariaid-title23">Security Considerations for Kudu Tables</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Security for Kudu tables involves:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            Sentry authorization.
+          </p>
+          <p class="p">
+        Access to Kudu tables must be granted to and revoked from roles as usual.
+        Only users with <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> can create external Kudu tables.
+        Currently, access to a Kudu table is <span class="q">"all or nothing"</span>:
+        enforced at the table level rather than the column level, and applying to all
+        SQL operations rather than individual statements such as <code class="ph codeph">INSERT</code>.
+        Because non-SQL APIs can access Kudu data without going through Sentry
+        authorization, currently the Sentry support is considered preliminary
+        and subject to change.
+      </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            Lineage tracking.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            Auditing.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            Redaction of sensitive information from log files.
+          </p>
+        </li>
+      </ul>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title24" id="impala_kudu__kudu_performance">
+
+    <h2 class="title topictitle2" id="ariaid-title24">Impala Query Performance for Kudu Tables</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        For queries involving Kudu tables, Impala can delegate much of the work of filtering the
+        result set to Kudu, avoiding some of the I/O involved in full table scans of tables
+        containing HDFS data files. This type of optimization is especially effective for
+        partitioned Kudu tables, where the Impala query <code class="ph codeph">WHERE</code> clause refers to
+        one or more primary key columns that are also used as partition key columns. For
+        example, if a partitioned Kudu table uses a <code class="ph codeph">HASH</code> clause for
+        <code class="ph codeph">col1</code> and a <code class="ph codeph">RANGE</code> clause for <code class="ph codeph">col2</code>, a
+        query using a clause such as <code class="ph codeph">WHERE col1 IN (1,2,3) AND col2 &gt; 100</code>
+        can determine exactly which tablet servers contain relevant data, and therefore
+        parallelize the query very efficiently.
+      </p>
+
+      <p class="p">
+        See <a class="xref" href="impala_explain.html">EXPLAIN Statement</a> for examples of evaluating the effectiveness of
+        the predicate pushdown for a specific query against a Kudu table.
+      </p>
+
+      
+      
+
+    </div>
+
+    
+
+    
+
+  </article>
+
+</article></main></body></html>

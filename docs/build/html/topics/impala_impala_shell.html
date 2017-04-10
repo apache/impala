@@ -1,0 +1,87 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_shell_options.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_connecting.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_shell_running_commands.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_shell_commands.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_shell"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using the Impala Shell (impala-shell Command)</title></head><body id="impala_shell"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Using the Impala Shell (impala-shell Command)</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      You can use the Impala shell tool (<code class="ph codeph">impala-shell</code>) to set up databases and tables, insert
+      data, and issue queries. For ad hoc queries and exploration, you can submit SQL statements in an interactive
+      session. To automate your work, you can specify command-line options to process a single statement or a
+      script file. The <span class="keyword cmdname">impala-shell</span> interpreter accepts all the same SQL statements listed in
+      <a class="xref" href="impala_langref_sql.html#langref_sql">Impala SQL Statements</a>, plus some shell-only commands that you can use for tuning
+      performance and diagnosing problems.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">impala-shell</code> command fits into the familiar Unix toolchain:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        The <code class="ph codeph">-q</code> option lets you issue a single query from the command line, without starting the
+        interactive interpreter. You could use this option to run <code class="ph codeph">impala-shell</code> from inside a shell
+        script or with the command invocation syntax from a Python, Perl, or other kind of script.
+      </li>
+
+      <li class="li">
+        The <code class="ph codeph">-f</code> option lets you process a file containing multiple SQL statements,
+        such as a set of reports or DDL statements to create a group of tables and views.
+      </li>
+
+      <li class="li">
+        The <code class="ph codeph">--var</code> option lets you pass substitution variables to the statements that
+        are executed by that <span class="keyword cmdname">impala-shell</span> session, for example the statements
+        in a script file processed by the <code class="ph codeph">-f</code> option. You encode the substitution variable
+        on the command line using the notation
+        <code class="ph codeph">--var=<var class="keyword varname">variable_name</var>=<var class="keyword varname">value</var></code>.
+        Within a SQL statement, you substitute the value by using the notation <code class="ph codeph">${var:<var class="keyword varname">variable_name</var>}</code>.
+        This feature is available in <span class="keyword">Impala 2.5</span> and higher.
+      </li>
+
+      <li class="li">
+        The <code class="ph codeph">-o</code> option lets you save query output to a file.
+      </li>
+
+      <li class="li">
+        The <code class="ph codeph">-B</code> option turns off pretty-printing, so that you can produce comma-separated,
+        tab-separated, or other delimited text files as output. (Use the <code class="ph codeph">--output_delimiter</code> option
+        to choose the delimiter character; the default is the tab character.)
+      </li>
+
+      <li class="li">
+        In non-interactive mode, query output is printed to <code class="ph codeph">stdout</code> or to the file specified by the
+        <code class="ph codeph">-o</code> option, while incidental output is printed to <code class="ph codeph">stderr</code>, so that you can
+        process just the query output as part of a Unix pipeline.
+      </li>
+
+      <li class="li">
+        In interactive mode, <code class="ph codeph">impala-shell</code> uses the <code class="ph codeph">readline</code> facility to recall
+        and edit previous commands.
+      </li>
+    </ul>
+
+    <p class="p">
+      For information on installing the Impala shell, see <a class="xref" href="impala_install.html#install">Installing Impala</a>.
+    </p>
+
+    <p class="p">
+      For information about establishing a connection to a DataNode running the <code class="ph codeph">impalad</code> daemon
+      through the <code class="ph codeph">impala-shell</code> command, see <a class="xref" href="impala_connecting.html#connecting">Connecting to impalad through impala-shell</a>.
+    </p>
+
+    <p class="p">
+      For a list of the <code class="ph codeph">impala-shell</code> command-line options, see
+      <a class="xref" href="impala_shell_options.html#shell_options">impala-shell Configuration Options</a>. For reference information about the
+      <code class="ph codeph">impala-shell</code> interactive commands, see
+      <a class="xref" href="impala_shell_commands.html#shell_commands">impala-shell Command Reference</a>.
+    </p>
+
+    <p class="p toc"></p>
+  </div>
+<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_shell_options.html">impala-shell Configuration Options</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_connecting.html">Connecting to impalad through impala-shell</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_shell_running_commands.html">Running Commands and SQL Statements in impala-shell</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_shell_commands.html">impala-shell Command Reference</a></strong><br></li></ul></nav></article></main></body></html>

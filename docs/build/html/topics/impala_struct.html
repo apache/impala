@@ -1,0 +1,500 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="struct"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>STRUCT Complex Type (Impala 2.3 or higher only)</title></head><body id="struct"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">STRUCT Complex Type (<span class="keyword">Impala 2.3</span> or higher only)</h1>
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      A complex data type, representing multiple fields of a single item. Frequently used as the element type of an <code class="ph codeph">ARRAY</code>
+      or the <code class="ph codeph">VALUE</code> part of a <code class="ph codeph">MAP</code>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">column_name</var> STRUCT &lt; <var class="keyword varname">name</var> : <var class="keyword varname">type</var> [COMMENT '<var class="keyword varname">comment_string</var>'], ... &gt;
+
+type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword varname">complex_type</var>
+</code></pre>
+
+    <p class="p">
+      The names and number of fields within the <code class="ph codeph">STRUCT</code> are fixed. Each field can be a different type. A field within a
+      <code class="ph codeph">STRUCT</code> can also be another <code class="ph codeph">STRUCT</code>, or an <code class="ph codeph">ARRAY</code> or a <code class="ph codeph">MAP</code>, allowing
+      you to create nested data structures with a maximum nesting depth of 100.
+    </p>
+
+    <p class="p">
+      A <code class="ph codeph">STRUCT</code> can be the top-level type for a column, or can itself be an item within an <code class="ph codeph">ARRAY</code> or the
+      value part of the key-value pair in a <code class="ph codeph">MAP</code>.
+    </p>
+
+    <p class="p">
+      When a <code class="ph codeph">STRUCT</code> is used as an <code class="ph codeph">ARRAY</code> element or a <code class="ph codeph">MAP</code> value, you use a join clause to
+      bring the <code class="ph codeph">ARRAY</code> or <code class="ph codeph">MAP</code> elements into the result set, and then refer to
+      <code class="ph codeph"><var class="keyword varname">array_name</var>.ITEM.<var class="keyword varname">field</var></code> or
+      <code class="ph codeph"><var class="keyword varname">map_name</var>.VALUE.<var class="keyword varname">field</var></code>. In the case of a <code class="ph codeph">STRUCT</code> directly inside
+      an <code class="ph codeph">ARRAY</code> or <code class="ph codeph">MAP</code>, you can omit the <code class="ph codeph">.ITEM</code> and <code class="ph codeph">.VALUE</code> pseudocolumns
+      and refer directly to <code class="ph codeph"><var class="keyword varname">array_name</var>.<var class="keyword varname">field</var></code> or
+      <code class="ph codeph"><var class="keyword varname">map_name</var>.<var class="keyword varname">field</var></code>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+        Because complex types are often used in combination,
+        for example an <code class="ph codeph">ARRAY</code> of <code class="ph codeph">STRUCT</code>
+        elements, if you are unfamiliar with the Impala complex types,
+        start with <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for
+        background information and usage examples.
+      </p>
+
+    <p class="p">
+      A <code class="ph codeph">STRUCT</code> is similar conceptually to a table row: it contains a fixed number of named fields, each with a predefined
+      type. To combine two related tables, while using complex types to minimize repetition, the typical way to represent that data is as an
+      <code class="ph codeph">ARRAY</code> of <code class="ph codeph">STRUCT</code> elements.
+    </p>
+
+    <p class="p">
+      Because a <code class="ph codeph">STRUCT</code> has a fixed number of named fields, it typically does not make sense to have a
+      <code class="ph codeph">STRUCT</code> as the type of a table column. In such a case, you could just make each field of the <code class="ph codeph">STRUCT</code>
+      into a separate column of the table. The <code class="ph codeph">STRUCT</code> type is most useful as an item of an <code class="ph codeph">ARRAY</code> or the
+      value part of the key-value pair in a <code class="ph codeph">MAP</code>. A nested type column with a <code class="ph codeph">STRUCT</code> at the lowest level
+      lets you associate a variable number of row-like objects with each row of the table.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">STRUCT</code> type is straightforward to reference within a query. You do not need to include the
+      <code class="ph codeph">STRUCT</code> column in a join clause or give it a table alias, as is required for the <code class="ph codeph">ARRAY</code> and
+      <code class="ph codeph">MAP</code> types. You refer to the individual fields using dot notation, such as
+      <code class="ph codeph"><var class="keyword varname">struct_column_name</var>.<var class="keyword varname">field_name</var></code>, without any pseudocolumn such as
+      <code class="ph codeph">ITEM</code> or <code class="ph codeph">VALUE</code>.
+    </p>
+
+    <p class="p">
+        You can pass a multi-part qualified name to <code class="ph codeph">DESCRIBE</code>
+        to specify an <code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
+        column and visualize its structure as if it were a table.
+        For example, if table <code class="ph codeph">T1</code> contains an <code class="ph codeph">ARRAY</code> column
+        <code class="ph codeph">A1</code>, you could issue the statement <code class="ph codeph">DESCRIBE t1.a1</code>.
+        If table <code class="ph codeph">T1</code> contained a <code class="ph codeph">STRUCT</code> column <code class="ph codeph">S1</code>,
+        and a field <code class="ph codeph">F1</code> within the <code class="ph codeph">STRUCT</code> was a <code class="ph codeph">MAP</code>,
+        you could issue the statement <code class="ph codeph">DESCRIBE t1.s1.f1</code>.
+        An <code class="ph codeph">ARRAY</code> is shown as a two-column table, with
+        <code class="ph codeph">ITEM</code> and <code class="ph codeph">POS</code> columns.
+        A <code class="ph codeph">STRUCT</code> is shown as a table with each field
+        representing a column in the table.
+        A <code class="ph codeph">MAP</code> is shown as a two-column table, with
+        <code class="ph codeph">KEY</code> and <code class="ph codeph">VALUE</code> columns.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Internal details:</strong>
+      </p>
+
+    <p class="p">
+      Within the Parquet data file, the values for each <code class="ph codeph">STRUCT</code> field are stored adjacent to each other, so that they can be
+      encoded and compressed using all the Parquet techniques for storing sets of similar or repeated values. The adjacency applies even
+      when the <code class="ph codeph">STRUCT</code> values are part of an <code class="ph codeph">ARRAY</code> or <code class="ph codeph">MAP</code>. During a query, Impala avoids
+      unnecessary I/O by reading only the portions of the Parquet data file containing the requested <code class="ph codeph">STRUCT</code> fields.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Restrictions:</strong>
+      </p>
+
+    <ul class="ul">
+        <li class="li">
+          <p class="p">
+            Columns with this data type can only be used in tables or partitions with the Parquet file format.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            Columns with this data type cannot be used as partition key columns in a partitioned table.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            The <code class="ph codeph">COMPUTE STATS</code> statement does not produce any statistics for columns of this data type.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p" id="struct__d6e2889">
+            The maximum length of the column definition for any complex type, including declarations for any nested types,
+            is 4000 characters.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types_limits">Limitations and Restrictions for Complex Types</a> for a full list of limitations
+            and associated guidelines about complex type columns.
+          </p>
+        </li>
+      </ul>
+
+    <p class="p">
+        <strong class="ph b">Kudu considerations:</strong>
+      </p>
+    <p class="p">
+        Currently, the data types <code class="ph codeph">DECIMAL</code>, <code class="ph codeph">TIMESTAMP</code>, <code class="ph codeph">CHAR</code>, <code class="ph codeph">VARCHAR</code>,
+        <code class="ph codeph">ARRAY</code>, <code class="ph codeph">MAP</code>, and <code class="ph codeph">STRUCT</code> cannot be used with Kudu tables.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      Many of the complex type examples refer to tables
+      such as <code class="ph codeph">CUSTOMER</code> and <code class="ph codeph">REGION</code>
+      adapted from the tables used in the TPC-H benchmark.
+      See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_sample_schema">Sample Schema and Data for Experimenting with Impala Complex Types</a>
+      for the table definitions.
+      </div>
+
+    <p class="p">
+      The following example shows a table with various kinds of <code class="ph codeph">STRUCT</code> columns, both at the top level and nested within
+      other complex types. Practice the <code class="ph codeph">CREATE TABLE</code> and query notation for complex type columns using empty tables, until
+      you can visualize a complex data structure and construct corresponding SQL statements reliably.
+    </p>
+
+<pre class="pre codeblock"><code>CREATE TABLE struct_demo
+(
+  id BIGINT,
+  name STRING,
+
+-- A STRUCT as a top-level column. Demonstrates how the table ID column
+-- and the ID field within the STRUCT can coexist without a name conflict.
+  employee_info STRUCT &lt; employer: STRING, id: BIGINT, address: STRING &gt;,
+
+-- A STRUCT as the element type of an ARRAY.
+  places_lived ARRAY &lt; STRUCT &lt;street: STRING, city: STRING, country: STRING &gt;&gt;,
+
+-- A STRUCT as the value portion of the key-value pairs in a MAP.
+  memorable_moments MAP &lt; STRING, STRUCT &lt; year: INT, place: STRING, details: STRING &gt;&gt;,
+
+-- A STRUCT where one of the fields is another STRUCT.
+  current_address STRUCT &lt; street_address: STRUCT &lt;street_number: INT, street_name: STRING, street_type: STRING&gt;, country: STRING, postal_code: STRING &gt;
+)
+STORED AS PARQUET;
+
+</code></pre>
+
+    <p class="p">
+      The following example shows how to examine the structure of a table containing one or more <code class="ph codeph">STRUCT</code> columns by using
+      the <code class="ph codeph">DESCRIBE</code> statement. You can visualize each <code class="ph codeph">STRUCT</code> as its own table, with columns named the same
+      as each field of the <code class="ph codeph">STRUCT</code>. If the <code class="ph codeph">STRUCT</code> is nested inside another complex type, such as
+      <code class="ph codeph">ARRAY</code>, you can extend the qualified name passed to <code class="ph codeph">DESCRIBE</code> until the output shows just the
+      <code class="ph codeph">STRUCT</code> fields.
+    </p>
+
+<pre class="pre codeblock"><code>DESCRIBE struct_demo;
++-------------------+--------------------------+
+| name              | type                     |
++-------------------+--------------------------+
+| id                | bigint                   |
+| name              | string                   |
+| employee_info     | struct&lt;                  |
+|                   |   employer:string,       |
+|                   |   id:bigint,             |
+|                   |   address:string         |
+|                   | &gt;                        |
+| places_lived      | array&lt;struct&lt;            |
+|                   |   street:string,         |
+|                   |   city:string,           |
+|                   |   country:string         |
+|                   | &gt;&gt;                       |
+| memorable_moments | map&lt;string,struct&lt;       |
+|                   |   year:int,              |
+|                   |   place:string,          |
+|                   |   details:string         |
+|                   | &gt;&gt;                       |
+| current_address   | struct&lt;                  |
+|                   |   street_address:struct&lt; |
+|                   |     street_number:int,   |
+|                   |     street_name:string,  |
+|                   |     street_type:string   |
+|                   |   &gt;,                     |
+|                   |   country:string,        |
+|                   |   postal_code:string     |
+|                   | &gt;                        |
++-------------------+--------------------------+
+
+</code></pre>
+
+    <p class="p">
+      The top-level column <code class="ph codeph">EMPLOYEE_INFO</code> is a <code class="ph codeph">STRUCT</code>. Describing
+      <code class="ph codeph"><var class="keyword varname">table_name</var>.<var class="keyword varname">struct_name</var></code> displays the fields of the <code class="ph codeph">STRUCT</code> as if
+      they were columns of a table:
+    </p>
+
+<pre class="pre codeblock"><code>DESCRIBE struct_demo.employee_info;
++----------+--------+
+| name     | type   |
++----------+--------+
+| employer | string |
+| id       | bigint |
+| address  | string |
++----------+--------+
+
+</code></pre>
+
+    <p class="p">
+      Because <code class="ph codeph">PLACES_LIVED</code> is a <code class="ph codeph">STRUCT</code> inside an <code class="ph codeph">ARRAY</code>, the initial
+      <code class="ph codeph">DESCRIBE</code> shows the structure of the <code class="ph codeph">ARRAY</code>:
+    </p>
+
+<pre class="pre codeblock"><code>DESCRIBE struct_demo.places_lived;
++------+------------------+
+| name | type             |
++------+------------------+
+| item | struct&lt;          |
+|      |   street:string, |
+|      |   city:string,   |
+|      |   country:string |
+|      | &gt;                |
+| pos  | bigint           |
++------+------------------+
+
+</code></pre>
+
+    <p class="p">
+      Ask for the details of the <code class="ph codeph">ITEM</code> field of the <code class="ph codeph">ARRAY</code> to see just the layout of the
+      <code class="ph codeph">STRUCT</code>:
+    </p>
+
+<pre class="pre codeblock"><code>DESCRIBE struct_demo.places_lived.item;
++---------+--------+
+| name    | type   |
++---------+--------+
+| street  | string |
+| city    | string |
+| country | string |
++---------+--------+
+
+</code></pre>
+
+    <p class="p">
+      Likewise, <code class="ph codeph">MEMORABLE_MOMENTS</code> has a <code class="ph codeph">STRUCT</code> inside a <code class="ph codeph">MAP</code>, which requires an extra
+      level of qualified name to see just the <code class="ph codeph">STRUCT</code> part:
+    </p>
+
+<pre class="pre codeblock"><code>DESCRIBE struct_demo.memorable_moments;
++-------+------------------+
+| name  | type             |
++-------+------------------+
+| key   | string           |
+| value | struct&lt;          |
+|       |   year:int,      |
+|       |   place:string,  |
+|       |   details:string |
+|       | &gt;                |
++-------+------------------+
+
+</code></pre>
+
+    <p class="p">
+      For a <code class="ph codeph">MAP</code>, ask to see the <code class="ph codeph">VALUE</code> field to see the corresponding <code class="ph codeph">STRUCT</code> fields in a
+      table-like structure:
+    </p>
+
+<pre class="pre codeblock"><code>DESCRIBE struct_demo.memorable_moments.value;
++---------+--------+
+| name    | type   |
++---------+--------+
+| year    | int    |
+| place   | string |
+| details | string |
++---------+--------+
+
+</code></pre>
+
+    <p class="p">
+      For a <code class="ph codeph">STRUCT</code> inside a <code class="ph codeph">STRUCT</code>, we can see the fields of the outer <code class="ph codeph">STRUCT</code>:
+    </p>
+
+<pre class="pre codeblock"><code>DESCRIBE struct_demo.current_address;
++----------------+-----------------------+
+| name           | type                  |
++----------------+-----------------------+
+| street_address | struct&lt;               |
+|                |   street_number:int,  |
+|                |   street_name:string, |
+|                |   street_type:string  |
+|                | &gt;                     |
+| country        | string                |
+| postal_code    | string                |
++----------------+-----------------------+
+
+</code></pre>
+
+    <p class="p">
+      Then we can use a further qualified name to see just the fields of the inner <code class="ph codeph">STRUCT</code>:
+    </p>
+
+<pre class="pre codeblock"><code>DESCRIBE struct_demo.current_address.street_address;
++---------------+--------+
+| name          | type   |
++---------------+--------+
+| street_number | int    |
+| street_name   | string |
+| street_type   | string |
++---------------+--------+
+
+</code></pre>
+
+    <p class="p">
+      The following example shows how to examine the structure of a table containing one or more <code class="ph codeph">STRUCT</code> columns by using
+      the <code class="ph codeph">DESCRIBE</code> statement. You can visualize each <code class="ph codeph">STRUCT</code> as its own table, with columns named the same
+      as each field of the <code class="ph codeph">STRUCT</code>. If the <code class="ph codeph">STRUCT</code> is nested inside another complex type, such as
+      <code class="ph codeph">ARRAY</code>, you can extend the qualified name passed to <code class="ph codeph">DESCRIBE</code> until the output shows just the
+      <code class="ph codeph">STRUCT</code> fields.
+    </p>
+
+
+
+<pre class="pre codeblock"><code>DESCRIBE struct_demo;
++-------------------+--------------------------+---------+
+| name              | type                     | comment |
++-------------------+--------------------------+---------+
+| id                | bigint                   |         |
+| name              | string                   |         |
+| employee_info     | struct&lt;                  |         |
+|                   |   employer:string,       |         |
+|                   |   id:bigint,             |         |
+|                   |   address:string         |         |
+|                   | &gt;                        |         |
+| places_lived      | array&lt;struct&lt;            |         |
+|                   |   street:string,         |         |
+|                   |   city:string,           |         |
+|                   |   country:string         |         |
+|                   | &gt;&gt;                       |         |
+| memorable_moments | map&lt;string,struct&lt;       |         |
+|                   |   year:int,              |         |
+|                   |   place:string,          |         |
+|                   |   details:string         |         |
+|                   | &gt;&gt;                       |         |
+| current_address   | struct&lt;                  |         |
+|                   |   street_address:struct&lt; |         |
+|                   |     street_number:int,   |         |
+|                   |     street_name:string,  |         |
+|                   |     street_type:string   |         |
+|                   |   &gt;,                     |         |
+|                   |   country:string,        |         |
+|                   |   postal_code:string     |         |
+|                   | &gt;                        |         |
++-------------------+--------------------------+---------+
+
+SELECT id, employee_info.id FROM struct_demo;
+
+SELECT id, employee_info.id AS employee_id FROM struct_demo;
+
+SELECT id, employee_info.id AS employee_id, employee_info.employer
+  FROM struct_demo;
+
+SELECT id, name, street, city, country
+  FROM struct_demo, struct_demo.places_lived;
+
+SELECT id, name, places_lived.pos, places_lived.street, places_lived.city, places_lived.country
+  FROM struct_demo, struct_demo.places_lived;
+
+SELECT id, name, pl.pos, pl.street, pl.city, pl.country
+  FROM struct_demo, struct_demo.places_lived AS pl;
+
+SELECT id, name, places_lived.pos, places_lived.street, places_lived.city, places_lived.country
+  FROM struct_demo, struct_demo.places_lived;
+
+SELECT id, name, pos, street, city, country
+  FROM struct_demo, struct_demo.places_lived;
+
+SELECT id, name, memorable_moments.key,
+  memorable_moments.value.year,
+  memorable_moments.value.place,
+  memorable_moments.value.details
+FROM struct_demo, struct_demo.memorable_moments
+WHERE memorable_moments.key IN ('Birthday','Anniversary','Graduation');
+
+SELECT id, name, mm.key, mm.value.year, mm.value.place, mm.value.details
+  FROM struct_demo, struct_demo.memorable_moments AS mm
+WHERE mm.key IN ('Birthday','Anniversary','Graduation');
+
+SELECT id, name, memorable_moments.key, memorable_moments.value.year,
+  memorable_moments.value.place, memorable_moments.value.details
+FROM struct_demo, struct_demo.memorable_moments
+WHERE key IN ('Birthday','Anniversary','Graduation');
+
+SELECT id, name, key, value.year, value.place, value.details
+  FROM struct_demo, struct_demo.memorable_moments
+WHERE key IN ('Birthday','Anniversary','Graduation');
+
+SELECT id, name, key, year, place, details
+  FROM struct_demo, struct_demo.memorable_moments
+WHERE key IN ('Birthday','Anniversary','Graduation');
+
+SELECT id, name,
+  current_address.street_address.street_number,
+  current_address.street_address.street_name,
+  current_address.street_address.street_type,
+  current_address.country,
+  current_address.postal_code
+FROM struct_demo;
+
+</code></pre>
+
+    <p class="p">
+      For example, this table uses a struct that encodes several data values for each phone number associated with a person. Each person can
+      have a variable-length array of associated phone numbers, and queries can refer to the category field to locate specific home, work,
+      mobile, and so on kinds of phone numbers.
+    </p>
+
+<pre class="pre codeblock"><code>CREATE TABLE contact_info_many_structs
+(
+  id BIGINT, name STRING,
+  phone_numbers ARRAY &lt; STRUCT &lt;category:STRING, country_code:STRING, area_code:SMALLINT, full_number:STRING, mobile:BOOLEAN, carrier:STRING &gt; &gt;
+) STORED AS PARQUET;
+
+</code></pre>
+
+    <p class="p">
+      Because structs are naturally suited to composite values where the fields have different data types, you might use them to decompose
+      things such as addresses:
+    </p>
+
+<pre class="pre codeblock"><code>CREATE TABLE contact_info_detailed_address
+(
+  id BIGINT, name STRING,
+  address STRUCT &lt; house_number:INT, street:STRING, street_type:STRING, apartment:STRING, city:STRING, region:STRING, country:STRING &gt;
+);
+
+</code></pre>
+
+    <p class="p">
+      In a big data context, splitting out data fields such as the number part of the address and the street name could let you do analysis
+      on each field independently. For example, which streets have the largest number range of addresses, what are the statistical
+      properties of the street names, which areas have a higher proportion of <span class="q">"Roads"</span>, <span class="q">"Courts"</span> or <span class="q">"Boulevards"</span>, and so on.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a>, <a class="xref" href="impala_array.html#array">ARRAY Complex Type (Impala 2.3 or higher only)</a>,
+
+      <a class="xref" href="impala_map.html#map">MAP Complex Type (Impala 2.3 or higher only)</a>
+    </p>
+
+  </div>
+
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div></div></nav></article></main></body></html>

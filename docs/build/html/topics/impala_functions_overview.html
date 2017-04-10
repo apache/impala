@@ -1,0 +1,109 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Overview of Impala Functions</title></head><body id="functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Overview of Impala Functions</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Functions let you apply arithmetic, string, or other computations and transformations to Impala data. You
+      typically use them in <code class="ph codeph">SELECT</code> lists and <code class="ph codeph">WHERE</code> clauses to filter and format
+      query results so that the result set is exactly what you want, with no further processing needed on the
+      application side.
+    </p>
+
+    <p class="p">
+      Scalar functions return a single result for each input row. See <a class="xref" href="impala_functions.html#builtins">Impala Built-In Functions</a>.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select name, population from country where continent = 'North America' order by population desc limit 4;
+[localhost:21000] &gt; select upper(name), population from country where continent = 'North America' order by population desc limit 4;
++-------------+------------+
+| upper(name) | population |
++-------------+------------+
+| USA         | 320000000  |
+| MEXICO      | 122000000  |
+| CANADA      | 25000000   |
+| GUATEMALA   | 16000000   |
++-------------+------------+
+</code></pre>
+    <p class="p">
+      Aggregate functions combine the results from multiple rows:
+      either a single result for the entire table, or a separate result for each group of rows.
+      Aggregate functions are frequently used in combination with <code class="ph codeph">GROUP BY</code>
+      and <code class="ph codeph">HAVING</code> clauses in the <code class="ph codeph">SELECT</code> statement.
+      See <a class="xref" href="impala_aggregate_functions.html#aggregate_functions">Impala Aggregate Functions</a>.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select continent, <strong class="ph b">sum(population)</strong> as howmany from country <strong class="ph b">group by continent</strong> order by howmany desc;
++---------------+------------+
+| continent     | howmany    |
++---------------+------------+
+| Asia          | 4298723000 |
+| Africa        | 1110635000 |
+| Europe        | 742452000  |
+| North America | 565265000  |
+| South America | 406740000  |
+| Oceania       | 38304000   |
++---------------+------------+
+</code></pre>
+
+    <p class="p">
+      User-defined functions (UDFs) let you code your own logic.  They can be either scalar or aggregate functions.
+      UDFs let you implement important business or scientific logic using high-performance code for Impala to automatically parallelize.
+      You can also use UDFs to implement convenience functions to simplify reporting or porting SQL from other database systems.
+      See <a class="xref" href="impala_udf.html#udfs">Impala User-Defined Functions (UDFs)</a>.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select <strong class="ph b">rot13('Hello world!')</strong> as 'Weak obfuscation';
++------------------+
+| weak obfuscation |
++------------------+
+| Uryyb jbeyq!     |
++------------------+
+[localhost:21000] &gt; select <strong class="ph b">likelihood_of_new_subatomic_particle(sensor1, sensor2, sensor3)</strong> as probability
+                  &gt; from experimental_results group by experiment;
+</code></pre>
+
+    <p class="p">
+      Each function is associated with a specific database. For example, if you issue a <code class="ph codeph">USE somedb</code>
+      statement followed by <code class="ph codeph">CREATE FUNCTION somefunc</code>, the new function is created in the
+      <code class="ph codeph">somedb</code> database, and you could refer to it through the fully qualified name
+      <code class="ph codeph">somedb.somefunc</code>. You could then issue another <code class="ph codeph">USE</code> statement
+      and create a function with the same name in a different database.
+    </p>
+
+    <p class="p">
+      Impala built-in functions are associated with a special database named <code class="ph codeph">_impala_builtins</code>,
+      which lets you refer to them from any database without qualifying the name.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; show databases;
++-------------------------+
+| name                    |
++-------------------------+
+| <strong class="ph b">_impala_builtins</strong>        |
+| analytic_functions      |
+| avro_testing            |
+| data_file_size          |
+...
+[localhost:21000] &gt; show functions in _impala_builtins like '*subs*';
++-------------+-----------------------------------+
+| return type | signature                         |
++-------------+-----------------------------------+
+| STRING      | substr(STRING, BIGINT)            |
+| STRING      | substr(STRING, BIGINT, BIGINT)    |
+| STRING      | substring(STRING, BIGINT)         |
+| STRING      | substring(STRING, BIGINT, BIGINT) |
++-------------+-----------------------------------+
+</code></pre>
+
+    <p class="p">
+      <strong class="ph b">Related statements:</strong> <a class="xref" href="impala_create_function.html#create_function">CREATE FUNCTION Statement</a>,
+      <a class="xref" href="impala_drop_function.html#drop_function">DROP FUNCTION Statement</a>
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_schema_objects.html">Impala Schema Objects and Object Names</a></div></div></nav></article></main></body></html>

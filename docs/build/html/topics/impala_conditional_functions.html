@@ -1,0 +1,517 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="conditional_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Conditional Functions</title></head><body id="conditional_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Conditional Functions</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Impala supports the following conditional functions for testing equality, comparison operators, and nullity:
+    </p>
+
+    <dl class="dl">
+      
+
+        <dt class="dt dlterm" id="conditional_functions__case">
+          <code class="ph codeph">CASE a WHEN b THEN c [WHEN d THEN e]... [ELSE f] END</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Compares an expression to one or more possible values, and returns a corresponding result
+          when a match is found.
+          <p class="p">
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
+        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
+        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            In this form of the <code class="ph codeph">CASE</code> expression, the initial value <code class="ph codeph">A</code>
+            being evaluated for each row it typically a column reference, or an expression involving
+            a column. This form can only compare against a set of specified values, not ranges,
+            multi-value comparisons such as <code class="ph codeph">BETWEEN</code> or <code class="ph codeph">IN</code>,
+            regular expressions, or <code class="ph codeph">NULL</code>.
+          </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            Although this example is split across multiple lines, you can put any or all parts of a <code class="ph codeph">CASE</code> expression
+            on a single line, with no punctuation or other separators between the <code class="ph codeph">WHEN</code>,
+            <code class="ph codeph">ELSE</code>, and <code class="ph codeph">END</code> clauses.
+          </p>
+<pre class="pre codeblock"><code>select case x
+    when 1 then 'one'
+    when 2 then 'two'
+    when 0 then 'zero'
+    else 'out of range'
+  end
+    from t1;
+</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__case2">
+          <code class="ph codeph">CASE WHEN a THEN b [WHEN c THEN d]... [ELSE e] END</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Tests whether any of a sequence of expressions is true, and returns a corresponding
+          result for the first true expression.
+          <p class="p">
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
+        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
+        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            <code class="ph codeph">CASE</code> expressions without an initial test value have more flexibility.
+            For example, they can test different columns in different <code class="ph codeph">WHEN</code> clauses,
+            or use comparison operators such as <code class="ph codeph">BETWEEN</code>, <code class="ph codeph">IN</code> and <code class="ph codeph">IS NULL</code>
+            rather than comparing against discrete values.
+          </p>
+          <p class="p">
+            <code class="ph codeph">CASE</code> expressions are often the foundation of long queries that
+            summarize and format results for easy-to-read reports. For example, you might
+            use a <code class="ph codeph">CASE</code> function call to turn values from a numeric column
+            into category strings corresponding to integer values, or labels such as <span class="q">"Small"</span>,
+            <span class="q">"Medium"</span> and <span class="q">"Large"</span> based on ranges. Then subsequent parts of the
+            query might aggregate based on the transformed values, such as how many
+            values are classified as small, medium, or large. You can also use <code class="ph codeph">CASE</code>
+            to signal problems with out-of-bounds values, <code class="ph codeph">NULL</code> values,
+            and so on.
+          </p>
+          <p class="p">
+            By using operators such as <code class="ph codeph">OR</code>, <code class="ph codeph">IN</code>,
+            <code class="ph codeph">REGEXP</code>, and so on in <code class="ph codeph">CASE</code> expressions,
+            you can build extensive tests and transformations into a single query.
+            Therefore, applications that construct SQL statements often rely heavily on <code class="ph codeph">CASE</code>
+            calls in the generated SQL code.
+          </p>
+          <p class="p">
+            Because this flexible form of the <code class="ph codeph">CASE</code> expressions allows you to perform
+            many comparisons and call multiple functions when evaluating each row, be careful applying
+            elaborate <code class="ph codeph">CASE</code> expressions to queries that process large amounts of data.
+            For example, when practical, evaluate and transform values through <code class="ph codeph">CASE</code>
+            after applying operations such as aggregations that reduce the size of the result set;
+            transform numbers to strings after performing joins with the original numeric values.
+          </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            Although this example is split across multiple lines, you can put any or all parts of a <code class="ph codeph">CASE</code> expression
+            on a single line, with no punctuation or other separators between the <code class="ph codeph">WHEN</code>,
+            <code class="ph codeph">ELSE</code>, and <code class="ph codeph">END</code> clauses.
+          </p>
+<pre class="pre codeblock"><code>select case
+    when dayname(now()) in ('Saturday','Sunday') then 'result undefined on weekends'
+    when x &gt; y then 'x greater than y'
+    when x = y then 'x and y are equal'
+    when x is null or y is null then 'one of the columns is null'
+    else null
+  end
+    from t1;
+</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__coalesce">
+          <code class="ph codeph">coalesce(type v1, type v2, ...)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the first specified argument that is not <code class="ph codeph">NULL</code>, or
+          <code class="ph codeph">NULL</code> if all arguments are <code class="ph codeph">NULL</code>.
+          <p class="p">
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
+        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
+        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__decode">
+          <code class="ph codeph">decode(type expression, type search1, type result1 [, type search2, type result2 ...] [, type
+          default] )</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Compares an expression to one or more possible values, and returns a corresponding result
+          when a match is found.
+          <p class="p">
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
+        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
+        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            Can be used as shorthand for a <code class="ph codeph">CASE</code> expression.
+          </p>
+          <p class="p">
+            The original expression and the search expressions must of the same type or convertible types. The
+            result expression can be a different type, but all result expressions must be of the same type.
+          </p>
+          <p class="p">
+            Returns a successful match If the original expression is <code class="ph codeph">NULL</code> and a search expression
+            is also <code class="ph codeph">NULL</code>. the
+          </p>
+          <p class="p">
+            Returns <code class="ph codeph">NULL</code> if the final <code class="ph codeph">default</code> value is omitted and none of the
+            search expressions match the original expression.
+          </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            The following example translates numeric day values into descriptive names:
+          </p>
+<pre class="pre codeblock"><code>SELECT event, decode(day_of_week, 1, "Monday", 2, "Tuesday", 3, "Wednesday",
+  4, "Thursday", 5, "Friday", 6, "Saturday", 7, "Sunday", "Unknown day")
+  FROM calendar;
+</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__if">
+          <code class="ph codeph">if(boolean condition, type ifTrue, type ifFalseOrNull)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Tests an expression and returns a corresponding result depending on whether the result is
+          true, false, or <code class="ph codeph">NULL</code>.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> Same as the <code class="ph codeph">ifTrue</code> argument value
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__ifnull">
+          <code class="ph codeph">ifnull(type a, type ifNull)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Alias for the <code class="ph codeph">isnull()</code> function, with the same behavior. To simplify
+          porting SQL with vendor extensions to Impala.
+          <p class="p">
+        <strong class="ph b">Added in:</strong> Impala 1.3.0
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__isfalse">
+          <code class="ph codeph">isfalse(<var class="keyword varname">boolean</var>)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Tests if a Boolean expression is <code class="ph codeph">false</code> or not.
+          Returns <code class="ph codeph">true</code> if so.
+          If the argument is <code class="ph codeph">NULL</code>, returns <code class="ph codeph">false</code>.
+          Identical to <code class="ph codeph">isnottrue()</code>, except it returns the opposite value for a <code class="ph codeph">NULL</code> argument.
+          <p class="p">
+        <strong class="ph b">Return type:</strong> <code class="ph codeph">BOOLEAN</code>
+      </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.2.0</span>
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__isnotfalse">
+          <code class="ph codeph">isnotfalse(<var class="keyword varname">boolean</var>)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Tests if a Boolean expression is not <code class="ph codeph">false</code> (that is, either <code class="ph codeph">true</code> or <code class="ph codeph">NULL</code>).
+          Returns <code class="ph codeph">true</code> if so.
+          If the argument is <code class="ph codeph">NULL</code>, returns <code class="ph codeph">true</code>.
+          Identical to <code class="ph codeph">istrue()</code>, except it returns the opposite value for a <code class="ph codeph">NULL</code> argument.
+          <p class="p">
+        <strong class="ph b">Return type:</strong> <code class="ph codeph">BOOLEAN</code>
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions to SQL.
+      </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.2.0</span>
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__isnottrue">
+          <code class="ph codeph">isnottrue(<var class="keyword varname">boolean</var>)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Tests if a Boolean expression is not <code class="ph codeph">true</code> (that is, either <code class="ph codeph">false</code> or <code class="ph codeph">NULL</code>).
+          Returns <code class="ph codeph">true</code> if so.
+          If the argument is <code class="ph codeph">NULL</code>, returns <code class="ph codeph">true</code>.
+          Identical to <code class="ph codeph">isfalse()</code>, except it returns the opposite value for a <code class="ph codeph">NULL</code> argument.
+          <p class="p">
+        <strong class="ph b">Return type:</strong> <code class="ph codeph">BOOLEAN</code>
+      </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.2.0</span>
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__isnull">
+          <code class="ph codeph">isnull(type a, type ifNull)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Tests if an expression is <code class="ph codeph">NULL</code>, and returns the expression result value
+          if not. If the first argument is <code class="ph codeph">NULL</code>, returns the second argument.
+          <p class="p">
+            <strong class="ph b">Compatibility notes:</strong> Equivalent to the <code class="ph codeph">nvl()</code> function from Oracle Database or
+            <code class="ph codeph">ifnull()</code> from MySQL. The <code class="ph codeph">nvl()</code> and <code class="ph codeph">ifnull()</code>
+            functions are also available in Impala.
+          </p>
+          <p class="p">
+            <strong class="ph b">Return type:</strong> Same as the first argument value
+          </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__istrue">
+          <code class="ph codeph">istrue(<var class="keyword varname">boolean</var>)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Tests if a Boolean expression is <code class="ph codeph">true</code> or not.
+          Returns <code class="ph codeph">true</code> if so.
+          If the argument is <code class="ph codeph">NULL</code>, returns <code class="ph codeph">false</code>.
+          Identical to <code class="ph codeph">isnotfalse()</code>, except it returns the opposite value for a <code class="ph codeph">NULL</code> argument.
+          <p class="p">
+        <strong class="ph b">Return type:</strong> <code class="ph codeph">BOOLEAN</code>
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions to SQL.
+      </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.2.0</span>
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__nonnullvalue">
+          <code class="ph codeph">nonnullvalue(<var class="keyword varname">expression</var>)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Tests if an expression (of any type) is <code class="ph codeph">NULL</code> or not.
+          Returns <code class="ph codeph">false</code> if so.
+          The converse of <code class="ph codeph">nullvalue()</code>.
+          <p class="p">
+        <strong class="ph b">Return type:</strong> <code class="ph codeph">BOOLEAN</code>
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions to SQL.
+      </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.2.0</span>
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__nullif">
+          <code class="ph codeph">nullif(<var class="keyword varname">expr1</var>,<var class="keyword varname">expr2</var>)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns <code class="ph codeph">NULL</code> if the two specified arguments are equal. If the specified
+          arguments are not equal, returns the value of <var class="keyword varname">expr1</var>. The data types of the expressions
+          must be compatible, according to the conversion rules from <a class="xref" href="impala_datatypes.html#datatypes">Data Types</a>.
+          You cannot use an expression that evaluates to <code class="ph codeph">NULL</code> for <var class="keyword varname">expr1</var>; that
+          way, you can distinguish a return value of <code class="ph codeph">NULL</code> from an argument value of
+          <code class="ph codeph">NULL</code>, which would never match <var class="keyword varname">expr2</var>.
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong> This function is effectively shorthand for a <code class="ph codeph">CASE</code> expression of
+            the form:
+          </p>
+<pre class="pre codeblock"><code>CASE
+  WHEN <var class="keyword varname">expr1</var> = <var class="keyword varname">expr2</var> THEN NULL
+  ELSE <var class="keyword varname">expr1</var>
+END</code></pre>
+          <p class="p">
+            It is commonly used in division expressions, to produce a <code class="ph codeph">NULL</code> result instead of a
+            divide-by-zero error when the divisor is equal to zero:
+          </p>
+<pre class="pre codeblock"><code>select 1.0 / nullif(c1,0) as reciprocal from t1;</code></pre>
+          <p class="p">
+            You might also use it for compatibility with other database systems that support the same
+            <code class="ph codeph">NULLIF()</code> function.
+          </p>
+          <p class="p">
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
+        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
+        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+      </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> Impala 1.3.0
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__nullifzero">
+          <code class="ph codeph">nullifzero(<var class="keyword varname">numeric_expr</var>)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns <code class="ph codeph">NULL</code> if the numeric expression evaluates to 0, otherwise returns
+          the result of the expression.
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong> Used to avoid error conditions such as divide-by-zero in numeric calculations.
+            Serves as shorthand for a more elaborate <code class="ph codeph">CASE</code> expression, to simplify porting SQL with
+            vendor extensions to Impala.
+          </p>
+          <p class="p">
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
+        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
+        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+      </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> Impala 1.3.0
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__nullvalue">
+          <code class="ph codeph">nullvalue(<var class="keyword varname">expression</var>)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Tests if an expression (of any type) is <code class="ph codeph">NULL</code> or not.
+          Returns <code class="ph codeph">true</code> if so.
+          The converse of <code class="ph codeph">nonnullvalue()</code>.
+          <p class="p">
+        <strong class="ph b">Return type:</strong> <code class="ph codeph">BOOLEAN</code>
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions to SQL.
+      </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.2.0</span>
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__nvl">
+          <code class="ph codeph">nvl(type a, type ifNull)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Alias for the <code class="ph codeph">isnull()</code> function. Tests if an expression is
+          <code class="ph codeph">NULL</code>, and returns the expression result value if not. If the first argument is
+          <code class="ph codeph">NULL</code>, returns the second argument. Equivalent to the <code class="ph codeph">nvl()</code> function
+          from Oracle Database or <code class="ph codeph">ifnull()</code> from MySQL.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> Same as the first argument value
+          </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> Impala 1.1
+      </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conditional_functions__zeroifnull">
+          <code class="ph codeph">zeroifnull(<var class="keyword varname">numeric_expr</var>)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns 0 if the numeric expression evaluates to <code class="ph codeph">NULL</code>, otherwise returns
+          the result of the expression.
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong> Used to avoid unexpected results due to unexpected propagation of
+            <code class="ph codeph">NULL</code> values in numeric calculations. Serves as shorthand for a more elaborate
+            <code class="ph codeph">CASE</code> expression, to simplify porting SQL with vendor extensions to Impala.
+          </p>
+          <p class="p">
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
+        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
+        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+      </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> Impala 1.3.0
+      </p>
+        </dd>
+
+      
+    </dl>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div></div></nav></article></main></body></html>

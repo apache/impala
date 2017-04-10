@@ -1,0 +1,170 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="boolean"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>BOOLEAN Data Type</title></head><body id="boolean"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">BOOLEAN Data Type</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      A data type used in <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER TABLE</code> statements, representing a
+      single true/false choice.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+    <p class="p">
+      In the column definition of a <code class="ph codeph">CREATE TABLE</code> statement:
+    </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">column_name</var> BOOLEAN</code></pre>
+
+    <p class="p">
+      <strong class="ph b">Range:</strong> <code class="ph codeph">TRUE</code> or <code class="ph codeph">FALSE</code>. Do not use quotation marks around the
+      <code class="ph codeph">TRUE</code> and <code class="ph codeph">FALSE</code> literal values. You can write the literal values in
+      uppercase, lowercase, or mixed case. The values queried from a table are always returned in lowercase,
+      <code class="ph codeph">true</code> or <code class="ph codeph">false</code>.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Conversions:</strong> Impala does not automatically convert any other type to <code class="ph codeph">BOOLEAN</code>. All
+      conversions must use an explicit call to the <code class="ph codeph">CAST()</code> function.
+    </p>
+
+    <p class="p">
+      You can use <code class="ph codeph">CAST()</code> to convert
+
+      any integer or floating-point type to
+      <code class="ph codeph">BOOLEAN</code>: a value of 0 represents <code class="ph codeph">false</code>, and any non-zero value is converted
+      to <code class="ph codeph">true</code>.
+    </p>
+
+<pre class="pre codeblock"><code>SELECT CAST(42 AS BOOLEAN) AS nonzero_int, CAST(99.44 AS BOOLEAN) AS nonzero_decimal,
+  CAST(000 AS BOOLEAN) AS zero_int, CAST(0.0 AS BOOLEAN) AS zero_decimal;
++-------------+-----------------+----------+--------------+
+| nonzero_int | nonzero_decimal | zero_int | zero_decimal |
++-------------+-----------------+----------+--------------+
+| true        | true            | false    | false        |
++-------------+-----------------+----------+--------------+
+</code></pre>
+
+    <p class="p">
+      When you cast the opposite way, from <code class="ph codeph">BOOLEAN</code> to a numeric type,
+      the result becomes either 1 or 0:
+    </p>
+
+<pre class="pre codeblock"><code>SELECT CAST(true AS INT) AS true_int, CAST(true AS DOUBLE) AS true_double,
+  CAST(false AS INT) AS false_int, CAST(false AS DOUBLE) AS false_double;
++----------+-------------+-----------+--------------+
+| true_int | true_double | false_int | false_double |
++----------+-------------+-----------+--------------+
+| 1        | 1           | 0         | 0            |
++----------+-------------+-----------+--------------+
+</code></pre>
+
+    <p class="p">
+
+      You can cast <code class="ph codeph">DECIMAL</code> values to <code class="ph codeph">BOOLEAN</code>, with the same treatment of zero and
+      non-zero values as the other numeric types. You cannot cast a <code class="ph codeph">BOOLEAN</code> to a
+      <code class="ph codeph">DECIMAL</code>.
+    </p>
+
+    <p class="p">
+      You cannot cast a <code class="ph codeph">STRING</code> value to <code class="ph codeph">BOOLEAN</code>, although you can cast a
+      <code class="ph codeph">BOOLEAN</code> value to <code class="ph codeph">STRING</code>, returning <code class="ph codeph">'1'</code> for
+      <code class="ph codeph">true</code> values and <code class="ph codeph">'0'</code> for <code class="ph codeph">false</code> values.
+    </p>
+
+    <p class="p">
+      Although you can cast a <code class="ph codeph">TIMESTAMP</code> to a <code class="ph codeph">BOOLEAN</code> or a
+      <code class="ph codeph">BOOLEAN</code> to a <code class="ph codeph">TIMESTAMP</code>, the results are unlikely to be useful. Any non-zero
+      <code class="ph codeph">TIMESTAMP</code> (that is, any value other than <code class="ph codeph">1970-01-01 00:00:00</code>) becomes
+      <code class="ph codeph">TRUE</code> when converted to <code class="ph codeph">BOOLEAN</code>, while <code class="ph codeph">1970-01-01 00:00:00</code>
+      becomes <code class="ph codeph">FALSE</code>. A value of <code class="ph codeph">FALSE</code> becomes <code class="ph codeph">1970-01-01
+      00:00:00</code> when converted to <code class="ph codeph">BOOLEAN</code>, and <code class="ph codeph">TRUE</code> becomes one second
+      past this epoch date, that is, <code class="ph codeph">1970-01-01 00:00:01</code>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">NULL considerations:</strong> An expression of this type produces a <code class="ph codeph">NULL</code> value if any
+        argument of the expression is <code class="ph codeph">NULL</code>.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Partitioning:</strong>
+      </p>
+
+    <p class="p">
+      Do not use a <code class="ph codeph">BOOLEAN</code> column as a partition key. Although you can create such a table,
+      subsequent operations produce errors:
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table truth_table (assertion string) partitioned by (truth boolean);
+[localhost:21000] &gt; insert into truth_table values ('Pigs can fly',false);
+ERROR: AnalysisException: INSERT into table with BOOLEAN partition column (truth) is not supported: partitioning.truth_table
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>SELECT 1 &lt; 2;
+SELECT 2 = 5;
+SELECT 100 &lt; NULL, 100 &gt; NULL;
+CREATE TABLE assertions (claim STRING, really BOOLEAN);
+INSERT INTO assertions VALUES
+  ("1 is less than 2", 1 &lt; 2),
+  ("2 is the same as 5", 2 = 5),
+  ("Grass is green", true),
+  ("The moon is made of green cheese", false);
+SELECT claim FROM assertions WHERE really = TRUE;
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">HBase considerations:</strong> This data type is fully compatible with HBase tables.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Parquet considerations:</strong> This type is fully compatible with Parquet tables.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text tables than in tables
+        using Parquet or other binary formats.
+      </p>
+
+
+
+
+
+
+
+    <p class="p">
+        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum and average size
+        fields are always filled in for column statistics, even before you run the <code class="ph codeph">COMPUTE STATS</code>
+        statement.
+      </p>
+
+
+
+    <p class="p">
+        <strong class="ph b">Kudu considerations:</strong>
+      </p>
+    <p class="p">
+        Currently, the data types <code class="ph codeph">BOOLEAN</code>, <code class="ph codeph">FLOAT</code>,
+        and <code class="ph codeph">DOUBLE</code> cannot be used for primary key columns in Kudu tables.
+      </p>
+
+
+
+    <p class="p">
+      <strong class="ph b">Related information:</strong> <a class="xref" href="impala_literals.html#boolean_literals">Boolean Literals</a>,
+      <a class="xref" href="impala_operators.html#operators">SQL Operators</a>,
+      <a class="xref" href="impala_conditional_functions.html#conditional_functions">Impala Conditional Functions</a>
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div></div></nav></article></main></body></html>

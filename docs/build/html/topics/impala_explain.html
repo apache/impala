@@ -1,0 +1,291 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="explain"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>EXPLAIN Statement</title></head><body id="explain"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">EXPLAIN Statement</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Returns the execution plan for a statement, showing the low-level mechanisms that Impala will use to read the
+      data, divide the work among nodes in the cluster, and transmit intermediate and final results across the
+      network. Use <code class="ph codeph">explain</code> followed by a complete <code class="ph codeph">SELECT</code> query. For example:
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>EXPLAIN { <var class="keyword varname">select_query</var> | <var class="keyword varname">ctas_stmt</var> | <var class="keyword varname">insert_stmt</var> }
+</code></pre>
+
+    <p class="p">
+      The <var class="keyword varname">select_query</var> is a <code class="ph codeph">SELECT</code> statement, optionally prefixed by a
+      <code class="ph codeph">WITH</code> clause. See <a class="xref" href="impala_select.html#select">SELECT Statement</a> for details.
+    </p>
+
+    <p class="p">
+      The <var class="keyword varname">insert_stmt</var> is an <code class="ph codeph">INSERT</code> statement that inserts into or overwrites an
+      existing table. It can use either the <code class="ph codeph">INSERT ... SELECT</code> or <code class="ph codeph">INSERT ...
+      VALUES</code> syntax. See <a class="xref" href="impala_insert.html#insert">INSERT Statement</a> for details.
+    </p>
+
+    <p class="p">
+      The <var class="keyword varname">ctas_stmt</var> is a <code class="ph codeph">CREATE TABLE</code> statement using the <code class="ph codeph">AS
+      SELECT</code> clause, typically abbreviated as a <span class="q">"CTAS"</span> operation. See
+      <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a> for details.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      You can interpret the output to judge whether the query is performing efficiently, and adjust the query
+      and/or the schema if not. For example, you might change the tests in the <code class="ph codeph">WHERE</code> clause, add
+      hints to make join operations more efficient, introduce subqueries, change the order of tables in a join, add
+      or change partitioning for a table, collect column statistics and/or table statistics in Hive, or any other
+      performance tuning steps.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">EXPLAIN</code> output reminds you if table or column statistics are missing from any table
+      involved in the query. These statistics are important for optimizing queries involving large tables or
+      multi-table joins. See <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a> for how to gather statistics,
+      and <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a> for how to use this information for query tuning.
+    </p>
+
+    <div class="p">
+        Read the <code class="ph codeph">EXPLAIN</code> plan from bottom to top:
+        <ul class="ul">
+          <li class="li">
+            The last part of the plan shows the low-level details such as the expected amount of data that will be
+            read, where you can judge the effectiveness of your partitioning strategy and estimate how long it will
+            take to scan a table based on total data size and the size of the cluster.
+          </li>
+
+          <li class="li">
+            As you work your way up, next you see the operations that will be parallelized and performed on each
+            Impala node.
+          </li>
+
+          <li class="li">
+            At the higher levels, you see how data flows when intermediate result sets are combined and transmitted
+            from one node to another.
+          </li>
+
+          <li class="li">
+            See <a class="xref" href="../shared/../topics/impala_explain_level.html#explain_level">EXPLAIN_LEVEL Query Option</a> for details about the
+            <code class="ph codeph">EXPLAIN_LEVEL</code> query option, which lets you customize how much detail to show in the
+            <code class="ph codeph">EXPLAIN</code> plan depending on whether you are doing high-level or low-level tuning,
+            dealing with logical or physical aspects of the query.
+          </li>
+        </ul>
+      </div>
+
+    <p class="p">
+      If you come from a traditional database background and are not familiar with data warehousing, keep in mind
+      that Impala is optimized for full table scans across very large tables. The structure and distribution of
+      this data is typically not suitable for the kind of indexing and single-row lookups that are common in OLTP
+      environments. Seeing a query scan entirely through a large table is common, not necessarily an indication of
+      an inefficient query. Of course, if you can reduce the volume of scanned data by orders of magnitude, for
+      example by using a query that affects only certain partitions within a partitioned table, then you might be
+      able to optimize a query so that it executes in seconds rather than minutes.
+    </p>
+
+    <p class="p">
+      For more information and examples to help you interpret <code class="ph codeph">EXPLAIN</code> output, see
+      <a class="xref" href="impala_explain_plan.html#perf_explain">Using the EXPLAIN Plan for Performance Tuning</a>.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Extended EXPLAIN output:</strong>
+    </p>
+
+    <p class="p">
+      For performance tuning of complex queries, and capacity planning (such as using the admission control and
+      resource management features), you can enable more detailed and informative output for the
+      <code class="ph codeph">EXPLAIN</code> statement. In the <span class="keyword cmdname">impala-shell</span> interpreter, issue the command
+      <code class="ph codeph">SET EXPLAIN_LEVEL=<var class="keyword varname">level</var></code>, where <var class="keyword varname">level</var> is an integer
+      from 0 to 3 or corresponding mnemonic values <code class="ph codeph">minimal</code>, <code class="ph codeph">standard</code>,
+      <code class="ph codeph">extended</code>, or <code class="ph codeph">verbose</code>.
+    </p>
+
+    <p class="p">
+      When extended <code class="ph codeph">EXPLAIN</code> output is enabled, <code class="ph codeph">EXPLAIN</code> statements print
+      information about estimated memory requirements, minimum number of virtual cores, and so on.
+      
+    </p>
+
+    <p class="p">
+      See <a class="xref" href="impala_explain_level.html#explain_level">EXPLAIN_LEVEL Query Option</a> for details and examples.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      This example shows how the standard <code class="ph codeph">EXPLAIN</code> output moves from the lowest (physical) level to
+      the higher (logical) levels. The query begins by scanning a certain amount of data; each node performs an
+      aggregation operation (evaluating <code class="ph codeph">COUNT(*)</code>) on some subset of data that is local to that
+      node; the intermediate results are transmitted back to the coordinator node (labelled here as the
+      <code class="ph codeph">EXCHANGE</code> node); lastly, the intermediate results are summed to display the final result.
+    </p>
+
+<pre class="pre codeblock" id="explain__explain_plan_simple"><code>[impalad-host:21000] &gt; explain select count(*) from customer_address;
++----------------------------------------------------------+
+| Explain String                                           |
++----------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=42.00MB VCores=1 |
+|                                                          |
+| 03:AGGREGATE [MERGE FINALIZE]                            |
+| |  output: sum(count(*))                                 |
+| |                                                        |
+| 02:EXCHANGE [PARTITION=UNPARTITIONED]                    |
+| |                                                        |
+| 01:AGGREGATE                                             |
+| |  output: count(*)                                      |
+| |                                                        |
+| 00:SCAN HDFS [default.customer_address]                  |
+|    partitions=1/1 size=5.25MB                            |
++----------------------------------------------------------+
+</code></pre>
+
+    <p class="p">
+      These examples show how the extended <code class="ph codeph">EXPLAIN</code> output becomes more accurate and informative as
+      statistics are gathered by the <code class="ph codeph">COMPUTE STATS</code> statement. Initially, much of the information
+      about data size and distribution is marked <span class="q">"unavailable"</span>. Impala can determine the raw data size, but
+      not the number of rows or number of distinct values for each column without additional analysis. The
+      <code class="ph codeph">COMPUTE STATS</code> statement performs this analysis, so a subsequent <code class="ph codeph">EXPLAIN</code>
+      statement has additional information to use in deciding how to optimize the distributed query.
+    </p>
+
+    
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; set explain_level=extended;
+EXPLAIN_LEVEL set to extended
+[localhost:21000] &gt; explain select x from t1;
+[localhost:21000] &gt; explain select x from t1;
++----------------------------------------------------------+
+| Explain String                                           |
++----------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=32.00MB VCores=1 |
+|                                                          |
+| 01:EXCHANGE [PARTITION=UNPARTITIONED]                    |
+| |  hosts=1 per-host-mem=unavailable                      |
+<strong class="ph b">| |  tuple-ids=0 row-size=4B cardinality=unavailable       |</strong>
+| |                                                        |
+| 00:SCAN HDFS [default.t2, PARTITION=RANDOM]              |
+|    partitions=1/1 size=36B                               |
+<strong class="ph b">|    table stats: unavailable                              |</strong>
+<strong class="ph b">|    column stats: unavailable                             |</strong>
+|    hosts=1 per-host-mem=32.00MB                          |
+<strong class="ph b">|    tuple-ids=0 row-size=4B cardinality=unavailable       |</strong>
++----------------------------------------------------------+
+</code></pre>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; compute stats t1;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 1 column(s). |
++-----------------------------------------+
+[localhost:21000] &gt; explain select x from t1;
++----------------------------------------------------------+
+| Explain String                                           |
++----------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=64.00MB VCores=1 |
+|                                                          |
+| 01:EXCHANGE [PARTITION=UNPARTITIONED]                    |
+| |  hosts=1 per-host-mem=unavailable                      |
+| |  tuple-ids=0 row-size=4B cardinality=0                 |
+| |                                                        |
+| 00:SCAN HDFS [default.t1, PARTITION=RANDOM]              |
+|    partitions=1/1 size=36B                               |
+<strong class="ph b">|    table stats: 0 rows total                             |</strong>
+<strong class="ph b">|    column stats: all                                     |</strong>
+|    hosts=1 per-host-mem=64.00MB                          |
+<strong class="ph b">|    tuple-ids=0 row-size=4B cardinality=0                 |</strong>
++----------------------------------------------------------+
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Security considerations:</strong>
+      </p>
+    <p class="p">
+        If these statements in your environment contain sensitive literal values such as credit card numbers or tax
+        identifiers, Impala can redact this sensitive information when displaying the statements in log files and
+        other administrative contexts. See <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">HDFS permissions:</strong>
+      </p>
+    <p class="p">
+      
+      The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
+      typically the <code class="ph codeph">impala</code> user, must have read
+      and execute permissions for all applicable directories in all source tables
+      for the query that is being explained.
+      (A <code class="ph codeph">SELECT</code> operation could read files from multiple different HDFS directories
+      if the source table is partitioned.)
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Kudu considerations:</strong>
+      </p>
+    <p class="p">
+      The <code class="ph codeph">EXPLAIN</code> statement displays equivalent plan
+      information for queries against Kudu tables as for queries
+      against HDFS-based tables.
+    </p>
+
+    <div class="p">
+      To see which predicates Impala can <span class="q">"push down"</span> to Kudu for
+      efficient evaluation, without transmitting unnecessary rows back
+      to Impala, look for the <code class="ph codeph">kudu predicates</code> item in
+      the scan phase of the query. The label <code class="ph codeph">kudu predicates</code>
+      indicates a condition that can be evaluated efficiently on the Kudu
+      side. The label <code class="ph codeph">predicates</code> in a <code class="ph codeph">SCAN KUDU</code>
+      node indicates a condition that is evaluated by Impala.
+      For example, in a table with primary key column <code class="ph codeph">X</code>
+      and non-primary key column <code class="ph codeph">Y</code>, you can see that
+      some operators in the <code class="ph codeph">WHERE</code> clause are evaluated
+      immediately by Kudu and others are evaluated later by Impala:
+<pre class="pre codeblock"><code>
+EXPLAIN SELECT x,y from kudu_table WHERE
+  x = 1 AND x NOT IN (2,3) AND y = 1
+  AND x IS NOT NULL AND x &gt; 0;
++----------------
+| Explain String
++----------------
+...
+| 00:SCAN KUDU [jrussell.hash_only]
+|    predicates: x IS NOT NULL, x NOT IN (2, 3)
+|    kudu predicates: x = 1, x &gt; 0, y = 1
+</code></pre>
+      Only binary predicates and <code class="ph codeph">IN</code> predicates containing
+      literal values that exactly match the types in the Kudu table, and do not
+      require any casting, can be pushed to Kudu.
+    </div>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+    <p class="p">
+      <a class="xref" href="impala_select.html#select">SELECT Statement</a>,
+      <a class="xref" href="impala_insert.html#insert">INSERT Statement</a>,
+      <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>,
+      <a class="xref" href="impala_explain_plan.html#explain_plan">Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles</a>
+    </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="offset"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>OFFSET Clause</title></head><body id="offset"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">OFFSET Clause</h1>
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">OFFSET</code> clause in a <code class="ph codeph">SELECT</code> query causes the result set to start some
+      number of rows after the logical first item. The result set is numbered starting from zero, so <code class="ph codeph">OFFSET
+      0</code> produces the same result as leaving out the <code class="ph codeph">OFFSET</code> clause. Always use this clause
+      in combination with <code class="ph codeph">ORDER BY</code> (so that it is clear which item should be first, second, and so
+      on) and <code class="ph codeph">LIMIT</code> (so that the result set covers a bounded range, such as items 0-9, 100-199,
+      and so on).
+    </p>
+
+    <p class="p">
+        In Impala 1.2.1 and higher, you can combine a <code class="ph codeph">LIMIT</code> clause with an <code class="ph codeph">OFFSET</code>
+        clause to produce a small result set that is different from a top-N query, for example, to return items 11
+        through 20. This technique can be used to simulate <span class="q">"paged"</span> results. Because Impala queries typically
+        involve substantial amounts of I/O, use this technique only for compatibility in cases where you cannot
+        rewrite the application logic. For best performance and scalability, wherever practical, query as many
+        items as you expect to need, cache them on the application side, and display small groups of results to
+        users using application logic.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      The following example shows how you could run a <span class="q">"paging"</span> query originally written for a traditional
+      database application. Because typical Impala queries process megabytes or gigabytes of data and read large
+      data files from disk each time, it is inefficient to run a separate query to retrieve each small group of
+      items. Use this technique only for compatibility while porting older applications, then rewrite the
+      application code to use a single query with a large result set, and display pages of results from the cached
+      result set.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table numbers (x int);
+[localhost:21000] &gt; insert into numbers select x from very_long_sequence;
+Inserted 1000000 rows in 1.34s
+[localhost:21000] &gt; select x from numbers order by x limit 5 offset 0;
++----+
+| x  |
++----+
+| 1  |
+| 2  |
+| 3  |
+| 4  |
+| 5  |
++----+
+[localhost:21000] &gt; select x from numbers order by x limit 5 offset 5;
++----+
+| x  |
++----+
+| 6  |
+| 7  |
+| 8  |
+| 9  |
+| 10 |
++----+
+</code></pre>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_select.html">SELECT Statement</a></div></div></nav></article></main></body></html>

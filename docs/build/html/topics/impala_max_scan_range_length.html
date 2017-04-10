@@ -1,0 +1,47 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="max_scan_range_length"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>MAX_SCAN_RANGE_LENGTH Query Option</title></head><body id="max_scan_range_length"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">MAX_SCAN_RANGE_LENGTH Query Option</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Maximum length of the scan range. Interacts with the number of HDFS blocks in the table to determine how many
+      CPU cores across the cluster are involved with the processing for a query. (Each core processes one scan
+      range.)
+    </p>
+
+    <p class="p">
+      Lowering the value can sometimes increase parallelism if you have unused CPU capacity, but a too-small value
+      can limit query performance because each scan range involves extra overhead.
+    </p>
+
+    <p class="p">
+      Only applicable to HDFS tables. Has no effect on Parquet tables. Unspecified or 0 indicates backend default,
+      which is the same as the HDFS block size for each table.
+    </p>
+
+    <p class="p">
+      Although the scan range can be arbitrarily long, Impala internally uses an 8 MB read buffer so that it can
+      query tables with huge block sizes without allocating equivalent blocks of memory.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> numeric
+    </p>
+
+    <p class="p">
+      In <span class="keyword">Impala 2.7</span> and higher, the argument value can include unit specifiers,
+      such as <code class="ph codeph">100m</code> or <code class="ph codeph">100mb</code>. In previous versions,
+      Impala interpreted such formatted values as 0, leading to query failures.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> 0
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

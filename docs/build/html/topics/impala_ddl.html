@@ -1,0 +1,141 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="ddl"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DDL Statements</title></head><body id="ddl"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">DDL Statements</h1>
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      DDL refers to <span class="q">"Data Definition Language"</span>, a subset of SQL statements that change the structure of the
+      database schema in some way, typically by creating, deleting, or modifying schema objects such as databases,
+      tables, and views. Most Impala DDL statements start with the keywords <code class="ph codeph">CREATE</code>,
+      <code class="ph codeph">DROP</code>, or <code class="ph codeph">ALTER</code>.
+    </p>
+
+    <p class="p">
+      The Impala DDL statements are:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_alter_view.html#alter_view">ALTER VIEW Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_create_database.html#create_database">CREATE DATABASE Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_create_function.html#create_function">CREATE FUNCTION Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_create_role.html#create_role">CREATE ROLE Statement (Impala 2.0 or higher only)</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_create_view.html#create_view">CREATE VIEW Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_drop_database.html#drop_database">DROP DATABASE Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_drop_function.html#drop_function">DROP FUNCTION Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_drop_role.html#drop_role">DROP ROLE Statement (Impala 2.0 or higher only)</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_drop_view.html#drop_view">DROP VIEW Statement</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_grant.html#grant">GRANT Statement (Impala 2.0 or higher only)</a>
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_revoke.html#revoke">REVOKE Statement (Impala 2.0 or higher only)</a>
+      </li>
+    </ul>
+
+    <p class="p">
+      After Impala executes a DDL command, information about available tables, columns, views, partitions, and so
+      on is automatically synchronized between all the Impala nodes in a cluster. (Prior to Impala 1.2, you had to
+      issue a <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE METADATA</code> statement manually on the other
+      nodes to make them aware of the changes.)
+    </p>
+
+    <p class="p">
+      If the timing of metadata updates is significant, for example if you use round-robin scheduling where each
+      query could be issued through a different Impala node, you can enable the
+      <a class="xref" href="impala_sync_ddl.html#sync_ddl">SYNC_DDL</a> query option to make the DDL statement wait until
+      all nodes have been notified about the metadata changes.
+    </p>
+
+    <p class="p">
+      See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about how Impala DDL statements interact with
+      tables and partitions stored in the Amazon S3 filesystem.
+    </p>
+
+    <p class="p">
+      Although the <code class="ph codeph">INSERT</code> statement is officially classified as a DML (data manipulation language)
+      statement, it also involves metadata changes that must be broadcast to all Impala nodes, and so is also
+      affected by the <code class="ph codeph">SYNC_DDL</code> query option.
+    </p>
+
+    <p class="p">
+      Because the <code class="ph codeph">SYNC_DDL</code> query option makes each DDL operation take longer than normal, you
+      might only enable it before the last DDL operation in a sequence. For example, if you are running a script
+      that issues multiple of DDL operations to set up an entire new schema, add several new partitions, and so on,
+      you might minimize the performance overhead by enabling the query option only before the last
+      <code class="ph codeph">CREATE</code>, <code class="ph codeph">DROP</code>, <code class="ph codeph">ALTER</code>, or <code class="ph codeph">INSERT</code> statement.
+      The script only finishes when all the relevant metadata changes are recognized by all the Impala nodes, so
+      you could connect to any node and issue queries through it.
+    </p>
+
+    <p class="p">
+      The classification of DDL, DML, and other statements is not necessarily the same between Impala and Hive.
+      Impala organizes these statements in a way intended to be familiar to people familiar with relational
+      databases or data warehouse products. Statements that modify the metastore database, such as <code class="ph codeph">COMPUTE
+      STATS</code>, are classified as DDL. Statements that only query the metastore database, such as
+      <code class="ph codeph">SHOW</code> or <code class="ph codeph">DESCRIBE</code>, are put into a separate category of utility statements.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      The query types shown in the Impala debug web user interface might not match exactly the categories listed
+      here. For example, currently the <code class="ph codeph">USE</code> statement is shown as DDL in the debug web UI. The
+      query types shown in the debug web UI are subject to change, for improved consistency.
+    </div>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      The other major classifications of SQL statements are data manipulation language (see
+      <a class="xref" href="impala_dml.html#dml">DML Statements</a>) and queries (see <a class="xref" href="impala_select.html#select">SELECT Statement</a>).
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

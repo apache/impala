@@ -1,0 +1,136 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="bigint"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>BIGINT Data Type</title></head><body id="bigint"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">BIGINT Data Type</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      An 8-byte integer data type used in <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER TABLE</code>
+      statements.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+    <p class="p">
+      In the column definition of a <code class="ph codeph">CREATE TABLE</code> statement:
+    </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">column_name</var> BIGINT</code></pre>
+
+    <p class="p">
+      <strong class="ph b">Range:</strong> -9223372036854775808 .. 9223372036854775807. There is no <code class="ph codeph">UNSIGNED</code> subtype.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Conversions:</strong> Impala automatically converts to a floating-point type (<code class="ph codeph">FLOAT</code> or
+      <code class="ph codeph">DOUBLE</code>) automatically. Use <code class="ph codeph">CAST()</code> to convert to <code class="ph codeph">TINYINT</code>,
+      <code class="ph codeph">SMALLINT</code>, <code class="ph codeph">INT</code>, <code class="ph codeph">STRING</code>, or <code class="ph codeph">TIMESTAMP</code>.
+      <span class="ph">Casting an integer or floating-point value <code class="ph codeph">N</code> to
+        <code class="ph codeph">TIMESTAMP</code> produces a value that is <code class="ph codeph">N</code> seconds past the start of the epoch
+        date (January 1, 1970). By default, the result value represents a date and time in the UTC time zone.
+        If the setting <code class="ph codeph">-use_local_tz_for_unix_timestamp_conversions=true</code> is in effect,
+        the resulting <code class="ph codeph">TIMESTAMP</code> represents a date and time in the local time zone.</span>
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>CREATE TABLE t1 (x BIGINT);
+SELECT CAST(1000 AS BIGINT);
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      <code class="ph codeph">BIGINT</code> is a convenient type to use for column declarations because you can use any kind of
+      integer values in <code class="ph codeph">INSERT</code> statements and they are promoted to <code class="ph codeph">BIGINT</code> where
+      necessary. However, <code class="ph codeph">BIGINT</code> also requires the most bytes of any integer type on disk and in
+      memory, meaning your queries are not as efficient and scalable as possible if you overuse this type.
+      Therefore, prefer to use the smallest integer type with sufficient range to hold all input values, and
+      <code class="ph codeph">CAST()</code> when necessary to the appropriate type.
+    </p>
+
+    <p class="p">
+      For a convenient and automated way to check the bounds of the <code class="ph codeph">BIGINT</code> type, call the
+      functions <code class="ph codeph">MIN_BIGINT()</code> and <code class="ph codeph">MAX_BIGINT()</code>.
+    </p>
+
+    <p class="p">
+      If an integer value is too large to be represented as a <code class="ph codeph">BIGINT</code>, use a
+      <code class="ph codeph">DECIMAL</code> instead with sufficient digits of precision.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">NULL considerations:</strong> Casting any non-numeric value to this type produces a <code class="ph codeph">NULL</code>
+        value.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Partitioning:</strong> Prefer to use this type for a partition key column. Impala can process the numeric
+        type more efficiently than a <code class="ph codeph">STRING</code> representation of the value.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">HBase considerations:</strong> This data type is fully compatible with HBase tables.
+      </p>
+
+
+
+    <p class="p">
+        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text tables than in tables
+        using Parquet or other binary formats.
+      </p>
+
+
+
+    <p class="p">
+        <strong class="ph b">Internal details:</strong> Represented in memory as an 8-byte value.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> Available in all versions of Impala.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum and average size
+        fields are always filled in for column statistics, even before you run the <code class="ph codeph">COMPUTE STATS</code>
+        statement.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Sqoop considerations:</strong>
+      </p>
+
+    <p class="p"> If you use Sqoop to
+        convert RDBMS data to Parquet, be careful with interpreting any
+        resulting values from <code class="ph codeph">DATE</code>, <code class="ph codeph">DATETIME</code>,
+        or <code class="ph codeph">TIMESTAMP</code> columns. The underlying values are
+        represented as the Parquet <code class="ph codeph">INT64</code> type, which is
+        represented as <code class="ph codeph">BIGINT</code> in the Impala table. The Parquet
+        values represent the time in milliseconds, while Impala interprets
+          <code class="ph codeph">BIGINT</code> as the time in seconds. Therefore, if you have
+        a <code class="ph codeph">BIGINT</code> column in a Parquet table that was imported
+        this way from Sqoop, divide the values by 1000 when interpreting as the
+          <code class="ph codeph">TIMESTAMP</code> type.</p>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_literals.html#numeric_literals">Numeric Literals</a>, <a class="xref" href="impala_tinyint.html#tinyint">TINYINT Data Type</a>,
+      <a class="xref" href="impala_smallint.html#smallint">SMALLINT Data Type</a>, <a class="xref" href="impala_int.html#int">INT Data Type</a>,
+      <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>, <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type (Impala 1.4 or higher only)</a>,
+      <a class="xref" href="impala_math_functions.html#math_functions">Impala Mathematical Functions</a>
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div></div></nav></article></main></body></html>

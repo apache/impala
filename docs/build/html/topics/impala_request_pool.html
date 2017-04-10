@@ -1,0 +1,35 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="request_pool"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>REQUEST_POOL Query Option</title></head><body id="request_pool"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">REQUEST_POOL Query Option</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      The pool or queue name that queries should be submitted to. Only applies when you enable the Impala admission control feature.
+      Specifies the name of the pool used by requests from Impala to the resource manager.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> <code class="ph codeph">STRING</code>
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> empty (use the user-to-pool mapping defined by an <span class="keyword cmdname">impalad</span> startup option
+      in the Impala configuration file)
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+    <p class="p">
+      <a class="xref" href="impala_admission.html">Admission Control and Query Queuing</a>
+    </p>
+
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

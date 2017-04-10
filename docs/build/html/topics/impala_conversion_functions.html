@@ -1,0 +1,288 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="conversion_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Type Conversion Functions</title></head><body id="conversion_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Type Conversion Functions</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Conversion functions are usually used in combination with other functions, to explicitly pass the expected
+      data types. Impala has strict rules regarding data types for function parameters. For example, Impala does
+      not automatically convert a <code class="ph codeph">DOUBLE</code> value to <code class="ph codeph">FLOAT</code>, a
+      <code class="ph codeph">BIGINT</code> value to <code class="ph codeph">INT</code>, or other conversion where precision could be lost or
+      overflow could occur. Also, for reporting or dealing with loosely defined schemas in big data contexts,
+      you might frequently need to convert values to or from the <code class="ph codeph">STRING</code> type.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+      Although in <span class="keyword">Impala 2.3</span>, the <code class="ph codeph">SHOW FUNCTIONS</code> output for
+      database <code class="ph codeph">_IMPALA_BUILTINS</code> contains some function signatures
+      matching the pattern <code class="ph codeph">castto*</code>, these functions are not intended
+      for public use and are expected to be hidden in future.
+    </div>
+
+    <p class="p">
+      <strong class="ph b">Function reference:</strong>
+    </p>
+
+    <p class="p">
+      Impala supports the following type conversion functions:
+    </p>
+
+<dl class="dl">
+
+
+<dt class="dt dlterm" id="conversion_functions__cast">
+<code class="ph codeph">cast(<var class="keyword varname">expr</var> AS <var class="keyword varname">type</var>)</code>
+</dt>
+
+<dd class="dd">
+
+<strong class="ph b">Purpose:</strong> Converts the value of an expression to any other type.
+If the expression value is of a type that cannot be converted to the target type, the result is <code class="ph codeph">NULL</code>.
+<p class="p"><strong class="ph b">Usage notes:</strong>
+Use <code class="ph codeph">CAST</code> when passing a column value or literal to a function that
+expects a parameter with a different type.
+Frequently used in SQL operations such as <code class="ph codeph">CREATE TABLE AS SELECT</code>
+and <code class="ph codeph">INSERT ... VALUES</code> to ensure that values from various sources
+are of the appropriate type for the destination columns.
+Where practical, do a one-time <code class="ph codeph">CAST()</code> operation during the ingestion process
+to make each column into the appropriate type, rather than using many <code class="ph codeph">CAST()</code>
+operations in each query; doing type conversions for each row during each query can be expensive
+for tables with millions or billions of rows.
+</p>
+    <p class="p">
+        The way this function deals with time zones when converting to or from <code class="ph codeph">TIMESTAMP</code>
+        values is affected by the <code class="ph codeph">-use_local_tz_for_unix_timestamp_conversions</code> startup flag for the
+        <span class="keyword cmdname">impalad</span> daemon. See <a class="xref" href="../shared/../topics/impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for details about
+        how Impala handles time zone considerations for the <code class="ph codeph">TIMESTAMP</code> data type.
+      </p>
+
+<p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+<pre class="pre codeblock"><code>select concat('Here are the first ',10,' results.'); -- Fails
+select concat('Here are the first ',cast(10 as string),' results.'); -- Succeeds
+</code></pre>
+<p class="p">
+The following example starts with a text table where every column has a type of <code class="ph codeph">STRING</code>,
+which might be how you ingest data of unknown schema until you can verify the cleanliness of the underly values.
+Then it uses <code class="ph codeph">CAST()</code> to create a new Parquet table with the same data, but using specific
+numeric data types for the columns with numeric data. Using numeric types of appropriate sizes can result in
+substantial space savings on disk and in memory, and performance improvements in queries,
+over using strings or larger-than-necessary numeric types.
+</p>
+<pre class="pre codeblock"><code>create table t1 (name string, x string, y string, z string);
+
+create table t2 stored as parquet
+as select
+  name,
+  cast(x as bigint) x,
+  cast(y as timestamp) y,
+  cast(z as smallint) z
+from t1;
+
+describe t2;
++------+----------+---------+
+| name | type     | comment |
++------+----------+---------+
+| name | string   |         |
+| x    | bigint   |         |
+| y    | smallint |         |
+| z    | tinyint  |         |
++------+----------+---------+
+</code></pre>
+<p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+<p class="p">
+
+  For details of casts from each kind of data type, see the description of
+  the appropriate type:
+  <a class="xref" href="impala_tinyint.html#tinyint">TINYINT Data Type</a>,
+  <a class="xref" href="impala_smallint.html#smallint">SMALLINT Data Type</a>,
+  <a class="xref" href="impala_int.html#int">INT Data Type</a>,
+  <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>,
+  <a class="xref" href="impala_float.html#float">FLOAT Data Type</a>,
+  <a class="xref" href="impala_double.html#double">DOUBLE Data Type</a>,
+  <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type (Impala 1.4 or higher only)</a>,
+  <a class="xref" href="impala_string.html#string">STRING Data Type</a>,
+  <a class="xref" href="impala_char.html#char">CHAR Data Type (Impala 2.0 or higher only)</a>,
+  <a class="xref" href="impala_varchar.html#varchar">VARCHAR Data Type (Impala 2.0 or higher only)</a>,
+  <a class="xref" href="impala_timestamp.html#timestamp">TIMESTAMP Data Type</a>,
+  <a class="xref" href="impala_boolean.html#boolean">BOOLEAN Data Type</a>
+</p>
+</dd>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dt class="dt dlterm" id="conversion_functions__typeof">
+<code class="ph codeph">typeof(type value)</code>
+</dt>
+<dd class="dd">
+
+<strong class="ph b">Purpose:</strong> Returns the name of the data type corresponding to an expression. For types with
+extra attributes, such as length for <code class="ph codeph">CHAR</code> and <code class="ph codeph">VARCHAR</code>,
+or precision and scale for <code class="ph codeph">DECIMAL</code>, includes the full specification of the type.
+
+<p class="p"><strong class="ph b">Return type:</strong> <code class="ph codeph">string</code></p>
+<p class="p"><strong class="ph b">Usage notes:</strong> Typically used in interactive exploration of a schema, or in application code that programmatically generates schema definitions such as <code class="ph codeph">CREATE TABLE</code> statements.
+For example, previously, to understand the type of an expression such as
+<code class="ph codeph">col1 / col2</code> or <code class="ph codeph">concat(col1, col2, col3)</code>,
+you might have created a dummy table with a single row, using syntax such as <code class="ph codeph">CREATE TABLE foo AS SELECT 5 / 3.0</code>,
+and then doing a <code class="ph codeph">DESCRIBE</code> to see the type of the row.
+Or you might have done a <code class="ph codeph">CREATE TABLE AS SELECT</code> operation to create a table and
+copy data into it, only learning the types of the columns by doing a <code class="ph codeph">DESCRIBE</code> afterward.
+This technique is especially useful for arithmetic expressions involving <code class="ph codeph">DECIMAL</code> types,
+because the precision and scale of the result is typically different than that of the operands.
+</p>
+<p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
+      </p>
+<p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+<p class="p">
+These examples show how to check the type of a simple literal or function value.
+Notice how adding even tiny integers together changes the data type of the result to
+avoid overflow, and how the results of arithmetic operations on <code class="ph codeph">DECIMAL</code> values
+have specific precision and scale attributes.
+</p>
+<pre class="pre codeblock"><code>select typeof(2)
++-----------+
+| typeof(2) |
++-----------+
+| TINYINT   |
++-----------+
+
+select typeof(2+2)
++---------------+
+| typeof(2 + 2) |
++---------------+
+| SMALLINT      |
++---------------+
+
+select typeof('xyz')
++---------------+
+| typeof('xyz') |
++---------------+
+| STRING        |
++---------------+
+
+select typeof(now())
++---------------+
+| typeof(now()) |
++---------------+
+| TIMESTAMP     |
++---------------+
+
+select typeof(5.3 / 2.1)
++-------------------+
+| typeof(5.3 / 2.1) |
++-------------------+
+| DECIMAL(6,4)      |
++-------------------+
+
+select typeof(5.30001 / 2342.1);
++--------------------------+
+| typeof(5.30001 / 2342.1) |
++--------------------------+
+| DECIMAL(13,11)           |
++--------------------------+
+
+select typeof(typeof(2+2))
++-----------------------+
+| typeof(typeof(2 + 2)) |
++-----------------------+
+| STRING                |
++-----------------------+
+</code></pre>
+
+<p class="p">
+This example shows how even if you do not have a record of the type of a column,
+for example because the type was changed by <code class="ph codeph">ALTER TABLE</code> after the
+original <code class="ph codeph">CREATE TABLE</code>, you can still find out the type in a
+more compact form than examining the full <code class="ph codeph">DESCRIBE</code> output.
+Remember to use <code class="ph codeph">LIMIT 1</code> in such cases, to avoid an identical
+result value for every row in the table.
+</p>
+<pre class="pre codeblock"><code>create table typeof_example (a int, b tinyint, c smallint, d bigint);
+
+/* Empty result set if there is no data in the table. */
+select typeof(a) from typeof_example;
+
+/* OK, now we have some data but the type of column A is being changed. */
+insert into typeof_example values (1, 2, 3, 4);
+alter table typeof_example change a a bigint;
+
+/* We can always find out the current type of that column without doing a full DESCRIBE. */
+select typeof(a) from typeof_example limit 1;
++-----------+
+| typeof(a) |
++-----------+
+| BIGINT    |
++-----------+
+</code></pre>
+<p class="p">
+This example shows how you might programmatically generate a <code class="ph codeph">CREATE TABLE</code> statement
+with the appropriate column definitions to hold the result values of arbitrary expressions.
+The <code class="ph codeph">typeof()</code> function lets you construct a detailed <code class="ph codeph">CREATE TABLE</code> statement
+without actually creating the table, as opposed to <code class="ph codeph">CREATE TABLE AS SELECT</code> operations
+where you create the destination table but only learn the column data types afterward through <code class="ph codeph">DESCRIBE</code>.
+</p>
+<pre class="pre codeblock"><code>describe typeof_example;
++------+----------+---------+
+| name | type     | comment |
++------+----------+---------+
+| a    | bigint   |         |
+| b    | tinyint  |         |
+| c    | smallint |         |
+| d    | bigint   |         |
++------+----------+---------+
+
+/* An ETL or business intelligence tool might create variations on a table with different file formats,
+   different sets of columns, and so on. TYPEOF() lets an application introspect the types of the original columns. */
+select concat('create table derived_table (a ', typeof(a), ', b ', typeof(b), ', c ',
+    typeof(c), ', d ', typeof(d), ') stored as parquet;')
+  as 'create table statement'
+from typeof_example limit 1;
++-------------------------------------------------------------------------------------------+
+| create table statement                                                                    |
++-------------------------------------------------------------------------------------------+
+| create table derived_table (a BIGINT, b TINYINT, c SMALLINT, d BIGINT) stored as parquet; |
++-------------------------------------------------------------------------------------------+
+</code></pre>
+</dd>
+
+
+</dl>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div></div></nav></article></main></body></html>

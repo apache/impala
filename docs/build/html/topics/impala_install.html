@@ -1,0 +1,126 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="install"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Installing Impala</title></head><body id="install"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1"><span class="ph">Installing Impala</span></h1>
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      
+      
+      
+      
+      
+      
+      
+      Impala is an open-source analytic database for Apache Hadoop
+      that returns rapid responses to queries.
+    </p>
+
+    <p class="p">
+      Follow these steps to set up Impala on a cluster by building from source:
+    </p>
+
+
+
+    <ul class="ul">
+      <li class="li">
+        <p class="p">
+          Download the latest release. See
+          <a class="xref" href="http://impala.apache.org/downloads.html" target="_blank">the Impala downloads page</a>
+          for the link to the latest release.
+        </p>
+      </li>
+      <li class="li">
+        <p class="p">
+          Check the <span class="ph filepath">README.md</span> file for a pointer
+          to the build instructions.
+        </p>
+      </li>
+      <li class="li">
+        <p class="p">
+          Please check the MD5 and SHA1 and GPG signature, the latter by using the code signing keys of the release managers.
+        </p>
+      </li>
+      <li class="li">
+        <div class="p">
+          Developers interested in working on Impala can clone the Impala source repository:
+<pre class="pre codeblock"><code>
+git clone https://git-wip-us.apache.org/repos/asf/incubator-impala.git
+</code></pre>
+        </div>
+      </li>
+    </ul>
+
+  </div>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="install__install_details">
+
+    <h2 class="title topictitle2" id="ariaid-title2">What is Included in an Impala Installation</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Impala is made up of a set of components that can be installed on multiple nodes throughout your cluster.
+        The key installation step for performance is to install the <span class="keyword cmdname">impalad</span> daemon (which does
+        most of the query processing work) on <em class="ph i">all</em> DataNodes in the cluster.
+      </p>
+
+      <p class="p">
+        The Impala package installs these binaries:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            <span class="keyword cmdname">impalad</span> - The Impala daemon. Plans and executes queries against HDFS, HBase, <span class="ph">and Amazon S3 data</span>.
+            <a class="xref" href="impala_processes.html#processes">Run one impalad process</a> on each node in the cluster
+            that has a DataNode.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            <span class="keyword cmdname">statestored</span> - Name service that tracks location and status of all
+            <code class="ph codeph">impalad</code> instances in the cluster. <a class="xref" href="impala_processes.html#processes">Run one
+            instance of this daemon</a> on a node in your cluster. Most production deployments run this daemon
+            on the namenode.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            <span class="keyword cmdname">catalogd</span> - Metadata coordination service that broadcasts changes from Impala DDL and
+            DML statements to all affected Impala nodes, so that new tables, newly loaded data, and so on are
+            immediately visible to queries submitted through any Impala node.
+
+            (Prior to Impala 1.2, you had to run the <code class="ph codeph">REFRESH</code> or <code class="ph codeph">INVALIDATE
+            METADATA</code> statement on each node to synchronize changed metadata. Now those statements are only
+            required if you perform the DDL or DML through an external mechanism such as Hive <span class="ph">or by uploading
+            data to the Amazon S3 filesystem</span>.)
+            <a class="xref" href="impala_processes.html#processes">Run one instance of this daemon</a> on a node in your cluster,
+            preferably on the same host as the <code class="ph codeph">statestored</code> daemon.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            <span class="keyword cmdname">impala-shell</span> - <a class="xref" href="impala_impala_shell.html#impala_shell">Command-line
+            interface</a> for issuing queries to the Impala daemon. You install this on one or more hosts
+            anywhere on your network, not necessarily DataNodes or even within the same cluster as Impala. It can
+            connect remotely to any instance of the Impala daemon.
+          </p>
+        </li>
+      </ul>
+
+      <p class="p">
+        Before doing the installation, ensure that you have all necessary prerequisites. See
+        <a class="xref" href="impala_prereqs.html#prereqs">Impala Requirements</a> for details.
+      </p>
+    </div>
+  </article>
+
+</article></main></body></html>

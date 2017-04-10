@@ -1,0 +1,50 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="disable_streaming_preaggregations"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DISABLE_STREAMING_PREAGGREGATIONS Query Option (Impala 2.5 or higher only)</title></head><body id="disable_streaming_preaggregations"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">DISABLE_STREAMING_PREAGGREGATIONS Query Option (<span class="keyword">Impala 2.5</span> or higher only)</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Turns off the <span class="q">"streaming preaggregation"</span> optimization that is available in <span class="keyword">Impala 2.5</span>
+      and higher. This optimization reduces unnecessary work performed by queries that perform aggregation
+      operations on columns with few or no duplicate values, for example <code class="ph codeph">DISTINCT <var class="keyword varname">id_column</var></code>
+      or <code class="ph codeph">GROUP BY <var class="keyword varname">unique_column</var></code>. If the optimization causes regressions in
+      existing queries that use aggregation functions, you can turn it off as needed by setting this query option.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and <code class="ph codeph">false</code>;
+        any other value interpreted as <code class="ph codeph">false</code>
+      </p>
+    <p class="p">
+        <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code> statement)
+      </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        In <span class="keyword">Impala 2.5.0</span>, only the value 1 enables the option, and the value
+        <code class="ph codeph">true</code> is not recognized. This limitation is
+        tracked by the issue
+        <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-3334" target="_blank">IMPALA-3334</a>,
+        which shows the releases where the problem is fixed.
+      </div>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+    <p class="p">
+      Typically, queries that would require enabling this option involve very large numbers of
+      aggregated values, such as a billion or more distinct keys being processed on each
+      worker node.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.5.0</span>
+      </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

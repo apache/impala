@@ -1,0 +1,89 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_isilon"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala with Isilon Storage</title></head><body id="impala_isilon"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Using Impala with Isilon Storage</h1>
+  
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      You can use Impala to query data files that reside on EMC Isilon storage devices, rather than in HDFS.
+      This capability allows convenient query access to a storage system where you might already be
+      managing large volumes of data. The combination of the Impala query engine and Isilon storage is
+      certified on <span class="keyword">Impala 2.2.4</span> or higher.
+    </p>
+
+    <div class="p">
+        Because the EMC Isilon storage devices use a global value for the block size
+        rather than a configurable value for each file, the <code class="ph codeph">PARQUET_FILE_SIZE</code>
+        query option has no effect when Impala inserts data into a table or partition
+        residing on Isilon storage. Use the <code class="ph codeph">isi</code> command to set the
+        default block size globally on the Isilon device. For example, to set the
+        Isilon default block size to 256 MB, the recommended size for Parquet
+        data files for Impala, issue the following command:
+<pre class="pre codeblock"><code>isi hdfs settings modify --default-block-size=256MB</code></pre>
+      </div>
+
+    <p class="p">
+      The typical use case for Impala and Isilon together is to use Isilon for the
+      default filesystem, replacing HDFS entirely. In this configuration,
+      when you create a database, table, or partition, the data always resides on
+      Isilon storage and you do not need to specify any special <code class="ph codeph">LOCATION</code>
+      attribute. If you do specify a <code class="ph codeph">LOCATION</code> attribute, its value refers
+      to a path within the Isilon filesystem.
+      For example:
+    </p>
+<pre class="pre codeblock"><code>-- If the default filesystem is Isilon, all Impala data resides there
+-- and all Impala databases and tables are located there.
+CREATE TABLE t1 (x INT, s STRING);
+
+-- You can specify LOCATION for database, table, or partition,
+-- using values from the Isilon filesystem.
+CREATE DATABASE d1 LOCATION '/some/path/on/isilon/server/d1.db';
+CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
+</code></pre>
+
+    <p class="p">
+      Impala can write to, delete, and rename data files and database, table,
+      and partition directories on Isilon storage. Therefore, Impala statements such
+      as
+      <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">DROP TABLE</code>,
+      <code class="ph codeph">CREATE DATABASE</code>, <code class="ph codeph">DROP DATABASE</code>,
+      <code class="ph codeph">ALTER TABLE</code>,
+      and
+      <code class="ph codeph">INSERT</code> work the same with Isilon storage as with HDFS.
+    </p>
+
+    <p class="p">
+      When the Impala spill-to-disk feature is activated by a query that approaches
+      the memory limit, Impala writes all the temporary data to a local (not Isilon)
+      storage device. Because the I/O bandwidth for the temporary data depends on
+      the number of local disks, and clusters using Isilon storage might not have
+      as many local disks attached, pay special attention on Isilon-enabled clusters
+      to any queries that use the spill-to-disk feature. Where practical, tune the
+      queries or allocate extra memory for Impala to avoid spilling.
+      Although you can specify an Isilon storage device as the destination for
+      the temporary data for the spill-to-disk feature, that configuration is
+      not recommended due to the need to transfer the data both ways using remote I/O.
+    </p>
+
+    <p class="p">
+      When tuning Impala queries on HDFS, you typically try to avoid any remote reads.
+      When the data resides on Isilon storage, all the I/O consists of remote reads.
+      Do not be alarmed when you see non-zero numbers for remote read measurements
+      in query profile output. The benefit of the Impala and Isilon integration is
+      primarily convenience of not having to move or copy large volumes of data to HDFS,
+      rather than raw query performance. You can increase the performance of Impala
+      I/O for Isilon systems by increasing the value for the
+      <code class="ph codeph">--num_remote_hdfs_io_threads</code> startup option for the
+      <span class="keyword cmdname">impalad</span> daemon.
+    </p>
+
+    
+  </div>
+
+</article></main></body></html>

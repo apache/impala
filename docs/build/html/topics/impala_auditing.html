@@ -1,0 +1,222 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="auditing"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Auditing Impala Operations</title></head><body id="auditing"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Auditing Impala Operations</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      To monitor how Impala data is being used within your organization, ensure
+      that your Impala authorization and authentication policies are effective.
+      To detect attempts at intrusion or unauthorized access to Impala
+      data, you can use the auditing feature in Impala 1.2.1 and higher:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        Enable auditing by including the option
+        <code class="ph codeph">-audit_event_log_dir=<var class="keyword varname">directory_path</var></code>
+        in your <span class="keyword cmdname">impalad</span> startup options.
+        The log directory must be a local directory on the
+        server, not an HDFS directory.
+      </li>
+
+      <li class="li">
+        Decide how many queries will be represented in each log file. By default,
+        Impala starts a new log file every 5000 queries. To specify a different number,
+        <span class="ph">include
+        the option <code class="ph codeph">-max_audit_event_log_file_size=<var class="keyword varname">number_of_queries</var></code>
+        in the <span class="keyword cmdname">impalad</span> startup options</span>.
+      </li>
+
+      <li class="li"> 
+        Use a cluster manager with governance capabilities to filter, visualize,
+        and produce reports based on the audit logs collected
+        from all the hosts in the cluster. 
+      </li>
+    </ul>
+
+    <p class="p toc inpage"></p>
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_security.html">Impala Security</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="auditing__auditing_performance">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Durability and Performance Considerations for Impala Auditing</h2>
+  
+
+    <div class="body conbody">
+
+      <p class="p">
+        The auditing feature only imposes performance overhead while auditing is enabled.
+      </p>
+
+      <p class="p">
+        Because any Impala host can process a query, enable auditing on all hosts where the
+        <span class="ph"><span class="keyword cmdname">impalad</span> daemon</span>
+         runs. Each host stores its own log
+        files, in a directory in the local filesystem. The log data is periodically flushed to disk (through an
+        <code class="ph codeph">fsync()</code> system call) to avoid loss of audit data in case of a crash.
+      </p>
+
+      <p class="p"> 
+        The runtime overhead of auditing applies to whichever host serves as the coordinator
+        for the query, that is, the host you connect to when you issue the query. This might
+        be the same host for all queries, or different applications or users might connect to
+        and issue queries through different hosts. 
+      </p>
+
+      <p class="p"> 
+        To avoid excessive I/O overhead on busy coordinator hosts, Impala syncs the audit log
+        data (using the <code class="ph codeph">fsync()</code> system call) periodically rather than after
+        every query. Currently, the <code class="ph codeph">fsync()</code> calls are issued at a fixed
+        interval, every 5 seconds. 
+      </p>
+
+      <p class="p">
+        By default, Impala avoids losing any audit log data in the case of an error during a logging operation
+        (such as a disk full error), by immediately shutting down
+        <span class="keyword cmdname">impalad</span> on the host where the auditing problem occurred.
+        <span class="ph">You can override this setting by specifying the option
+        <code class="ph codeph">-abort_on_failed_audit_event=false</code> in the <span class="keyword cmdname">impalad</span> startup options.</span>
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="auditing__auditing_format">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Format of the Audit Log Files</h2>
+  
+
+    <div class="body conbody">
+
+      <p class="p"> 
+        The audit log files represent the query information in JSON format, one query per line.
+        Typically, rather than looking at the log files themselves, you should use cluster-management
+        software to consolidate the log data from all Impala hosts and filter and visualize the results
+        in useful ways. (If you do examine the raw log data, you might run the files through
+        a JSON pretty-printer first.) 
+     </p>
+
+      <p class="p">
+        All the information about schema objects accessed by the query is encoded in a single nested record on the
+        same line. For example, the audit log for an <code class="ph codeph">INSERT ... SELECT</code> statement records that a
+        select operation occurs on the source table and an insert operation occurs on the destination table. The
+        audit log for a query against a view records the base table accessed by the view, or multiple base tables
+        in the case of a view that includes a join query. Every Impala operation that corresponds to a SQL
+        statement is recorded in the audit logs, whether the operation succeeds or fails. Impala records more
+        information for a successful operation than for a failed one, because an unauthorized query is stopped
+        immediately, before all the query planning is completed.
+      </p>
+
+
+
+      <p class="p">
+        The information logged for each query includes:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          Client session state:
+          <ul class="ul">
+            <li class="li">
+              Session ID
+            </li>
+
+            <li class="li">
+              User name
+            </li>
+
+            <li class="li">
+              Network address of the client connection
+            </li>
+          </ul>
+        </li>
+
+        <li class="li">
+          SQL statement details:
+          <ul class="ul">
+            <li class="li">
+              Query ID
+            </li>
+
+            <li class="li">
+              Statement Type - DML, DDL, and so on
+            </li>
+
+            <li class="li">
+              SQL statement text
+            </li>
+
+            <li class="li">
+              Execution start time, in local time
+            </li>
+
+            <li class="li">
+              Execution Status - Details on any errors that were encountered
+            </li>
+
+            <li class="li">
+              Target Catalog Objects:
+              <ul class="ul">
+                <li class="li">
+                  Object Type - Table, View, or Database
+                </li>
+
+                <li class="li">
+                  Fully qualified object name
+                </li>
+
+                <li class="li">
+                  Privilege - How the object is being used (<code class="ph codeph">SELECT</code>, <code class="ph codeph">INSERT</code>,
+                  <code class="ph codeph">CREATE</code>, and so on)
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+      </ul>
+
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="auditing__auditing_exceptions">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Which Operations Are Audited</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        The kinds of SQL queries represented in the audit log are:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          Queries that are prevented due to lack of authorization.
+        </li>
+
+        <li class="li">
+          Queries that Impala can analyze and parse to determine that they are authorized. The audit data is
+          recorded immediately after Impala finishes its analysis, before the query is actually executed.
+        </li>
+      </ul>
+
+      <p class="p">
+        The audit log does not contain entries for queries that could not be parsed and analyzed. For example, a
+        query that fails due to a syntax error is not recorded in the audit log. The audit log also does not
+        contain queries that fail due to a reference to a table that does not exist, if you would be authorized to
+        access the table if it did exist.
+      </p>
+
+      <p class="p">
+        Certain statements in the <span class="keyword cmdname">impala-shell</span> interpreter, such as <code class="ph codeph">CONNECT</code>,
+        <code class="ph codeph">SUMMARY</code>, <code class="ph codeph">PROFILE</code>, <code class="ph codeph">SET</code>, and
+        <code class="ph codeph">QUIT</code>, do not correspond to actual SQL queries, and these statements are not reflected in
+        the audit log.
+      </p>
+    </div>
+  </article>
+</article></main></body></html>

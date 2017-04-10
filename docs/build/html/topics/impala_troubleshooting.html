@@ -1,0 +1,370 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_webui.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_breakpad.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="troubleshooting"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Troubleshooting Impala</title></head><body id="troubleshooting"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Troubleshooting Impala</h1>
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Troubleshooting for Impala requires being able to diagnose and debug problems
+      with performance, network connectivity, out-of-memory conditions, disk space usage,
+      and crash or hang conditions in any of the Impala-related daemons.
+    </p>
+
+    <p class="p toc inpage">
+      The following sections describe the general troubleshooting procedures to diagnose
+      different kinds of problems:
+    </p>
+
+  </div>
+
+  <nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_webui.html">Impala Web User Interface for Debugging</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_breakpad.html">Breakpad Minidumps for Impala (Impala 2.6 or higher only)</a></strong><br></li></ul></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="troubleshooting__trouble_sql">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Troubleshooting Impala SQL Syntax Issues</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        In general, if queries issued against Impala fail, you can try running these same queries against Hive.
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          If a query fails against both Impala and Hive, it is likely that there is a problem with your query or
+          other elements of your <span class="keyword"></span> environment:
+          <ul class="ul">
+            <li class="li">
+              Review the <a class="xref" href="impala_langref.html#langref">Language Reference</a> to ensure your query is
+              valid.
+            </li>
+
+            <li class="li">
+              Check <a class="xref" href="impala_reserved_words.html#reserved_words">Impala Reserved Words</a> to see if any database, table,
+              column, or other object names in your query conflict with Impala reserved words.
+              Quote those names with backticks (<code class="ph codeph">``</code>) if so.
+            </li>
+
+            <li class="li">
+              Check <a class="xref" href="impala_functions.html#builtins">Impala Built-In Functions</a> to confirm whether Impala supports all the
+              built-in functions being used by your query, and whether argument and return types are the
+              same as you expect.
+            </li>
+
+            <li class="li">
+              Review the <a class="xref" href="impala_logging.html#logs_debug">contents of the Impala logs</a> for any information that may be useful in identifying the
+              source of the problem.
+            </li>
+          </ul>
+        </li>
+
+        <li class="li">
+          If a query fails against Impala but not Hive, it is likely that there is a problem with your Impala
+          installation.
+        </li>
+      </ul>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="troubleshooting__trouble_io">
+    <h2 class="title topictitle2" id="ariaid-title3">Troubleshooting I/O Capacity Problems</h2>
+    <div class="body conbody">
+      <p class="p">
+        Impala queries are typically I/O-intensive. If there is an I/O problem with storage devices,
+        or with HDFS itself, Impala queries could show slow response times with no obvious cause
+        on the Impala side. Slow I/O on even a single DataNode could result in an overall slowdown, because
+        queries involving clauses such as <code class="ph codeph">ORDER BY</code>, <code class="ph codeph">GROUP BY</code>, or <code class="ph codeph">JOIN</code>
+        do not start returning results until all DataNodes have finished their work.
+      </p>
+      <p class="p">
+        To test whether the Linux I/O system itself is performing as expected, run Linux commands like
+        the following on each DataNode:
+      </p>
+<pre class="pre codeblock"><code>
+$ sudo sysctl -w vm.drop_caches=3 vm.drop_caches=0
+vm.drop_caches = 3
+vm.drop_caches = 0
+$ sudo dd if=/dev/sda bs=1M of=/dev/null count=1k 
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB) copied, 5.60373 s, 192 MB/s
+$ sudo dd if=/dev/sdb bs=1M of=/dev/null count=1k
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB) copied, 5.51145 s, 195 MB/s
+$ sudo dd if=/dev/sdc bs=1M of=/dev/null count=1k
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB) copied, 5.58096 s, 192 MB/s
+$ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB) copied, 5.43924 s, 197 MB/s
+</code></pre>
+      <p class="p">
+        On modern hardware, a throughput rate of less than 100 MB/s typically indicates
+        a performance issue with the storage device. Correct the hardware problem before
+        continuing with Impala tuning or benchmarking.
+      </p>
+    </div>
+  </article>
+
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="troubleshooting__trouble_cookbook">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Impala Troubleshooting Quick Reference</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        The following table lists common problems and potential solutions.
+      </p>
+
+      <table class="table"><caption></caption><colgroup><col style="width:14.285714285714285%"><col style="width:42.857142857142854%"><col style="width:42.857142857142854%"></colgroup><thead class="thead">
+            <tr class="row">
+              <th class="entry nocellnorowborder" id="trouble_cookbook__entry__1">
+                Symptom
+              </th>
+              <th class="entry nocellnorowborder" id="trouble_cookbook__entry__2">
+                Explanation
+              </th>
+              <th class="entry nocellnorowborder" id="trouble_cookbook__entry__3">
+                Recommendation
+              </th>
+            </tr>
+          </thead><tbody class="tbody">
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__1 ">
+                Impala takes a long time to start.
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__2 ">
+                Impala instances with large numbers of tables, partitions, or data files take longer to start
+                because the metadata for these objects is broadcast to all <span class="keyword cmdname">impalad</span> nodes and
+                cached.
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__3 ">
+                Adjust timeout and synchronicity settings.
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__1 ">
+                <p class="p">
+                  Joins fail to complete.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__2 ">
+                <p class="p">
+                  There may be insufficient memory. During a join, data from the second, third, and so on sets to
+                  be joined is loaded into memory. If Impala chooses an inefficient join order or join mechanism,
+                  the query could exceed the total memory available.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__3 ">
+                <p class="p">
+                  Start by gathering statistics with the <code class="ph codeph">COMPUTE STATS</code> statement for each table
+                  involved in the join. Consider specifying the <code class="ph codeph">[SHUFFLE]</code> hint so that data from
+                  the joined tables is split up between nodes rather than broadcast to each node. If tuning at the
+                  SQL level is not sufficient, add more memory to your system or join smaller data sets.
+                </p>
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__1 ">
+                <p class="p">
+                  Queries return incorrect results.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__2 ">
+                <p class="p">
+                  Impala metadata may be outdated after changes are performed in Hive.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__3 ">
+                <p class="p">
+                  Where possible, use the appropriate Impala statement (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
+                  DATA</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">ALTER TABLE</code>, <code class="ph codeph">COMPUTE
+                  STATS</code>, and so on) rather than switching back and forth between Impala and Hive. Impala
+                  automatically broadcasts the results of DDL and DML operations to all Impala nodes in the
+                  cluster, but does not automatically recognize when such changes are made through Hive. After
+                  inserting data, adding a partition, or other operation in Hive, refresh the metadata for the
+                  table as described in <a class="xref" href="impala_refresh.html#refresh">REFRESH Statement</a>.
+                </p>
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__1 ">
+                <p class="p">
+                  Queries are slow to return results.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__2 ">
+                <p class="p">
+                  Some <code class="ph codeph">impalad</code> instances may not have started. Using a browser, connect to the
+                  host running the Impala state store. Connect using an address of the form
+                  <code class="ph codeph">http://<var class="keyword varname">hostname</var>:<var class="keyword varname">port</var>/metrics</code>.
+                </p>
+
+                <div class="p">
+                  <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+                    Replace <var class="keyword varname">hostname</var> and <var class="keyword varname">port</var> with the hostname and port of
+                    your Impala state store host machine and web server port. The default port is 25010.
+                  </div>
+                  The number of <code class="ph codeph">impalad</code> instances listed should match the expected number of
+                  <code class="ph codeph">impalad</code> instances installed in the cluster. There should also be one
+                  <code class="ph codeph">impalad</code> instance installed on each DataNode
+                </div>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__3 ">
+                <p class="p">
+                  Ensure Impala is installed on all DataNodes. Start any <code class="ph codeph">impalad</code> instances that
+                  are not running.
+                </p>
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__1 ">
+                <p class="p">
+                  Queries are slow to return results.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__2 ">
+                <p class="p">
+                  Impala may not be configured to use native checksumming. Native checksumming uses
+                  machine-specific instructions to compute checksums over HDFS data very quickly. Review Impala
+                  logs. If you find instances of "<code class="ph codeph">INFO util.NativeCodeLoader: Loaded the
+                  native-hadoop</code>" messages, native checksumming is not enabled.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__3 ">
+                <p class="p">
+                  Ensure Impala is configured to use native checksumming as described in
+                  <a class="xref" href="impala_config_performance.html#config_performance">Post-Installation Configuration for Impala</a>.
+                </p>
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__1 ">
+                <p class="p">
+                  Queries are slow to return results.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__2 ">
+                <p class="p">
+                  Impala may not be configured to use data locality tracking.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__3 ">
+                <p class="p">
+                  Test Impala for data locality tracking and make configuration changes as necessary. Information
+                  on this process can be found in <a class="xref" href="impala_config_performance.html#config_performance">Post-Installation Configuration for Impala</a>.
+                </p>
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__1 ">
+                <p class="p">
+                  Attempts to complete Impala tasks such as executing INSERT-SELECT actions fail. The Impala logs
+                  include notes that files could not be opened due to permission denied.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__2 ">
+                <p class="p">
+                  This can be the result of permissions issues. For example, you could use the Hive shell as the
+                  hive user to create a table. After creating this table, you could attempt to complete some
+                  action, such as an INSERT-SELECT on the table. Because the table was created using one user and
+                  the INSERT-SELECT is attempted by another, this action may fail due to permissions issues.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__3 ">
+                <p class="p">
+                  In general, ensure the Impala user has sufficient permissions. In the preceding example, ensure
+                  the Impala user has sufficient permissions to the table that the Hive user created.
+                </p>
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__1 ">
+                <p class="p">
+                  Impala fails to start up, with the <span class="keyword cmdname">impalad</span> logs referring to errors connecting
+                  to the statestore service and attempts to re-register.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__2 ">
+                <p class="p">
+                  A large number of databases, tables, partitions, and so on can require metadata synchronization,
+                  particularly on startup, that takes longer than the default timeout for the statestore service.
+                </p>
+              </td>
+              <td class="entry nocellnorowborder" headers="trouble_cookbook__entry__3 ">
+                <p class="p">
+                  Configure the statestore timeout value and possibly other settings related to the frequency of
+                  statestore updates and metadata loading. See
+                  <a class="xref" href="impala_timeouts.html#statestore_timeout">Increasing the Statestore Timeout</a> and
+                  <a class="xref" href="impala_scalability.html#statestore_scalability">Scalability Considerations for the Impala Statestore</a>.
+                </p>
+              </td>
+            </tr>
+          </tbody></table>
+
+      
+    </div>
+  </article>
+
+  
+
+  
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="troubleshooting__webui_snippet">
+    <h2 class="title topictitle2" id="ariaid-title5">Impala Web User Interface for Debugging</h2>
+    <div class="body conbody">
+      <div class="p">
+      
+      
+      Each of the Impala daemons (<span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">statestored</span>,
+      and <span class="keyword cmdname">catalogd</span>) includes a built-in web server that displays
+      diagnostic and status information:
+      <ul class="ul">
+      <li class="li">
+        <p class="p">
+          The <span class="keyword cmdname">impalad</span> web UI (default port: 25000) includes
+          information about configuration settings, running and completed queries, and associated performance and
+          resource usage for queries. In particular, the <span class="ph uicontrol">Details</span> link for each query displays
+          alternative views of the query including a graphical representation of the plan, and the
+          output of the <code class="ph codeph">EXPLAIN</code>, <code class="ph codeph">SUMMARY</code>, and <code class="ph codeph">PROFILE</code>
+          statements from <span class="keyword cmdname">impala-shell</span>.
+          Each host that runs the <span class="keyword cmdname">impalad</span> daemon has
+          its own instance of the web UI, with details about those queries for which that
+          host served as the coordinator. The <span class="keyword cmdname">impalad</span> web UI is mainly
+          for diagnosing query problems that can be traced to a particular node.
+        </p>
+      </li>
+      <li class="li">
+        <p class="p">
+          The <span class="keyword cmdname">statestored</span> web UI (default port: 25010) includes
+          information about memory usage, configuration settings, and ongoing health checks
+          performed by this daemon. Because there is only a single instance of this
+          daemon within any cluster, you view the web UI only on the particular host
+          that serves as the Impala Statestore.
+        </p>
+      </li>
+      <li class="li">
+        <p class="p">
+          The <span class="keyword cmdname">catalogd</span> web UI (default port: 25020) includes
+          information about the databases, tables, and other objects managed by Impala,
+          in addition to the resource usage and configuration settings of the daemon itself.
+          The catalog information is represented as the underlying Thrift data structures.
+          Because there is only a single instance of this daemon within any cluster, you view the
+          web UI only on the particular host that serves as the Impala Catalog Server.
+        </p>
+      </li>
+      </ul>
+    </div>
+      <p class="p">
+        For full details, see <a class="xref" href="impala_webui.html#webui">Impala Web User Interface for Debugging</a>.
+      </p>
+    </div>
+  </article>
+
+</article></main></body></html>

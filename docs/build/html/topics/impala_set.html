@@ -1,0 +1,200 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="set"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>SET Statement</title></head><body id="set"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">SET Statement</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Specifies values for query options that control the runtime behavior of other statements within the same
+      session.
+    </p>
+
+    <p class="p">
+      In <span class="keyword">Impala 2.5</span> and higher, <code class="ph codeph">SET</code> also defines user-specified substitution variables for
+      the <span class="keyword cmdname">impala-shell</span> interpreter. This feature uses the <code class="ph codeph">SET</code> command
+      built into <span class="keyword cmdname">impala-shell</span> instead of the SQL <code class="ph codeph">SET</code> statement.
+      Therefore the substitution mechanism only works with queries processed by <span class="keyword cmdname">impala-shell</span>,
+      not with queries submitted through JDBC or ODBC.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>SET [<var class="keyword varname">query_option</var>=<var class="keyword varname">option_value</var>]
+</code></pre>
+
+    <p class="p">
+      <code class="ph codeph">SET</code> with no arguments returns a result set consisting of all available query options and
+      their current values.
+    </p>
+
+    <p class="p">
+      The query option name and any string argument values are case-insensitive.
+    </p>
+
+    <p class="p">
+      Each query option has a specific allowed notation for its arguments. Boolean options can be enabled and
+      disabled by assigning values of either <code class="ph codeph">true</code> and <code class="ph codeph">false</code>, or
+      <code class="ph codeph">1</code> and <code class="ph codeph">0</code>. Some numeric options accept a final character signifying the unit,
+      such as <code class="ph codeph">2g</code> for 2 gigabytes or <code class="ph codeph">100m</code> for 100 megabytes. See
+      <a class="xref" href="impala_query_options.html#query_options">Query Options for the SET Statement</a> for the details of each query option.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">User-specified substitution variables:</strong>
+    </p>
+
+    <p class="p">
+      In <span class="keyword">Impala 2.5</span> and higher, you can specify your own names and string substitution values
+      within the <span class="keyword cmdname">impala-shell</span> interpreter. Once a substitution variable is set up,
+      its value is inserted into any SQL statement in that same <span class="keyword cmdname">impala-shell</span> session
+      that contains the notation <code class="ph codeph">${var:<var class="keyword varname">varname</var>}</code>.
+      Using <code class="ph codeph">SET</code> in an interactive <span class="keyword cmdname">impala-shell</span> session overrides
+      any value for that same variable passed in through the <code class="ph codeph">--var=<var class="keyword varname">varname</var>=<var class="keyword varname">value</var></code>
+      command-line option.
+    </p>
+
+    <p class="p">
+      For example, to set up some default parameters for report queries, but then override those default
+      within an <span class="keyword cmdname">impala-shell</span> session, you might issue commands and statements such as
+      the following:
+    </p>
+
+<pre class="pre codeblock"><code>
+-- Initial setup for this example.
+create table staging_table (s string);
+insert into staging_table values ('foo'), ('bar'), ('bletch');
+
+create table production_table (s string);
+insert into production_table values ('North America'), ('EMEA'), ('Asia');
+quit;
+
+-- Start impala-shell with user-specified substitution variables,
+-- run a query, then override the variables with SET and run the query again.
+$ impala-shell --var=table_name=staging_table --var=cutoff=2
+... <var class="keyword varname">banner message</var> ...
+[localhost:21000] &gt; select s from ${var:table_name} order by s limit ${var:cutoff};
+Query: select s from staging_table order by s limit 2
++--------+
+| s      |
++--------+
+| bar    |
+| bletch |
++--------+
+Fetched 2 row(s) in 1.06s
+
+[localhost:21000] &gt; set var:table_name=production_table;
+Variable TABLE_NAME set to production_table
+[localhost:21000] &gt; set var:cutoff=3;
+Variable CUTOFF set to 3
+
+[localhost:21000] &gt; select s from ${var:table_name} order by s limit ${var:cutoff};
+Query: select s from production_table order by s limit 3
++---------------+
+| s             |
++---------------+
+| Asia          |
+| EMEA          |
+| North America |
++---------------+
+</code></pre>
+
+    <p class="p">
+      The following example shows how <code class="ph codeph">SET</code> with no parameters displays
+      all user-specified substitution variables, and how <code class="ph codeph">UNSET</code> removes
+      the substitution variable entirely:
+    </p>
+
+<pre class="pre codeblock"><code>
+[localhost:21000] &gt; set;
+Query options (defaults shown in []):
+  ABORT_ON_DEFAULT_LIMIT_EXCEEDED: [0]
+  ...
+  V_CPU_CORES: [0]
+
+Shell Options
+  LIVE_PROGRESS: False
+  LIVE_SUMMARY: False
+
+Variables:
+  CUTOFF: 3
+  TABLE_NAME: staging_table
+
+[localhost:21000] &gt; unset var:cutoff;
+Unsetting variable CUTOFF
+[localhost:21000] &gt; select s from ${var:table_name} order by s limit ${var:cutoff};
+Error: Unknown variable CUTOFF
+</code></pre>
+
+    <p class="p">
+      See <a class="xref" href="impala_shell_running_commands.html">Running Commands and SQL Statements in impala-shell</a> for more examples of using the
+      <code class="ph codeph">--var</code>, <code class="ph codeph">SET</code>, and <code class="ph codeph">${var:<var class="keyword varname">varname</var>}</code>
+      substitution technique in <span class="keyword cmdname">impala-shell</span>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      <code class="ph codeph">MEM_LIMIT</code> is probably the most commonly used query option. You can specify a high value to
+      allow a resource-intensive query to complete. For testing how queries would work on memory-constrained
+      systems, you might specify an artificially low value.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      The following example sets some numeric and some Boolean query options to control usage of memory, disk
+      space, and timeout periods, then runs a query whose success could depend on the options in effect:
+    </p>
+
+<pre class="pre codeblock"><code>set mem_limit=64g;
+set DISABLE_UNSAFE_SPILLS=true;
+set parquet_file_size=400m;
+set RESERVATION_REQUEST_TIMEOUT=900000;
+insert overwrite parquet_table select c1, c2, count(c3) from text_table group by c1, c2, c3;
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
+      </p>
+
+    <p class="p">
+      <code class="ph codeph">SET</code> has always been available as an <span class="keyword cmdname">impala-shell</span> command. Promoting it to
+      a SQL statement lets you use this feature in client applications through the JDBC and ODBC APIs.
+    </p>
+
+
+
+    <p class="p">
+        <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">HDFS permissions:</strong> This statement does not touch any HDFS files or directories,
+        therefore no HDFS permissions are required.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      See <a class="xref" href="impala_query_options.html#query_options">Query Options for the SET Statement</a> for the query options you can adjust using this
+      statement.
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_query_options.html">Query Options for the SET Statement</a></strong><br></li></ul><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

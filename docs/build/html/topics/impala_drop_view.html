@@ -1,0 +1,80 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="drop_view"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DROP VIEW Statement</title></head><body id="drop_view"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">DROP VIEW Statement</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Removes the specified view, which was originally created by the <code class="ph codeph">CREATE VIEW</code> statement.
+      Because a view is purely a logical construct (an alias for a query) with no physical data behind it,
+      <code class="ph codeph">DROP VIEW</code> only involves changes to metadata in the metastore database, not any data files in
+      HDFS.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>DROP VIEW [IF EXISTS] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">view_name</var></code></pre>
+
+    <p class="p">
+        <strong class="ph b">Statement type:</strong> DDL
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">HDFS permissions:</strong> This statement does not touch any HDFS files or directories,
+        therefore no HDFS permissions are required.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <div class="p">
+        The following example creates a series of views and then drops them. These examples illustrate how views
+        are associated with a particular database, and both the view definitions and the view names for
+        <code class="ph codeph">CREATE VIEW</code> and <code class="ph codeph">DROP VIEW</code> can refer to a view in the current database or
+        a fully qualified view name.
+<pre class="pre codeblock"><code>
+-- Create and drop a view in the current database.
+CREATE VIEW few_rows_from_t1 AS SELECT * FROM t1 LIMIT 10;
+DROP VIEW few_rows_from_t1;
+
+-- Create and drop a view referencing a table in a different database.
+CREATE VIEW table_from_other_db AS SELECT x FROM db1.foo WHERE x IS NOT NULL;
+DROP VIEW table_from_other_db;
+
+USE db1;
+-- Create a view in a different database.
+CREATE VIEW db2.v1 AS SELECT * FROM db2.foo;
+-- Switch into the other database and drop the view.
+USE db2;
+DROP VIEW v1;
+
+USE db1;
+-- Create a view in a different database.
+CREATE VIEW db2.v1 AS SELECT * FROM db2.foo;
+-- Drop a view in the other database.
+DROP VIEW db2.v1;
+</code></pre>
+      </div>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_views.html#views">Overview of Impala Views</a>, <a class="xref" href="impala_create_view.html#create_view">CREATE VIEW Statement</a>,
+      <a class="xref" href="impala_alter_view.html#alter_view">ALTER VIEW Statement</a>
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

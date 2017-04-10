@@ -1,0 +1,125 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="smallint"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>SMALLINT Data Type</title></head><body id="smallint"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">SMALLINT Data Type</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      A 2-byte integer data type used in <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER TABLE</code> statements.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+    <p class="p">
+      In the column definition of a <code class="ph codeph">CREATE TABLE</code> statement:
+    </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">column_name</var> SMALLINT</code></pre>
+
+    <p class="p">
+      <strong class="ph b">Range:</strong> -32768 .. 32767. There is no <code class="ph codeph">UNSIGNED</code> subtype.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Conversions:</strong> Impala automatically converts to a larger integer type (<code class="ph codeph">INT</code> or
+      <code class="ph codeph">BIGINT</code>) or a floating-point type (<code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>)
+      automatically. Use <code class="ph codeph">CAST()</code> to convert to <code class="ph codeph">TINYINT</code>, <code class="ph codeph">STRING</code>,
+      or <code class="ph codeph">TIMESTAMP</code>.
+      <span class="ph">Casting an integer or floating-point value <code class="ph codeph">N</code> to
+        <code class="ph codeph">TIMESTAMP</code> produces a value that is <code class="ph codeph">N</code> seconds past the start of the epoch
+        date (January 1, 1970). By default, the result value represents a date and time in the UTC time zone.
+        If the setting <code class="ph codeph">-use_local_tz_for_unix_timestamp_conversions=true</code> is in effect,
+        the resulting <code class="ph codeph">TIMESTAMP</code> represents a date and time in the local time zone.</span>
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      For a convenient and automated way to check the bounds of the <code class="ph codeph">SMALLINT</code> type, call the
+      functions <code class="ph codeph">MIN_SMALLINT()</code> and <code class="ph codeph">MAX_SMALLINT()</code>.
+    </p>
+
+    <p class="p">
+      If an integer value is too large to be represented as a <code class="ph codeph">SMALLINT</code>, use an
+      <code class="ph codeph">INT</code> instead.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">NULL considerations:</strong> Casting any non-numeric value to this type produces a <code class="ph codeph">NULL</code>
+        value.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>CREATE TABLE t1 (x SMALLINT);
+SELECT CAST(1000 AS SMALLINT);
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Parquet considerations:</strong>
+      </p>
+
+
+
+    <p class="p">
+      Physically, Parquet files represent <code class="ph codeph">TINYINT</code> and <code class="ph codeph">SMALLINT</code> values as 32-bit
+      integers. Although Impala rejects attempts to insert out-of-range values into such columns, if you create a
+      new table with the <code class="ph codeph">CREATE TABLE ... LIKE PARQUET</code> syntax, any <code class="ph codeph">TINYINT</code> or
+      <code class="ph codeph">SMALLINT</code> columns in the original table turn into <code class="ph codeph">INT</code> columns in the new
+      table.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Partitioning:</strong> Prefer to use this type for a partition key column. Impala can process the numeric
+        type more efficiently than a <code class="ph codeph">STRING</code> representation of the value.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">HBase considerations:</strong> This data type is fully compatible with HBase tables.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text tables than in tables
+        using Parquet or other binary formats.
+      </p>
+
+
+
+    <p class="p">
+        <strong class="ph b">Internal details:</strong> Represented in memory as a 2-byte value.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> Available in all versions of Impala.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum and average size
+        fields are always filled in for column statistics, even before you run the <code class="ph codeph">COMPUTE STATS</code>
+        statement.
+      </p>
+
+
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_literals.html#numeric_literals">Numeric Literals</a>, <a class="xref" href="impala_tinyint.html#tinyint">TINYINT Data Type</a>,
+      <a class="xref" href="impala_smallint.html#smallint">SMALLINT Data Type</a>, <a class="xref" href="impala_int.html#int">INT Data Type</a>,
+      <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>, <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type (Impala 1.4 or higher only)</a>,
+      <a class="xref" href="impala_math_functions.html#math_functions">Impala Mathematical Functions</a>
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div></div></nav></article></main></body></html>

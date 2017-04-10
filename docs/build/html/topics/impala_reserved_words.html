@@ -1,0 +1,357 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="reserved_words"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Reserved Words</title></head><body id="reserved_words"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Reserved Words</h1>
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      The following are the reserved words for the current release of Impala. A reserved word is one that
+      cannot be used directly as an identifier; you must quote it with backticks. For example, a statement
+      <code class="ph codeph">CREATE TABLE select (x INT)</code> fails, while <code class="ph codeph">CREATE TABLE `select` (x INT)</code>
+      succeeds. Impala does not reserve the names of aggregate or scalar built-in functions. (Formerly, Impala did
+      reserve the names of some aggregate functions.)
+    </p>
+
+    <p class="p">
+      Because different database systems have different sets of reserved words, and the reserved words change from
+      release to release, carefully consider database, table, and column names to ensure maximum compatibility
+      between products and versions.
+    </p>
+
+    <p class="p">
+      Because you might switch between Impala and Hive when doing analytics and ETL, also consider whether
+      your object names are the same as any Hive keywords, and rename or quote any that conflict. Consult the
+      <a class="xref" href="https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-Keywords,Non-reservedKeywordsandReservedKeywords" target="_blank">list of Hive keywords</a>.
+    </p>
+
+    <p class="p toc inpage"></p>
+
+  </div>
+
+<article class="topic concept nested1" aria-labelledby="ariaid-title2" id="reserved_words__reserved_words_current">
+<h2 class="title topictitle2" id="ariaid-title2">List of Current Reserved Words</h2>
+<div class="body conbody">
+
+
+<pre class="pre codeblock"><code>add
+aggregate
+all
+alter
+<span class="ph">analytic</span>
+and
+<span class="ph">anti</span>
+<span class="ph">api_version</span>
+as
+asc
+avro
+between
+bigint
+<span class="ph">binary</span>
+<span class="ph">blocksize</span>
+boolean
+
+by
+<span class="ph">cached</span>
+<span class="ph">cascade</span>
+case
+cast
+change
+<span class="ph">char</span>
+<span class="ph">class</span>
+<span class="ph">close_fn</span>
+column
+columns
+comment
+<span class="ph">compression</span>
+compute
+create
+cross
+<span class="ph">current</span>
+data
+database
+databases
+date
+datetime
+decimal
+<span class="ph">default</span>
+<span class="ph">delete</span>
+delimited
+desc
+describe
+distinct
+
+div
+double
+drop
+else
+<span class="ph">encoding</span>
+end
+escaped
+exists
+explain
+<span class="ph">extended</span>
+external
+false
+fields
+fileformat
+<span class="ph">finalize_fn</span>
+first
+float
+<span class="ph">following</span>
+<span class="ph">for</span>
+format
+formatted
+from
+full
+function
+functions
+<span class="ph">grant</span>
+group
+<span class="ph">hash</span>
+having
+if
+
+<span class="ph">ilike</span>
+in
+<span class="ph">incremental</span>
+<span class="ph">init_fn</span>
+inner
+inpath
+insert
+int
+integer
+intermediate
+interval
+into
+invalidate
+<span class="ph">iregexp</span>
+is
+join
+last
+left
+like
+limit
+lines
+load
+location
+<span class="ph">merge_fn</span>
+metadata
+not
+null
+nulls
+offset
+on
+or
+order
+outer
+<span class="ph">over</span>
+overwrite
+parquet
+parquetfile
+partition
+partitioned
+<span class="ph">partitions</span>
+<span class="ph">preceding</span>
+<span class="ph">prepare_fn</span>
+<span class="ph">produced</span>
+<span class="ph">purge</span>
+<span class="ph">range</span>
+rcfile
+real
+refresh
+regexp
+rename
+replace
+<span class="ph">restrict</span>
+returns
+<span class="ph">revoke</span>
+right
+rlike
+<span class="ph">role</span>
+<span class="ph">roles</span>
+row
+<span class="ph">rows</span>
+schema
+schemas
+select
+semi
+sequencefile
+serdeproperties
+<span class="ph">serialize_fn</span>
+set
+show
+smallint
+
+stats
+stored
+straight_join
+string
+symbol
+table
+tables
+tblproperties
+terminated
+textfile
+then
+timestamp
+tinyint
+to
+true
+<span class="ph">truncate</span>
+<span class="ph">unbounded</span>
+<span class="ph">uncached</span>
+union
+<span class="ph">update</span>
+<span class="ph">update_fn</span>
+<span class="ph">upsert</span>
+use
+using
+values
+<span class="ph">varchar</span>
+view
+when
+where
+with</code></pre>
+</div>
+</article>
+
+<article class="topic concept nested1" aria-labelledby="ariaid-title3" id="reserved_words__reserved_words_planning">
+<h2 class="title topictitle2" id="ariaid-title3">Planning for Future Reserved Words</h2>
+<div class="body conbody">
+<p class="p">
+The previous list of reserved words includes all the keywords
+used in the current level of Impala SQL syntax.
+To future-proof your code,
+you should avoid additional words in case they
+become reserved words if
+Impala adds features in later releases.
+This kind of planning can also help to avoid
+name conflicts in case you port SQL from other systems that
+have different sets of reserved words.
+</p>
+
+<p class="p">
+The following list contains additional words that you should
+avoid for table, column, or other object names,
+even though they are not currently reserved by Impala.
+</p>
+
+<pre class="pre codeblock"><code>any
+authorization
+backup
+begin
+break
+browse
+bulk
+cascade
+check
+checkpoint
+close
+clustered
+coalesce
+collate
+commit
+constraint
+contains
+continue
+convert
+current
+current_date
+current_time
+current_timestamp
+current_user
+cursor
+dbcc
+deallocate
+declare
+default
+deny
+disk
+distributed
+dump
+errlvl
+escape
+except
+exec
+execute
+exit
+fetch
+file
+fillfactor
+for
+foreign
+freetext
+goto
+holdlock
+identity
+index
+intersect
+key
+kill
+lineno
+merge
+national
+nocheck
+nonclustered
+nullif
+of
+off
+offsets
+open
+option
+percent
+pivot
+plan
+precision
+primary
+print
+proc
+procedure
+public
+raiserror
+read
+readtext
+reconfigure
+references
+replication
+restore
+restrict
+return
+revert
+rollback
+rowcount
+rule
+save
+securityaudit
+session_user
+setuser
+shutdown
+some
+statistics
+system_user
+tablesample
+textsize
+then
+top
+tran
+transaction
+trigger
+try_convert
+unique
+unpivot
+updatetext
+user
+varying
+waitfor
+while
+within
+writetext
+</code></pre>
+</div>
+</article>
+
+</article></main></body></html>

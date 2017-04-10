@@ -1,0 +1,66 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_comments.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_literals.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_operators.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_unsupported.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_porting.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="langref"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala SQL Language Reference</title></head><body id="langref"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala SQL Language Reference</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Impala uses SQL as its query language. To protect user investment in skills development and query
+      design, Impala provides a high degree of compatibility with the Hive Query Language (HiveQL):
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        Because Impala uses the same metadata store as Hive to record information about table structure and
+        properties, Impala can access tables defined through the native Impala <code class="ph codeph">CREATE TABLE</code>
+        command, or tables created using the Hive data definition language (DDL).
+      </li>
+
+      <li class="li">
+        Impala supports data manipulation (DML) statements similar to the DML component of HiveQL.
+      </li>
+
+      <li class="li">
+        Impala provides many <a class="xref" href="impala_functions.html#builtins">built-in functions</a> with the same
+        names and parameter types as their HiveQL equivalents.
+      </li>
+    </ul>
+
+    <p class="p">
+      Impala supports most of the same <a class="xref" href="impala_langref_sql.html#langref_sql">statements and
+      clauses</a> as HiveQL, including, but not limited to <code class="ph codeph">JOIN</code>, <code class="ph codeph">AGGREGATE</code>,
+      <code class="ph codeph">DISTINCT</code>, <code class="ph codeph">UNION ALL</code>, <code class="ph codeph">ORDER BY</code>, <code class="ph codeph">LIMIT</code> and
+      (uncorrelated) subquery in the <code class="ph codeph">FROM</code> clause. Impala also supports <code class="ph codeph">INSERT
+      INTO</code> and <code class="ph codeph">INSERT OVERWRITE</code>.
+    </p>
+
+    <p class="p">
+      Impala supports data types with the same names and semantics as the equivalent Hive data types:
+      <code class="ph codeph">STRING</code>, <code class="ph codeph">TINYINT</code>, <code class="ph codeph">SMALLINT</code>, <code class="ph codeph">INT</code>,
+      <code class="ph codeph">BIGINT</code>, <code class="ph codeph">FLOAT</code>, <code class="ph codeph">DOUBLE</code>, <code class="ph codeph">BOOLEAN</code>,
+      <code class="ph codeph">STRING</code>, <code class="ph codeph">TIMESTAMP</code>.
+    </p>
+
+    <p class="p">
+      For full details about Impala SQL syntax and semantics, see
+      <a class="xref" href="impala_langref_sql.html#langref_sql">Impala SQL Statements</a>.
+    </p>
+
+    <p class="p">
+      Most HiveQL <code class="ph codeph">SELECT</code> and <code class="ph codeph">INSERT</code> statements run unmodified with Impala. For
+      information about Hive syntax not available in Impala, see
+      <a class="xref" href="impala_langref_unsupported.html#langref_hiveql_delta">SQL Differences Between Impala and Hive</a>.
+    </p>
+
+    <p class="p">
+      For a list of the built-in functions available in Impala queries, see
+      <a class="xref" href="impala_functions.html#builtins">Impala Built-In Functions</a>.
+    </p>
+
+    <p class="p toc"></p>
+  </div>
+<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_comments.html">Comments</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_datatypes.html">Data Types</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_literals.html">Literals</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_operators.html">SQL Operators</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_schema_objects.html">Impala Schema Objects and Object Names</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_langref_sql.html">Impala SQL Statements</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_functions.html">Impala Built-In Functions</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_langref_unsupported.html">SQL Differences Between Impala and Hive</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_porting.html">Porting SQL from Other Database Systems to Impala</a></strong><br></li></ul></nav></article></main></body></html>

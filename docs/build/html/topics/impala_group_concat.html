@@ -1,0 +1,137 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_aggregate_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="group_concat"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>GROUP_CONCAT Function</title></head><body id="group_concat"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">GROUP_CONCAT Function</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      An aggregate function that returns a single string representing the argument value concatenated together for
+      each row of the result set. If the optional separator string is specified, the separator is added between
+      each pair of concatenated values. The default separator is a comma followed by a space.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+
+
+<pre class="pre codeblock"><code>GROUP_CONCAT([ALL] <var class="keyword varname">expression</var> [, <var class="keyword varname">separator</var>])</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are appropriate for
+        concatenating the values of multiple columns within the same row, while <code class="ph codeph">group_concat()</code>
+        joins together values from different rows.
+      </p>
+
+    <p class="p">
+      By default, returns a single string covering the whole result set. To include other columns or values in the
+      result set, or to produce multiple concatenated strings for subsets of rows, include a <code class="ph codeph">GROUP
+      BY</code> clause in the query.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Restrictions:</strong>
+      </p>
+
+    <p class="p">
+      You cannot apply the <code class="ph codeph">DISTINCT</code> operator to the argument of this function.
+    </p>
+
+    <p class="p">
+        This function cannot be used in an analytic context. That is, the <code class="ph codeph">OVER()</code> clause is not allowed at all with this function.
+      </p>
+
+    <p class="p">
+      Currently, Impala returns an error if the result value grows larger than 1 GiB.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      The following examples illustrate various aspects of the <code class="ph codeph">GROUP_CONCAT()</code> function.
+    </p>
+
+    <p class="p">
+      You can call the function directly on a <code class="ph codeph">STRING</code> column. To use it with a numeric column, cast
+      the value to <code class="ph codeph">STRING</code>.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table t1 (x int, s string);
+[localhost:21000] &gt; insert into t1 values (1, "one"), (3, "three"), (2, "two"), (1, "one");
+[localhost:21000] &gt; select group_concat(s) from t1;
++----------------------+
+| group_concat(s)      |
++----------------------+
+| one, three, two, one |
++----------------------+
+[localhost:21000] &gt; select group_concat(cast(x as string)) from t1;
++---------------------------------+
+| group_concat(cast(x as string)) |
++---------------------------------+
+| 1, 3, 2, 1                      |
++---------------------------------+
+</code></pre>
+
+    <p class="p">
+      The optional separator lets you format the result in flexible ways. The separator can be an arbitrary string
+      expression, not just a single character.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select group_concat(s,"|") from t1;
++----------------------+
+| group_concat(s, '|') |
++----------------------+
+| one|three|two|one    |
++----------------------+
+[localhost:21000] &gt; select group_concat(s,'---') from t1;
++-------------------------+
+| group_concat(s, '---')  |
++-------------------------+
+| one---three---two---one |
++-------------------------+
+</code></pre>
+
+    <p class="p">
+      The default separator is a comma followed by a space. To get a comma-delimited result without extra spaces,
+      specify a delimiter character that is only a comma.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select group_concat(s,',') from t1;
++----------------------+
+| group_concat(s, ',') |
++----------------------+
+| one,three,two,one    |
++----------------------+
+</code></pre>
+
+    <p class="p">
+      Including a <code class="ph codeph">GROUP BY</code> clause lets you produce a different concatenated result for each group
+      in the result set. In this example, the only <code class="ph codeph">X</code> value that occurs more than once is
+      <code class="ph codeph">1</code>, so that is the only row in the result set where <code class="ph codeph">GROUP_CONCAT()</code> returns a
+      delimited value. For groups containing a single value, <code class="ph codeph">GROUP_CONCAT()</code> returns the original
+      value of its <code class="ph codeph">STRING</code> argument.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select x, group_concat(s) from t1 group by x;
++---+-----------------+
+| x | group_concat(s) |
++---+-----------------+
+| 2 | two             |
+| 3 | three           |
+| 1 | one, one        |
++---+-----------------+
+</code></pre>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_aggregate_functions.html">Impala Aggregate Functions</a></div></div></nav></article></main></body></html>

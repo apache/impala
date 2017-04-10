@@ -1,0 +1,140 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="group_by"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>GROUP BY Clause</title></head><body id="group_by"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">GROUP BY Clause</h1>
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Specify the <code class="ph codeph">GROUP BY</code> clause in queries that use aggregation functions, such as
+      <code class="ph codeph"><a class="xref" href="impala_count.html#count">COUNT()</a></code>,
+      <code class="ph codeph"><a class="xref" href="impala_sum.html#sum">SUM()</a></code>,
+      <code class="ph codeph"><a class="xref" href="impala_avg.html#avg">AVG()</a></code>,
+      <code class="ph codeph"><a class="xref" href="impala_min.html#min">MIN()</a></code>, and
+      <code class="ph codeph"><a class="xref" href="impala_max.html#max">MAX()</a></code>. Specify in the
+      <code class="ph codeph"><a class="xref" href="impala_group_by.html#group_by">GROUP BY</a></code> clause the names of all the
+      columns that do not participate in the aggregation operation.
+    </p>
+
+    
+    <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+    <p class="p">
+      In <span class="keyword">Impala 2.3</span> and higher, the complex data types <code class="ph codeph">STRUCT</code>,
+      <code class="ph codeph">ARRAY</code>, and <code class="ph codeph">MAP</code> are available. These columns cannot
+      be referenced directly in the <code class="ph codeph">ORDER BY</code> clause.
+      When you query a complex type column, you use join notation to <span class="q">"unpack"</span> the elements
+      of the complex type, and within the join query you can include an <code class="ph codeph">ORDER BY</code>
+      clause to control the order in the result set of the scalar elements from the complex type.
+      See <a class="xref" href="impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details about Impala support for complex types.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Zero-length strings:</strong> For purposes of clauses such as <code class="ph codeph">DISTINCT</code> and <code class="ph codeph">GROUP
+        BY</code>, Impala considers zero-length strings (<code class="ph codeph">""</code>), <code class="ph codeph">NULL</code>, and space
+        to all be different values.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      For example, the following query finds the 5 items that sold the highest total quantity (using the
+      <code class="ph codeph">SUM()</code> function, and also counts the number of sales transactions for those items (using the
+      <code class="ph codeph">COUNT()</code> function). Because the column representing the item IDs is not used in any
+      aggregation functions, we specify that column in the <code class="ph codeph">GROUP BY</code> clause.
+    </p>
+
+<pre class="pre codeblock"><code>select
+  <strong class="ph b">ss_item_sk</strong> as Item,
+  <strong class="ph b">count</strong>(ss_item_sk) as Times_Purchased,
+  <strong class="ph b">sum</strong>(ss_quantity) as Total_Quantity_Purchased
+from store_sales
+  <strong class="ph b">group by ss_item_sk</strong>
+  order by sum(ss_quantity) desc
+  limit 5;
++-------+-----------------+--------------------------+
+| item  | times_purchased | total_quantity_purchased |
++-------+-----------------+--------------------------+
+| 9325  | 372             | 19072                    |
+| 4279  | 357             | 18501                    |
+| 7507  | 371             | 18475                    |
+| 5953  | 369             | 18451                    |
+| 16753 | 375             | 18446                    |
++-------+-----------------+--------------------------+</code></pre>
+
+    <p class="p">
+      The <code class="ph codeph">HAVING</code> clause lets you filter the results of aggregate functions, because you cannot
+      refer to those expressions in the <code class="ph codeph">WHERE</code> clause. For example, to find the 5 lowest-selling
+      items that were included in at least 100 sales transactions, we could use this query:
+    </p>
+
+<pre class="pre codeblock"><code>select
+  <strong class="ph b">ss_item_sk</strong> as Item,
+  <strong class="ph b">count</strong>(ss_item_sk) as Times_Purchased,
+  <strong class="ph b">sum</strong>(ss_quantity) as Total_Quantity_Purchased
+from store_sales
+  <strong class="ph b">group by ss_item_sk</strong>
+  <strong class="ph b">having times_purchased &gt;= 100</strong>
+  order by sum(ss_quantity)
+  limit 5;
++-------+-----------------+--------------------------+
+| item  | times_purchased | total_quantity_purchased |
++-------+-----------------+--------------------------+
+| 13943 | 105             | 4087                     |
+| 2992  | 101             | 4176                     |
+| 4773  | 107             | 4204                     |
+| 14350 | 103             | 4260                     |
+| 11956 | 102             | 4275                     |
++-------+-----------------+--------------------------+</code></pre>
+
+    <p class="p">
+      When performing calculations involving scientific or financial data, remember that columns with type
+      <code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code> are stored as true floating-point numbers, which cannot
+      precisely represent every possible fractional value. Thus, if you include a <code class="ph codeph">FLOAT</code> or
+      <code class="ph codeph">DOUBLE</code> column in a <code class="ph codeph">GROUP BY</code> clause, the results might not precisely match
+      literal values in your query or from an original Text data file. Use rounding operations, the
+      <code class="ph codeph">BETWEEN</code> operator, or another arithmetic technique to match floating-point values that are
+      <span class="q">"near"</span> literal values you expect. For example, this query on the <code class="ph codeph">ss_wholesale_cost</code>
+      column returns cost values that are close but not identical to the original figures that were entered as
+      decimal fractions.
+    </p>
+
+<pre class="pre codeblock"><code>select ss_wholesale_cost, avg(ss_quantity * ss_sales_price) as avg_revenue_per_sale
+  from sales
+  group by ss_wholesale_cost
+  order by avg_revenue_per_sale desc
+  limit 5;
++-------------------+----------------------+
+| ss_wholesale_cost | avg_revenue_per_sale |
++-------------------+----------------------+
+| 96.94000244140625 | 4454.351539300434    |
+| 95.93000030517578 | 4423.119941283189    |
+| 98.37999725341797 | 4332.516490316291    |
+| 97.97000122070312 | 4330.480601655014    |
+| 98.52999877929688 | 4291.316953108634    |
++-------------------+----------------------+</code></pre>
+
+    <p class="p">
+      Notice how wholesale cost values originally entered as decimal fractions such as <code class="ph codeph">96.94</code> and
+      <code class="ph codeph">98.38</code> are slightly larger or smaller in the result set, due to precision limitations in the
+      hardware floating-point types. The imprecise representation of <code class="ph codeph">FLOAT</code> and
+      <code class="ph codeph">DOUBLE</code> values is why financial data processing systems often store currency using data types
+      that are less space-efficient but avoid these types of rounding errors.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+    <p class="p">
+      <a class="xref" href="impala_select.html#select">SELECT Statement</a>,
+      <a class="xref" href="impala_aggregate_functions.html#aggregate_functions">Impala Aggregate Functions</a>
+    </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_select.html">SELECT Statement</a></div></div></nav></article></main></body></html>
