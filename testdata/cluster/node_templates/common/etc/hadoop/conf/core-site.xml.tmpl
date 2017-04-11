@@ -112,4 +112,24 @@ DEFAULT</value>
 
   <!-- END Kerberos settings -->
 
+  <property>
+    <name>dfs.adls.oauth2.access.token.provider.type</name>
+    <value>ClientCredential</value>
+  </property>
+
+  <property>
+    <name>dfs.adls.oauth2.client.id</name>
+    <value>${azure_client_id}</value>
+  </property>
+
+  <property>
+    <name>dfs.adls.oauth2.credential</name>
+    <value>${azure_client_secret}</value>
+  </property>
+
+  <property>
+    <name>dfs.adls.oauth2.refresh.url</name>
+    <value>https://login.windows.net/${azure_tenant_id}/oauth2/token</value>
+  </property>
+
 </configuration>

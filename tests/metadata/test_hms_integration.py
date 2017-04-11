@@ -30,7 +30,7 @@ import string
 from subprocess import call
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -41,6 +41,7 @@ logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('test_configuration')
 
 @SkipIfS3.hive
+@SkipIfADLS.hive
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 class TestHmsIntegrationSanity(ImpalaTestSuite):
@@ -87,6 +88,7 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
     assert 'test_tbl' in self.client.execute("show tables in hms_sanity_db").data
 
 @SkipIfS3.hive
+@SkipIfADLS.hive
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 class TestHmsIntegration(ImpalaTestSuite):

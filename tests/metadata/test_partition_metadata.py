@@ -16,7 +16,7 @@
 # under the License.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE
 
@@ -78,6 +78,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
     assert data.split('\t') == ['6', '9']
 
   @SkipIfS3.hive
+  @SkipIfADLS.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   def test_partition_metadata_compatibility(self, vector, unique_database):

@@ -32,7 +32,12 @@ from subprocess import check_call
 
 from testdata.common import widetable
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfOldAggsJoins, SkipIfLocal
+from tests.common.skip import (
+    SkipIfS3,
+    SkipIfADLS,
+    SkipIfIsilon,
+    SkipIfOldAggsJoins,
+    SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_result_verifier import (
     parse_column_types,
@@ -335,6 +340,7 @@ class TestParquet(ImpalaTestSuite):
                        vector, unique_database)
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
   def test_misaligned_parquet_row_groups(self, vector):
@@ -390,6 +396,7 @@ class TestParquet(ImpalaTestSuite):
     assert total == num_scanners_with_no_reads
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
   def test_multiple_blocks(self, vector):
@@ -403,6 +410,7 @@ class TestParquet(ImpalaTestSuite):
     self._multiple_blocks_helper(table_name, 40000, ranges_per_node=2)
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
   def test_multiple_blocks_one_row_group(self, vector):
@@ -693,6 +701,7 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
 
 # Missing Coverage: No coverage for truncated files errors or scans.
 @SkipIfS3.hive
+@SkipIfADLS.hive
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 class TestScanTruncatedFiles(ImpalaTestSuite):

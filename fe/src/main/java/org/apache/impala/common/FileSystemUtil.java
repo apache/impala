@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
@@ -301,7 +302,8 @@ public class FileSystemUtil {
     // Common case.
     if (isDistributedFileSystem(fs)) return true;
     // Blacklist FileSystems that are known to not to include storage UUIDs.
-    return !(fs instanceof S3AFileSystem || fs instanceof LocalFileSystem);
+    return !(fs instanceof S3AFileSystem || fs instanceof LocalFileSystem ||
+        fs instanceof AdlFileSystem);
   }
 
   /**
@@ -316,6 +318,20 @@ public class FileSystemUtil {
    */
   public static boolean isS3AFileSystem(Path path) throws IOException {
     return isS3AFileSystem(path.getFileSystem(CONF));
+  }
+
+  /**
+   * Returns true iff the filesystem is AdlFileSystem.
+   */
+  public static boolean isADLFileSystem(FileSystem fs) {
+    return fs instanceof AdlFileSystem;
+  }
+
+  /**
+   * Returns true iff the path is on AdlFileSystem.
+   */
+  public static boolean isADLFileSystem(Path path) throws IOException {
+    return isADLFileSystem(path.getFileSystem(CONF));
   }
 
   /**
@@ -463,6 +479,8 @@ public class FileSystemUtil {
       throws IOException {
     Path path = new Path(location);
     return (FileSystemUtil.isDistributedFileSystem(path) ||
-        FileSystemUtil.isLocalFileSystem(path) || FileSystemUtil.isS3AFileSystem(path));
+        FileSystemUtil.isLocalFileSystem(path) ||
+        FileSystemUtil.isS3AFileSystem(path) ||
+        FileSystemUtil.isADLFileSystem(path));
   }
 }
