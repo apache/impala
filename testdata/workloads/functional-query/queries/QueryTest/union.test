@@ -1150,3 +1150,24 @@ select count(b) from (
 ---- TYPES
 bigint
 =====
+---- QUERY
+# IMPALA-5188: The slot descriptors might be ordered differently for the operands and the
+# union tuple. (Regression test).
+select 1, 1
+union all
+select avg(id), id
+from alltypestiny
+group by id
+---- RESULTS
+0,0
+1,1
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6
+7,7
+---- TYPES
+double, int
+=====

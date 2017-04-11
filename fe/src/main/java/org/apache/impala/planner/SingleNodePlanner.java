@@ -237,6 +237,7 @@ public class SingleNodePlanner {
       Preconditions.checkState(collExpr instanceof SlotRef);
       SlotRef collSlotRef = (SlotRef) collExpr;
       collSlotRef.getDesc().setIsMaterialized(false);
+      collSlotRef.getDesc().getParent().recomputeMemLayout();
     }
   }
 

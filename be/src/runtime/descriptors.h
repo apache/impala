@@ -432,7 +432,8 @@ class TupleDescriptor {
   const int num_null_bytes_;
   const int null_bytes_offset_;
 
-  /// Contains all slots.
+  /// Contains all slots. Slots are in the same order as the expressions that materialize
+  /// them. See Tuple::MaterializeExprs().
   std::vector<SlotDescriptor*> slots_;
 
   /// Contains only materialized string slots.
@@ -452,6 +453,9 @@ class TupleDescriptor {
 
   TupleDescriptor(const TTupleDescriptor& tdesc);
   void AddSlot(SlotDescriptor* slot);
+
+  /// Returns slots in their physical order.
+  vector<SlotDescriptor*> SlotsOrderedByIdx() const;
 };
 
 class DescriptorTbl {

@@ -231,11 +231,22 @@ public class TupleDescriptor {
     return ttupleDesc;
   }
 
+  /**
+   * In some cases changes are made to a tuple after the memory layout has been computed.
+   * This function allows us to recompute the memory layout.
+   */
+  public void recomputeMemLayout() {
+    Preconditions.checkState(hasMemLayout_);
+    hasMemLayout_ = false;
+    computeMemLayout();
+  }
+
   public void computeMemLayout() {
     if (hasMemLayout_) return;
     hasMemLayout_ = true;
 
     boolean alwaysAddNullBit = hasNullableKuduScanSlots();
+    avgSerializedSize_ = 0;
 
     // maps from slot size to slot descriptors with that size
     Map<Integer, List<SlotDescriptor>> slotsBySize =

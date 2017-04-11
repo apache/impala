@@ -341,10 +341,11 @@ string TupleDescriptor::DebugString() const {
 }
 
 bool TupleDescriptor::LayoutEquals(const TupleDescriptor& other_desc) const {
-  const vector<SlotDescriptor*>& slots = this->slots();
-  const vector<SlotDescriptor*>& other_slots = other_desc.slots();
-  if (this->byte_size() != other_desc.byte_size()) return false;
-  if (slots.size() != other_slots.size()) return false;
+  if (byte_size() != other_desc.byte_size()) return false;
+  if (slots().size() != other_desc.slots().size()) return false;
+
+  vector<SlotDescriptor*> slots = SlotsOrderedByIdx();
+  vector<SlotDescriptor*> other_slots = other_desc.SlotsOrderedByIdx();
   for (int i = 0; i < slots.size(); ++i) {
     if (!slots[i]->LayoutEquals(*other_slots[i])) return false;
   }
@@ -672,10 +673,15 @@ llvm::Value* SlotDescriptor::CodegenGetNullByte(
   return builder->CreateLoad(byte_ptr, "null_byte");
 }
 
+vector<SlotDescriptor*> TupleDescriptor::SlotsOrderedByIdx() const {
+  vector<SlotDescriptor*> sorted_slots(slots().size());
+  for (SlotDescriptor* slot: slots()) sorted_slots[slot->slot_idx_] = slot;
+  return sorted_slots;
+}
+
 llvm::StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
-  // Sort slots in the order they will appear in LLVM struct.
-  vector<SlotDescriptor*> sorted_slots(slots_.size());
-  for (SlotDescriptor* slot: slots_) sorted_slots[slot->slot_idx_] = slot;
+  // Get slots in the order they will appear in LLVM struct.
+  vector<SlotDescriptor*> sorted_slots = SlotsOrderedByIdx();
 
   // Add the slot types to the struct description.
   vector<llvm::Type*> struct_fields;
