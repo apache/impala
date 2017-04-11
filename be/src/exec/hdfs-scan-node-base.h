@@ -452,8 +452,7 @@ class HdfsScanNodeBase : public ScanNode {
   Status IssueInitialScanRanges(RuntimeState* state);
 
   /// Create and open new scanner for this partition type.
-  /// If the scanner is successfully created, it is returned in 'scanner'.
-  /// Passes 'add_batches_to_queue' to the scanner constructor.
+  /// If the scanner is successfully created and opened, it is returned in 'scanner'.
   Status CreateAndOpenScanner(HdfsPartitionDescriptor* partition,
       ScannerContext* context, boost::scoped_ptr<HdfsScanner>* scanner);
 

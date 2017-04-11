@@ -97,6 +97,7 @@ Status BaseSequenceScanner::Open(ScannerContext* context) {
 }
 
 void BaseSequenceScanner::Close(RowBatch* row_batch) {
+  DCHECK(!is_closed_);
   VLOG_FILE << "Bytes read past scan range: " << -stream_->bytes_left();
   VLOG_FILE << "Average block size: "
             << (num_syncs_ > 1 ? total_block_size_ / (num_syncs_ - 1) : 0);

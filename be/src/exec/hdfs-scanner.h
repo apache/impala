@@ -142,6 +142,7 @@ class HdfsScanner {
   /// and memory in mem pools to the given row batch. If the row batch is NULL,
   /// those resources are released instead. In any case, releases all other resources
   /// that are not backing returned rows (e.g. temporary decompression buffers).
+  /// This function is not idempotent and must only be called once.
   virtual void Close(RowBatch* row_batch);
 
   /// Only valid to call if the parent scan node is single-threaded.
@@ -201,6 +202,9 @@ class HdfsScanner {
   /// Set if this scanner has processed all ranges and will not produce more rows.
   /// Only relevant when calling the GetNext() interface.
   bool eos_;
+
+  /// Starts as false and is set to true in Close().
+  bool is_closed_;
 
   /// Clones of the conjuncts ExprContexts in scan_node_->conjuncts_map(). Each scanner
   /// has its own ExprContexts so the conjuncts can be safely evaluated in parallel.

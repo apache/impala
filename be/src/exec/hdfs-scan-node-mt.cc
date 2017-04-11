@@ -89,7 +89,13 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
     HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
     scanner_ctx_.reset(new ScannerContext(
         runtime_state_, this, partition, scan_range_, filter_ctxs()));
-    RETURN_IF_ERROR(CreateAndOpenScanner(partition, scanner_ctx_.get(), &scanner_));
+    Status status = CreateAndOpenScanner(partition, scanner_ctx_.get(), &scanner_);
+    if (!status.ok()) {
+      DCHECK(scanner_ == NULL);
+      // Avoid leaking unread buffers in the scan range.
+      scan_range_->Cancel(status);
+      return status;
+    }
   }
 
   Status status = scanner_->GetNext(row_batch);

@@ -63,6 +63,7 @@ HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
       context_(NULL),
       stream_(NULL),
       eos_(false),
+      is_closed_(false),
       scanner_conjunct_ctxs_(NULL),
       template_tuple_pool_(new MemPool(scan_node->mem_tracker())),
       template_tuple_(NULL),
@@ -83,6 +84,7 @@ HdfsScanner::HdfsScanner()
       context_(NULL),
       stream_(NULL),
       eos_(false),
+      is_closed_(false),
       scanner_conjunct_ctxs_(NULL),
       template_tuple_pool_(NULL),
       template_tuple_(NULL),
@@ -132,12 +134,17 @@ Status HdfsScanner::Open(ScannerContext* context) {
 }
 
 void HdfsScanner::Close(RowBatch* row_batch) {
-  if (decompressor_.get() != NULL) decompressor_->Close();
+  DCHECK(!is_closed_);
+  if (decompressor_.get() != NULL) {
+    decompressor_->Close();
+    decompressor_.reset();
+  }
   for (const auto& entry: scanner_conjuncts_map_) Expr::Close(entry.second, state_);
   for (const auto& entry: scanner_dict_filter_map_) Expr::Close(entry.second, state_);
   obj_pool_.Clear();
   stream_ = NULL;
   context_->ClearStreams();
+  is_closed_ = true;
 }
 
 Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,

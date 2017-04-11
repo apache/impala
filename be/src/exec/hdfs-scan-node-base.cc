@@ -684,9 +684,11 @@ Status HdfsScanNodeBase::CreateAndOpenScanner(HdfsPartitionDescriptor* partition
     if (!status.ok()) {
       RowBatch* batch = (HasRowBatchQueue()) ? scanner->get()->batch() : NULL;
       scanner->get()->Close(batch);
+      scanner->reset();
     }
   } else {
     context->ClearStreams();
+    scanner->reset();
   }
   return status;
 }

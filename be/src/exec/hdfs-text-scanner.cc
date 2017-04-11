@@ -169,6 +169,7 @@ Status HdfsTextScanner::ProcessSplit() {
 }
 
 void HdfsTextScanner::Close(RowBatch* row_batch) {
+  DCHECK(!is_closed_);
   // Need to close the decompressor before transferring the remaining resources to
   // 'row_batch' because in some cases there is memory allocated in the decompressor_'s
   // temp_memory_pool_.

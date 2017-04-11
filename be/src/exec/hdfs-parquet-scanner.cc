@@ -267,6 +267,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 }
 
 void HdfsParquetScanner::Close(RowBatch* row_batch) {
+  DCHECK(!is_closed_);
   if (row_batch != nullptr) {
     FlushRowGroupResources(row_batch);
     row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
