@@ -24,7 +24,7 @@ import string
 import subprocess
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon
 
 class TestParquetMaxPageHeader(CustomClusterTestSuite):
   '''This tests large page headers in parquet files. Parquet page header size can
@@ -92,6 +92,7 @@ class TestParquetMaxPageHeader(CustomClusterTestSuite):
     put.wait()
 
   @SkipIfS3.hive
+  @SkipIfADLS.hive
   @SkipIfIsilon.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("-max_page_header_size=31457280")

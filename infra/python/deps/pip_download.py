@@ -37,7 +37,7 @@ PYPI_MIRROR = os.environ.get('PYPI_MIRROR', 'https://pypi.python.org')
 
 # The requirement files that list all of the required packages and versions.
 REQUIREMENTS_FILES = ['requirements.txt', 'compiled-requirements.txt',
-                      'kudu-requirements.txt']
+                      'kudu-requirements.txt', 'adls-requirements.txt']
 
 def check_md5sum(filename, expected_md5):
   actual_md5 = md5(open(filename).read()).hexdigest()

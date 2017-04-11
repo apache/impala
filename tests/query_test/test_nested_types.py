@@ -22,7 +22,13 @@ from subprocess import check_call
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfOldAggsJoins, SkipIfIsilon, SkipIfS3, SkipIfLocal
+from tests.common.skip import (
+    SkipIfOldAggsJoins,
+    SkipIfIsilon,
+    SkipIfS3,
+    SkipIfADLS,
+    SkipIfLocal)
+
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
 
 @SkipIfOldAggsJoins.nested_types
@@ -553,6 +559,7 @@ class TestMaxNestingDepth(ImpalaTestSuite):
 
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfADLS.hive
   @SkipIfLocal.hive
   def test_load_hive_table(self, vector, unique_database):
     """Tests that Impala rejects Hive-created tables with complex types that exceed

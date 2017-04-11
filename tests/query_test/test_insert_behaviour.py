@@ -22,7 +22,7 @@ import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_S3
 
 @SkipIfLocal.hdfs_client
@@ -45,6 +45,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     if method.__name__ == "test_insert_select_with_empty_resultset":
       self.cleanup_db(self.TEST_DB_NAME)
 
+  @SkipIfADLS.eventually_consistent
   @pytest.mark.execute_serially
   def test_insert_removes_staging_files(self):
     TBL_NAME = "insert_overwrite_nopart"
@@ -130,6 +131,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     assert len(self.filesystem_client.ls(part_dir)) == 1
 
   @SkipIfS3.hdfs_acls
+  @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
   @pytest.mark.xfail(run=False, reason="Fails intermittently on test clusters")
   @pytest.mark.execute_serially
@@ -190,6 +192,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     check_has_acls("p1=1/p2=2/p3=30", "default:group:new_leaf_group:-w-")
 
   @SkipIfS3.hdfs_acls
+  @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
   def test_insert_file_permissions(self, unique_database):
     """Test that INSERT correctly respects file permission (minimum ACLs)"""
@@ -240,6 +243,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, insert_query)
 
   @SkipIfS3.hdfs_acls
+  @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
   def test_insert_acl_permissions(self, unique_database):
     """Test that INSERT correctly respects ACLs"""
@@ -317,6 +321,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, insert_query)
 
   @SkipIfS3.hdfs_acls
+  @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
   def test_load_permissions(self, unique_database):
     # We rely on test_insert_acl_permissions() to exhaustively check that ACL semantics
@@ -369,6 +374,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # We expect this to succeed, it's not an error if all files in the dir cannot be read
     self.execute_query_expect_success(self.client, load_dir_query)
 
+  @SkipIfADLS.eventually_consistent
   @pytest.mark.execute_serially
   def test_insert_select_with_empty_resultset(self):
     """Test insert/select query won't trigger partition directory or zero size data file
@@ -439,6 +445,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_failure(self.client, insert_query)
 
   @SkipIfS3.hdfs_acls
+  @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
   def test_multiple_group_acls(self, unique_database):
     """Test that INSERT correctly respects multiple group ACLs"""

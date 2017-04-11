@@ -30,6 +30,7 @@ from tests.util.filesystem_utils import (
     IS_LOCAL,
     IS_HDFS,
     IS_S3,
+    IS_ADLS,
     SECONDARY_FILESYSTEM)
 
 
@@ -50,6 +51,26 @@ class SkipIfS3:
   hbase = pytest.mark.skipif(IS_S3, reason="HBase not started with S3")
   qualified_path = pytest.mark.skipif(IS_S3,
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")
+
+class SkipIfADLS:
+
+  # These ones are skipped due to product limitations.
+  caching = pytest.mark.skipif(IS_ADLS, reason="SET CACHED not implemented for ADLS")
+  hive = pytest.mark.skipif(IS_ADLS, reason="Hive doesn't work with ADLS")
+  hdfs_block_size = pytest.mark.skipif(IS_ADLS, reason="ADLS uses it's own block size")
+  hdfs_acls = pytest.mark.skipif(IS_ADLS, reason="HDFS acls are not supported on ADLS")
+  jira = partial(pytest.mark.skipif, IS_ADLS)
+  hdfs_encryption = pytest.mark.skipif(IS_ADLS,
+      reason="HDFS encryption is not supported with ADLS")
+
+  # These ones need test infra work to re-enable.
+  udfs = pytest.mark.skipif(IS_ADLS, reason="udas/udfs not copied to ADLS")
+  datasrc = pytest.mark.skipif(IS_ADLS, reason="data sources not copied to ADLS")
+  hbase = pytest.mark.skipif(IS_ADLS, reason="HBase not started with ADLS")
+  qualified_path = pytest.mark.skipif(IS_ADLS,
+      reason="Tests rely on HDFS qualified paths, IMPALA-1872")
+  eventually_consistent = pytest.mark.skipif(IS_ADLS,
+      reason="The client is slow to realize changes to file metadata")
 
 class SkipIfKudu:
   unsupported_env = pytest.mark.skipif(os.environ["KUDU_IS_SUPPORTED"] == "false",

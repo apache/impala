@@ -16,7 +16,7 @@
 # under the License.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 
 class TestObservability(ImpalaTestSuite):
   @classmethod
@@ -55,6 +55,7 @@ class TestObservability(ImpalaTestSuite):
   @SkipIfS3.hbase
   @SkipIfLocal.hbase
   @SkipIfIsilon.hbase
+  @SkipIfADLS.hbase
   def test_scan_summary(self):
     """IMPALA-4499: Checks that the exec summary for scans show the table name."""
     # HDFS table

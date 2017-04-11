@@ -18,13 +18,14 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfS3, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfLocal
 from tests.util.filesystem_utils import IS_ISILON, WAREHOUSE
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 
 TEST_TBL = "insert_inherit_permission"
 
 @SkipIfS3.hdfs_acls
+@SkipIfADLS.hdfs_acls
 class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
 
   @classmethod

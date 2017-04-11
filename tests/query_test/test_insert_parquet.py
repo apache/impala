@@ -30,7 +30,7 @@ from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder
 from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIfIsilon, SkipIfLocal, SkipIfS3
+from tests.common.skip import SkipIfIsilon, SkipIfLocal, SkipIfS3, SkipIfADLS
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path
@@ -161,6 +161,10 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension("compression_codec", *PARQUET_CODECS))
 
+  # ADLS does not have a configurable block size, so the 'PARQUET_FILE_SIZE' option
+  # that's passed as a hint to Hadoop is ignored for AdlFileSystem. So, we skip this
+  # test for ADLS.
+  @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.hdfs_client
   def test_insert_parquet_verify_size(self, vector, unique_database):
@@ -297,6 +301,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 @SkipIfS3.hive
+@SkipIfADLS.hive
 # TODO: Should we move this to test_parquet_stats.py?
 class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 

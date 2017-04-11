@@ -240,6 +240,10 @@ export FILESYSTEM_PREFIX="${FILESYSTEM_PREFIX-}"
 export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY-DummySecretAccessKey}"
 export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID-DummyAccessKeyId}"
 export S3_BUCKET="${S3_BUCKET-}"
+export azure_tenant_id="${azure_tenant_id-DummyAdlsTenantId}"
+export azure_client_id="${azure_client_id-DummyAdlsClientId}"
+export azure_client_secret="${azure_client_secret-DummyAdlsClientSecret}"
+export azure_data_lake_store_name="${azure_data_lake_store_name-}"
 export HDFS_REPLICATION="${HDFS_REPLICATION-3}"
 export ISILON_NAMENODE="${ISILON_NAMENODE-}"
 export DEFAULT_FS="${DEFAULT_FS-hdfs://localhost:20500}"
@@ -267,6 +271,22 @@ if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
     return 1
   fi
   DEFAULT_FS="s3a://${S3_BUCKET}"
+  export DEFAULT_FS
+elif [ "${TARGET_FILESYSTEM}" = "adls" ]; then
+  # Basic error checking
+  if [[ "${azure_client_id}" = "DummyAdlsClientId" ||\
+        "${azure_tenant_id}" = "DummyAdlsTenantId" ||\
+        "${azure_client_secret}" = "DummyAdlsClientSecret" ]]; then
+    echo "All 3 of the following need to be assigned valid values and belong
+      to the owner of the ADLS store in order to access the filesystem:
+      azure_client_id, azure_tenant_id, azure_client_secret."
+    return 1
+  fi
+  if [[ "${azure_data_lake_store_name}" = "" ]]; then
+    echo "azure_data_lake_store_name cannot be an empty string for ADLS"
+    return 1
+  fi
+  DEFAULT_FS="adl://${azure_data_lake_store_name}.azuredatalakestore.net"
   export DEFAULT_FS
 elif [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
   if [ "${ISILON_NAMENODE}" = "" ]; then

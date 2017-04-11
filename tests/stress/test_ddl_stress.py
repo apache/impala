@@ -18,7 +18,7 @@
 import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 
 # Number of tables to create per thread
 NUM_TBLS_PER_THREAD = 10
@@ -48,6 +48,7 @@ class TestDdlStress(ImpalaTestSuite):
                    v.get_value('table_format').compression_codec == 'none'))
 
   @SkipIfS3.caching
+  @SkipIfADLS.caching
   @SkipIfIsilon.caching
   @SkipIfLocal.caching
   @pytest.mark.stress

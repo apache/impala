@@ -768,7 +768,7 @@ public class HdfsTable extends Table {
    * permissions Impala has on the given path. If the path does not exist, recurses up
    * the path until a existing parent directory is found, and inherit access permissions
    * from that.
-   * Always returns READ_WRITE for S3 files.
+   * Always returns READ_WRITE for S3 and ADLS files.
    */
   private TAccessLevel getAvailableAccessLevel(FileSystem fs, Path location)
       throws IOException {
@@ -780,6 +780,12 @@ public class HdfsTable extends Table {
     // TODO: Revisit if the S3A connector is updated to be able to manage S3 object
     // permissions. (see HADOOP-13892)
     if (FileSystemUtil.isS3AFileSystem(fs)) return TAccessLevel.READ_WRITE;
+
+    // The ADLS connector currently returns ACLs for files in ADLS, but can only map
+    // them to the ADLS client SPI and not the Hadoop users/groups, causing unexpected
+    // behavior. So ADLS ACLs are unsupported until the connector is able to map
+    // permissions to hadoop users/groups (HADOOP-14437).
+    if (FileSystemUtil.isADLFileSystem(fs)) return TAccessLevel.READ_WRITE;
 
     FsPermissionChecker permissionChecker = FsPermissionChecker.getInstance();
     while (location != null) {

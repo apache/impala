@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.HdfsFileFormat;
@@ -126,6 +127,9 @@ public class LoadDataStmt extends StatementBase {
    * paths for this LOAD statement (which maps onto a sequence of file move operations,
    * with the requisite permission requirements), and check to see if all files to be
    * moved are in format that Impala understands. Errors are raised as AnalysisExceptions.
+   *
+   * We don't check permissions for the S3AFileSystem and the AdlFileSystem due to
+   * limitations with thier getAclStatus() API. (see HADOOP-13892 and HADOOP-14437)
    */
   private void analyzePaths(Analyzer analyzer, HdfsTable hdfsTable)
       throws AnalysisException {
@@ -137,9 +141,10 @@ public class LoadDataStmt extends StatementBase {
     try {
       Path source = sourceDataPath_.getPath();
       FileSystem fs = source.getFileSystem(FileSystemUtil.getConfiguration());
-      if (!(fs instanceof DistributedFileSystem) && !(fs instanceof S3AFileSystem)) {
+      if (!(fs instanceof DistributedFileSystem) && !(fs instanceof S3AFileSystem) &&
+          !(fs instanceof AdlFileSystem)) {
         throw new AnalysisException(String.format("INPATH location '%s' " +
-            "must point to an HDFS or S3A filesystem.", sourceDataPath_));
+            "must point to an HDFS, S3A or ADL filesystem.", sourceDataPath_));
       }
       if (!fs.exists(source)) {
         throw new AnalysisException(String.format(
@@ -150,6 +155,8 @@ public class LoadDataStmt extends StatementBase {
       // it. If the source file is a file, we must be able to read from it, and write to
       // its parent directory (in order to delete the file as part of the move operation).
       FsPermissionChecker checker = FsPermissionChecker.getInstance();
+      // TODO: Disable permission checking for S3A as well (HADOOP-13892)
+      boolean shouldCheckPerms = !(fs instanceof AdlFileSystem);
 
       if (fs.isDirectory(source)) {
         if (FileSystemUtil.getTotalNumVisibleFiles(source) == 0) {
@@ -162,7 +169,7 @@ public class LoadDataStmt extends StatementBase {
               sourceDataPath_));
         }
         if (!checker.getPermissions(fs, source).checkPermissions(
-            FsAction.READ_WRITE)) {
+            FsAction.READ_WRITE) && shouldCheckPerms) {
           throw new AnalysisException(String.format("Unable to LOAD DATA from %s " +
               "because Impala does not have READ and WRITE permissions on this directory",
               source));
@@ -175,14 +182,14 @@ public class LoadDataStmt extends StatementBase {
         }
 
         if (!checker.getPermissions(fs, source.getParent()).checkPermissions(
-            FsAction.WRITE)) {
+            FsAction.WRITE) && shouldCheckPerms) {
           throw new AnalysisException(String.format("Unable to LOAD DATA from %s " +
               "because Impala does not have WRITE permissions on its parent " +
               "directory %s", source, source.getParent()));
         }
 
         if (!checker.getPermissions(fs, source).checkPermissions(
-            FsAction.READ)) {
+            FsAction.READ) && shouldCheckPerms) {
           throw new AnalysisException(String.format("Unable to LOAD DATA from %s " +
               "because Impala does not have READ permissions on this file", source));
         }

@@ -26,7 +26,8 @@ from tests.common.skip import (
     SkipIfIsilon,
     SkipIfLocal,
     SkipIfOldAggsJoins,
-    SkipIfS3)
+    SkipIfS3,
+    SkipIfADLS)
 from tests.common.test_vector import ImpalaTestDimension
 
 class TestJoinQueries(ImpalaTestSuite):
@@ -60,6 +61,7 @@ class TestJoinQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/joins-partitioned', vector)
 
   @SkipIfS3.hbase
+  @SkipIfADLS.hbase
   @SkipIfIsilon.hbase
   @SkipIf.skip_hbase
   @SkipIfLocal.hbase

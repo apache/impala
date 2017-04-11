@@ -19,7 +19,7 @@ import pytest
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
 # Tests to validate HDFS partitioning.
@@ -46,6 +46,7 @@ class TestPartitioning(ImpalaTestSuite):
   # Missing Coverage: Impala deals with boolean partitions created by Hive on a non-hdfs
   # filesystem.
   @SkipIfS3.hive
+  @SkipIfADLS.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   def test_boolean_partitions(self, vector, unique_database):

@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.impala.analysis.DescriptorTable;
@@ -716,7 +717,9 @@ public class JniFrontend {
   private String checkFileSystem(Configuration conf) {
     try {
       FileSystem fs = FileSystem.get(CONF);
-      if (!(fs instanceof DistributedFileSystem || fs instanceof S3AFileSystem)) {
+      if (!(fs instanceof DistributedFileSystem ||
+            fs instanceof S3AFileSystem ||
+            fs instanceof AdlFileSystem)) {
         return "Currently configured default filesystem: " +
             fs.getClass().getSimpleName() + ". " +
             CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY +

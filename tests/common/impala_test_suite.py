@@ -51,7 +51,13 @@ from tests.common.test_vector import ImpalaTestDimension
 from tests.performance.query import Query
 from tests.performance.query_exec_functions import execute_using_jdbc
 from tests.performance.query_executor import JdbcQueryExecConfig
-from tests.util.filesystem_utils import IS_S3, S3_BUCKET_NAME, FILESYSTEM_PREFIX
+from tests.util.filesystem_utils import (
+    IS_S3,
+    IS_ADLS,
+    S3_BUCKET_NAME,
+    ADLS_STORE_NAME,
+    FILESYSTEM_PREFIX)
+
 from tests.util.hdfs_util import (
   HdfsConfig,
   get_hdfs_client,
@@ -68,8 +74,18 @@ from tests.util.thrift_util import create_transport
 from hive_metastore import ThriftHiveMetastore
 from thrift.protocol import TBinaryProtocol
 
+# Initializing the logger before conditional imports, since we will need it
+# for them.
 logging.basicConfig(level=logging.INFO, format='-- %(message)s')
 LOG = logging.getLogger('impala_test_suite')
+
+# The ADLS python client isn't downloaded when ADLS isn't the target FS, so do a
+# conditional import.
+if IS_ADLS:
+  try:
+    from tests.util.adls_util import ADLSClient
+  except ImportError:
+    LOG.error("Need the ADLSClient for testing with ADLS")
 
 IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
 assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
@@ -126,8 +142,11 @@ class ImpalaTestSuite(BaseTestSuite):
 
     cls.impalad_test_service = cls.create_impala_service()
     cls.hdfs_client = cls.create_hdfs_client()
-    cls.s3_client = S3Client(S3_BUCKET_NAME)
-    cls.filesystem_client = cls.s3_client if IS_S3 else cls.hdfs_client
+    cls.filesystem_client = cls.hdfs_client
+    if IS_S3:
+      cls.filesystem_client = S3Client(S3_BUCKET_NAME)
+    elif IS_ADLS:
+      cls.filesystem_client = ADLSClient(ADLS_STORE_NAME)
 
   @classmethod
   def teardown_class(cls):
@@ -645,7 +664,7 @@ class ImpalaTestSuite(BaseTestSuite):
     # If 'skip_hbase' is specified or the filesystem is isilon, s3 or local, we don't
     # need the hbase dimension.
     if pytest.config.option.skip_hbase or TARGET_FILESYSTEM.lower() \
-        in ['s3', 'isilon', 'local']:
+        in ['s3', 'isilon', 'local', 'adls']:
       for tf_dimension in tf_dimensions:
         if tf_dimension.value.file_format == "hbase":
           tf_dimensions.remove(tf_dimension)

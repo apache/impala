@@ -29,6 +29,7 @@ IS_S3 = FILESYSTEM == "s3"
 IS_ISILON = FILESYSTEM == "isilon"
 IS_LOCAL = FILESYSTEM == "local"
 IS_HDFS = FILESYSTEM == "hdfs"
+IS_ADLS = FILESYSTEM == "adls"
 # This condition satisfies both the states where one can assume a default fs
 #   - The environment variable is set to an empty string.
 #   - Tne environment variables is unset ( None )
@@ -41,6 +42,12 @@ ISILON_WEBHDFS_PORT = 8082
 
 # S3 specific values
 S3_BUCKET_NAME = os.getenv("S3_BUCKET")
+
+# ADLS specific values
+ADLS_STORE_NAME = os.getenv("azure_data_lake_store_name")
+ADLS_CLIENT_ID = os.getenv("azure_client_id")
+ADLS_TENANT_ID = os.getenv("azure_tenant_id")
+ADLS_CLIENT_SECRET = os.getenv("azure_client_secret")
 
 def get_fs_path(path):
   return "%s%s" % (FILESYSTEM_PREFIX, path)

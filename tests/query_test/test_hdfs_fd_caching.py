@@ -20,10 +20,11 @@ import pytest
 
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfADLS
 
 
 @SkipIfS3.caching
+@SkipIfADLS.caching
 class TestHdfsFdCaching(ImpalaTestSuite):
   """
   This test suite tests the behavior of HDFS file descriptor caching by evaluating the

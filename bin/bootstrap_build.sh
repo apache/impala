@@ -32,7 +32,7 @@ set -euxo pipefail
 # Install dependencies:
 sudo apt-get update
 sudo apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make maven openjdk-7-jdk \
-    python-dev python-setuptools
+    python-dev python-setuptools libffi-dev
 
 export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64/
 ./buildall.sh -notests -so
