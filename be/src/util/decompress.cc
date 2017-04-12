@@ -435,7 +435,9 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
 
     if (!size_only) {
       int64_t remaining_output_size = *output_len - uncompressed_total_len;
-      DCHECK_GE(remaining_output_size, uncompressed_block_len);
+      if (remaining_output_size < uncompressed_block_len) {
+        return Status(TErrorCode::SNAPPY_DECOMPRESS_DECOMPRESS_SIZE_INCORRECT);
+      }
     }
 
     while (uncompressed_block_len > 0) {
@@ -459,6 +461,11 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
       DCHECK_GT(uncompressed_len, 0);
 
       if (!size_only) {
+        // Check output bounds
+        int64_t remaining_output_size = *output_len - uncompressed_total_len;
+        if (remaining_output_size < uncompressed_len) {
+          return Status(TErrorCode::SNAPPY_DECOMPRESS_DECOMPRESS_SIZE_INCORRECT);
+        }
         // Decompress this snappy block
         if (!snappy::RawUncompress(reinterpret_cast<const char*>(input),
                 compressed_len, output)) {
@@ -522,9 +529,12 @@ int64_t SnappyDecompressor::MaxOutputLen(int64_t input_len, const uint8_t* input
 
 Status SnappyDecompressor::ProcessBlock(bool output_preallocated, int64_t input_length,
     const uint8_t* input, int64_t* output_length, uint8_t** output) {
+  int64_t uncompressed_length = MaxOutputLen(input_length, input);
+  if (uncompressed_length < 0) {
+    return Status(TErrorCode::SNAPPY_DECOMPRESS_UNCOMPRESSED_LENGTH_FAILED);
+  }
+
   if (!output_preallocated) {
-    int64_t uncompressed_length = MaxOutputLen(input_length, input);
-    if (uncompressed_length < 0) return Status("Snappy: GetUncompressedLength failed");
     if (!reuse_buffer_ || out_buffer_ == NULL || buffer_length_ < uncompressed_length) {
       buffer_length_ = uncompressed_length;
       out_buffer_ = memory_pool_->TryAllocate(buffer_length_);
@@ -537,6 +547,12 @@ Status SnappyDecompressor::ProcessBlock(bool output_preallocated, int64_t input_
     }
     *output = out_buffer_;
     *output_length = uncompressed_length;
+  } else {
+    // If the preallocated buffer is too small (e.g. if the file metadata is corrupt),
+    // bail out early. Otherwise, this could result in a buffer overrun.
+    if (uncompressed_length > *output_length) {
+      return Status(TErrorCode::SNAPPY_DECOMPRESS_DECOMPRESS_SIZE_INCORRECT);
+    }
   }
 
   if (!snappy::RawUncompress(reinterpret_cast<const char*>(input),
