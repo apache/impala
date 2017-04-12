@@ -307,12 +307,13 @@ Status ExecEnv::StartServices() {
   metrics_->Init(enable_webserver_ ? webserver_.get() : nullptr);
   impalad_client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
   catalogd_client_cache_->InitMetrics(metrics_.get(), "catalog.server");
-  RETURN_IF_ERROR(RegisterMemoryMetrics(metrics_.get(), true));
+  RETURN_IF_ERROR(RegisterMemoryMetrics(
+      metrics_.get(), true, buffer_reservation_.get(), buffer_pool_.get()));
 
 #ifndef ADDRESS_SANITIZER
   // Limit of -1 means no memory limit.
-  mem_tracker_.reset(new MemTracker(TcmallocMetric::PHYSICAL_BYTES_RESERVED,
-      bytes_limit > 0 ? bytes_limit : -1, "Process"));
+  mem_tracker_.reset(new MemTracker(
+      AggregateMemoryMetric::TOTAL_USED, bytes_limit > 0 ? bytes_limit : -1, "Process"));
 #else
   // tcmalloc metrics aren't defined in ASAN builds, just use the default behavior to
   // track process memory usage (sum of all children trackers).

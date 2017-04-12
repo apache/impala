@@ -21,13 +21,20 @@
 #include "runtime/bufferpool/buffer-allocator.h"
 #include "runtime/bufferpool/buffer-pool-internal.h"
 #include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/system-allocator.h"
 #include "testutil/cpu-util.h"
 #include "testutil/gtest-util.h"
 #include "util/cpu-info.h"
 
 #include "common/names.h"
 
+DECLARE_bool(mmap_buffers);
+DECLARE_bool(madvise_huge_pages);
+
 namespace impala {
+
+using BufferAllocator = BufferPool::BufferAllocator;
+using BufferHandle = BufferPool::BufferHandle;
 
 class BufferAllocatorTest : public ::testing::Test {
  public:
@@ -45,7 +52,7 @@ class BufferAllocatorTest : public ::testing::Test {
     CpuTestUtil::ResetAffinity(); // Some tests modify affinity.
   }
 
-  int GetFreeListSize(BufferPool::BufferAllocator* allocator, int core, int64_t len) {
+  int GetFreeListSize(BufferAllocator* allocator, int core, int64_t len) {
     return allocator->GetFreeListSize(core, len);
   }
 
@@ -70,7 +77,7 @@ TEST_F(BufferAllocatorTest, FreeListSizes) {
   const int NUM_BUFFERS = 512;
   const int64_t TOTAL_BYTES = NUM_BUFFERS * TEST_BUFFER_LEN;
 
-  BufferPool::BufferAllocator allocator(dummy_pool_, TEST_BUFFER_LEN, TOTAL_BYTES);
+  BufferAllocator allocator(dummy_pool_, TEST_BUFFER_LEN, TOTAL_BYTES);
 
   // Allocate a bunch of buffers - all free list checks should miss.
   vector<BufferHandle> buffers(NUM_BUFFERS);
@@ -121,5 +128,69 @@ TEST_F(BufferAllocatorTest, FreeListSizes) {
   allocator.ReleaseMemory(TOTAL_BYTES);
   ASSERT_EQ(0, GetFreeListSize(&allocator, CORE, TEST_BUFFER_LEN));
 }
+
+class SystemAllocatorTest : public ::testing::Test {
+ public:
+  virtual void SetUp() {}
+
+  virtual void TearDown() {}
+
+  static const int64_t MIN_BUFFER_LEN = 4 * 1024;
+  static const int64_t MAX_BUFFER_LEN = 1024 * 1024 * 1024;
+};
+
+/// Basic test that checks that we can allocate buffers of the expected power-of-two
+/// sizes.
+TEST_F(SystemAllocatorTest, BasicPowersOfTwo) {
+  SystemAllocator allocator(MIN_BUFFER_LEN);
+
+  // Iterate a few times to make sure we can reallocate.
+  for (int iter = 0; iter < 5; ++iter) {
+    // Allocate buffers of a mix of sizes.
+    vector<BufferHandle> buffers;
+    for (int alloc_iter = 0; alloc_iter < 2; ++alloc_iter) {
+      for (int64_t len = MIN_BUFFER_LEN; len <= MAX_BUFFER_LEN; len *= 2) {
+        BufferHandle buffer;
+        ASSERT_OK(allocator.Allocate(len, &buffer));
+        ASSERT_TRUE(buffer.is_open());
+        // Write a few bytes to the buffer to check it's valid memory.
+        buffer.data()[0] = 0;
+        buffer.data()[buffer.len() / 2] = 0;
+        buffer.data()[buffer.len() - 1] = 0;
+        buffers.push_back(move(buffer));
+      }
+    }
+
+    // Free all the buffers.
+    for (BufferHandle& buffer : buffers) allocator.Free(move(buffer));
+  }
 }
-IMPALA_TEST_MAIN();
+
+/// Make an absurdly large allocation to test the failure path.
+TEST_F(SystemAllocatorTest, LargeAllocFailure) {
+  SystemAllocator allocator(MIN_BUFFER_LEN);
+  BufferHandle buffer;
+  Status status = allocator.Allocate(1LL << 48, &buffer);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.msg().error(), TErrorCode::BUFFER_ALLOCATION_FAILED);
+}
+}
+
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  int result = 0;
+  for (bool mmap : {false, true}) {
+    for (bool madvise : {false, true}) {
+      if (madvise && !mmap) continue; // Not an interesting combination.
+      std::cerr << "+==================================================" << std::endl
+                << "| Running tests with mmap=" << mmap << " madvise=" << madvise
+                << std::endl
+                << "+==================================================" << std::endl;
+      FLAGS_mmap_buffers = mmap;
+      FLAGS_madvise_huge_pages = madvise;
+      if (RUN_ALL_TESTS() != 0) result = 1;
+    }
+  }
+  return result;
+}

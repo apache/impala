@@ -19,9 +19,10 @@
 #define IMPALA_UTIL_METRICS_H
 
 #include <map>
-#include <string>
 #include <sstream>
 #include <stack>
+#include <string>
+#include <vector>
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/locks.hpp>
@@ -211,6 +212,26 @@ class SimpleMetric : public Metric {
   T value_;
 };
 
+// Gauge metric that computes the sum of several gauges.
+template <typename T>
+class SumGauge : public SimpleMetric<T, TMetricKind::GAUGE> {
+ public:
+  SumGauge(const TMetricDef& metric_def,
+      const std::vector<SimpleMetric<T, TMetricKind::GAUGE>*>& metrics)
+    : SimpleMetric<T, TMetricKind::GAUGE>(metric_def, 0), metrics_(metrics) {}
+  virtual ~SumGauge() {}
+
+ private:
+  virtual void CalculateValue() override {
+    T sum = 0;
+    for (SimpleMetric<T, TMetricKind::GAUGE>* metric : metrics_) sum += metric->value();
+    this->value_ = sum;
+  }
+
+  /// The metrics to be summed.
+  std::vector<SimpleMetric<T, TMetricKind::GAUGE>*> metrics_;
+};
+
 /// Container for a set of metrics. A MetricGroup owns the memory for every metric
 /// contained within it (see Add*() to create commonly used metric
 /// types). Metrics are 'registered' with a MetricGroup, once registered they cannot be
@@ -218,8 +239,8 @@ class SimpleMetric : public Metric {
 //
 /// MetricGroups may be organised hierarchically as a tree.
 //
-/// Typically a metric object is cached by its creator after registration. If a metric must
-/// be retrieved without an available pointer, FindMetricForTesting() will search the
+/// Typically a metric object is cached by its creator after registration. If a metric
+/// must be retrieved without an available pointer, FindMetricForTesting() will search the
 /// MetricGroup and all its descendent MetricGroups in turn.
 //
 /// TODO: Hierarchical naming: that is, resolve "group1.group2.metric-name" to a path

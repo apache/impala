@@ -240,6 +240,14 @@ void BufferPool::ReleaseMemory(int64_t bytes_to_free) {
   allocator_->ReleaseMemory(bytes_to_free);
 }
 
+int64_t BufferPool::GetSystemBytesLimit() const {
+  return allocator_->system_bytes_limit();
+}
+
+int64_t BufferPool::GetSystemBytesAllocated() const {
+  return allocator_->GetSystemBytesAllocated();
+}
+
 bool BufferPool::ClientHandle::IncreaseReservation(int64_t bytes) {
   return impl_->reservation()->IncreaseReservation(bytes);
 }

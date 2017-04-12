@@ -69,8 +69,8 @@ int CatalogdMain(int argc, char** argv) {
     LOG(INFO) << "Not starting webserver";
   }
 
-  metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
-  ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), true));
+  metrics->Init(FLAGS_enable_webserver ? webserver.get() : nullptr);
+  ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), true, nullptr, nullptr));
   StartThreadInstrumentation(metrics.get(), webserver.get(), true);
 
   InitRpcEventTracing(webserver.get());

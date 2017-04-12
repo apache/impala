@@ -281,7 +281,7 @@ error_codes = (
   ("SCRATCH_LIMIT_EXCEEDED", 90, "Scratch space limit of $0 bytes exceeded for query "
    "while spilling data to disk."),
 
-  ("BUFFER_ALLOCATION_FAILED", 91, "Unexpected error allocating $0 byte buffer."),
+  ("BUFFER_ALLOCATION_FAILED", 91, "Unexpected error allocating $0 byte buffer: $1"),
 
   ("PARQUET_ZERO_ROWS_IN_NON_EMPTY_FILE", 92, "File '$0' is corrupt: metadata indicates "
    "a zero row count but there is at least one non-empty row group."),

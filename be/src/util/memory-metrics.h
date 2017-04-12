@@ -29,7 +29,19 @@
 
 namespace impala {
 
+class BufferPool;
+class ReservationTracker;
 class Thread;
+
+/// Memory metrics including TCMalloc and BufferPool memory.
+class AggregateMemoryMetric {
+ public:
+  /// The sum of Tcmalloc TOTAL_BYTES_RESERVED and BufferPool SYSTEM_ALLOCATED.
+  /// Approximates the total amount of physical memory consumed by the backend (i.e. not
+  /// including JVM memory), which is either in use by queries or cached by the BufferPool
+  /// or TcMalloc.
+  static SumGauge<uint64_t>* TOTAL_USED;
+};
 
 /// Specialised metric which exposes numeric properties from tcmalloc.
 class TcmallocMetric : public UIntGauge {
@@ -128,10 +140,44 @@ class JvmMetric : public IntGauge {
   JvmMetricType metric_type_;
 };
 
-/// Registers common tcmalloc memory metrics. If register_jvm_metrics is true, the JVM
-/// memory metrics are also registered.
-Status RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_metrics);
+/// Metric that reports information about the buffer pool.
+class BufferPoolMetric : public UIntGauge {
+ public:
+  static Status InitMetrics(MetricGroup* metrics, ReservationTracker* global_reservations,
+      BufferPool* buffer_pool);
 
+  /// Global metrics, initialized by CreateAndRegisterMetrics().
+  static BufferPoolMetric* LIMIT;
+  static BufferPoolMetric* SYSTEM_ALLOCATED;
+  static BufferPoolMetric* RESERVED;
+
+ protected:
+  virtual void CalculateValue();
+
+ private:
+  enum class BufferPoolMetricType {
+    LIMIT, // Limit on memory allocated to buffers.
+    // Total amount of buffer memory allocated from the system. Always <= LIMIT.
+    SYSTEM_ALLOCATED,
+    // Total of all buffer reservations. May be < SYSTEM_ALLOCATED if not all reservations
+    // are fulfilled, or > SYSTEM_ALLOCATED because of additional memory cached by
+    // BufferPool. Always <= LIMIT.
+    RESERVED,
+  };
+
+  BufferPoolMetric(const TMetricDef& def, BufferPoolMetricType type,
+      ReservationTracker* global_reservations, BufferPool* buffer_pool);
+
+  BufferPoolMetricType type_;
+  ReservationTracker* global_reservations_;
+  BufferPool* buffer_pool_;
+};
+
+/// Registers common tcmalloc memory metrics. If 'register_jvm_metrics' is true, the JVM
+/// memory metrics are also registered. If 'global_reservations' and 'buffer_pool' are
+/// not NULL, also register buffer pool metrics.
+Status RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_metrics,
+    ReservationTracker* global_reservations, BufferPool* buffer_pool);
 }
 
 #endif

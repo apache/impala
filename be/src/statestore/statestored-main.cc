@@ -63,8 +63,8 @@ int StatestoredMain(int argc, char** argv) {
     LOG(INFO) << "Not starting webserver";
   }
 
-  metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
-  ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), false));
+  metrics->Init(FLAGS_enable_webserver ? webserver.get() : nullptr);
+  ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), false, nullptr, nullptr));
   StartThreadInstrumentation(metrics.get(), webserver.get(), false);
   InitRpcEventTracing(webserver.get());
   // TODO: Add a 'common metrics' method to add standard metrics to

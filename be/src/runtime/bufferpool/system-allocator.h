@@ -25,12 +25,9 @@
 namespace impala {
 
 /// The underlying memory allocator for the buffer pool that allocates buffer memory from
-/// the system. All buffers are allocated through the BufferPool's SystemAllocator. The
-/// allocator only handles allocating buffers that are power-of-two multiples of the
-/// minimum buffer length.
-///
-/// TODO:
-/// * Allocate memory with mmap() instead of malloc().
+/// the operating system using mmap(). All buffers are allocated through the BufferPool's
+/// SystemAllocator. The allocator only handles allocating buffers that are power-of-two
+/// multiples of the minimum buffer length.
 class SystemAllocator {
  public:
   SystemAllocator(int64_t min_buffer_len);
@@ -43,6 +40,9 @@ class SystemAllocator {
   void Free(BufferPool::BufferHandle&& buffer);
 
  private:
+  /// Allocate 'len' bytes of memory for a buffer via mmap().
+  Status AllocateViaMMap(int64_t len, uint8_t** buffer_mem);
+
   const int64_t min_buffer_len_;
 };
 }

@@ -1092,6 +1092,48 @@
     "key": "tcmalloc.total-bytes-reserved"
   },
   {
+    "description": "Maximum allowed bytes allocated by the buffer pool.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Allocated Memory Limit.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "buffer-pool.limit"
+  },
+  {
+    "description": "Total buffer memory currently allocated by the buffer pool.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Total Allocated Memory.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "buffer-pool.system-allocated"
+  },
+  {
+    "description": "Total memory currently reserved for buffers.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Total Reserved Memory.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "buffer-pool.reserved"
+  },
+  {
+    "description": "Total memory currently used by TCMalloc and buffer pool.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Total Used Memory.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "memory.total-used"
+  },
+  {
     "description": "The number of running threads in this process.",
     "contexts": [
       "STATESTORE",

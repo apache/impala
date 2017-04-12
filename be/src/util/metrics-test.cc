@@ -106,6 +106,27 @@ TEST_F(MetricsTest, GaugeMetrics) {
   AssertValue(int_gauge_with_units, 10, "10s000ms");
 }
 
+TEST_F(MetricsTest, SumGauge) {
+  MetricGroup metrics("SumGauge");
+  AddMetricDef("gauge1", TMetricKind::GAUGE, TUnit::NONE);
+  AddMetricDef("gauge2", TMetricKind::GAUGE, TUnit::NONE);
+  AddMetricDef("sum", TMetricKind::GAUGE, TUnit::NONE);
+  IntGauge* gauge1 = metrics.AddGauge<int64_t>("gauge1", 0);
+  IntGauge* gauge2 = metrics.AddGauge<int64_t>("gauge2", 0);
+
+  vector<IntGauge*> gauges({gauge1, gauge2});
+  IntGauge* sum_gauge =
+      metrics.RegisterMetric(new SumGauge<int64_t>(MetricDefs::Get("sum"), gauges));
+
+  AssertValue(sum_gauge, 0, "0");
+  gauge1->Increment(1);
+  AssertValue(sum_gauge, 1, "1");
+  gauge2->Increment(-1);
+  AssertValue(sum_gauge, 0, "0");
+  gauge2->Increment(100);
+  AssertValue(sum_gauge, 100, "100");
+}
+
 TEST_F(MetricsTest, PropertyMetrics) {
   MetricGroup metrics("PropertyMetrics");
   AddMetricDef("bool_property", TMetricKind::PROPERTY, TUnit::NONE);
@@ -196,7 +217,7 @@ TEST_F(MetricsTest, StatsMetricsSingle) {
 TEST_F(MetricsTest, MemMetric) {
 #ifndef ADDRESS_SANITIZER
   MetricGroup metrics("MemMetrics");
-  RegisterMemoryMetrics(&metrics, false);
+  RegisterMemoryMetrics(&metrics, false, nullptr, nullptr);
   // Smoke test to confirm that tcmalloc metrics are returning reasonable values.
   UIntGauge* bytes_in_use =
       metrics.FindMetricForTesting<UIntGauge>("tcmalloc.bytes-in-use");
@@ -228,7 +249,7 @@ TEST_F(MetricsTest, MemMetric) {
 
 TEST_F(MetricsTest, JvmMetrics) {
   MetricGroup metrics("JvmMetrics");
-  RegisterMemoryMetrics(&metrics, true);
+  RegisterMemoryMetrics(&metrics, true, nullptr, nullptr);
   UIntGauge* jvm_total_used =
       metrics.GetOrCreateChildGroup("jvm")->FindMetricForTesting<UIntGauge>(
           "jvm.total.current-usage-bytes");

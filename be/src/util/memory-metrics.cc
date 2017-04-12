@@ -20,6 +20,8 @@
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
 
+#include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "util/jni-util.h"
 #include "util/time.h"
 
@@ -27,25 +29,40 @@ using boost::algorithm::to_lower;
 using namespace impala;
 using namespace strings;
 
+DECLARE_bool(mmap_buffers);
+
+SumGauge<uint64_t>* AggregateMemoryMetric::TOTAL_USED = nullptr;
+
 TcmallocMetric* TcmallocMetric::BYTES_IN_USE = NULL;
 TcmallocMetric* TcmallocMetric::PAGEHEAP_FREE_BYTES = NULL;
 TcmallocMetric* TcmallocMetric::TOTAL_BYTES_RESERVED = NULL;
 TcmallocMetric* TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = NULL;
 TcmallocMetric::PhysicalBytesMetric* TcmallocMetric::PHYSICAL_BYTES_RESERVED = NULL;
 
-TcmallocMetric* TcmallocMetric::CreateAndRegister(MetricGroup* metrics, const string& key,
-  const string& tcmalloc_var) {
-    return metrics->RegisterMetric(
-        new TcmallocMetric(MetricDefs::Get(key), tcmalloc_var));
+BufferPoolMetric* BufferPoolMetric::LIMIT = nullptr;
+BufferPoolMetric* BufferPoolMetric::SYSTEM_ALLOCATED = nullptr;
+BufferPoolMetric* BufferPoolMetric::RESERVED = nullptr;
+
+TcmallocMetric* TcmallocMetric::CreateAndRegister(
+    MetricGroup* metrics, const string& key, const string& tcmalloc_var) {
+  return metrics->RegisterMetric(new TcmallocMetric(MetricDefs::Get(key), tcmalloc_var));
 }
 
-Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_metrics) {
+Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_metrics,
+    ReservationTracker* global_reservations, BufferPool* buffer_pool) {
+  if (global_reservations != nullptr) {
+    DCHECK(buffer_pool != nullptr);
+    RETURN_IF_ERROR(
+        BufferPoolMetric::InitMetrics(metrics, global_reservations, buffer_pool));
+  }
 #ifndef ADDRESS_SANITIZER
-  TcmallocMetric::BYTES_IN_USE = TcmallocMetric::CreateAndRegister(metrics,
-      "tcmalloc.bytes-in-use", "generic.current_allocated_bytes");
+  // We rely on TCMalloc for our global memory metrics, so skip setting them up
+  // if we're not using TCMalloc.
+  TcmallocMetric::BYTES_IN_USE = TcmallocMetric::CreateAndRegister(
+      metrics, "tcmalloc.bytes-in-use", "generic.current_allocated_bytes");
 
-  TcmallocMetric::TOTAL_BYTES_RESERVED = TcmallocMetric::CreateAndRegister(metrics,
-      "tcmalloc.total-bytes-reserved", "generic.heap_size");
+  TcmallocMetric::TOTAL_BYTES_RESERVED = TcmallocMetric::CreateAndRegister(
+      metrics, "tcmalloc.total-bytes-reserved", "generic.heap_size");
 
   TcmallocMetric::PAGEHEAP_FREE_BYTES = TcmallocMetric::CreateAndRegister(metrics,
       "tcmalloc.pageheap-free-bytes", "tcmalloc.pageheap_free_bytes");
@@ -53,11 +70,22 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
   TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = TcmallocMetric::CreateAndRegister(metrics,
       "tcmalloc.pageheap-unmapped-bytes", "tcmalloc.pageheap_unmapped_bytes");
 
-  TcmallocMetric::PHYSICAL_BYTES_RESERVED = metrics->RegisterMetric(
-      new TcmallocMetric::PhysicalBytesMetric(
+  TcmallocMetric::PHYSICAL_BYTES_RESERVED =
+      metrics->RegisterMetric(new TcmallocMetric::PhysicalBytesMetric(
           MetricDefs::Get("tcmalloc.physical-bytes-reserved")));
 #endif
 
+  // Add compound metrics that track totals across TCMalloc and the buffer pool.
+  // total-used should track the total physical memory in use.
+  vector<UIntGauge*> used_metrics{TcmallocMetric::PHYSICAL_BYTES_RESERVED};
+  if (FLAGS_mmap_buffers && global_reservations != nullptr) {
+    // If we mmap() buffers, the buffers are not allocated via TCMalloc. Ensure they are
+    // properly tracked.
+    used_metrics.push_back(BufferPoolMetric::SYSTEM_ALLOCATED);
+  }
+
+  AggregateMemoryMetric::TOTAL_USED = metrics->RegisterMetric(
+      new SumGauge<uint64_t>(MetricDefs::Get("memory.total-used"), used_metrics));
   if (register_jvm_metrics) {
     RETURN_IF_ERROR(JvmMetric::InitMetrics(metrics->GetOrCreateChildGroup("jvm")));
   }
@@ -131,6 +159,44 @@ void JvmMetric::CalculateValue() {
       return;
     case PEAK_COMMITTED: value_ = pool.peak_committed;
       return;
-    default: DCHECK(false) << "Unknown JvmMetricType: " << metric_type_;
+    default:
+      DCHECK(false) << "Unknown JvmMetricType: " << metric_type_;
+  }
+}
+
+Status BufferPoolMetric::InitMetrics(MetricGroup* metrics,
+    ReservationTracker* global_reservations, BufferPool* buffer_pool) {
+  LIMIT = metrics->RegisterMetric(
+      new BufferPoolMetric(MetricDefs::Get("buffer-pool.limit"),
+          BufferPoolMetricType::LIMIT, global_reservations, buffer_pool));
+  SYSTEM_ALLOCATED = metrics->RegisterMetric(
+      new BufferPoolMetric(MetricDefs::Get("buffer-pool.system-allocated"),
+          BufferPoolMetricType::SYSTEM_ALLOCATED, global_reservations, buffer_pool));
+  RESERVED = metrics->RegisterMetric(
+      new BufferPoolMetric(MetricDefs::Get("buffer-pool.reserved"),
+          BufferPoolMetricType::RESERVED, global_reservations, buffer_pool));
+  return Status::OK();
+}
+
+BufferPoolMetric::BufferPoolMetric(const TMetricDef& def, BufferPoolMetricType type,
+    ReservationTracker* global_reservations, BufferPool* buffer_pool)
+  : UIntGauge(def, 0),
+    type_(type),
+    global_reservations_(global_reservations),
+    buffer_pool_(buffer_pool) {}
+
+void BufferPoolMetric::CalculateValue() {
+  switch (type_) {
+    case BufferPoolMetricType::LIMIT:
+      value_ = buffer_pool_->GetSystemBytesLimit();
+      break;
+    case BufferPoolMetricType::SYSTEM_ALLOCATED:
+      value_ = buffer_pool_->GetSystemBytesAllocated();
+      break;
+    case BufferPoolMetricType::RESERVED:
+      value_ = global_reservations_->GetReservation();
+      break;
+    default:
+      DCHECK(false) << "Unknown BufferPoolMetricType: " << static_cast<int>(type_);
   }
 }

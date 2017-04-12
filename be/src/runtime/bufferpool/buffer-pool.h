@@ -252,6 +252,8 @@ class BufferPool : public CacheLineAligned {
   std::string DebugString();
 
   int64_t min_buffer_len() const { return min_buffer_len_; }
+  int64_t GetSystemBytesLimit() const;
+  int64_t GetSystemBytesAllocated() const;
 
   /// Generous upper bounds on page and buffer size and the number of different
   /// power-of-two buffer sizes.
