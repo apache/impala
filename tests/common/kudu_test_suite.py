@@ -45,6 +45,11 @@ class KuduTestSuite(ImpalaTestSuite):
   __DB_NAME = None
 
   @classmethod
+  def get_conn_timeout(cls):
+    # For IMPALA-5079,IMPALA-4454
+    return 60 * 5 # 5 minutes
+
+  @classmethod
   def setup_class(cls):
     if os.environ["KUDU_IS_SUPPORTED"] == "false":
       pytest.skip("Kudu is not supported")
