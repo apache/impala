@@ -123,8 +123,21 @@ class TmpFileMgr {
 
     /// Synchronously read the data referenced by 'handle' from the temporary file into
     /// 'buffer'. buffer.len() must be the same as handle->len(). Can only be called
-    /// after a write successfully completes.
+    /// after a write successfully completes. Should not be called while an async read
+    /// is in flight. Equivalent to calling ReadAsync() then WaitForAsyncRead().
     Status Read(WriteHandle* handle, MemRange buffer) WARN_UNUSED_RESULT;
+
+    /// Asynchronously read the data referenced by 'handle' from the temporary file into
+    /// 'buffer'. buffer.len() must be the same as handle->len(). Can only be called
+    /// after a write successfully completes. WaitForAsyncRead() must be called before the
+    /// data in the buffer is valid. Should not be called while an async read
+    /// is already in flight.
+    Status ReadAsync(WriteHandle* handle, MemRange buffer) WARN_UNUSED_RESULT;
+
+    /// Wait until the read started for 'handle' by ReadAsync() completes. 'buffer'
+    /// should be the same buffer passed into ReadAsync(). Returns an error if the
+    /// read fails. Retrying a failed read by calling ReadAsync() again is allowed.
+    Status WaitForAsyncRead(WriteHandle* handle, MemRange buffer) WARN_UNUSED_RESULT;
 
     /// Restore the original data in the 'buffer' passed to Write(), decrypting or
     /// decompressing as necessary. Returns an error if restoring the data fails.
@@ -215,7 +228,7 @@ class TmpFileMgr {
     /// Amount of scratch space allocated in bytes.
     RuntimeProfile::Counter* const scratch_space_bytes_used_counter_;
 
-    /// Time taken for disk reads.
+    /// Time spent waiting for disk reads.
     RuntimeProfile::Counter* const disk_read_timer_;
 
     /// Time spent in disk spill encryption, decryption, and integrity checking.
@@ -263,13 +276,20 @@ class TmpFileMgr {
    public:
     /// The write must be destroyed by passing it to FileGroup - destroying it before
     /// the write completes is an error.
-    ~WriteHandle() { DCHECK(!write_in_flight_); }
+    ~WriteHandle() {
+      DCHECK(!write_in_flight_);
+      DCHECK(read_range_ == nullptr);
+    }
 
-    /// Cancels the write asynchronously. After Cancel() is called, writes are not
+    /// Cancels any in-flight writes or reads. Reads are cancelled synchronously and
+    /// writes are cancelled asynchronously. After Cancel() is called, writes are not
     /// retried. The write callback may be called with a CANCELLED status (unless
     /// it succeeded or encountered a different error first).
     /// TODO: IMPALA-3200: make this private once BufferedBlockMgr doesn't need it.
     void Cancel();
+
+    /// Cancel any in-flight read synchronously.
+    void CancelRead();
 
     /// Blocks until the write completes either successfully or unsuccessfully.
     /// May return before the write callback has been called.
@@ -332,6 +352,10 @@ class TmpFileMgr {
     /// If --disk_spill_encryption is on, our hash of the data being written. Filled in
     /// on writes; verified on reads. This is calculated _after_ encryption.
     IntegrityHash hash_;
+
+    /// The scan range for the read that is currently in flight. NULL when no read is in
+    /// flight.
+    DiskIoMgr::ScanRange* read_range_;
 
     /// Protects all fields below while 'write_in_flight_' is true. At other times, it is
     /// invalid to call WriteRange/FileGroup methods concurrently from multiple threads,

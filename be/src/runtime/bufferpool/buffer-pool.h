@@ -133,7 +133,9 @@ class SystemAllocator;
 /// * Once the operator needs the page's contents again and has sufficient unused
 ///   reservation, it can call Pin(), which brings the page's contents back into memory,
 ///   perhaps in a different buffer. Therefore the operator must fix up any pointers into
-///   the previous buffer.
+///   the previous buffer. Pin() can execute asynchronously - the caller only blocks
+///   waiting for read I/O if it calls GetBuffer() or ExtractBuffer() while the read is
+///   in flight.
 /// * If the operator is done with the page, it can call FreeBuffer() to destroy the
 ///   handle and release resources, or call ExtractBuffer() to extract the buffer.
 ///
@@ -184,15 +186,19 @@ class BufferPool : public CacheLineAligned {
   /// sufficient unused reservation to pin the new page (otherwise it will DCHECK).
   /// CreatePage() only fails when a system error prevents the buffer pool from fulfilling
   /// the reservation.
-  /// On success, the handle is mapped to the new page.
-  Status CreatePage(
-      ClientHandle* client, int64_t len, PageHandle* handle) WARN_UNUSED_RESULT;
+  /// On success, the handle is mapped to the new page and 'buffer', if non-NULL, is set
+  /// to the page's buffer.
+  Status CreatePage(ClientHandle* client, int64_t len, PageHandle* handle,
+      const BufferHandle** buffer = nullptr) WARN_UNUSED_RESULT;
 
   /// Increment the pin count of 'handle'. After Pin() the underlying page will
-  /// be mapped to a buffer, which will be accessible through 'handle'. Uses
-  /// reservation from 'client'. The caller is responsible for ensuring it has enough
-  /// unused reservation before calling Pin() (otherwise it will DCHECK). Pin() only
-  /// fails when a system error prevents the buffer pool from fulfilling the reservation.
+  /// be mapped to a buffer, which will be accessible through 'handle'. If the data
+  /// was evicted from memory, it will be read back into memory asynchronously.
+  /// Attempting to access the buffer with ExtractBuffer() or handle.GetBuffer() will
+  /// block until the data is in memory. The caller is responsible for ensuring it has
+  /// enough unused reservation before calling Pin() (otherwise it will DCHECK). Pin()
+  /// only fails when a system error prevents the buffer pool from fulfilling the
+  /// reservation or if an I/O error is encountered reading back data from disk.
   /// 'handle' must be open.
   Status Pin(ClientHandle* client, PageHandle* handle) WARN_UNUSED_RESULT;
 
@@ -214,9 +220,11 @@ class BufferPool : public CacheLineAligned {
   /// Extracts buffer from a pinned page. After this returns, the page referenced by
   /// 'page_handle' will be destroyed and 'buffer_handle' will reference the buffer from
   /// 'page_handle'. This may decrease reservation usage of 'client' if the page was
-  /// pinned multiple times via 'page_handle'.
-  void ExtractBuffer(
-      ClientHandle* client, PageHandle* page_handle, BufferHandle* buffer_handle);
+  /// pinned multiple times via 'page_handle'. May return an error if 'page_handle' was
+  /// unpinned earlier with no subsequent GetBuffer() call and a read error is
+  /// encountered while bringing the page back into memory.
+  Status ExtractBuffer(
+      ClientHandle* client, PageHandle* page_handle, BufferHandle* buffer_handle) WARN_UNUSED_RESULT;
 
   /// Allocates a new buffer of 'len' bytes. Uses reservation from 'client'. The caller
   /// is responsible for ensuring it has enough unused reservation before calling
@@ -400,19 +408,15 @@ class BufferPool::PageHandle {
   bool is_pinned() const { return pin_count() > 0; }
   int pin_count() const;
   int64_t len() const;
-  /// Get a pointer to the start of the page's buffer. Only valid to call if the page
-  /// is pinned.
-  uint8_t* data() const { return buffer_handle()->data(); }
 
-  /// Convenience function to get the memory range for the page's buffer. Only valid to
-  /// call if the page is pinned.
-  MemRange mem_range() const { return buffer_handle()->mem_range(); }
-
-  /// Return a pointer to the page's buffer handle. Only valid to call if the page is
-  /// pinned via this handle. Only const accessors of the returned handle can be used:
-  /// it is invalid to call FreeBuffer() or TransferBuffer() on it or to otherwise modify
-  /// the handle.
-  const BufferHandle* buffer_handle() const;
+  /// Get a reference to the page's buffer handle. Only valid to call if the page is
+  /// pinned. If the page was previously unpinned and the read I/O for the data is still
+  /// in flight, this can block waiting. Returns an error if an error was encountered
+  /// reading the data back, which can only happen if Unpin() was called on the page
+  /// since the last call to GetBuffer(). Only const accessors of the returned handle can
+  /// be used: it is invalid to call FreeBuffer() or TransferBuffer() on it or to
+  /// otherwise modify the handle.
+  Status GetBuffer(const BufferHandle** buffer_handle) const WARN_UNUSED_RESULT;
 
   std::string DebugString() const;
 
@@ -431,9 +435,8 @@ class BufferPool::PageHandle {
   /// The internal page structure. NULL if the handle is not open.
   Page* page_;
 
-  /// The client the page handle belongs to, used to validate that the correct client
-  /// is being used.
-  const ClientHandle* client_;
+  /// The client the page handle belongs to.
+  ClientHandle* client_;
 };
 
 inline BufferPool::BufferHandle::BufferHandle(BufferHandle&& src) {

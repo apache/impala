@@ -90,11 +90,18 @@ int64_t BufferPool::PageHandle::len() const {
   return page_->len; // Does not require locking.
 }
 
-const BufferPool::BufferHandle* BufferPool::PageHandle::buffer_handle() const {
+Status BufferPool::PageHandle::GetBuffer(const BufferHandle** buffer) const {
+  DCHECK(is_open());
+  DCHECK(client_->is_registered());
   DCHECK(is_pinned());
-  // The 'buffer' field cannot change while the page is pinned, so it is safe to access
-  // without locking.
-  return &page_->buffer;
+  if (page_->pin_in_flight) {
+    // Finish the work started in Pin().
+    RETURN_IF_ERROR(client_->impl_->FinishMoveEvictedToPinned(page_));
+  }
+  DCHECK(!page_->pin_in_flight);
+  *buffer = &page_->buffer;
+  DCHECK((*buffer)->is_open());
+  return Status::OK();
 }
 
 BufferPool::BufferPool(int64_t min_buffer_len, int64_t buffer_bytes_limit)
@@ -123,16 +130,18 @@ void BufferPool::DeregisterClient(ClientHandle* client) {
   client->impl_ = NULL;
 }
 
-Status BufferPool::CreatePage(ClientHandle* client, int64_t len, PageHandle* handle) {
+Status BufferPool::CreatePage(
+    ClientHandle* client, int64_t len, PageHandle* handle, const BufferHandle** buffer) {
   DCHECK(!handle->is_open());
   DCHECK_GE(len, min_buffer_len_);
   DCHECK_EQ(len, BitUtil::RoundUpToPowerOfTwo(len));
 
-  BufferHandle buffer;
+  BufferHandle new_buffer;
   // No changes have been made to state yet, so we can cleanly return on error.
-  RETURN_IF_ERROR(AllocateBuffer(client, len, &buffer));
-  Page* page = client->impl_->CreatePinnedPage(move(buffer));
+  RETURN_IF_ERROR(AllocateBuffer(client, len, &new_buffer));
+  Page* page = client->impl_->CreatePinnedPage(move(new_buffer));
   handle->Open(page, client);
+  if (buffer != nullptr) *buffer = &page->buffer;
   return Status::OK();
 }
 
@@ -140,10 +149,16 @@ void BufferPool::DestroyPage(ClientHandle* client, PageHandle* handle) {
   if (!handle->is_open()) return; // DestroyPage() should be idempotent.
 
   if (handle->is_pinned()) {
+    // Cancel the read I/O - we don't need the data any more.
+    if (handle->page_->pin_in_flight) {
+      handle->page_->write_handle->CancelRead();
+      handle->page_->pin_in_flight = false;
+    }
     // In the pinned case, delegate to ExtractBuffer() and FreeBuffer() to do the work
     // of cleaning up the page, freeing the buffer and updating reservations correctly.
     BufferHandle buffer;
-    ExtractBuffer(client, handle, &buffer);
+    Status status = ExtractBuffer(client, handle, &buffer);
+    DCHECK(status.ok()) << status.msg().msg();
     FreeBuffer(client, &buffer);
   } else {
     // In the unpinned case, no reservations are used so we just clean up the page.
@@ -158,7 +173,7 @@ Status BufferPool::Pin(ClientHandle* client, PageHandle* handle) {
 
   Page* page = handle->page_;
   if (page->pin_count == 0) {
-    RETURN_IF_ERROR(client->impl_->MoveToPinned(client, handle));
+    RETURN_IF_ERROR(client->impl_->StartMoveToPinned(client, page));
     COUNTER_ADD(client->impl_->counters().peak_unpinned_bytes, -page->len);
   }
   // Update accounting last to avoid complicating the error return path above.
@@ -178,16 +193,26 @@ void BufferPool::Unpin(ClientHandle* client, PageHandle* handle) {
   reservation->ReleaseTo(page->len);
 
   if (--page->pin_count > 0) return;
-  client->impl_->MoveToDirtyUnpinned(page);
+  if (page->pin_in_flight) {
+    // Data is not in memory - move it back to evicted.
+    client->impl_->UndoMoveEvictedToPinned(page);
+  } else {
+    // Data is in memory - move it to dirty unpinned.
+    client->impl_->MoveToDirtyUnpinned(page);
+  }
   COUNTER_ADD(client->impl_->counters().total_unpinned_bytes, handle->len());
   COUNTER_ADD(client->impl_->counters().peak_unpinned_bytes, handle->len());
 }
 
-void BufferPool::ExtractBuffer(
+Status BufferPool::ExtractBuffer(
     ClientHandle* client, PageHandle* page_handle, BufferHandle* buffer_handle) {
   DCHECK(page_handle->is_pinned());
   DCHECK(!buffer_handle->is_open());
   DCHECK_EQ(page_handle->client_, client);
+
+  // If an async pin is in flight, we need to wait for it.
+  const BufferHandle* dummy;
+  RETURN_IF_ERROR(page_handle->GetBuffer(&dummy));
 
   // Bring the pin count to 1 so that we're not using surplus reservations.
   while (page_handle->pin_count() > 1) Unpin(client, page_handle);
@@ -195,6 +220,7 @@ void BufferPool::ExtractBuffer(
   // Destroy the page and extract the buffer.
   client->impl_->DestroyPageInternal(page_handle, buffer_handle);
   DCHECK(buffer_handle->is_open());
+  return Status::OK();
 }
 
 Status BufferPool::AllocateBuffer(
@@ -347,6 +373,7 @@ void BufferPool::Client::MoveToDirtyUnpinned(Page* page) {
   // Only valid to unpin pages if spilling is enabled.
   DCHECK(spilling_enabled());
   DCHECK_EQ(0, page->pin_count);
+
   unique_lock<mutex> lock(lock_);
   DCHECK_CONSISTENCY();
   DCHECK(pinned_pages_.Contains(page));
@@ -357,8 +384,7 @@ void BufferPool::Client::MoveToDirtyUnpinned(Page* page) {
   WriteDirtyPagesAsync();
 }
 
-Status BufferPool::Client::MoveToPinned(ClientHandle* client, PageHandle* handle) {
-  Page* page = handle->page_;
+Status BufferPool::Client::StartMoveToPinned(ClientHandle* client, Page* page) {
   unique_lock<mutex> cl(lock_);
   DCHECK_CONSISTENCY();
   // Propagate any write errors that occurred for this client.
@@ -390,31 +416,55 @@ Status BufferPool::Client::MoveToPinned(ClientHandle* client, PageHandle* handle
     return file_group_->RestoreData(move(page->write_handle), page->buffer.mem_range());
   }
   // If the page wasn't in the clean pages list, it must have been evicted.
-  return MoveEvictedToPinned(&cl, client, handle);
+  return StartMoveEvictedToPinned(&cl, client, page);
 }
 
-Status BufferPool::Client::MoveEvictedToPinned(
-    unique_lock<mutex>* client_lock, ClientHandle* client, PageHandle* handle) {
-  Page* page = handle->page_;
+Status BufferPool::Client::StartMoveEvictedToPinned(
+    unique_lock<mutex>* client_lock, ClientHandle* client, Page* page) {
   DCHECK(!page->buffer.is_open());
 
-  // Don't hold any locks while allocating or reading back the data. It is safe to modify
-  // the page's buffer handle without holding any locks because no concurrent operations
-  // can modify evicted pages.
-  client_lock->unlock();
+  // Safe to modify the page's buffer handle without holding the page lock because no
+  // concurrent operations can modify evicted pages.
   BufferHandle buffer;
   RETURN_IF_ERROR(pool_->allocator_->Allocate(client, page->len, &page->buffer));
   COUNTER_ADD(counters().bytes_read, page->len);
   COUNTER_ADD(counters().read_io_ops, 1);
-  {
-    SCOPED_TIMER(counters().read_wait_time);
-    RETURN_IF_ERROR(
-        file_group_->Read(page->write_handle.get(), page->buffer.mem_range()));
-  }
-  file_group_->DestroyWriteHandle(move(page->write_handle));
-  client_lock->lock();
+  RETURN_IF_ERROR(
+      file_group_->ReadAsync(page->write_handle.get(), page->buffer.mem_range()));
   pinned_pages_.Enqueue(page);
+  page->pin_in_flight = true;
   DCHECK_CONSISTENCY();
+  return Status::OK();
+}
+
+void BufferPool::Client::UndoMoveEvictedToPinned(Page* page) {
+  // We need to get the page back to the evicted state where:
+  // * There is no in-flight read.
+  // * The page's data is on disk referenced by 'write_handle'
+  // * The page has no attached buffer.
+  DCHECK(page->pin_in_flight);
+  page->write_handle->CancelRead();
+  page->pin_in_flight = false;
+
+  unique_lock<mutex> lock(lock_);
+  DCHECK_CONSISTENCY();
+  DCHECK(pinned_pages_.Contains(page));
+  pinned_pages_.Remove(page);
+  // Discard the buffer - the pin was in flight so there was no way that a valid
+  // reference to the buffer's contents was returned since the pin was still in flight.
+  pool_->allocator_->Free(move(page->buffer));
+}
+
+Status BufferPool::Client::FinishMoveEvictedToPinned(Page* page) {
+  DCHECK(page->pin_in_flight);
+  SCOPED_TIMER(counters().read_wait_time);
+  // Don't hold any locks while reading back the data. It is safe to modify the page's
+  // buffer handle without holding any locks because no concurrent operations can modify
+  // evicted pages.
+  RETURN_IF_ERROR(
+      file_group_->WaitForAsyncRead(page->write_handle.get(), page->buffer.mem_range()));
+  file_group_->DestroyWriteHandle(move(page->write_handle));
+  page->pin_in_flight = false;
   return Status::OK();
 }
 

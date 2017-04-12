@@ -37,15 +37,21 @@
 /// Each Page object is owned by at most one InternalList<Page> at any given point.
 /// Each page is either pinned or unpinned. Unpinned has a number of sub-states, which
 /// is determined by which list in Client/BufferPool contains the page.
-/// * Pinned: Always in this state when 'pin_count' > 0. The page is in
-///     Client::pinned_pages_.
-/// * Unpinned - Dirty: When no write has been started for an unpinned page. The page is
-///     in Client::dirty_unpinned_pages_.
-/// * Unpinned - Write in flight: When the write has been started but not completed for
-///     a dirty unpinned page. The page is in Client::write_in_flight_pages_. For
-///     accounting purposes this is considered a dirty page.
-/// * Unpinned - Clean: When the write has completed but the page was not evicted. The
-///     page is in a clean pages list in a BufferAllocator arena.
+/// * Pinned: Always in this state when 'pin_count' > 0. The page has a buffer and is in
+///     Client::pinned_pages_. 'pin_in_flight' determines which sub-state the page is in:
+///   -> When pin_in_flight=false, the buffer contains the page's data and the client can
+///      read and write to the buffer.
+///   -> When pin_in_flight=true, the page's data is in the process of being read from
+///      scratch disk into the buffer. Clients will block on the read I/O if they attempt
+///      to access the buffer.
+/// * Unpinned - Dirty: When no write to scratch has been started for an unpinned page.
+///     The page is in Client::dirty_unpinned_pages_.
+/// * Unpinned - Write in flight: When the write to scratch has been started but not
+///     completed for a dirty unpinned page. The page is in
+///     Client::write_in_flight_pages_. For accounting purposes this is considered a
+///     dirty page.
+/// * Unpinned - Clean: When the write to scratch has completed but the page was not
+///     evicted. The page is in a clean pages list in a BufferAllocator arena.
 /// * Unpinned - Evicted: After a clean page's buffer has been reclaimed. The page is
 ///     not in any list.
 ///
@@ -91,7 +97,8 @@ namespace impala {
 /// The internal representation of a page, which can be pinned or unpinned. See the
 /// class comment for explanation of the different page states.
 struct BufferPool::Page : public InternalList<Page>::Node {
-  Page(Client* client, int64_t len) : client(client), len(len), pin_count(0) {}
+  Page(Client* client, int64_t len)
+    : client(client), len(len), pin_count(0), pin_in_flight(false) {}
 
   std::string DebugString();
 
@@ -107,6 +114,11 @@ struct BufferPool::Page : public InternalList<Page>::Node {
   /// The pin count of the page. Only accessed in contexts that are passed the associated
   /// PageHandle, so it cannot be accessed by multiple threads concurrently.
   int pin_count;
+
+  /// True if the read I/O to pin the page was started but not completed. Only accessed
+  /// in contexts that are passed the associated PageHandle, so it cannot be accessed
+  /// by multiple threads concurrently.
+  bool pin_in_flight;
 
   /// Non-null if there is a write in flight, the page is clean, or the page is evicted.
   std::unique_ptr<TmpFileMgr::WriteHandle> write_handle;
@@ -211,10 +223,20 @@ class BufferPool::Client {
   void MoveToDirtyUnpinned(Page* page);
 
   /// Move an unpinned page to the pinned state, moving between data structures and
-  /// reading from disk if necessary. Returns once the page's buffer is allocated
-  /// and contains the page's data. Neither the client's lock nor
-  /// handle->page_->buffer_lock should be held by the caller.
-  Status MoveToPinned(ClientHandle* client, PageHandle* handle);
+  /// reading from disk if necessary. Ensures the page has a buffer. If the data is
+  /// already in memory, ensures the data is in the page's buffer. If the data is on
+  /// disk, starts an async read of the data and sets 'pin_in_flight' on the page to
+  /// true. Neither the client's lock nor page->buffer_lock should be held by the caller.
+  Status StartMoveToPinned(ClientHandle* client, Page* page);
+
+  /// Moves a page that has a pin in flight back to the evicted state, undoing
+  /// StartMoveToPinned(). Neither the client's lock nor page->buffer_lock should be held
+  /// by the caller.
+  void UndoMoveEvictedToPinned(Page* page);
+
+  /// Finish the work of bring the data of an evicted page to memory if
+  /// page->pin_in_flight was set to true by StartMoveToPinned().
+  Status FinishMoveEvictedToPinned(Page* page);
 
   /// Must be called once before allocating a buffer of 'len' via the AllocateBuffer()
   /// API to deduct from the client's reservation and update internal accounting. Cleans
@@ -285,12 +307,12 @@ class BufferPool::Client {
   /// Called when a write for 'page' completes.
   void WriteCompleteCallback(Page* page, const Status& write_status);
 
-  /// Move an evicted page to the pinned state by allocating a new buffer, reading data
-  /// from disk and moving the page to 'pinned_pages_'. client->impl must be locked by
-  /// the caller via 'client_lock' and handle->page must be unlocked. 'client_lock' is
-  /// released then reacquired.
-  Status MoveEvictedToPinned(boost::unique_lock<boost::mutex>* client_lock,
-      ClientHandle* client, PageHandle* handle);
+  /// Move an evicted page to the pinned state by allocating a new buffer, starting an
+  /// async read from disk and moving the page to 'pinned_pages_'. client->impl must be
+  /// locked by the caller via 'client_lock' and handle->page must be unlocked.
+  /// 'client_lock' is released then reacquired.
+  Status StartMoveEvictedToPinned(
+      boost::unique_lock<boost::mutex>* client_lock, ClientHandle* client, Page* page);
 
   /// The buffer pool that owns the client.
   BufferPool* const pool_;

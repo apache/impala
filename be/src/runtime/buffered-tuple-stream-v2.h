@@ -152,7 +152,9 @@ class TupleRow;
 ///     or false respectively) before advancing to the next page.
 ///   2. Pinned: All pages in the stream are pinned so do not need to be pinned or
 ///     unpinned when reading from the stream. If delete on read is true, pages are
-///     deleted after being read.
+///     deleted after being read. If the stream was previously unpinned, the page's data
+///     may not yet be in memory - reading from the stream can block on I/O or fail with
+///     an I/O error.
 /// Write:
 ///   1. Unpinned: Unpin pages as they fill up. This means that only a enough reservation
 ///     to pin a single write page is required to write to the stream, regardless of the
@@ -314,10 +316,9 @@ class BufferedTupleStreamV2 {
       bool* got_rows) WARN_UNUSED_RESULT;
 
   /// Must be called once at the end to cleanup all resources. If 'batch' is non-NULL,
-  /// attaches buffers from any pinned pages to the batch and deletes unpinned
-  /// pages. Otherwise deletes all pages. Does nothing if the stream was already
-  /// closed. The 'flush' mode is forwarded to RowBatch::AddBuffer() when attaching
-  /// buffers.
+  /// attaches buffers from pinned pages that rows returned from GetNext() may reference.
+  /// Otherwise deletes all pages. Does nothing if the stream was already closed. The
+  /// 'flush' mode is forwarded to RowBatch::AddBuffer() when attaching buffers.
   void Close(RowBatch* batch, RowBatch::FlushMode flush);
 
   /// Number of rows in the stream.
@@ -354,18 +355,27 @@ class BufferedTupleStreamV2 {
 
   /// Wrapper around BufferPool::PageHandle that tracks additional info about the page.
   struct Page {
-    Page() : num_rows(0) {}
+    Page() : num_rows(0), retrieved_buffer(true) {}
 
     inline int len() const { return handle.len(); }
-    inline uint8_t* data() const { return handle.data(); }
     inline bool is_pinned() const { return handle.is_pinned(); }
     inline int pin_count() const { return handle.pin_count(); }
+    Status GetBuffer(const BufferPool::BufferHandle** buffer) {
+      RETURN_IF_ERROR(handle.GetBuffer(buffer));
+      retrieved_buffer = true;
+      return Status::OK();
+    }
     std::string DebugString() const;
 
     BufferPool::PageHandle handle;
 
     /// Number of rows written to the page.
     int num_rows;
+
+    /// Whether we called GetBuffer() on the page since it was last pinned. This means
+    /// that GetBuffer() and ExtractBuffer() cannot fail and that GetNext() may have
+    /// returned rows referencing the page's buffer.
+    bool retrieved_buffer;
   };
 
   /// Runtime state instance used to check for cancellation. Not owned.
@@ -415,11 +425,14 @@ class BufferedTupleStreamV2 {
   /// Pointer into read_page_ to the byte after the last row read.
   uint8_t* read_ptr_;
 
+  /// Pointer to one byte past the end of read_page_. Used to detect overruns.
+  const uint8_t* read_end_ptr_;
+
   /// Pointer into write_page_ to the byte after the last row written.
   uint8_t* write_ptr_;
 
   /// Pointer to one byte past the end of write_page_. Cached to speed up computation
-  uint8_t* write_end_ptr_;
+  const uint8_t* write_end_ptr_;
 
   /// Number of rows returned to the caller from GetNext() since the last
   /// PrepareForRead() call.

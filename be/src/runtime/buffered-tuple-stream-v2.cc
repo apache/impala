@@ -44,6 +44,8 @@
 using namespace impala;
 using namespace strings;
 
+using BufferHandle = BufferPool::BufferHandle;
+
 BufferedTupleStreamV2::BufferedTupleStreamV2(RuntimeState* state,
     const RowDescriptor& row_desc, BufferPool::ClientHandle* buffer_pool_client,
     int64_t page_len, const set<SlotId>& ext_varlen_slots)
@@ -54,6 +56,7 @@ BufferedTupleStreamV2::BufferedTupleStreamV2(RuntimeState* state,
     total_byte_size_(0),
     read_page_rows_returned_(-1),
     read_ptr_(nullptr),
+    read_end_ptr_(nullptr),
     write_ptr_(nullptr),
     write_end_ptr_(nullptr),
     rows_returned_(0),
@@ -109,15 +112,20 @@ void BufferedTupleStreamV2::CheckConsistency() const {
   }
   if (has_write_iterator()) {
     DCHECK(write_page_->is_pinned());
-    DCHECK_GE(write_ptr_, write_page_->data());
-    DCHECK_EQ(write_end_ptr_, write_page_->data() + write_page_->len());
+    DCHECK(write_page_->retrieved_buffer);
+    const BufferHandle* write_buffer;
+    Status status = write_page_->GetBuffer(&write_buffer);
+    DCHECK(status.ok()); // Write buffer should never have been unpinned.
+    DCHECK_GE(write_ptr_, write_buffer->data());
+    DCHECK_EQ(write_end_ptr_, write_buffer->data() + write_page_->len());
     DCHECK_GE(write_end_ptr_, write_ptr_);
   }
   if (has_read_iterator()) {
     DCHECK(read_page_->is_pinned());
-    uint8_t* read_end_ptr = read_page_->data() + read_page_->len();
-    DCHECK_GE(read_ptr_, read_page_->data());
-    DCHECK_GE(read_end_ptr, read_ptr_);
+    DCHECK(read_page_->retrieved_buffer);
+    // Can't check read buffer without affecting behaviour, because a read may be in
+    // flight and this would required blocking on that write.
+    DCHECK_GE(read_end_ptr_, read_ptr_);
   }
 }
 
@@ -186,9 +194,13 @@ Status BufferedTupleStreamV2::PrepareForReadWrite(
 
 void BufferedTupleStreamV2::Close(RowBatch* batch, RowBatch::FlushMode flush) {
   for (Page& page : pages_) {
-    if (batch != nullptr && page.is_pinned()) {
+    if (batch != nullptr && page.retrieved_buffer) {
+      // Subtle: We only need to attach buffers from pages that we may have returned
+      // references to. ExtractBuffer() cannot fail for these pages because the data
+      // is guaranteed to already be in -memory.
       BufferPool::BufferHandle buffer;
-      buffer_pool_->ExtractBuffer(buffer_pool_client_, &page.handle, &buffer);
+      Status status = buffer_pool_->ExtractBuffer(buffer_pool_client_, &page.handle, &buffer);
+      DCHECK(status.ok());
       batch->AddBuffer(buffer_pool_client_, move(buffer), flush);
     } else {
       buffer_pool_->DestroyPage(buffer_pool_client_, &page.handle);
@@ -247,6 +259,7 @@ void BufferedTupleStreamV2::UnpinPageIfNeeded(Page* page, bool stream_pinned) {
     DCHECK_EQ(new_pin_count, page->pin_count() - 1);
     buffer_pool_->Unpin(buffer_pool_client_, &page->handle);
     bytes_pinned_ -= page->len();
+    if (page->pin_count() == 0) page->retrieved_buffer = false;
   }
 }
 
@@ -255,16 +268,17 @@ Status BufferedTupleStreamV2::NewWritePage() noexcept {
   DCHECK(!has_write_iterator());
 
   Page new_page;
-  RETURN_IF_ERROR(
-      buffer_pool_->CreatePage(buffer_pool_client_, page_len_, &new_page.handle));
+  const BufferHandle* write_buffer;
+  RETURN_IF_ERROR(buffer_pool_->CreatePage(
+      buffer_pool_client_, page_len_, &new_page.handle, &write_buffer));
   bytes_pinned_ += page_len_;
   total_byte_size_ += page_len_;
 
   pages_.push_back(std::move(new_page));
   write_page_ = &pages_.back();
   DCHECK_EQ(write_page_->num_rows, 0);
-  write_ptr_ = write_page_->data();
-  write_end_ptr_ = write_page_->data() + page_len_;
+  write_ptr_ = write_buffer->data();
+  write_end_ptr_ = write_ptr_ + page_len_;
   return Status::OK();
 }
 
@@ -312,6 +326,8 @@ void BufferedTupleStreamV2::ResetWritePage() {
   // Unpin the write page if we're reading in unpinned mode.
   Page* prev_write_page = write_page_;
   write_page_ = nullptr;
+  write_ptr_ = nullptr;
+  write_end_ptr_ = nullptr;
 
   // May need to decrement pin count now that it's not the write page, depending on
   // the stream's mode.
@@ -347,8 +363,13 @@ Status BufferedTupleStreamV2::NextReadPage() {
   // actually fail once we have variable-length pages.
   RETURN_IF_ERROR(PinPageIfNeeded(&*read_page_, pinned_));
 
+  // This waits for the pin to complete if the page was unpinned earlier.
+  const BufferHandle* read_buffer;
+  RETURN_IF_ERROR(read_page_->GetBuffer(&read_buffer));
+
   read_page_rows_returned_ = 0;
-  read_ptr_ = read_page_->data();
+  read_ptr_ = read_buffer->data();
+  read_end_ptr_ = read_ptr_ + read_buffer->len();
 
   CHECK_CONSISTENCY();
   return Status::OK();
@@ -359,6 +380,8 @@ void BufferedTupleStreamV2::ResetReadPage() {
   // Unpin the write page if we're reading in unpinned mode.
   Page* prev_read_page = &*read_page_;
   read_page_ = pages_.end();
+  read_ptr_ = nullptr;
+  read_end_ptr_ = nullptr;
 
   // May need to decrement pin count after destroying read iterator.
   UnpinPageIfNeeded(prev_read_page, pinned_);
@@ -384,10 +407,15 @@ Status BufferedTupleStreamV2::PrepareForReadInternal(bool delete_on_read) {
   read_page_ = pages_.begin();
   RETURN_IF_ERROR(PinPageIfNeeded(&*read_page_, pinned_));
 
+  // This waits for the pin to complete if the page was unpinned earlier.
+  const BufferHandle* read_buffer;
+  RETURN_IF_ERROR(read_page_->GetBuffer(&read_buffer));
+
   DCHECK(has_read_iterator());
   DCHECK(read_page_->is_pinned());
   read_page_rows_returned_ = 0;
-  read_ptr_ = read_page_->data();
+  read_ptr_ = read_buffer->data();
+  read_end_ptr_ = read_ptr_ + read_buffer->len();
   rows_returned_ = 0;
   delete_on_read_ = delete_on_read;
   CHECK_CONSISTENCY();
@@ -411,6 +439,8 @@ Status BufferedTupleStreamV2::PinStream(bool* pinned) {
   if (!reservation_granted) return Status::OK();
 
   // At this point success is guaranteed - go through to pin the pages we need to pin.
+  // If the page data was evicted from memory, the read I/O can happen in parallel
+  // because we defer calling GetBuffer() until NextReadPage().
   for (Page& page : pages_) RETURN_IF_ERROR(PinPageIfNeeded(&page, true));
 
   pinned_ = true;
@@ -556,7 +586,7 @@ Status BufferedTupleStreamV2::GetNextInternal(
     batch->MarkNeedsDeepCopy();
   }
   if (FILL_FLAT_ROWS) DCHECK_EQ(flat_rows->size(), rows_to_fill);
-  DCHECK_LE(read_ptr_, read_page_->data() + read_page_->len());
+  DCHECK_LE(read_ptr_, read_end_ptr_);
   return Status::OK();
 }
 
@@ -567,7 +597,7 @@ void BufferedTupleStreamV2::FixUpStringsForRead(
     if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
 
     StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
-    DCHECK_LE(read_ptr_ + sv->len, read_page_->data() + read_page_->len());
+    DCHECK_LE(read_ptr_ + sv->len, read_end_ptr_);
     sv->ptr = reinterpret_cast<char*>(read_ptr_);
     read_ptr_ += sv->len;
   }
@@ -582,7 +612,7 @@ void BufferedTupleStreamV2::FixUpCollectionsForRead(
     CollectionValue* cv = tuple->GetCollectionSlot(slot_desc->tuple_offset());
     const TupleDescriptor& item_desc = *slot_desc->collection_item_descriptor();
     int coll_byte_size = cv->num_tuples * item_desc.byte_size();
-    DCHECK_LE(read_ptr_ + coll_byte_size, read_page_->data() + read_page_->len());
+    DCHECK_LE(read_ptr_ + coll_byte_size, read_end_ptr_);
     cv->ptr = reinterpret_cast<uint8_t*>(read_ptr_);
     read_ptr_ += coll_byte_size;
 
