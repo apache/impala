@@ -136,17 +136,13 @@ Status::Status(const string& error_msg, bool silent)
 Status::Status(const ErrorMsg& message)
   : msg_(new ErrorMsg(message)) { }
 
-Status::Status(const TStatus& status)
-  : msg_(status.status_code == TErrorCode::OK
-      ? NULL : new ErrorMsg(status.status_code, status.error_msgs)) { }
+Status::Status(const TStatus& status) {
+  FromThrift(status);
+}
 
 Status& Status::operator=(const TStatus& status) {
   delete msg_;
-  if (status.status_code == TErrorCode::OK) {
-    msg_ = NULL;
-  } else {
-    msg_ = new ErrorMsg(status.status_code, status.error_msgs);
-  }
+  FromThrift(status);
   return *this;
 }
 
@@ -209,6 +205,22 @@ void Status::ToThrift(TStatus* status) const {
     status->error_msgs.push_back(msg_->msg());
     for (const string& s: msg_->details()) status->error_msgs.push_back(s);
     status->__isset.error_msgs = true;
+  }
+}
+
+void Status::FromThrift(const TStatus& status) {
+  if (status.status_code == TErrorCode::OK) {
+    msg_ = NULL;
+  } else {
+    msg_ = new ErrorMsg();
+    msg_->SetErrorCode(status.status_code);
+    if (status.error_msgs.size() > 0) {
+      // The first message is the actual error message. (See Status::ToThrift()).
+      msg_->SetErrorMsg(status.error_msgs.front());
+      // The following messages are details.
+      std::for_each(status.error_msgs.begin() + 1, status.error_msgs.end(),
+          [&](string const& detail) { msg_->AddDetail(detail); });
+    }
   }
 }
 

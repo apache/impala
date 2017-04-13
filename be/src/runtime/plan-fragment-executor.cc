@@ -335,13 +335,6 @@ Status PlanFragmentExecutor::Exec() {
     SCOPED_TIMER(profile()->total_time_counter());
     SCOPED_TIMER(ADD_TIMER(timings_profile_, EXEC_TIMER_NAME));
     status = ExecInternal();
-
-    if (!status.ok() && !status.IsCancelled() && !status.IsMemLimitExceeded()) {
-      // Log error message in addition to returning in Status. Queries that do not fetch
-      // results (e.g. insert) may not receive the message directly and can only retrieve
-      // the log.
-      runtime_state_->LogError(status.msg());
-    }
   }
   FragmentComplete(status);
   return status;

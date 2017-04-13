@@ -22,6 +22,7 @@
 import pytest
 import random
 
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
@@ -41,6 +42,27 @@ class TestDataErrors(ImpalaTestSuite):
   def get_workload(self):
     return 'functional-query'
 
+# Regression test for IMP-633. Added as a part of IMPALA-5198
+class TestHdfsFileOpenFailErrors(ImpalaTestSuite):
+  @pytest.mark.execute_serially
+  def test_hdfs_file_open_fail(self):
+    absolute_location = "/test-warehouse/file_open_fail"
+    create_stmt = \
+        "create table file_open_fail (x int) location '" + absolute_location + "'"
+    insert_stmt = "insert into file_open_fail values(1)"
+    select_stmt = "select * from file_open_fail"
+    drop_stmt = "drop table if exists file_open_fail purge"
+    self.client.execute(drop_stmt)
+    self.client.execute(create_stmt)
+    self.client.execute(insert_stmt)
+    self.filesystem_client.delete_file_dir(absolute_location, recursive=True)
+    assert not self.filesystem_client.exists(absolute_location)
+    try:
+      self.client.execute(select_stmt)
+    except ImpalaBeeswaxException as e:
+      assert "Failed to open HDFS file" in str(e)
+    self.client.execute(drop_stmt)
+
 
 @SkipIfS3.qualified_path
 class TestHdfsScanNodeErrors(TestDataErrors):
@@ -58,7 +80,6 @@ class TestHdfsScanNodeErrors(TestDataErrors):
     if (vector.get_value('table_format').file_format != 'text'):
       pytest.xfail("Expected results differ across file formats")
     self.run_test_case('DataErrorsTest/hdfs-scan-node-errors', vector)
-
 
 @SkipIfS3.qualified_path
 @SkipIfLocal.qualified_path

@@ -83,9 +83,6 @@ class ErrorMsg {
       const ArgType& arg5, const ArgType& arg6, const ArgType& arg7,
       const ArgType& arg8, const ArgType& arg9);
 
-  ErrorMsg(TErrorCode::type error, const std::vector<string>& detail)
-      : error_(error), details_(detail) {}
-
   /// Static initializer that is needed to avoid issues with static initialization order
   /// and the point in time when the string list generated via thrift becomes
   /// available. This method should not be used if no static initialization is needed as
@@ -111,8 +108,13 @@ class ErrorMsg {
   }
 
   /// Set a specific error code.
-  void SetError(TErrorCode::type e) {
+  void SetErrorCode(TErrorCode::type e) {
     error_ = e;
+  }
+
+  /// Set a specific error message.
+  void SetErrorMsg(const std::string& msg) {
+    message_ = msg;
   }
 
   /// Return the formatted error string.
