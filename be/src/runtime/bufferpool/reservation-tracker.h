@@ -134,7 +134,7 @@ class ReservationTracker {
   /// (because linked MemTrackers with limits below the query level are not supported).
   /// Returns true on success or false if the transfer would have caused a reservation
   /// limit to be exceeded.
-  bool TransferReservationTo(ReservationTracker* other, int64_t bytes);
+  bool TransferReservationTo(ReservationTracker* other, int64_t bytes) WARN_UNUSED_RESULT;
 
   /// Allocate 'bytes' from the reservation. The tracker must have at least 'bytes'
   /// unused reservation before calling this method.
@@ -158,6 +158,8 @@ class ReservationTracker {
 
   /// Returns the total reservations of children in bytes.
   int64_t GetChildReservations();
+
+  ReservationTracker* parent() const { return parent_; }
 
   std::string DebugString();
 

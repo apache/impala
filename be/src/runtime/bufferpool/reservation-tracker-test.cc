@@ -359,7 +359,7 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
       ASSERT_EQ(amount, mem_trackers[ancestor]->consumption());
     }
     // Return the reservation to the root before the next iteration.
-    reservations[level].TransferReservationTo(&reservations[0], amount);
+    ASSERT_TRUE(reservations[level].TransferReservationTo(&reservations[0], amount));
   }
 
   for (int i = HIERARCHY_DEPTH - 1; i >= 0; --i) {

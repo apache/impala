@@ -151,6 +151,7 @@ class BufferPool : public CacheLineAligned {
   class BufferHandle;
   class ClientHandle;
   class PageHandle;
+  class SubReservation;
 
   /// Constructs a new buffer pool.
   /// 'min_buffer_len': the minimum buffer length for the pool. Must be a power of two.
@@ -323,6 +324,14 @@ class BufferPool::ClientHandle {
   /// if successful, after which 'bytes' can be used.
   bool IncreaseReservationToFit(int64_t bytes) WARN_UNUSED_RESULT;
 
+  /// Move some of this client's reservation to the SubReservation. 'bytes' of unused
+  /// reservation must be available in this tracker.
+  void SaveReservation(SubReservation* dst, int64_t bytes);
+
+  /// Move some of src's reservation to this client. 'bytes' of unused reservation must be
+  /// available in 'src'.
+  void RestoreReservation(SubReservation* src, int64_t bytes);
+
   /// Accessors for this client's reservation corresponding to the identically-named
   /// methods in ReservationTracker.
   int64_t GetReservation() const;
@@ -336,11 +345,37 @@ class BufferPool::ClientHandle {
  private:
   friend class BufferPool;
   friend class BufferPoolTest;
+  friend class SubReservation;
   DISALLOW_COPY_AND_ASSIGN(ClientHandle);
 
   /// Internal state for the client. NULL means the client isn't registered.
   /// Owned by BufferPool.
   Client* impl_;
+};
+
+/// Helper class that allows dividing up a client's reservation into separate buckets.
+class BufferPool::SubReservation {
+ public:
+  SubReservation(ClientHandle* client);
+  ~SubReservation();
+
+  /// Returns the amount of reservation stored in this sub-reservation.
+  int64_t GetReservation() const;
+
+  /// Releases the subreservation to the client's tracker. Must be called before
+  /// destruction.
+  void Close();
+
+  bool is_closed() const { return tracker_ == nullptr; }
+
+ private:
+  friend class BufferPool::ClientHandle;
+  DISALLOW_COPY_AND_ASSIGN(SubReservation);
+
+  /// Child of the client's tracker used to track the sub-reservation. Usage is not
+  /// tracked against this tracker - instead the reservation is always transferred back
+  /// to the client's tracker before use.
+  boost::scoped_ptr<ReservationTracker> tracker_;
 };
 
 /// A handle to a buffer allocated from the buffer pool. Each BufferHandle should only

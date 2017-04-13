@@ -1888,6 +1888,39 @@ void BufferPoolTest::TestRandomInternalImpl(BufferPool* pool, FileGroup* file_gr
   for (auto& buffer : buffers) pool->FreeBuffer(&client, &buffer.first);
   pool->DeregisterClient(&client);
 }
+
+/// Test basic SubReservation functionality.
+TEST_F(BufferPoolTest, SubReservation) {
+  const int64_t TOTAL_MEM = TEST_BUFFER_LEN * 10;
+  global_reservations_.InitRootTracker(NULL, TOTAL_MEM);
+  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM);
+  BufferPool::ClientHandle client;
+  ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
+      TOTAL_MEM, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservationToFit(TEST_BUFFER_LEN));
+
+  BufferPool::SubReservation subreservation(&client);
+  BufferPool::BufferHandle buffer;
+  // Save and check that the reservation moved as expected.
+  client.SaveReservation(&subreservation, TEST_BUFFER_LEN);
+  EXPECT_EQ(0, client.GetUnusedReservation());
+  EXPECT_EQ(TEST_BUFFER_LEN, subreservation.GetReservation());
+
+  // Should not be able to allocate from client since the reservation was moved.
+  IMPALA_ASSERT_DEBUG_DEATH(AllocateAndFree(&pool, &client, TEST_BUFFER_LEN), "");
+
+  // Restore and check that the reservation moved as expected.
+  client.RestoreReservation(&subreservation, TEST_BUFFER_LEN);
+  EXPECT_EQ(TEST_BUFFER_LEN, client.GetUnusedReservation());
+  EXPECT_EQ(0, subreservation.GetReservation());
+
+  // Should be able to allocate from the client after restoring.
+  ASSERT_OK(AllocateAndFree(&pool, &client, TEST_BUFFER_LEN));
+  EXPECT_EQ(TEST_BUFFER_LEN, client.GetUnusedReservation());
+
+  subreservation.Close();
+  pool.DeregisterClient(&client);
+}
 }
 
 int main(int argc, char** argv) {

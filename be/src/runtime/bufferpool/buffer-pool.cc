@@ -308,6 +308,40 @@ int64_t BufferPool::ClientHandle::GetUnusedReservation() const {
   return impl_->reservation()->GetUnusedReservation();
 }
 
+void BufferPool::ClientHandle::SaveReservation(SubReservation* dst, int64_t bytes) {
+  DCHECK_EQ(dst->tracker_->parent(), impl_->reservation());
+  bool success = impl_->reservation()->TransferReservationTo(dst->tracker_.get(), bytes);
+  DCHECK(success); // SubReservation should not have a limit, so this shouldn't fail.
+}
+
+void BufferPool::ClientHandle::RestoreReservation(SubReservation* src, int64_t bytes) {
+  DCHECK_EQ(src->tracker_->parent(), impl_->reservation());
+  bool success = src->tracker_->TransferReservationTo(impl_->reservation(), bytes);
+  DCHECK(success); // Transferring reservation to parent shouldn't fail.
+}
+
+BufferPool::SubReservation::SubReservation(ClientHandle* client) {
+  tracker_.reset(new ReservationTracker);
+  tracker_->InitChildTracker(
+      nullptr, client->impl_->reservation(), nullptr, numeric_limits<int64_t>::max());
+}
+
+BufferPool::SubReservation::~SubReservation() {}
+
+int64_t BufferPool::SubReservation::GetReservation() const {
+  return tracker_->GetReservation();
+}
+
+void BufferPool::SubReservation::Close() {
+  // Give any reservation back to the client.
+  if (is_closed()) return;
+  bool success =
+      tracker_->TransferReservationTo(tracker_->parent(), tracker_->GetReservation());
+  DCHECK(success); // Transferring reservation to parent shouldn't fail.
+  tracker_->Close();
+  tracker_.reset();
+}
+
 BufferPool::Client::Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
     const string& name, ReservationTracker* parent_reservation, MemTracker* mem_tracker,
     int64_t reservation_limit, RuntimeProfile* profile)

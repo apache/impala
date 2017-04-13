@@ -31,31 +31,23 @@ inline int BufferedTupleStreamV2::NullIndicatorBytesPerRow() const {
   return BitUtil::RoundUpNumBytes(fixed_tuple_sizes_.size());
 }
 
-inline bool BufferedTupleStreamV2::AddRow(TupleRow* row, Status* status) noexcept {
+inline bool BufferedTupleStreamV2::AddRowCustom(
+    int64_t size, const WriteRowFn& write_fn, Status* status) {
   DCHECK(!closed_);
-  if (LIKELY(DeepCopy(row))) return true;
-  return AddRowSlow(row, status);
-}
-
-inline uint8_t* BufferedTupleStreamV2::AllocateRow(
-    int fixed_size, int varlen_size, uint8_t** varlen_data, Status* status) {
-  DCHECK(!closed_);
-  DCHECK(!has_nullable_tuple_) << "AllocateRow does not support nullable tuples";
-  const int total_size = fixed_size + varlen_size;
-  if (UNLIKELY(write_page_ == nullptr || write_ptr_ + total_size > write_end_ptr_)) {
-    return AllocateRowSlow(fixed_size, varlen_size, varlen_data, status);
+  DCHECK(has_write_iterator());
+  if (UNLIKELY(write_page_ == nullptr || write_ptr_ + size > write_end_ptr_)) {
+    return AddRowCustomSlow(size, write_fn, status);
   }
   DCHECK(write_page_ != nullptr);
   DCHECK(write_page_->is_pinned());
-  DCHECK_LE(write_ptr_ + total_size, write_end_ptr_);
+  DCHECK_LE(write_ptr_ + size, write_end_ptr_);
   ++num_rows_;
   ++write_page_->num_rows;
 
-  uint8_t* fixed_data = write_ptr_;
-  write_ptr_ += fixed_size;
-  *varlen_data = write_ptr_;
-  write_ptr_ += varlen_size;
-  return fixed_data;
+  uint8_t* data = write_ptr_;
+  write_ptr_ += size;
+  write_fn(data);
+  return true;
 }
 }
 

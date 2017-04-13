@@ -319,6 +319,10 @@ error_codes = (
   ("KUDU_TIMESTAMP_OUT_OF_RANGE", 103,
    "Kudu table '$0' column '$1' contains an out of range timestamp. "
    "The valid date range is 1400-01-01..9999-12-31."),
+
+  # TODO: IMPALA-3200: make sure that this references the correct query option.
+  ("MAX_ROW_SIZE", 104, "Row of size $0 could not be materialized in plan node with "
+    "id $1. Limit is $2, which can be increased with query option max_row_size"),
 )
 
 import sys
