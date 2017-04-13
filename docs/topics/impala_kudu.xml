@@ -1292,6 +1292,18 @@ kudu.table_name  | impala::some_database.table_name_demo
           <p conref="../shared/impala_common.xml#common/kudu_sentry_limitations"/>
         </li>
 
+        <li rev="2.9.0">
+          <p>
+            Kerberos authentication. See <xref keyref="kudu_security"/> for details.
+          </p>
+        </li>
+
+        <li rev="2.9.0">
+          <p>
+            TLS encryption. See <xref keyref="kudu_security"/> for details.
+          </p>
+        </li>
+
         <li>
           <p>
             Lineage tracking.

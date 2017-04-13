@@ -33,6 +33,10 @@ under the License.
   </keydef>
 -->
 
+  <keydef href="https://kudu.apache.org/docs/security.html" scope="external" format="html" keys="kudu_security">
+    <topicmeta><linktext>Kudu Security</linktext></topicmeta>
+  </keydef>
+
   <keydef href="https://web.mit.edu/kerberos/krb5-latest/doc/admin/install_kdc.html" scope="external" format="html" keys="mit_install_kdc">
     <topicmeta><linktext>Kerberos Key Distribution Center (KDC)</linktext></topicmeta>
   </keydef>

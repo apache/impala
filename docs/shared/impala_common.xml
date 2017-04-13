@@ -3377,7 +3377,7 @@ sudo pip-python install ssl</codeblock>
       </p>
     </section>
 
-    <section id="kudu">
+    <section id="kudu_common">
 
       <title>Kudu</title>
 
