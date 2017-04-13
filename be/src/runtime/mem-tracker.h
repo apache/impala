@@ -195,13 +195,8 @@ class MemTracker {
       return;
     }
 
-    if (UNLIKELY(released_memory_since_gc_.Add(bytes) > GC_RELEASE_SIZE)) {
-      GcTcmalloc();
-    }
-
     if (consumption_metric_ != NULL) {
-      DCHECK(parent_ == NULL);
-      consumption_->Set(consumption_metric_->value());
+      RefreshConsumptionFromMetric();
       return;
     }
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
@@ -258,9 +253,13 @@ class MemTracker {
     return result;
   }
 
-  /// Refresh the value of consumption_. Only valid to call if consumption_metric_ is not
-  /// null.
-  void RefreshConsumptionFromMetric();
+  /// Refresh the memory consumption value from the consumption metric. Only valid to
+  /// call if this tracker has a consumption metric.
+  void RefreshConsumptionFromMetric() {
+    DCHECK(consumption_metric_ != nullptr);
+    DCHECK(parent_ == nullptr);
+    consumption_->Set(consumption_metric_->value());
+  }
 
   int64_t limit() const { return limit_; }
   bool has_limit() const { return limit_ >= 0; }
@@ -336,12 +335,6 @@ class MemTracker {
   /// gc_lock. Updates metrics if initialized.
   bool GcMemory(int64_t max_consumption);
 
-  /// Called when the total release memory is larger than GC_RELEASE_SIZE.
-  /// TcMalloc holds onto released memory and very slowly (if ever) releases it back to
-  /// the OS. This is problematic since it is memory we are not constantly tracking which
-  /// can cause us to go way over mem limits.
-  void GcTcmalloc();
-
   /// Walks the MemTracker hierarchy and populates all_trackers_ and
   /// limit_trackers_
   void Init();
@@ -353,17 +346,6 @@ class MemTracker {
   /// 'logged_consumption'.
   static std::string LogUsage(const std::string& prefix,
       const std::list<MemTracker*>& trackers, int64_t* logged_consumption);
-
-  /// Size, in bytes, that is considered a large value for Release() (or Consume() with
-  /// a negative value). If tcmalloc is used, this can trigger it to GC.
-  /// A higher value will make us call into tcmalloc less often (and therefore more
-  /// efficient). A lower value will mean our memory overhead is lower.
-  /// TODO: this is a stopgap.
-  static const int64_t GC_RELEASE_SIZE = 128 * 1024L * 1024L;
-
-  /// Total amount of memory from calls to Release() since the last GC. If this
-  /// is greater than GC_RELEASE_SIZE, this will trigger a tcmalloc gc.
-  static AtomicInt64 released_memory_since_gc_;
 
   /// Lock to protect GcMemory(). This prevents many GCs from occurring at once.
   boost::mutex gc_lock_;

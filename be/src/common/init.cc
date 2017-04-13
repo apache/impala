@@ -40,6 +40,7 @@
 #include "util/disk-info.h"
 #include "util/logging-support.h"
 #include "util/mem-info.h"
+#include "util/memory-metrics.h"
 #include "util/minidump.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
@@ -69,7 +70,7 @@ DEFINE_int32(max_audit_event_log_files, 0, "Maximum number of audit event log fi
     "to retain. The most recent audit event log files are retained. If set to 0, "
     "all audit event log files are retained.");
 
-DEFINE_int32(memory_maintenance_sleep_time_ms, 1000, "Sleep time in milliseconds "
+DEFINE_int32(memory_maintenance_sleep_time_ms, 10000, "Sleep time in milliseconds "
     "between memory maintenance iterations");
 
 DEFINE_int64(pause_monitor_sleep_time_ms, 500, "Sleep time in milliseconds for "
@@ -88,11 +89,6 @@ DEFINE_string(local_library_dir, "/tmp",
 // is enabled, this option won't be allowed because some logging dumps table data
 // in ways the authors of redaction rules can't anticipate.
 DECLARE_string(vmodule);
-
-// tcmalloc will hold on to freed memory. We will periodically release the memory back
-// to the OS if the extra memory is too high. If the memory used by the application
-// is less than this fraction of the total reserved memory, free it back to the OS.
-static const float TCMALLOC_RELEASE_FREE_MEMORY_FRACTION = 0.5f;
 
 using std::string;
 
@@ -137,36 +133,16 @@ static scoped_ptr<impala::Thread> pause_monitor;
     if (buffer_pool != nullptr) buffer_pool->Maintenance();
 
 #ifndef ADDRESS_SANITIZER
-    // Required to ensure memory gets released back to the OS, even if tcmalloc doesn't do
-    // it for us. This is because tcmalloc releases memory based on the
-    // TCMALLOC_RELEASE_RATE property, which is not actually a rate but a divisor based
-    // on the number of blocks that have been deleted. When tcmalloc does decide to
-    // release memory, it removes a single span from the PageHeap. This means there are
-    // certain allocation patterns that can lead to OOM due to not enough memory being
-    // released by tcmalloc, even when that memory is no longer being used.
-    // One example is continually resizing a vector which results in many allocations.
-    // Even after the vector goes out of scope, all the memory will not be released
-    // unless there are enough other deletions that are occurring in the system.
-    // This can eventually lead to OOM/crashes (see IMPALA-818).
-    // See: http://google-perftools.googlecode.com/svn/trunk/doc/tcmalloc.html#runtime
-    size_t bytes_used = 0;
-    size_t bytes_in_pageheap = 0;
-    MallocExtension::instance()->GetNumericProperty(
-        "generic.current_allocated_bytes", &bytes_used);
-    MallocExtension::instance()->GetNumericProperty(
-        "generic.heap_size", &bytes_in_pageheap);
-    if (bytes_used < bytes_in_pageheap * TCMALLOC_RELEASE_FREE_MEMORY_FRACTION) {
-      MallocExtension::instance()->ReleaseFreeMemory();
-    }
-
     // When using tcmalloc, the process limit as measured by our trackers will
-    // be out of sync with the process usage. Update the process tracker periodically.
+    // be out of sync with the process usage. The metric is refreshed whenever
+    // memory is consumed or released via a MemTracker, so on a system with
+    // queries executing it will be refreshed frequently. However if the system
+    // is idle, we need to refresh the tracker occasionally since untracked
+    // memory may be allocated or freed, e.g. by background threads.
     if (env != NULL && env->process_mem_tracker() != NULL) {
       env->process_mem_tracker()->RefreshConsumptionFromMetric();
     }
 #endif
-    // TODO: we should also update the process mem tracker with the reported JVM
-    // mem usage.
   }
 }
 

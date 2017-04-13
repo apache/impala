@@ -39,8 +39,6 @@ namespace impala {
 
 const string MemTracker::COUNTER_NAME = "PeakMemoryUsage";
 
-AtomicInt64 MemTracker::released_memory_since_gc_;
-
 // Name for request pool MemTrackers. '$0' is replaced with the pool name.
 const string REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT = "RequestPool=$0";
 
@@ -209,12 +207,6 @@ void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
   limit_metric_ = metrics->AddGauge<int64_t>(Substitute("$0.limit", prefix), limit_);
 }
 
-void MemTracker::RefreshConsumptionFromMetric() {
-  DCHECK(consumption_metric_ != NULL);
-  DCHECK(parent_ == NULL);
-  consumption_->Set(consumption_metric_->value());
-}
-
 // Calling this on the query tracker results in output like:
 //
 //  Query(4a4c81fedaed337d:4acadfda00000000) Limit=10.00 GB Total=508.28 MB Peak=508.45 MB
@@ -345,7 +337,7 @@ void MemTracker::AddGcFunction(GcFunction f) {
 bool MemTracker::GcMemory(int64_t max_consumption) {
   if (max_consumption < 0) return true;
   lock_guard<mutex> l(gc_lock_);
-  if (consumption_metric_ != NULL) consumption_->Set(consumption_metric_->value());
+  if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
   int64_t pre_gc_consumption = consumption();
   // Check if someone gc'd before us
   if (pre_gc_consumption < max_consumption) return false;
@@ -370,14 +362,4 @@ bool MemTracker::GcMemory(int64_t max_consumption) {
   }
   return curr_consumption > max_consumption;
 }
-
-void MemTracker::GcTcmalloc() {
-#ifndef ADDRESS_SANITIZER
-  released_memory_since_gc_.Store(0);
-  MallocExtension::instance()->ReleaseFreeMemory();
-#else
-  // Nothing to do if not using tcmalloc.
-#endif
-}
-
 }

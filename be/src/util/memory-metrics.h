@@ -40,6 +40,7 @@ class AggregateMemoryMetric {
   /// Approximates the total amount of physical memory consumed by the backend (i.e. not
   /// including JVM memory), which is either in use by queries or cached by the BufferPool
   /// or TcMalloc. NULL when running under ASAN.
+  /// TODO: IMPALA-691 - consider changing this to include JVM memory.
   static SumGauge<uint64_t>* TOTAL_USED;
 };
 

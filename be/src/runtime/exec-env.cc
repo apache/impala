@@ -315,6 +315,14 @@ Status ExecEnv::StartServices() {
   // Limit of -1 means no memory limit.
   mem_tracker_.reset(new MemTracker(
       AggregateMemoryMetric::TOTAL_USED, bytes_limit > 0 ? bytes_limit : -1, "Process"));
+  // Aggressive decommit is required so that unused pages in the TCMalloc page heap are
+  // not backed by physical pages and do not contribute towards memory consumption.
+  size_t aggressive_decommit_enabled = 0;
+  MallocExtension::instance()->GetNumericProperty(
+      "tcmalloc.aggressive_memory_decommit", &aggressive_decommit_enabled);
+  if (!aggressive_decommit_enabled) {
+    return Status("TCMalloc aggressive decommit is required but is disabled.");
+  }
 #else
   // tcmalloc metrics aren't defined in ASAN builds, just use the default behavior to
   // track process memory usage (sum of all children trackers).
@@ -336,19 +344,6 @@ Status ExecEnv::StartServices() {
 
   mem_tracker_->AddGcFunction(
       [this](int64_t bytes_to_free) { disk_io_mgr_->GcIoBuffers(bytes_to_free); });
-
-  // TODO: IMPALA-3200: register BufferPool::ReleaseMemory() as GC function.
-
-#ifndef ADDRESS_SANITIZER
-  // Since tcmalloc does not free unused memory, we may exceed the process mem limit even
-  // if Impala is not actually using that much memory. Add a callback to free any unused
-  // memory if we hit the process limit. TCMalloc GC must run last, because other GC
-  // functions may have released memory to TCMalloc, and TCMalloc may have cached it
-  // instead of releasing it to the system.
-  mem_tracker_->AddGcFunction([](int64_t bytes_to_free) {
-    MallocExtension::instance()->ReleaseToSystem(bytes_to_free);
-  });
-#endif
 
   // Start services in order to ensure that dependencies between them are met
   if (enable_webserver_) {
