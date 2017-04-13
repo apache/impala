@@ -154,6 +154,8 @@ TBackendDescriptor MakeBackendDescriptor(const Hostname& hostname, const IpAddr&
   TBackendDescriptor be_desc;
   be_desc.address = MakeNetworkAddress(hostname, port);
   be_desc.ip_address = ip;
+  be_desc.is_coordinator = true;
+  be_desc.is_executor = true;
   return be_desc;
 }
 

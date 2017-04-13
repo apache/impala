@@ -23,13 +23,17 @@ under the License.
 <table id="backends" class='table table-hover table-bordered'>
   <thead>
     <tr>
-      <th>Backend</th>
+      <th>Address</th>
+      <th>Coordinator</th>
+      <th>Executor</th>
     </tr>
   </thead>
   <tbody>
     {{#backends}}
     <tr>
-      <td>{{.}}</td>
+      <td>{{address}}</td>
+      <td>{{is_coordinator}}</td>
+      <td>{{is_executor}}</td>
     </tr>
     {{/backends}}
   </tbody>

@@ -84,3 +84,37 @@ class TestCoordinators(CustomClusterTestSuite):
       assert num_tbls == 0
       client1.close()
       client2.close()
+
+  @pytest.mark.execute_serially
+  def test_single_coordinator_cluster_config(self):
+    """Test a cluster configuration with a single coordinator."""
+
+    def exec_and_verify_num_executors(expected_num_of_executors):
+      """Connects to the coordinator node, runs a query and verifies that certain
+        operators are executed on 'expected_num_of_executors' nodes."""
+      coordinator = self.cluster.impalads[0]
+      try:
+        client = coordinator.service.create_beeswax_client()
+        assert client is not None
+        query = "select count(*) from functional.alltypesagg"
+        result = self.execute_query_expect_success(client, query)
+        # Verify that SCAN and AGG are executed on the expected number of
+        # executor nodes
+        for rows in result.exec_summary:
+          if rows['operator'] == 'OO:SCAN HDFS':
+            assert rows['num_hosts'] == expected_num_of_executors
+          elif rows['operator'] == '01:AGGREGATE':
+            assert rows['num_hosts'] == expected_num_of_executors
+      finally:
+        client.close()
+
+    # Cluster config where the coordinator can execute query fragments
+    self._start_impala_cluster([], cluster_size=3, num_coordinators=1,
+        use_exclusive_coordinators=False)
+    exec_and_verify_num_executors(3)
+    # Stop the cluster
+    self._stop_impala_cluster()
+    # Cluster config where the oordinator can only execute coordinator fragments
+    self._start_impala_cluster([], cluster_size=3, num_coordinators=1,
+        use_exclusive_coordinators=True)
+    exec_and_verify_num_executors(2)

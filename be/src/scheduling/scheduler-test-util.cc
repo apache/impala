@@ -58,14 +58,14 @@ const string Cluster::IP_PREFIX = "10";
 /// Default size for new blocks is 1MB.
 const int64_t Block::DEFAULT_BLOCK_SIZE = 1 << 20;
 
-int Cluster::AddHost(bool has_backend, bool has_datanode) {
+int Cluster::AddHost(bool has_backend, bool has_datanode, bool is_executor) {
   int host_idx = hosts_.size();
   int be_port = has_backend ? BACKEND_PORT : -1;
   int dn_port = has_datanode ? DATANODE_PORT : -1;
   IpAddr ip = HostIdxToIpAddr(host_idx);
   DCHECK(ip_to_idx_.find(ip) == ip_to_idx_.end());
   ip_to_idx_[ip] = host_idx;
-  hosts_.push_back(Host(HostIdxToHostname(host_idx), ip, be_port, dn_port));
+  hosts_.push_back(Host(HostIdxToHostname(host_idx), ip, be_port, dn_port, is_executor));
   // Add host to lists of backend indexes per type.
   if (has_backend) backend_host_idxs_.push_back(host_idx);
   if (has_datanode) {
@@ -79,8 +79,9 @@ int Cluster::AddHost(bool has_backend, bool has_datanode) {
   return host_idx;
 }
 
-void Cluster::AddHosts(int num_hosts, bool has_backend, bool has_datanode) {
-  for (int i = 0; i < num_hosts; ++i) AddHost(has_backend, has_datanode);
+void Cluster::AddHosts(int num_hosts, bool has_backend, bool has_datanode,
+    bool is_executor) {
+  for (int i = 0; i < num_hosts; ++i) AddHost(has_backend, has_datanode, is_executor);
 }
 
 Hostname Cluster::HostIdxToHostname(int host_idx) {
@@ -454,7 +455,7 @@ Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
 
   // Compute Assignment.
   FragmentScanRangeAssignment* assignment = result->AddAssignment();
-  return scheduler_->ComputeScanRangeAssignment(*scheduler_->GetBackendConfig(), 0,
+  return scheduler_->ComputeScanRangeAssignment(*scheduler_->GetExecutorsConfig(), 0,
       nullptr, false, plan_.scan_range_locations(), plan_.referenced_datanodes(),
       exec_at_coord, plan_.query_options(), nullptr, assignment);
 }
@@ -519,6 +520,8 @@ void SchedulerWrapper::AddHostToTopicDelta(const Host& host, TTopicDelta* delta)
   be_desc.address.hostname = host.ip;
   be_desc.address.port = host.be_port;
   be_desc.ip_address = host.ip;
+  be_desc.__set_is_coordinator(host.is_coordinator);
+  be_desc.__set_is_executor(host.is_executor);
 
   // Build topic item.
   TTopicItem item;

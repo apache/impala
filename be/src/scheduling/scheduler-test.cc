@@ -52,6 +52,27 @@ TEST_F(SchedulerTest, SingleHostSingleFile) {
   EXPECT_EQ(0, result.NumCachedAssignments());
 }
 
+/// Test cluster configuration with one coordinator that can't process scan ranges.
+TEST_F(SchedulerTest, SingleCoordinatorNoExecutor) {
+  Cluster cluster;
+  cluster.AddHost(true, true, false);
+  cluster.AddHost(true, true, true);
+  cluster.AddHost(true, true, true);
+
+  Schema schema(cluster);
+  schema.AddMultiBlockTable("T1", 10, ReplicaPlacement::LOCAL_ONLY, 3);
+
+  Plan plan(schema);
+  plan.AddTableScan("T1");
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+  scheduler.Compute(&result);
+
+  EXPECT_EQ(2, result.NumDistinctBackends());
+  EXPECT_EQ(0, result.NumDiskAssignments(0));
+}
+
 /// Test assigning all scan ranges to the coordinator.
 TEST_F(SchedulerTest, ExecAtCoord) {
   Cluster cluster;

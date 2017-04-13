@@ -47,7 +47,8 @@ struct TPoolStats {
 // Structure serialised in the Impala backend topic. Each Impalad
 // constructs one TBackendDescriptor, and registers it in the backend
 // topic. Impalads subscribe to this topic to learn of the location of
-// all other Impalads in the cluster.
+// all other Impalads in the cluster. Impalads can act as coordinators, executors or
+// both.
 struct TBackendDescriptor {
   // Network address of the Impala service on this backend
   1: required Types.TNetworkAddress address;
@@ -56,11 +57,17 @@ struct TBackendDescriptor {
   // cost of resolution at every Impalad (since IP addresses are needed for scheduling)
   2: required string ip_address;
 
+  // True if this is a coordinator node
+  3: required bool is_coordinator;
+
+  // True if this is an executor node
+  4: required bool is_executor;
+
   // The address of the debug HTTP server
-  3: optional Types.TNetworkAddress debug_http_address;
+  5: optional Types.TNetworkAddress debug_http_address;
 
   // True if the debug webserver is secured (for correctly generating links)
-  4: optional bool secure_webserver;
+  6: optional bool secure_webserver;
 }
 
 // Description of a single entry in a topic

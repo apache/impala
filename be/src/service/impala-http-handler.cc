@@ -76,6 +76,9 @@ static Status ParseIdFromArguments(const Webserver::ArgumentMap& args, TUniqueId
 void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
   DCHECK(webserver != NULL);
 
+  webserver->RegisterUrlCallback("/backends", "backends.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::BackendsHandler));
+
   webserver->RegisterUrlCallback("/hadoop-varz", "hadoop-varz.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::HadoopVarzHandler));
 
@@ -776,4 +779,20 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
   document->AddMember("status", json_status, document->GetAllocator());
   Value json_id(PrintId(query_id).c_str(), document->GetAllocator());
   document->AddMember("query_id", json_id, document->GetAllocator());
+}
+
+void ImpalaHttpHandler::BackendsHandler(const Webserver::ArgumentMap& args,
+    Document* document) {
+  Value backends_list(kArrayType);
+  for (const auto& entry : server_->GetKnownBackends()) {
+    TBackendDescriptor backend = entry.second;
+    Value backend_obj(kObjectType);
+    Value str(TNetworkAddressToString(backend.address).c_str(), document->GetAllocator());
+    backend_obj.AddMember("address", str, document->GetAllocator());
+    backend_obj.AddMember("is_coordinator", backend.is_coordinator,
+        document->GetAllocator());
+    backend_obj.AddMember("is_executor", backend.is_executor, document->GetAllocator());
+    backends_list.PushBack(backend_obj, document->GetAllocator());
+  }
+  document->AddMember("backends", backends_list, document->GetAllocator());
 }

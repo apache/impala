@@ -56,6 +56,7 @@ typedef sig_t sighandler_t;
 #endif
 
 using boost::algorithm::is_any_of;
+using boost::algorithm::join;
 using boost::algorithm::split;
 using boost::algorithm::trim_right;
 using boost::algorithm::to_lower;
@@ -193,10 +194,11 @@ void Webserver::RootHandler(const ArgumentMap& args, Document* document) {
 
   ExecEnv* env = ExecEnv::GetInstance();
   if (env == nullptr || env->impala_server() == nullptr) return;
-  string mode = (env->impala_server()->IsCoordinator()) ?
-      "Coordinator + Executor" : "Executor";
-  Value impala_server_mode(mode.c_str(), document->GetAllocator());
-  document->AddMember("impala_server_mode", impala_server_mode, document->GetAllocator());
+  document->AddMember("impala_server_mode", true, document->GetAllocator());
+  document->AddMember("is_coordinator", env->impala_server()->IsCoordinator(),
+      document->GetAllocator());
+  document->AddMember("is_executor", env->impala_server()->IsExecutor(),
+      document->GetAllocator());
 }
 
 void Webserver::ErrorHandler(const ArgumentMap& args, Document* document) {

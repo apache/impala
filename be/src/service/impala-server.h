@@ -273,6 +273,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// Retuns true if this is a coordinator, false otherwise.
   bool IsCoordinator();
 
+  /// Returns true if this is an executor, false otherwise.
+  bool IsExecutor();
+
+  typedef boost::unordered_map<std::string, TBackendDescriptor> BackendDescriptorMap;
+  const BackendDescriptorMap& GetKnownBackends();
+
   /// The prefix of audit event log filename.
   static const string AUDIT_EVENT_LOG_FILE_PREFIX;
 
@@ -853,16 +859,17 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       QueryLocations;
   QueryLocations query_locations_;
 
-  /// A map from unique backend ID to the corresponding TBackendDescriptor of that backend.
-  /// Used to track membership updates from the statestore so queries can be cancelled
-  /// when a backend is removed. It's not enough to just cancel fragments that are running
-  /// based on the deletions mentioned in the most recent statestore heartbeat; sometimes
-  /// cancellations are skipped and the statestore, at its discretion, may send only
-  /// a delta of the current membership so we need to compute any deletions.
+  /// A map from unique backend ID to the corresponding TBackendDescriptor of that
+  /// backend. Used to track membership updates from the statestore so queries can be
+  /// cancelled when a backend is removed. It's not enough to just cancel fragments that
+  /// are running based on the deletions mentioned in the most recent statestore
+  /// heartbeat; sometimes cancellations are skipped and the statestore, at its
+  /// discretion, may send only a delta of the current membership so we need to compute
+  /// any deletions.
   /// TODO: Currently there are multiple locations where cluster membership is tracked,
-  /// here and in the scheduler. This should be consolidated so there is a single component
-  /// (the scheduler?) that tracks this information and calls other interested components.
-  typedef boost::unordered_map<std::string, TBackendDescriptor> BackendDescriptorMap;
+  /// here and in the scheduler. This should be consolidated so there is a single
+  /// component (the scheduler?) that tracks this information and calls other interested
+  /// components.
   BackendDescriptorMap known_backends_;
 
   /// Generate unique session id for HiveServer2 session
@@ -956,6 +963,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// True if this ImpalaServer can accept client connections and coordinate
   /// queries.
   bool is_coordinator_;
+
+  /// True if this ImpalaServer can execute query fragments.
+  bool is_executor_;
 };
 
 /// Create an ImpalaServer and Thrift servers.

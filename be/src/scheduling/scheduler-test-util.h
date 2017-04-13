@@ -86,13 +86,17 @@ enum class ReplicaPlacement {
 
 /// Host model. Each host can have either a backend, a datanode, or both. To specify that
 /// a host should not act as a backend or datanode specify '-1' as the respective port.
+/// A host with a backend is always a coordinator but it may not be an executor.
 struct Host {
-  Host(const Hostname& name, const IpAddr& ip, int be_port, int dn_port)
-    : name(name), ip(ip), be_port(be_port), dn_port(dn_port) {}
+  Host(const Hostname& name, const IpAddr& ip, int be_port, int dn_port, bool is_executor)
+    : name(name), ip(ip), be_port(be_port), dn_port(dn_port), is_coordinator(true),
+      is_executor(is_executor) {}
   Hostname name;
   IpAddr ip;
   int be_port; // Backend port
   int dn_port; // Datanode port
+  bool is_coordinator; // True if this is a coordinator host
+  bool is_executor; // True if this is an executor host
 };
 
 /// A cluster stores a list of hosts and provides various methods to add hosts to the
@@ -101,10 +105,13 @@ class Cluster {
  public:
   /// Add a host and return the host's index. 'hostname' and 'ip' of the new host will be
   /// generated and are guaranteed to be unique.
-  int AddHost(bool has_backend, bool has_datanode);
+  /// TODO: Refactor the construction of a host and its addition to a cluster to
+  /// avoid the boolean input parameters.
+  int AddHost(bool has_backend, bool has_datanode, bool is_executor = true);
 
   /// Add a number of hosts with the same properties by repeatedly calling AddHost(..).
-  void AddHosts(int num_hosts, bool has_backend, bool has_datanode);
+  void AddHosts(int num_hosts, bool has_backend, bool has_datanode,
+      bool is_executor = true);
 
   /// Convert a host index to a hostname.
   static Hostname HostIdxToHostname(int host_idx);
