@@ -835,6 +835,19 @@ public class HdfsTable extends Table {
   }
 
   /**
+   * Helper method to load the partition file metadata from scratch. This method is
+   * optimized for loading newly added partitions. For refreshing existing partitions
+   * use refreshFileMetadata(HdfsPartition).
+   */
+  private void loadFileMetadataFromScratch(HdfsPartition partition) {
+    Path partitionDirPath = partition.getLocationPath();
+    Set<Path> dirsToLoad = Sets.newHashSet(partitionDirPath);
+    HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
+    partsByPath.put(partitionDirPath, Lists.newArrayList(partition));
+    loadMetadataAndDiskIds(dirsToLoad, partsByPath);
+  }
+
+  /**
    * Helper method to load the block locations from each directory in 'locations'
    * and filtering only the paths from 'partsByPath'. Also loads the disk IDs
    * corresponding to these block locations.
@@ -903,7 +916,7 @@ public class HdfsTable extends Table {
       org.apache.hadoop.hive.metastore.api.Partition msPartition)
       throws CatalogException {
     HdfsPartition hdfsPartition = createPartition(storageDescriptor, msPartition);
-    refreshFileMetadata(hdfsPartition);
+    loadFileMetadataFromScratch(hdfsPartition);
     return hdfsPartition;
   }
 
@@ -1513,7 +1526,9 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Loads the file descriptors and block metadata of a list of partitions.
+   * Loads the file descriptors and block metadata of a list of partitions. This function
+   * is optimized for incremental loading of the partition file metadata. To load it from
+   * scratch, use loadFileMetadataFromScratch(HdfsPartition).
    */
   private void loadPartitionFileMetadata(List<HdfsPartition> partitions)
       throws Exception {
@@ -1548,8 +1563,7 @@ public class HdfsTable extends Table {
   /**
    * Loads the file descriptors and block metadata of a partition from its
    * StorageDescriptor. If 'partition' does not have an entry in the Hive Metastore,
-   * 'storageDescriptor' is the StorageDescriptor of the associated table. Populates
-   * 'perFsFileBlocks' with file block info and updates table metadata.
+   * 'storageDescriptor' is the StorageDescriptor of the associated table.
    */
   private void loadPartitionFileMetadata(StorageDescriptor storageDescriptor,
       HdfsPartition partition) throws Exception {
@@ -1994,8 +2008,9 @@ public class HdfsTable extends Table {
    */
   public void reloadPartition(HdfsPartition oldPartition, Partition hmsPartition)
       throws CatalogException {
-    HdfsPartition refreshedPartition = createAndLoadPartition(
+    HdfsPartition refreshedPartition = createPartition(
         hmsPartition.getSd(), hmsPartition);
+    refreshFileMetadata(refreshedPartition);
     Preconditions.checkArgument(oldPartition == null
         || oldPartition.compareTo(refreshedPartition) == 0);
     dropPartition(oldPartition);
