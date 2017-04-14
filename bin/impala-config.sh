@@ -432,6 +432,9 @@ export LIBHDFS_OPTS="${LIBHDFS_OPTS:-} -Djava.library.path=${HADOOP_LIB_DIR}/nat
 # TODO: Consider having cmake scripts change this value depending on
 # the build type.
 LIBHDFS_OPTS="${LIBHDFS_OPTS}:${IMPALA_HOME}/be/build/debug/service"
+# IMPALA-5080: Our use of PermGen space sometimes exceeds the default maximum while
+# running tests that load UDF jars.
+LIBHDFS_OPTS="${LIBHDFS_OPTS} -XX:MaxPermSize=128mb"
 
 export ARTISTIC_STYLE_OPTIONS="$IMPALA_BE_DIR/.astylerc"
 
