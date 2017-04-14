@@ -2734,3 +2734,11 @@ select distinct case when true then id else 0 end from functional.alltypestiny
 ---- TYPES
 INT
 ====
+---- QUERY
+# IMPALA-5125: test behavior when an agg function could be eliminated by expr rewrites.
+select if (true, 0, sum(id)) from functional.alltypestiny
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

@@ -51,7 +51,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
     Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
     stmt.analyze(analyzer);
-    Expr origExpr = stmt.getResultExprs().get(0);
+    Expr origExpr = stmt.getSelectList().getItems().get(0).getExpr();
     String origSql = origExpr.toSql();
     ExprRewriter rewriter = new ExprRewriter(rules);
     Expr rewrittenExpr = rewriter.rewrite(origExpr, analyzer);
@@ -324,6 +324,15 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("decode(id, null, 0, 1)", rules, null);
     // All non-constant, don't rewrite.
     RewritesOk("decode(id, 1, 1, 2, 2)", rules, null);
+
+    // IMPALA-5125: Exprs containing aggregates should not be rewritten if the rewrite
+    // eliminates all aggregates.
+    RewritesOk("if(true, 0, sum(id))", rule, null);
+    RewritesOk("if(false, max(id), min(id))", rule, "min(id)");
+    RewritesOk("true || sum(id) = 0", rule, null);
+    RewritesOk("case when true then 0 when false then sum(id) end", rule, null);
+    RewritesOk(
+        "case when true then count(id) when false then sum(id) end", rule, "count(id)");
   }
 
   @Test

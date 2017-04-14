@@ -51,14 +51,25 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
   public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
     if (!expr.isAnalyzed()) return expr;
 
+    Expr simplified;
     if (expr instanceof FunctionCallExpr) {
-      return simplifyFunctionCallExpr((FunctionCallExpr) expr);
+      simplified = simplifyFunctionCallExpr((FunctionCallExpr) expr);
     } else if (expr instanceof CompoundPredicate) {
-      return simplifyCompoundPredicate((CompoundPredicate) expr);
+      simplified = simplifyCompoundPredicate((CompoundPredicate) expr);
     } else if (expr instanceof CaseExpr) {
-      return simplifyCaseExpr((CaseExpr) expr, analyzer);
+      simplified = simplifyCaseExpr((CaseExpr) expr, analyzer);
+    } else {
+      return expr;
     }
-    return expr;
+
+    // IMPALA-5125: We can't eliminate aggregates as this may change the meaning of the
+    // query, for example:
+    // 'select if (true, 0, sum(id)) from alltypes' != 'select 0 from alltypes'
+    if (expr != simplified && expr.contains(Expr.isAggregatePredicate())
+        && !simplified.contains(Expr.isAggregatePredicate())) {
+      return expr;
+    }
+    return simplified;
   }
 
   /**

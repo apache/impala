@@ -68,16 +68,16 @@ public class SelectStmt extends QueryStmt {
   // set if we have AnalyticExprs in the select list/order by clause
   private AnalyticInfo analyticInfo_;
 
-  // SQL string of this SelectStmt before inline-view expression substitution.
-  // Set in analyze().
-  protected String sqlString_;
-
   // substitutes all exprs in this select block to reference base tables
   // directly
   private ExprSubstitutionMap baseTblSmap_ = new ExprSubstitutionMap();
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
+
+  // SQL string of this SelectStmt before inline-view expression substitution.
+  // Set in analyze().
+  protected String sqlString_;
 
   SelectStmt(SelectList selectList,
              FromClause fromClause,
@@ -1029,10 +1029,13 @@ public class SelectStmt extends QueryStmt {
     selectList_.reset();
     colLabels_.clear();
     fromClause_.reset();
-    baseTblSmap_.clear();
     if (whereClause_ != null) whereClause_.reset();
     if (groupingExprs_ != null) Expr.resetList(groupingExprs_);
     if (havingClause_ != null) havingClause_.reset();
+    havingPred_ = null;
+    aggInfo_ = null;
+    analyticInfo_ = null;
+    baseTblSmap_.clear();
   }
 
   @Override
