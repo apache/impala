@@ -28,9 +28,10 @@ PLAN-ROOT SINK
 ====
 # Test a variety of types
 select count(*) from functional_parquet.alltypes
-where id = 1 and bool_col and tinyint_col < 50 and smallint_col > 50
+where id = 1 and bool_col and tinyint_col < 50 and smallint_col in (1,2,3,4,5)
 and mod(int_col,2) = 1 and bigint_col < 5000 and float_col > 50.00
-and double_col > 100.00 and date_string_col > '1993-10-01' and string_col > 'aaaa'
+and double_col > 100.00 and date_string_col > '1993-10-01'
+and string_col in ('aaaa', 'bbbb', 'cccc')
 and timestamp_cmp(timestamp_col, '2016-11-20 00:00:00') = 1
 and year > 2000 and month < 12;
 ---- PLAN
@@ -45,11 +46,39 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partitions=22/24 files=22 size=143.36KB
-   predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, smallint_col > 50, tinyint_col < 50, string_col > 'aaaa', mod(int_col, 2) = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
+   predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), mod(int_col, 2) = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
    table stats: unavailable
    columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
-   parquet statistics predicates: bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, smallint_col > 50, tinyint_col < 50, string_col > 'aaaa', date_string_col > '1993-10-01'
-   parquet dictionary predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, smallint_col > 50, tinyint_col < 50, string_col > 'aaaa', mod(int_col, 2) = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
+   parquet statistics predicates: bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), date_string_col > '1993-10-01'
+   parquet dictionary predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), mod(int_col, 2) = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=80B cardinality=unavailable
+====
+# Test negative cases for IN predicate min/max filtering
+#  - NOT IN
+#  - IN list with NULL
+#  - IN list contains non-Literals
+#  - complex expression on left side of IN
+select count(*) from functional_parquet.alltypes
+where id NOT IN (0,1,2) and string_col IN ('aaaa', 'bbbb', 'cccc', NULL)
+and mod(int_col,50) IN (0,1)
+and id IN (int_col);
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+  PLAN-ROOT SINK
+  |  mem-estimate=0B mem-reservation=0B
+  |
+  01:AGGREGATE [FINALIZE]
+  |  output: count(*)
+  |  mem-estimate=10.00MB mem-reservation=0B
+  |  tuple-ids=1 row-size=8B cardinality=1
+  |
+  00:SCAN HDFS [functional_parquet.alltypes]
+     partitions=24/24 files=24 size=173.09KB
+     predicates: id IN (int_col), id NOT IN (0, 1, 2), string_col IN ('aaaa', 'bbbb', 'cccc', NULL), mod(int_col, 50) IN (0, 1)
+     table stats: unavailable
+     column stats: unavailable
+     parquet dictionary predicates: id NOT IN (0, 1, 2), string_col IN ('aaaa', 'bbbb', 'cccc', NULL), mod(int_col, 50) IN (0, 1)
+     mem-estimate=48.00MB mem-reservation=0B
+     tuple-ids=0 row-size=24B cardinality=unavailable
 ====

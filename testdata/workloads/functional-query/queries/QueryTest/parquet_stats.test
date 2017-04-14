@@ -279,3 +279,20 @@ select count(*) from functional_parquet.complextypestbl.int_array where pos < 5;
 row_regex: .*NumRowGroups: 2 .*
 row_regex: .*NumStatsFilteredRowGroups: 0 .*
 ====
+---- QUERY
+# Test the conversion of constant IN lists to min/max predicats
+select count(*) from functional_parquet.alltypes where int_col in (-1,-2,-3,-4);
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumStatsFilteredRowGroups): 24
+====
+---- QUERY
+select count(*) from functional_parquet.alltypes where id IN (1,25,49);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumStatsFilteredRowGroups): 23
+====

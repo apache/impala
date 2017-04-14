@@ -32,6 +32,10 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.FunctionCallExpr;
+import org.apache.impala.analysis.InPredicate;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
@@ -326,6 +330,77 @@ public class HdfsScanNode extends ScanNode {
     minMaxConjuncts_.add(statsPred);
   }
 
+  private void tryComputeBinaryMinMaxPredicate(Analyzer analyzer,
+      BinaryPredicate binaryPred) {
+    // We only support slot refs on the left hand side of the predicate, a rewriting
+    // rule makes sure that all compatible exprs are rewritten into this form. Only
+    // implicit casts are supported.
+    SlotRef slot = binaryPred.getChild(0).unwrapSlotRef(true);
+    if (slot == null) return;
+
+    // This node is a table scan, so this must be a scanning slot.
+    Preconditions.checkState(slot.getDesc().isScanSlot());
+    // If the column is null, then this can be a 'pos' scanning slot of a nested type.
+    if (slot.getDesc().getColumn() == null) return;
+
+    Expr constExpr = binaryPred.getChild(1);
+    // Only constant exprs can be evaluated against parquet::Statistics. This includes
+    // LiteralExpr, but can also be an expr like "1 + 2".
+    if (!constExpr.isConstant()) return;
+    if (constExpr.isNullLiteral()) return;
+
+    BinaryPredicate.Operator op = binaryPred.getOp();
+    if (op == BinaryPredicate.Operator.LT || op == BinaryPredicate.Operator.LE ||
+        op == BinaryPredicate.Operator.GE || op == BinaryPredicate.Operator.GT) {
+      minMaxOriginalConjuncts_.add(binaryPred);
+      buildStatsPredicate(analyzer, slot, binaryPred, op);
+    } else if (op == BinaryPredicate.Operator.EQ) {
+      minMaxOriginalConjuncts_.add(binaryPred);
+      // TODO: this could be optimized for boolean columns.
+      buildStatsPredicate(analyzer, slot, binaryPred, BinaryPredicate.Operator.LE);
+      buildStatsPredicate(analyzer, slot, binaryPred, BinaryPredicate.Operator.GE);
+    }
+  }
+
+  private void tryComputeInListMinMaxPredicate(Analyzer analyzer, InPredicate inPred) {
+    // Retrieve the left side of the IN predicate. It must be a simple slot to
+    // proceed.
+    SlotRef slot = inPred.getBoundSlot();
+    if (slot == null) return;
+    // This node is a table scan, so this must be a scanning slot.
+    Preconditions.checkState(slot.getDesc().isScanSlot());
+    // If the column is null, then this can be a 'pos' scanning slot of a nested type.
+    if (slot.getDesc().getColumn() == null) return;
+    if (inPred.isNotIn()) return;
+
+    ArrayList<Expr> children = inPred.getChildren();
+    LiteralExpr min = null;
+    LiteralExpr max = null;
+    for (int i = 1; i < children.size(); ++i) {
+      Expr child = children.get(i);
+
+      // If any child is not a literal, then nothing can be done
+      if (!child.isLiteral()) return;
+      LiteralExpr literalChild = (LiteralExpr) child;
+      // If any child is NULL, then there is not a valid min/max. Nothing can be done.
+      if (literalChild instanceof NullLiteral) return;
+
+      if (min == null || literalChild.compareTo(min) < 0) min = literalChild;
+      if (max == null || literalChild.compareTo(max) > 0) max = literalChild;
+    }
+    Preconditions.checkState(min != null);
+    Preconditions.checkState(max != null);
+
+    BinaryPredicate minBound = new BinaryPredicate(BinaryPredicate.Operator.GE,
+        children.get(0).clone(), min.clone());
+    BinaryPredicate maxBound = new BinaryPredicate(BinaryPredicate.Operator.LE,
+        children.get(0).clone(), max.clone());
+
+    minMaxOriginalConjuncts_.add(inPred);
+    buildStatsPredicate(analyzer, slot, minBound, minBound.getOp());
+    buildStatsPredicate(analyzer, slot, maxBound, maxBound.getOp());
+  }
+
   /**
    * Analyzes 'conjuncts_', populates 'minMaxTuple_' with slots for statistics values, and
    * populates 'minMaxConjuncts_' with conjuncts pointing into the 'minMaxTuple_'. Only
@@ -340,38 +415,11 @@ public class HdfsScanNode extends ScanNode {
     minMaxTuple_.setPath(desc_.getPath());
 
     for (Expr pred: conjuncts_) {
-      if (!(pred instanceof BinaryPredicate)) continue;
-      BinaryPredicate binaryPred = (BinaryPredicate) pred;
-
-      // We only support slot refs on the left hand side of the predicate, a rewriting
-      // rule makes sure that all compatible exprs are rewritten into this form. Only
-      // implicit casts are supported.
-      SlotRef slot = binaryPred.getChild(0).unwrapSlotRef(true);
-      if (slot == null) continue;
-
-      // This node is a table scan, so this must be a scanning slot.
-      Preconditions.checkState(slot.getDesc().isScanSlot());
-      // If the column is null, then this can be a 'pos' scanning slot of a nested type.
-      if (slot.getDesc().getColumn() == null) continue;
-
-      Expr constExpr = binaryPred.getChild(1);
-      // Only constant exprs can be evaluated against parquet::Statistics. This includes
-      // LiteralExpr, but can also be an expr like "1 + 2".
-      if (!constExpr.isConstant()) continue;
-      if (constExpr.isNullLiteral()) continue;
-
-      BinaryPredicate.Operator op = binaryPred.getOp();
-      if (op == BinaryPredicate.Operator.LT || op == BinaryPredicate.Operator.LE ||
-          op == BinaryPredicate.Operator.GE || op == BinaryPredicate.Operator.GT) {
-        minMaxOriginalConjuncts_.add(pred);
-        buildStatsPredicate(analyzer, slot, binaryPred, op);
-      } else if (op == BinaryPredicate.Operator.EQ) {
-        minMaxOriginalConjuncts_.add(pred);
-        // TODO: this could be optimized for boolean columns.
-        buildStatsPredicate(analyzer, slot, binaryPred, BinaryPredicate.Operator.LE);
-        buildStatsPredicate(analyzer, slot, binaryPred, BinaryPredicate.Operator.GE);
+      if (pred instanceof BinaryPredicate) {
+        tryComputeBinaryMinMaxPredicate(analyzer, (BinaryPredicate) pred);
+      } else if (pred instanceof InPredicate) {
+        tryComputeInListMinMaxPredicate(analyzer, (InPredicate) pred);
       }
-
     }
     minMaxTuple_.computeMemLayout();
   }
