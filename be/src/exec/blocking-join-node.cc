@@ -144,31 +144,24 @@ void BlockingJoinNode::Close(RuntimeState* state) {
 }
 
 void BlockingJoinNode::ProcessBuildInputAsync(RuntimeState* state, DataSink* build_sink,
-    Promise<Status>* status) {
-  Status s;
-  {
-    SCOPED_THREAD_COUNTER_MEASUREMENT(state->total_thread_statistics());
-    if  (build_sink == NULL){
-      s = ProcessBuildInput(state);
-    } else {
-      s = SendBuildInputToSink<true>(state, build_sink);
-    }
-    // IMPALA-1863: If the build-side thread failed, then we need to close the right
-    // (build-side) child to avoid a potential deadlock between fragment instances.  This
-    // is safe to do because while the build may have partially completed, it will not be
-    // probed.  BlockJoinNode::Open() will return failure as soon as child(0)->Open()
-    // completes.
-    if (!s.ok()) child(1)->Close(state);
-    // Release the thread token as soon as possible (before the main thread joins
-    // on it).  This way, if we had a chain of 10 joins using 1 additional thread,
-    // we'd keep the additional thread busy the whole time.
-    state->resource_pool()->ReleaseThreadToken(false);
+    Status* status) {
+  DCHECK(status != nullptr);
+  SCOPED_THREAD_COUNTER_MEASUREMENT(state->total_thread_statistics());
+  if  (build_sink == nullptr){
+    *status = ProcessBuildInput(state);
+  } else {
+    *status = SendBuildInputToSink<true>(state, build_sink);
   }
-  // Please keep this as the last line in this function to avoid use-after-free problem.
-  // Once 'status' is set, ProcessBuildInputAndProbe() will start running and 'states'
-  // may have been freed after this line once the query completes. IMPALA-4532.
-  // TODO: Make this less fragile.
-  status->Set(s);
+  // IMPALA-1863: If the build-side thread failed, then we need to close the right
+  // (build-side) child to avoid a potential deadlock between fragment instances.  This
+  // is safe to do because while the build may have partially completed, it will not be
+  // probed.  BlockJoinNode::Open() will return failure as soon as child(0)->Open()
+  // completes.
+  if (!status->ok()) child(1)->Close(state);
+  // Release the thread token as soon as possible (before the main thread joins
+  // on it).  This way, if we had a chain of 10 joins using 1 additional thread,
+  // we'd keep the additional thread busy the whole time.
+  state->resource_pool()->ReleaseThreadToken(false);
 }
 
 Status BlockingJoinNode::Open(RuntimeState* state) {
@@ -194,7 +187,7 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
   // build side in a different thread, the overlap stops when the left child Open()
   // returns.
   if (!IsInSubplan() && state->resource_pool()->TryAcquireThreadToken()) {
-    Promise<Status> build_side_status;
+    Status build_side_status;
     runtime_profile()->AppendExecOption("Join Build-Side Prepared Asynchronously");
     Thread build_thread(
         node_name_, "build thread", bind(&BlockingJoinNode::ProcessBuildInputAsync, this,
@@ -209,7 +202,8 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
 
     // Blocks until ProcessBuildInput has returned, after which the build side structures
     // are fully constructed.
-    RETURN_IF_ERROR(build_side_status.Get());
+    build_thread.Join();
+    RETURN_IF_ERROR(build_side_status);
     RETURN_IF_ERROR(open_status);
   } else if (IsInSubplan()) {
     // When inside a subplan, open the first child before doing the build such that

@@ -204,8 +204,7 @@ class BlockingJoinNode : public ExecNode {
   /// The main function for the thread that processes the build input asynchronously.
   /// Its status is returned in the 'status' promise. If 'build_sink' is non-NULL, it
   /// is used for the build. Otherwise, ProcessBuildInput() is called on the subclass.
-  void ProcessBuildInputAsync(RuntimeState* state, DataSink* build_sink,
-      Promise<Status>* status);
+  void ProcessBuildInputAsync(RuntimeState* state, DataSink* build_sink, Status* status);
 };
 
 }
